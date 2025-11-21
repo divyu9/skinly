@@ -328,13 +328,13 @@ export default function ProductsPage() {
               <Skeleton className="h-12 w-64 mx-auto mb-4" />
               <Skeleton className="h-6 w-96 mx-auto" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
               {Array.from({ length: 8 }).map((_, i) => (
                 <Card key={i}>
-                  <Skeleton className="aspect-square w-full rounded-t-xl" />
-                  <CardContent className="pt-4 space-y-2">
-                    <Skeleton className="h-6 w-full" />
-                    <Skeleton className="h-4 w-24" />
+                  <Skeleton className="aspect-[3/4] sm:aspect-square w-full rounded-t-xl" />
+                  <CardContent className="pt-3 sm:pt-4 space-y-2 px-3 sm:px-6">
+                    <Skeleton className="h-4 sm:h-6 w-full" />
+                    <Skeleton className="h-3 sm:h-4 w-16 sm:w-24" />
                   </CardContent>
                 </Card>
               ))}
@@ -418,16 +418,16 @@ export default function ProductsPage() {
       </nav>
 
       {/* Products Section */}
-      <section className="pt-24 pb-20 px-4">
+      <section className="pt-20 sm:pt-24 pb-12 sm:pb-20 px-2 sm:px-4">
         <div className="container mx-auto">
-          <div className="text-center mb-12 space-y-4">
-            <h1 className="text-4xl lg:text-5xl font-bold text-balance">
+          <div className="text-center mb-6 sm:mb-12 space-y-2 sm:space-y-4">
+            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
               {searchQuery ? `Search Results` :
                deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
                'All Products'}
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+            <p className="text-sm sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
               {searchQuery 
                 ? `${sortedAndFilteredProducts.length} ${sortedAndFilteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
                 : `${sortedAndFilteredProducts.length} quirky ${sortedAndFilteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop`
@@ -435,25 +435,25 @@ export default function ProductsPage() {
             </p>
             
             {/* Search Bar */}
-            <div className="max-w-md mx-auto pt-4">
+            <div className="max-w-md mx-auto pt-2 sm:pt-4">
               <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+                <SearchIcon className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 size-4 sm:size-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search patterns & designs (not phone models)..."
+                  placeholder="Search patterns & designs..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-12 text-base"
+                  className="pl-8 sm:pl-10 h-9 sm:h-12 text-sm sm:text-base"
                 />
               </div>
             </div>
             
             {/* Sorting and Filtering */}
-            <div className="max-w-4xl mx-auto pt-6 flex flex-wrap gap-3 justify-center items-center">
-              <div className="flex items-center gap-2">
-                <ArrowUpDown className="size-4 text-muted-foreground" />
+            <div className="max-w-4xl mx-auto pt-3 sm:pt-6 flex flex-wrap gap-2 sm:gap-3 justify-center items-center">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <ArrowUpDown className="size-3 sm:size-4 text-muted-foreground" />
                 <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-[200px]">
+                  <SelectTrigger className="w-[140px] sm:w-[200px] h-8 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
                   <SelectContent>
@@ -465,10 +465,10 @@ export default function ProductsPage() {
                 </Select>
               </div>
               
-              <div className="flex items-center gap-2">
-                <PackageIcon className="size-4 text-muted-foreground" />
+              <div className="flex items-center gap-1 sm:gap-2">
+                <PackageIcon className="size-3 sm:size-4 text-muted-foreground" />
                 <Select value={stockFilter} onValueChange={setStockFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-[120px] sm:w-[180px] h-8 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="Stock Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -481,12 +481,12 @@ export default function ProductsPage() {
             </div>
             
             {(deviceFilter || finishFilter || searchQuery || sortBy !== "default" || stockFilter !== "all") && (
-              <div className="pt-4">
-                <Button variant="outline" onClick={() => {
+              <div className="pt-2 sm:pt-4">
+                <Button variant="outline" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
                   window.location.href = '/products';
-                }}>
+                }} className="h-8 sm:h-10 text-xs sm:text-sm">
                   Clear All Filters
                 </Button>
               </div>
@@ -495,29 +495,29 @@ export default function ProductsPage() {
 
           {/* Important Notice for Finish Pages */}
           {finishFilter && (
-            <Card className="mb-8 border-2 border-primary bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
-              <CardContent className="p-6">
-                <div className="flex flex-col md:flex-row items-center gap-6">
+            <Card className="mb-4 sm:mb-8 border-2 border-primary bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col md:flex-row items-center gap-3 sm:gap-6">
                   {/* Left side - Icons */}
-                  <div className="flex gap-3 shrink-0">
-                    <div className="size-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                  <div className="flex gap-2 sm:gap-3 shrink-0">
+                    <div className="size-12 sm:size-16 bg-gradient-to-br from-primary to-secondary rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg">
                       📱
                     </div>
-                    <div className="size-16 bg-gradient-to-br from-secondary to-accent rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                    <div className="size-12 sm:size-16 bg-gradient-to-br from-secondary to-accent rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg">
                       ✨
                     </div>
-                    <div className="size-16 bg-gradient-to-br from-accent to-primary rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                    <div className="size-12 sm:size-16 bg-gradient-to-br from-accent to-primary rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg">
                       ✓
                     </div>
                   </div>
                   
                   {/* Right side - Text */}
-                  <div className="flex-1 text-center md:text-left space-y-2">
-                    <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                      <InfoIcon className="size-5 text-primary" />
-                      <h3 className="text-2xl font-bold text-primary">Good News!</h3>
+                  <div className="flex-1 text-center md:text-left space-y-1 sm:space-y-2">
+                    <div className="flex items-center justify-center md:justify-start gap-2 mb-1 sm:mb-2">
+                      <InfoIcon className="size-4 sm:size-5 text-primary" />
+                      <h3 className="text-lg sm:text-2xl font-bold text-primary">Good News!</h3>
                     </div>
-                    <p className="text-base leading-relaxed">
+                    <p className="text-xs sm:text-base leading-relaxed">
                       <strong className="font-semibold">All designs are available for your device!</strong> The images you see are for reference to show how the design and colors actually look on any phone. When you select a design, you'll be asked to choose your specific phone model.
                     </p>
                   </div>
@@ -526,7 +526,7 @@ export default function ProductsPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
             {sortedAndFilteredProducts.map((product) => {
               const mainImage = product.images[0];
               const minPrice = Math.min(...product.variants.map(v => v.price));
@@ -538,7 +538,7 @@ export default function ProductsPage() {
 
               return (
                 <Card key={product._id} className="group overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
-                  <div className="aspect-square overflow-hidden bg-muted">
+                  <div className="aspect-[3/4] sm:aspect-square overflow-hidden bg-muted">
                     {mainImage ? (
                       <img
                         src={mainImage.url}
@@ -547,25 +547,26 @@ export default function ProductsPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <PackageIcon className="size-16 text-muted-foreground" />
+                        <PackageIcon className="size-12 sm:size-16 text-muted-foreground" />
                       </div>
                     )}
                   </div>
-                  <CardContent className="pt-4 space-y-2">
-                    <h3 className="font-bold text-lg line-clamp-2">{product.title}</h3>
+                  <CardContent className="pt-3 sm:pt-4 space-y-1 sm:space-y-2 px-3 sm:px-6 pb-3 sm:pb-6">
+                    <h3 className="font-bold text-xs sm:text-lg line-clamp-2">{product.title}</h3>
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-primary">{priceDisplay}</span>
+                      <span className="text-sm sm:text-lg font-bold text-primary">{priceDisplay}</span>
                       {product.variants.length > 1 && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[10px] sm:text-xs text-muted-foreground hidden sm:inline">
                           {product.variants.length} options
                         </span>
                       )}
                     </div>
                   </CardContent>
-                  <CardFooter>
-                    <Button className="w-full" asChild>
+                  <CardFooter className="px-3 sm:px-6 pb-3 sm:pb-6 pt-0">
+                    <Button className="w-full text-xs sm:text-sm h-8 sm:h-10" asChild>
                       <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
-                        Select My Phone Model
+                        <span className="hidden sm:inline">Select My Phone Model</span>
+                        <span className="sm:hidden">Select Model</span>
                       </Link>
                     </Button>
                   </CardFooter>
