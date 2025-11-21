@@ -20,15 +20,21 @@ function AdminProductsPageInner() {
   const [isMigrating, setIsMigrating] = useState(false);
 
   const handleMigration = async () => {
-    if (!confirm("This will import all active products from Shopify. Existing products with the same slug will be skipped. Continue?")) {
+    if (!confirm("This will import all active products from Shopify. Products already in your database will be skipped automatically. Continue?")) {
       return;
     }
 
     setIsMigrating(true);
     try {
       const result = await migrateFromShopify({});
+      const parts = [
+        `${result.successful} imported`,
+        result.skipped > 0 ? `${result.skipped} skipped` : null,
+        result.failed > 0 ? `${result.failed} failed` : null,
+      ].filter(Boolean);
+      
       toast.success(
-        `Migration complete! ${result.successful} products imported, ${result.failed} failed.`
+        `Migration complete! ${parts.join(", ")}. Total: ${result.total} products.`
       );
       if (result.errors.length > 0) {
         console.error("Migration errors:", result.errors);

@@ -81,6 +81,7 @@ export const migrateFromShopify = action({
       const migrationResults = {
         total: allProducts.length,
         successful: 0,
+        skipped: 0,
         failed: 0,
         errors: [] as string[],
       };
@@ -90,6 +91,16 @@ export const migrateFromShopify = action({
         try {
           // Create slug from handle
           const slug = shopifyProduct.handle;
+
+          // Check if product already exists
+          const existingProducts = await ctx.runQuery(internal.migrationInternal.checkProductExists, {
+            slug,
+          });
+
+          if (existingProducts) {
+            migrationResults.skipped++;
+            continue; // Skip this product
+          }
 
           // Parse tags
           const tags = shopifyProduct.tags

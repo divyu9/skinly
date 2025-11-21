@@ -1,5 +1,17 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
+
+// Check if product already exists (for migration)
+export const checkProductExists = internalQuery({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const existingProduct = await ctx.db
+      .query("products")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+    return !!existingProduct;
+  },
+});
 
 // Internal mutations to create products without auth checks (for migration)
 export const createProductInternal = internalMutation({
