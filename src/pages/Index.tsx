@@ -59,6 +59,28 @@ const chargerModels: Record<string, string[]> = {
     "Charger 3 Pin",
     "MagSafe Charger",
     "iPhone Charger"
+  ],
+  "OnePlus": [
+    "OnePlus 9 Pro Charger",
+    "OnePlus Charger",
+    "OnePlus SuperVOOC 100W",
+    "OnePlus SuperVOOC 150W",
+    "OnePlus Warp 30W 6A",
+    "OnePlus Warp Charger 65W"
+  ],
+  "Realme": [
+    "Realme Power Adapter 18W",
+    "Realme Super Vooc 50W"
+  ],
+  "Vivo": [
+    "Vivo Flash Charger 44W",
+    "Vivo Flash Charger 80W/120W",
+    "Vivo Flash Charger 2.0 33W",
+    "Vivo Travel Adapter V051"
+  ],
+  "Xiaomi": [
+    "Xiaomi Sonic Charge 2.0",
+    "Xiaomi Sonic Charger 67W"
   ]
 };
 
@@ -1711,9 +1733,13 @@ export default function Index() {
               Choose your charger brand to continue
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
             {[
-              { name: "Apple", logo: "🍎" }
+              { name: "Apple", logo: "🍎" },
+              { name: "OnePlus", logo: "➕" },
+              { name: "Realme", logo: "🟡" },
+              { name: "Vivo", logo: "🔵" },
+              { name: "Xiaomi", logo: "🦊" }
             ].map((brand, index) => (
               <button
                 key={index}
