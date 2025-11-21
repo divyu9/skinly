@@ -1,15 +1,22 @@
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -49,6 +56,8 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
+  const [sortBy, setSortBy] = useState<string>("default");
+  const [stockFilter, setStockFilter] = useState<string>("all");
 
   const testConnection = async () => {
     try {
@@ -105,6 +114,37 @@ export default function ProductsPage() {
       applyFilters(allProducts, deviceFilter, finishFilter, brandFilter, searchQuery);
     }
   }, [allProducts, deviceFilter, finishFilter, brandFilter, searchQuery]);
+  
+  // Apply sorting and stock filtering
+  const sortedAndFilteredProducts = useMemo(() => {
+    let result = [...filteredProducts];
+    
+    // Apply stock filter
+    if (stockFilter === "in-stock") {
+      result = result.filter(p => p.variants.some(v => v.available && v.inventory_quantity > 0));
+    } else if (stockFilter === "out-of-stock") {
+      result = result.filter(p => p.variants.every(v => !v.available || v.inventory_quantity === 0));
+    }
+    
+    // Apply sorting
+    if (sortBy === "price-low-high") {
+      result.sort((a, b) => {
+        const minPriceA = Math.min(...a.variants.map(v => parseFloat(v.price)));
+        const minPriceB = Math.min(...b.variants.map(v => parseFloat(v.price)));
+        return minPriceA - minPriceB;
+      });
+    } else if (sortBy === "price-high-low") {
+      result.sort((a, b) => {
+        const maxPriceA = Math.max(...a.variants.map(v => parseFloat(v.price)));
+        const maxPriceB = Math.max(...b.variants.map(v => parseFloat(v.price)));
+        return maxPriceB - maxPriceA;
+      });
+    } else if (sortBy === "latest") {
+      result.sort((a, b) => b.id - a.id);
+    }
+    
+    return result;
+  }, [filteredProducts, sortBy, stockFilter]);
 
   const applyFilters = (products: ShopifyProduct[], device: string | null, finish: string | null, brand: string | null, search: string) => {
     let filtered = [...products];
@@ -257,8 +297,11 @@ export default function ProductsPage() {
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="size-8 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg" />
-              <span className="text-xl font-bold">SkinStudio</span>
+              <img 
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                alt="Skinly" 
+                className="h-10"
+              />
             </Link>
           </div>
         </nav>
@@ -292,8 +335,11 @@ export default function ProductsPage() {
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="size-8 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg" />
-              <span className="text-xl font-bold">SkinStudio</span>
+              <img 
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                alt="Skinly" 
+                className="h-10"
+              />
             </Link>
           </div>
         </nav>
@@ -332,8 +378,11 @@ export default function ProductsPage() {
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
-              <div className="size-8 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg" />
-              <span className="text-xl font-bold">SkinStudio</span>
+              <img 
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                alt="Skinly" 
+                className="h-10"
+              />
             </Link>
           </div>
         </nav>
@@ -347,14 +396,18 @@ export default function ProductsPage() {
                 </EmptyMedia>
                 <EmptyTitle>No Products Found</EmptyTitle>
                 <EmptyDescription>
-                  {deviceFilter || finishFilter
-                    ? `No products match your filters. Try browsing all products.`
+                  {deviceFilter || finishFilter || sortBy !== "default" || stockFilter !== "all"
+                    ? `No products match your filters. Try adjusting your filters.`
                     : `Your Shopify store doesn't have any products yet.`}
                 </EmptyDescription>
               </EmptyHeader>
-              {(deviceFilter || finishFilter) && (
+              {(deviceFilter || finishFilter || sortBy !== "default" || stockFilter !== "all") && (
                 <EmptyContent>
-                  <Button onClick={() => window.location.href = '/products'}>View All Products</Button>
+                  <Button onClick={() => {
+                    setSortBy("default");
+                    setStockFilter("all");
+                    window.location.href = '/products';
+                  }}>Clear All Filters</Button>
                 </EmptyContent>
               )}
             </Empty>
@@ -403,8 +456,8 @@ export default function ProductsPage() {
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
               {searchQuery 
-                ? `${filteredProducts.length} ${filteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
-                : `${filteredProducts.length} quirky ${filteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop`
+                ? `${sortedAndFilteredProducts.length} ${sortedAndFilteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
+                : `${sortedAndFilteredProducts.length} quirky ${sortedAndFilteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop`
               }
             </p>
             
@@ -422,10 +475,48 @@ export default function ProductsPage() {
               </div>
             </div>
             
-            {(deviceFilter || finishFilter || searchQuery) && (
-              <Button variant="outline" onClick={() => window.location.href = '/products'}>
-                Clear {searchQuery ? 'Search' : 'Filters'}
-              </Button>
+            {/* Sorting and Filtering */}
+            <div className="max-w-4xl mx-auto pt-6 flex flex-wrap gap-3 justify-center items-center">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="size-4 text-muted-foreground" />
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default</SelectItem>
+                    <SelectItem value="price-low-high">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high-low">Price: High to Low</SelectItem>
+                    <SelectItem value="latest">Latest Addition</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <PackageIcon className="size-4 text-muted-foreground" />
+                <Select value={stockFilter} onValueChange={setStockFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Stock Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Products</SelectItem>
+                    <SelectItem value="in-stock">In Stock</SelectItem>
+                    <SelectItem value="out-of-stock">Out of Stock</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {(deviceFilter || finishFilter || searchQuery || sortBy !== "default" || stockFilter !== "all") && (
+              <div className="pt-4">
+                <Button variant="outline" onClick={() => {
+                  setSortBy("default");
+                  setStockFilter("all");
+                  window.location.href = '/products';
+                }}>
+                  Clear All Filters
+                </Button>
+              </div>
             )}
           </div>
 
@@ -463,7 +554,7 @@ export default function ProductsPage() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.map((product) => {
+            {sortedAndFilteredProducts.map((product) => {
               const mainImage = product.images[0];
               const minPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
               const maxPrice = Math.max(...product.variants.map(v => parseFloat(v.price)));
