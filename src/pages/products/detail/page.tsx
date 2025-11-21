@@ -5,7 +5,19 @@ import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
-import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon, CheckIcon, RefreshCwIcon } from "lucide-react";
+import { 
+  ArrowLeftIcon, 
+  PackageIcon, 
+  ShoppingCartIcon, 
+  CheckIcon, 
+  RefreshCwIcon, 
+  StarIcon,
+  ShieldCheckIcon,
+  TruckIcon,
+  SparklesIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
+} from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth.ts";
@@ -19,6 +31,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
+import { Authenticated, Unauthenticated } from "convex/react";
+import { SignInButton } from "@/components/ui/signin.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 // Phone models data
 const phoneModels: Record<string, string[]> = {
@@ -80,6 +96,14 @@ const phoneModels: Record<string, string[]> = {
   "Google": ["Google Pixel 9 Pro XL", "Google Pixel 9 Pro", "Google Pixel 8 Pro"]
 };
 
+// USP bullet points
+const skinUSPs = [
+  { icon: ShieldCheckIcon, text: "Precision Cut for Perfect Fit" },
+  { icon: SparklesIcon, text: "High-Resolution Print Quality" },
+  { icon: TruckIcon, text: "Bubble-Free Application" },
+  { icon: CheckIcon, text: "Easy to Remove & Residue-Free" },
+];
+
 export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -91,6 +115,13 @@ export default function ProductDetailPage() {
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [modelSearch, setModelSearch] = useState("");
+  
+  // UI state
+  const [showFullDescription, setShowFullDescription] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewComment, setReviewComment] = useState("");
   
   // Filter models based on search
   const filteredModels = useMemo(() => {
@@ -127,7 +158,18 @@ export default function ProductDetailPage() {
     productSlug ? { slug: productSlug } : "skip"
   );
   
+  const reviews = useQuery(
+    api.reviews.getProductReviews,
+    productData ? { productId: productData._id } : "skip"
+  );
+  
+  const reviewStats = useQuery(
+    api.reviews.getReviewStats,
+    productData ? { productId: productData._id } : "skip"
+  );
+  
   const addToCart = useMutation(api.cart.addToCart);
+  const addReview = useMutation(api.reviews.addReview);
   const { user } = useAuth();
   const { addToGuestCart } = useGuestCart();
   const [selectedImage, setSelectedImage] = useState<string>("");
@@ -142,9 +184,39 @@ export default function ProductDetailPage() {
     setSelectedImage(product.images[0].url);
   }
 
+  const handleAddReview = async () => {
+    if (!product) return;
+    
+    if (!reviewTitle.trim() || !reviewComment.trim()) {
+      toast.error("Please fill in all review fields");
+      return;
+    }
+    
+    try {
+      await addReview({
+        productId: product._id,
+        rating: reviewRating,
+        title: reviewTitle,
+        comment: reviewComment,
+      });
+      toast.success("Review added successfully!");
+      setReviewDialogOpen(false);
+      setReviewTitle("");
+      setReviewComment("");
+      setReviewRating(5);
+    } catch (error) {
+      if (error instanceof ConvexError) {
+        const { message } = error.data as { code: string; message: string };
+        toast.error(message);
+      } else {
+        toast.error("Failed to add review");
+      }
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="min-h-screen">
+      <div className="min-h-screen bg-background">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
@@ -160,12 +232,12 @@ export default function ProductDetailPage() {
         <div className="pt-24 pb-20 px-4">
           <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-8 w-32 mb-8" />
-            <div className="grid lg:grid-cols-2 gap-12">
-              <Skeleton className="aspect-square w-full rounded-2xl" />
-              <div className="space-y-6">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-6 w-32" />
-                <Skeleton className="h-24 w-full" />
+            <div className="grid lg:grid-cols-2 gap-8">
+              <Skeleton className="aspect-square w-full rounded-xl" />
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-3/4" />
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-20 w-full" />
                 <Skeleton className="h-12 w-full" />
               </div>
             </div>
@@ -178,7 +250,7 @@ export default function ProductDetailPage() {
   if (!product) {
     if (!isLoading) {
       return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-background">
           <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
             <div className="container mx-auto px-4 py-4 flex items-center justify-between">
               <Link to="/" className="flex items-center gap-2">
@@ -213,7 +285,7 @@ export default function ProductDetailPage() {
     : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background">
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -234,19 +306,19 @@ export default function ProductDetailPage() {
       </nav>
 
       {/* Product Detail Section */}
-      <section className="pt-24 pb-20 px-4">
+      <section className="pt-20 pb-12 px-4">
         <div className="container mx-auto max-w-6xl">
-          <Button variant="ghost" asChild className="mb-8">
+          <Button variant="ghost" size="sm" asChild className="mb-6">
             <Link to="/products">
               <ArrowLeftIcon className="size-4 mr-2" />
               Back to Products
             </Link>
           </Button>
 
-          <div className="grid lg:grid-cols-2 gap-12">
+          <div className="grid lg:grid-cols-[400px_1fr] gap-8 mb-12">
             {/* Image Gallery */}
-            <div className="space-y-4">
-              <div className="aspect-square overflow-hidden rounded-2xl bg-muted border-2 border-border">
+            <div className="space-y-3">
+              <div className="aspect-square overflow-hidden rounded-xl bg-muted border border-border">
                 {selectedImage ? (
                   <img
                     src={selectedImage}
@@ -255,15 +327,15 @@ export default function ProductDetailPage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <PackageIcon className="size-16 text-muted-foreground" />
+                    <PackageIcon className="size-12 text-muted-foreground" />
                   </div>
                 )}
               </div>
               
               {/* Thumbnail Gallery */}
               {product.images.length > 1 && (
-                <div className="grid grid-cols-4 gap-4">
-                  {product.images.map((image, idx) => (
+                <div className="grid grid-cols-4 gap-2">
+                  {product.images.slice(0, 4).map((image, idx) => (
                     <button
                       key={idx}
                       onClick={() => setSelectedImage(image.url)}
@@ -287,179 +359,318 @@ export default function ProductDetailPage() {
             {/* Product Info */}
             <div className="space-y-6">
               <div>
-                <h1 className="text-4xl font-bold mb-4">{product.title}</h1>
-                <div className="text-3xl font-bold text-primary mb-6">{priceDisplay}</div>
+                <h1 className="text-3xl font-bold mb-2">{product.title}</h1>
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="text-2xl font-bold text-primary">{priceDisplay}</div>
+                  {reviewStats && reviewStats.totalReviews > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <StarIcon
+                            key={i}
+                            className={`size-4 ${
+                              i < Math.round(reviewStats.averageRating)
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "fill-muted text-muted"
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm text-muted-foreground">
+                        {reviewStats.averageRating} ({reviewStats.totalReviews} reviews)
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
+              {/* USPs */}
+              <div className="grid grid-cols-2 gap-3">
+                {skinUSPs.map((usp, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm">
+                    <usp.icon className="size-4 text-primary shrink-0 mt-0.5" />
+                    <span className="text-muted-foreground">{usp.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Description */}
               {product.description && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-2">Description</h3>
+                <div className="border border-border rounded-lg p-4">
+                  <button
+                    onClick={() => setShowFullDescription(!showFullDescription)}
+                    className="flex items-center justify-between w-full text-left"
+                  >
+                    <h3 className="font-semibold text-sm">Product Description</h3>
+                    {showFullDescription ? (
+                      <ChevronUpIcon className="size-4" />
+                    ) : (
+                      <ChevronDownIcon className="size-4" />
+                    )}
+                  </button>
+                  {showFullDescription && (
                     <div 
-                      className="text-muted-foreground prose prose-sm max-w-none"
+                      className="mt-3 text-sm text-muted-foreground prose prose-sm max-w-none"
                       dangerouslySetInnerHTML={{ __html: product.description }}
                     />
+                  )}
+                </div>
+              )}
+
+              {/* Phone Model Selection */}
+              {phoneModel ? (
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <CheckIcon className="size-5 text-primary shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">Selected Model</p>
+                        <p className="font-semibold">{phoneModel}</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setModelDialogOpen(true)}
+                      >
+                        <RefreshCwIcon className="size-3 mr-1" />
+                        Change
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-amber-500/50 bg-amber-500/10">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="text-xl shrink-0">📱</div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold">Select Your Phone Model</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Ensure perfect fit for your device
+                        </p>
+                      </div>
+                      <Button 
+                        size="sm"
+                        onClick={() => setModelDialogOpen(true)}
+                      >
+                        Select
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               )}
+              
+              {/* Variant Selection */}
+              {product.variants.length > 1 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">Select Finish</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {product.variants.map((variant, idx) => (
+                      <button
+                        key={variant._id}
+                        onClick={() => setSelectedVariant(idx)}
+                        className={`p-3 rounded-lg border-2 transition-all text-left ${
+                          selectedVariant === idx
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="font-medium text-sm">{variant.title}</div>
+                        <div className="font-bold text-primary text-sm">
+                          ₹{variant.price.toFixed(0)}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Add to Cart */}
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={async () => {
+                  if (!phoneModel) {
+                    toast.error("Please select your phone model first");
+                    return;
+                  }
+                  
+                  setIsAdding(true);
+                  
+                  try {
+                    const cartItem = {
+                      productId: product._id,
+                      productTitle: product.title,
+                      productImage: product.images[0]?.url,
+                      variant: product.variants[selectedVariant].title,
+                      price: product.variants[selectedVariant].price,
+                      quantity: 1,
+                      phoneModel: phoneModel,
+                      phoneBrand: phoneBrand || undefined,
+                    };
+                    
+                    if (user) {
+                      await addToCart(cartItem);
+                    } else {
+                      addToGuestCart(cartItem);
+                    }
+                    
+                    toast.success("Added to cart!");
+                  } catch (error) {
+                    if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
+                      addToGuestCart({
+                        productId: product._id,
+                        productTitle: product.title,
+                        productImage: product.images[0]?.url,
+                        variant: product.variants[selectedVariant].title,
+                        price: product.variants[selectedVariant].price,
+                        quantity: 1,
+                        phoneModel: phoneModel,
+                        phoneBrand: phoneBrand || undefined,
+                      });
+                      toast.success("Added to cart!");
+                    } else {
+                      toast.error("Failed to add to cart");
+                    }
+                  } finally {
+                    setIsAdding(false);
+                  }
+                }}
+                disabled={isAdding || !phoneModel}
+              >
+                <ShoppingCartIcon className="size-5 mr-2" />
+                {isAdding ? "Adding..." : "Add to Cart"}
+              </Button>
+            </div>
+          </div>
 
-              {/* Add to Cart Section */}
-              <Card className="border-2 border-primary bg-primary/5">
-                <CardContent className="pt-6 space-y-4">
-                  <h3 className="text-xl font-bold">Add to Cart</h3>
-                  
-                  {/* Phone Model Display */}
-                  {phoneModel ? (
-                    <Card className="border border-primary/20 bg-primary/5">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <CheckIcon className="size-5 text-primary shrink-0" />
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground mb-1">Selected Phone Model</p>
-                            <p className="font-bold text-base">{phoneModel}</p>
+          {/* Reviews Section */}
+          <div className="border-t border-border pt-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">Customer Reviews</h2>
+              <Authenticated>
+                <Button onClick={() => setReviewDialogOpen(true)}>
+                  Write a Review
+                </Button>
+              </Authenticated>
+              <Unauthenticated>
+                <SignInButton>Sign in to Review</SignInButton>
+              </Unauthenticated>
+            </div>
+
+            {reviewStats && reviewStats.totalReviews > 0 ? (
+              <div className="space-y-6">
+                {/* Rating Summary */}
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <div className="text-4xl font-bold">{reviewStats.averageRating}</div>
+                          <div className="flex items-center justify-center mt-1">
+                            {[...Array(5)].map((_, i) => (
+                              <StarIcon
+                                key={i}
+                                className={`size-4 ${
+                                  i < Math.round(reviewStats.averageRating)
+                                    ? "fill-yellow-400 text-yellow-400"
+                                    : "fill-muted text-muted"
+                                }`}
+                              />
+                            ))}
                           </div>
-                          <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => setModelDialogOpen(true)}
-                          >
-                            <RefreshCwIcon className="size-3 mr-1.5" />
-                            Change
-                          </Button>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {reviewStats.totalReviews} reviews
+                          </p>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <Card className="border border-yellow-500/50 bg-yellow-500/10">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="text-2xl shrink-0">📱</div>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold mb-1">Phone Model Required</p>
-                            <p className="text-xs text-muted-foreground mb-3">
-                              Select your phone model to ensure perfect fit
-                            </p>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="w-full"
-                              onClick={() => setModelDialogOpen(true)}
-                            >
-                              Select Phone Model
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                  
-                  {product.variants.length > 1 && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold">Select Variant</label>
+                      </div>
                       <div className="space-y-2">
-                        {product.variants.map((variant, idx) => (
-                          <button
-                            key={variant._id}
-                            onClick={() => setSelectedVariant(idx)}
-                            className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
-                              selectedVariant === idx
-                                ? "border-primary bg-primary/10"
-                                : "border-border hover:border-primary/50"
-                            }`}
-                          >
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{variant.title}</span>
-                              <span className="font-bold text-primary">
-                                ₹{variant.price.toFixed(0)}
-                              </span>
+                        {[5, 4, 3, 2, 1].map((rating) => (
+                          <div key={rating} className="flex items-center gap-2">
+                            <span className="text-sm w-3">{rating}</span>
+                            <StarIcon className="size-3 fill-yellow-400 text-yellow-400" />
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-yellow-400"
+                                style={{
+                                  width: `${
+                                    reviewStats.totalReviews > 0
+                                      ? (reviewStats.ratingDistribution[rating as 1 | 2 | 3 | 4 | 5] /
+                                          reviewStats.totalReviews) *
+                                        100
+                                      : 0
+                                  }%`,
+                                }}
+                              />
                             </div>
-                          </button>
+                            <span className="text-sm text-muted-foreground w-8">
+                              {reviewStats.ratingDistribution[rating as 1 | 2 | 3 | 4 | 5]}
+                            </span>
+                          </div>
                         ))}
                       </div>
                     </div>
-                  )}
-                  
-                  <Button
-                    className="w-full"
-                    size="lg"
-                    onClick={async () => {
-                      if (!phoneModel) {
-                        toast.error("Please select your phone model first");
-                        return;
-                      }
-                      
-                      setIsAdding(true);
-                      
-                      try {
-                        const cartItem = {
-                          productId: product._id,
-                          productTitle: product.title,
-                          productImage: product.images[0]?.url,
-                          variant: product.variants[selectedVariant].title,
-                          price: product.variants[selectedVariant].price,
-                          quantity: 1,
-                          phoneModel: phoneModel,
-                          phoneBrand: phoneBrand || undefined,
-                        };
-                        
-                        if (user) {
-                          // Add to authenticated cart
-                          await addToCart(cartItem);
-                        } else {
-                          // Add to guest cart
-                          addToGuestCart(cartItem);
-                        }
-                        
-                        toast.success("Added to cart!");
-                      } catch (error) {
-                        if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
-                          // Fallback to guest cart if auth fails
-                          addToGuestCart({
-                            productId: product._id,
-                            productTitle: product.title,
-                            productImage: product.images[0]?.url,
-                            variant: product.variants[selectedVariant].title,
-                            price: product.variants[selectedVariant].price,
-                            quantity: 1,
-                            phoneModel: phoneModel,
-                            phoneBrand: phoneBrand || undefined,
-                          });
-                          toast.success("Added to cart!");
-                        } else {
-                          toast.error("Failed to add to cart");
-                        }
-                      } finally {
-                        setIsAdding(false);
-                      }
-                    }}
-                    disabled={isAdding || !phoneModel}
-                  >
-                    <ShoppingCartIcon className="size-5 mr-2" />
-                    {isAdding ? "Adding..." : "Add to Cart"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Product Details */}
-              {product.variants.length > 1 && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <h3 className="font-semibold mb-3">Available Options</h3>
-                    <div className="space-y-2">
-                      {product.variants.map((variant) => (
-                        <div
-                          key={variant._id}
-                          className="flex justify-between items-center p-3 bg-muted rounded-lg"
-                        >
-                          <span className="text-sm">{variant.title}</span>
-                          <span className="text-sm font-semibold">₹{variant.price.toFixed(0)}</span>
-                        </div>
-                      ))}
-                    </div>
                   </CardContent>
                 </Card>
-              )}
-            </div>
+
+                {/* Reviews List */}
+                <div className="space-y-4">
+                  {reviews && reviews.map((review) => (
+                    <Card key={review._id}>
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold">{review.userName}</span>
+                              {review.verified && (
+                                <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded">
+                                  Verified Purchase
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center">
+                              {[...Array(5)].map((_, i) => (
+                                <StarIcon
+                                  key={i}
+                                  className={`size-4 ${
+                                    i < review.rating
+                                      ? "fill-yellow-400 text-yellow-400"
+                                      : "fill-muted text-muted"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(review._creationTime).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <h4 className="font-semibold mb-2">{review.title}</h4>
+                        <p className="text-sm text-muted-foreground">{review.comment}</p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <StarIcon className="size-12 text-muted-foreground mx-auto mb-3" />
+                  <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Be the first to review this product
+                  </p>
+                  <Authenticated>
+                    <Button onClick={() => setReviewDialogOpen(true)}>
+                      Write a Review
+                    </Button>
+                  </Authenticated>
+                  <Unauthenticated>
+                    <SignInButton>Sign in to Review</SignInButton>
+                  </Unauthenticated>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </section>
@@ -540,6 +751,63 @@ export default function ProductDetailPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Review Dialog */}
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Write a Review</DialogTitle>
+            <DialogDescription>Share your experience with this product</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Rating</label>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    onClick={() => setReviewRating(rating)}
+                    className="transition-transform hover:scale-110"
+                  >
+                    <StarIcon
+                      className={`size-8 ${
+                        rating <= reviewRating
+                          ? "fill-yellow-400 text-yellow-400"
+                          : "fill-muted text-muted"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Title</label>
+              <Input
+                placeholder="Summarize your review"
+                value={reviewTitle}
+                onChange={(e) => setReviewTitle(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold mb-2 block">Review</label>
+              <Textarea
+                placeholder="Share your thoughts about this product..."
+                value={reviewComment}
+                onChange={(e) => setReviewComment(e.target.value)}
+                rows={4}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddReview}>
+                Submit Review
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

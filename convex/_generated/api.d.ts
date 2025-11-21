@@ -14,6 +14,7 @@ import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
+import type * as reviews from "../reviews.js";
 import type * as shopify from "../shopify.js";
 import type * as users from "../users.js";
 
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   migrationInternal: typeof migrationInternal;
   orders: typeof orders;
   products: typeof products;
+  reviews: typeof reviews;
   shopify: typeof shopify;
   users: typeof users;
 }>;

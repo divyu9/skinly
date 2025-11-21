@@ -98,4 +98,16 @@ export default defineSchema({
   })
     .index("by_product", ["productId"])
     .index("by_sku", ["sku"]),
+
+  reviews: defineTable({
+    productId: v.id("products"),
+    userId: v.id("users"),
+    userName: v.string(),
+    rating: v.number(), // 1-5
+    title: v.string(),
+    comment: v.string(),
+    verified: v.boolean(), // verified purchase
+  })
+    .index("by_product", ["productId"])
+    .index("by_user", ["userId"]),
 });
