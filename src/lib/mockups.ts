@@ -1,16 +1,18 @@
 /**
  * Utility functions for handling product mockup images
  * 
- * Mockup images should be uploaded to Files & Media with this folder structure:
- * /mockups/{Brand}/{ModelVariation}_{SKU}.jpg
+ * Mockup images should be uploaded to Files & Media and mapped in mockup-mappings.ts
  * 
- * Examples:
- * - /mockups/Apple/15pro_M-174.jpg
- * - /mockups/Samsung/S24_M-174.jpg
- * - /mockups/Oppo/15Pro_M-174.jpg
+ * How to add mockups:
+ * 1. Upload image to Files & Media tab
+ * 2. Copy the file ID from the URL (starts with "file_")
+ * 3. Add to mockup-mappings.ts: "Brand|Model|SKU": "file_id"
  * 
- * Fallback: Will also check /mockups/{ModelVariation}_{SKU}.jpg for backward compatibility
+ * Example:
+ * - "Apple|iPhone 15 Pro|M-174": "file_abc123"
  */
+
+import { getMockupFileId } from './mockup-mappings.ts';
 
 const MOCKUP_BASE_URL = "https://cdn.hercules.app";
 
@@ -246,11 +248,10 @@ export async function mockupImageExists(imageUrl: string): Promise<boolean> {
 }
 
 /**
- * Finds the correct mockup image URL by trying multiple filename variations
- * Uses a cache to speed up subsequent lookups
+ * Finds the correct mockup image URL
  * 
- * Tries brand folders first (e.g., /mockups/Apple/15pro_M-174.jpg)
- * Falls back to root mockups folder (e.g., /mockups/15pro_M-174.jpg)
+ * Priority 1: Checks mockup-mappings.ts for file ID
+ * Priority 2: Tries multiple filename variations (legacy support)
  * 
  * @param modelName Full phone model name (e.g., "Apple iPhone 15 Pro")
  * @param sku SKU code (e.g., "M-174")
@@ -258,10 +259,8 @@ export async function mockupImageExists(imageUrl: string): Promise<boolean> {
  * 
  * @example
  * ```ts
- * // Will try:
- * // - /mockups/Apple/15pro_M-174.jpg
- * // - /mockups/Apple/iPhone15Pro_M-174.jpg
- * // - /mockups/15pro_M-174.jpg (fallback)
+ * // Looks up: "Apple|iPhone 15 Pro|M-174" in mockup-mappings.ts
+ * // Returns: https://cdn.hercules.app/file_abc123
  * const url = await findMockupImageUrl("Apple iPhone 15 Pro", "M-174");
  * ```
  */
@@ -275,13 +274,23 @@ export async function findMockupImageUrl(
     return mockupCache.get(cacheKey)!;
   }
   
-  // Extract brand for folder organization
+  // Extract brand
   const brand = extractBrand(modelName);
   
-  // Generate all possible filename variations
+  // Priority 1: Check mapping file for file ID
+  if (brand) {
+    const fileId = getMockupFileId(brand, modelName, sku);
+    if (fileId) {
+      const url = `${MOCKUP_BASE_URL}/${fileId}`;
+      mockupCache.set(cacheKey, url);
+      return url;
+    }
+  }
+  
+  // Priority 2: Try legacy filename variations (backward compatibility)
   const variations = generateModelVariations(modelName);
   
-  // Priority 1: Try brand folder first (most specific)
+  // Try brand folder paths
   if (brand) {
     for (const variation of variations) {
       const url = constructMockupUrl(variation, sku, brand);
@@ -294,7 +303,7 @@ export async function findMockupImageUrl(
     }
   }
   
-  // Priority 2: Fall back to root mockups folder (backward compatibility)
+  // Try root mockups folder
   for (const variation of variations) {
     const url = constructMockupUrl(variation, sku, null);
     const exists = await mockupImageExists(url);
