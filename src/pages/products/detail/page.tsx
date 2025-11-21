@@ -23,7 +23,9 @@ import {
   XCircleIcon,
   BanknoteIcon,
   PackageCheckIcon,
-  AlertTriangleIcon
+  AlertTriangleIcon,
+  TagIcon,
+  CopyIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -176,6 +178,9 @@ export default function ProductDetailPage() {
     api.reviews.getReviewStats,
     productData ? { productId: productData._id } : "skip"
   );
+  
+  // Fetch active coupons
+  const activeCoupons = useQuery(api.coupons.getActiveCoupons);
   
   // Determine if this product needs phone model selection
   // Includes: phone skins and membranes
@@ -662,33 +667,90 @@ export default function ProductDetailPage() {
               </Button>
 
               {/* Shipping & Delivery Info */}
-              <div className="border-t border-border pt-6 space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <ZapIcon className="size-4 text-primary shrink-0" />
-                  <span className="text-muted-foreground">Fast Shipping</span>
+              <div className="border-t border-border pt-6">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  <div className="flex items-center gap-2 text-sm">
+                    <ZapIcon className="size-4 text-primary shrink-0" />
+                    <span className="text-muted-foreground">Fast Shipping</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <XCircleIcon className="size-4 text-red-500 shrink-0" />
+                    <span className="text-muted-foreground">Non Returnable</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPinIcon className="size-4 text-primary shrink-0" />
+                    <span className="text-muted-foreground">Pan India Delivery</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <BanknoteIcon className="size-4 text-red-500 shrink-0" />
+                    <span className="text-muted-foreground">COD Not Available</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm col-span-2">
+                    <PackageCheckIcon className="size-4 text-primary shrink-0" />
+                    <span className="text-muted-foreground">Safe Packaging</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPinIcon className="size-4 text-primary shrink-0" />
-                  <span className="text-muted-foreground">Pan India Delivery</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <PackageCheckIcon className="size-4 text-primary shrink-0" />
-                  <span className="text-muted-foreground">Safe Packaging</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <XCircleIcon className="size-4 text-red-500 shrink-0" />
-                  <span className="text-muted-foreground">Non Returnable</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <BanknoteIcon className="size-4 text-red-500 shrink-0" />
-                  <span className="text-muted-foreground">COD Not Available</span>
-                </div>
+                
                 {isPhoneSkin && (
-                  <div className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-2">
+                  <div className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
                     <AlertTriangleIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
                     <span className="text-foreground">
                       <strong>Custom Cut Product:</strong> No order cancellation or changes allowed after order confirmation. Your product is custom-cut upon order placement.
                     </span>
+                  </div>
+                )}
+                
+                {/* Active Offers Section */}
+                {activeCoupons && activeCoupons.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <TagIcon className="size-4 text-primary" />
+                      <span>Active Offers</span>
+                    </div>
+                    <div className="space-y-2">
+                      {activeCoupons.map((coupon) => {
+                        const discountText = coupon.discountType === "percentage" 
+                          ? `${coupon.discountValue}% OFF${coupon.maxDiscount ? ` (max ₹${coupon.maxDiscount})` : ''}`
+                          : `₹${coupon.discountValue} OFF`;
+                        
+                        return (
+                          <div 
+                            key={coupon._id}
+                            className="border border-primary/30 rounded-lg p-3 bg-primary/5"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <code className="px-2 py-0.5 bg-primary text-primary-foreground rounded text-xs font-bold">
+                                    {coupon.code}
+                                  </code>
+                                  <span className="text-xs font-bold text-primary">
+                                    {discountText}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {coupon.description}
+                                </p>
+                                {coupon.minPurchase && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Min. purchase: ₹{coupon.minPurchase}
+                                  </p>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(coupon.code);
+                                  toast.success("Coupon code copied!");
+                                }}
+                                className="shrink-0 p-2 hover:bg-primary/10 rounded transition-colors"
+                              >
+                                <CopyIcon className="size-4 text-primary" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

@@ -112,4 +112,20 @@ export default defineSchema({
   })
     .index("by_product", ["productId"])
     .index("by_user", ["userId"]),
+
+  coupons: defineTable({
+    code: v.string(),
+    description: v.string(),
+    discountType: v.union(v.literal("percentage"), v.literal("fixed")),
+    discountValue: v.number(),
+    minPurchase: v.optional(v.number()),
+    maxDiscount: v.optional(v.number()),
+    startDate: v.number(), // timestamp
+    endDate: v.number(), // timestamp
+    isActive: v.boolean(),
+    usageLimit: v.optional(v.number()),
+    usageCount: v.number(),
+  })
+    .index("by_code", ["code"])
+    .index("by_active", ["isActive"]),
 });
