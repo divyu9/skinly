@@ -176,18 +176,25 @@ export default function ProductDetailPage() {
     productData ? { productId: productData._id } : "skip"
   );
   
-  // Determine if this is a phone skin (check product tags or title)
-  // Exclude cases, covers, camera rings, membranes, and tempered glass
+  // Determine if this product needs phone model selection
+  // Includes: phone skins and membranes
+  // Excludes: cases, covers, camera rings, tempered glass
   const isPhoneSkin = productData ? (() => {
     const titleLower = productData.title.toLowerCase();
     const tagsLower = productData.tags?.map(t => t.toLowerCase()) || [];
+    
+    // Check if it's a membrane (matte or gloss) - these need phone selector
+    const isMembrane = 
+      (titleLower.includes("membrane") && titleLower.includes("3 layer")) ||
+      (titleLower.includes("matte membrane") || titleLower.includes("gloss membrane"));
+    
+    if (isMembrane) return true;
     
     // Exclude products that are not skins
     const isNotSkin = 
       titleLower.includes("case") ||
       titleLower.includes("cover") ||
       titleLower.includes("camera ring") ||
-      titleLower.includes("membrane") ||
       titleLower.includes("tempered") ||
       titleLower.includes("glass") ||
       titleLower.includes("screen guard") ||
