@@ -17,7 +17,12 @@ import {
   SparklesIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  InfoIcon
+  InfoIcon,
+  ZapIcon,
+  MapPinIcon,
+  XCircleIcon,
+  BanknoteIcon,
+  PackageCheckIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -552,6 +557,30 @@ export default function ProductDetailPage() {
                 <ShoppingCartIcon className="size-5 mr-2" />
                 {isAdding ? "Adding..." : "Add to Cart"}
               </Button>
+
+              {/* Shipping & Delivery Info */}
+              <div className="border-t border-border pt-6 space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ZapIcon className="size-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">Fast Shipping</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <MapPinIcon className="size-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">Pan India Delivery</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <PackageCheckIcon className="size-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">Safe Packaging</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <XCircleIcon className="size-4 text-red-500 shrink-0" />
+                  <span className="text-muted-foreground">Non Returnable</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <BanknoteIcon className="size-4 text-red-500 shrink-0" />
+                  <span className="text-muted-foreground">COD Not Available</span>
+                </div>
+              </div>
             </div>
           </div>
 
