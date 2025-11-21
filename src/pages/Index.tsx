@@ -16,7 +16,7 @@ import {
   GamepadIcon,
   SearchIcon
 } from "lucide-react";
-import { usePaginatedQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -1347,6 +1347,13 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchedModel, setSearchedModel] = useState<string>("");
+  
+  // Query mockups for the searched model
+  const mockupsForModel = useQuery(
+    api.mockups.getProductsWithMockupsForModel,
+    searchedModel ? { model: searchedModel } : "skip"
+  );
 
   const matteProducts = useMemo(() => 
     products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4),
@@ -1430,8 +1437,11 @@ export default function Index() {
                 placeholder="iPhone 15 Pro, Canon EOS R5, Mac Mini M4, matte black..."
                 value={homeSearchQuery}
                 onChange={(e) => {
-                  setHomeSearchQuery(e.target.value);
-                  setShowSearchResults(e.target.value.trim().length > 0);
+                  const query = e.target.value;
+                  setHomeSearchQuery(query);
+                  setShowSearchResults(query.trim().length > 0);
+                  // Set searched model for mockup query
+                  setSearchedModel(query.trim());
                 }}
                 className="pl-14 h-16 text-lg border-2 focus:border-primary"
               />
@@ -1540,6 +1550,102 @@ export default function Index() {
                               ))}
                             </div>
                           ))}
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Products with Mockups Section */}
+                  {mockupsForModel && mockupsForModel.length > 0 && (() => {
+                    // Filter products that have mockups for this model
+                    const productsWithMockups = products.filter(product => {
+                      // Check if any variant SKU matches mockup SKUs
+                      return product.variants.some(variant => 
+                        mockupsForModel.some(mockup => 
+                          variant.title.toLowerCase().includes(mockup.sku.toLowerCase())
+                        )
+                      );
+                    });
+
+                    if (productsWithMockups.length > 0) {
+                      return (
+                        <>
+                          <div className="text-xs font-bold text-green-600 mb-3 uppercase tracking-wide flex items-center gap-2">
+                            🎨 Products with Mockup Preview for {searchedModel}
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-normal">
+                              {productsWithMockups.length}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                            {productsWithMockups.slice(0, 8).map((product) => {
+                              // Find the mockup for this product
+                              const mockup = mockupsForModel.find(m => 
+                                product.variants.some(v => v.title.toLowerCase().includes(m.sku.toLowerCase()))
+                              );
+                              const mockupUrl = mockup ? `https://cdn.hercules.app/${mockup.fileId}` : null;
+                              
+                              return (
+                                <Link
+                                  key={product._id}
+                                  to={`/products/detail?id=${product.slug}&model=${encodeURIComponent(searchedModel)}`}
+                                  onClick={() => {
+                                    setHomeSearchQuery("");
+                                    setShowSearchResults(false);
+                                  }}
+                                  className="group relative"
+                                >
+                                  <Card className="overflow-hidden hover:shadow-lg transition-all border-green-200 hover:border-green-400">
+                                    <div className="aspect-square bg-muted relative overflow-hidden">
+                                      {mockupUrl ? (
+                                        <>
+                                          <img 
+                                            src={mockupUrl} 
+                                            alt={`${product.title} on ${searchedModel}`}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                          />
+                                          <div className="absolute top-2 right-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded">
+                                            Preview on {searchedModel}
+                                          </div>
+                                        </>
+                                      ) : product.images[0] ? (
+                                        <img 
+                                          src={product.images[0].url} 
+                                          alt={product.images[0].alt || product.title}
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                        />
+                                      ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                          <PackageIcon className="size-8 text-muted-foreground" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <CardContent className="p-3">
+                                      <div className="font-medium text-sm truncate group-hover:text-primary">
+                                        {product.title}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground mt-1">
+                                        ₹{product.variants[0]?.price || "N/A"}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                          {productsWithMockups.length > 8 && (
+                            <Link
+                              to={`/products?model=${encodeURIComponent(searchedModel)}`}
+                              onClick={() => {
+                                setHomeSearchQuery("");
+                                setShowSearchResults(false);
+                              }}
+                              className="block text-center p-3 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-all mb-4"
+                            >
+                              View all {productsWithMockups.length} products with mockups →
+                            </Link>
+                          )}
+                          <div className="my-4 border-t border-border" />
                         </>
                       );
                     }

@@ -116,3 +116,40 @@ export const generateUploadUrl = mutation({
     return await ctx.storage.generateUploadUrl();
   },
 });
+
+/**
+ * Get all products (SKUs) that have mockups for a specific model
+ * Returns array of { sku, fileId }
+ */
+export const getProductsWithMockupsForModel = query({
+  args: {
+    model: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Normalize model name for search (remove spaces, lowercase)
+    const normalizedSearch = args.model.toLowerCase().replace(/\s+/g, "");
+    
+    // Get all mockups
+    const allMockups = await ctx.db.query("mockups").collect();
+    
+    // Filter mockups that match the model (case-insensitive, flexible matching)
+    const matchingMockups = allMockups.filter((mockup) => {
+      const normalizedMockupModel = mockup.model.toLowerCase().replace(/\s+/g, "");
+      return normalizedMockupModel.includes(normalizedSearch) || 
+             normalizedSearch.includes(normalizedMockupModel);
+    });
+    
+    // Group by SKU to get unique products
+    const uniqueProducts = new Map<string, string>();
+    matchingMockups.forEach((mockup) => {
+      if (!uniqueProducts.has(mockup.sku)) {
+        uniqueProducts.set(mockup.sku, mockup.fileId);
+      }
+    });
+    
+    return Array.from(uniqueProducts.entries()).map(([sku, fileId]) => ({
+      sku,
+      fileId,
+    }));
+  },
+});
