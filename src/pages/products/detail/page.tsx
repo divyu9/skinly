@@ -200,6 +200,30 @@ export default function ProductDetailPage() {
     });
   }, [activeCoupons, productData]);
   
+  // Filter images based on selected phone model
+  const displayImages = useMemo(() => {
+    if (!productData) return [];
+    
+    // If no phone model is selected, show all images (or default ones)
+    if (!phoneModel) {
+      return productData.images;
+    }
+    
+    // Find images that match the selected phone model
+    const modelSpecificImages = productData.images.filter(
+      (img) => img.phoneModel?.toLowerCase() === phoneModel.toLowerCase()
+    );
+    
+    // If model-specific images exist, use them
+    if (modelSpecificImages.length > 0) {
+      return modelSpecificImages;
+    }
+    
+    // Otherwise, fall back to images without phoneModel tags (default images)
+    const defaultImages = productData.images.filter((img) => !img.phoneModel);
+    return defaultImages.length > 0 ? defaultImages : productData.images;
+  }, [productData, phoneModel]);
+  
   // Determine if this product needs phone model selection
   // Includes: phone skins and membranes
   // Excludes: cases, covers, camera rings, tempered glass
@@ -253,9 +277,9 @@ export default function ProductDetailPage() {
   const isLoading = productData === undefined;
   const product = productData;
   
-  // Set initial selected image when product loads
-  if (product && !selectedImage && product.images[0]) {
-    setSelectedImage(product.images[0].url);
+  // Set initial selected image when product loads or phone model changes
+  if (product && displayImages.length > 0 && (!selectedImage || !displayImages.find(img => img.url === selectedImage))) {
+    setSelectedImage(displayImages[0].url);
   }
 
   const handleAddToCart = async () => {
@@ -269,7 +293,7 @@ export default function ProductDetailPage() {
       const cartItem = {
         productId: product._id,
         productTitle: product.title,
-        productImage: product.images[0]?.url,
+        productImage: displayImages[0]?.url || product.images[0]?.url,
         variant: product.variants[selectedVariant].title,
         price: product.variants[selectedVariant].price,
         quantity: 1,
@@ -291,7 +315,7 @@ export default function ProductDetailPage() {
         addToGuestCart({
           productId: product._id,
           productTitle: product.title,
-          productImage: product.images[0]?.url,
+          productImage: displayImages[0]?.url || product.images[0]?.url,
           variant: product.variants[selectedVariant].title,
           price: product.variants[selectedVariant].price,
           quantity: 1,

@@ -81,6 +81,7 @@ export default defineSchema({
     images: v.array(v.object({
       url: v.string(),
       alt: v.optional(v.string()),
+      phoneModel: v.optional(v.string()), // e.g., "iPhone 14 Pro", "Realme 11", etc.
     })),
     tags: v.array(v.string()),
   })
