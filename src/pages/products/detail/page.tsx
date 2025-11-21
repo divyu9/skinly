@@ -573,6 +573,14 @@ export default function ProductDetailPage() {
                   <span className="text-muted-foreground">Safe Packaging</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
+                  <CheckIcon className="size-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">Easy Installation</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <PackageIcon className="size-4 text-primary shrink-0" />
+                  <span className="text-muted-foreground">Premium Installation Kit Included</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
                   <XCircleIcon className="size-4 text-red-500 shrink-0" />
                   <span className="text-muted-foreground">Non Returnable</span>
                 </div>
