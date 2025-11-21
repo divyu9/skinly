@@ -61,4 +61,41 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_order_number", ["orderNumber"]),
+
+  collections: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    image: v.optional(v.string()),
+  }).index("by_slug", ["slug"]),
+
+  products: defineTable({
+    title: v.string(),
+    slug: v.string(),
+    description: v.string(),
+    metaDescription: v.optional(v.string()),
+    collectionId: v.optional(v.id("collections")),
+    status: v.union(v.literal("active"), v.literal("draft"), v.literal("archived")),
+    images: v.array(v.object({
+      url: v.string(),
+      alt: v.optional(v.string()),
+    })),
+    tags: v.array(v.string()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_collection", ["collectionId"])
+    .index("by_status", ["status"]),
+
+  variants: defineTable({
+    productId: v.id("products"),
+    sku: v.string(),
+    title: v.string(),
+    price: v.number(),
+    compareAtPrice: v.optional(v.number()),
+    inventoryQuantity: v.number(),
+    weight: v.optional(v.number()),
+    weightUnit: v.optional(v.string()),
+  })
+    .index("by_product", ["productId"])
+    .index("by_sku", ["sku"]),
 });

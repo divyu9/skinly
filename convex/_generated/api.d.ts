@@ -9,7 +9,9 @@
  */
 
 import type * as cart from "../cart.js";
+import type * as collections from "../collections.js";
 import type * as orders from "../orders.js";
+import type * as products from "../products.js";
 import type * as shopify from "../shopify.js";
 import type * as users from "../users.js";
 
@@ -21,7 +23,9 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   cart: typeof cart;
+  collections: typeof collections;
   orders: typeof orders;
+  products: typeof products;
   shopify: typeof shopify;
   users: typeof users;
 }>;

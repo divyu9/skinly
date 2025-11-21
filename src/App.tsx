@@ -7,6 +7,8 @@ import ProductDetailPage from "./pages/products/detail/page.tsx";
 import CheckoutPage from "./pages/checkout/page.tsx";
 import OrdersPage from "./pages/orders/page.tsx";
 import OrderDetailPage from "./pages/orders/detail/page.tsx";
+import AdminProductsPage from "./pages/admin/products/page.tsx";
+import AdminCollectionsPage from "./pages/admin/collections/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 export default function App() {
@@ -20,6 +22,8 @@ export default function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+          <Route path="/admin/products" element={<AdminProductsPage />} />
+          <Route path="/admin/collections" element={<AdminCollectionsPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
