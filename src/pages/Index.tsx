@@ -104,6 +104,81 @@ export default function Index() {
         </div>
       </section>
 
+      {/* Categories Section */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
+              Pick Your Finish
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+              Three unique finishes, endless personality
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="group relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
+              <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                CLASSIC
+              </div>
+              <CardContent className="pt-8 space-y-6">
+                <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 rounded-2xl flex items-center justify-center">
+                  <div className="text-6xl">🎨</div>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold">Matte Finish</h3>
+                  <p className="text-muted-foreground">
+                    Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    Shop Matte
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="group relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl">
+              <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                PREMIUM
+              </div>
+              <CardContent className="pt-8 space-y-6">
+                <div className="aspect-square bg-gradient-to-br from-secondary/20 to-secondary/5 rounded-2xl flex items-center justify-center">
+                  <div className="text-6xl">✨</div>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold">3D Embossed Finish</h3>
+                  <p className="text-muted-foreground">
+                    Raised textures you can feel. Touch meets art in the most satisfying way.
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    Shop 3D Embossed
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="group relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl">
+              <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                SLEEK
+              </div>
+              <CardContent className="pt-8 space-y-6">
+                <div className="aspect-square bg-gradient-to-br from-accent/20 to-accent/5 rounded-2xl flex items-center justify-center">
+                  <div className="text-6xl">💎</div>
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-2xl font-bold">Transparent Finish</h3>
+                  <p className="text-muted-foreground">
+                    Show off your phone's original color with our crystal-clear protective layer.
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    Shop Transparent
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 px-4 bg-muted/30">
         <div className="container mx-auto">
