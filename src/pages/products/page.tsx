@@ -497,7 +497,7 @@ export default function ProductsPage() {
                   </CardContent>
                   <CardFooter>
                     <Button className="w-full" asChild>
-                      <Link to={`/products/detail?id=${product.id}`}>
+                      <Link to={`/products/detail?id=${product.id}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
                         Select My Phone Model
                       </Link>
                     </Button>

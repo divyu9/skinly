@@ -228,13 +228,37 @@ export default function ProductDetailPage() {
               <Card className="border-2 border-primary bg-primary/5">
                 <CardContent className="pt-6 space-y-4">
                   <h3 className="text-xl font-bold">Add to Cart</h3>
-                  {phoneModel && phoneBrand && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <CheckIcon className="size-4 text-primary" />
-                      <span>
-                        Selected Model: <strong>{phoneModel}</strong>
-                      </span>
-                    </div>
+                  
+                  {/* Phone Model Display */}
+                  {phoneModel ? (
+                    <Card className="border border-primary/20 bg-primary/5">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-2">
+                          <CheckIcon className="size-5 text-primary shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground mb-1">Selected Phone Model</p>
+                            <p className="font-bold text-base">{phoneModel}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="border border-yellow-500/50 bg-yellow-500/10">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="text-2xl shrink-0">📱</div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold mb-1">Phone Model Required</p>
+                            <p className="text-xs text-muted-foreground mb-3">
+                              Select your phone model to ensure perfect fit
+                            </p>
+                            <Button size="sm" variant="outline" asChild className="w-full">
+                              <Link to="/">Select Phone Model</Link>
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                   
                   {product.variants.length > 1 && (
@@ -268,6 +292,10 @@ export default function ProductDetailPage() {
                       className="w-full"
                       size="lg"
                       onClick={async () => {
+                        if (!phoneModel) {
+                          toast.error("Please select your phone model first");
+                          return;
+                        }
                         setIsAdding(true);
                         try {
                           await addToCart({
@@ -277,7 +305,7 @@ export default function ProductDetailPage() {
                             variant: product.variants[selectedVariant].title,
                             price: parseFloat(product.variants[selectedVariant].price),
                             quantity: 1,
-                            phoneModel: phoneModel || undefined,
+                            phoneModel: phoneModel,
                             phoneBrand: phoneBrand || undefined,
                           });
                           toast.success("Added to cart!");
@@ -287,7 +315,7 @@ export default function ProductDetailPage() {
                           setIsAdding(false);
                         }
                       }}
-                      disabled={isAdding}
+                      disabled={isAdding || !phoneModel}
                     >
                       <ShoppingCartIcon className="size-5 mr-2" />
                       {isAdding ? "Adding..." : "Add to Cart"}
