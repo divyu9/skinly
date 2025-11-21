@@ -313,9 +313,9 @@ export default function ProductDetailPage() {
             </Link>
           </Button>
 
-          <div className="grid lg:grid-cols-[400px_1fr] gap-8 mb-12">
+          <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-8 mb-12">
             {/* Image Gallery */}
-            <div className="space-y-3">
+            <div className="space-y-3 md:sticky md:top-24 md:self-start">
               <div className="aspect-square overflow-hidden rounded-xl bg-muted border border-border">
                 {selectedImage ? (
                   <img
