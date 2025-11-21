@@ -1,6 +1,15 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 
+// Get total product count in local database
+export const getProductCount = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const products = await ctx.db.query("products").collect();
+    return products.length;
+  },
+});
+
 // Check if product already exists (for migration)
 export const checkProductExists = internalQuery({
   args: { slug: v.string() },

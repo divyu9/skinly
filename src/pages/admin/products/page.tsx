@@ -18,8 +18,34 @@ function AdminProductsPageInner() {
   const deleteProduct = useMutation(api.products.deleteProduct);
   const deleteAllProducts = useMutation(api.products.deleteAllProducts);
   const migrateFromShopify = useAction(api.migration.migrateFromShopify);
+  const checkProductCount = useAction(api.migration.checkShopifyProductCount);
   const [isMigrating, setIsMigrating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCheckingCount, setIsCheckingCount] = useState(false);
+
+  const handleCheckCount = async () => {
+    setIsCheckingCount(true);
+    try {
+      const result = await checkProductCount({});
+      const message = `
+Shopify: ${result.shopifyTotal} products
+Local DB: ${result.localTotal} products
+Missing: ${result.missing} products
+
+${result.missing > 0 ? "Click 'Import from Shopify' to import missing products." : "All products are synced!"}
+      `.trim();
+      
+      if (result.missing > 0) {
+        toast.warning(message);
+      } else {
+        toast.success(message);
+      }
+    } catch (error) {
+      toast.error(`Failed to check product count: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsCheckingCount(false);
+    }
+  };
 
   const handleMigration = async () => {
     if (!confirm("This will import all active products from Shopify. Products already in your database will be skipped automatically. Continue?")) {
@@ -28,7 +54,7 @@ function AdminProductsPageInner() {
 
     setIsMigrating(true);
     try {
-      const result = await migrateFromShopify({});
+      const result = await migrateFromShopify({ forceReimport: false });
       const parts = [
         `${result.successful} imported`,
         result.skipped > 0 ? `${result.skipped} skipped` : null,
@@ -36,10 +62,11 @@ function AdminProductsPageInner() {
       ].filter(Boolean);
       
       toast.success(
-        `Migration complete! ${parts.join(", ")}. Total: ${result.total} products.`
+        `Migration complete! ${parts.join(", ")}. Total: ${result.total} products from Shopify.`
       );
       if (result.errors.length > 0) {
         console.error("Migration errors:", result.errors);
+        toast.error(`${result.errors.length} errors occurred. Check console for details.`);
       }
     } catch (error) {
       toast.error(`Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
@@ -132,6 +159,10 @@ function AdminProductsPageInner() {
               {isDeleting ? "Clearing..." : "Clear All"}
             </Button>
           )}
+          <Button variant="secondary" onClick={handleCheckCount} disabled={isCheckingCount}>
+            <PackageIcon className="size-4 mr-2" />
+            {isCheckingCount ? "Checking..." : "Check Product Count"}
+          </Button>
           <Button variant="outline" onClick={handleMigration} disabled={isMigrating}>
             <DownloadIcon className="size-4 mr-2" />
             {isMigrating ? "Importing..." : "Import from Shopify"}

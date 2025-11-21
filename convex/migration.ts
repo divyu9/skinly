@@ -2,6 +2,7 @@
 
 import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { v } from "convex/values";
 
 interface ShopifyProduct {
   id: number;
@@ -28,9 +29,55 @@ interface ShopifyProduct {
   }>;
 }
 
-export const migrateFromShopify = action({
+// Diagnostic action to check Shopify product counts
+export const checkShopifyProductCount = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ shopifyTotal: number; localTotal: number; missing: number }> => {
+    const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
+    const accessToken = process.env.SHOPIFY_ADMIN_API_TOKEN;
+    const apiVersion = process.env.SHOPIFY_API_VERSION || "2024-01";
+
+    if (!shopDomain || !accessToken) {
+      throw new Error("Shopify credentials not configured");
+    }
+
+    try {
+      // Get product count from Shopify
+      const countResponse = await fetch(
+        `https://${shopDomain}/admin/api/${apiVersion}/products/count.json?status=active`,
+        {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!countResponse.ok) {
+        throw new Error(`Shopify API error: ${countResponse.statusText}`);
+      }
+
+      const countData: { count: number } = await countResponse.json();
+
+      // Get local product count
+      const localProducts: number = await ctx.runQuery(internal.migrationInternal.getProductCount, {});
+
+      return {
+        shopifyTotal: countData.count,
+        localTotal: localProducts,
+        missing: countData.count - localProducts,
+      };
+    } catch (error) {
+      throw new Error(
+        `Check failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  },
+});
+
+export const migrateFromShopify = action({
+  args: { forceReimport: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
     const shopDomain = process.env.SHOPIFY_SHOP_DOMAIN;
     const accessToken = process.env.SHOPIFY_ADMIN_API_TOKEN;
     const apiVersion = process.env.SHOPIFY_API_VERSION || "2024-01";
@@ -43,9 +90,13 @@ export const migrateFromShopify = action({
       // Collect all products from all pages
       const allProducts: ShopifyProduct[] = [];
       let nextPageUrl: string | null = `https://${shopDomain}/admin/api/${apiVersion}/products.json?limit=250&status=active`;
+      let pageCount = 0;
 
       // Loop through all pages using pagination
       while (nextPageUrl) {
+        pageCount++;
+        console.log(`Fetching page ${pageCount} from Shopify...`);
+        
         const response: Response = await fetch(nextPageUrl, {
           headers: {
             "X-Shopify-Access-Token": accessToken,
@@ -59,6 +110,7 @@ export const migrateFromShopify = action({
 
         const data: { products: ShopifyProduct[] } = await response.json();
         const products = data.products;
+        console.log(`Page ${pageCount}: Fetched ${products.length} products (Total so far: ${allProducts.length + products.length})`);
         allProducts.push(...products);
 
         // Check for next page in Link header
@@ -72,9 +124,12 @@ export const migrateFromShopify = action({
             const match: RegExpMatchArray | null = link.match(/<([^>]+)>;\s*rel="next"/);
             if (match) {
               nextPageUrl = match[1];
+              console.log(`Next page URL found: ${nextPageUrl}`);
               break;
             }
           }
+        } else {
+          console.log(`No more pages. Total products fetched: ${allProducts.length}`);
         }
       }
 
@@ -92,14 +147,16 @@ export const migrateFromShopify = action({
           // Create slug from handle
           const slug = shopifyProduct.handle;
 
-          // Check if product already exists
-          const existingProducts = await ctx.runQuery(internal.migrationInternal.checkProductExists, {
-            slug,
-          });
+          // Check if product already exists (skip unless forceReimport is true)
+          if (!args.forceReimport) {
+            const existingProducts = await ctx.runQuery(internal.migrationInternal.checkProductExists, {
+              slug,
+            });
 
-          if (existingProducts) {
-            migrationResults.skipped++;
-            continue; // Skip this product
+            if (existingProducts) {
+              migrationResults.skipped++;
+              continue; // Skip this product
+            }
           }
 
           // Parse tags
