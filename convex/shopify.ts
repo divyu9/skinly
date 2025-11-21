@@ -3,11 +3,27 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 
-const SHOP = process.env.SHOPIFY_SHOP_DOMAIN!;
-const TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN!;
+const SHOP = process.env.SHOPIFY_SHOP_DOMAIN;
+const TOKEN = process.env.SHOPIFY_ADMIN_API_TOKEN;
 const VERSION = process.env.SHOPIFY_API_VERSION ?? "2024-10";
 
+function validateEnvVars() {
+  if (!SHOP) {
+    throw new Error("SHOPIFY_SHOP_DOMAIN is not set in environment variables. Please add it in the Secrets tab.");
+  }
+  if (!TOKEN) {
+    throw new Error("SHOPIFY_ADMIN_API_TOKEN is not set in environment variables. Please add it in the Secrets tab.");
+  }
+  if (!SHOP.includes('.myshopify.com')) {
+    throw new Error(`SHOPIFY_SHOP_DOMAIN format is incorrect. Should be 'your-store.myshopify.com', got: ${SHOP}`);
+  }
+}
+
 async function shopify(path: string, init?: RequestInit) {
+  if (!SHOP || !TOKEN) {
+    throw new Error("Shopify credentials not configured");
+  }
+  
   const url = `https://${SHOP}/admin/api/${VERSION}${path}`;
   const res = await fetch(url, {
     ...init,
@@ -44,12 +60,20 @@ function nextCursor(linkHeader?: string | null) {
 export const verifyConnection = action({
   args: {},
   handler: async () => {
-    const { json } = await shopify(`/shop.json`);
-    return { 
-      shop: json.shop.name, 
-      domain: json.shop.myshopify_domain,
-      email: json.shop.email 
-    };
+    try {
+      validateEnvVars();
+      const { json } = await shopify(`/shop.json`);
+      return { 
+        shop: json.shop.name, 
+        domain: json.shop.myshopify_domain,
+        email: json.shop.email 
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Shopify Connection Error: ${error.message}`);
+      }
+      throw error;
+    }
   },
 });
 
@@ -172,42 +196,51 @@ interface ProductResult {
 export const getAllProducts = action({
   args: {},
   handler: async () => {
-    let allProducts: ProductResult[] = [];
-    let pageInfo: string | null = null;
-    
-    do {
-      const { json, link } = await shopify(
-        `/products.json?limit=250${pageInfo ? `&page_info=${pageInfo}` : ""}`
-      );
+    try {
+      validateEnvVars();
       
-      const products = (json.products as ShopifyProduct[]).map((p) => ({
-        id: p.id,
-        title: p.title,
-        handle: p.handle,
-        description: p.body_html,
-        vendor: p.vendor,
-        product_type: p.product_type,
-        tags: p.tags,
-        status: p.status,
-        images: p.images.map((img) => ({
-          id: img.id,
-          src: img.src,
-          alt: img.alt,
-        })),
-        variants: p.variants.map((v) => ({
-          id: v.id,
-          title: v.title,
-          price: v.price,
-          sku: v.sku,
-          inventory_quantity: v.inventory_quantity,
-          available: v.available,
-        })),
-      }));
+      let allProducts: ProductResult[] = [];
+      let pageInfo: string | null = null;
       
-      allProducts = [...allProducts, ...products];
-      pageInfo = nextCursor(link);
-    } while (pageInfo);
-    
-    return allProducts;
+      do {
+        const { json, link } = await shopify(
+          `/products.json?limit=250${pageInfo ? `&page_info=${pageInfo}` : ""}`
+        );
+        
+        const products = (json.products as ShopifyProduct[]).map((p) => ({
+          id: p.id,
+          title: p.title,
+          handle: p.handle,
+          description: p.body_html,
+          vendor: p.vendor,
+          product_type: p.product_type,
+          tags: p.tags,
+          status: p.status,
+          images: p.images.map((img) => ({
+            id: img.id,
+            src: img.src,
+            alt: img.alt,
+          })),
+          variants: p.variants.map((v) => ({
+            id: v.id,
+            title: v.title,
+            price: v.price,
+            sku: v.sku,
+            inventory_quantity: v.inventory_quantity,
+            available: v.available,
+          })),
+        }));
+        
+        allProducts = [...allProducts, ...products];
+        pageInfo = nextCursor(link);
+      } while (pageInfo);
+      
+      return allProducts;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch products: ${error.message}`);
+      }
+      throw error;
+    }
   },
 });
