@@ -12,7 +12,8 @@ import {
   CameraIcon,
   CircleDotIcon,
   BatteryChargingIcon,
-  TabletSmartphoneIcon
+  TabletSmartphoneIcon,
+  GamepadIcon
 } from "lucide-react";
 
 export default function Index() {
@@ -128,7 +129,7 @@ export default function Index() {
               We've got skins for all your tech
             </p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
             {[
               { icon: LaptopIcon, label: "Laptop" },
               { icon: SmartphoneIcon, label: "Phones" },
@@ -137,7 +138,8 @@ export default function Index() {
               { icon: CameraIcon, label: "Camera" },
               { icon: CircleDotIcon, label: "Lenses" },
               { icon: BatteryChargingIcon, label: "Chargers" },
-              { icon: TabletSmartphoneIcon, label: "iPad/Tablet" }
+              { icon: TabletSmartphoneIcon, label: "iPad/Tablet" },
+              { icon: GamepadIcon, label: "Gaming Console" }
             ].map((device, index) => (
               <button
                 key={index}
