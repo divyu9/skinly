@@ -5,11 +5,11 @@ import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon, CheckIcon } from "lucide-react";
+import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon, CheckIcon, RefreshCwIcon } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
-import { Authenticated, Unauthenticated } from "convex/react";
-import { SignInButton } from "@/components/ui/signin.tsx";
+import { useAuth } from "@/hooks/use-auth.ts";
+import { ConvexError } from "convex/values";
 
 interface ShopifyProduct {
   id: number;
@@ -38,6 +38,7 @@ export default function ProductDetailPage() {
   const phoneBrand = searchParams.get('brand');
   const getAllProducts = useAction(api.shopify.getAllProducts);
   const addToCart = useMutation(api.cart.addToCart);
+  const { user, signinRedirect } = useAuth();
   const [product, setProduct] = useState<ShopifyProduct | null>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<number>(0);
@@ -233,12 +234,18 @@ export default function ProductDetailPage() {
                   {phoneModel ? (
                     <Card className="border border-primary/20 bg-primary/5">
                       <CardContent className="p-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <CheckIcon className="size-5 text-primary shrink-0" />
                           <div className="flex-1">
                             <p className="text-xs text-muted-foreground mb-1">Selected Phone Model</p>
                             <p className="font-bold text-base">{phoneModel}</p>
                           </div>
+                          <Button size="sm" variant="outline" asChild>
+                            <Link to="/">
+                              <RefreshCwIcon className="size-3 mr-1.5" />
+                              Change
+                            </Link>
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -287,49 +294,51 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                   
-                  <Authenticated>
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      onClick={async () => {
-                        if (!phoneModel) {
-                          toast.error("Please select your phone model first");
-                          return;
-                        }
-                        setIsAdding(true);
-                        try {
-                          await addToCart({
-                            productId: product.id.toString(),
-                            productTitle: product.title,
-                            productImage: product.images[0]?.src,
-                            variant: product.variants[selectedVariant].title,
-                            price: parseFloat(product.variants[selectedVariant].price),
-                            quantity: 1,
-                            phoneModel: phoneModel,
-                            phoneBrand: phoneBrand || undefined,
-                          });
-                          toast.success("Added to cart!");
-                        } catch (error) {
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={async () => {
+                      if (!phoneModel) {
+                        toast.error("Please select your phone model first");
+                        return;
+                      }
+                      
+                      // Check if user is signed in
+                      if (!user) {
+                        toast.info("Please sign in to add items to your cart");
+                        signinRedirect();
+                        return;
+                      }
+                      
+                      setIsAdding(true);
+                      try {
+                        await addToCart({
+                          productId: product.id.toString(),
+                          productTitle: product.title,
+                          productImage: product.images[0]?.src,
+                          variant: product.variants[selectedVariant].title,
+                          price: parseFloat(product.variants[selectedVariant].price),
+                          quantity: 1,
+                          phoneModel: phoneModel,
+                          phoneBrand: phoneBrand || undefined,
+                        });
+                        toast.success("Added to cart!");
+                      } catch (error) {
+                        if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
+                          toast.info("Please sign in to add items to your cart");
+                          signinRedirect();
+                        } else {
                           toast.error("Failed to add to cart");
-                        } finally {
-                          setIsAdding(false);
                         }
-                      }}
-                      disabled={isAdding || !phoneModel}
-                    >
-                      <ShoppingCartIcon className="size-5 mr-2" />
-                      {isAdding ? "Adding..." : "Add to Cart"}
-                    </Button>
-                  </Authenticated>
-                  
-                  <Unauthenticated>
-                    <div className="space-y-3">
-                      <p className="text-sm text-muted-foreground text-center">
-                        Please sign in to add items to your cart
-                      </p>
-                      <SignInButton className="w-full" size="lg" />
-                    </div>
-                  </Unauthenticated>
+                      } finally {
+                        setIsAdding(false);
+                      }
+                    }}
+                    disabled={isAdding || !phoneModel}
+                  >
+                    <ShoppingCartIcon className="size-5 mr-2" />
+                    {isAdding ? "Adding..." : "Add to Cart"}
+                  </Button>
                 </CardContent>
               </Card>
 
