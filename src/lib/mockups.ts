@@ -1,16 +1,82 @@
 /**
  * Utility functions for handling product mockup images
  * 
- * Mockup images should be uploaded to Files & Media with naming convention:
- * {NormalizedModelName}_{SKU}.jpg
+ * Mockup images should be uploaded to Files & Media with this folder structure:
+ * /mockups/{Brand}/{ModelVariation}_{SKU}.jpg
  * 
- * Example: RedmiNote11Pro_M-174.jpg, 15pro_M-174.jpg, SamsungS24_M-174.jpg
+ * Examples:
+ * - /mockups/Apple/15pro_M-174.jpg
+ * - /mockups/Samsung/S24_M-174.jpg
+ * - /mockups/Oppo/15Pro_M-174.jpg
+ * 
+ * Fallback: Will also check /mockups/{ModelVariation}_{SKU}.jpg for backward compatibility
  */
 
 const MOCKUP_BASE_URL = "https://cdn.hercules.app";
 
 // Cache for successful mockup URL patterns
 const mockupCache = new Map<string, string>();
+
+/**
+ * List of supported phone brands
+ * Used to extract brand from model name and organize mockups by brand folder
+ */
+const PHONE_BRANDS = [
+  'Apple',
+  'Samsung',
+  'Xiaomi',
+  'Redmi',
+  'Realme',
+  'Oppo',
+  'Vivo',
+  'OnePlus',
+  'Nothing',
+  'CMF',
+  'Motorola',
+  'Google',
+  'Nokia',
+  'Sony',
+  'Asus',
+  'iQOO',
+  'Honor',
+  'Huawei',
+  'Lenovo',
+] as const;
+
+/**
+ * Extracts brand name from phone model string
+ * 
+ * @param modelName Full phone model name (e.g., "Apple iPhone 15 Pro", "Samsung Galaxy S24")
+ * @returns Brand name or null if not found
+ * 
+ * @example
+ * extractBrand("Apple iPhone 15 Pro") → "Apple"
+ * extractBrand("Samsung Galaxy S24") → "Samsung"
+ * extractBrand("iPhone 15 Pro") → "Apple" (infers from model pattern)
+ */
+export function extractBrand(modelName: string): string | null {
+  const modelLower = modelName.toLowerCase();
+  
+  // Check each brand (case-insensitive)
+  for (const brand of PHONE_BRANDS) {
+    if (modelLower.includes(brand.toLowerCase())) {
+      return brand;
+    }
+  }
+  
+  // Special inference rules for models without explicit brand
+  if (modelLower.includes('iphone') || modelLower.includes('ipad')) {
+    return 'Apple';
+  }
+  if (modelLower.includes('galaxy')) {
+    return 'Samsung';
+  }
+  if (modelLower.includes('pixel')) {
+    return 'Google';
+  }
+  
+  return null;
+}
 
 /**
  * Normalizes phone model name to match image filename format
@@ -149,10 +215,18 @@ export function extractSKU(title: string, sku?: string): string | null {
  * 
  * @param modelVariation Normalized model name variation
  * @param sku SKU code (e.g., "M-174")
+ * @param brand Optional brand name for folder organization
  * @returns Constructed mockup image URL
  */
-function constructMockupUrl(modelVariation: string, sku: string): string {
+function constructMockupUrl(modelVariation: string, sku: string, brand?: string | null): string {
   const filename = `${modelVariation}_${sku}.jpg`;
+  
+  // Use brand folder if provided
+  if (brand) {
+    return `${MOCKUP_BASE_URL}/mockups/${brand}/${filename}`;
+  }
+  
+  // Fallback to root mockups folder
   return `${MOCKUP_BASE_URL}/mockups/${filename}`;
 }
 
@@ -175,13 +249,19 @@ export async function mockupImageExists(imageUrl: string): Promise<boolean> {
  * Finds the correct mockup image URL by trying multiple filename variations
  * Uses a cache to speed up subsequent lookups
  * 
+ * Tries brand folders first (e.g., /mockups/Apple/15pro_M-174.jpg)
+ * Falls back to root mockups folder (e.g., /mockups/15pro_M-174.jpg)
+ * 
  * @param modelName Full phone model name (e.g., "Apple iPhone 15 Pro")
  * @param sku SKU code (e.g., "M-174")
  * @returns Promise that resolves to the mockup URL if found, or null
  * 
  * @example
  * ```ts
- * // Will try: 15pro_M-174.jpg, iPhone15Pro_M-174.jpg, etc.
+ * // Will try:
+ * // - /mockups/Apple/15pro_M-174.jpg
+ * // - /mockups/Apple/iPhone15Pro_M-174.jpg
+ * // - /mockups/15pro_M-174.jpg (fallback)
  * const url = await findMockupImageUrl("Apple iPhone 15 Pro", "M-174");
  * ```
  */
@@ -195,16 +275,31 @@ export async function findMockupImageUrl(
     return mockupCache.get(cacheKey)!;
   }
   
-  // Generate all possible variations
+  // Extract brand for folder organization
+  const brand = extractBrand(modelName);
+  
+  // Generate all possible filename variations
   const variations = generateModelVariations(modelName);
   
-  // Try each variation until we find one that exists
+  // Priority 1: Try brand folder first (most specific)
+  if (brand) {
+    for (const variation of variations) {
+      const url = constructMockupUrl(variation, sku, brand);
+      const exists = await mockupImageExists(url);
+      
+      if (exists) {
+        mockupCache.set(cacheKey, url);
+        return url;
+      }
+    }
+  }
+  
+  // Priority 2: Fall back to root mockups folder (backward compatibility)
   for (const variation of variations) {
-    const url = constructMockupUrl(variation, sku);
+    const url = constructMockupUrl(variation, sku, null);
     const exists = await mockupImageExists(url);
     
     if (exists) {
-      // Cache the successful URL
       mockupCache.set(cacheKey, url);
       return url;
     }
