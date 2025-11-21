@@ -43,6 +43,25 @@ interface ShopifyProduct {
   }>;
 }
 
+// Charger models data
+const chargerModels: Record<string, string[]> = {
+  "Apple": [
+    "Apple Macbook 140W Charger",
+    "Apple USB-C Power Adapter 140W",
+    "Apple USB-C Power Adapter 96W",
+    "Apple USB-C Power Adapter 87W",
+    "Apple USB-C Power Adapter 61W",
+    "Apple USB-C Power Adapter 30W",
+    "Apple USB-C Power Adapter 20W",
+    "Apple USB-C (30W) Power Adapter",
+    "Charger iPhone 11 Series",
+    "Charger 20W USB-C 2021",
+    "Charger 3 Pin",
+    "MagSafe Charger",
+    "iPhone Charger"
+  ]
+};
+
 // Drone models data
 const droneModels: Record<string, string[]> = {
   "DJI": [
@@ -874,7 +893,8 @@ export default function Index() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
   const [showDroneBrandSelectorDialog, setShowDroneBrandSelectorDialog] = useState(false);
-  const [deviceType, setDeviceType] = useState<"phone" | "drone">("phone");
+  const [showChargerBrandSelectorDialog, setShowChargerBrandSelectorDialog] = useState(false);
+  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger">("phone");
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1265,11 +1285,11 @@ export default function Index() {
               { icon: PlaneIcon, label: "Drones", filter: "drone", showBrandSelector: true, type: "drone" as const },
               { icon: CameraIcon, label: "Camera", filter: "camera" },
               { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
-              { icon: BatteryChargingIcon, label: "Chargers", filter: "charger" },
+              { icon: BatteryChargingIcon, label: "Chargers", filter: "charger", showBrandSelector: true, type: "charger" as const },
               { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
               { icon: GamepadIcon, label: "Gaming Console", filter: "console" }
             ].map((device, index) => {
-              // Special handling for Phones and Drones - open brand selector instead of filtering
+              // Special handling for Phones, Drones, and Chargers - open brand selector instead of filtering
               if (device.showBrandSelector) {
                 return (
                   <button
@@ -1281,6 +1301,9 @@ export default function Index() {
                       } else if (device.type === "drone") {
                         setDeviceType("drone");
                         setShowDroneBrandSelectorDialog(true);
+                      } else if (device.type === "charger") {
+                        setDeviceType("charger");
+                        setShowChargerBrandSelectorDialog(true);
                       }
                     }}
                     className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
@@ -1679,15 +1702,49 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
+      {/* Charger Brand Selector Dialog */}
+      <Dialog open={showChargerBrandSelectorDialog} onOpenChange={setShowChargerBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Charger Brand</DialogTitle>
+            <DialogDescription>
+              Choose your charger brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "Apple", logo: "🍎" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("charger");
+                  setShowChargerBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Model Selector Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : "Drone"}
+              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : deviceType === "drone" ? "Drone" : "Charger"}
             </DialogTitle>
             <DialogDescription>
-              Choose your {deviceType === "phone" ? "phone model" : "drone model"} to see compatible skins
+              Choose your {deviceType === "phone" ? "phone model" : deviceType === "drone" ? "drone model" : "charger model"} to see compatible skins
             </DialogDescription>
           </DialogHeader>
           
@@ -1705,7 +1762,11 @@ export default function Index() {
 
           {/* Model List */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-            {selectedBrand && (deviceType === "phone" ? phoneModels[selectedBrand] : droneModels[selectedBrand])
+            {selectedBrand && (
+              deviceType === "phone" ? phoneModels[selectedBrand] : 
+              deviceType === "drone" ? droneModels[selectedBrand] : 
+              chargerModels[selectedBrand]
+            )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
                 model.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1730,7 +1791,11 @@ export default function Index() {
                 </button>
               ))}
             
-            {selectedBrand && (deviceType === "phone" ? phoneModels[selectedBrand] : droneModels[selectedBrand])
+            {selectedBrand && (
+              deviceType === "phone" ? phoneModels[selectedBrand] : 
+              deviceType === "drone" ? droneModels[selectedBrand] : 
+              chargerModels[selectedBrand]
+            )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
                 model.toLowerCase().includes(searchQuery.toLowerCase())
