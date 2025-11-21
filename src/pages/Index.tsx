@@ -1343,6 +1343,10 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [showRequestModelDialog, setShowRequestModelDialog] = useState(false);
+  const [requestedModel, setRequestedModel] = useState("");
+  const [requestedBrand, setRequestedBrand] = useState("");
+  const [requestedCategory, setRequestedCategory] = useState("");
 
   const matteProducts = useMemo(() => 
     products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4),
@@ -1656,13 +1660,30 @@ export default function Index() {
 
                     if (!hasDeviceModels && matchingProducts.length === 0) {
                       return (
-                        <div className="text-center py-8">
-                          <div className="text-muted-foreground mb-2">
-                            No results found for &quot;{homeSearchQuery}&quot;
+                        <div className="text-center py-8 space-y-4">
+                          <div>
+                            <div className="text-muted-foreground mb-2">
+                              No results found for &quot;{homeSearchQuery}&quot;
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Try searching for a device model or design pattern
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            Try searching for a device model or design pattern
-                          </div>
+                          <Button
+                            onClick={() => {
+                              setRequestedModel(homeSearchQuery);
+                              setRequestedBrand("");
+                              setRequestedCategory("General");
+                              setShowSearchResults(false);
+                              setHomeSearchQuery("");
+                              setShowRequestModelDialog(true);
+                            }}
+                            variant="outline"
+                            className="gap-2"
+                          >
+                            <PackageIcon className="size-4" />
+                            Request Your Model
+                          </Button>
                         </div>
                       );
                     }
@@ -2541,11 +2562,82 @@ export default function Index() {
               ?.filter(model => 
                 searchQuery.trim() === "" || 
                 model.toLowerCase().includes(searchQuery.toLowerCase())
-              ).length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  No models found matching &quot;{searchQuery}&quot;
+              ).length === 0 && searchQuery.trim() !== "" && (
+                <div className="text-center py-8 space-y-4">
+                  <div className="text-muted-foreground">
+                    No models found matching &quot;{searchQuery}&quot;
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setRequestedModel(searchQuery);
+                      setRequestedBrand(selectedBrand);
+                      setRequestedCategory(
+                        deviceType === "phone" ? "Phone" : 
+                        deviceType === "drone" ? "Drone" : 
+                        deviceType === "charger" ? "Charger" : 
+                        deviceType === "console" ? "Gaming Console" : 
+                        deviceType === "tablet" ? "Tablet" :
+                        deviceType === "macmini" ? "Mac Mini" :
+                        deviceType === "lens" ? "Lens" :
+                        "Camera"
+                      );
+                      setIsDialogOpen(false);
+                      setShowRequestModelDialog(true);
+                    }}
+                    variant="outline"
+                    className="gap-2"
+                  >
+                    <PackageIcon className="size-4" />
+                    Request Your Model
+                  </Button>
                 </div>
               )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Model Dialog */}
+      <Dialog open={showRequestModelDialog} onOpenChange={setShowRequestModelDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Your Model</DialogTitle>
+            <DialogDescription>
+              We&apos;ll notify you when this model becomes available
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Card className="bg-muted/50 border-2">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Model:</span>
+                  <span className="font-semibold">{requestedModel}</span>
+                </div>
+                {requestedBrand && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Brand:</span>
+                    <span className="font-semibold">{requestedBrand}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Category:</span>
+                  <span className="font-semibold">{requestedCategory}</span>
+                </div>
+              </CardContent>
+            </Card>
+            <div className="text-center text-sm text-muted-foreground">
+              Your request has been noted. We&apos;ll work on adding support for this model and notify you once it&apos;s available.
+            </div>
+            <Button 
+              className="w-full" 
+              onClick={() => {
+                setShowRequestModelDialog(false);
+                setRequestedModel("");
+                setRequestedBrand("");
+                setRequestedCategory("");
+              }}
+            >
+              Got it!
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
