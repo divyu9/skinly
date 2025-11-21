@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
 import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon } from "lucide-react";
-import { Authenticated } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useConvex } from "convex/react";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
 export default function MockupsPage() {
   const [csvData, setCsvData] = useState("");
@@ -248,14 +249,32 @@ export default function MockupsPage() {
   };
   
   return (
-    <Authenticated>
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Mockup Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Upload mockup images with automatic parsing and import
+    <>
+      <Unauthenticated>
+        <div className="container mx-auto py-16 px-4 text-center">
+          <h1 className="text-3xl font-bold mb-4">Mockup Management</h1>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to access the mockup management system
           </p>
+          <SignInButton />
         </div>
+      </Unauthenticated>
+      
+      <AuthLoading>
+        <div className="container mx-auto py-8 px-4">
+          <Skeleton className="h-12 w-64 mb-4" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </AuthLoading>
+      
+      <Authenticated>
+        <div className="container mx-auto py-8 px-4">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold">Mockup Management</h1>
+            <p className="text-muted-foreground mt-2">
+              Upload mockup images with automatic parsing and import
+            </p>
+          </div>
         
         {/* Recommended Method: Direct Upload */}
         <Card className="mb-6 border-green-200 bg-green-50/50">
@@ -568,7 +587,8 @@ Samsung_GalaxyS24_M-174.jpg"
             </CardContent>
           </Card>
         )}
-      </div>
-    </Authenticated>
+        </div>
+      </Authenticated>
+    </>
   );
 }
