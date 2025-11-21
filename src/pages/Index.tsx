@@ -43,6 +43,39 @@ interface ShopifyProduct {
   }>;
 }
 
+// Drone models data
+const droneModels: Record<string, string[]> = {
+  "DJI": [
+    "DJI Mini 4 Pro",
+    "DJI Mavic Pro",
+    "DJI Mavic Air 2S",
+    "DJI Mavic Air 2",
+    "DJI Mavic Air 3",
+    "DJI Mavic Mini",
+    "DJI Mavic Mini 2",
+    "DJI Mavic Mini 3",
+    "DJI Mavic Mini 3 Pro",
+    "DJI Phantom 3",
+    "DJI Phantom 3 Pro",
+    "DJI Phantom 4",
+    "DJI Phantom 4 Pro",
+    "DJI Spark",
+    "DJI FPV",
+    "DJI Mic",
+    "DJI Osmo Mobile SE",
+    "DJI Remote Controller N1",
+    "DJI RC Pro Controller (2024)",
+    "DJI RC Pro Controller (2023)",
+    "DJI RC Controller (2022)",
+    "DJI RC Controller (2022) Standard",
+    "DJI Ronin RS3",
+    "DJI Ronin RS3 Mini"
+  ],
+  "Xiaomi": [
+    "Xiaomi Fimi X8 SE 2020"
+  ]
+};
+
 // Phone models data - extracted from Shopify variants
 const phoneModels: Record<string, string[]> = {
   "Apple": [
@@ -840,6 +873,8 @@ export default function Index() {
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
+  const [showDroneBrandSelectorDialog, setShowDroneBrandSelectorDialog] = useState(false);
+  const [deviceType, setDeviceType] = useState<"phone" | "drone">("phone");
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1225,21 +1260,29 @@ export default function Index() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
             {[
               { icon: LaptopIcon, label: "Laptop", filter: "laptop" },
-              { icon: SmartphoneIcon, label: "Phones", filter: "phone", showBrandSelector: true },
+              { icon: SmartphoneIcon, label: "Phones", filter: "phone", showBrandSelector: true, type: "phone" as const },
               { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini" },
-              { icon: PlaneIcon, label: "Drones", filter: "drone" },
+              { icon: PlaneIcon, label: "Drones", filter: "drone", showBrandSelector: true, type: "drone" as const },
               { icon: CameraIcon, label: "Camera", filter: "camera" },
               { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
               { icon: BatteryChargingIcon, label: "Chargers", filter: "charger" },
               { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
               { icon: GamepadIcon, label: "Gaming Console", filter: "console" }
             ].map((device, index) => {
-              // Special handling for Phones - open brand selector instead of filtering
+              // Special handling for Phones and Drones - open brand selector instead of filtering
               if (device.showBrandSelector) {
                 return (
                   <button
                     key={index}
-                    onClick={() => setShowBrandSelectorDialog(true)}
+                    onClick={() => {
+                      if (device.type === "phone") {
+                        setDeviceType("phone");
+                        setShowBrandSelectorDialog(true);
+                      } else if (device.type === "drone") {
+                        setDeviceType("drone");
+                        setShowDroneBrandSelectorDialog(true);
+                      }
+                    }}
                     className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
                   >
                     <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -1585,6 +1628,7 @@ export default function Index() {
                 onClick={() => {
                   setSelectedBrand(brand.name);
                   setSearchQuery("");
+                  setDeviceType("phone");
                   setShowBrandSelectorDialog(false);
                   setIsDialogOpen(true);
                 }}
@@ -1600,13 +1644,50 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
+      {/* Drone Brand Selector Dialog */}
+      <Dialog open={showDroneBrandSelectorDialog} onOpenChange={setShowDroneBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Drone Brand</DialogTitle>
+            <DialogDescription>
+              Choose your drone brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "DJI", logo: "🛸" },
+              { name: "Xiaomi", logo: "🦊" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("drone");
+                  setShowDroneBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Model Selector Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your {selectedBrand} Model</DialogTitle>
+            <DialogTitle className="text-2xl">
+              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : "Drone"}
+            </DialogTitle>
             <DialogDescription>
-              Choose your phone model to see compatible skins
+              Choose your {deviceType === "phone" ? "phone model" : "drone model"} to see compatible skins
             </DialogDescription>
           </DialogHeader>
           
@@ -1624,7 +1705,7 @@ export default function Index() {
 
           {/* Model List */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-            {selectedBrand && phoneModels[selectedBrand]
+            {selectedBrand && (deviceType === "phone" ? phoneModels[selectedBrand] : droneModels[selectedBrand])
               ?.filter(model => 
                 searchQuery.trim() === "" || 
                 model.toLowerCase().includes(searchQuery.toLowerCase())
@@ -1649,7 +1730,7 @@ export default function Index() {
                 </button>
               ))}
             
-            {selectedBrand && phoneModels[selectedBrand]
+            {selectedBrand && (deviceType === "phone" ? phoneModels[selectedBrand] : droneModels[selectedBrand])
               ?.filter(model => 
                 searchQuery.trim() === "" || 
                 model.toLowerCase().includes(searchQuery.toLowerCase())
