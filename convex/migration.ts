@@ -39,32 +39,54 @@ export const migrateFromShopify = action({
       throw new Error("Shopify credentials not configured");
     }
 
-    const url = `https://${shopDomain}/admin/api/${apiVersion}/products.json?limit=250&status=active`;
-
     try {
-      const response = await fetch(url, {
-        headers: {
-          "X-Shopify-Access-Token": accessToken,
-          "Content-Type": "application/json",
-        },
-      });
+      // Collect all products from all pages
+      const allProducts: ShopifyProduct[] = [];
+      let nextPageUrl: string | null = `https://${shopDomain}/admin/api/${apiVersion}/products.json?limit=250&status=active`;
 
-      if (!response.ok) {
-        throw new Error(`Shopify API error: ${response.statusText}`);
+      // Loop through all pages using pagination
+      while (nextPageUrl) {
+        const response: Response = await fetch(nextPageUrl, {
+          headers: {
+            "X-Shopify-Access-Token": accessToken,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Shopify API error: ${response.statusText}`);
+        }
+
+        const data: { products: ShopifyProduct[] } = await response.json();
+        const products = data.products;
+        allProducts.push(...products);
+
+        // Check for next page in Link header
+        const linkHeader: string | null = response.headers.get("Link");
+        nextPageUrl = null;
+
+        if (linkHeader) {
+          // Parse Link header for rel="next"
+          const links: string[] = linkHeader.split(",");
+          for (const link of links) {
+            const match: RegExpMatchArray | null = link.match(/<([^>]+)>;\s*rel="next"/);
+            if (match) {
+              nextPageUrl = match[1];
+              break;
+            }
+          }
+        }
       }
 
-      const data = await response.json();
-      const products = data.products as ShopifyProduct[];
-
       const migrationResults = {
-        total: products.length,
+        total: allProducts.length,
         successful: 0,
         failed: 0,
         errors: [] as string[],
       };
 
       // Migrate each product
-      for (const shopifyProduct of products) {
+      for (const shopifyProduct of allProducts) {
         try {
           // Create slug from handle
           const slug = shopifyProduct.handle;
