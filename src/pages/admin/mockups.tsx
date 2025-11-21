@@ -190,22 +190,66 @@ export default function MockupsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileTextIcon className="h-5 w-5" />
-              Step 1: Parse File List (Auto-Generate CSV)
+              Step 1: Extract File List (Auto-Generate CSV)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm">
-              <h4 className="font-semibold mb-2">📋 How to use:</h4>
-              <ol className="space-y-1 list-decimal list-inside">
-                <li>Name files: <code className="bg-white px-1">Brand_Model_SKU.jpg</code></li>
-                <li>Upload to Files & Media tab</li>
-                <li>Copy the file list (URLs, file IDs, or filenames)</li>
-                <li>Paste below and click "Generate CSV"</li>
-              </ol>
-              <p className="mt-2 text-xs text-amber-700">
-                Example: <code className="bg-white px-1">Apple_iPhone15Pro_M-174.jpg</code> or 
-                <code className="bg-white px-1 ml-1">Samsung_GalaxyS24_M-174.jpg</code>
-              </p>
+            <div className="bg-amber-50 border border-amber-200 rounded p-4 text-sm space-y-3">
+              <div>
+                <h4 className="font-semibold mb-2">📋 Quick Method (Recommended):</h4>
+                <ol className="space-y-1 list-decimal list-inside ml-2">
+                  <li>Name files: <code className="bg-white px-1">Brand_Model_SKU.jpg</code></li>
+                  <li>Upload to Files & Media tab</li>
+                  <li>Open browser console (F12 or Right-click → Inspect)</li>
+                  <li>Paste this script and press Enter:</li>
+                </ol>
+                <div className="relative">
+                  <div className="bg-gray-900 text-green-400 p-3 rounded text-xs font-mono overflow-x-auto">
+                    {`// Extract all file info from Files & Media page
+const files = [];
+document.querySelectorAll('[data-file-id], img[src*="file_"]').forEach(el => {
+  const fileId = el.dataset?.fileId || el.src?.match(/file_[a-zA-Z0-9]+/)?.[0];
+  const filename = el.alt || el.title || el.textContent || '';
+  if (fileId && filename) files.push(\`\${fileId} \${filename}\`);
+});
+console.log(files.join('\\n'));
+copy(files.join('\\n'));
+alert('Copied ' + files.length + ' files to clipboard!');`}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={() => {
+                      const script = `// Extract all file info from Files & Media page
+const files = [];
+document.querySelectorAll('[data-file-id], img[src*="file_"]').forEach(el => {
+  const fileId = el.dataset?.fileId || el.src?.match(/file_[a-zA-Z0-9]+/)?.[0];
+  const filename = el.alt || el.title || el.textContent || '';
+  if (fileId && filename) files.push(\`\${fileId} \${filename}\`);
+});
+console.log(files.join('\\n'));
+copy(files.join('\\n'));
+alert('Copied ' + files.length + ' files to clipboard!');`;
+                      navigator.clipboard.writeText(script);
+                      toast.success("Script copied! Paste in browser console.");
+                    }}
+                  >
+                    <CopyIcon className="h-3 w-3 mr-1" />
+                    Copy
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-amber-700">
+                  ⚡ Script automatically extracts and copies file list
+                </p>
+              </div>
+              
+              <div className="border-t pt-3">
+                <h4 className="font-semibold mb-2">📝 Manual Method:</h4>
+                <p className="text-xs">
+                  Manually copy file URLs/IDs from Files & Media in any format
+                </p>
+              </div>
             </div>
             
             <div>
