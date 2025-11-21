@@ -199,43 +199,34 @@ export const getAllProducts = action({
     try {
       validateEnvVars();
       
-      let allProducts: ProductResult[] = [];
-      let pageInfo: string | null = null;
+      // Fetch only published products, limit to 250 for speed
+      const { json } = await shopify(`/products.json?limit=250&status=active`);
       
-      do {
-        const { json, link } = await shopify(
-          `/products.json?limit=250${pageInfo ? `&page_info=${pageInfo}` : ""}`
-        );
-        
-        const products = (json.products as ShopifyProduct[]).map((p) => ({
-          id: p.id,
-          title: p.title,
-          handle: p.handle,
-          description: p.body_html,
-          vendor: p.vendor,
-          product_type: p.product_type,
-          tags: p.tags,
-          status: p.status,
-          images: p.images.map((img) => ({
-            id: img.id,
-            src: img.src,
-            alt: img.alt,
-          })),
-          variants: p.variants.map((v) => ({
-            id: v.id,
-            title: v.title,
-            price: v.price,
-            sku: v.sku,
-            inventory_quantity: v.inventory_quantity,
-            available: v.available,
-          })),
-        }));
-        
-        allProducts = [...allProducts, ...products];
-        pageInfo = nextCursor(link);
-      } while (pageInfo);
+      const products = (json.products as ShopifyProduct[]).map((p) => ({
+        id: p.id,
+        title: p.title,
+        handle: p.handle,
+        description: p.body_html,
+        vendor: p.vendor,
+        product_type: p.product_type,
+        tags: p.tags,
+        status: p.status,
+        images: p.images.map((img) => ({
+          id: img.id,
+          src: img.src,
+          alt: img.alt,
+        })),
+        variants: p.variants.map((v) => ({
+          id: v.id,
+          title: v.title,
+          price: v.price,
+          sku: v.sku,
+          inventory_quantity: v.inventory_quantity,
+          available: v.available,
+        })),
+      }));
       
-      return allProducts;
+      return products;
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Failed to fetch products: ${error.message}`);
