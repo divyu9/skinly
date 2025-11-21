@@ -213,3 +213,75 @@ export const clearCart = mutation({
     }
   },
 });
+
+// Sync guest cart to user cart when signing in
+export const syncGuestCart = mutation({
+  args: {
+    guestCartItems: v.array(
+      v.object({
+        productId: v.string(),
+        productTitle: v.string(),
+        productImage: v.optional(v.string()),
+        variant: v.string(),
+        price: v.number(),
+        quantity: v.number(),
+        phoneModel: v.optional(v.string()),
+        phoneBrand: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Add each guest cart item to user's cart
+    for (const item of args.guestCartItems) {
+      // Check if item already exists in cart
+      const existingItem = await ctx.db
+        .query("cart")
+        .withIndex("by_user_and_product", (q) =>
+          q.eq("userId", user._id).eq("productId", item.productId).eq("variant", item.variant)
+        )
+        .unique();
+
+      if (existingItem) {
+        // Update quantity if item exists
+        await ctx.db.patch(existingItem._id, {
+          quantity: existingItem.quantity + item.quantity,
+        });
+      } else {
+        // Add new item
+        await ctx.db.insert("cart", {
+          userId: user._id,
+          productId: item.productId,
+          productTitle: item.productTitle,
+          productImage: item.productImage,
+          variant: item.variant,
+          price: item.price,
+          quantity: item.quantity,
+          phoneModel: item.phoneModel,
+          phoneBrand: item.phoneBrand,
+        });
+      }
+    }
+  },
+});

@@ -9,6 +9,7 @@ import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon, CheckIcon, RefreshCwIcon 
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth.ts";
+import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { ConvexError } from "convex/values";
 
 interface ShopifyProduct {
@@ -39,6 +40,7 @@ export default function ProductDetailPage() {
   const getAllProducts = useAction(api.shopify.getAllProducts);
   const addToCart = useMutation(api.cart.addToCart);
   const { user, signinRedirect } = useAuth();
+  const { addToGuestCart } = useGuestCart();
   const [product, setProduct] = useState<ShopifyProduct | null>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<number>(0);
@@ -303,16 +305,10 @@ export default function ProductDetailPage() {
                         return;
                       }
                       
-                      // Check if user is signed in
-                      if (!user) {
-                        toast.info("Please sign in to add items to your cart");
-                        signinRedirect();
-                        return;
-                      }
-                      
                       setIsAdding(true);
+                      
                       try {
-                        await addToCart({
+                        const cartItem = {
                           productId: product.id.toString(),
                           productTitle: product.title,
                           productImage: product.images[0]?.src,
@@ -321,12 +317,31 @@ export default function ProductDetailPage() {
                           quantity: 1,
                           phoneModel: phoneModel,
                           phoneBrand: phoneBrand || undefined,
-                        });
+                        };
+                        
+                        if (user) {
+                          // Add to authenticated cart
+                          await addToCart(cartItem);
+                        } else {
+                          // Add to guest cart
+                          addToGuestCart(cartItem);
+                        }
+                        
                         toast.success("Added to cart!");
                       } catch (error) {
                         if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
-                          toast.info("Please sign in to add items to your cart");
-                          signinRedirect();
+                          // Fallback to guest cart if auth fails
+                          addToGuestCart({
+                            productId: product.id.toString(),
+                            productTitle: product.title,
+                            productImage: product.images[0]?.src,
+                            variant: product.variants[selectedVariant].title,
+                            price: parseFloat(product.variants[selectedVariant].price),
+                            quantity: 1,
+                            phoneModel: phoneModel,
+                            phoneBrand: phoneBrand || undefined,
+                          });
+                          toast.success("Added to cart!");
                         } else {
                           toast.error("Failed to add to cart");
                         }
