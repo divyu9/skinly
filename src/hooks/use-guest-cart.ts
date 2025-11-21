@@ -9,6 +9,7 @@ export interface GuestCartItem {
   quantity: number;
   phoneModel?: string;
   phoneBrand?: string;
+  coverage?: "only_back" | "full_body_wrap";
 }
 
 const GUEST_CART_KEY = "skinly_guest_cart";

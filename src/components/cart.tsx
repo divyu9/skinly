@@ -190,6 +190,11 @@ function CartContent() {
                         For: {item.phoneModel}
                       </p>
                     )}
+                    {item.coverage && (
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Coverage: {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
+                      </p>
+                    )}
                     {item.variant !== "Default Title" && (
                       <p className="text-xs text-muted-foreground mb-2">
                         Variant: {item.variant}

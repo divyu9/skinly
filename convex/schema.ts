@@ -18,6 +18,7 @@ export default defineSchema({
     quantity: v.number(),
     phoneModel: v.optional(v.string()),
     phoneBrand: v.optional(v.string()),
+    coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_product", ["userId", "productId", "variant"]),
@@ -43,6 +44,7 @@ export default defineSchema({
         quantity: v.number(),
         phoneModel: v.optional(v.string()),
         phoneBrand: v.optional(v.string()),
+        coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
       })
     ),
     subtotal: v.number(),

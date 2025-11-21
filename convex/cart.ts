@@ -77,6 +77,7 @@ export const addToCart = mutation({
     quantity: v.number(),
     phoneModel: v.optional(v.string()),
     phoneBrand: v.optional(v.string()),
+    coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -113,6 +114,7 @@ export const addToCart = mutation({
       // Update quantity if item exists
       await ctx.db.patch(existingItem._id, {
         quantity: existingItem.quantity + args.quantity,
+        coverage: args.coverage,
       });
       return existingItem._id;
     } else {
@@ -127,6 +129,7 @@ export const addToCart = mutation({
         quantity: args.quantity,
         phoneModel: args.phoneModel,
         phoneBrand: args.phoneBrand,
+        coverage: args.coverage,
       });
       return cartId;
     }
@@ -227,6 +230,7 @@ export const syncGuestCart = mutation({
         quantity: v.number(),
         phoneModel: v.optional(v.string()),
         phoneBrand: v.optional(v.string()),
+        coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
       })
     ),
   },
@@ -267,6 +271,7 @@ export const syncGuestCart = mutation({
         // Update quantity if item exists
         await ctx.db.patch(existingItem._id, {
           quantity: existingItem.quantity + item.quantity,
+          coverage: item.coverage,
         });
       } else {
         // Add new item
@@ -280,6 +285,7 @@ export const syncGuestCart = mutation({
           quantity: item.quantity,
           phoneModel: item.phoneModel,
           phoneBrand: item.phoneBrand,
+          coverage: item.coverage,
         });
       }
     }

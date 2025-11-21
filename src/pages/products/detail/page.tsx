@@ -181,6 +181,7 @@ export default function ProductDetailPage() {
   const { addToGuestCart } = useGuestCart();
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<number>(0);
+  const [selectedCoverage, setSelectedCoverage] = useState<"only_back" | "full_body_wrap">("only_back");
   const [isAdding, setIsAdding] = useState(false);
   
   const isLoading = productData === undefined;
@@ -437,25 +438,60 @@ export default function ProductDetailPage() {
 
               {/* Phone Model Selection */}
               {phoneModel ? (
-                <Card className="border-primary/20 bg-primary/5">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <CheckIcon className="size-5 text-primary shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-xs text-muted-foreground">Selected Model</p>
-                        <p className="font-semibold">{phoneModel}</p>
+                <div className="space-y-4">
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <CheckIcon className="size-5 text-primary shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground">Selected Model</p>
+                          <p className="font-semibold">{phoneModel}</p>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setModelDialogOpen(true)}
+                        >
+                          <RefreshCwIcon className="size-3 mr-1" />
+                          Change
+                        </Button>
                       </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => setModelDialogOpen(true)}
+                    </CardContent>
+                  </Card>
+
+                  {/* Coverage Selection */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Select Coverage</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setSelectedCoverage("only_back")}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          selectedCoverage === "only_back"
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
                       >
-                        <RefreshCwIcon className="size-3 mr-1" />
-                        Change
-                      </Button>
+                        <div className="font-medium text-sm">Only Back</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Back coverage only
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => setSelectedCoverage("full_body_wrap")}
+                        className={`p-4 rounded-lg border-2 transition-all text-left ${
+                          selectedCoverage === "full_body_wrap"
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <div className="font-medium text-sm">Full Body Wrap</div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Complete protection
+                        </div>
+                      </button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ) : (
                 <Card className="border-amber-500/50 bg-amber-500/10">
                   <CardContent className="p-4">
@@ -525,6 +561,7 @@ export default function ProductDetailPage() {
                       quantity: 1,
                       phoneModel: phoneModel,
                       phoneBrand: phoneBrand || undefined,
+                      coverage: selectedCoverage,
                     };
                     
                     if (user) {
@@ -545,6 +582,7 @@ export default function ProductDetailPage() {
                         quantity: 1,
                         phoneModel: phoneModel,
                         phoneBrand: phoneBrand || undefined,
+                        coverage: selectedCoverage,
                       });
                       toast.success("Added to cart!");
                     } else {

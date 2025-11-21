@@ -77,6 +77,7 @@ export const createOrder = mutation({
         quantity: item.quantity,
         phoneModel: item.phoneModel,
         phoneBrand: item.phoneBrand,
+        coverage: item.coverage,
       })),
       subtotal,
       shippingFee,
