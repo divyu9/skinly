@@ -42,7 +42,7 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { findMockupImageUrl, extractSKU } from "@/lib/mockups.ts";
+import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 
 // Phone models data
 const phoneModels: Record<string, string[]> = {
@@ -187,6 +187,18 @@ export default function ProductDetailPage() {
   // Fetch active coupons
   const activeCoupons = useQuery(api.coupons.getActiveCoupons);
   
+  // Query mockup file ID from database
+  const mockupFileId = useQuery(
+    api.mockups.getMockupFileId,
+    phoneModel && productData
+      ? {
+          brand: extractBrand(phoneModel) || "",
+          model: phoneModel,
+          sku: extractSKU(productData.title, productData.variants[0]?.sku) || "",
+        }
+      : "skip"
+  );
+  
   // Filter coupons to only show applicable ones for this product
   const applicableCoupons = useMemo(() => {
     if (!activeCoupons || !productData) return [];
@@ -223,8 +235,8 @@ export default function ProductDetailPage() {
       
       setMockupLoading(true);
       try {
-        // Try to find mockup with multiple filename variations
-        const url = await findMockupImageUrl(phoneModel, sku);
+        // Use database file ID if available (fast), otherwise try filename variations (slower)
+        const url = await findMockupImageUrl(phoneModel, sku, mockupFileId);
         setMockupUrl(url);
       } catch (error) {
         console.error('Error loading mockup:', error);
@@ -235,7 +247,7 @@ export default function ProductDetailPage() {
     }
     
     loadMockup();
-  }, [phoneModel, productData]);
+  }, [phoneModel, productData, mockupFileId]);
   
   // Filter images based on selected phone model and mockup URLs
   const displayImages = useMemo(() => {

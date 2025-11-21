@@ -12,6 +12,7 @@ import AdminCollectionsPage from "./pages/admin/collections/page.tsx";
 import NewProductPage from "./pages/admin/products/new/page.tsx";
 import EditProductPage from "./pages/admin/products/edit/page.tsx";
 import AdminOrdersPage from "./pages/admin/orders/page.tsx";
+import AdminMockupsPage from "./pages/admin/mockups.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/admin/products/:productId" element={<EditProductPage />} />
           <Route path="/admin/collections" element={<AdminCollectionsPage />} />
           <Route path="/admin/orders" element={<AdminOrdersPage />} />
+          <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

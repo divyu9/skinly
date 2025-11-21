@@ -1,18 +1,15 @@
 /**
  * Utility functions for handling product mockup images
  * 
- * Mockup images should be uploaded to Files & Media and mapped in mockup-mappings.ts
+ * Mockup images are stored in the database for scalability.
+ * To manage 100,000+ mockups:
+ * 1. Go to Admin Dashboard → Mockups tab
+ * 2. Use CSV bulk import tool
  * 
- * How to add mockups:
- * 1. Upload image to Files & Media tab
- * 2. Copy the file ID from the URL (starts with "file_")
- * 3. Add to mockup-mappings.ts: "Brand|Model|SKU": "file_id"
- * 
- * Example:
- * - "Apple|iPhone 15 Pro|M-174": "file_abc123"
+ * CSV Format:
+ * brand,model,sku,fileId
+ * Apple,iPhone 15 Pro,M-174,file_abc123
  */
-
-import { getMockupFileId } from './mockup-mappings.ts';
 
 const MOCKUP_BASE_URL = "https://cdn.hercules.app";
 
@@ -248,25 +245,40 @@ export async function mockupImageExists(imageUrl: string): Promise<boolean> {
 }
 
 /**
+ * Constructs mockup image URL from file ID
+ * 
+ * @param fileId Hercules CDN file ID from database query
+ * @returns Full CDN URL
+ */
+export function getMockupUrl(fileId: string): string {
+  return `${MOCKUP_BASE_URL}/${fileId}`;
+}
+
+/**
  * Finds the correct mockup image URL
  * 
- * Priority 1: Checks mockup-mappings.ts for file ID
- * Priority 2: Tries multiple filename variations (legacy support)
+ * Priority 1: Uses provided fileId from database (recommended)
+ * Priority 2: Tries legacy filename variations (backward compatibility)
  * 
  * @param modelName Full phone model name (e.g., "Apple iPhone 15 Pro")
  * @param sku SKU code (e.g., "M-174")
+ * @param fileId Optional file ID from database query
  * @returns Promise that resolves to the mockup URL if found, or null
  * 
  * @example
  * ```ts
- * // Looks up: "Apple|iPhone 15 Pro|M-174" in mockup-mappings.ts
- * // Returns: https://cdn.hercules.app/file_abc123
+ * // With database fileId (recommended):
+ * const fileId = useQuery(api.mockups.getMockupFileId, {...});
+ * const url = await findMockupImageUrl("Apple iPhone 15 Pro", "M-174", fileId);
+ * 
+ * // Legacy fallback (slower):
  * const url = await findMockupImageUrl("Apple iPhone 15 Pro", "M-174");
  * ```
  */
 export async function findMockupImageUrl(
   modelName: string,
-  sku: string
+  sku: string,
+  fileId?: string | null
 ): Promise<string | null> {
   // Check cache first
   const cacheKey = `${modelName}_${sku}`;
@@ -274,20 +286,15 @@ export async function findMockupImageUrl(
     return mockupCache.get(cacheKey)!;
   }
   
-  // Extract brand
-  const brand = extractBrand(modelName);
-  
-  // Priority 1: Check mapping file for file ID
-  if (brand) {
-    const fileId = getMockupFileId(brand, modelName, sku);
-    if (fileId) {
-      const url = `${MOCKUP_BASE_URL}/${fileId}`;
-      mockupCache.set(cacheKey, url);
-      return url;
-    }
+  // Priority 1: Use provided file ID from database
+  if (fileId) {
+    const url = getMockupUrl(fileId);
+    mockupCache.set(cacheKey, url);
+    return url;
   }
   
   // Priority 2: Try legacy filename variations (backward compatibility)
+  const brand = extractBrand(modelName);
   const variations = generateModelVariations(modelName);
   
   // Try brand folder paths

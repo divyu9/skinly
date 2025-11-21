@@ -130,4 +130,13 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_active", ["isActive"]),
+
+  mockups: defineTable({
+    brand: v.string(), // e.g., "Apple", "Samsung"
+    model: v.string(), // e.g., "iPhone 15 Pro", "Galaxy S24"
+    sku: v.string(), // e.g., "M-174"
+    fileId: v.string(), // Hercules CDN file ID (e.g., "file_abc123")
+  })
+    .index("by_brand_model_sku", ["brand", "model", "sku"])
+    .index("by_sku", ["sku"]),
 });

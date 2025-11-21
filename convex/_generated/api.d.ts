@@ -14,6 +14,7 @@ import type * as coupons from "../coupons.js";
 import type * as fixCoupon from "../fixCoupon.js";
 import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
+import type * as mockups from "../mockups.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
 import type * as reviews from "../reviews.js";
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   fixCoupon: typeof fixCoupon;
   migration: typeof migration;
   migrationInternal: typeof migrationInternal;
+  mockups: typeof mockups;
   orders: typeof orders;
   products: typeof products;
   reviews: typeof reviews;
