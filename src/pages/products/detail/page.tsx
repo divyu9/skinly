@@ -177,9 +177,30 @@ export default function ProductDetailPage() {
   );
   
   // Determine if this is a phone skin (check product tags or title)
-  const isPhoneSkin = productData?.tags?.some(tag => 
-    tag.toLowerCase().includes("phone") || tag.toLowerCase().includes("skin")
-  ) || productData?.title.toLowerCase().includes("phone skin") || false;
+  // Exclude cases, covers, camera rings, membranes, and tempered glass
+  const isPhoneSkin = productData ? (() => {
+    const titleLower = productData.title.toLowerCase();
+    const tagsLower = productData.tags?.map(t => t.toLowerCase()) || [];
+    
+    // Exclude products that are not skins
+    const isNotSkin = 
+      titleLower.includes("case") ||
+      titleLower.includes("cover") ||
+      titleLower.includes("camera ring") ||
+      titleLower.includes("membrane") ||
+      titleLower.includes("tempered") ||
+      titleLower.includes("glass") ||
+      titleLower.includes("screen guard") ||
+      titleLower.includes("protector");
+    
+    if (isNotSkin) return false;
+    
+    // Check if it's actually a phone skin
+    const isSkin = titleLower.includes("phone skin") ||
+      titleLower.includes("skin") && (titleLower.includes("phone") || titleLower.includes("matte") || titleLower.includes("3d embossed") || titleLower.includes("transparent"));
+    
+    return isSkin;
+  })() : false;
   
   // Fetch cross-sell products
   const crossSellProducts = useQuery(
@@ -207,7 +228,9 @@ export default function ProductDetailPage() {
   }
 
   const handleAddToCart = async () => {
-    if (!product || !phoneModel) return;
+    if (!product) return;
+    // Only require phoneModel for phone skins
+    if (isPhoneSkin && !phoneModel) return;
     
     setIsAdding(true);
     
@@ -219,9 +242,9 @@ export default function ProductDetailPage() {
         variant: product.variants[selectedVariant].title,
         price: product.variants[selectedVariant].price,
         quantity: 1,
-        phoneModel: phoneModel,
+        phoneModel: phoneModel || undefined,
         phoneBrand: phoneBrand || undefined,
-        coverage: selectedCoverage,
+        coverage: isPhoneSkin ? selectedCoverage : undefined,
       };
       
       if (user) {
@@ -241,9 +264,9 @@ export default function ProductDetailPage() {
           variant: product.variants[selectedVariant].title,
           price: product.variants[selectedVariant].price,
           quantity: 1,
-          phoneModel: phoneModel,
+          phoneModel: phoneModel || undefined,
           phoneBrand: phoneBrand || undefined,
-          coverage: selectedCoverage,
+          coverage: isPhoneSkin ? selectedCoverage : undefined,
         });
         toast.success("Added to cart!");
         setCrossSellDialogOpen(false);
@@ -455,26 +478,28 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* USPs */}
-              <div className="space-y-3">
-                {skinUSPs.map((usp, idx) => (
-                  <div 
-                    key={idx} 
-                    className={`flex items-start gap-2 text-sm ${
-                      usp.highlighted 
-                        ? "bg-amber-500/10 border border-amber-500/30 rounded-lg p-3" 
-                        : ""
-                    }`}
-                  >
-                    <usp.icon className={`size-4 shrink-0 mt-0.5 ${
-                      usp.highlighted ? "text-amber-600" : "text-primary"
-                    }`} />
-                    <span className={usp.highlighted ? "text-foreground font-medium" : "text-muted-foreground"}>
-                      {usp.text}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              {/* USPs - Only for phone skins */}
+              {isPhoneSkin && (
+                <div className="space-y-3">
+                  {skinUSPs.map((usp, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`flex items-start gap-2 text-sm ${
+                        usp.highlighted 
+                          ? "bg-amber-500/10 border border-amber-500/30 rounded-lg p-3" 
+                          : ""
+                      }`}
+                    >
+                      <usp.icon className={`size-4 shrink-0 mt-0.5 ${
+                        usp.highlighted ? "text-amber-600" : "text-primary"
+                      }`} />
+                      <span className={usp.highlighted ? "text-foreground font-medium" : "text-muted-foreground"}>
+                        {usp.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Description */}
               {product.description && (
@@ -499,82 +524,84 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Phone Model Selection */}
-              {phoneModel ? (
-                <div className="space-y-4">
-                  <Card className="border-primary/20 bg-primary/5">
+              {/* Phone Model Selection - Only for phone skins */}
+              {isPhoneSkin && (
+                phoneModel ? (
+                  <div className="space-y-4">
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <CheckIcon className="size-5 text-primary shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">Selected Model</p>
+                            <p className="font-semibold">{phoneModel}</p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => setModelDialogOpen(true)}
+                          >
+                            <RefreshCwIcon className="size-3 mr-1" />
+                            Change
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Coverage Selection */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Select Coverage</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          onClick={() => setSelectedCoverage("only_back")}
+                          className={`p-4 rounded-lg border-2 transition-all text-left ${
+                            selectedCoverage === "only_back"
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Only Back</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Back coverage only
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => setSelectedCoverage("full_body_wrap")}
+                          className={`p-4 rounded-lg border-2 transition-all text-left ${
+                            selectedCoverage === "full_body_wrap"
+                              ? "border-primary bg-primary/10"
+                              : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <div className="font-medium text-sm">Full Body Wrap</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Complete protection
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <Card className="border-amber-500/50 bg-amber-500/10">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <CheckIcon className="size-5 text-primary shrink-0" />
+                        <div className="text-xl shrink-0">📱</div>
                         <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">Selected Model</p>
-                          <p className="font-semibold">{phoneModel}</p>
+                          <p className="text-sm font-semibold">Select Your Phone Model</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Ensure perfect fit for your device
+                          </p>
                         </div>
                         <Button 
-                          size="sm" 
-                          variant="outline"
+                          size="sm"
                           onClick={() => setModelDialogOpen(true)}
                         >
-                          <RefreshCwIcon className="size-3 mr-1" />
-                          Change
+                          Select
                         </Button>
                       </div>
                     </CardContent>
                   </Card>
-
-                  {/* Coverage Selection */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Select Coverage</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setSelectedCoverage("only_back")}
-                        className={`p-4 rounded-lg border-2 transition-all text-left ${
-                          selectedCoverage === "only_back"
-                            ? "border-primary bg-primary/10"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                      >
-                        <div className="font-medium text-sm">Only Back</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Back coverage only
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => setSelectedCoverage("full_body_wrap")}
-                        className={`p-4 rounded-lg border-2 transition-all text-left ${
-                          selectedCoverage === "full_body_wrap"
-                            ? "border-primary bg-primary/10"
-                            : "border-border hover:border-primary/50"
-                        }`}
-                      >
-                        <div className="font-medium text-sm">Full Body Wrap</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Complete protection
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <Card className="border-amber-500/50 bg-amber-500/10">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="text-xl shrink-0">📱</div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold">Select Your Phone Model</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Ensure perfect fit for your device
-                        </p>
-                      </div>
-                      <Button 
-                        size="sm"
-                        onClick={() => setModelDialogOpen(true)}
-                      >
-                        Select
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                )
               )}
               
               {/* Variant Selection */}
@@ -607,7 +634,8 @@ export default function ProductDetailPage() {
                 className="w-full"
                 size="lg"
                 onClick={() => {
-                  if (!phoneModel) {
+                  // Only require phone model for phone skins
+                  if (isPhoneSkin && !phoneModel) {
                     toast.error("Please select your phone model first");
                     return;
                   }
@@ -619,7 +647,7 @@ export default function ProductDetailPage() {
                     handleAddToCart();
                   }
                 }}
-                disabled={isAdding || !phoneModel}
+                disabled={isAdding || (isPhoneSkin && !phoneModel)}
               >
                 <ShoppingCartIcon className="size-5 mr-2" />
                 {isAdding ? "Adding..." : "Add to Cart"}
