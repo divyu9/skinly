@@ -4,14 +4,15 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Input } from "@/components/ui/input.tsx";
 
 function AdminProductsPageInner() {
   const products = useQuery(api.products.getAllProducts, {});
@@ -22,6 +23,7 @@ function AdminProductsPageInner() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCheckingCount, setIsCheckingCount] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const handleCheckCount = async () => {
     setIsCheckingCount(true);
@@ -130,6 +132,23 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     }
   };
 
+  // Filter products based on search query
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (!searchQuery.trim()) return products;
+    
+    const query = searchQuery.toLowerCase().trim();
+    return products.filter((product) => {
+      return (
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query) ||
+        product.slug.toLowerCase().includes(query) ||
+        product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+        (product.collection?.name.toLowerCase().includes(query))
+      );
+    });
+  }, [products, searchQuery]);
+
   if (products === undefined) {
     return (
       <div className="space-y-4">
@@ -145,7 +164,11 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-muted-foreground">Manage your product catalog</p>
+          <p className="text-muted-foreground">
+            {searchQuery 
+              ? `${filteredProducts.length} of ${products.length} products` 
+              : `Manage your product catalog (${products.length} products)`}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {products && products.length > 0 && (
@@ -176,6 +199,22 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         </div>
       </div>
 
+      {/* Search Bar */}
+      {products.length > 0 && (
+        <div className="max-w-md">
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search products by title, description, tags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+      )}
+
       {products.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -196,9 +235,26 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             </Link>
           </EmptyContent>
         </Empty>
+      ) : filteredProducts.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SearchIcon />
+            </EmptyMedia>
+            <EmptyTitle>No products found</EmptyTitle>
+            <EmptyDescription>
+              No products match your search &quot;{searchQuery}&quot;
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={() => setSearchQuery("")} variant="outline">
+              Clear Search
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
         <div className="space-y-4">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <Card key={product._id}>
               <CardContent className="p-6">
                 <div className="flex gap-4">
