@@ -495,7 +495,42 @@ const phoneModels: Record<string, string[]> = {
     // A series
     "Vivo A33S"
   ],
-  "iQOO": ["iQOO 12", "iQOO 11", "iQOO Neo 9 Pro", "iQOO Neo 9"],
+  "iQOO": [
+    // Number series
+    "IQOO 13 5G",
+    "IQOO 12 5G",
+    "IQOO 11 5G",
+    "IQOO 9T",
+    "IQOO 9 Pro 5G",
+    "IQOO 9 SE 5G",
+    "IQOO 9 5G",
+    "IQOO 7 Legend",
+    "IQOO 7",
+    "IQOO 3",
+    // Neo series
+    "IQOO Neo 10R",
+    "IQOO Neo 9 Pro",
+    "IQOO Neo 7 PRO",
+    "IQOO Neo 7 PR",
+    "IQOO Neo 7 5G",
+    "IQOO Neo 6 5G",
+    "IQOO Neo 3",
+    // Z series
+    "IQOO Z9X",
+    "IQOO Z9S",
+    "IQOO Z9",
+    "IQOO Z7 S 5G",
+    "IQOO Z7 Pro",
+    "IQOO Z7",
+    "IQOO Z6 Lite 5G",
+    "IQOO Z6 PRO 5G",
+    "IQOO Z6 44W",
+    "IQOO Z6 5G",
+    "IQOO Z5",
+    "IQOO Z3 5G",
+    "IQOO Z3",
+    "IQOO Z1X"
+  ],
   "Xiaomi": ["Xiaomi 14 Pro", "Xiaomi 14", "Xiaomi 13 Pro", "Xiaomi 13", "Redmi Note 13 Pro+", "Redmi Note 13 Pro"],
   "Lava": ["Lava Blaze 2", "Lava Agni 2"],
   "Infinix": ["Infinix Note 30 Pro", "Infinix Zero 30"],
