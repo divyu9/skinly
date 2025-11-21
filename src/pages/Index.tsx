@@ -16,9 +16,9 @@ import {
   GamepadIcon,
   SearchIcon
 } from "lucide-react";
-import { useAction } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   Dialog,
@@ -31,15 +31,21 @@ import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { Link } from "react-router-dom";
 
-interface ShopifyProduct {
-  id: number;
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
+interface ConvexProduct {
+  _id: Id<"products">;
   title: string;
-  handle: string;
-  images: Array<{ id: number; src: string; alt: string | null }>;
+  slug: string;
+  description: string;
+  status: "active" | "draft" | "archived";
+  images: Array<{ url: string; alt?: string }>;
+  tags: string[];
   variants: Array<{
-    id: number;
+    _id: Id<"variants">;
     title: string;
-    price: string;
+    price: number;
+    inventoryQuantity: number;
   }>;
 }
 
@@ -1318,9 +1324,11 @@ const phoneModels: Record<string, string[]> = {
 };
 
 export default function Index() {
-  const getAllProducts = useAction(api.shopify.getAllProducts);
-  const [products, setProducts] = useState<ShopifyProduct[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  // Query products from Convex database
+  const allProducts = useQuery(api.products.getAllProducts, { status: "active" }) as ConvexProduct[] | undefined;
+  const products = allProducts ?? [];
+  const isLoadingProducts = allProducts === undefined;
+  
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
@@ -1336,26 +1344,21 @@ export default function Index() {
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const data = await getAllProducts({});
-        setProducts(data);
-      } catch (err) {
-        console.error("Failed to load products:", err);
-      } finally {
-        setIsLoadingProducts(false);
-      }
-    }
-    fetchProducts();
-  }, [getAllProducts]);
-
-  const matteProducts = products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4);
-  const embossedProducts = products.filter(p => 
-    p.title.toLowerCase().includes('3d textured') || 
-    p.title.toLowerCase().includes('3d embossed')
-  ).slice(0, 4);
-  const transparentProducts = products.filter(p => p.title.toLowerCase().includes('tranzy')).slice(0, 4);
+  const matteProducts = useMemo(() => 
+    products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4),
+    [products]
+  );
+  const embossedProducts = useMemo(() =>
+    products.filter(p => 
+      p.title.toLowerCase().includes('3d textured') || 
+      p.title.toLowerCase().includes('3d embossed')
+    ).slice(0, 4),
+    [products]
+  );
+  const transparentProducts = useMemo(() =>
+    products.filter(p => p.title.toLowerCase().includes('tranzy')).slice(0, 4),
+    [products]
+  );
 
   const features = [
     {
@@ -1521,8 +1524,8 @@ export default function Index() {
                           <div className="space-y-1">
                             {matchingProducts.slice(0, 8).map((product) => (
                               <Link
-                                key={product.id}
-                                to={`/products/detail?id=${product.handle}`}
+                                key={product._id}
+                                to={`/products/detail?id=${product.slug}`}
                                 onClick={() => {
                                   setHomeSearchQuery("");
                                   setShowSearchResults(false);
@@ -1532,8 +1535,8 @@ export default function Index() {
                                 <div className="size-12 bg-muted rounded overflow-hidden flex-shrink-0">
                                   {product.images[0] ? (
                                     <img 
-                                      src={product.images[0].src} 
-                                      alt={product.title}
+                                      src={product.images[0].url} 
+                                      alt={product.images[0].alt || product.title}
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
@@ -1818,11 +1821,11 @@ export default function Index() {
                 ) : matteProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {matteProducts.map((product) => (
-                      <div key={product.id} className="aspect-square overflow-hidden rounded-lg bg-muted">
+                      <div key={product._id} className="aspect-square overflow-hidden rounded-lg bg-muted">
                         {product.images[0] ? (
                           <img 
-                            src={product.images[0].src} 
-                            alt={product.title}
+                            src={product.images[0].url} 
+                            alt={product.images[0].alt || product.title}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -1864,11 +1867,11 @@ export default function Index() {
                 ) : embossedProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {embossedProducts.map((product) => (
-                      <div key={product.id} className="aspect-square overflow-hidden rounded-lg bg-muted">
+                      <div key={product._id} className="aspect-square overflow-hidden rounded-lg bg-muted">
                         {product.images[0] ? (
                           <img 
-                            src={product.images[0].src} 
-                            alt={product.title}
+                            src={product.images[0].url} 
+                            alt={product.images[0].alt || product.title}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -1910,11 +1913,11 @@ export default function Index() {
                 ) : transparentProducts.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2">
                     {transparentProducts.map((product) => (
-                      <div key={product.id} className="aspect-square overflow-hidden rounded-lg bg-muted">
+                      <div key={product._id} className="aspect-square overflow-hidden rounded-lg bg-muted">
                         {product.images[0] ? (
                           <img 
-                            src={product.images[0].src} 
-                            alt={product.title}
+                            src={product.images[0].url} 
+                            alt={product.images[0].alt || product.title}
                             className="w-full h-full object-cover"
                           />
                         ) : (
