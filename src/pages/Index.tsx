@@ -1,6 +1,19 @@
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
-import { ShieldCheckIcon, SparklesIcon, PackageIcon, TruckIcon } from "lucide-react";
+import { 
+  ShieldCheckIcon, 
+  SparklesIcon, 
+  PackageIcon, 
+  TruckIcon,
+  LaptopIcon,
+  SmartphoneIcon,
+  MonitorIcon,
+  PlaneIcon,
+  CameraIcon,
+  CircleDotIcon,
+  BatteryChargingIcon,
+  TabletSmartphoneIcon
+} from "lucide-react";
 
 export default function Index() {
   const features = [
@@ -100,6 +113,42 @@ export default function Index() {
                 className="relative rounded-3xl shadow-2xl w-full object-cover aspect-square"
               />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Device Selector Section */}
+      <section className="py-20 px-4 bg-muted/30">
+        <div className="container mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
+              What Needs a Makeover?
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+              We've got skins for all your tech
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            {[
+              { icon: LaptopIcon, label: "Laptop" },
+              { icon: SmartphoneIcon, label: "Phones" },
+              { icon: MonitorIcon, label: "Mac Mini" },
+              { icon: PlaneIcon, label: "Drones" },
+              { icon: CameraIcon, label: "Camera" },
+              { icon: CircleDotIcon, label: "Lenses" },
+              { icon: BatteryChargingIcon, label: "Chargers" },
+              { icon: TabletSmartphoneIcon, label: "iPad/Tablet" }
+            ].map((device, index) => (
+              <button
+                key={index}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <device.icon className="size-8 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-center">{device.label}</span>
+              </button>
+            ))}
           </div>
         </div>
       </section>
