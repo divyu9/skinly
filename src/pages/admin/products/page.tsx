@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -23,6 +23,110 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 
+// Variant editor component for inline editing
+function VariantEditor({ 
+  variant, 
+  onUpdate 
+}: { 
+  variant: { 
+    _id: Id<"variants">; 
+    title: string; 
+    sku: string; 
+    price: number; 
+    inventoryQuantity: number; 
+  }; 
+  onUpdate: () => void;
+}) {
+  const updateVariant = useMutation(api.products.updateVariant);
+  const [price, setPrice] = useState(variant.price.toString());
+  const [stock, setStock] = useState(variant.inventoryQuantity.toString());
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const handlePriceChange = (value: string) => {
+    setPrice(value);
+    setHasChanges(true);
+  };
+
+  const handleStockChange = (value: string) => {
+    setStock(value);
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    const priceNum = parseFloat(price);
+    const stockNum = parseInt(stock, 10);
+
+    if (isNaN(priceNum) || priceNum < 0) {
+      toast.error("Please enter a valid price");
+      return;
+    }
+
+    if (isNaN(stockNum) || stockNum < 0) {
+      toast.error("Please enter a valid stock quantity");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateVariant({
+        variantId: variant._id,
+        price: priceNum,
+        inventoryQuantity: stockNum,
+      });
+      toast.success("Variant updated successfully");
+      setHasChanges(false);
+      onUpdate();
+    } catch (error) {
+      toast.error("Failed to update variant");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{variant.title}</p>
+        <p className="text-xs text-muted-foreground">SKU: {variant.sku}</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Price (₹)</label>
+          <Input
+            type="number"
+            value={price}
+            onChange={(e) => handlePriceChange(e.target.value)}
+            className="w-24 h-8 text-sm"
+            min="0"
+            step="0.01"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Stock</label>
+          <Input
+            type="number"
+            value={stock}
+            onChange={(e) => handleStockChange(e.target.value)}
+            className="w-20 h-8 text-sm"
+            min="0"
+            step="1"
+          />
+        </div>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={!hasChanges || isSaving}
+          className="h-8 mt-5"
+        >
+          <SaveIcon className="size-4 mr-1" />
+          {isSaving ? "Saving..." : "Save"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function AdminProductsPageInner() {
   const products = useQuery(api.products.getAllProducts, {});
   const deleteProduct = useMutation(api.products.deleteProduct);
@@ -33,6 +137,7 @@ function AdminProductsPageInner() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCheckingCount, setIsCheckingCount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -152,6 +257,18 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       default:
         return "";
     }
+  };
+
+  const toggleProductExpanded = (productId: string) => {
+    setExpandedProducts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
   };
 
   // Filter products based on search query
@@ -330,7 +447,34 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       </span>
                     </div>
 
+                    {/* Variants - Inline Editing */}
+                    {expandedProducts.has(product._id) && product.variants.length > 0 && (
+                      <div className="space-y-2 mb-4">
+                        <div className="text-sm font-medium text-muted-foreground mb-2">
+                          Variants - Edit Price & Stock:
+                        </div>
+                        {product.variants.map((variant) => (
+                          <VariantEditor
+                            key={variant._id}
+                            variant={variant}
+                            onUpdate={() => {
+                              // The data will auto-refresh via Convex reactivity
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2">
+                      {product.variants.length > 0 && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => toggleProductExpanded(product._id)}
+                        >
+                          {expandedProducts.has(product._id) ? "Hide" : "Show"} Variants
+                        </Button>
+                      )}
                       <Link to={`/admin/products/${product._id}`}>
                         <Button size="sm" variant="outline">
                           <EditIcon className="size-4 mr-2" />
