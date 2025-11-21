@@ -22,7 +22,8 @@ import {
   MapPinIcon,
   XCircleIcon,
   BanknoteIcon,
-  PackageCheckIcon
+  PackageCheckIcon,
+  AlertTriangleIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -682,6 +683,14 @@ export default function ProductDetailPage() {
                   <BanknoteIcon className="size-4 text-red-500 shrink-0" />
                   <span className="text-muted-foreground">COD Not Available</span>
                 </div>
+                {isPhoneSkin && (
+                  <div className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-2">
+                    <AlertTriangleIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span className="text-foreground">
+                      <strong>Custom Cut Product:</strong> No order cancellation or changes allowed after order confirmation. Your product is custom-cut upon order placement.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
