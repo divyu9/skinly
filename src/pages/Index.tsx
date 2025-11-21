@@ -43,6 +43,22 @@ interface ShopifyProduct {
   }>;
 }
 
+// Console models data
+const consoleModels: Record<string, string[]> = {
+  "PlayStation": [
+    "PS5 - Disk",
+    "PS5 - Digital",
+    "PS5 Slim - Disk",
+    "PS5 Slim - Digital",
+    "PS5 Controller"
+  ],
+  "Xbox": [
+    "Xbox S",
+    "Xbox X",
+    "Xbox Controller"
+  ]
+};
+
 // Charger models data
 const chargerModels: Record<string, string[]> = {
   "Apple": [
@@ -923,7 +939,8 @@ export default function Index() {
   const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
   const [showDroneBrandSelectorDialog, setShowDroneBrandSelectorDialog] = useState(false);
   const [showChargerBrandSelectorDialog, setShowChargerBrandSelectorDialog] = useState(false);
-  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger">("phone");
+  const [showConsoleBrandSelectorDialog, setShowConsoleBrandSelectorDialog] = useState(false);
+  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console">("phone");
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1316,9 +1333,9 @@ export default function Index() {
               { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
               { icon: BatteryChargingIcon, label: "Chargers", filter: "charger", showBrandSelector: true, type: "charger" as const },
               { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
-              { icon: GamepadIcon, label: "Gaming Console", filter: "console" }
+              { icon: GamepadIcon, label: "Gaming Console", filter: "console", showBrandSelector: true, type: "console" as const }
             ].map((device, index) => {
-              // Special handling for Phones, Drones, and Chargers - open brand selector instead of filtering
+              // Special handling for Phones, Drones, Chargers, and Consoles - open brand selector instead of filtering
               if (device.showBrandSelector) {
                 return (
                   <button
@@ -1333,6 +1350,9 @@ export default function Index() {
                       } else if (device.type === "charger") {
                         setDeviceType("charger");
                         setShowChargerBrandSelectorDialog(true);
+                      } else if (device.type === "console") {
+                        setDeviceType("console");
+                        setShowConsoleBrandSelectorDialog(true);
                       }
                     }}
                     className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
@@ -1771,15 +1791,50 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
+      {/* Console Brand Selector Dialog */}
+      <Dialog open={showConsoleBrandSelectorDialog} onOpenChange={setShowConsoleBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Gaming Console Brand</DialogTitle>
+            <DialogDescription>
+              Choose your gaming console brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "PlayStation", logo: "🎮" },
+              { name: "Xbox", logo: "🎯" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("console");
+                  setShowConsoleBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Model Selector Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : deviceType === "drone" ? "Drone" : "Charger"}
+              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : deviceType === "drone" ? "Drone" : deviceType === "charger" ? "Charger" : "Console"}
             </DialogTitle>
             <DialogDescription>
-              Choose your {deviceType === "phone" ? "phone model" : deviceType === "drone" ? "drone model" : "charger model"} to see compatible skins
+              Choose your {deviceType === "phone" ? "phone model" : deviceType === "drone" ? "drone model" : deviceType === "charger" ? "charger model" : "console model"} to see compatible skins
             </DialogDescription>
           </DialogHeader>
           
@@ -1800,7 +1855,8 @@ export default function Index() {
             {selectedBrand && (
               deviceType === "phone" ? phoneModels[selectedBrand] : 
               deviceType === "drone" ? droneModels[selectedBrand] : 
-              chargerModels[selectedBrand]
+              deviceType === "charger" ? chargerModels[selectedBrand] :
+              consoleModels[selectedBrand]
             )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
@@ -1829,7 +1885,8 @@ export default function Index() {
             {selectedBrand && (
               deviceType === "phone" ? phoneModels[selectedBrand] : 
               deviceType === "drone" ? droneModels[selectedBrand] : 
-              chargerModels[selectedBrand]
+              deviceType === "charger" ? chargerModels[selectedBrand] :
+              consoleModels[selectedBrand]
             )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
