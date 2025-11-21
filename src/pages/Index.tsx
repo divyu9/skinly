@@ -600,7 +600,13 @@ const phoneModels: Record<string, string[]> = {
     // Other Xiaomi
     "Xiaomi Black Shark 2"
   ],
-  "Lava": ["Lava Blaze 2", "Lava Agni 2"],
+  "Lava": [
+    "LAVA Agni 3 (5G)",
+    "LAVA Agni 2 (5G)",
+    "LAVA Blaze Curve (5G)",
+    "LAVA Blaze Pro",
+    "LAVA Blaze (5G)"
+  ],
   "Infinix": ["Infinix Note 30 Pro", "Infinix Zero 30"],
   "Asus": ["ROG Phone 8 Pro", "ROG Phone 8", "Zenfone 11 Ultra"],
   "HMD": [
