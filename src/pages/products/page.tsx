@@ -9,7 +9,6 @@ import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon } from "lucide-react
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
-import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -421,14 +420,35 @@ export default function ProductsPage() {
 
           {/* Important Notice for Finish Pages */}
           {finishFilter && (
-            <Alert className="mb-8 border-2 border-primary bg-primary/5">
-              <InfoIcon className="size-5" />
-              <AlertDescription className="text-base">
-                <strong className="font-semibold">Good news!</strong> All the designs you see here are available for your device. 
-                The images are for reference to show you how the design and colors actually look on any phone. 
-                When you select a design, you'll be asked to choose your specific phone model.
-              </AlertDescription>
-            </Alert>
+            <Card className="mb-8 border-2 border-primary bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row items-center gap-6">
+                  {/* Left side - Icons */}
+                  <div className="flex gap-3 shrink-0">
+                    <div className="size-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                      📱
+                    </div>
+                    <div className="size-16 bg-gradient-to-br from-secondary to-accent rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                      ✨
+                    </div>
+                    <div className="size-16 bg-gradient-to-br from-accent to-primary rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                      ✓
+                    </div>
+                  </div>
+                  
+                  {/* Right side - Text */}
+                  <div className="flex-1 text-center md:text-left space-y-2">
+                    <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                      <InfoIcon className="size-5 text-primary" />
+                      <h3 className="text-2xl font-bold text-primary">Good News!</h3>
+                    </div>
+                    <p className="text-base leading-relaxed">
+                      <strong className="font-semibold">All designs are available for your device!</strong> The images you see are for reference to show how the design and colors actually look on any phone. When you select a design, you'll be asked to choose your specific phone model.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
