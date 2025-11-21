@@ -1,22 +1,125 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon, CheckIcon, RefreshCwIcon } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { ConvexError } from "convex/values";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
+
+// Phone models data
+const phoneModels: Record<string, string[]> = {
+  "Apple": [
+    "iPhone 17 Pro Max", "iPhone 17 Pro", "iPhone 17 Air", "iPhone 17",
+    "iPhone 16E", "iPhone 16 Pro Max", "iPhone 16 pro max", "iPhone 16 pro",
+    "iPhone 16 Plus", "iPhone 16", "iPhone 15 Pro Max", "iPhone 15 Pro",
+    "iPhone 15 Plus", "iPhone 15", "iPhone 14 Pro Max", "iPhone 14 Pro",
+    "iPhone 14 Plus", "iPhone 14", "iPhone 13 Pro Max", "iPhone 13 Pro",
+    "iPhone 13 Mini", "iPhone 13", "iPhone 12 Pro Max", "iPhone 12 Pro",
+    "iPhone 12 Mini", "iPhone 12", "iPhone 11 Pro Max", "iPhone 11 Pro",
+    "iPhone 11", "iPhone XS Max", "iPhone XS", "iPhone XR", "iPhone X",
+    "iPhone 8 Plus", "iPhone 8", "iPhone 7 Plus", "iPhone 7",
+    "iPhone 6S Plus", "iPhone 6S", "iPhone 6 Plus", "iPhone 6",
+    "iPhone SE", "iPhone 5E", "iPhone 5S", "iPhone 5"
+  ],
+  "Samsung": [
+    "Samsung Galaxy S25 Edge", "Samsung Galaxy S25 Plus", "Samsung Galaxy S25 Ultra (5G)",
+    "Samsung Galaxy S25 (5G)", "Samsung Galaxy S24 Ultra (5G)", "Samsung Galaxy S24 Plus",
+    "Samsung Galaxy S24 (5G)", "Samsung Galaxy S24 FE (5G)", "Samsung Galaxy S23 FE (5G)",
+    "Samsung Galaxy S23 (5G)", "Samsung Galaxy S22 Ultra", "Samsung Galaxy S22 Plus",
+    "Samsung Galaxy S22", "Samsung Galaxy S21 Ultra 5G", "Samsung Galaxy S21 Plus 5G",
+    "Samsung Galaxy S21 FE 5G", "Samsung Galaxy S21 5G", "Samsung Galaxy Z Fold 5",
+    "Samsung Galaxy Z Fold 4", "Samsung Galaxy Z Flip 5", "Samsung Galaxy Z Flip 4"
+  ],
+  "OnePlus": [
+    "OnePlus 13 Pro", "OnePlus 13", "OnePlus 12", "OnePlus 11 5G", "OnePlus 10 Pro 5G",
+    "OnePlus 9 Pro", "OnePlus 9", "OnePlus 8T", "OnePlus 8 Pro", "OnePlus Nord 4",
+    "OnePlus Nord 3", "OnePlus Nord CE 4", "OnePlus Nord CE 3"
+  ],
+  "Nothing": [
+    "Nothing Phone 3A Pro", "Nothing Phone 3A", "Nothing Phone 2A",
+    "Nothing Phone 2", "Nothing Phone 1 5G"
+  ],
+  "Oppo": [
+    "Oppo Find 8X Pro (5G)", "Oppo Find 8X (5G)", "Oppo Reno 14 Pro 5G",
+    "Oppo Reno 14 5G", "Oppo Reno 13 Pro (5G)", "Oppo Reno 12 Pro (5G)",
+    "Oppo F31 Pro Plus 5G", "Oppo F29 Pro (5G)", "Oppo F27 Pro Plus (5G)"
+  ],
+  "Realme": [
+    "Realme GT 7T 5G", "Realme GT7 Pro 5G", "Realme P4 Pro 5G", "Realme P4 5G",
+    "Realme 15 Pro 5G", "Realme 14 Pro Plus (5G)", "Realme 13 Pro Plus 5G",
+    "Realme 12 Pro Plus (5G)", "Realme 11 Pro Plus"
+  ],
+  "Vivo": [
+    "Vivo X200 Pro (5G)", "Vivo X200 (5G)", "Vivo X100 Pro", "Vivo V60 5G",
+    "Vivo V50 5G", "Vivo V40 5G", "Vivo V30 Pro (5G)", "Vivo V29 Pro (5G)"
+  ],
+  "Xiaomi": [
+    "Xiaomi 15 Ultra", "Xiaomi 15 Pro", "Xiaomi 15", "Xiaomi 14 Ultra",
+    "Xiaomi 14 Pro", "Xiaomi 14", "Xiaomi 13 Pro", "Redmi Note 14 Pro Plus 5G",
+    "Redmi Note 13 Pro Plus", "Poco X7 Pro", "Poco F6"
+  ],
+  "CMF": ["CMF Phone 2 Pro", "CMF Phone 1"],
+  "Motorola": [
+    "Motorola Edge 60 Ultra", "Motorola Edge 50 Pro", "Motorola Edge 40",
+    "Moto G85", "Moto G75", "Moto G64"
+  ],
+  "Google": ["Google Pixel 9 Pro XL", "Google Pixel 9 Pro", "Google Pixel 8 Pro"]
+};
 
 export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const productSlug = searchParams.get('slug');
   const phoneModel = searchParams.get('model');
   const phoneBrand = searchParams.get('brand');
+  
+  // Model selector state
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [modelSearch, setModelSearch] = useState("");
+  
+  // Filter models based on search
+  const filteredModels = useMemo(() => {
+    if (!modelSearch.trim()) return phoneModels[selectedBrand] || [];
+    
+    const searchTerms = modelSearch
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((term) => term.length > 0);
+    
+    return (phoneModels[selectedBrand] || []).filter((model) => {
+      const modelLower = model.toLowerCase();
+      return searchTerms.every((term) => modelLower.includes(term));
+    });
+  }, [selectedBrand, modelSearch]);
+  
+  // Handle model selection
+  const handleModelSelect = (model: string, brand: string) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    newSearchParams.set('model', model);
+    newSearchParams.set('brand', brand);
+    navigate({
+      pathname: '/products/detail',
+      search: newSearchParams.toString(),
+    });
+    setModelDialogOpen(false);
+    setSelectedBrand("");
+    setModelSearch("");
+  };
   
   // Query local database
   const productData = useQuery(
@@ -215,11 +318,13 @@ export default function ProductDetailPage() {
                             <p className="text-xs text-muted-foreground mb-1">Selected Phone Model</p>
                             <p className="font-bold text-base">{phoneModel}</p>
                           </div>
-                          <Button size="sm" variant="outline" asChild>
-                            <Link to="/">
-                              <RefreshCwIcon className="size-3 mr-1.5" />
-                              Change
-                            </Link>
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => setModelDialogOpen(true)}
+                          >
+                            <RefreshCwIcon className="size-3 mr-1.5" />
+                            Change
                           </Button>
                         </div>
                       </CardContent>
@@ -234,8 +339,13 @@ export default function ProductDetailPage() {
                             <p className="text-xs text-muted-foreground mb-3">
                               Select your phone model to ensure perfect fit
                             </p>
-                            <Button size="sm" variant="outline" asChild className="w-full">
-                              <Link to="/">Select Phone Model</Link>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => setModelDialogOpen(true)}
+                            >
+                              Select Phone Model
                             </Button>
                           </div>
                         </div>
@@ -353,6 +463,85 @@ export default function ProductDetailPage() {
           </div>
         </div>
       </section>
+      
+      {/* Model Selector Dialog */}
+      <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          {!selectedBrand ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Select Phone Brand</DialogTitle>
+                <DialogDescription>Choose your phone brand to see available models</DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pr-2">
+                {Object.keys(phoneModels).sort().map((brand) => (
+                  <Button
+                    key={brand}
+                    variant="outline"
+                    className="h-auto py-4"
+                    onClick={() => setSelectedBrand(brand)}
+                  >
+                    {brand}
+                  </Button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>Select {selectedBrand} Model</DialogTitle>
+                <DialogDescription>
+                  {filteredModels.length} models available
+                </DialogDescription>
+              </DialogHeader>
+              <Input
+                placeholder={`Search ${selectedBrand} models...`}
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                className="mb-2"
+              />
+              <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+                {filteredModels.length > 0 ? (
+                  filteredModels.map((model) => (
+                    <Button
+                      key={model}
+                      variant="outline"
+                      className="w-full justify-start text-left h-auto py-3"
+                      onClick={() => handleModelSelect(model, selectedBrand)}
+                    >
+                      {model}
+                    </Button>
+                  ))
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                    <p className="text-muted-foreground">No models found matching "{modelSearch}"</p>
+                    <a
+                      href={`https://wa.me/919761011121?text=${encodeURIComponent("I Want to request a model on Skinly")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                    >
+                      Request Your Model
+                    </a>
+                  </div>
+                )}
+              </div>
+              <div className="pt-4 border-t">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSelectedBrand("");
+                    setModelSearch("");
+                  }}
+                  className="w-full"
+                >
+                  ← Back to Brands
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
