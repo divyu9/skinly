@@ -5,11 +5,16 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon } from "lucide-react";
+import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon } from "lucide-react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useConvex } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
+
+interface FailedFile {
+  filename: string;
+  reason: string;
+}
 
 export default function MockupsPage() {
   const [csvData, setCsvData] = useState("");
@@ -18,6 +23,7 @@ export default function MockupsPage() {
   const [generatedCsv, setGeneratedCsv] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const [failedFiles, setFailedFiles] = useState<FailedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const convex = useConvex();
@@ -102,11 +108,13 @@ export default function MockupsPage() {
     
     setUploading(true);
     setUploadProgress({ current: 0, total: files.length });
+    setFailedFiles([]); // Reset failed files
     
     let imported = 0;
     let updated = 0;
     let skipped = 0;
     let failed = 0;
+    const failedList: FailedFile[] = [];
     
     try {
       for (let i = 0; i < files.length; i++) {
@@ -118,6 +126,10 @@ export default function MockupsPage() {
           const filename = file.name;
           if (!/^[A-Za-z0-9]+_[A-Za-z0-9\s]+_[A-Za-z0-9-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
             console.warn(`Skipping invalid filename: ${filename}`);
+            failedList.push({
+              filename,
+              reason: "Invalid filename format. Expected: Brand_Model_SKU.jpg"
+            });
             failed++;
             continue;
           }
@@ -130,6 +142,10 @@ export default function MockupsPage() {
             headers: { "Content-Type": file.type },
             body: file,
           });
+          
+          if (!uploadResult.ok) {
+            throw new Error(`Upload failed with status ${uploadResult.status}`);
+          }
           
           const { storageId } = await uploadResult.json();
           
@@ -145,9 +161,15 @@ export default function MockupsPage() {
           
         } catch (error) {
           console.error(`Failed to upload ${file.name}:`, error);
+          failedList.push({
+            filename: file.name,
+            reason: error instanceof Error ? error.message : "Upload or processing error"
+          });
           failed++;
         }
       }
+      
+      setFailedFiles(failedList);
       
       toast.success(
         `Upload complete! ${imported} new, ${updated} updated, ${skipped} skipped, ${failed} failed`
@@ -246,6 +268,35 @@ export default function MockupsPage() {
       console.error('Parse error:', error);
       toast.error("Failed to parse file list");
     }
+  };
+  
+  const handleDownloadFailedReport = () => {
+    if (failedFiles.length === 0) {
+      toast.error("No failed files to download");
+      return;
+    }
+    
+    // Generate CSV report
+    const csvLines = ['Filename,Reason'];
+    failedFiles.forEach(file => {
+      // Escape commas in filename and reason
+      const escapedFilename = file.filename.includes(',') ? `"${file.filename}"` : file.filename;
+      const escapedReason = file.reason.includes(',') ? `"${file.reason}"` : file.reason;
+      csvLines.push(`${escapedFilename},${escapedReason}`);
+    });
+    
+    const csvContent = csvLines.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mockup-failed-files-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success(`Downloaded report with ${failedFiles.length} failed files`);
   };
   
   return (
@@ -347,6 +398,60 @@ export default function MockupsPage() {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Failed Files Report */}
+        {failedFiles.length > 0 && (
+          <Card className="mb-6 border-red-200 bg-red-50/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-red-700">
+                <AlertCircleIcon className="h-5 w-5" />
+                Failed Files Report ({failedFiles.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-white border border-red-200 rounded p-4 text-sm">
+                <p className="font-semibold text-red-800 mb-3">
+                  The following files failed to upload or had naming issues:
+                </p>
+                <div className="max-h-48 overflow-y-auto border border-red-100 rounded">
+                  <table className="w-full text-xs">
+                    <thead className="bg-red-100 sticky top-0">
+                      <tr>
+                        <th className="text-left p-2 font-semibold">Filename</th>
+                        <th className="text-left p-2 font-semibold">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {failedFiles.map((file, idx) => (
+                        <tr key={idx} className="border-t border-red-100">
+                          <td className="p-2 font-mono">{file.filename}</td>
+                          <td className="p-2 text-muted-foreground">{file.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleDownloadFailedReport}
+                  variant="destructive"
+                  className="flex-1"
+                >
+                  <DownloadIcon className="h-4 w-4 mr-2" />
+                  Download Failed Files Report (CSV)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setFailedFiles([])}
+                >
+                  Clear
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         
         <div className="mb-4 text-center text-sm text-muted-foreground">
           — OR use alternative methods below —
