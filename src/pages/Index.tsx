@@ -72,7 +72,36 @@ const cameraModels: Record<string, string[]> = {
     "Nikon Camera"
   ],
   "Canon": [
-    "Canon Camera"
+    "Canon EOS 1D Mark IV",
+    "Canon EOS-1Ds Mark III",
+    "Canon EOS 5D",
+    "Canon EOS 5D Mark II",
+    "Canon EOS 5D Mark III",
+    "Canon EOS 5D Mark IV",
+    "Canon EOS 5DS R",
+    "Canon EOS 6D",
+    "Canon EOS 6D Mark II",
+    "Canon EOS 7D",
+    "Canon EOS 7D Mark II",
+    "Canon EOS 40D",
+    "Canon EOS 50D",
+    "Canon EOS 60D",
+    "Canon EOS 70D",
+    "Canon EOS 77D",
+    "Canon EOS 80D",
+    "Canon EOS 90D",
+    "Canon EOS 200D I",
+    "Canon EOS 300X",
+    "Canon EOS 300X SX",
+    "Canon EOS 500D",
+    "Canon EOS 550D",
+    "Canon EOS R3",
+    "Canon EOS R6 Mark II",
+    "Canon EOS R7",
+    "Canon EOS R With Mount Adapter",
+    "Canon Eos R50",
+    "Canon EOS R100",
+    "Canon PowerShot G7 X Mark II"
   ]
 };
 
