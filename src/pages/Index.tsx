@@ -798,7 +798,23 @@ const phoneModels: Record<string, string[]> = {
     "Infinix 10 Play",
     "Infinix Smart 5A"
   ],
-  "Asus": ["ROG Phone 8 Pro", "ROG Phone 8", "Zenfone 11 Ultra"],
+  "Asus": [
+    // ROG Phone series
+    "Asus ROG Phone 9 FE",
+    "Asus ROG Phone 8 Pro",
+    "Asus ROG Phone 8",
+    "Asus ROG Phone 7 (5G)",
+    "Asus ROG Phone 6 PRO (5G)",
+    "Asus ROG Phone 6 (5G)",
+    "Asus ROG Phone 5",
+    "Asus ROG Phone 4",
+    "Asus ROG Phone 3",
+    "Asus ROG Phone 2",
+    // Zenfone series
+    "Asus Zenfone 12 Ultra",
+    "Asus Zenfone 11 Ultra",
+    "Asus ZENFONE MAX PRO (M1)"
+  ],
   "HMD": [
     "HMD Nokia C300",
     "HMD Nokia G60",
