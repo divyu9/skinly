@@ -839,6 +839,7 @@ export default function Index() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1224,7 +1225,7 @@ export default function Index() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
             {[
               { icon: LaptopIcon, label: "Laptop", filter: "laptop" },
-              { icon: SmartphoneIcon, label: "Phones", filter: "phone" },
+              { icon: SmartphoneIcon, label: "Phones", filter: "phone", showBrandSelector: true },
               { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini" },
               { icon: PlaneIcon, label: "Drones", filter: "drone" },
               { icon: CameraIcon, label: "Camera", filter: "camera" },
@@ -1232,18 +1233,37 @@ export default function Index() {
               { icon: BatteryChargingIcon, label: "Chargers", filter: "charger" },
               { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
               { icon: GamepadIcon, label: "Gaming Console", filter: "console" }
-            ].map((device, index) => (
-              <a
-                key={index}
-                href={`/products?device=${device.filter}`}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <device.icon className="size-8 text-primary" />
-                </div>
-                <span className="text-sm font-semibold text-center">{device.label}</span>
-              </a>
-            ))}
+            ].map((device, index) => {
+              // Special handling for Phones - open brand selector instead of filtering
+              if (device.showBrandSelector) {
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setShowBrandSelectorDialog(true)}
+                    className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+                  >
+                    <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <device.icon className="size-8 text-primary" />
+                    </div>
+                    <span className="text-sm font-semibold text-center">{device.label}</span>
+                  </button>
+                );
+              }
+              
+              // Regular devices - navigate to filtered products page
+              return (
+                <a
+                  key={index}
+                  href={`/products?device=${device.filter}`}
+                  className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+                >
+                  <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <device.icon className="size-8 text-primary" />
+                  </div>
+                  <span className="text-sm font-semibold text-center">{device.label}</span>
+                </a>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1534,6 +1554,51 @@ export default function Index() {
           </div>
         </div>
       </footer>
+
+      {/* Brand Selector Dialog */}
+      <Dialog open={showBrandSelectorDialog} onOpenChange={setShowBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Phone Brand</DialogTitle>
+            <DialogDescription>
+              Choose your phone brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "Apple", logo: "🍎" },
+              { name: "Samsung", logo: "📱" },
+              { name: "Nothing", logo: "⚫" },
+              { name: "Oppo", logo: "🔷" },
+              { name: "Realme", logo: "🟡" },
+              { name: "CMF", logo: "🔸" },
+              { name: "Vivo", logo: "🔵" },
+              { name: "iQOO", logo: "⚡" },
+              { name: "Xiaomi", logo: "🦊" },
+              { name: "Lava", logo: "🌋" },
+              { name: "Infinix", logo: "♾️" },
+              { name: "Asus", logo: "🎮" },
+              { name: "HMD", logo: "📞" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setShowBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-3 p-6 bg-card rounded-xl border-2 border-border hover:border-primary transition-all hover:shadow-lg"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Model Selector Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
