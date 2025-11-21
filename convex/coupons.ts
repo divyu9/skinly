@@ -227,3 +227,26 @@ export const incrementCouponUsage = mutation({
     });
   },
 });
+
+// Update coupon dates (admin only)
+export const updateCouponDates = mutation({
+  args: {
+    couponId: v.id("coupons"),
+    startDate: v.number(),
+    endDate: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+    
+    await ctx.db.patch(args.couponId, {
+      startDate: args.startDate,
+      endDate: args.endDate,
+    });
+  },
+});
