@@ -753,7 +753,51 @@ const phoneModels: Record<string, string[]> = {
     "LAVA Blaze Pro",
     "LAVA Blaze (5G)"
   ],
-  "Infinix": ["Infinix Note 30 Pro", "Infinix Zero 30"],
+  "Infinix": [
+    // GT series
+    "Infinix GT 20 PRO (5G)",
+    "Infinix GT 10 PRO",
+    // Zero series
+    "Infinix Zero 30 (5G)",
+    "Infinix Zero 30 4G",
+    "Infinix Zero 8i",
+    "Infinix Zero 5G",
+    "Infinix Zero (5G)",
+    // Note series
+    "Infinix Note 40X (5G)",
+    "Infinix Note 40 PRO PLUS",
+    "Infinix Note 40 PRO (5G)",
+    "Infinix Note 40 PRO 4G",
+    "Infinix Note 40",
+    "Infinix Note 30 (5G)",
+    "Infinix Note 12 Pro (5G)",
+    "Infinix Note 12 G96",
+    "Infinix Note 11S",
+    "Infinix Note 11",
+    "Infinix Note 10 PRO",
+    "Infinix Note 10",
+    "Infinix Note 8",
+    "Infinix Note 7",
+    "Infinix Note 5",
+    "Infinix Note 4 Pro",
+    // Hot series
+    "Infinix Hot 30i",
+    "Infinix Hot 30",
+    "Infinix Hot 12 Play",
+    "Infinix Hot 11S",
+    "Infinix Hot 11",
+    "Infinix Hot 10S",
+    "Infinix Hot 10",
+    "Infinix Hot 9 PRO",
+    "Infinix Hot 9",
+    "Infinix Hot 7",
+    "Infinix Hot 6",
+    "Infinix Hot 4 PRO",
+    "Infinix Hot 4",
+    // Other models
+    "Infinix 10 Play",
+    "Infinix Smart 5A"
+  ],
   "Asus": ["ROG Phone 8 Pro", "ROG Phone 8", "Zenfone 11 Ultra"],
   "HMD": [
     "HMD Nokia C300",
