@@ -48,23 +48,40 @@ export default function ProductsPage() {
   };
 
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     async function fetchProducts() {
       try {
         setIsLoading(true);
         setError(null);
-        console.log("Fetching products from Shopify...");
+        
+        // Set a timeout to show error if it takes too long
+        timeoutId = setTimeout(() => {
+          setError("Request is taking longer than expected. Please check your Shopify credentials in the Secrets tab.");
+          setIsLoading(false);
+        }, 15000); // 15 second timeout
+        
         const data = await getAllProducts({});
-        console.log("Products fetched:", data.length);
+        clearTimeout(timeoutId);
+        
+        if (!data || data.length === 0) {
+          toast.info("No products found in your Shopify store");
+        }
+        
         setProducts(data);
       } catch (err) {
+        clearTimeout(timeoutId);
         const errorMsg = err instanceof Error ? err.message : "Failed to load products";
-        console.error("Error fetching products:", err);
         setError(errorMsg);
+        toast.error(`Error: ${errorMsg}`);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     }
     fetchProducts();
+    
+    return () => clearTimeout(timeoutId);
   }, [getAllProducts]);
 
   if (isLoading) {
