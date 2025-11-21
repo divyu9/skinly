@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { AlertCircleIcon, PackageIcon } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 interface ShopifyProduct {
   id: number;
@@ -30,19 +31,35 @@ interface ShopifyProduct {
 
 export default function ProductsPage() {
   const getAllProducts = useAction(api.shopify.getAllProducts);
+  const verifyConnection = useAction(api.shopify.verifyConnection);
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const testConnection = async () => {
+    try {
+      const result = await verifyConnection({});
+      toast.success(`Connected to: ${result.shop} (${result.domain})`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Connection failed";
+      toast.error(`Connection Error: ${errorMsg}`);
+      console.error("Shopify connection error:", err);
+    }
+  };
 
   useEffect(() => {
     async function fetchProducts() {
       try {
         setIsLoading(true);
         setError(null);
+        console.log("Fetching products from Shopify...");
         const data = await getAllProducts({});
+        console.log("Products fetched:", data.length);
         setProducts(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load products");
+        const errorMsg = err instanceof Error ? err.message : "Failed to load products";
+        console.error("Error fetching products:", err);
+        setError(errorMsg);
       } finally {
         setIsLoading(false);
       }
@@ -113,7 +130,10 @@ export default function ProductsPage() {
                 </EmptyDescription>
               </EmptyHeader>
               <EmptyContent>
-                <Button onClick={() => window.location.reload()}>Try Again</Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => window.location.reload()}>Try Again</Button>
+                  <Button variant="outline" onClick={testConnection}>Test Connection</Button>
+                </div>
               </EmptyContent>
             </Empty>
           </div>
