@@ -107,6 +107,8 @@ const skinUSPs = [
   { icon: SparklesIcon, text: "High-Resolution Print Quality", highlighted: false },
   { icon: TruckIcon, text: "Bubble-Free Application", highlighted: false },
   { icon: CheckIcon, text: "Easy to Remove & Residue-Free", highlighted: false },
+  { icon: CheckIcon, text: "Easy Installation", highlighted: false },
+  { icon: PackageIcon, text: "Premium Installation Kit Included", highlighted: false },
 ];
 
 export default function ProductDetailPage() {
@@ -571,14 +573,6 @@ export default function ProductDetailPage() {
                 <div className="flex items-center gap-2 text-sm">
                   <PackageCheckIcon className="size-4 text-primary shrink-0" />
                   <span className="text-muted-foreground">Safe Packaging</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <CheckIcon className="size-4 text-primary shrink-0" />
-                  <span className="text-muted-foreground">Easy Installation</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <PackageIcon className="size-4 text-primary shrink-0" />
-                  <span className="text-muted-foreground">Premium Installation Kit Included</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <XCircleIcon className="size-4 text-red-500 shrink-0" />
