@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 
 export function CartButton() {
   const cartCount = useQuery(api.cart.getCartCount);
@@ -194,9 +195,11 @@ function CartContent() {
           <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
         </div>
 
-        <Button className="w-full" size="lg">
-          Proceed to Checkout
-        </Button>
+        <Link to="/checkout" className="block">
+          <Button className="w-full" size="lg">
+            Proceed to Checkout
+          </Button>
+        </Link>
 
         <Button
           variant="outline"
