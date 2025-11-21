@@ -1,11 +1,11 @@
-import { useQuery, useAction } from "convex/react";
+import { usePaginatedQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
@@ -41,8 +41,38 @@ interface ConvexProduct {
 export default function ProductsPage() {
   const verifyConnection = useAction(api.shopify.verifyConnection);
   
-  // Query local database instead of Shopify
-  const productsData = useQuery(api.products.getAllProducts, { status: "active" });
+  // Use paginated query - load 30 products at a time
+  const { results: productsData, status, loadMore } = usePaginatedQuery(
+    api.products.getAllProductsPaginated,
+    { status: "active" },
+    { initialNumItems: 30 }
+  );
+  
+  // Intersection observer for infinite scroll
+  const observerTarget = useRef<HTMLDivElement>(null);
+  
+  const handleLoadMore = useCallback(() => {
+    if (status === "CanLoadMore") {
+      loadMore(30);
+    }
+  }, [status, loadMore]);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [handleLoadMore]);
   
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -70,7 +100,7 @@ export default function ProductsPage() {
 
   // Convert Convex products to the format needed
   const allProducts = useMemo(() => {
-    if (!productsData) return [];
+    if (!productsData || productsData.length === 0) return [];
     
     return productsData.map((product) => ({
       _id: product._id,
@@ -275,9 +305,9 @@ export default function ProductsPage() {
     );
   }
 
-  const isLoading = productsData === undefined;
+  const isInitialLoading = status === "LoadingFirstPage";
   
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
@@ -315,7 +345,7 @@ export default function ProductsPage() {
     );
   }
 
-  if (filteredProducts.length === 0 && !isLoading) {
+  if (filteredProducts.length === 0 && status === "Exhausted") {
     return (
       <div className="min-h-screen">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
@@ -542,6 +572,30 @@ export default function ProductsPage() {
                 </Card>
               );
             })}
+          </div>
+          
+          {/* Infinite scroll trigger */}
+          <div ref={observerTarget} className="py-8 flex justify-center">
+            {status === "LoadingMore" && (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2Icon className="size-5 animate-spin" />
+                <span>Loading more products...</span>
+              </div>
+            )}
+            {status === "CanLoadMore" && (
+              <Button 
+                onClick={handleLoadMore} 
+                variant="outline" 
+                size="lg"
+              >
+                Load More Products
+              </Button>
+            )}
+            {status === "Exhausted" && allProducts.length > 30 && (
+              <p className="text-muted-foreground text-sm">
+                You've reached the end! 🎉
+              </p>
+            )}
           </div>
         </div>
       </section>

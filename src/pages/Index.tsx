@@ -16,7 +16,7 @@ import {
   GamepadIcon,
   SearchIcon
 } from "lucide-react";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -1324,10 +1324,14 @@ const phoneModels: Record<string, string[]> = {
 };
 
 export default function Index() {
-  // Query products from Convex database
-  const allProducts = useQuery(api.products.getAllProducts, { status: "active" }) as ConvexProduct[] | undefined;
-  const products = allProducts ?? [];
-  const isLoadingProducts = allProducts === undefined;
+  // Query products from Convex database - use pagination for better performance
+  const { results: paginatedProducts } = usePaginatedQuery(
+    api.products.getAllProductsPaginated,
+    { status: "active" },
+    { initialNumItems: 50 }
+  );
+  const products = paginatedProducts || [];
+  const isLoadingProducts = !paginatedProducts;
   
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);

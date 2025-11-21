@@ -1,8 +1,58 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 
-// Get all products
+// Get all products with pagination
+export const getAllProductsPaginated = query({
+  args: {
+    status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    let productsQuery;
+
+    if (args.status) {
+      productsQuery = ctx.db
+        .query("products")
+        .withIndex("by_status", (q) => q.eq("status", args.status!));
+    } else {
+      productsQuery = ctx.db.query("products");
+    }
+
+    const result = await productsQuery.paginate(args.paginationOpts);
+    
+    // Fetch ALL variants in one query and group by productId
+    const allVariants = await ctx.db.query("variants").collect();
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+
+    // Build products with their variants
+    const productsWithVariants = result.page.map((product) => {
+      const variants = variantsByProduct.get(product._id) || [];
+      return {
+        ...product,
+        variants,
+        collection: null, // Skip collection lookup for performance
+      };
+    });
+
+    return {
+      page: productsWithVariants,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+// Get all products (non-paginated - keep for backward compatibility)
 export const getAllProducts = query({
   args: {
     status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),

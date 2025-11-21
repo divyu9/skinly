@@ -326,8 +326,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         product.title.toLowerCase().includes(query) ||
         product.description.toLowerCase().includes(query) ||
         product.slug.toLowerCase().includes(query) ||
-        product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-        (product.collection?.name.toLowerCase().includes(query))
+        product.tags.some((tag) => tag.toLowerCase().includes(query))
       );
     });
   }, [products, searchQuery]);
@@ -479,9 +478,6 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
                     <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                       <span>{product.variants.length} variant(s)</span>
-                      {product.collection && (
-                        <span>Collection: {product.collection.name}</span>
-                      )}
                       <span>
                         Total Stock:{" "}
                         {product.variants.reduce(
