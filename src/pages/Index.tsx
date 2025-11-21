@@ -54,6 +54,21 @@ const macMiniModels: Record<string, string[]> = {
   ]
 };
 
+// Camera Lens models data
+const lensModels: Record<string, string[]> = {
+  "Sony": ["Sony Lenses"],
+  "Nikon": ["Nikon Lenses"],
+  "Canon": ["Canon Lenses"],
+  "Sigma": ["Sigma Lenses"],
+  "Tamron": ["Tamron Lenses"],
+  "Samyang": ["Samyang Lenses"],
+  "Vitrox": ["Vitrox Lenses"],
+  "Tokina": ["Tokina Lenses"],
+  "Zeiss": ["Zeiss Lenses"],
+  "Olympus": ["Olympus Lenses"],
+  "Fujifilm": ["Fujifilm Lenses"]
+};
+
 // Camera models data
 const cameraModels: Record<string, string[]> = {
   "Sony": [
@@ -127,7 +142,7 @@ const cameraModels: Record<string, string[]> = {
     "Canon EOS R6 Mark II",
     "Canon EOS R7",
     "Canon EOS R With Mount Adapter",
-    "Canon Eos R50",
+    "Canon EOS R50",
     "Canon EOS R100",
     "Canon PowerShot G7 X Mark II"
   ]
@@ -1102,7 +1117,8 @@ export default function Index() {
   const [showTabletBrandSelectorDialog, setShowTabletBrandSelectorDialog] = useState(false);
   const [showMacMiniBrandSelectorDialog, setShowMacMiniBrandSelectorDialog] = useState(false);
   const [showCameraBrandSelectorDialog, setShowCameraBrandSelectorDialog] = useState(false);
-  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console" | "tablet" | "macmini" | "camera">("phone");
+  const [showLensBrandSelectorDialog, setShowLensBrandSelectorDialog] = useState(false);
+  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console" | "tablet" | "macmini" | "camera" | "lens">("phone");
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1492,7 +1508,7 @@ export default function Index() {
               { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini", showBrandSelector: true, type: "macmini" as const },
               { icon: PlaneIcon, label: "Drones", filter: "drone", showBrandSelector: true, type: "drone" as const },
               { icon: CameraIcon, label: "Camera", filter: "camera", showBrandSelector: true, type: "camera" as const },
-              { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
+              { icon: CircleDotIcon, label: "Lenses", filter: "lens", showBrandSelector: true, type: "lens" as const },
               { icon: BatteryChargingIcon, label: "Chargers", filter: "charger", showBrandSelector: true, type: "charger" as const },
               { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad", showBrandSelector: true, type: "tablet" as const },
               { icon: GamepadIcon, label: "Gaming Console", filter: "console", showBrandSelector: true, type: "console" as const }
@@ -1524,6 +1540,9 @@ export default function Index() {
                       } else if (device.type === "camera") {
                         setDeviceType("camera");
                         setShowCameraBrandSelectorDialog(true);
+                      } else if (device.type === "lens") {
+                        setDeviceType("lens");
+                        setShowLensBrandSelectorDialog(true);
                       }
                     }}
                     className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
@@ -2104,6 +2123,50 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
+      {/* Lens Brand Selector Dialog */}
+      <Dialog open={showLensBrandSelectorDialog} onOpenChange={setShowLensBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Lens Brand</DialogTitle>
+            <DialogDescription>
+              Choose your camera lens brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "Sony", logo: "🔴" },
+              { name: "Nikon", logo: "🟡" },
+              { name: "Canon", logo: "🔵" },
+              { name: "Sigma", logo: "⚫" },
+              { name: "Tamron", logo: "🟢" },
+              { name: "Samyang", logo: "🟣" },
+              { name: "Vitrox", logo: "🟠" },
+              { name: "Tokina", logo: "🟤" },
+              { name: "Zeiss", logo: "⚪" },
+              { name: "Olympus", logo: "🔷" },
+              { name: "Fujifilm", logo: "🟥" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("lens");
+                  setShowLensBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Model Selector Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -2116,6 +2179,7 @@ export default function Index() {
                 deviceType === "console" ? "Console" : 
                 deviceType === "tablet" ? "Tablet" :
                 deviceType === "macmini" ? "Mac Mini" :
+                deviceType === "lens" ? "Lens" :
                 "Camera"
               }
             </DialogTitle>
@@ -2127,6 +2191,7 @@ export default function Index() {
                 deviceType === "console" ? "console model" : 
                 deviceType === "tablet" ? "tablet model" :
                 deviceType === "macmini" ? "Mac Mini model" :
+                deviceType === "lens" ? "lens model" :
                 "camera model"
               } to see compatible skins
             </DialogDescription>
@@ -2153,6 +2218,7 @@ export default function Index() {
               deviceType === "console" ? consoleModels[selectedBrand] :
               deviceType === "tablet" ? tabletModels[selectedBrand] :
               deviceType === "macmini" ? macMiniModels[selectedBrand] :
+              deviceType === "lens" ? lensModels[selectedBrand] :
               cameraModels[selectedBrand]
             )
               ?.filter(model => 
@@ -2186,6 +2252,7 @@ export default function Index() {
               deviceType === "console" ? consoleModels[selectedBrand] :
               deviceType === "tablet" ? tabletModels[selectedBrand] :
               deviceType === "macmini" ? macMiniModels[selectedBrand] :
+              deviceType === "lens" ? lensModels[selectedBrand] :
               cameraModels[selectedBrand]
             )
               ?.filter(model => 
