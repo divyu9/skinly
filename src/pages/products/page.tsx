@@ -404,7 +404,7 @@ export default function ProductsPage() {
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search products..."
+                  placeholder="Search patterns & designs (not phone models)..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 h-12 text-base"
