@@ -256,7 +256,30 @@ const lensModels: Record<string, string[]> = {
     "12-100mm f4",
     "40-150mm f2"
   ],
-  "Fujifilm": ["Fujifilm Lenses"]
+  "Fujifilm": [
+    "120mm F4 Macro R LM OIS WR",
+    "GF 23mm f4 R LM WR",
+    "GF 32-64mm f4 R LM WR",
+    "GF 110 F2 R",
+    "GF 250mm f4 R LM OIS WR",
+    "XC 15-45mm F3.5-5",
+    "XC 16-50mm f3.5-5",
+    "XC 50-230mm",
+    "XF 10-24mm f4 R OIS",
+    "XF 16-55mm f2",
+    "XF 16mm F1",
+    "XF 18-55mm f2",
+    "XF 23mm f1",
+    "XF 23mm f2 R",
+    "XF 35mm f1",
+    "XF 50-140mm f2",
+    "XF 50mm F1",
+    "XF 56mm. f1",
+    "XF 60mm f2",
+    "XF 90mm f2 R LM WR",
+    "XF16-55mmF2",
+    "XF16-80mm F4 R OIS WR"
+  ]
 };
 
 // Camera models data
