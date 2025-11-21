@@ -5,10 +5,11 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
+import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -417,6 +418,18 @@ export default function ProductsPage() {
               </Button>
             )}
           </div>
+
+          {/* Important Notice for Finish Pages */}
+          {finishFilter && (
+            <Alert className="mb-8 border-2 border-primary bg-primary/5">
+              <InfoIcon className="size-5" />
+              <AlertDescription className="text-base">
+                <strong className="font-semibold">Good news!</strong> All the designs you see here are available for your device. 
+                The images are for reference to show you how the design and colors actually look on any phone. 
+                When you select a design, you'll be asked to choose your specific phone model.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredProducts.map((product) => {
