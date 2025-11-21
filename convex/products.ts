@@ -487,11 +487,16 @@ export const getCrossSellProducts = query({
       }
     }
     
-    // For Apple phones: Show AutoApply Tempered Glass + Cases
+    // For Apple phones: Show AutoApply Tempered Glass + Privacy Pack + Cases
     if (args.phoneBrand?.toLowerCase() === "apple") {
       const temperedGlass = allProducts.find(p => 
         p.title.toLowerCase().includes("autoapply") && 
-        p.title.toLowerCase().includes("tempered")
+        p.title.toLowerCase().includes("tempered") &&
+        !p.title.toLowerCase().includes("privacy")
+      );
+      const privacyPack = allProducts.find(p => 
+        p.title.toLowerCase().includes("autoapply") && 
+        p.title.toLowerCase().includes("privacy")
       );
       const appleCase = allProducts.find(p => 
         p.title.toLowerCase().includes("case") && 
@@ -505,6 +510,12 @@ export const getCrossSellProducts = query({
           variants: variantsByProduct.get(temperedGlass._id) || [],
         });
       }
+      if (privacyPack) {
+        crossSells.push({
+          ...privacyPack,
+          variants: variantsByProduct.get(privacyPack._id) || [],
+        });
+      }
       if (appleCase) {
         crossSells.push({
           ...appleCase,
@@ -513,10 +524,15 @@ export const getCrossSellProducts = query({
       }
     }
     
-    // For Samsung phones: Show Cases
+    // For Samsung phones: Show Cases + Camera Rings
     if (args.phoneBrand?.toLowerCase() === "samsung") {
       const samsungCase = allProducts.find(p => 
         p.title.toLowerCase().includes("case") && 
+        p.title.toLowerCase().includes("samsung")
+      );
+      const cameraRings = allProducts.find(p => 
+        p.title.toLowerCase().includes("camera") && 
+        p.title.toLowerCase().includes("ring") &&
         p.title.toLowerCase().includes("samsung")
       );
       
@@ -524,6 +540,12 @@ export const getCrossSellProducts = query({
         crossSells.push({
           ...samsungCase,
           variants: variantsByProduct.get(samsungCase._id) || [],
+        });
+      }
+      if (cameraRings) {
+        crossSells.push({
+          ...cameraRings,
+          variants: variantsByProduct.get(cameraRings._id) || [],
         });
       }
     }

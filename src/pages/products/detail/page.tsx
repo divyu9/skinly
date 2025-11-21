@@ -129,6 +129,7 @@ export default function ProductDetailPage() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewComment, setReviewComment] = useState("");
+  const [crossSellDialogOpen, setCrossSellDialogOpen] = useState(false);
   
   // Filter models based on search
   const filteredModels = useMemo(() => {
@@ -204,6 +205,55 @@ export default function ProductDetailPage() {
   if (product && !selectedImage && product.images[0]) {
     setSelectedImage(product.images[0].url);
   }
+
+  const handleAddToCart = async () => {
+    if (!product || !phoneModel) return;
+    
+    setIsAdding(true);
+    
+    try {
+      const cartItem = {
+        productId: product._id,
+        productTitle: product.title,
+        productImage: product.images[0]?.url,
+        variant: product.variants[selectedVariant].title,
+        price: product.variants[selectedVariant].price,
+        quantity: 1,
+        phoneModel: phoneModel,
+        phoneBrand: phoneBrand || undefined,
+        coverage: selectedCoverage,
+      };
+      
+      if (user) {
+        await addToCart(cartItem);
+      } else {
+        addToGuestCart(cartItem);
+      }
+      
+      toast.success("Added to cart!");
+      setCrossSellDialogOpen(false);
+    } catch (error) {
+      if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
+        addToGuestCart({
+          productId: product._id,
+          productTitle: product.title,
+          productImage: product.images[0]?.url,
+          variant: product.variants[selectedVariant].title,
+          price: product.variants[selectedVariant].price,
+          quantity: 1,
+          phoneModel: phoneModel,
+          phoneBrand: phoneBrand || undefined,
+          coverage: selectedCoverage,
+        });
+        toast.success("Added to cart!");
+        setCrossSellDialogOpen(false);
+      } else {
+        toast.error("Failed to add to cart");
+      }
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   const handleAddReview = async () => {
     if (!product) return;
@@ -556,53 +606,17 @@ export default function ProductDetailPage() {
               <Button
                 className="w-full"
                 size="lg"
-                onClick={async () => {
+                onClick={() => {
                   if (!phoneModel) {
                     toast.error("Please select your phone model first");
                     return;
                   }
                   
-                  setIsAdding(true);
-                  
-                  try {
-                    const cartItem = {
-                      productId: product._id,
-                      productTitle: product.title,
-                      productImage: product.images[0]?.url,
-                      variant: product.variants[selectedVariant].title,
-                      price: product.variants[selectedVariant].price,
-                      quantity: 1,
-                      phoneModel: phoneModel,
-                      phoneBrand: phoneBrand || undefined,
-                      coverage: selectedCoverage,
-                    };
-                    
-                    if (user) {
-                      await addToCart(cartItem);
-                    } else {
-                      addToGuestCart(cartItem);
-                    }
-                    
-                    toast.success("Added to cart!");
-                  } catch (error) {
-                    if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
-                      addToGuestCart({
-                        productId: product._id,
-                        productTitle: product.title,
-                        productImage: product.images[0]?.url,
-                        variant: product.variants[selectedVariant].title,
-                        price: product.variants[selectedVariant].price,
-                        quantity: 1,
-                        phoneModel: phoneModel,
-                        phoneBrand: phoneBrand || undefined,
-                        coverage: selectedCoverage,
-                      });
-                      toast.success("Added to cart!");
-                    } else {
-                      toast.error("Failed to add to cart");
-                    }
-                  } finally {
-                    setIsAdding(false);
+                  // Show cross-sell dialog if products available, otherwise add directly
+                  if (crossSellProducts && crossSellProducts.length > 0) {
+                    setCrossSellDialogOpen(true);
+                  } else {
+                    handleAddToCart();
                   }
                 }}
                 disabled={isAdding || !phoneModel}
@@ -636,55 +650,6 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </div>
-
-          {/* Cross-Sell Products Section */}
-          {crossSellProducts && crossSellProducts.length > 0 && (
-            <div className="border-t border-border pt-12 mb-12">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold mb-2">Protect Your Device</h2>
-                <p className="text-muted-foreground">Complete your protection with these recommended products</p>
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {crossSellProducts.map((crossSellProduct) => {
-                  const minPrice = crossSellProduct.variants.length > 0 
-                    ? Math.min(...crossSellProduct.variants.map(v => v.price))
-                    : 0;
-                  
-                  return (
-                    <Card 
-                      key={crossSellProduct._id}
-                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                      onClick={() => {
-                        navigate(`/products/detail?slug=${crossSellProduct.slug}`);
-                      }}
-                    >
-                      <div className="aspect-square overflow-hidden bg-muted">
-                        {crossSellProduct.images[0] ? (
-                          <img
-                            src={crossSellProduct.images[0].url}
-                            alt={crossSellProduct.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <PackageIcon className="size-12 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold text-sm mb-2 line-clamp-2">
-                          {crossSellProduct.title}
-                        </h3>
-                        <div className="text-primary font-bold">
-                          ₹{minPrice.toFixed(0)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
 
           {/* Reviews Section */}
           <div className="border-t border-border pt-12">
@@ -953,6 +918,82 @@ export default function ProductDetailPage() {
               </Button>
               <Button onClick={handleAddReview}>
                 Submit Review
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cross-Sell Dialog */}
+      <Dialog open={crossSellDialogOpen} onOpenChange={setCrossSellDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">The skin's got your back... but what about the front?</DialogTitle>
+            <DialogDescription className="text-base">
+              Complete 360° protection with these essentials for your device
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Cross-sell products grid */}
+            <div className="grid grid-cols-2 gap-4">
+              {crossSellProducts?.map((crossSellProduct) => {
+                const minPrice = crossSellProduct.variants.length > 0 
+                  ? Math.min(...crossSellProduct.variants.map(v => v.price))
+                  : 0;
+                
+                return (
+                  <button
+                    key={crossSellProduct._id}
+                    onClick={() => {
+                      navigate(`/products/detail?slug=${crossSellProduct.slug}`);
+                      setCrossSellDialogOpen(false);
+                    }}
+                    className="group relative overflow-hidden rounded-lg border-2 border-border hover:border-primary transition-all text-left"
+                  >
+                    <div className="aspect-square overflow-hidden bg-muted">
+                      {crossSellProduct.images[0] ? (
+                        <img
+                          src={crossSellProduct.images[0].url}
+                          alt={crossSellProduct.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <PackageIcon className="size-8 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <h4 className="font-semibold text-sm mb-1 line-clamp-2">
+                        {crossSellProduct.title}
+                      </h4>
+                      <div className="text-primary font-bold text-sm">
+                        ₹{minPrice.toFixed(0)}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-3 pt-4 border-t">
+              <Button 
+                size="lg" 
+                onClick={handleAddToCart}
+                disabled={isAdding}
+                className="w-full"
+              >
+                {isAdding ? "Adding..." : "Just Add The Skin"}
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setCrossSellDialogOpen(false)}
+                className="w-full"
+              >
+                Continue Shopping
               </Button>
             </div>
           </div>
