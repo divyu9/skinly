@@ -1,23 +1,29 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon } from "lucide-react";
+import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon } from "lucide-react";
 import { Authenticated } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { useConvex } from "convex/react";
 
 export default function MockupsPage() {
   const [csvData, setCsvData] = useState("");
   const [importing, setImporting] = useState(false);
   const [fileListData, setFileListData] = useState("");
   const [generatedCsv, setGeneratedCsv] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const convex = useConvex();
   const mockups = useQuery(api.mockups.getAllMockups);
   const bulkImport = useMutation(api.mockups.bulkImportMockups);
   const clearAll = useMutation(api.mockups.clearAllMockups);
+  const storeMockupFile = useMutation(api.mockupsUpload.storeMockupFile);
   
   const handleBulkImport = async () => {
     if (!csvData.trim()) {
@@ -87,6 +93,72 @@ export default function MockupsPage() {
       toast.success(`Deleted ${result.deleted} mockups`);
     } catch (error) {
       toast.error("Failed to clear mockups");
+    }
+  };
+  
+  const handleBulkUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    setUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
+    
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+    let failed = 0;
+    
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress({ current: i + 1, total: files.length });
+        
+        try {
+          // Validate filename format
+          const filename = file.name;
+          if (!/^[A-Za-z0-9]+_[A-Za-z0-9\s]+_[A-Za-z0-9-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+            console.warn(`Skipping invalid filename: ${filename}`);
+            failed++;
+            continue;
+          }
+          
+          // Upload to storage
+          const uploadUrl = await convex.mutation(api.mockups.generateUploadUrl, {});
+          
+          const uploadResult = await fetch(uploadUrl, {
+            method: "POST",
+            headers: { "Content-Type": file.type },
+            body: file,
+          });
+          
+          const { storageId } = await uploadResult.json();
+          
+          // Store mockup with filename
+          const result = await storeMockupFile({
+            fileId: storageId,
+            filename,
+          });
+          
+          if (result.action === "created") imported++;
+          else if (result.action === "updated") updated++;
+          else skipped++;
+          
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+          failed++;
+        }
+      }
+      
+      toast.success(
+        `Upload complete! ${imported} new, ${updated} updated, ${skipped} skipped, ${failed} failed`
+      );
+    } catch (error) {
+      toast.error("Bulk upload failed");
+    } finally {
+      setUploading(false);
+      setUploadProgress({ current: 0, total: 0 });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
   
@@ -181,8 +253,84 @@ export default function MockupsPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold">Mockup Management</h1>
           <p className="text-muted-foreground mt-2">
-            Automatically generate CSV from uploaded file list
+            Upload mockup images with automatic parsing and import
           </p>
+        </div>
+        
+        {/* Recommended Method: Direct Upload */}
+        <Card className="mb-6 border-green-200 bg-green-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-700">
+              <ImageIcon className="h-5 w-5" />
+              ⭐ Recommended: Bulk Upload Mockups
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-white border border-green-200 rounded p-4 text-sm space-y-3">
+              <p className="font-semibold text-green-800">
+                ✨ Upload 100k+ files directly - No manual work required!
+              </p>
+              <ol className="space-y-1.5 list-decimal list-inside ml-2">
+                <li>Name your files: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Brand_Model_SKU.jpg</code></li>
+                <li>Select all mockup files (1000s at once)</li>
+                <li>Upload below - Automatic parsing & import!</li>
+              </ol>
+              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs">
+                <p className="font-semibold mb-1">Examples:</p>
+                <ul className="space-y-0.5 ml-4 list-disc">
+                  <li><code>Apple_iPhone15Pro_M-174.jpg</code></li>
+                  <li><code>Samsung_GalaxyS24_M-174.jpg</code></li>
+                  <li><code>Oppo_15Pro_M-174.jpg</code></li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="border-2 border-dashed border-green-300 rounded-lg p-8 text-center bg-white">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleBulkUpload(e.target.files)}
+                disabled={uploading}
+              />
+              
+              {uploading ? (
+                <div className="space-y-3">
+                  <div className="text-lg font-medium">
+                    Uploading {uploadProgress.current} / {uploadProgress.total}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
+                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">Please wait...</p>
+                </div>
+              ) : (
+                <>
+                  <ImageIcon className="h-12 w-12 mx-auto text-green-600 mb-3" />
+                  <Button
+                    size="lg"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <UploadIcon className="h-5 w-5 mr-2" />
+                    Select Mockup Files
+                  </Button>
+                  <p className="text-sm text-muted-foreground mt-3">
+                    Supports JPG, PNG, WEBP • Can upload 1000s at once
+                  </p>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="mb-4 text-center text-sm text-muted-foreground">
+          — OR use alternative methods below —
         </div>
         
         {/* Step 1: Filename Parser */}

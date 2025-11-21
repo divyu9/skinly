@@ -106,3 +106,13 @@ export const clearAllMockups = mutation({
     return { deleted: mockups.length };
   },
 });
+
+/**
+ * Generate upload URL for mockup files
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
