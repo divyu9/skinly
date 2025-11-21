@@ -74,13 +74,20 @@ const chargerModels: Record<string, string[]> = {
   ],
   "Vivo": [
     "Vivo Flash Charger 44W",
-    "Vivo Flash Charger 80W/120W",
+    "Vivo Flash Charger 80W/",
     "Vivo Flash Charger 2.0 33W",
-    "Vivo Travel Adapter V051"
+    "Vivo Travel Adapter V0510A"
   ],
   "Xiaomi": [
     "Xiaomi Sonic Charge 2.0",
-    "Xiaomi Sonic Charger 67W"
+    "Xiaomi Sonic Charger 67"
+  ],
+  "iQOO": [
+    "iQOO Flash Charger 80W"
+  ],
+  "Samsung": [
+    "Samsung Super Fast Charge 3.0 25W Type C",
+    "Samsung Travel Adapter 15W"
   ]
 };
 
@@ -1739,7 +1746,9 @@ export default function Index() {
               { name: "OnePlus", logo: "➕" },
               { name: "Realme", logo: "🟡" },
               { name: "Vivo", logo: "🔵" },
-              { name: "Xiaomi", logo: "🦊" }
+              { name: "Xiaomi", logo: "🦊" },
+              { name: "iQOO", logo: "⚡" },
+              { name: "Samsung", logo: "📱" }
             ].map((brand, index) => (
               <button
                 key={index}
