@@ -34,11 +34,6 @@ interface ShopifyProduct {
 export default function ProductsPage() {
   const getAllProducts = useAction(api.shopify.getAllProducts);
   const verifyConnection = useAction(api.shopify.verifyConnection);
-  const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ShopifyProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
   
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -47,6 +42,13 @@ export default function ProductsPage() {
   const brandFilter = urlParams.get('brand');
   const modelFilter = urlParams.get('model');
   const showFinish = urlParams.get('showFinish') === 'true';
+  const urlSearchQuery = urlParams.get('search') || '';
+  
+  const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<ShopifyProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
 
   const testConnection = async () => {
     try {
@@ -394,12 +396,16 @@ export default function ProductsPage() {
         <div className="container mx-auto">
           <div className="text-center mb-12 space-y-4">
             <h1 className="text-4xl lg:text-5xl font-bold text-balance">
-              {deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
+              {searchQuery ? `Search Results` :
+               deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
                'All Products'}
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              {filteredProducts.length} quirky {filteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop
+              {searchQuery 
+                ? `${filteredProducts.length} ${filteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
+                : `${filteredProducts.length} quirky ${filteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop`
+              }
             </p>
             
             {/* Search Bar */}
@@ -416,9 +422,9 @@ export default function ProductsPage() {
               </div>
             </div>
             
-            {(deviceFilter || finishFilter) && (
+            {(deviceFilter || finishFilter || searchQuery) && (
               <Button variant="outline" onClick={() => window.location.href = '/products'}>
-                Clear Filters
+                Clear {searchQuery ? 'Search' : 'Filters'}
               </Button>
             )}
           </div>
