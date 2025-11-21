@@ -24,7 +24,15 @@ export const getActiveCoupons = query({
 
 // Validate and get coupon by code
 export const validateCoupon = query({
-  args: { code: v.string(), cartTotal: v.number() },
+  args: { 
+    code: v.string(), 
+    cartTotal: v.number(),
+    cartItems: v.optional(v.array(v.object({
+      productTitle: v.string(),
+      price: v.number(),
+      quantity: v.number(),
+    }))),
+  },
   handler: async (ctx, args) => {
     const coupon = await ctx.db
       .query("coupons")
@@ -64,7 +72,63 @@ export const validateCoupon = query({
       });
     }
     
-    // Check minimum purchase
+    // Check product restrictions
+    if (coupon.applicableProductKeywords && coupon.applicableProductKeywords.length > 0) {
+      if (!args.cartItems || args.cartItems.length === 0) {
+        throw new ConvexError({
+          message: "This coupon requires specific products in your cart",
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      const hasMatchingProduct = args.cartItems.some((item) =>
+        coupon.applicableProductKeywords!.some((keyword) =>
+          item.productTitle.toLowerCase().includes(keyword.toLowerCase())
+        )
+      );
+      
+      if (!hasMatchingProduct) {
+        throw new ConvexError({
+          message: `This coupon is only valid for ${coupon.applicableProductKeywords.join(", ")} products`,
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      // Calculate eligible total (only products matching keywords)
+      const eligibleTotal = args.cartItems
+        .filter((item) =>
+          coupon.applicableProductKeywords!.some((keyword) =>
+            item.productTitle.toLowerCase().includes(keyword.toLowerCase())
+          )
+        )
+        .reduce((sum, item) => sum + item.price * item.quantity, 0);
+      
+      // Check minimum purchase against eligible items only
+      if (coupon.minPurchase && eligibleTotal < coupon.minPurchase) {
+        throw new ConvexError({
+          message: `Minimum purchase of ₹${coupon.minPurchase} required for eligible products`,
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      // Calculate discount on eligible items only
+      let discountAmount = 0;
+      if (coupon.discountType === "percentage") {
+        discountAmount = (eligibleTotal * coupon.discountValue) / 100;
+        if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+          discountAmount = coupon.maxDiscount;
+        }
+      } else {
+        discountAmount = coupon.discountValue;
+      }
+      
+      return {
+        coupon,
+        discountAmount,
+      };
+    }
+    
+    // Check minimum purchase for non-restricted coupons
     if (coupon.minPurchase && args.cartTotal < coupon.minPurchase) {
       throw new ConvexError({
         message: `Minimum purchase of ₹${coupon.minPurchase} required`,
@@ -72,7 +136,7 @@ export const validateCoupon = query({
       });
     }
     
-    // Calculate discount
+    // Calculate discount on full cart for non-restricted coupons
     let discountAmount = 0;
     if (coupon.discountType === "percentage") {
       discountAmount = (args.cartTotal * coupon.discountValue) / 100;
@@ -103,6 +167,7 @@ export const createCoupon = mutation({
     endDate: v.number(),
     isActive: v.boolean(),
     usageLimit: v.optional(v.number()),
+    applicableProductKeywords: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -138,6 +203,7 @@ export const createCoupon = mutation({
       isActive: args.isActive,
       usageLimit: args.usageLimit,
       usageCount: 0,
+      applicableProductKeywords: args.applicableProductKeywords,
     });
     
     return couponId;

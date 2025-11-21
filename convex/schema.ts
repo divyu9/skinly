@@ -125,6 +125,7 @@ export default defineSchema({
     isActive: v.boolean(),
     usageLimit: v.optional(v.number()),
     usageCount: v.number(),
+    applicableProductKeywords: v.optional(v.array(v.string())), // restrict to products containing these keywords in title
   })
     .index("by_code", ["code"])
     .index("by_active", ["isActive"]),
