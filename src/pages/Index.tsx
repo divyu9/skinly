@@ -43,6 +43,75 @@ interface ShopifyProduct {
   }>;
 }
 
+// Tablet models data
+const tabletModels: Record<string, string[]> = {
+  "Apple": [
+    "iPad Pro 13 (M4)",
+    "iPad Pro 11 (M4)",
+    "iPad Pro 12.9 (2022)",
+    "iPad Pro 11 (2022)",
+    "iPad Pro 12.9 (2021)",
+    "iPad Pro 11 (2021)",
+    "iPad Pro 12.9 (2020)",
+    "iPad Pro 11 (2020)",
+    "iPad Pro 12.9 (2018)",
+    "iPad Pro 11 (2018)",
+    "iPad Pro 10.5",
+    "iPad Pro 9.7",
+    "iPad Air (M2)",
+    "iPad Air (5th Gen)",
+    "iPad Air (4th Gen)",
+    "iPad Air (3rd Gen)",
+    "iPad Air 2",
+    "iPad Air",
+    "iPad (10th Gen)",
+    "iPad (9th Gen)",
+    "iPad (8th Gen)",
+    "iPad (7th Gen)",
+    "iPad (6th Gen)",
+    "iPad mini (6th Gen)",
+    "iPad mini (5th Gen)",
+    "iPad mini 4"
+  ],
+  "Samsung": [
+    "Galaxy Tab A10.1 2016",
+    "Galaxy Tab S7",
+    "Galaxy Tab S7 FE",
+    "Galaxy Tab S7 Ultra",
+    "Galaxy Tab A8",
+    "Galaxy Tab S6 Lite",
+    "Galaxy Tab A7 T505",
+    "Galaxy Tab A7 Lite",
+    "Galaxy Tab S5e 10.5",
+    "Galaxy Tab S4 10.5 2019",
+    "Galaxy Tab S9 Plus",
+    "Galaxy Tab S9 FE Plus",
+    "Galaxy Tab S9 FE (Only Back)"
+  ],
+  "Lenovo": [
+    "Lenovo Tab 3 7 Essential",
+    "Lenovo Tab TB-750X Tab 7",
+    "Lenovo Tab M8 Tab",
+    "Lenovo Tab Yoga Tab",
+    "Lenovo Tab M7",
+    "Lenovo Tab M8",
+    "Lenovo Tab M10",
+    "Lenovo Tab P11 Pro",
+    "Lenovo Tab P11",
+    "Lenovo Tab Yoga Tab 3",
+    "Lenovo Tab A7 A3300",
+    "Lenovo Tab K10",
+    "Lenovo Tab M10 Gen 3",
+    "Lenovo Tab M7 7306F"
+  ],
+  "Xiaomi": [
+    "XIAOMI PAD 6",
+    "Xiaomi Pad 7",
+    "Redmi Pad",
+    "Redmi Pad SE"
+  ]
+};
+
 // Console models data
 const consoleModels: Record<string, string[]> = {
   "PlayStation": [
@@ -940,7 +1009,8 @@ export default function Index() {
   const [showDroneBrandSelectorDialog, setShowDroneBrandSelectorDialog] = useState(false);
   const [showChargerBrandSelectorDialog, setShowChargerBrandSelectorDialog] = useState(false);
   const [showConsoleBrandSelectorDialog, setShowConsoleBrandSelectorDialog] = useState(false);
-  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console">("phone");
+  const [showTabletBrandSelectorDialog, setShowTabletBrandSelectorDialog] = useState(false);
+  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console" | "tablet">("phone");
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1332,10 +1402,10 @@ export default function Index() {
               { icon: CameraIcon, label: "Camera", filter: "camera" },
               { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
               { icon: BatteryChargingIcon, label: "Chargers", filter: "charger", showBrandSelector: true, type: "charger" as const },
-              { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
+              { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad", showBrandSelector: true, type: "tablet" as const },
               { icon: GamepadIcon, label: "Gaming Console", filter: "console", showBrandSelector: true, type: "console" as const }
             ].map((device, index) => {
-              // Special handling for Phones, Drones, Chargers, and Consoles - open brand selector instead of filtering
+              // Special handling for Phones, Drones, Chargers, Tablets, and Consoles - open brand selector instead of filtering
               if (device.showBrandSelector) {
                 return (
                   <button
@@ -1353,6 +1423,9 @@ export default function Index() {
                       } else if (device.type === "console") {
                         setDeviceType("console");
                         setShowConsoleBrandSelectorDialog(true);
+                      } else if (device.type === "tablet") {
+                        setDeviceType("tablet");
+                        setShowTabletBrandSelectorDialog(true);
                       }
                     }}
                     className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
@@ -1791,6 +1864,43 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
+      {/* Tablet Brand Selector Dialog */}
+      <Dialog open={showTabletBrandSelectorDialog} onOpenChange={setShowTabletBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Tablet Brand</DialogTitle>
+            <DialogDescription>
+              Choose your tablet brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "Apple", logo: "🍎" },
+              { name: "Samsung", logo: "📱" },
+              { name: "Lenovo", logo: "💻" },
+              { name: "Xiaomi", logo: "🦊" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("tablet");
+                  setShowTabletBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Console Brand Selector Dialog */}
       <Dialog open={showConsoleBrandSelectorDialog} onOpenChange={setShowConsoleBrandSelectorDialog}>
         <DialogContent className="max-w-3xl max-h-[80vh]">
@@ -1831,10 +1941,10 @@ export default function Index() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : deviceType === "drone" ? "Drone" : deviceType === "charger" ? "Charger" : "Console"}
+              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : deviceType === "drone" ? "Drone" : deviceType === "charger" ? "Charger" : deviceType === "console" ? "Console" : "Tablet"}
             </DialogTitle>
             <DialogDescription>
-              Choose your {deviceType === "phone" ? "phone model" : deviceType === "drone" ? "drone model" : deviceType === "charger" ? "charger model" : "console model"} to see compatible skins
+              Choose your {deviceType === "phone" ? "phone model" : deviceType === "drone" ? "drone model" : deviceType === "charger" ? "charger model" : deviceType === "console" ? "console model" : "tablet model"} to see compatible skins
             </DialogDescription>
           </DialogHeader>
           
@@ -1856,7 +1966,8 @@ export default function Index() {
               deviceType === "phone" ? phoneModels[selectedBrand] : 
               deviceType === "drone" ? droneModels[selectedBrand] : 
               deviceType === "charger" ? chargerModels[selectedBrand] :
-              consoleModels[selectedBrand]
+              deviceType === "console" ? consoleModels[selectedBrand] :
+              tabletModels[selectedBrand]
             )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
@@ -1886,7 +1997,8 @@ export default function Index() {
               deviceType === "phone" ? phoneModels[selectedBrand] : 
               deviceType === "drone" ? droneModels[selectedBrand] : 
               deviceType === "charger" ? chargerModels[selectedBrand] :
-              consoleModels[selectedBrand]
+              deviceType === "console" ? consoleModels[selectedBrand] :
+              tabletModels[selectedBrand]
             )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
