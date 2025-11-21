@@ -139,7 +139,12 @@ export const migrateFromShopify = action({
         skipped: 0,
         failed: 0,
         errors: [] as string[],
+        skippedProducts: [] as Array<{ title: string; reason: string }>,
+        failedProducts: [] as Array<{ title: string; reason: string }>,
+        successfulProducts: [] as string[],
       };
+
+      console.log(`\n=== Starting migration of ${allProducts.length} products ===\n`);
 
       // Migrate each product
       for (const shopifyProduct of allProducts) {
@@ -155,6 +160,11 @@ export const migrateFromShopify = action({
 
             if (existingProducts) {
               migrationResults.skipped++;
+              migrationResults.skippedProducts.push({
+                title: shopifyProduct.title,
+                reason: "Already exists in database",
+              });
+              console.log(`⏭️  SKIPPED: "${shopifyProduct.title}" - Already exists`);
               continue; // Skip this product
             }
           }
@@ -199,13 +209,27 @@ export const migrateFromShopify = action({
           }
 
           migrationResults.successful++;
+          migrationResults.successfulProducts.push(shopifyProduct.title);
+          console.log(`✅ SUCCESS: "${shopifyProduct.title}" - Imported with ${shopifyProduct.variants.length} variant(s)`);
         } catch (error) {
           migrationResults.failed++;
+          const errorMessage = error instanceof Error ? error.message : String(error);
           migrationResults.errors.push(
-            `Failed to migrate "${shopifyProduct.title}": ${error instanceof Error ? error.message : String(error)}`
+            `Failed to migrate "${shopifyProduct.title}": ${errorMessage}`
           );
+          migrationResults.failedProducts.push({
+            title: shopifyProduct.title,
+            reason: errorMessage,
+          });
+          console.error(`❌ FAILED: "${shopifyProduct.title}" - ${errorMessage}`);
         }
       }
+
+      console.log(`\n=== Migration Complete ===`);
+      console.log(`Total: ${migrationResults.total}`);
+      console.log(`✅ Successful: ${migrationResults.successful}`);
+      console.log(`⏭️  Skipped: ${migrationResults.skipped}`);
+      console.log(`❌ Failed: ${migrationResults.failed}\n`);
 
       return migrationResults;
     } catch (error) {

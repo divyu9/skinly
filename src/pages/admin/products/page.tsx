@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -13,6 +13,15 @@ import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 
 function AdminProductsPageInner() {
   const products = useQuery(api.products.getAllProducts, {});
@@ -24,6 +33,16 @@ function AdminProductsPageInner() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCheckingCount, setIsCheckingCount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [migrationReport, setMigrationReport] = useState<{
+    total: number;
+    successful: number;
+    skipped: number;
+    failed: number;
+    successfulProducts: string[];
+    skippedProducts: Array<{ title: string; reason: string }>;
+    failedProducts: Array<{ title: string; reason: string }>;
+  } | null>(null);
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   const handleCheckCount = async () => {
     setIsCheckingCount(true);
@@ -57,6 +76,10 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     setIsMigrating(true);
     try {
       const result = await migrateFromShopify({ forceReimport: false });
+      
+      // Store the full report
+      setMigrationReport(result);
+      
       const parts = [
         `${result.successful} imported`,
         result.skipped > 0 ? `${result.skipped} skipped` : null,
@@ -64,12 +87,11 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       ].filter(Boolean);
       
       toast.success(
-        `Migration complete! ${parts.join(", ")}. Total: ${result.total} products from Shopify.`
+        `Migration complete! ${parts.join(", ")}. Click "View Details" to see full report.`
       );
-      if (result.errors.length > 0) {
-        console.error("Migration errors:", result.errors);
-        toast.error(`${result.errors.length} errors occurred. Check console for details.`);
-      }
+      
+      // Show the dialog with detailed report
+      setShowReportDialog(true);
     } catch (error) {
       toast.error(`Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
@@ -190,6 +212,15 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             <DownloadIcon className="size-4 mr-2" />
             {isMigrating ? "Importing..." : "Import from Shopify"}
           </Button>
+          {migrationReport && (
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowReportDialog(true)}
+              className="text-xs"
+            >
+              View Last Report
+            </Button>
+          )}
           <Link to="/admin/products/new">
             <Button>
               <PlusIcon className="size-4 mr-2" />
@@ -323,6 +354,118 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
           ))}
         </div>
       )}
+
+      {/* Migration Report Dialog */}
+      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Import Report</DialogTitle>
+            <DialogDescription>
+              {migrationReport && (
+                <>
+                  Imported {migrationReport.successful} of {migrationReport.total} products from Shopify
+                  {migrationReport.skipped > 0 && ` (${migrationReport.skipped} skipped)`}
+                  {migrationReport.failed > 0 && ` (${migrationReport.failed} failed)`}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {migrationReport && (
+            <Tabs defaultValue="skipped" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="skipped" className="flex items-center gap-2">
+                  <AlertCircleIcon className="size-4" />
+                  Skipped ({migrationReport.skipped})
+                </TabsTrigger>
+                <TabsTrigger value="successful" className="flex items-center gap-2">
+                  <CheckCircleIcon className="size-4" />
+                  Imported ({migrationReport.successful})
+                </TabsTrigger>
+                <TabsTrigger value="failed" className="flex items-center gap-2">
+                  <XCircleIcon className="size-4" />
+                  Failed ({migrationReport.failed})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="skipped">
+                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                  {migrationReport.skippedProducts.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">
+                      No products were skipped
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {migrationReport.skippedProducts.map((product, idx) => (
+                        <Card key={idx}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <AlertCircleIcon className="size-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-sm">{product.title}</h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {product.reason}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="successful">
+                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                  {migrationReport.successfulProducts.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">
+                      No products were imported
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {migrationReport.successfulProducts.map((title, idx) => (
+                        <div key={idx} className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                          <CheckCircleIcon className="size-4 text-green-500 flex-shrink-0" />
+                          <span className="text-sm">{title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="failed">
+                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                  {migrationReport.failedProducts.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">
+                      No products failed to import
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {migrationReport.failedProducts.map((product, idx) => (
+                        <Card key={idx}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <XCircleIcon className="size-5 text-red-500 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-sm">{product.title}</h4>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {product.reason}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
