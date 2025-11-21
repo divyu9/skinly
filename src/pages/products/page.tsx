@@ -1,4 +1,4 @@
-import { useAction } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState, useMemo } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
@@ -18,29 +18,31 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 
-interface ShopifyProduct {
-  id: number;
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
+interface ConvexProduct {
+  _id: Id<"products">;
   title: string;
-  handle: string;
+  slug: string;
   description: string;
-  vendor: string;
-  product_type: string;
-  tags: string;
-  status: string;
-  images: Array<{ id: number; src: string; alt: string | null }>;
+  status: "active" | "draft" | "archived";
+  images: Array<{ url: string; alt?: string }>;
+  tags: string[];
   variants: Array<{
-    id: number;
+    _id: Id<"variants">;
     title: string;
-    price: string;
+    price: number;
+    compareAtPrice?: number;
+    inventoryQuantity: number;
     sku: string;
-    inventory_quantity: number;
-    available: boolean;
   }>;
 }
 
 export default function ProductsPage() {
-  const getAllProducts = useAction(api.shopify.getAllProducts);
   const verifyConnection = useAction(api.shopify.verifyConnection);
+  
+  // Query local database instead of Shopify
+  const productsData = useQuery(api.products.getAllProducts, { status: "active" });
   
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -51,10 +53,6 @@ export default function ProductsPage() {
   const showFinish = urlParams.get('showFinish') === 'true';
   const urlSearchQuery = urlParams.get('search') || '';
   
-  const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ShopifyProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
@@ -70,50 +68,74 @@ export default function ProductsPage() {
     }
   };
 
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+  // Convert Convex products to the format needed
+  const allProducts = useMemo(() => {
+    if (!productsData) return [];
     
-    async function fetchProducts() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Set a timeout to show error if it takes too long
-        timeoutId = setTimeout(() => {
-          setError("Request is taking longer than expected. Please check your Shopify credentials in the Secrets tab.");
-          setIsLoading(false);
-        }, 15000); // 15 second timeout
-        
-        const data = await getAllProducts({});
-        clearTimeout(timeoutId);
-        
-        if (!data || data.length === 0) {
-          toast.info("No products found in your Shopify store");
-        }
-        
-        setAllProducts(data);
-        applyFilters(data, deviceFilter, finishFilter, brandFilter, searchQuery);
-      } catch (err) {
-        clearTimeout(timeoutId);
-        const errorMsg = err instanceof Error ? err.message : "Failed to load products";
-        setError(errorMsg);
-        toast.error(`Error: ${errorMsg}`);
-      } finally {
-        clearTimeout(timeoutId);
-        setIsLoading(false);
-      }
-    }
-    fetchProducts();
-    
-    return () => clearTimeout(timeoutId);
-  }, [getAllProducts, deviceFilter, finishFilter, brandFilter, searchQuery]);
+    return productsData.map((product) => ({
+      _id: product._id,
+      slug: product.slug,
+      title: product.title,
+      description: product.description,
+      status: product.status,
+      tags: product.tags.join(", "),
+      images: product.images,
+      variants: product.variants.map((v) => ({
+        _id: v._id,
+        title: v.title,
+        price: v.price,
+        compareAtPrice: v.compareAtPrice,
+        sku: v.sku,
+        inventory_quantity: v.inventoryQuantity,
+        available: v.inventoryQuantity > 0,
+      })),
+    }));
+  }, [productsData]);
 
-  // Apply filters when products or filters change
-  useEffect(() => {
-    if (allProducts.length > 0) {
-      applyFilters(allProducts, deviceFilter, finishFilter, brandFilter, searchQuery);
+  // Apply filters
+  const filteredProducts = useMemo(() => {
+    let filtered = [...allProducts];
+    
+    // Filter by device
+    if (deviceFilter) {
+      filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        if (deviceFilter === 'phone') return title.includes('phone') || title.includes('iphone') || title.includes('samsung') || title.includes('oneplus');
+        if (deviceFilter === 'laptop') return title.includes('laptop') || title.includes('macbook');
+        if (deviceFilter === 'mac mini') return title.includes('mac mini');
+        if (deviceFilter === 'drone') return title.includes('drone');
+        if (deviceFilter === 'camera') return title.includes('camera');
+        if (deviceFilter === 'lens') return title.includes('lens');
+        if (deviceFilter === 'charger') return title.includes('charger');
+        if (deviceFilter === 'ipad') return title.includes('ipad') || title.includes('tablet');
+        if (deviceFilter === 'console') return title.includes('console') || title.includes('playstation') || title.includes('xbox') || title.includes('nintendo');
+        return false;
+      });
     }
-  }, [allProducts, deviceFilter, finishFilter, brandFilter, searchQuery]);
+    
+    // Filter by finish
+    if (finishFilter) {
+      filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        if (finishFilter === 'matte') return title.includes('matte');
+        if (finishFilter === 'embossed') return title.includes('3d textured') || title.includes('3d embossed');
+        if (finishFilter === 'transparent') return title.includes('tranzy');
+        return false;
+      });
+    }
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(p => 
+        p.title.toLowerCase().includes(searchLower) || 
+        p.description?.toLowerCase().includes(searchLower) ||
+        p.tags?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered;
+  }, [allProducts, deviceFilter, finishFilter, searchQuery]);
   
   // Apply sorting and stock filtering
   const sortedAndFilteredProducts = useMemo(() => {
@@ -129,66 +151,28 @@ export default function ProductsPage() {
     // Apply sorting
     if (sortBy === "price-low-high") {
       result.sort((a, b) => {
-        const minPriceA = Math.min(...a.variants.map(v => parseFloat(v.price)));
-        const minPriceB = Math.min(...b.variants.map(v => parseFloat(v.price)));
+        const minPriceA = Math.min(...a.variants.map(v => v.price));
+        const minPriceB = Math.min(...b.variants.map(v => v.price));
         return minPriceA - minPriceB;
       });
     } else if (sortBy === "price-high-low") {
       result.sort((a, b) => {
-        const maxPriceA = Math.max(...a.variants.map(v => parseFloat(v.price)));
-        const maxPriceB = Math.max(...b.variants.map(v => parseFloat(v.price)));
+        const maxPriceA = Math.max(...a.variants.map(v => v.price));
+        const maxPriceB = Math.max(...b.variants.map(v => v.price));
         return maxPriceB - maxPriceA;
       });
     } else if (sortBy === "latest") {
-      result.sort((a, b) => b.id - a.id);
+      // Sort by _creationTime instead
+      result.sort((a, b) => {
+        // Since we don't have _creationTime in our mapped data, reverse order by index
+        const indexA = allProducts.findIndex(p => p._id === a._id);
+        const indexB = allProducts.findIndex(p => p._id === b._id);
+        return indexB - indexA;
+      });
     }
     
     return result;
-  }, [filteredProducts, sortBy, stockFilter]);
-
-  const applyFilters = (products: ShopifyProduct[], device: string | null, finish: string | null, brand: string | null, search: string) => {
-    let filtered = [...products];
-    
-    // Filter by device
-    if (device) {
-      filtered = filtered.filter(p => {
-        const title = p.title.toLowerCase();
-        if (device === 'phone') return title.includes('phone') || title.includes('iphone') || title.includes('samsung') || title.includes('oneplus');
-        if (device === 'laptop') return title.includes('laptop') || title.includes('macbook');
-        if (device === 'mac mini') return title.includes('mac mini');
-        if (device === 'drone') return title.includes('drone');
-        if (device === 'camera') return title.includes('camera');
-        if (device === 'lens') return title.includes('lens');
-        if (device === 'charger') return title.includes('charger');
-        if (device === 'ipad') return title.includes('ipad') || title.includes('tablet');
-        if (device === 'console') return title.includes('console') || title.includes('playstation') || title.includes('xbox') || title.includes('nintendo');
-        return false;
-      });
-    }
-    
-    // Filter by finish (brand selection doesn't filter products, just guides user to finish selection)
-    if (finish) {
-      filtered = filtered.filter(p => {
-        const title = p.title.toLowerCase();
-        if (finish === 'matte') return title.includes('matte');
-        if (finish === 'embossed') return title.includes('3d textured') || title.includes('3d embossed');
-        if (finish === 'transparent') return title.includes('tranzy');
-        return false;
-      });
-    }
-    
-    // Filter by search query
-    if (search.trim()) {
-      const searchLower = search.toLowerCase().trim();
-      filtered = filtered.filter(p => 
-        p.title.toLowerCase().includes(searchLower) || 
-        p.description?.toLowerCase().includes(searchLower) ||
-        p.tags?.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    setFilteredProducts(filtered);
-  };
+  }, [filteredProducts, sortBy, stockFilter, allProducts]);
 
   // Show finish selector when brand is selected and showFinish is true
   if (showFinish && brandFilter) {
@@ -291,6 +275,8 @@ export default function ProductsPage() {
     );
   }
 
+  const isLoading = productsData === undefined;
+  
   if (isLoading) {
     return (
       <div className="min-h-screen">
@@ -329,50 +315,7 @@ export default function ProductsPage() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen">
-        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img 
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                alt="Skinly" 
-                className="h-10"
-              />
-            </Link>
-          </div>
-        </nav>
-
-        <div className="pt-24 pb-20 px-4">
-          <div className="container mx-auto max-w-2xl">
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <AlertCircleIcon />
-                </EmptyMedia>
-                <EmptyTitle>Connection Error</EmptyTitle>
-                <EmptyDescription>
-                  {error}
-                  <br />
-                  <br />
-                  Make sure you've added your Shopify credentials in the Secrets tab.
-                </EmptyDescription>
-              </EmptyHeader>
-              <EmptyContent>
-                <div className="flex gap-2">
-                  <Button onClick={() => window.location.reload()}>Try Again</Button>
-                  <Button variant="outline" onClick={testConnection}>Test Connection</Button>
-                </div>
-              </EmptyContent>
-            </Empty>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (filteredProducts.length === 0 && !isLoading && !error) {
+  if (filteredProducts.length === 0 && !isLoading) {
     return (
       <div className="min-h-screen">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
@@ -556,19 +499,19 @@ export default function ProductsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {sortedAndFilteredProducts.map((product) => {
               const mainImage = product.images[0];
-              const minPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
-              const maxPrice = Math.max(...product.variants.map(v => parseFloat(v.price)));
+              const minPrice = Math.min(...product.variants.map(v => v.price));
+              const maxPrice = Math.max(...product.variants.map(v => v.price));
               
               const priceDisplay = minPrice === maxPrice 
                 ? `₹${minPrice.toFixed(0)}`
                 : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
 
               return (
-                <Card key={product.id} className="group overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
+                <Card key={product._id} className="group overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
                   <div className="aspect-square overflow-hidden bg-muted">
                     {mainImage ? (
                       <img
-                        src={mainImage.src}
+                        src={mainImage.url}
                         alt={mainImage.alt || product.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                       />
@@ -580,9 +523,6 @@ export default function ProductsPage() {
                   </div>
                   <CardContent className="pt-4 space-y-2">
                     <h3 className="font-bold text-lg line-clamp-2">{product.title}</h3>
-                    {product.vendor && (
-                      <p className="text-sm text-muted-foreground">{product.vendor}</p>
-                    )}
                     <div className="flex items-center justify-between">
                       <span className="text-lg font-bold text-primary">{priceDisplay}</span>
                       {product.variants.length > 1 && (
@@ -594,7 +534,7 @@ export default function ProductsPage() {
                   </CardContent>
                   <CardFooter>
                     <Button className="w-full" asChild>
-                      <Link to={`/products/detail?id=${product.id}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
+                      <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
                         Select My Phone Model
                       </Link>
                     </Button>

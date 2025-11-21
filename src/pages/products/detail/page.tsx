@@ -1,6 +1,6 @@
-import { useAction, useMutation } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -12,62 +12,32 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { ConvexError } from "convex/values";
 
-interface ShopifyProduct {
-  id: number;
-  title: string;
-  handle: string;
-  description: string;
-  vendor: string;
-  product_type: string;
-  tags: string;
-  status: string;
-  images: Array<{ id: number; src: string; alt: string | null }>;
-  variants: Array<{
-    id: number;
-    title: string;
-    price: string;
-    sku: string;
-    inventory_quantity: number;
-    available: boolean;
-  }>;
-}
-
 export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
-  const productId = searchParams.get('id');
+  const productSlug = searchParams.get('slug');
   const phoneModel = searchParams.get('model');
   const phoneBrand = searchParams.get('brand');
-  const getAllProducts = useAction(api.shopify.getAllProducts);
+  
+  // Query local database
+  const productData = useQuery(
+    api.products.getProductBySlug, 
+    productSlug ? { slug: productSlug } : "skip"
+  );
+  
   const addToCart = useMutation(api.cart.addToCart);
-  const { user, signinRedirect } = useAuth();
+  const { user } = useAuth();
   const { addToGuestCart } = useGuestCart();
-  const [product, setProduct] = useState<ShopifyProduct | null>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-
-  useEffect(() => {
-    async function fetchProduct() {
-      try {
-        setIsLoading(true);
-        const data = await getAllProducts({});
-        const foundProduct = data.find((p: ShopifyProduct) => p.id.toString() === productId);
-        if (foundProduct) {
-          setProduct(foundProduct);
-          setSelectedImage(foundProduct.images[0]?.src || "");
-        }
-      } catch (err) {
-        console.error("Failed to load product:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-    
-    if (productId) {
-      fetchProduct();
-    }
-  }, [getAllProducts, productId]);
+  
+  const isLoading = productData === undefined;
+  const product = productData;
+  
+  // Set initial selected image when product loads
+  if (product && !selectedImage && product.images[0]) {
+    setSelectedImage(product.images[0].url);
+  }
 
   if (isLoading) {
     return (
@@ -103,35 +73,38 @@ export default function ProductDetailPage() {
   }
 
   if (!product) {
-    return (
-      <div className="min-h-screen">
-        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img 
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                alt="Skinly" 
-                className="h-10"
-              />
-            </Link>
-          </div>
-        </nav>
+    if (!isLoading) {
+      return (
+        <div className="min-h-screen">
+          <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+              <Link to="/" className="flex items-center gap-2">
+                <img 
+                  src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                  alt="Skinly" 
+                  className="h-10"
+                />
+              </Link>
+            </div>
+          </nav>
 
-        <div className="pt-24 pb-20 px-4">
-          <div className="container mx-auto max-w-2xl text-center">
-            <PackageIcon className="size-16 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-3xl font-bold mb-4">Product Not Found</h1>
-            <Button asChild>
-              <Link to="/products">Browse All Products</Link>
-            </Button>
+          <div className="pt-24 pb-20 px-4">
+            <div className="container mx-auto max-w-2xl text-center">
+              <PackageIcon className="size-16 text-muted-foreground mx-auto mb-4" />
+              <h1 className="text-3xl font-bold mb-4">Product Not Found</h1>
+              <Button asChild>
+                <Link to="/products">Browse All Products</Link>
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    }
+    return null;
   }
 
-  const minPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
-  const maxPrice = Math.max(...product.variants.map(v => parseFloat(v.price)));
+  const minPrice = Math.min(...product.variants.map(v => v.price));
+  const maxPrice = Math.max(...product.variants.map(v => v.price));
   const priceDisplay = minPrice === maxPrice 
     ? `₹${minPrice.toFixed(0)}`
     : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
@@ -187,18 +160,18 @@ export default function ProductDetailPage() {
               {/* Thumbnail Gallery */}
               {product.images.length > 1 && (
                 <div className="grid grid-cols-4 gap-4">
-                  {product.images.map((image) => (
+                  {product.images.map((image, idx) => (
                     <button
-                      key={image.id}
-                      onClick={() => setSelectedImage(image.src)}
+                      key={idx}
+                      onClick={() => setSelectedImage(image.url)}
                       className={`aspect-square overflow-hidden rounded-lg border-2 transition-all ${
-                        selectedImage === image.src
+                        selectedImage === image.url
                           ? "border-primary"
                           : "border-border hover:border-primary/50"
                       }`}
                     >
                       <img
-                        src={image.src}
+                        src={image.url}
                         alt={image.alt || product.title}
                         className="w-full h-full object-cover"
                       />
@@ -212,9 +185,6 @@ export default function ProductDetailPage() {
             <div className="space-y-6">
               <div>
                 <h1 className="text-4xl font-bold mb-4">{product.title}</h1>
-                {product.vendor && (
-                  <p className="text-lg text-muted-foreground mb-4">by {product.vendor}</p>
-                )}
                 <div className="text-3xl font-bold text-primary mb-6">{priceDisplay}</div>
               </div>
 
@@ -222,7 +192,10 @@ export default function ProductDetailPage() {
                 <Card>
                   <CardContent className="pt-6">
                     <h3 className="font-semibold mb-2">Description</h3>
-                    <p className="text-muted-foreground">{product.description}</p>
+                    <div 
+                      className="text-muted-foreground prose prose-sm max-w-none"
+                      dangerouslySetInnerHTML={{ __html: product.description }}
+                    />
                   </CardContent>
                 </Card>
               )}
@@ -276,7 +249,7 @@ export default function ProductDetailPage() {
                       <div className="space-y-2">
                         {product.variants.map((variant, idx) => (
                           <button
-                            key={variant.id}
+                            key={variant._id}
                             onClick={() => setSelectedVariant(idx)}
                             className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
                               selectedVariant === idx
@@ -287,7 +260,7 @@ export default function ProductDetailPage() {
                             <div className="flex justify-between items-center">
                               <span className="font-medium">{variant.title}</span>
                               <span className="font-bold text-primary">
-                                ₹{parseFloat(variant.price).toFixed(0)}
+                                ₹{variant.price.toFixed(0)}
                               </span>
                             </div>
                           </button>
@@ -309,11 +282,11 @@ export default function ProductDetailPage() {
                       
                       try {
                         const cartItem = {
-                          productId: product.id.toString(),
+                          productId: product._id,
                           productTitle: product.title,
-                          productImage: product.images[0]?.src,
+                          productImage: product.images[0]?.url,
                           variant: product.variants[selectedVariant].title,
-                          price: parseFloat(product.variants[selectedVariant].price),
+                          price: product.variants[selectedVariant].price,
                           quantity: 1,
                           phoneModel: phoneModel,
                           phoneBrand: phoneBrand || undefined,
@@ -332,11 +305,11 @@ export default function ProductDetailPage() {
                         if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
                           // Fallback to guest cart if auth fails
                           addToGuestCart({
-                            productId: product.id.toString(),
+                            productId: product._id,
                             productTitle: product.title,
-                            productImage: product.images[0]?.src,
+                            productImage: product.images[0]?.url,
                             variant: product.variants[selectedVariant].title,
-                            price: parseFloat(product.variants[selectedVariant].price),
+                            price: product.variants[selectedVariant].price,
                             quantity: 1,
                             phoneModel: phoneModel,
                             phoneBrand: phoneBrand || undefined,
@@ -365,11 +338,11 @@ export default function ProductDetailPage() {
                     <div className="space-y-2">
                       {product.variants.map((variant) => (
                         <div
-                          key={variant.id}
+                          key={variant._id}
                           className="flex justify-between items-center p-3 bg-muted rounded-lg"
                         >
                           <span className="text-sm">{variant.title}</span>
-                          <span className="text-sm font-semibold">₹{parseFloat(variant.price).toFixed(0)}</span>
+                          <span className="text-sm font-semibold">₹{variant.price.toFixed(0)}</span>
                         </div>
                       ))}
                     </div>

@@ -72,6 +72,39 @@ export const getProduct = query({
   },
 });
 
+// Get product by slug
+export const getProductBySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const product = await ctx.db
+      .query("products")
+      .withIndex("by_slug", (q) => q.eq("slug", args.slug))
+      .first();
+      
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", product._id))
+      .collect();
+
+    const collection = product.collectionId
+      ? await ctx.db.get(product.collectionId)
+      : null;
+
+    return {
+      ...product,
+      variants,
+      collection,
+    };
+  },
+});
+
 // Create product
 export const createProduct = mutation({
   args: {
