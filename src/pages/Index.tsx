@@ -101,6 +101,7 @@ const phoneModels: Record<string, string[]> = {
     "Samsung Galaxy S24 Ultra (5G)",
     "Samsung Galaxy S24 Plus",
     "Samsung Galaxy S24 (5G)",
+    "Samsung Galaxy S24 FE (5G)",
     "Samsung Galaxy S23 FE (5G)",
     "Samsung Galaxy S23 (5G)",
     "Samsung Galaxy S22 Ultra",
