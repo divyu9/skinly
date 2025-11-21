@@ -182,6 +182,24 @@ export default function ProductDetailPage() {
   // Fetch active coupons
   const activeCoupons = useQuery(api.coupons.getActiveCoupons);
   
+  // Filter coupons to only show applicable ones for this product
+  const applicableCoupons = useMemo(() => {
+    if (!activeCoupons || !productData) return [];
+    
+    return activeCoupons.filter((coupon) => {
+      // If coupon has no product restrictions, show it for all products
+      if (!coupon.applicableProductKeywords || coupon.applicableProductKeywords.length === 0) {
+        return true;
+      }
+      
+      // Check if current product matches any of the keywords
+      const productTitle = productData.title.toLowerCase();
+      return coupon.applicableProductKeywords.some((keyword) =>
+        productTitle.includes(keyword.toLowerCase())
+      );
+    });
+  }, [activeCoupons, productData]);
+  
   // Determine if this product needs phone model selection
   // Includes: phone skins and membranes
   // Excludes: cases, covers, camera rings, tempered glass
@@ -701,14 +719,14 @@ export default function ProductDetailPage() {
                 )}
                 
                 {/* Active Offers Section */}
-                {activeCoupons && activeCoupons.length > 0 && (
+                {applicableCoupons && applicableCoupons.length > 0 && (
                   <div className="mt-4 space-y-2">
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <TagIcon className="size-4 text-primary" />
                       <span>Active Offers</span>
                     </div>
                     <div className="space-y-2">
-                      {activeCoupons.map((coupon) => {
+                      {applicableCoupons.map((coupon) => {
                         const discountText = coupon.discountType === "percentage" 
                           ? `${coupon.discountValue}% OFF${coupon.maxDiscount ? ` (max ₹${coupon.maxDiscount})` : ''}`
                           : `₹${coupon.discountValue} OFF`;
