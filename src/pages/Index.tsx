@@ -1343,10 +1343,6 @@ export default function Index() {
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showRequestModelDialog, setShowRequestModelDialog] = useState(false);
-  const [requestedModel, setRequestedModel] = useState("");
-  const [requestedBrand, setRequestedBrand] = useState("");
-  const [requestedCategory, setRequestedCategory] = useState("");
 
   const matteProducts = useMemo(() => 
     products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4),
@@ -1670,19 +1666,18 @@ export default function Index() {
                             </div>
                           </div>
                           <Button
-                            onClick={() => {
-                              setRequestedModel(homeSearchQuery);
-                              setRequestedBrand("");
-                              setRequestedCategory("General");
-                              setShowSearchResults(false);
-                              setHomeSearchQuery("");
-                              setShowRequestModelDialog(true);
-                            }}
+                            asChild
                             variant="outline"
                             className="gap-2"
                           >
-                            <PackageIcon className="size-4" />
-                            Request Your Model
+                            <a 
+                              href="https://wa.me/919761011121?text=I%20Want%20to%20request%20a%20model%20on%20Skinly" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              <PackageIcon className="size-4" />
+                              Request Your Model
+                            </a>
                           </Button>
                         </div>
                       );
@@ -2568,27 +2563,18 @@ export default function Index() {
                     No models found matching &quot;{searchQuery}&quot;
                   </div>
                   <Button
-                    onClick={() => {
-                      setRequestedModel(searchQuery);
-                      setRequestedBrand(selectedBrand);
-                      setRequestedCategory(
-                        deviceType === "phone" ? "Phone" : 
-                        deviceType === "drone" ? "Drone" : 
-                        deviceType === "charger" ? "Charger" : 
-                        deviceType === "console" ? "Gaming Console" : 
-                        deviceType === "tablet" ? "Tablet" :
-                        deviceType === "macmini" ? "Mac Mini" :
-                        deviceType === "lens" ? "Lens" :
-                        "Camera"
-                      );
-                      setIsDialogOpen(false);
-                      setShowRequestModelDialog(true);
-                    }}
+                    asChild
                     variant="outline"
                     className="gap-2"
                   >
-                    <PackageIcon className="size-4" />
-                    Request Your Model
+                    <a 
+                      href="https://wa.me/919761011121?text=I%20Want%20to%20request%20a%20model%20on%20Skinly" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <PackageIcon className="size-4" />
+                      Request Your Model
+                    </a>
                   </Button>
                 </div>
               )}
@@ -2596,51 +2582,6 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
-      {/* Request Model Dialog */}
-      <Dialog open={showRequestModelDialog} onOpenChange={setShowRequestModelDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Request Your Model</DialogTitle>
-            <DialogDescription>
-              We&apos;ll notify you when this model becomes available
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Card className="bg-muted/50 border-2">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Model:</span>
-                  <span className="font-semibold">{requestedModel}</span>
-                </div>
-                {requestedBrand && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Brand:</span>
-                    <span className="font-semibold">{requestedBrand}</span>
-                  </div>
-                )}
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Category:</span>
-                  <span className="font-semibold">{requestedCategory}</span>
-                </div>
-              </CardContent>
-            </Card>
-            <div className="text-center text-sm text-muted-foreground">
-              Your request has been noted. We&apos;ll work on adding support for this model and notify you once it&apos;s available.
-            </div>
-            <Button 
-              className="w-full" 
-              onClick={() => {
-                setShowRequestModelDialog(false);
-                setRequestedModel("");
-                setRequestedBrand("");
-                setRequestedCategory("");
-              }}
-            >
-              Got it!
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
