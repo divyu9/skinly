@@ -175,6 +175,19 @@ export default function ProductDetailPage() {
     productData ? { productId: productData._id } : "skip"
   );
   
+  // Determine if this is a phone skin (check product tags or title)
+  const isPhoneSkin = productData?.tags?.some(tag => 
+    tag.toLowerCase().includes("phone") || tag.toLowerCase().includes("skin")
+  ) || productData?.title.toLowerCase().includes("phone skin") || false;
+  
+  // Fetch cross-sell products
+  const crossSellProducts = useQuery(
+    api.products.getCrossSellProducts,
+    phoneBrand && isPhoneSkin
+      ? { phoneBrand: phoneBrand, isPhoneSkin: true }
+      : "skip"
+  );
+  
   const addToCart = useMutation(api.cart.addToCart);
   const addReview = useMutation(api.reviews.addReview);
   const { user } = useAuth();
@@ -623,6 +636,55 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Cross-Sell Products Section */}
+          {crossSellProducts && crossSellProducts.length > 0 && (
+            <div className="border-t border-border pt-12 mb-12">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold mb-2">Protect Your Device</h2>
+                <p className="text-muted-foreground">Complete your protection with these recommended products</p>
+              </div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {crossSellProducts.map((crossSellProduct) => {
+                  const minPrice = crossSellProduct.variants.length > 0 
+                    ? Math.min(...crossSellProduct.variants.map(v => v.price))
+                    : 0;
+                  
+                  return (
+                    <Card 
+                      key={crossSellProduct._id}
+                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => {
+                        navigate(`/products/detail?slug=${crossSellProduct.slug}`);
+                      }}
+                    >
+                      <div className="aspect-square overflow-hidden bg-muted">
+                        {crossSellProduct.images[0] ? (
+                          <img
+                            src={crossSellProduct.images[0].url}
+                            alt={crossSellProduct.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <PackageIcon className="size-12 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold text-sm mb-2 line-clamp-2">
+                          {crossSellProduct.title}
+                        </h3>
+                        <div className="text-primary font-bold">
+                          ₹{minPrice.toFixed(0)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Reviews Section */}
           <div className="border-t border-border pt-12">

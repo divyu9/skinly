@@ -439,3 +439,95 @@ export const deleteAllProducts = mutation({
     };
   },
 });
+
+// Get cross-sell products
+export const getCrossSellProducts = query({
+  args: {
+    phoneBrand: v.optional(v.string()),
+    isPhoneSkin: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const allProducts = await ctx.db.query("products").collect();
+    const allVariants = await ctx.db.query("variants").collect();
+    
+    // Group variants by product
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+    
+    const crossSells: Array<typeof allProducts[0] & { variants: typeof allVariants }> = [];
+    
+    // For all phone skins: Show Matte Membrane + Gloss Membrane
+    if (args.isPhoneSkin) {
+      const matteMemb = allProducts.find(p => 
+        p.title.toLowerCase().includes("matte membrane") && 
+        p.title.toLowerCase().includes("3 layer")
+      );
+      const glossMemb = allProducts.find(p => 
+        p.title.toLowerCase().includes("gloss membrane") && 
+        p.title.toLowerCase().includes("3 layer")
+      );
+      
+      if (matteMemb) {
+        crossSells.push({
+          ...matteMemb,
+          variants: variantsByProduct.get(matteMemb._id) || [],
+        });
+      }
+      if (glossMemb) {
+        crossSells.push({
+          ...glossMemb,
+          variants: variantsByProduct.get(glossMemb._id) || [],
+        });
+      }
+    }
+    
+    // For Apple phones: Show AutoApply Tempered Glass + Cases
+    if (args.phoneBrand?.toLowerCase() === "apple") {
+      const temperedGlass = allProducts.find(p => 
+        p.title.toLowerCase().includes("autoapply") && 
+        p.title.toLowerCase().includes("tempered")
+      );
+      const appleCase = allProducts.find(p => 
+        p.title.toLowerCase().includes("case") && 
+        p.title.toLowerCase().includes("iphone") &&
+        p.title.toLowerCase().includes("magsafe")
+      );
+      
+      if (temperedGlass) {
+        crossSells.push({
+          ...temperedGlass,
+          variants: variantsByProduct.get(temperedGlass._id) || [],
+        });
+      }
+      if (appleCase) {
+        crossSells.push({
+          ...appleCase,
+          variants: variantsByProduct.get(appleCase._id) || [],
+        });
+      }
+    }
+    
+    // For Samsung phones: Show Cases
+    if (args.phoneBrand?.toLowerCase() === "samsung") {
+      const samsungCase = allProducts.find(p => 
+        p.title.toLowerCase().includes("case") && 
+        p.title.toLowerCase().includes("samsung")
+      );
+      
+      if (samsungCase) {
+        crossSells.push({
+          ...samsungCase,
+          variants: variantsByProduct.get(samsungCase._id) || [],
+        });
+      }
+    }
+    
+    return crossSells;
+  },
+});
