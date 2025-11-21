@@ -4,7 +4,16 @@ import {
   ShieldCheckIcon, 
   SparklesIcon, 
   PackageIcon, 
-  TruckIcon
+  TruckIcon,
+  LaptopIcon,
+  SmartphoneIcon,
+  MonitorIcon,
+  PlaneIcon,
+  CameraIcon,
+  CircleDotIcon,
+  BatteryChargingIcon,
+  TabletSmartphoneIcon,
+  GamepadIcon
 } from "lucide-react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -192,6 +201,44 @@ export default function Index() {
                 </div>
                 <span className="text-sm font-semibold text-center">{brand.name}</span>
               </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Device Selector Section */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-16 space-y-4">
+            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
+              What Needs a Makeover?
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+              We've got skins for all your tech
+            </p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
+            {[
+              { icon: LaptopIcon, label: "Laptop", filter: "laptop" },
+              { icon: SmartphoneIcon, label: "Phones", filter: "phone" },
+              { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini" },
+              { icon: PlaneIcon, label: "Drones", filter: "drone" },
+              { icon: CameraIcon, label: "Camera", filter: "camera" },
+              { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
+              { icon: BatteryChargingIcon, label: "Chargers", filter: "charger" },
+              { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
+              { icon: GamepadIcon, label: "Gaming Console", filter: "console" }
+            ].map((device, index) => (
+              <a
+                key={index}
+                href={`/products?device=${device.filter}`}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <device.icon className="size-8 text-primary" />
+                </div>
+                <span className="text-sm font-semibold text-center">{device.label}</span>
+              </a>
             ))}
           </div>
         </div>
