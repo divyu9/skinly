@@ -4,10 +4,13 @@
  * Mockup images should be uploaded to Files & Media with naming convention:
  * {NormalizedModelName}_{SKU}.jpg
  * 
- * Example: RedmiNote11Pro_M-174.jpg
+ * Example: RedmiNote11Pro_M-174.jpg, 15pro_M-174.jpg, SamsungS24_M-174.jpg
  */
 
 const MOCKUP_BASE_URL = "https://cdn.hercules.app";
+
+// Cache for successful mockup URL patterns
+const mockupCache = new Map<string, string>();
 
 /**
  * Normalizes phone model name to match image filename format
@@ -22,6 +25,99 @@ export function normalizeModelName(modelName: string): string {
   return modelName
     .replace(/[\s-()]/g, '') // Remove spaces, hyphens, parentheses
     .replace(/[^a-zA-Z0-9]/g, ''); // Remove any other special characters
+}
+
+/**
+ * Generates multiple possible filename variations for a model
+ * Handles cases like:
+ * - "Apple iPhone 15 Pro" → ["AppleiPhone15Pro", "iPhone15Pro", "15Pro", "15pro"]
+ * - "Samsung Galaxy S24 5G" → ["SamsungGalaxyS245G", "SamsungS245G", "SamsungS24", "S245G", "S24"]
+ * 
+ * @param modelName Full phone model name
+ * @returns Array of possible filename variations (without extension)
+ */
+export function generateModelVariations(modelName: string): string[] {
+  const variations = new Set<string>();
+  const normalized = normalizeModelName(modelName);
+  
+  // 1. Full normalized name
+  variations.add(normalized);
+  
+  // 2. Remove common suffixes (5G, 4G, LTE, Plus, Pro Max, etc.)
+  const withoutSuffixes = normalized
+    .replace(/5G$/i, '')
+    .replace(/4G$/i, '')
+    .replace(/LTE$/i, '')
+    .replace(/Plus$/i, '');
+  if (withoutSuffixes !== normalized) {
+    variations.add(withoutSuffixes);
+  }
+  
+  // 3. Extract brand and model parts
+  const brands = ['Apple', 'Samsung', 'Xiaomi', 'Redmi', 'Realme', 'Oppo', 'Vivo', 'OnePlus', 'Nokia', 'Motorola', 'Google', 'Sony', 'Asus', 'iQOO'];
+  
+  for (const brand of brands) {
+    const brandRegex = new RegExp(`^${brand}`, 'i');
+    if (brandRegex.test(normalized)) {
+      // Without brand prefix
+      const withoutBrand = normalized.replace(brandRegex, '');
+      if (withoutBrand) {
+        variations.add(withoutBrand);
+        
+        // Also try without suffixes
+        const withoutBrandAndSuffixes = withoutBrand
+          .replace(/5G$/i, '')
+          .replace(/4G$/i, '')
+          .replace(/LTE$/i, '')
+          .replace(/Plus$/i, '');
+        if (withoutBrandAndSuffixes !== withoutBrand) {
+          variations.add(withoutBrandAndSuffixes);
+        }
+      }
+      
+      // Brand + shortened model (e.g., SamsungS24 from SamsungGalaxyS24)
+      const shortened = normalized.replace(/Galaxy/i, '').replace(/Note/i, '');
+      if (shortened !== normalized) {
+        variations.add(shortened);
+      }
+      
+      break; // Only match one brand
+    }
+  }
+  
+  // 4. Extract just numbers and key identifiers (e.g., "15Pro" from "iPhone15ProMax")
+  const numberMatch = normalized.match(/\d+[A-Za-z]*/);
+  if (numberMatch) {
+    const coreModel = numberMatch[0];
+    variations.add(coreModel);
+    
+    // Also try lowercase version
+    variations.add(coreModel.toLowerCase());
+  }
+  
+  // 5. Special handling for common patterns
+  // iPhone patterns: "iPhone15Pro" → "15Pro", "15pro"
+  if (/iPhone/i.test(normalized)) {
+    const withoutIPhone = normalized.replace(/iPhone/i, '');
+    if (withoutIPhone) {
+      variations.add(withoutIPhone);
+      variations.add(withoutIPhone.toLowerCase());
+    }
+  }
+  
+  // Samsung patterns: "GalaxyS24" → "S24"
+  if (/Samsung/i.test(normalized)) {
+    const withoutGalaxy = normalized.replace(/Samsung/i, '').replace(/Galaxy/i, '');
+    if (withoutGalaxy) {
+      variations.add(withoutGalaxy);
+      
+      // Also try with "Samsung" prefix but no "Galaxy"
+      const samsungShort = 'Samsung' + withoutGalaxy;
+      variations.add(samsungShort);
+    }
+  }
+  
+  return Array.from(variations).filter(v => v.length > 0);
 }
 
 /**
@@ -49,27 +145,14 @@ export function extractSKU(title: string, sku?: string): string | null {
 }
 
 /**
- * Constructs mockup image URL based on model name and SKU
+ * Constructs a single mockup image URL based on model variation and SKU
  * 
- * @param modelName Phone model name (e.g., "Redmi Note 11 Pro")
+ * @param modelVariation Normalized model name variation
  * @param sku SKU code (e.g., "M-174")
- * @param fileId Optional: specific file ID if you know it
  * @returns Constructed mockup image URL
  */
-export function getMockupImageUrl(
-  modelName: string, 
-  sku: string,
-  fileId?: string
-): string {
-  const normalizedModel = normalizeModelName(modelName);
-  const filename = `${normalizedModel}_${sku}.jpg`;
-  
-  if (fileId) {
-    return `${MOCKUP_BASE_URL}/${fileId}`;
-  }
-  
-  // If you store all mockups in a specific folder, use that folder's ID
-  // Otherwise, construct a predictable URL
+function constructMockupUrl(modelVariation: string, sku: string): string {
+  const filename = `${modelVariation}_${sku}.jpg`;
   return `${MOCKUP_BASE_URL}/mockups/${filename}`;
 }
 
@@ -86,4 +169,72 @@ export async function mockupImageExists(imageUrl: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Finds the correct mockup image URL by trying multiple filename variations
+ * Uses a cache to speed up subsequent lookups
+ * 
+ * @param modelName Full phone model name (e.g., "Apple iPhone 15 Pro")
+ * @param sku SKU code (e.g., "M-174")
+ * @returns Promise that resolves to the mockup URL if found, or null
+ * 
+ * @example
+ * ```ts
+ * // Will try: 15pro_M-174.jpg, iPhone15Pro_M-174.jpg, etc.
+ * const url = await findMockupImageUrl("Apple iPhone 15 Pro", "M-174");
+ * ```
+ */
+export async function findMockupImageUrl(
+  modelName: string,
+  sku: string
+): Promise<string | null> {
+  // Check cache first
+  const cacheKey = `${modelName}_${sku}`;
+  if (mockupCache.has(cacheKey)) {
+    return mockupCache.get(cacheKey)!;
+  }
+  
+  // Generate all possible variations
+  const variations = generateModelVariations(modelName);
+  
+  // Try each variation until we find one that exists
+  for (const variation of variations) {
+    const url = constructMockupUrl(variation, sku);
+    const exists = await mockupImageExists(url);
+    
+    if (exists) {
+      // Cache the successful URL
+      mockupCache.set(cacheKey, url);
+      return url;
+    }
+  }
+  
+  // No mockup found
+  return null;
+}
+
+/**
+ * Constructs mockup image URL based on model name and SKU
+ * Note: This returns the first variation without checking if it exists.
+ * For automatic fallback checking, use findMockupImageUrl instead.
+ * 
+ * @param modelName Phone model name (e.g., "Redmi Note 11 Pro")
+ * @param sku SKU code (e.g., "M-174")
+ * @param fileId Optional: specific file ID if you know it
+ * @returns Constructed mockup image URL
+ * 
+ * @deprecated Use findMockupImageUrl for automatic variation checking
+ */
+export function getMockupImageUrl(
+  modelName: string, 
+  sku: string,
+  fileId?: string
+): string {
+  if (fileId) {
+    return `${MOCKUP_BASE_URL}/${fileId}`;
+  }
+  
+  const normalizedModel = normalizeModelName(modelName);
+  return constructMockupUrl(normalizedModel, sku);
 }

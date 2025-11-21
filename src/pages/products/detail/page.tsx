@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -42,7 +42,7 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { getMockupImageUrl, extractSKU, normalizeModelName } from "@/lib/mockups.ts";
+import { findMockupImageUrl, extractSKU } from "@/lib/mockups.ts";
 
 // Phone models data
 const phoneModels: Record<string, string[]> = {
@@ -135,6 +135,10 @@ export default function ProductDetailPage() {
   const [reviewComment, setReviewComment] = useState("");
   const [crossSellDialogOpen, setCrossSellDialogOpen] = useState(false);
   
+  // Mockup image state
+  const [mockupUrl, setMockupUrl] = useState<string | null>(null);
+  const [mockupLoading, setMockupLoading] = useState(false);
+  
   // Filter models based on search
   const filteredModels = useMemo(() => {
     if (!modelSearch.trim()) return phoneModels[selectedBrand] || [];
@@ -201,7 +205,39 @@ export default function ProductDetailPage() {
     });
   }, [activeCoupons, productData]);
   
-  // Filter images based on selected phone model and generate mockup URLs
+  // Fetch mockup image URL asynchronously when phone model or product changes
+  useEffect(() => {
+    async function loadMockup() {
+      if (!phoneModel || !productData) {
+        setMockupUrl(null);
+        return;
+      }
+      
+      const firstVariantSku = productData.variants[0]?.sku;
+      const sku = extractSKU(productData.title, firstVariantSku);
+      
+      if (!sku) {
+        setMockupUrl(null);
+        return;
+      }
+      
+      setMockupLoading(true);
+      try {
+        // Try to find mockup with multiple filename variations
+        const url = await findMockupImageUrl(phoneModel, sku);
+        setMockupUrl(url);
+      } catch (error) {
+        console.error('Error loading mockup:', error);
+        setMockupUrl(null);
+      } finally {
+        setMockupLoading(false);
+      }
+    }
+    
+    loadMockup();
+  }, [phoneModel, productData]);
+  
+  // Filter images based on selected phone model and mockup URLs
   const displayImages = useMemo(() => {
     if (!productData) return [];
     
@@ -212,16 +248,11 @@ export default function ProductDetailPage() {
     
     const images = [];
     
-    // Try to generate mockup image URL from SKU and model
-    // Use first variant's SKU or extract from title
-    const firstVariantSku = productData.variants[0]?.sku;
-    const sku = extractSKU(productData.title, firstVariantSku);
-    if (sku && phoneModel) {
-      const mockupUrl = getMockupImageUrl(phoneModel, sku);
-      // Add mockup as first image
+    // Add mockup image if found
+    if (mockupUrl) {
       images.push({
         url: mockupUrl,
-        alt: `${productData.title} - ${phoneModel} Mockup`,
+        alt: `${productData.title} - ${phoneModel} Preview`,
         phoneModel: phoneModel,
       });
     }
@@ -242,7 +273,7 @@ export default function ProductDetailPage() {
     
     // If we have images, return them; otherwise fall back to all product images
     return images.length > 0 ? images : productData.images;
-  }, [productData, phoneModel]);
+  }, [productData, phoneModel, mockupUrl]);
   
   // Determine if this product needs phone model selection
   // Includes: phone skins and membranes
