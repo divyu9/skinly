@@ -5,9 +5,10 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -36,11 +37,14 @@ export default function ProductsPage() {
   const [filteredProducts, setFilteredProducts] = useState<ShopifyProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const deviceFilter = urlParams.get('device');
   const finishFilter = urlParams.get('finish');
+  const brandFilter = urlParams.get('brand');
+  const showFinish = urlParams.get('showFinish') === 'true';
 
   const testConnection = async () => {
     try {
@@ -75,7 +79,7 @@ export default function ProductsPage() {
         }
         
         setAllProducts(data);
-        applyFilters(data, deviceFilter, finishFilter);
+        applyFilters(data, deviceFilter, finishFilter, brandFilter, searchQuery);
       } catch (err) {
         clearTimeout(timeoutId);
         const errorMsg = err instanceof Error ? err.message : "Failed to load products";
@@ -89,17 +93,26 @@ export default function ProductsPage() {
     fetchProducts();
     
     return () => clearTimeout(timeoutId);
-  }, [getAllProducts, deviceFilter, finishFilter]);
+  }, [getAllProducts, deviceFilter, finishFilter, brandFilter, searchQuery]);
 
   // Apply filters when products or filters change
   useEffect(() => {
     if (allProducts.length > 0) {
-      applyFilters(allProducts, deviceFilter, finishFilter);
+      applyFilters(allProducts, deviceFilter, finishFilter, brandFilter, searchQuery);
     }
-  }, [allProducts, deviceFilter, finishFilter]);
+  }, [allProducts, deviceFilter, finishFilter, brandFilter, searchQuery]);
 
-  const applyFilters = (products: ShopifyProduct[], device: string | null, finish: string | null) => {
+  const applyFilters = (products: ShopifyProduct[], device: string | null, finish: string | null, brand: string | null, search: string) => {
     let filtered = [...products];
+    
+    // Filter by brand
+    if (brand) {
+      filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        const brandLower = brand.toLowerCase();
+        return title.includes(brandLower);
+      });
+    }
     
     // Filter by device
     if (device) {
@@ -129,8 +142,119 @@ export default function ProductsPage() {
       });
     }
     
+    // Filter by search query
+    if (search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      filtered = filtered.filter(p => 
+        p.title.toLowerCase().includes(searchLower) || 
+        p.description?.toLowerCase().includes(searchLower) ||
+        p.tags?.toLowerCase().includes(searchLower)
+      );
+    }
+    
     setFilteredProducts(filtered);
   };
+
+  // Show finish selector when brand is selected and showFinish is true
+  if (showFinish && brandFilter) {
+    return (
+      <div className="min-h-screen">
+        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2">
+              <img 
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                alt="Skinly" 
+                className="h-10"
+              />
+            </Link>
+            <Button size="sm" asChild>
+              <Link to="/">Back to Home</Link>
+            </Button>
+          </div>
+        </nav>
+
+        <section className="pt-32 pb-20 px-4">
+          <div className="container mx-auto max-w-4xl">
+            {/* Confirmation Message */}
+            <div className="text-center mb-16 space-y-6">
+              <div className="inline-block animate-bounce">
+                <div className="size-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-4xl">
+                  ✓
+                </div>
+              </div>
+              <h1 className="text-4xl lg:text-5xl font-bold text-balance">
+                We Got You Covered!
+              </h1>
+              <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+                Perfect! Now pick the finish type for your {brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} device
+              </p>
+            </div>
+
+            {/* Finish Selection */}
+            <div className="grid md:grid-cols-3 gap-6">
+              <Card 
+                className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl"
+                onClick={() => window.location.href = `/products?brand=${brandFilter}&finish=matte`}
+              >
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                  CLASSIC
+                </div>
+                <CardContent className="pt-8 space-y-6 text-center">
+                  <div className="text-6xl mb-4">🎨</div>
+                  <h3 className="text-2xl font-bold">Matte Finish</h3>
+                  <p className="text-muted-foreground">
+                    Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    Choose Matte
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card 
+                className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl"
+                onClick={() => window.location.href = `/products?brand=${brandFilter}&finish=embossed`}
+              >
+                <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                  PREMIUM
+                </div>
+                <CardContent className="pt-8 space-y-6 text-center">
+                  <div className="text-6xl mb-4">✨</div>
+                  <h3 className="text-2xl font-bold">3D Embossed Finish</h3>
+                  <p className="text-muted-foreground">
+                    Raised textures you can feel. Touch meets art in the most satisfying way.
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    Choose 3D Embossed
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card 
+                className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl"
+                onClick={() => window.location.href = `/products?brand=${brandFilter}&finish=transparent`}
+              >
+                <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                  SLEEK
+                </div>
+                <CardContent className="pt-8 space-y-6 text-center">
+                  <div className="text-6xl mb-4">💎</div>
+                  <h3 className="text-2xl font-bold">Transparent Finish</h3>
+                  <p className="text-muted-foreground">
+                    Show off your phone's original color with our crystal-clear protective layer.
+                  </p>
+                  <Button className="w-full" variant="outline">
+                    Choose Transparent
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -274,14 +398,30 @@ export default function ProductsPage() {
         <div className="container mx-auto">
           <div className="text-center mb-12 space-y-4">
             <h1 className="text-4xl lg:text-5xl font-bold text-balance">
-              {deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
+              {brandFilter ? `${brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} Skins` :
+               deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
                'All Products'}
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
               {filteredProducts.length} quirky {filteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop
             </p>
-            {(deviceFilter || finishFilter) && (
+            
+            {/* Search Bar */}
+            <div className="max-w-md mx-auto pt-4">
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-12 text-base"
+                />
+              </div>
+            </div>
+            
+            {(deviceFilter || finishFilter || brandFilter) && (
               <Button variant="outline" onClick={() => window.location.href = '/products'}>
                 Clear Filters
               </Button>
@@ -293,9 +433,14 @@ export default function ProductsPage() {
               const mainImage = product.images[0];
               const minPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
               const maxPrice = Math.max(...product.variants.map(v => parseFloat(v.price)));
+              
+              // Convert USD to INR (approximate rate: 1 USD = 83 INR)
+              const minPriceINR = minPrice * 83;
+              const maxPriceINR = maxPrice * 83;
+              
               const priceDisplay = minPrice === maxPrice 
-                ? `$${minPrice.toFixed(2)}`
-                : `$${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}`;
+                ? `₹${minPriceINR.toFixed(0)}`
+                : `₹${minPriceINR.toFixed(0)} - ₹${maxPriceINR.toFixed(0)}`;
 
               return (
                 <Card key={product.id} className="group overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
