@@ -332,7 +332,7 @@ export default function ProductsPage() {
               {Array.from({ length: 8 }).map((_, i) => (
                 <Card key={i} className="p-0">
                   <Skeleton className="aspect-square w-full rounded-t-xl" />
-                  <div className="p-1 sm:p-4 space-y-0.5">
+                  <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5">
                     <Skeleton className="h-3 sm:h-6 w-full" />
                     <Skeleton className="h-3 sm:h-4 w-12 sm:w-24" />
                     <Skeleton className="h-5 sm:h-10 w-full" />
@@ -543,10 +543,10 @@ export default function ProductsPage() {
                       </div>
                     )}
                   </div>
-                  <div className="p-1 sm:p-4 space-y-0.5 sm:space-y-2">
-                    <h3 className="font-semibold text-[10px] leading-tight sm:text-lg line-clamp-2">{product.title}</h3>
+                  <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                    <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-lg sm:leading-normal line-clamp-2">{product.title}</h3>
                     <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
-                    <Button className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 mt-0.5" asChild>
+                    <Button className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4" asChild>
                       <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
                         <span className="hidden sm:inline">Select My Phone Model</span>
                         <span className="sm:hidden">Select</span>
