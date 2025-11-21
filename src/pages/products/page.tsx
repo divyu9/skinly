@@ -9,6 +9,7 @@ import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon } from "lucide-react
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
+import { CartButton } from "@/components/cart.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -380,7 +381,7 @@ export default function ProductsPage() {
             <Link to="/products" className="text-sm font-medium text-primary">
               All Products
             </Link>
-            <Button size="sm">Cart</Button>
+            <CartButton />
           </div>
         </div>
       </nav>

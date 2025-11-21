@@ -1,11 +1,15 @@
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon } from "lucide-react";
+import { ArrowLeftIcon, PackageIcon, ShoppingCartIcon, CheckIcon } from "lucide-react";
+import { CartButton } from "@/components/cart.tsx";
+import { toast } from "sonner";
+import { Authenticated, Unauthenticated } from "convex/react";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -30,10 +34,15 @@ interface ShopifyProduct {
 export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
   const productId = searchParams.get('id');
+  const phoneModel = searchParams.get('model');
+  const phoneBrand = searchParams.get('brand');
   const getAllProducts = useAction(api.shopify.getAllProducts);
+  const addToCart = useMutation(api.cart.addToCart);
   const [product, setProduct] = useState<ShopifyProduct | null>(null);
   const [selectedImage, setSelectedImage] = useState<string>("");
+  const [selectedVariant, setSelectedVariant] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -140,7 +149,7 @@ export default function ProductDetailPage() {
             <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
               All Products
             </Link>
-            <Button size="sm">Cart</Button>
+            <CartButton />
           </div>
         </div>
       </nav>
@@ -215,24 +224,84 @@ export default function ProductDetailPage() {
                 </Card>
               )}
 
-              {/* Phone Model Selector Placeholder */}
+              {/* Add to Cart Section */}
               <Card className="border-2 border-primary bg-primary/5">
                 <CardContent className="pt-6 space-y-4">
-                  <h3 className="text-xl font-bold">Select Your Phone Model</h3>
-                  <p className="text-sm text-muted-foreground">
-                    This design is available for all phone models. Please select your device to proceed.
-                  </p>
+                  <h3 className="text-xl font-bold">Add to Cart</h3>
+                  {phoneModel && phoneBrand && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckIcon className="size-4 text-primary" />
+                      <span>
+                        Selected Model: <strong>{phoneModel}</strong>
+                      </span>
+                    </div>
+                  )}
                   
-                  {/* Placeholder for phone model selector - will be implemented */}
-                  <div className="space-y-3">
-                    <Button className="w-full" size="lg" disabled>
+                  {product.variants.length > 1 && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Select Variant</label>
+                      <div className="space-y-2">
+                        {product.variants.map((variant, idx) => (
+                          <button
+                            key={variant.id}
+                            onClick={() => setSelectedVariant(idx)}
+                            className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                              selectedVariant === idx
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{variant.title}</span>
+                              <span className="font-bold text-primary">
+                                ₹{parseFloat(variant.price).toFixed(0)}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Authenticated>
+                    <Button
+                      className="w-full"
+                      size="lg"
+                      onClick={async () => {
+                        setIsAdding(true);
+                        try {
+                          await addToCart({
+                            productId: product.id.toString(),
+                            productTitle: product.title,
+                            productImage: product.images[0]?.src,
+                            variant: product.variants[selectedVariant].title,
+                            price: parseFloat(product.variants[selectedVariant].price),
+                            quantity: 1,
+                            phoneModel: phoneModel || undefined,
+                            phoneBrand: phoneBrand || undefined,
+                          });
+                          toast.success("Added to cart!");
+                        } catch (error) {
+                          toast.error("Failed to add to cart");
+                        } finally {
+                          setIsAdding(false);
+                        }
+                      }}
+                      disabled={isAdding}
+                    >
                       <ShoppingCartIcon className="size-5 mr-2" />
-                      Phone Model Selector (Coming Soon)
+                      {isAdding ? "Adding..." : "Add to Cart"}
                     </Button>
-                    <p className="text-xs text-center text-muted-foreground">
-                      Phone model selection will be available soon
-                    </p>
-                  </div>
+                  </Authenticated>
+                  
+                  <Unauthenticated>
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground text-center">
+                        Please sign in to add items to your cart
+                      </p>
+                      <SignInButton className="w-full" size="lg" />
+                    </div>
+                  </Unauthenticated>
                 </CardContent>
               </Card>
 

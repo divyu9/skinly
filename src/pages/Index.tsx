@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { CartButton } from "@/components/cart.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -177,7 +178,7 @@ export default function Index() {
             <a href="/products" className="text-sm font-medium hover:text-primary transition-colors">
               All Products
             </a>
-            <Button size="sm">Cart</Button>
+            <CartButton />
           </div>
         </div>
       </nav>
