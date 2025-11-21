@@ -1417,13 +1417,13 @@ export default function Index() {
           <div className="max-w-3xl mx-auto mb-16">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold mb-2">Find Your Device or Design</h2>
-              <p className="text-muted-foreground">Search phone models, devices, or design patterns</p>
+              <p className="text-muted-foreground">Search across all devices and design patterns</p>
             </div>
             <div className="relative">
               <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-6 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search for phone model, Mac Mini, black skins, etc..."
+                placeholder="iPhone 15 Pro, Canon EOS R5, Mac Mini M4, matte black..."
                 value={homeSearchQuery}
                 onChange={(e) => {
                   setHomeSearchQuery(e.target.value);
@@ -1437,65 +1437,110 @@ export default function Index() {
             {showSearchResults && homeSearchQuery.trim().length > 0 && (
               <Card className="mt-2 max-h-96 overflow-y-auto border-2">
                 <CardContent className="p-4">
-                  {/* Phone Models Section */}
-                  {Object.entries(phoneModels).some(([, models]) => {
+                  {/* Device Models Section - All Categories */}
+                  {(() => {
                     const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-                    return models.some(model => {
-                      const modelLower = model.toLowerCase();
-                      return searchTerms.every(term => modelLower.includes(term));
-                    });
-                  }) && (
-                    <>
-                      <div className="text-xs font-bold text-primary mb-3 uppercase tracking-wide">
-                        Phone Models
-                      </div>
-                      {Object.entries(phoneModels).map(([brand, models]) => {
-                        const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-                        const filteredModels = models.filter(model => {
-                          const modelLower = model.toLowerCase();
-                          return searchTerms.every(term => modelLower.includes(term));
-                        });
+                    
+                    // Combine all device models with their categories
+                    const allDeviceCategories = [
+                      { name: "Phones", icon: "📱", models: phoneModels, type: "phone" },
+                      { name: "Cameras", icon: "📷", models: cameraModels, type: "camera" },
+                      { name: "Lenses", icon: "🔍", models: lensModels, type: "lens" },
+                      { name: "Tablets", icon: "📱", models: tabletModels, type: "tablet" },
+                      { name: "Mac Mini", icon: "💻", models: macMiniModels, type: "macmini" },
+                      { name: "Gaming Consoles", icon: "🎮", models: consoleModels, type: "console" },
+                      { name: "Drones", icon: "🚁", models: droneModels, type: "drone" },
+                      { name: "Chargers", icon: "🔌", models: chargerModels, type: "charger" },
+                    ] as const;
+
+                    interface MatchingBrand {
+                      brand: string;
+                      models: string[];
+                    }
+
+                    interface MatchingCategory {
+                      name: string;
+                      icon: string;
+                      type: string;
+                      matchingBrands: MatchingBrand[];
+                    }
+
+                    // Find matching categories
+                    const matchingCategories = allDeviceCategories
+                      .map(category => {
+                        const matchingBrands: MatchingBrand[] = Object.entries(category.models)
+                          .map(([brand, models]) => {
+                            const filteredModels = models.filter((model: string) => {
+                              const modelLower = model.toLowerCase();
+                              return searchTerms.every(term => modelLower.includes(term));
+                            });
+                            return filteredModels.length > 0 ? { brand, models: filteredModels } : null;
+                          })
+                          .filter((item): item is MatchingBrand => item !== null);
                         
-                        if (filteredModels.length === 0) return null;
-                        
-                        return (
-                          <div key={brand} className="mb-4 last:mb-0">
-                            <div className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-                              <span>{brand}</span>
-                              <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
-                                {filteredModels.length}
-                              </span>
-                            </div>
-                            <div className="space-y-1">
-                              {filteredModels.slice(0, 5).map((model, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => {
-                                    setHomeSearchQuery("");
-                                    setShowSearchResults(false);
-                                    window.location.href = `/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
-                                  }}
-                                  className="w-full text-left p-3 rounded-lg hover:bg-primary/10 hover:text-primary transition-all group"
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-medium">{model}</span>
-                                    <span className="text-xs text-muted-foreground group-hover:text-primary">
-                                      Select Model →
+                        return matchingBrands.length > 0 ? { 
+                          name: category.name, 
+                          icon: category.icon, 
+                          type: category.type,
+                          matchingBrands 
+                        } : null;
+                      })
+                      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+                    if (matchingCategories.length > 0) {
+                      return (
+                        <>
+                          <div className="text-xs font-bold text-primary mb-3 uppercase tracking-wide">
+                            Device Models
+                          </div>
+                          {matchingCategories.map((category) => (
+                            <div key={category.name} className="mb-4">
+                              <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                                <span>{category.icon}</span>
+                                <span>{category.name}</span>
+                              </div>
+                              {category.matchingBrands.map(({ brand, models }) => (
+                                <div key={brand} className="mb-3 last:mb-0">
+                                  <div className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2 pl-6">
+                                    <span>{brand}</span>
+                                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+                                      {models.length}
                                     </span>
                                   </div>
-                                </button>
-                              ))}
-                              {filteredModels.length > 5 && (
-                                <div className="text-xs text-muted-foreground pl-3 pt-1">
-                                  +{filteredModels.length - 5} more models
+                                  <div className="space-y-1 pl-6">
+                                    {models.slice(0, 3).map((model: string, idx: number) => (
+                                      <button
+                                        key={idx}
+                                        onClick={() => {
+                                          setHomeSearchQuery("");
+                                          setShowSearchResults(false);
+                                          window.location.href = `/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
+                                        }}
+                                        className="w-full text-left p-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-all group"
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-sm font-medium">{model}</span>
+                                          <span className="text-xs text-muted-foreground group-hover:text-primary">
+                                            Select →
+                                          </span>
+                                        </div>
+                                      </button>
+                                    ))}
+                                    {models.length > 3 && (
+                                      <div className="text-xs text-muted-foreground pl-2 pt-1">
+                                        +{models.length - 3} more
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              )}
+                              ))}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
+                          ))}
+                        </>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Products Section */}
                   {(() => {
@@ -1505,15 +1550,24 @@ export default function Index() {
                       return searchTerms.every(term => titleLower.includes(term));
                     });
 
+                    // Check if there are any device models
+                    const allDeviceCategories = [
+                      phoneModels, cameraModels, lensModels, tabletModels, 
+                      macMiniModels, consoleModels, droneModels, chargerModels
+                    ];
+                    const hasDeviceModels = allDeviceCategories.some(category =>
+                      Object.values(category).some(models =>
+                        models.some(model => {
+                          const modelLower = model.toLowerCase();
+                          return searchTerms.every(term => modelLower.includes(term));
+                        })
+                      )
+                    );
+
                     if (matchingProducts.length > 0) {
                       return (
                         <>
-                          {Object.entries(phoneModels).some(([, models]) => {
-                            return models.some(model => {
-                              const modelLower = model.toLowerCase();
-                              return searchTerms.every(term => modelLower.includes(term));
-                            });
-                          }) && <div className="my-4 border-t border-border" />}
+                          {hasDeviceModels && <div className="my-4 border-t border-border" />}
                           
                           <div className="text-xs font-bold text-secondary mb-3 uppercase tracking-wide flex items-center gap-2">
                             Design Patterns & Products
@@ -1578,29 +1632,42 @@ export default function Index() {
                   })()}
                   
                   {/* No Results */}
-                  {Object.entries(phoneModels).every(([, models]) => {
+                  {(() => {
                     const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-                    return models.filter(model => {
-                      const modelLower = model.toLowerCase();
-                      return searchTerms.every(term => modelLower.includes(term));
-                    }).length === 0;
-                  }) && (() => {
-                    const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+                    
+                    // Check all device categories
+                    const allDeviceCategories = [
+                      phoneModels, cameraModels, lensModels, tabletModels, 
+                      macMiniModels, consoleModels, droneModels, chargerModels
+                    ];
+                    const hasDeviceModels = allDeviceCategories.some(category =>
+                      Object.values(category).some(models =>
+                        models.some(model => {
+                          const modelLower = model.toLowerCase();
+                          return searchTerms.every(term => modelLower.includes(term));
+                        })
+                      )
+                    );
+
                     const matchingProducts = products.filter(product => {
                       const titleLower = product.title.toLowerCase();
                       return searchTerms.every(term => titleLower.includes(term));
                     });
-                    return matchingProducts.length === 0;
-                  })() && (
-                    <div className="text-center py-8">
-                      <div className="text-muted-foreground mb-2">
-                        No results found for &quot;{homeSearchQuery}&quot;
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Try searching for a phone model, device type, or design pattern
-                      </div>
-                    </div>
-                  )}
+
+                    if (!hasDeviceModels && matchingProducts.length === 0) {
+                      return (
+                        <div className="text-center py-8">
+                          <div className="text-muted-foreground mb-2">
+                            No results found for &quot;{homeSearchQuery}&quot;
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Try searching for a device model or design pattern
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </CardContent>
               </Card>
             )}
