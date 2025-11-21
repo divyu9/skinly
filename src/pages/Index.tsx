@@ -942,9 +942,11 @@ export default function Index() {
               <Card className="mt-2 max-h-96 overflow-y-auto border-2">
                 <CardContent className="p-4">
                   {Object.entries(phoneModels).map(([brand, models]) => {
-                    const filteredModels = models.filter(model =>
-                      model.toLowerCase().includes(homeSearchQuery.toLowerCase())
-                    );
+                    const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+                    const filteredModels = models.filter(model => {
+                      const modelLower = model.toLowerCase();
+                      return searchTerms.every(term => modelLower.includes(term));
+                    });
                     
                     if (filteredModels.length === 0) return null;
                     
@@ -980,11 +982,13 @@ export default function Index() {
                     );
                   })}
                   
-                  {Object.entries(phoneModels).every(([, models]) =>
-                    models.filter(model =>
-                      model.toLowerCase().includes(homeSearchQuery.toLowerCase())
-                    ).length === 0
-                  ) && (
+                  {Object.entries(phoneModels).every(([, models]) => {
+                    const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+                    return models.filter(model => {
+                      const modelLower = model.toLowerCase();
+                      return searchTerms.every(term => modelLower.includes(term));
+                    }).length === 0;
+                  }) && (
                     <div className="text-center py-8 text-muted-foreground">
                       No models found matching &quot;{homeSearchQuery}&quot;
                     </div>
