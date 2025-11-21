@@ -500,7 +500,21 @@ const phoneModels: Record<string, string[]> = {
   "Lava": ["Lava Blaze 2", "Lava Agni 2"],
   "Infinix": ["Infinix Note 30 Pro", "Infinix Zero 30"],
   "Asus": ["ROG Phone 8 Pro", "ROG Phone 8", "Zenfone 11 Ultra"],
-  "HMD": ["Nokia G60", "Nokia X30"]
+  "HMD": [
+    "HMD Nokia C300",
+    "HMD Nokia G60",
+    "HMD Nokia G42 5G",
+    "HMD Nokia G21",
+    "HMD Nokia G20",
+    "HMD Nokia X30",
+    "HMD Nokia C32",
+    "HMD Nokia C31",
+    "HMD Nokia C30",
+    "HMD Nokia C22",
+    "HMD Nokia C21 Plus",
+    "HMD Nokia C12 Pro",
+    "HMD Nokia 9"
+  ]
 };
 
 export default function Index() {
