@@ -51,12 +51,12 @@ export default function Index() {
           </div>
           <div className="flex items-center gap-6">
             <a href="#products" className="text-sm font-medium hover:text-primary transition-colors">
-              Shop
+              Categories
             </a>
-            <a href="#about" className="text-sm font-medium hover:text-primary transition-colors">
-              About
+            <a href="/products" className="text-sm font-medium hover:text-primary transition-colors">
+              All Products
             </a>
-            <Button size="sm">Get Started</Button>
+            <Button size="sm">Cart</Button>
           </div>
         </div>
       </nav>
@@ -82,8 +82,8 @@ export default function Index() {
                 Why blend in when you were born to stand out?
               </p>
               <div className="flex flex-wrap gap-4">
-                <Button size="lg" className="text-base">
-                  Browse Collection
+                <Button size="lg" className="text-base" asChild>
+                  <a href="/products">Browse Collection</a>
                 </Button>
                 <Button size="lg" variant="secondary" className="text-base">
                   Custom Design
