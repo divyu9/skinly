@@ -43,6 +43,39 @@ interface ShopifyProduct {
   }>;
 }
 
+// Mac Mini models data
+const macMiniModels: Record<string, string[]> = {
+  "Apple": [
+    "Mac Mini Intel (2018)",
+    "Mac Mini M1 / M1 Pro (2020)",
+    "Mac Mini M2 (2023)",
+    "Mac Mini M2 Pro (2023)",
+    "Mac Mini M4 / M4 Pro (2024)"
+  ]
+};
+
+// Camera models data
+const cameraModels: Record<string, string[]> = {
+  "Sony": [
+    "Sony A7r3",
+    "Sony A1",
+    "Sony A7 I",
+    "Sony A7 II",
+    "Sony A7",
+    "Sony A7C",
+    "Sony A7R IV",
+    "Sony Alpha A7 Mark IV",
+    "Sony FX30",
+    "Sony ZV E10"
+  ],
+  "Nikon": [
+    "Nikon Camera"
+  ],
+  "Canon": [
+    "Canon Camera"
+  ]
+};
+
 // Tablet models data
 const tabletModels: Record<string, string[]> = {
   "Apple": [
@@ -1010,7 +1043,9 @@ export default function Index() {
   const [showChargerBrandSelectorDialog, setShowChargerBrandSelectorDialog] = useState(false);
   const [showConsoleBrandSelectorDialog, setShowConsoleBrandSelectorDialog] = useState(false);
   const [showTabletBrandSelectorDialog, setShowTabletBrandSelectorDialog] = useState(false);
-  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console" | "tablet">("phone");
+  const [showMacMiniBrandSelectorDialog, setShowMacMiniBrandSelectorDialog] = useState(false);
+  const [showCameraBrandSelectorDialog, setShowCameraBrandSelectorDialog] = useState(false);
+  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console" | "tablet" | "macmini" | "camera">("phone");
   const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1397,15 +1432,15 @@ export default function Index() {
             {[
               { icon: LaptopIcon, label: "Laptop", filter: "laptop" },
               { icon: SmartphoneIcon, label: "Phones", filter: "phone", showBrandSelector: true, type: "phone" as const },
-              { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini" },
+              { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini", showBrandSelector: true, type: "macmini" as const },
               { icon: PlaneIcon, label: "Drones", filter: "drone", showBrandSelector: true, type: "drone" as const },
-              { icon: CameraIcon, label: "Camera", filter: "camera" },
+              { icon: CameraIcon, label: "Camera", filter: "camera", showBrandSelector: true, type: "camera" as const },
               { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
               { icon: BatteryChargingIcon, label: "Chargers", filter: "charger", showBrandSelector: true, type: "charger" as const },
               { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad", showBrandSelector: true, type: "tablet" as const },
               { icon: GamepadIcon, label: "Gaming Console", filter: "console", showBrandSelector: true, type: "console" as const }
             ].map((device, index) => {
-              // Special handling for Phones, Drones, Chargers, Tablets, and Consoles - open brand selector instead of filtering
+              // Special handling for Phones, Drones, Chargers, Tablets, Consoles, Mac Mini, and Camera - open brand selector instead of filtering
               if (device.showBrandSelector) {
                 return (
                   <button
@@ -1426,6 +1461,12 @@ export default function Index() {
                       } else if (device.type === "tablet") {
                         setDeviceType("tablet");
                         setShowTabletBrandSelectorDialog(true);
+                      } else if (device.type === "macmini") {
+                        setDeviceType("macmini");
+                        setShowMacMiniBrandSelectorDialog(true);
+                      } else if (device.type === "camera") {
+                        setDeviceType("camera");
+                        setShowCameraBrandSelectorDialog(true);
                       }
                     }}
                     className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
@@ -1936,15 +1977,101 @@ export default function Index() {
         </DialogContent>
       </Dialog>
 
+      {/* Mac Mini Brand Selector Dialog */}
+      <Dialog open={showMacMiniBrandSelectorDialog} onOpenChange={setShowMacMiniBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Mac Mini Brand</DialogTitle>
+            <DialogDescription>
+              Choose your Mac Mini brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "Apple", logo: "🍎" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("macmini");
+                  setShowMacMiniBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Camera Brand Selector Dialog */}
+      <Dialog open={showCameraBrandSelectorDialog} onOpenChange={setShowCameraBrandSelectorDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your Camera Brand</DialogTitle>
+            <DialogDescription>
+              Choose your camera brand to continue
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            {[
+              { name: "Sony", logo: "📷" },
+              { name: "Nikon", logo: "📸" },
+              { name: "Canon", logo: "📹" }
+            ].map((brand, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setDeviceType("camera");
+                  setShowCameraBrandSelectorDialog(false);
+                  setIsDialogOpen(true);
+                }}
+                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+              >
+                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
+                  {brand.logo}
+                </div>
+                <span className="text-sm font-semibold text-center">{brand.name}</span>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Model Selector Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-2xl">
-              Select Your {selectedBrand} {deviceType === "phone" ? "Model" : deviceType === "drone" ? "Drone" : deviceType === "charger" ? "Charger" : deviceType === "console" ? "Console" : "Tablet"}
+              Select Your {selectedBrand} {
+                deviceType === "phone" ? "Model" : 
+                deviceType === "drone" ? "Drone" : 
+                deviceType === "charger" ? "Charger" : 
+                deviceType === "console" ? "Console" : 
+                deviceType === "tablet" ? "Tablet" :
+                deviceType === "macmini" ? "Mac Mini" :
+                "Camera"
+              }
             </DialogTitle>
             <DialogDescription>
-              Choose your {deviceType === "phone" ? "phone model" : deviceType === "drone" ? "drone model" : deviceType === "charger" ? "charger model" : deviceType === "console" ? "console model" : "tablet model"} to see compatible skins
+              Choose your {
+                deviceType === "phone" ? "phone model" : 
+                deviceType === "drone" ? "drone model" : 
+                deviceType === "charger" ? "charger model" : 
+                deviceType === "console" ? "console model" : 
+                deviceType === "tablet" ? "tablet model" :
+                deviceType === "macmini" ? "Mac Mini model" :
+                "camera model"
+              } to see compatible skins
             </DialogDescription>
           </DialogHeader>
           
@@ -1967,7 +2094,9 @@ export default function Index() {
               deviceType === "drone" ? droneModels[selectedBrand] : 
               deviceType === "charger" ? chargerModels[selectedBrand] :
               deviceType === "console" ? consoleModels[selectedBrand] :
-              tabletModels[selectedBrand]
+              deviceType === "tablet" ? tabletModels[selectedBrand] :
+              deviceType === "macmini" ? macMiniModels[selectedBrand] :
+              cameraModels[selectedBrand]
             )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
@@ -1998,7 +2127,9 @@ export default function Index() {
               deviceType === "drone" ? droneModels[selectedBrand] : 
               deviceType === "charger" ? chargerModels[selectedBrand] :
               deviceType === "console" ? consoleModels[selectedBrand] :
-              tabletModels[selectedBrand]
+              deviceType === "tablet" ? tabletModels[selectedBrand] :
+              deviceType === "macmini" ? macMiniModels[selectedBrand] :
+              cameraModels[selectedBrand]
             )
               ?.filter(model => 
                 searchQuery.trim() === "" || 
