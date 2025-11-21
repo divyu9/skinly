@@ -42,6 +42,7 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { getMockupImageUrl, extractSKU, normalizeModelName } from "@/lib/mockups.ts";
 
 // Phone models data
 const phoneModels: Record<string, string[]> = {
@@ -200,7 +201,7 @@ export default function ProductDetailPage() {
     });
   }, [activeCoupons, productData]);
   
-  // Filter images based on selected phone model
+  // Filter images based on selected phone model and generate mockup URLs
   const displayImages = useMemo(() => {
     if (!productData) return [];
     
@@ -209,19 +210,38 @@ export default function ProductDetailPage() {
       return productData.images;
     }
     
-    // Find images that match the selected phone model
+    const images = [];
+    
+    // Try to generate mockup image URL from SKU and model
+    // Use first variant's SKU or extract from title
+    const firstVariantSku = productData.variants[0]?.sku;
+    const sku = extractSKU(productData.title, firstVariantSku);
+    if (sku && phoneModel) {
+      const mockupUrl = getMockupImageUrl(phoneModel, sku);
+      // Add mockup as first image
+      images.push({
+        url: mockupUrl,
+        alt: `${productData.title} - ${phoneModel} Mockup`,
+        phoneModel: phoneModel,
+      });
+    }
+    
+    // Find images that match the selected phone model from database
     const modelSpecificImages = productData.images.filter(
       (img) => img.phoneModel?.toLowerCase() === phoneModel.toLowerCase()
     );
     
-    // If model-specific images exist, use them
+    // Add model-specific images from database
     if (modelSpecificImages.length > 0) {
-      return modelSpecificImages;
+      images.push(...modelSpecificImages);
     }
     
-    // Otherwise, fall back to images without phoneModel tags (default images)
+    // Add default images (without phoneModel tags)
     const defaultImages = productData.images.filter((img) => !img.phoneModel);
-    return defaultImages.length > 0 ? defaultImages : productData.images;
+    images.push(...defaultImages);
+    
+    // If we have images, return them; otherwise fall back to all product images
+    return images.length > 0 ? images : productData.images;
   }, [productData, phoneModel]);
   
   // Determine if this product needs phone model selection
@@ -467,13 +487,27 @@ export default function ProductDetailPage() {
           <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-8 mb-12">
             {/* Image Gallery */}
             <div className="space-y-3 md:sticky md:top-24 md:self-start">
-              <div className="aspect-square overflow-hidden rounded-xl bg-muted border border-border">
+              <div className="aspect-square overflow-hidden rounded-xl bg-muted border border-border relative">
                 {selectedImage ? (
-                  <img
-                    src={selectedImage}
-                    alt={product.title}
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    <img
+                      src={selectedImage}
+                      alt={product.title}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // If mockup image fails to load, show next available image
+                        const nextImage = displayImages.find(img => img.url !== selectedImage);
+                        if (nextImage) {
+                          setSelectedImage(nextImage.url);
+                        }
+                      }}
+                    />
+                    {phoneModel && selectedImage.includes('/mockups/') && (
+                      <div className="absolute top-3 right-3 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
+                        Preview on {phoneModel}
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <PackageIcon className="size-12 text-muted-foreground" />
@@ -482,9 +516,9 @@ export default function ProductDetailPage() {
               </div>
               
               {/* Thumbnail Gallery */}
-              {product.images.length > 1 && (
+              {displayImages.length > 1 && (
                 <div className="grid grid-cols-4 gap-2">
-                  {product.images.slice(0, 4).map((image, idx) => (
+                  {displayImages.slice(0, 4).map((image, idx) => (
                     <button
                       key={idx}
                       onClick={() => setSelectedImage(image.url)}
@@ -498,6 +532,10 @@ export default function ProductDetailPage() {
                         src={image.url}
                         alt={image.alt || product.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Hide thumbnail if image fails to load (e.g., mockup doesn't exist)
+                          (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                        }}
                       />
                     </button>
                   ))}
