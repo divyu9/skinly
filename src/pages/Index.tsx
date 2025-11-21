@@ -6,23 +6,23 @@ export default function Index() {
   const features = [
     {
       icon: ShieldCheckIcon,
-      title: "Premium Protection",
-      description: "Military-grade materials protect your phone from drops, scratches, and daily wear"
+      title: "Tough as Nails",
+      description: "Your phone's new BFF. We protect against drops, bumps, and life's little accidents"
     },
     {
       icon: SparklesIcon,
-      title: "Unique Designs",
-      description: "Stand out with exclusive patterns and colors you won't find anywhere else"
+      title: "Weirdly Wonderful",
+      description: "From cosmic cats to dancing tacos, our designs are as unique as your personality"
     },
     {
       icon: PackageIcon,
-      title: "Perfect Fit",
-      description: "Precision-cut for all major phone models with easy button access"
+      title: "Fits Like a Glove",
+      description: "Snug fit for every button, port, and camera. No awkward gaps here"
     },
     {
       icon: TruckIcon,
-      title: "Fast Shipping",
-      description: "Free shipping on all orders. Get your new look in 2-3 business days"
+      title: "Lightning Fast",
+      description: "Free shipping, always. Your new phone vibe arrives in 2-3 days"
     }
   ];
 
@@ -54,18 +54,18 @@ export default function Index() {
             <div className="space-y-8">
               <div className="inline-block">
                 <div className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                  New Collection Available
+                  ✨ New Quirky Drops
                 </div>
               </div>
               <h1 className="text-5xl lg:text-7xl font-bold text-balance leading-tight">
-                Style Your Phone,
+                Boring Phones?
                 <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                  {" "}Express Yourself
+                  {" "}Not On Our Watch!
                 </span>
               </h1>
               <p className="text-xl text-muted-foreground text-balance max-w-xl">
-                Premium phone skins that combine protection with personality. 
-                Transform your device with stunning designs that last.
+                Wildly creative phone skins that'll make your friends jealous. 
+                Why blend in when you were born to stand out?
               </p>
               <div className="flex flex-wrap gap-4">
                 <Button size="lg" className="text-base">
@@ -109,10 +109,10 @@ export default function Index() {
         <div className="container mx-auto">
           <div className="text-center mb-16 space-y-4">
             <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Why Choose SkinStudio?
+              Why We're Different
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Premium quality meets creative design for the ultimate phone protection
+              Because your phone deserves more than another boring case
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -136,10 +136,10 @@ export default function Index() {
         <div className="container mx-auto">
           <div className="text-center mb-16 space-y-4">
             <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Popular Designs
+              Fan Favorites
             </h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Explore our most loved phone skins
+              The designs everyone's obsessed with right now
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -173,10 +173,10 @@ export default function Index() {
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10" />
             <CardContent className="relative py-16 text-center space-y-6">
               <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-                Ready to Transform Your Phone?
+                Your Phone Called. It Wants Personality.
               </h2>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-                Join thousands of satisfied customers and give your phone the protection and style it deserves
+                Join 10,000+ happy humans who ditched boring for bold
               </p>
               <div className="flex flex-wrap gap-4 justify-center pt-4">
                 <Button size="lg" className="text-base">
@@ -201,7 +201,7 @@ export default function Index() {
                 <span className="text-xl font-bold">SkinStudio</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Premium phone skins for the style-conscious
+                Where quirky meets quality
               </p>
             </div>
             <div>
