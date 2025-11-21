@@ -19,25 +19,27 @@ export const getAllProducts = query({
       products = await ctx.db.query("products").collect();
     }
 
-    // Fetch variants for each product
-    const productsWithVariants = await Promise.all(
-      products.map(async (product) => {
-        const variants = await ctx.db
-          .query("variants")
-          .withIndex("by_product", (q) => q.eq("productId", product._id))
-          .collect();
+    // Fetch ALL variants in one query and group by productId
+    const allVariants = await ctx.db.query("variants").collect();
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
 
-        const collection = product.collectionId
-          ? await ctx.db.get(product.collectionId)
-          : null;
-
-        return {
-          ...product,
-          variants,
-          collection,
-        };
-      })
-    );
+    // Build products with their variants
+    const productsWithVariants = products.map((product) => {
+      const variants = variantsByProduct.get(product._id) || [];
+      return {
+        ...product,
+        variants,
+        collection: null, // Skip collection lookup for performance
+      };
+    });
 
     return productsWithVariants;
   },
