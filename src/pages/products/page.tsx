@@ -44,6 +44,7 @@ export default function ProductsPage() {
   const deviceFilter = urlParams.get('device');
   const finishFilter = urlParams.get('finish');
   const brandFilter = urlParams.get('brand');
+  const modelFilter = urlParams.get('model');
   const showFinish = urlParams.get('showFinish') === 'true';
 
   const testConnection = async () => {
@@ -178,7 +179,7 @@ export default function ProductsPage() {
                 We Got You Covered!
               </h1>
               <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-                Perfect! Now pick the finish type for your {brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} device
+                Perfect! Now pick the finish type for your {modelFilter || `${brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} device`}
               </p>
             </div>
 
@@ -186,7 +187,7 @@ export default function ProductsPage() {
             <div className="grid md:grid-cols-3 gap-6">
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}&finish=matte`}
+                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=matte`}
               >
                 <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
                   CLASSIC
@@ -205,7 +206,7 @@ export default function ProductsPage() {
 
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}&finish=embossed`}
+                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=embossed`}
               >
                 <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
                   PREMIUM
@@ -224,7 +225,7 @@ export default function ProductsPage() {
 
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}&finish=transparent`}
+                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=transparent`}
               >
                 <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
                   SLEEK

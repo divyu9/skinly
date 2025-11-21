@@ -13,12 +13,21 @@ import {
   CircleDotIcon,
   BatteryChargingIcon,
   TabletSmartphoneIcon,
-  GamepadIcon
+  GamepadIcon,
+  SearchIcon
 } from "lucide-react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
 
 interface ShopifyProduct {
   id: number;
@@ -32,10 +41,30 @@ interface ShopifyProduct {
   }>;
 }
 
+// Phone models data - can be expanded with more models
+const phoneModels: Record<string, string[]> = {
+  "Apple": ["iPhone 16 Pro Max", "iPhone 16 Pro", "iPhone 16 Plus", "iPhone 16", "iPhone 15 Pro Max", "iPhone 15 Pro", "iPhone 15 Plus", "iPhone 15", "iPhone 14 Pro Max", "iPhone 14 Pro", "iPhone 14 Plus", "iPhone 14", "iPhone 13 Pro Max", "iPhone 13 Pro", "iPhone 13", "iPhone 13 Mini"],
+  "Samsung": ["Galaxy S24 Ultra", "Galaxy S24+", "Galaxy S24", "Galaxy S23 Ultra", "Galaxy S23+", "Galaxy S23", "Galaxy S22 Ultra", "Galaxy S22+", "Galaxy S22", "Galaxy Z Fold 5", "Galaxy Z Flip 5", "Galaxy A54", "Galaxy A34"],
+  "Nothing": ["Nothing Phone 2", "Nothing Phone 2a", "Nothing Phone 1"],
+  "Oppo": ["Reno 11 Pro", "Reno 11", "Reno 10 Pro+", "Reno 10 Pro", "Find N3", "Find X6 Pro"],
+  "Realme": ["Realme 12 Pro+", "Realme 12 Pro", "Realme 11 Pro+", "Realme 11 Pro", "Realme GT 3"],
+  "CMF": ["CMF Phone 1"],
+  "Vivo": ["V30 Pro", "V30", "V29 Pro", "V29", "X100 Pro", "X100"],
+  "iQOO": ["iQOO 12", "iQOO 11", "iQOO Neo 9 Pro", "iQOO Neo 9"],
+  "Xiaomi": ["Xiaomi 14 Pro", "Xiaomi 14", "Xiaomi 13 Pro", "Xiaomi 13", "Redmi Note 13 Pro+", "Redmi Note 13 Pro"],
+  "Lava": ["Lava Blaze 2", "Lava Agni 2"],
+  "Infinix": ["Infinix Note 30 Pro", "Infinix Zero 30"],
+  "Asus": ["ROG Phone 8 Pro", "ROG Phone 8", "Zenfone 11 Ultra"],
+  "HMD": ["Nokia G60", "Nokia X30"]
+};
+
 export default function Index() {
   const getAllProducts = useAction(api.shopify.getAllProducts);
   const [products, setProducts] = useState<ShopifyProduct[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function fetchProducts() {
@@ -192,7 +221,9 @@ export default function Index() {
               <button
                 key={index}
                 onClick={() => {
-                  window.location.href = `/products?brand=${brand.name.toLowerCase()}&showFinish=true`;
+                  setSelectedBrand(brand.name);
+                  setSearchQuery("");
+                  setIsDialogOpen(true);
                 }}
                 className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
               >
@@ -530,6 +561,68 @@ export default function Index() {
           </div>
         </div>
       </footer>
+
+      {/* Model Selector Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Select Your {selectedBrand} Model</DialogTitle>
+            <DialogDescription>
+              Choose your phone model to see compatible skins
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Search Bar */}
+          <div className="relative">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search models..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Model List */}
+          <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+            {selectedBrand && phoneModels[selectedBrand]
+              ?.filter(model => 
+                searchQuery.trim() === "" || 
+                model.toLowerCase().includes(searchQuery.toLowerCase())
+              )
+              .map((model, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    window.location.href = `/products?brand=${selectedBrand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
+                  }}
+                  className="w-full text-left p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium group-hover:text-primary transition-colors">
+                      {model}
+                    </span>
+                    <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
+                      Select →
+                    </span>
+                  </div>
+                </button>
+              ))}
+            
+            {selectedBrand && phoneModels[selectedBrand]
+              ?.filter(model => 
+                searchQuery.trim() === "" || 
+                model.toLowerCase().includes(searchQuery.toLowerCase())
+              ).length === 0 && (
+                <div className="text-center py-8 text-muted-foreground">
+                  No models found matching &quot;{searchQuery}&quot;
+                </div>
+              )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
