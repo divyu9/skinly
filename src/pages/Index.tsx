@@ -111,6 +111,8 @@ export default function Index() {
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [homeSearchQuery, setHomeSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -183,6 +185,83 @@ export default function Index() {
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto">
+          {/* Model Search Bar */}
+          <div className="max-w-3xl mx-auto mb-16">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold mb-2">Find Your Phone Model</h2>
+              <p className="text-muted-foreground">Search across all brands to find your device</p>
+            </div>
+            <div className="relative">
+              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-6 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search for your phone model (e.g., iPhone 16 Pro, Galaxy S24...)"
+                value={homeSearchQuery}
+                onChange={(e) => {
+                  setHomeSearchQuery(e.target.value);
+                  setShowSearchResults(e.target.value.trim().length > 0);
+                }}
+                className="pl-14 h-16 text-lg border-2 focus:border-primary"
+              />
+            </div>
+            
+            {/* Search Results Dropdown */}
+            {showSearchResults && homeSearchQuery.trim().length > 0 && (
+              <Card className="mt-2 max-h-96 overflow-y-auto border-2">
+                <CardContent className="p-4">
+                  {Object.entries(phoneModels).map(([brand, models]) => {
+                    const filteredModels = models.filter(model =>
+                      model.toLowerCase().includes(homeSearchQuery.toLowerCase())
+                    );
+                    
+                    if (filteredModels.length === 0) return null;
+                    
+                    return (
+                      <div key={brand} className="mb-4 last:mb-0">
+                        <div className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2">
+                          <span>{brand}</span>
+                          <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+                            {filteredModels.length}
+                          </span>
+                        </div>
+                        <div className="space-y-1">
+                          {filteredModels.map((model, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => {
+                                setHomeSearchQuery("");
+                                setShowSearchResults(false);
+                                window.location.href = `/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
+                              }}
+                              className="w-full text-left p-3 rounded-lg hover:bg-primary/10 hover:text-primary transition-all group"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{model}</span>
+                                <span className="text-xs text-muted-foreground group-hover:text-primary">
+                                  Select →
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {Object.entries(phoneModels).every(([, models]) =>
+                    models.filter(model =>
+                      model.toLowerCase().includes(homeSearchQuery.toLowerCase())
+                    ).length === 0
+                  ) && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No models found matching &quot;{homeSearchQuery}&quot;
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-8">
               <div className="inline-block">
