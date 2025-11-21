@@ -328,14 +328,15 @@ export default function ProductsPage() {
               <Skeleton className="h-6 sm:h-12 w-32 sm:w-64 mx-auto mb-2 sm:mb-4" />
               <Skeleton className="h-4 sm:h-6 w-48 sm:w-96 mx-auto hidden sm:block" />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
               {Array.from({ length: 8 }).map((_, i) => (
-                <Card key={i}>
+                <Card key={i} className="p-0">
                   <Skeleton className="aspect-square w-full rounded-t-xl" />
-                  <CardContent className="pt-2 sm:pt-4 space-y-1 px-2 sm:px-6 pb-2">
+                  <div className="p-1 sm:p-4 space-y-0.5">
                     <Skeleton className="h-3 sm:h-6 w-full" />
                     <Skeleton className="h-3 sm:h-4 w-12 sm:w-24" />
-                  </CardContent>
+                    <Skeleton className="h-5 sm:h-10 w-full" />
+                  </div>
                 </Card>
               ))}
             </div>
@@ -517,7 +518,7 @@ export default function ProductsPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
             {sortedAndFilteredProducts.map((product) => {
               const mainImage = product.images[0];
               const minPrice = Math.min(...product.variants.map(v => v.price));
@@ -528,7 +529,7 @@ export default function ProductsPage() {
                 : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
 
               return (
-                <Card key={product._id} className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl">
+                <Card key={product._id} className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0">
                   <div className="aspect-square overflow-hidden bg-muted">
                     {mainImage ? (
                       <img
@@ -542,20 +543,16 @@ export default function ProductsPage() {
                       </div>
                     )}
                   </div>
-                  <CardContent className="pt-2 sm:pt-4 space-y-0.5 sm:space-y-2 px-2 sm:px-6 pb-2 sm:pb-6">
+                  <div className="p-1 sm:p-4 space-y-0.5 sm:space-y-2">
                     <h3 className="font-semibold text-[10px] leading-tight sm:text-lg line-clamp-2">{product.title}</h3>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs sm:text-lg font-bold text-primary">{priceDisplay}</span>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="px-2 sm:px-6 pb-2 sm:pb-6 pt-0">
-                    <Button className="w-full text-[10px] sm:text-sm h-7 sm:h-10 px-1 sm:px-4" asChild>
+                    <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
+                    <Button className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 mt-0.5" asChild>
                       <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
                         <span className="hidden sm:inline">Select My Phone Model</span>
                         <span className="sm:hidden">Select</span>
                       </Link>
                     </Button>
-                  </CardFooter>
+                  </div>
                 </Card>
               );
             })}
