@@ -10,7 +10,6 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
-import { Authenticated } from "convex/react";
 
 interface ShopifyProduct {
   id: number;
@@ -382,11 +381,9 @@ export default function ProductsPage() {
             <Link to="/products" className="text-sm font-medium text-primary">
               All Products
             </Link>
-            <Authenticated>
-              <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
-                My Orders
-              </Link>
-            </Authenticated>
+            <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
+              My Orders
+            </Link>
             <CartButton />
           </div>
         </div>

@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
-import { Authenticated } from "convex/react";
 import { Link } from "react-router-dom";
 
 interface ShopifyProduct {
@@ -180,11 +179,9 @@ export default function Index() {
             <a href="/products" className="text-sm font-medium hover:text-primary transition-colors">
               All Products
             </a>
-            <Authenticated>
-              <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
-                My Orders
-              </Link>
-            </Authenticated>
+            <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
+              My Orders
+            </Link>
             <CartButton />
           </div>
         </div>
