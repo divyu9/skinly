@@ -32,9 +32,15 @@ interface ShopifyProduct {
 export default function ProductsPage() {
   const getAllProducts = useAction(api.shopify.getAllProducts);
   const verifyConnection = useAction(api.shopify.verifyConnection);
-  const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [allProducts, setAllProducts] = useState<ShopifyProduct[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<ShopifyProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Get URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const deviceFilter = urlParams.get('device');
+  const finishFilter = urlParams.get('finish');
 
   const testConnection = async () => {
     try {
@@ -68,7 +74,8 @@ export default function ProductsPage() {
           toast.info("No products found in your Shopify store");
         }
         
-        setProducts(data);
+        setAllProducts(data);
+        applyFilters(data, deviceFilter, finishFilter);
       } catch (err) {
         clearTimeout(timeoutId);
         const errorMsg = err instanceof Error ? err.message : "Failed to load products";
@@ -82,7 +89,48 @@ export default function ProductsPage() {
     fetchProducts();
     
     return () => clearTimeout(timeoutId);
-  }, [getAllProducts]);
+  }, [getAllProducts, deviceFilter, finishFilter]);
+
+  // Apply filters when products or filters change
+  useEffect(() => {
+    if (allProducts.length > 0) {
+      applyFilters(allProducts, deviceFilter, finishFilter);
+    }
+  }, [allProducts, deviceFilter, finishFilter]);
+
+  const applyFilters = (products: ShopifyProduct[], device: string | null, finish: string | null) => {
+    let filtered = [...products];
+    
+    // Filter by device
+    if (device) {
+      filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        if (device === 'phone') return title.includes('phone') || title.includes('iphone') || title.includes('samsung') || title.includes('oneplus');
+        if (device === 'laptop') return title.includes('laptop') || title.includes('macbook');
+        if (device === 'mac mini') return title.includes('mac mini');
+        if (device === 'drone') return title.includes('drone');
+        if (device === 'camera') return title.includes('camera');
+        if (device === 'lens') return title.includes('lens');
+        if (device === 'charger') return title.includes('charger');
+        if (device === 'ipad') return title.includes('ipad') || title.includes('tablet');
+        if (device === 'console') return title.includes('console') || title.includes('playstation') || title.includes('xbox') || title.includes('nintendo');
+        return false;
+      });
+    }
+    
+    // Filter by finish
+    if (finish) {
+      filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        if (finish === 'matte') return title.includes('matte');
+        if (finish === 'embossed') return title.includes('3d textured') || title.includes('3d embossed');
+        if (finish === 'transparent') return title.includes('tranzy');
+        return false;
+      });
+    }
+    
+    setFilteredProducts(filtered);
+  };
 
   if (isLoading) {
     return (
@@ -159,7 +207,7 @@ export default function ProductsPage() {
     );
   }
 
-  if (products.length === 0) {
+  if (filteredProducts.length === 0 && !isLoading && !error) {
     return (
       <div className="min-h-screen">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
@@ -180,9 +228,16 @@ export default function ProductsPage() {
                 </EmptyMedia>
                 <EmptyTitle>No Products Found</EmptyTitle>
                 <EmptyDescription>
-                  Your Shopify store doesn't have any products yet.
+                  {deviceFilter || finishFilter 
+                    ? `No products match your filters. Try browsing all products.`
+                    : `Your Shopify store doesn't have any products yet.`}
                 </EmptyDescription>
               </EmptyHeader>
+              {(deviceFilter || finishFilter) && (
+                <EmptyContent>
+                  <Button onClick={() => window.location.href = '/products'}>View All Products</Button>
+                </EmptyContent>
+              )}
             </Empty>
           </div>
         </div>
@@ -219,15 +274,22 @@ export default function ProductsPage() {
         <div className="container mx-auto">
           <div className="text-center mb-12 space-y-4">
             <h1 className="text-4xl lg:text-5xl font-bold text-balance">
-              All Products
+              {deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
+               finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
+               'All Products'}
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              {products.length} quirky {products.length === 1 ? "skin" : "skins"} ready to make your tech pop
+              {filteredProducts.length} quirky {filteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop
             </p>
+            {(deviceFilter || finishFilter) && (
+              <Button variant="outline" onClick={() => window.location.href = '/products'}>
+                Clear Filters
+              </Button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map((product) => {
+            {filteredProducts.map((product) => {
               const mainImage = product.images[0];
               const minPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
               const maxPrice = Math.max(...product.variants.map(v => parseFloat(v.price)));

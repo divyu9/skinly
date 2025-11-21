@@ -15,8 +15,49 @@ import {
   TabletSmartphoneIcon,
   GamepadIcon
 } from "lucide-react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+
+interface ShopifyProduct {
+  id: number;
+  title: string;
+  handle: string;
+  images: Array<{ id: number; src: string; alt: string | null }>;
+  variants: Array<{
+    id: number;
+    title: string;
+    price: string;
+  }>;
+}
 
 export default function Index() {
+  const getAllProducts = useAction(api.shopify.getAllProducts);
+  const [products, setProducts] = useState<ShopifyProduct[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const data = await getAllProducts({});
+        setProducts(data);
+      } catch (err) {
+        console.error("Failed to load products:", err);
+      } finally {
+        setIsLoadingProducts(false);
+      }
+    }
+    fetchProducts();
+  }, [getAllProducts]);
+
+  const matteProducts = products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4);
+  const embossedProducts = products.filter(p => 
+    p.title.toLowerCase().includes('3d textured') || 
+    p.title.toLowerCase().includes('3d embossed')
+  ).slice(0, 4);
+  const transparentProducts = products.filter(p => p.title.toLowerCase().includes('tranzy')).slice(0, 4);
+
   const features = [
     {
       icon: ShieldCheckIcon,
@@ -134,25 +175,26 @@ export default function Index() {
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
             {[
-              { icon: LaptopIcon, label: "Laptop" },
-              { icon: SmartphoneIcon, label: "Phones" },
-              { icon: MonitorIcon, label: "Mac Mini" },
-              { icon: PlaneIcon, label: "Drones" },
-              { icon: CameraIcon, label: "Camera" },
-              { icon: CircleDotIcon, label: "Lenses" },
-              { icon: BatteryChargingIcon, label: "Chargers" },
-              { icon: TabletSmartphoneIcon, label: "iPad/Tablet" },
-              { icon: GamepadIcon, label: "Gaming Console" }
+              { icon: LaptopIcon, label: "Laptop", filter: "laptop" },
+              { icon: SmartphoneIcon, label: "Phones", filter: "phone" },
+              { icon: MonitorIcon, label: "Mac Mini", filter: "mac mini" },
+              { icon: PlaneIcon, label: "Drones", filter: "drone" },
+              { icon: CameraIcon, label: "Camera", filter: "camera" },
+              { icon: CircleDotIcon, label: "Lenses", filter: "lens" },
+              { icon: BatteryChargingIcon, label: "Chargers", filter: "charger" },
+              { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad" },
+              { icon: GamepadIcon, label: "Gaming Console", filter: "console" }
             ].map((device, index) => (
-              <button
+              <a
                 key={index}
+                href={`/products?device=${device.filter}`}
                 className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
               >
                 <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
                   <device.icon className="size-8 text-primary" />
                 </div>
                 <span className="text-sm font-semibold text-center">{device.label}</span>
-              </button>
+              </a>
             ))}
           </div>
         </div>
@@ -175,18 +217,44 @@ export default function Index() {
                 CLASSIC
               </div>
               <CardContent className="pt-8 space-y-6">
-                <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 rounded-2xl flex items-center justify-center">
-                  <div className="text-6xl">🎨</div>
-                </div>
                 <div className="space-y-3">
                   <h3 className="text-2xl font-bold">Matte Finish</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground mb-4">
                     Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
                   </p>
-                  <Button className="w-full" variant="outline">
-                    Shop Matte
-                  </Button>
                 </div>
+                {isLoadingProducts ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-square w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : matteProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {matteProducts.map((product) => (
+                      <div key={product.id} className="aspect-square overflow-hidden rounded-lg bg-muted">
+                        {product.images[0] ? (
+                          <img 
+                            src={product.images[0].src} 
+                            alt={product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <PackageIcon className="size-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 rounded-2xl flex items-center justify-center">
+                    <div className="text-6xl">🎨</div>
+                  </div>
+                )}
+                <Button className="w-full" variant="outline" asChild>
+                  <a href="/products?finish=matte">Shop Matte</a>
+                </Button>
               </CardContent>
             </Card>
 
@@ -195,18 +263,44 @@ export default function Index() {
                 PREMIUM
               </div>
               <CardContent className="pt-8 space-y-6">
-                <div className="aspect-square bg-gradient-to-br from-secondary/20 to-secondary/5 rounded-2xl flex items-center justify-center">
-                  <div className="text-6xl">✨</div>
-                </div>
                 <div className="space-y-3">
                   <h3 className="text-2xl font-bold">3D Embossed Finish</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground mb-4">
                     Raised textures you can feel. Touch meets art in the most satisfying way.
                   </p>
-                  <Button className="w-full" variant="outline">
-                    Shop 3D Embossed
-                  </Button>
                 </div>
+                {isLoadingProducts ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-square w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : embossedProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {embossedProducts.map((product) => (
+                      <div key={product.id} className="aspect-square overflow-hidden rounded-lg bg-muted">
+                        {product.images[0] ? (
+                          <img 
+                            src={product.images[0].src} 
+                            alt={product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <PackageIcon className="size-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="aspect-square bg-gradient-to-br from-secondary/20 to-secondary/5 rounded-2xl flex items-center justify-center">
+                    <div className="text-6xl">✨</div>
+                  </div>
+                )}
+                <Button className="w-full" variant="outline" asChild>
+                  <a href="/products?finish=embossed">Shop 3D Embossed</a>
+                </Button>
               </CardContent>
             </Card>
 
@@ -215,18 +309,44 @@ export default function Index() {
                 SLEEK
               </div>
               <CardContent className="pt-8 space-y-6">
-                <div className="aspect-square bg-gradient-to-br from-accent/20 to-accent/5 rounded-2xl flex items-center justify-center">
-                  <div className="text-6xl">💎</div>
-                </div>
                 <div className="space-y-3">
                   <h3 className="text-2xl font-bold">Transparent Finish</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-muted-foreground mb-4">
                     Show off your phone's original color with our crystal-clear protective layer.
                   </p>
-                  <Button className="w-full" variant="outline">
-                    Shop Transparent
-                  </Button>
                 </div>
+                {isLoadingProducts ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="aspect-square w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : transparentProducts.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {transparentProducts.map((product) => (
+                      <div key={product.id} className="aspect-square overflow-hidden rounded-lg bg-muted">
+                        {product.images[0] ? (
+                          <img 
+                            src={product.images[0].src} 
+                            alt={product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <PackageIcon className="size-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="aspect-square bg-gradient-to-br from-accent/20 to-accent/5 rounded-2xl flex items-center justify-center">
+                    <div className="text-6xl">💎</div>
+                  </div>
+                )}
+                <Button className="w-full" variant="outline" asChild>
+                  <a href="/products?finish=transparent">Shop Transparent</a>
+                </Button>
               </CardContent>
             </Card>
           </div>
