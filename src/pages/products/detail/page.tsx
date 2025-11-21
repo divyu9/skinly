@@ -32,8 +32,6 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
-import { Authenticated, Unauthenticated } from "convex/react";
-import { SignInButton } from "@/components/ui/signin.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 // Phone models data
@@ -548,14 +546,17 @@ export default function ProductDetailPage() {
           <div className="border-t border-border pt-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Customer Reviews</h2>
-              <Authenticated>
-                <Button onClick={() => setReviewDialogOpen(true)}>
-                  Write a Review
-                </Button>
-              </Authenticated>
-              <Unauthenticated>
-                <SignInButton>Sign in to Review</SignInButton>
-              </Unauthenticated>
+              <Button 
+                onClick={() => {
+                  if (user) {
+                    setReviewDialogOpen(true);
+                  } else {
+                    toast.error("Please sign in to post a review");
+                  }
+                }}
+              >
+                Post A Review
+              </Button>
             </div>
 
             {reviewStats && reviewStats.totalReviews > 0 ? (
@@ -660,14 +661,17 @@ export default function ProductDetailPage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Be the first to review this product
                   </p>
-                  <Authenticated>
-                    <Button onClick={() => setReviewDialogOpen(true)}>
-                      Write a Review
-                    </Button>
-                  </Authenticated>
-                  <Unauthenticated>
-                    <SignInButton>Sign in to Review</SignInButton>
-                  </Unauthenticated>
+                  <Button 
+                    onClick={() => {
+                      if (user) {
+                        setReviewDialogOpen(true);
+                      } else {
+                        toast.error("Please sign in to post a review");
+                      }
+                    }}
+                  >
+                    Post A Review
+                  </Button>
                 </CardContent>
               </Card>
             )}
