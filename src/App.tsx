@@ -10,6 +10,7 @@ import OrderDetailPage from "./pages/orders/detail/page.tsx";
 import AdminProductsPage from "./pages/admin/products/page.tsx";
 import AdminCollectionsPage from "./pages/admin/collections/page.tsx";
 import NewProductPage from "./pages/admin/products/new/page.tsx";
+import EditProductPage from "./pages/admin/products/edit/page.tsx";
 import AdminOrdersPage from "./pages/admin/orders/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/orders/:orderId" element={<OrderDetailPage />} />
           <Route path="/admin/products" element={<AdminProductsPage />} />
           <Route path="/admin/products/new" element={<NewProductPage />} />
+          <Route path="/admin/products/:productId" element={<EditProductPage />} />
           <Route path="/admin/collections" element={<AdminCollectionsPage />} />
           <Route path="/admin/orders" element={<AdminOrdersPage />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
