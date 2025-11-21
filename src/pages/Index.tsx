@@ -93,7 +93,13 @@ const phoneModels: Record<string, string[]> = {
     "iPhone 5"
   ],
   "Samsung": ["Galaxy S24 Ultra", "Galaxy S24+", "Galaxy S24", "Galaxy S23 Ultra", "Galaxy S23+", "Galaxy S23", "Galaxy S22 Ultra", "Galaxy S22+", "Galaxy S22", "Galaxy Z Fold 5", "Galaxy Z Flip 5", "Galaxy A54", "Galaxy A34"],
-  "Nothing": ["Nothing Phone 2", "Nothing Phone 2a", "Nothing Phone 1"],
+  "Nothing": [
+    "Nothing Phone 3A Pro",
+    "Nothing Phone 3A", 
+    "Nothing Phone 2A",
+    "Nothing Phone 2",
+    "Nothing Phone 1 5G"
+  ],
   "Oppo": [
     // Find series
     "Oppo Find 8X Pro (5G)",
@@ -210,7 +216,10 @@ const phoneModels: Record<string, string[]> = {
     "Oppo Neo 5"
   ],
   "Realme": ["Realme 12 Pro+", "Realme 12 Pro", "Realme 11 Pro+", "Realme 11 Pro", "Realme GT 3"],
-  "CMF": ["CMF Phone 1"],
+  "CMF": [
+    "CMF Phone 2 Pro",
+    "CMF Phone 1"
+  ],
   "Vivo": ["V30 Pro", "V30", "V29 Pro", "V29", "X100 Pro", "X100"],
   "iQOO": ["iQOO 12", "iQOO 11", "iQOO Neo 9 Pro", "iQOO Neo 9"],
   "Xiaomi": ["Xiaomi 14 Pro", "Xiaomi 14", "Xiaomi 13 Pro", "Xiaomi 13", "Redmi Note 13 Pro+", "Redmi Note 13 Pro"],
