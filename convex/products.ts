@@ -323,3 +323,34 @@ export const updateInventory = mutation({
     });
   },
 });
+
+// Delete all products (use with caution!)
+export const deleteAllProducts = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Delete all variants first
+    const variants = await ctx.db.query("variants").collect();
+    for (const variant of variants) {
+      await ctx.db.delete(variant._id);
+    }
+
+    // Delete all products
+    const products = await ctx.db.query("products").collect();
+    for (const product of products) {
+      await ctx.db.delete(product._id);
+    }
+
+    return {
+      deletedProducts: products.length,
+      deletedVariants: variants.length,
+    };
+  },
+});

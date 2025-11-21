@@ -16,8 +16,10 @@ import { useState } from "react";
 function AdminProductsPageInner() {
   const products = useQuery(api.products.getAllProducts, {});
   const deleteProduct = useMutation(api.products.deleteProduct);
+  const deleteAllProducts = useMutation(api.products.deleteAllProducts);
   const migrateFromShopify = useAction(api.migration.migrateFromShopify);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleMigration = async () => {
     if (!confirm("This will import all active products from Shopify. Products already in your database will be skipped automatically. Continue?")) {
@@ -43,6 +45,35 @@ function AdminProductsPageInner() {
       toast.error(`Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsMigrating(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!confirm("⚠️ WARNING: This will permanently delete ALL products and variants from your database. This action cannot be undone. Are you absolutely sure?")) {
+      return;
+    }
+
+    // Double confirmation for safety
+    if (!confirm("Last chance! Type 'DELETE' in the next dialog to confirm.")) {
+      return;
+    }
+
+    const userInput = prompt("Type 'DELETE' to confirm deletion of all products:");
+    if (userInput !== "DELETE") {
+      toast.error("Deletion cancelled - confirmation text did not match.");
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteAllProducts({});
+      toast.success(
+        `All products cleared! Deleted ${result.deletedProducts} products and ${result.deletedVariants} variants.`
+      );
+    } catch (error) {
+      toast.error(`Failed to delete products: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -90,6 +121,17 @@ function AdminProductsPageInner() {
           <p className="text-muted-foreground">Manage your product catalog</p>
         </div>
         <div className="flex items-center gap-2">
+          {products && products.length > 0 && (
+            <Button 
+              variant="outline" 
+              onClick={handleClearAll} 
+              disabled={isDeleting}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <TrashIcon className="size-4 mr-2" />
+              {isDeleting ? "Clearing..." : "Clear All"}
+            </Button>
+          )}
           <Button variant="outline" onClick={handleMigration} disabled={isMigrating}>
             <DownloadIcon className="size-4 mr-2" />
             {isMigrating ? "Importing..." : "Import from Shopify"}
