@@ -926,17 +926,17 @@ export default function ProductDetailPage() {
 
       {/* Cross-Sell Dialog */}
       <Dialog open={crossSellDialogOpen} onOpenChange={setCrossSellDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">The skin's got your back... but what about the front?</DialogTitle>
-            <DialogDescription className="text-base">
-              Complete 360° protection with these essentials for your device
+        <DialogContent className="max-w-xl max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-6 pb-4">
+            <DialogTitle className="text-xl">The skin's got your back... but what about the front?</DialogTitle>
+            <DialogDescription>
+              Complete 360° protection with these essentials
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6">
-            {/* Cross-sell products grid */}
-            <div className="grid grid-cols-2 gap-4">
+          {/* Scrollable content area */}
+          <div className="flex-1 overflow-y-auto px-6">
+            <div className="grid grid-cols-2 gap-3 pb-4">
               {crossSellProducts?.map((crossSellProduct) => {
                 const minPrice = crossSellProduct.variants.length > 0 
                   ? Math.min(...crossSellProduct.variants.map(v => v.price))
@@ -964,11 +964,11 @@ export default function ProductDetailPage() {
                         </div>
                       )}
                     </div>
-                    <div className="p-3">
-                      <h4 className="font-semibold text-sm mb-1 line-clamp-2">
+                    <div className="p-2">
+                      <h4 className="font-semibold text-xs mb-1 line-clamp-2">
                         {crossSellProduct.title}
                       </h4>
-                      <div className="text-primary font-bold text-sm">
+                      <div className="text-primary font-bold text-xs">
                         ₹{minPrice.toFixed(0)}
                       </div>
                     </div>
@@ -976,26 +976,26 @@ export default function ProductDetailPage() {
                 );
               })}
             </div>
+          </div>
 
-            {/* Action buttons */}
-            <div className="flex flex-col gap-3 pt-4 border-t">
-              <Button 
-                size="lg" 
-                onClick={handleAddToCart}
-                disabled={isAdding}
-                className="w-full"
-              >
-                {isAdding ? "Adding..." : "Just Add The Skin"}
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setCrossSellDialogOpen(false)}
-                className="w-full"
-              >
-                Continue Shopping
-              </Button>
-            </div>
+          {/* Fixed action buttons */}
+          <div className="flex flex-col gap-2 px-6 pb-6 pt-4 border-t bg-background">
+            <Button 
+              size="lg" 
+              onClick={handleAddToCart}
+              disabled={isAdding}
+              className="w-full"
+            >
+              {isAdding ? "Adding..." : "Just Add The Skin"}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setCrossSellDialogOpen(false)}
+              className="w-full"
+            >
+              Continue Shopping
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
