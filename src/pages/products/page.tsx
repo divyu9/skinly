@@ -105,15 +105,6 @@ export default function ProductsPage() {
   const applyFilters = (products: ShopifyProduct[], device: string | null, finish: string | null, brand: string | null, search: string) => {
     let filtered = [...products];
     
-    // Filter by brand
-    if (brand) {
-      filtered = filtered.filter(p => {
-        const title = p.title.toLowerCase();
-        const brandLower = brand.toLowerCase();
-        return title.includes(brandLower);
-      });
-    }
-    
     // Filter by device
     if (device) {
       filtered = filtered.filter(p => {
@@ -131,7 +122,7 @@ export default function ProductsPage() {
       });
     }
     
-    // Filter by finish
+    // Filter by finish (brand selection doesn't filter products, just guides user to finish selection)
     if (finish) {
       filtered = filtered.filter(p => {
         const title = p.title.toLowerCase();
@@ -352,7 +343,7 @@ export default function ProductsPage() {
                 </EmptyMedia>
                 <EmptyTitle>No Products Found</EmptyTitle>
                 <EmptyDescription>
-                  {deviceFilter || finishFilter 
+                  {deviceFilter || finishFilter
                     ? `No products match your filters. Try browsing all products.`
                     : `Your Shopify store doesn't have any products yet.`}
                 </EmptyDescription>
@@ -398,8 +389,7 @@ export default function ProductsPage() {
         <div className="container mx-auto">
           <div className="text-center mb-12 space-y-4">
             <h1 className="text-4xl lg:text-5xl font-bold text-balance">
-              {brandFilter ? `${brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} Skins` :
-               deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
+              {deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
                'All Products'}
             </h1>
@@ -421,7 +411,7 @@ export default function ProductsPage() {
               </div>
             </div>
             
-            {(deviceFilter || finishFilter || brandFilter) && (
+            {(deviceFilter || finishFilter) && (
               <Button variant="outline" onClick={() => window.location.href = '/products'}>
                 Clear Filters
               </Button>
@@ -434,13 +424,9 @@ export default function ProductsPage() {
               const minPrice = Math.min(...product.variants.map(v => parseFloat(v.price)));
               const maxPrice = Math.max(...product.variants.map(v => parseFloat(v.price)));
               
-              // Convert USD to INR (approximate rate: 1 USD = 83 INR)
-              const minPriceINR = minPrice * 83;
-              const maxPriceINR = maxPrice * 83;
-              
               const priceDisplay = minPrice === maxPrice 
-                ? `₹${minPriceINR.toFixed(0)}`
-                : `₹${minPriceINR.toFixed(0)} - ₹${maxPriceINR.toFixed(0)}`;
+                ? `₹${minPrice.toFixed(0)}`
+                : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
 
               return (
                 <Card key={product.id} className="group overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
