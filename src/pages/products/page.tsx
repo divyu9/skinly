@@ -491,7 +491,11 @@ export default function ProductsPage() {
                     </div>
                   </CardContent>
                   <CardFooter>
-                    <Button className="w-full">View Details</Button>
+                    <Button className="w-full" asChild>
+                      <Link to={`/products/detail?id=${product.id}`}>
+                        Select My Phone Model
+                      </Link>
+                    </Button>
                   </CardFooter>
                 </Card>
               );
