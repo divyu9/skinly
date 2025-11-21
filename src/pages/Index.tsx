@@ -46,8 +46,11 @@ export default function Index() {
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="size-8 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg" />
-            <span className="text-xl font-bold">SkinStudio</span>
+            <img 
+              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              alt="Skinly" 
+              className="h-10"
+            />
           </div>
           <div className="flex items-center gap-6">
             <a href="#products" className="text-sm font-medium hover:text-primary transition-colors">
@@ -323,11 +326,14 @@ export default function Index() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <div className="size-8 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg" />
-                <span className="text-xl font-bold">SkinStudio</span>
+                <img 
+                  src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                  alt="Skinly" 
+                  className="h-10"
+                />
               </div>
               <p className="text-sm text-muted-foreground">
-                Where quirky meets quality
+                Quirky wear for your gadgets
               </p>
             </div>
             <div>
@@ -356,7 +362,7 @@ export default function Index() {
             </div>
           </div>
           <div className="pt-8 border-t border-border text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} SkinStudio. All rights reserved.
+            © {new Date().getFullYear()} Skinly. All rights reserved.
           </div>
         </div>
       </footer>

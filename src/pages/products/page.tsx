@@ -196,8 +196,11 @@ export default function ProductsPage() {
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div className="size-8 bg-gradient-to-br from-primary via-secondary to-accent rounded-lg" />
-            <span className="text-xl font-bold">SkinStudio</span>
+            <img 
+              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              alt="Skinly" 
+              className="h-10"
+            />
           </Link>
           <div className="flex items-center gap-6">
             <a href="/#products" className="text-sm font-medium hover:text-primary transition-colors">
