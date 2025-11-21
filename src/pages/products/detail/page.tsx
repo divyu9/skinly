@@ -16,7 +16,8 @@ import {
   TruckIcon,
   SparklesIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  InfoIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -96,10 +97,11 @@ const phoneModels: Record<string, string[]> = {
 
 // USP bullet points
 const skinUSPs = [
-  { icon: ShieldCheckIcon, text: "Precision Cut for Perfect Fit" },
-  { icon: SparklesIcon, text: "High-Resolution Print Quality" },
-  { icon: TruckIcon, text: "Bubble-Free Application" },
-  { icon: CheckIcon, text: "Easy to Remove & Residue-Free" },
+  { icon: InfoIcon, text: "Model images are for reference only - You will receive the skin for your selected model", highlighted: true },
+  { icon: ShieldCheckIcon, text: "Precision Cut for Perfect Fit", highlighted: false },
+  { icon: SparklesIcon, text: "High-Resolution Print Quality", highlighted: false },
+  { icon: TruckIcon, text: "Bubble-Free Application", highlighted: false },
+  { icon: CheckIcon, text: "Easy to Remove & Residue-Free", highlighted: false },
 ];
 
 export default function ProductDetailPage() {
@@ -383,11 +385,22 @@ export default function ProductDetailPage() {
               </div>
 
               {/* USPs */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 {skinUSPs.map((usp, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
-                    <usp.icon className="size-4 text-primary shrink-0 mt-0.5" />
-                    <span className="text-muted-foreground">{usp.text}</span>
+                  <div 
+                    key={idx} 
+                    className={`flex items-start gap-2 text-sm ${
+                      usp.highlighted 
+                        ? "bg-amber-500/10 border border-amber-500/30 rounded-lg p-3" 
+                        : ""
+                    }`}
+                  >
+                    <usp.icon className={`size-4 shrink-0 mt-0.5 ${
+                      usp.highlighted ? "text-amber-600" : "text-primary"
+                    }`} />
+                    <span className={usp.highlighted ? "text-foreground font-medium" : "text-muted-foreground"}>
+                      {usp.text}
+                    </span>
                   </div>
                 ))}
               </div>
