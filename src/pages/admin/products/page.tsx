@@ -33,18 +33,25 @@ function VariantEditor({
     title: string; 
     sku: string; 
     price: number; 
+    compareAtPrice?: number;
     inventoryQuantity: number; 
   }; 
   onUpdate: () => void;
 }) {
   const updateVariant = useMutation(api.products.updateVariant);
   const [price, setPrice] = useState(variant.price.toString());
+  const [compareAtPrice, setCompareAtPrice] = useState(variant.compareAtPrice?.toString() || "");
   const [stock, setStock] = useState(variant.inventoryQuantity.toString());
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   const handlePriceChange = (value: string) => {
     setPrice(value);
+    setHasChanges(true);
+  };
+
+  const handleCompareAtPriceChange = (value: string) => {
+    setCompareAtPrice(value);
     setHasChanges(true);
   };
 
@@ -56,9 +63,15 @@ function VariantEditor({
   const handleSave = async () => {
     const priceNum = parseFloat(price);
     const stockNum = parseInt(stock, 10);
+    const compareAtPriceNum = compareAtPrice ? parseFloat(compareAtPrice) : undefined;
 
     if (isNaN(priceNum) || priceNum < 0) {
       toast.error("Please enter a valid price");
+      return;
+    }
+
+    if (compareAtPrice && (isNaN(compareAtPriceNum!) || compareAtPriceNum! < 0)) {
+      toast.error("Please enter a valid MRP");
       return;
     }
 
@@ -72,6 +85,7 @@ function VariantEditor({
       await updateVariant({
         variantId: variant._id,
         price: priceNum,
+        compareAtPrice: compareAtPriceNum,
         inventoryQuantity: stockNum,
       });
       toast.success("Variant updated successfully");
@@ -85,42 +99,72 @@ function VariantEditor({
   };
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{variant.title}</p>
+    <div className="p-4 bg-muted/30 rounded-lg border">
+      <div className="mb-3">
+        <p className="text-sm font-medium">{variant.title}</p>
         <p className="text-xs text-muted-foreground">SKU: {variant.sku}</p>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Price (₹)</label>
-          <Input
-            type="number"
-            value={price}
-            onChange={(e) => handlePriceChange(e.target.value)}
-            className="w-24 h-8 text-sm"
-            min="0"
-            step="0.01"
-          />
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Price */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Price</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              ₹
+            </span>
+            <Input
+              type="number"
+              value={price}
+              onChange={(e) => handlePriceChange(e.target.value)}
+              className="pl-8"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Stock</label>
+
+        {/* Compare-at Price (MRP) */}
+        <div>
+          <label className="block text-sm font-medium mb-2">MRP (Compare-at price)</label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              ₹
+            </span>
+            <Input
+              type="number"
+              value={compareAtPrice}
+              onChange={(e) => handleCompareAtPriceChange(e.target.value)}
+              className="pl-8"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+
+        {/* Stock */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Quantity (On hand)</label>
           <Input
             type="number"
             value={stock}
             onChange={(e) => handleStockChange(e.target.value)}
-            className="w-20 h-8 text-sm"
             min="0"
             step="1"
+            placeholder="0"
           />
         </div>
+      </div>
+
+      <div className="mt-4 flex justify-end">
         <Button
-          size="sm"
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
-          className="h-8 mt-5"
         >
-          <SaveIcon className="size-4 mr-1" />
-          {isSaving ? "Saving..." : "Save"}
+          <SaveIcon className="size-4 mr-2" />
+          {isSaving ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </div>
@@ -449,10 +493,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
                     {/* Variants - Inline Editing */}
                     {expandedProducts.has(product._id) && product.variants.length > 0 && (
-                      <div className="space-y-2 mb-4">
-                        <div className="text-sm font-medium text-muted-foreground mb-2">
-                          Variants - Edit Price & Stock:
-                        </div>
+                      <div className="space-y-3 mb-4">
                         {product.variants.map((variant) => (
                           <VariantEditor
                             key={variant._id}
