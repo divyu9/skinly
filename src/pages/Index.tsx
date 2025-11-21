@@ -230,10 +230,32 @@ const lensModels: Record<string, string[]> = {
     "ED 12mm F2.8 Lena",
     "FE 50mm F1.8 Lens"
   ],
-  "Vitrox": ["Vitrox Lenses"],
-  "Tokina": ["Tokina Lenses"],
-  "Zeiss": ["Zeiss Lenses"],
-  "Olympus": ["Olympus Lenses"],
+  "Vitrox": [
+    "Vitrox Lens 85mm F1.8 Sony Lens",
+    "Vitrox Lens AF 33mm F1.4 XF Lens",
+    "Vitrox Lens 85mm F1.8 Lens",
+    "Vitrox Lens 56mm F1.4 XF Lens"
+  ],
+  "Tokina": [
+    "11-16mm Lens",
+    "16-28mm 2.8 Lens",
+    "16-28mm Fix Lens",
+    "50mm 1.4 FF Lens"
+  ],
+  "Zeiss": [
+    "Zeiss 35mm F1.4 FE Sony Lens",
+    "135mm F1.8 Zeiss Sony Lens",
+    "Carl Zeiss Sonnar 90mm F2.8 Sony Lens",
+    "24-70mm F4 Zeiss Sony Lens",
+    "32mm F1.8 Zeiss Touit Sony Lens",
+    "50mm 15 Zeiss Planar Sony Lens"
+  ],
+  "Olympus": [
+    "8mm F1",
+    "12-40mm f2",
+    "12-100mm f4",
+    "40-150mm f2"
+  ],
   "Fujifilm": ["Fujifilm Lenses"]
 };
 
