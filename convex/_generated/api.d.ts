@@ -10,6 +10,8 @@
 
 import type * as cart from "../cart.js";
 import type * as collections from "../collections.js";
+import type * as migration from "../migration.js";
+import type * as migrationInternal from "../migrationInternal.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
 import type * as shopify from "../shopify.js";
@@ -24,6 +26,8 @@ import type {
 declare const fullApi: ApiFromModules<{
   cart: typeof cart;
   collections: typeof collections;
+  migration: typeof migration;
+  migrationInternal: typeof migrationInternal;
   orders: typeof orders;
   products: typeof products;
   shopify: typeof shopify;

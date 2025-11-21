@@ -1,20 +1,44 @@
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { useState } from "react";
 
 function AdminProductsPageInner() {
   const products = useQuery(api.products.getAllProducts, {});
   const deleteProduct = useMutation(api.products.deleteProduct);
+  const migrateFromShopify = useAction(api.migration.migrateFromShopify);
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  const handleMigration = async () => {
+    if (!confirm("This will import all active products from Shopify. Existing products with the same slug will be skipped. Continue?")) {
+      return;
+    }
+
+    setIsMigrating(true);
+    try {
+      const result = await migrateFromShopify({});
+      toast.success(
+        `Migration complete! ${result.successful} products imported, ${result.failed} failed.`
+      );
+      if (result.errors.length > 0) {
+        console.error("Migration errors:", result.errors);
+      }
+    } catch (error) {
+      toast.error(`Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsMigrating(false);
+    }
+  };
 
   const handleDelete = async (productId: Id<"products">) => {
     if (!confirm("Are you sure you want to delete this product? This will also delete all variants.")) {
@@ -59,12 +83,18 @@ function AdminProductsPageInner() {
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-muted-foreground">Manage your product catalog</p>
         </div>
-        <Link to="/admin/products/new">
-          <Button>
-            <PlusIcon className="size-4 mr-2" />
-            Add Product
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleMigration} disabled={isMigrating}>
+            <DownloadIcon className="size-4 mr-2" />
+            {isMigrating ? "Importing..." : "Import from Shopify"}
           </Button>
-        </Link>
+          <Link to="/admin/products/new">
+            <Button>
+              <PlusIcon className="size-4 mr-2" />
+              Add Product
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {products.length === 0 ? (
