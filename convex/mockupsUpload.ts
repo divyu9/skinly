@@ -18,30 +18,37 @@ export const storeMockupFile = mutation({
     filename: v.string(),
   },
   handler: async (ctx, args) => {
-    // Parse filename: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg
+    // Parse filename: Brand_Model_SKU.jpg or Model_SKU.jpg
     const nameWithoutExt = args.filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
     const parts = nameWithoutExt.split('_');
     
     if (parts.length < 2) {
-      throw new Error(`Invalid filename format: ${args.filename}. Expected: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg`);
+      throw new Error(`Invalid filename format: ${args.filename}. Expected at least Model_SKU.jpg`);
     }
     
-    let brand = parts[0];
-    let sku = parts[parts.length - 1];
-    let model = parts.slice(1, -1).join(' ');
+    // Last part is always SKU
+    const sku = parts[parts.length - 1];
     
-    // Auto-detect Apple brand if filename contains "iPhone" or "iPad"
+    // Check if filename contains iPhone or iPad to auto-detect Apple brand
     const filenameLower = nameWithoutExt.toLowerCase();
-    if (filenameLower.includes('iphone') || filenameLower.includes('ipad')) {
-      // If brand is "iPhone" or "iPad", it means the filename is like "iPhone16_M-75.jpg"
-      if (brand.toLowerCase() === 'iphone' || brand.toLowerCase() === 'ipad') {
-        // Reconstruct: brand = Apple, model = iPhone + rest
-        brand = 'Apple';
-        model = parts.slice(0, -1).join(' ');
-      } else {
-        // If brand is something else but model contains iPhone/iPad, still use Apple
-        brand = 'Apple';
-      }
+    const isAppleDevice = filenameLower.includes('iphone') || filenameLower.includes('ipad');
+    
+    let brand: string;
+    let model: string;
+    
+    if (isAppleDevice) {
+      // Auto-detect Apple brand
+      brand = 'Apple';
+      // Model is everything except the last part (SKU)
+      model = parts.slice(0, -1).join(' ');
+    } else if (parts.length === 2) {
+      // Format: Model_SKU.jpg (no brand specified)
+      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple devices must include brand: Brand_Model_SKU.jpg`);
+    } else {
+      // Format: Brand_Model_SKU.jpg (3+ parts)
+      brand = parts[0];
+      // Model is everything between brand and SKU
+      model = parts.slice(1, -1).join(' ');
     }
     
     // Validate we have all required parts

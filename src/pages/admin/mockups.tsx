@@ -138,14 +138,28 @@ export default function MockupsPage() {
         try {
           // Validate filename format - allow Brand_Model_SKU.jpg or Model_SKU.jpg (for iPhone/iPad auto-detection)
           const filename = file.name;
-          const hasValidFormat = /^[A-Za-z0-9]+_[A-Za-z0-9\s]+(_[A-Za-z0-9-]+)?\.(jpg|jpeg|png|webp)$/i.test(filename);
-          const hasMinimumParts = filename.split('_').length >= 2;
           
-          if (!hasValidFormat || !hasMinimumParts) {
+          // Check for valid image extension
+          const hasValidExtension = /\.(jpg|jpeg|png|webp)$/i.test(filename);
+          if (!hasValidExtension) {
+            console.warn(`Skipping invalid extension: ${filename}`);
+            failedList.push({
+              filename,
+              reason: "Invalid file extension. Expected: .jpg, .jpeg, .png, or .webp"
+            });
+            failed++;
+            continue;
+          }
+          
+          // Check for minimum underscore-separated parts (at least Model_SKU)
+          const nameWithoutExt = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+          const hasMinimumParts = nameWithoutExt.split('_').length >= 2;
+          
+          if (!hasMinimumParts) {
             console.warn(`Skipping invalid filename: ${filename}`);
             failedList.push({
               filename,
-              reason: "Invalid filename format. Expected: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg"
+              reason: "Invalid filename format. Expected at least: Model_SKU.jpg (use underscores to separate)"
             });
             failed++;
             continue;
@@ -253,12 +267,12 @@ export default function MockupsPage() {
           continue;
         }
         
-        // Parse filename: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg
+        // Parse filename: Brand_Model_SKU.jpg or Model_SKU.jpg (for iPhone/iPad)
         // Examples:
-        // - Apple_iPhone15Pro_M-174.jpg
-        // - iPhone16_M-174.jpg (auto-detects Apple)
-        // - Samsung_GalaxyS24_M-174.jpg
-        // - Oppo_15Pro_M-174.jpg
+        // - Apple_iPhone 15 Pro_M-174.jpg
+        // - iPhone 16 Plus_M-174.jpg (auto-detects Apple)
+        // - Samsung_Galaxy S24_M-174.jpg
+        // - Oppo_15 Pro_M-174.jpg
         const parts = filename.split('_');
         
         if (parts.length < 2) {
@@ -266,21 +280,30 @@ export default function MockupsPage() {
           continue;
         }
         
-        let brand = parts[0];
-        let sku = parts[parts.length - 1];
-        let model = parts.slice(1, -1).join(' '); // Everything between brand and SKU
+        // Last part is always SKU
+        const sku = parts[parts.length - 1];
         
-        // Auto-detect Apple for iPhone/iPad files
+        // Check if filename contains iPhone or iPad to auto-detect Apple brand
         const filenameLower = filename.toLowerCase();
-        if (filenameLower.includes('iphone') || filenameLower.includes('ipad')) {
-          if (brand.toLowerCase() === 'iphone' || brand.toLowerCase() === 'ipad') {
-            // Filename is like "iPhone16_M-75", reconstruct as Apple_iPhone16_M-75
-            brand = 'Apple';
-            model = parts.slice(0, -1).join(' ');
-          } else {
-            // Brand is something else but contains iPhone/iPad
-            brand = 'Apple';
-          }
+        const isAppleDevice = filenameLower.includes('iphone') || filenameLower.includes('ipad');
+        
+        let brand: string;
+        let model: string;
+        
+        if (isAppleDevice) {
+          // Auto-detect Apple brand
+          brand = 'Apple';
+          // Model is everything except the last part (SKU)
+          model = parts.slice(0, -1).join(' ');
+        } else if (parts.length === 2) {
+          // Format: Model_SKU.jpg (no brand specified) - skip non-Apple devices
+          skipped++;
+          continue;
+        } else {
+          // Format: Brand_Model_SKU.jpg (3+ parts)
+          brand = parts[0];
+          // Model is everything between brand and SKU
+          model = parts.slice(1, -1).join(' ');
         }
         
         if (!brand || !model || !sku) {
