@@ -48,7 +48,7 @@ import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 const phoneModels: Record<string, string[]> = {
   "Apple": [
     "iPhone 17 Pro Max", "iPhone 17 Pro", "iPhone 17 Air", "iPhone 17",
-    "iPhone 16E", "iPhone 16 Pro Max", "iPhone 16 pro max", "iPhone 16 pro",
+    "iPhone 16E", "iPhone 16 Pro Max", "iPhone 16 Pro",
     "iPhone 16 Plus", "iPhone 16", "iPhone 15 Pro Max", "iPhone 15 Pro",
     "iPhone 15 Plus", "iPhone 15", "iPhone 14 Pro Max", "iPhone 14 Pro",
     "iPhone 14 Plus", "iPhone 14", "iPhone 13 Pro Max", "iPhone 13 Pro",
