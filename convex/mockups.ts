@@ -2,8 +2,16 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 /**
+ * Normalize model name for matching (removes spaces, lowercase)
+ */
+function normalizeModelName(model: string): string {
+  return model.toLowerCase().replace(/\s+/g, '');
+}
+
+/**
  * Get mockup file URL for a specific brand, model, and SKU
  * Returns the actual storage URL, not just the file ID
+ * Uses space-insensitive matching for model names
  */
 export const getMockupFileId = query({
   args: {
@@ -12,12 +20,21 @@ export const getMockupFileId = query({
     sku: v.string(),
   },
   handler: async (ctx, args) => {
-    const mockup = await ctx.db
+    // Normalize the search model name
+    const normalizedSearchModel = normalizeModelName(args.model);
+    
+    // Get all mockups for this brand and SKU
+    const mockups = await ctx.db
       .query("mockups")
       .withIndex("by_brand_model_sku", (q) =>
-        q.eq("brand", args.brand).eq("model", args.model).eq("sku", args.sku)
+        q.eq("brand", args.brand)
       )
-      .first();
+      .collect();
+    
+    // Find mockup with matching normalized model name and SKU
+    const mockup = mockups.find((m) => 
+      normalizeModelName(m.model) === normalizedSearchModel && m.sku === args.sku
+    );
 
     if (!mockup) return null;
     
@@ -40,6 +57,7 @@ export const getAllMockups = query({
 /**
  * Bulk import mockups from CSV data
  * Expected format: brand,model,sku,fileId
+ * Uses space-insensitive matching for model names
  */
 export const bulkImportMockups = mutation({
   args: {
@@ -58,16 +76,20 @@ export const bulkImportMockups = mutation({
     let skipped = 0;
 
     for (const mockup of args.mockups) {
-      // Check if mockup already exists
-      const existing = await ctx.db
+      // Normalize model name for comparison
+      const normalizedModel = normalizeModelName(mockup.model);
+      
+      // Check if mockup already exists (space-insensitive match)
+      const allMockups = await ctx.db
         .query("mockups")
         .withIndex("by_brand_model_sku", (q) =>
-          q
-            .eq("brand", mockup.brand)
-            .eq("model", mockup.model)
-            .eq("sku", mockup.sku)
+          q.eq("brand", mockup.brand)
         )
-        .first();
+        .collect();
+      
+      const existing = allMockups.find((m) => 
+        normalizeModelName(m.model) === normalizedModel && m.sku === mockup.sku
+      );
 
       if (existing) {
         // Update if fileId changed
@@ -78,7 +100,7 @@ export const bulkImportMockups = mutation({
           skipped++;
         }
       } else {
-        // Insert new mockup
+        // Insert new mockup (preserve original model name formatting)
         await ctx.db.insert("mockups", mockup);
         imported++;
       }

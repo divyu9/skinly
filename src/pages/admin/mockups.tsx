@@ -430,13 +430,19 @@ export default function MockupsPage() {
                 <p className="font-semibold mb-1">Examples:</p>
                 <ul className="space-y-0.5 ml-4 list-disc">
                   <li><code>Apple_iPhone15Pro_M-174.jpg</code></li>
+                  <li><code>iPhone 16 Plus_M-174.jpg</code> <span className="text-amber-700">(Spaces OK!)</span></li>
                   <li><code>iPhone16_M-174.jpg</code> <span className="text-amber-700">(Auto-detects Apple)</span></li>
                   <li><code>Samsung_GalaxyS24_M-174.jpg</code></li>
                   <li><code>Oppo_15Pro_M-174.jpg</code></li>
                 </ul>
-                <p className="mt-2 text-amber-800 font-medium">
-                  💡 Tip: Files with "iPhone" or "iPad" automatically assign to Apple brand
-                </p>
+                <div className="mt-2 space-y-1">
+                  <p className="text-amber-800 font-medium">
+                    💡 Files with "iPhone" or "iPad" automatically assign to Apple brand
+                  </p>
+                  <p className="text-green-700 font-medium">
+                    ✅ Spaces in model names don't matter - "iPhone 16 Plus" matches "iPhone16Plus"
+                  </p>
+                </div>
               </div>
             </div>
             

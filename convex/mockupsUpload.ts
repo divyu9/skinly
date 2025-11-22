@@ -2,6 +2,13 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 
 /**
+ * Normalize model name for matching (removes spaces, lowercase)
+ */
+function normalizeModelName(model: string): string {
+  return model.toLowerCase().replace(/\s+/g, '');
+}
+
+/**
  * Store mockup file with metadata
  * Called after file is uploaded to storage
  */
@@ -42,13 +49,20 @@ export const storeMockupFile = mutation({
       throw new Error(`Invalid filename format: ${args.filename}. Could not extract brand, model, and SKU.`);
     }
     
-    // Check if mockup already exists
-    const existing = await ctx.db
+    // Normalize model name for comparison
+    const normalizedModel = normalizeModelName(model);
+    
+    // Check if mockup already exists (space-insensitive match)
+    const allMockups = await ctx.db
       .query("mockups")
       .withIndex("by_brand_model_sku", (q) =>
-        q.eq("brand", brand).eq("model", model).eq("sku", sku)
+        q.eq("brand", brand)
       )
-      .first();
+      .collect();
+    
+    const existing = allMockups.find((m) => 
+      normalizeModelName(m.model) === normalizedModel && m.sku === sku
+    );
     
     if (existing) {
       // Update file ID if changed
@@ -59,7 +73,7 @@ export const storeMockupFile = mutation({
       return { action: "skipped", brand, model, sku };
     }
     
-    // Insert new mockup
+    // Insert new mockup (preserve original model name formatting)
     await ctx.db.insert("mockups", {
       brand,
       model,
