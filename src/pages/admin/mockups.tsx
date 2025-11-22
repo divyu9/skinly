@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon } from "lucide-react";
+import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon, FolderIcon } from "lucide-react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useConvex } from "convex/react";
@@ -117,11 +117,85 @@ export default function MockupsPage() {
     }
   };
   
-  const handleBulkUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  /**
+   * Recursively collect all image files from a directory and its subdirectories
+   */
+  const collectImagesFromDirectory = async (dirHandle: unknown): Promise<File[]> => {
+    const imageFiles: File[] = [];
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+    
+    // Cast to handle File System Access API types
+    const handle = dirHandle as { values: () => AsyncIterableIterator<{ kind: string; name: string; getFile?: () => Promise<File> }> };
+    
+    for await (const entry of handle.values()) {
+      if (entry.kind === 'file' && entry.getFile) {
+        const file = await entry.getFile();
+        const hasImageExtension = imageExtensions.some(ext => 
+          file.name.toLowerCase().endsWith(ext)
+        );
+        if (hasImageExtension) {
+          imageFiles.push(file);
+        }
+      } else if (entry.kind === 'directory') {
+        // Recursively collect from subdirectories
+        const subFiles = await collectImagesFromDirectory(entry);
+        imageFiles.push(...subFiles);
+      }
+    }
+    
+    return imageFiles;
+  };
+
+  /**
+   * Handle folder selection using File System Access API
+   */
+  const handleFolderUpload = async () => {
+    try {
+      // Check if the File System Access API is supported
+      if (!('showDirectoryPicker' in window)) {
+        toast.error("Folder upload not supported in this browser. Please use Chrome, Edge, or another Chromium-based browser.");
+        return;
+      }
+      
+      // Show directory picker
+      interface WindowWithDirectoryPicker extends Window {
+        showDirectoryPicker: () => Promise<unknown>;
+      }
+      const dirHandle = await (window as WindowWithDirectoryPicker).showDirectoryPicker();
+      
+      toast.info("Scanning folder and subfolders for images...");
+      
+      // Collect all image files recursively
+      const imageFiles = await collectImagesFromDirectory(dirHandle);
+      
+      if (imageFiles.length === 0) {
+        toast.error("No image files found in the selected folder");
+        return;
+      }
+      
+      toast.success(`Found ${imageFiles.length} images. Starting upload...`);
+      
+      // Process the collected files
+      await processFilesUpload(imageFiles);
+      
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        // User cancelled the picker
+        return;
+      }
+      console.error('Folder selection error:', error);
+      toast.error("Failed to access folder");
+    }
+  };
+
+  /**
+   * Process file upload (extracted from handleBulkUpload for reuse)
+   */
+  const processFilesUpload = async (files: File[] | FileList) => {
+    const fileArray = Array.from(files);
     
     setUploading(true);
-    setUploadProgress({ current: 0, total: files.length });
+    setUploadProgress({ current: 0, total: fileArray.length });
     setFailedFiles([]); // Reset failed files
     
     let imported = 0;
@@ -131,9 +205,9 @@ export default function MockupsPage() {
     const failedList: FailedFile[] = [];
     
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setUploadProgress({ current: i + 1, total: files.length });
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        setUploadProgress({ current: i + 1, total: fileArray.length });
         
         try {
           // Validate filename format - allow Brand_Model_SKU.jpg or Model_SKU.jpg (for iPhone/iPad auto-detection)
@@ -214,6 +288,14 @@ export default function MockupsPage() {
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  /**
+   * Handle file input change (user selected files)
+   */
+  const handleBulkUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    await processFilesUpload(files);
   };
   
   const handleParseFileList = () => {
@@ -446,7 +528,7 @@ export default function MockupsPage() {
               </p>
               <ol className="space-y-1.5 list-decimal list-inside ml-2">
                 <li>Name your files: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">Brand_Model_SKU.jpg</code></li>
-                <li>Select all mockup files (1000s at once)</li>
+                <li>Either select individual files or choose a folder (scans all subfolders automatically)</li>
                 <li>Upload below - Automatic parsing & import!</li>
               </ol>
               <div className="bg-amber-50 border border-amber-200 rounded p-3 text-xs">
@@ -496,16 +578,27 @@ export default function MockupsPage() {
               ) : (
                 <>
                   <ImageIcon className="h-12 w-12 mx-auto text-green-600 mb-3" />
-                  <Button
-                    size="lg"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <UploadIcon className="h-5 w-5 mr-2" />
-                    Select Mockup Files
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button
+                      size="lg"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <UploadIcon className="h-5 w-5 mr-2" />
+                      Select Files
+                    </Button>
+                    <Button
+                      size="lg"
+                      onClick={handleFolderUpload}
+                      variant="secondary"
+                      className="border-2 border-green-600"
+                    >
+                      <FolderIcon className="h-5 w-5 mr-2" />
+                      Select Folder
+                    </Button>
+                  </div>
                   <p className="text-sm text-muted-foreground mt-3">
-                    Supports JPG, PNG, WEBP • Can upload 1000s at once
+                    Supports JPG, PNG, WEBP • Folder selection scans all subfolders
                   </p>
                 </>
               )}
