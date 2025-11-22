@@ -136,13 +136,16 @@ export default function MockupsPage() {
         setUploadProgress({ current: i + 1, total: files.length });
         
         try {
-          // Validate filename format
+          // Validate filename format - allow Brand_Model_SKU.jpg or Model_SKU.jpg (for iPhone/iPad auto-detection)
           const filename = file.name;
-          if (!/^[A-Za-z0-9]+_[A-Za-z0-9\s]+_[A-Za-z0-9-]+\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+          const hasValidFormat = /^[A-Za-z0-9]+_[A-Za-z0-9\s]+(_[A-Za-z0-9-]+)?\.(jpg|jpeg|png|webp)$/i.test(filename);
+          const hasMinimumParts = filename.split('_').length >= 2;
+          
+          if (!hasValidFormat || !hasMinimumParts) {
             console.warn(`Skipping invalid filename: ${filename}`);
             failedList.push({
               filename,
-              reason: "Invalid filename format. Expected: Brand_Model_SKU.jpg"
+              reason: "Invalid filename format. Expected: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg"
             });
             failed++;
             continue;
@@ -250,28 +253,47 @@ export default function MockupsPage() {
           continue;
         }
         
-        // Parse filename: Brand_Model_SKU.jpg
+        // Parse filename: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg
         // Examples:
         // - Apple_iPhone15Pro_M-174.jpg
+        // - iPhone16_M-174.jpg (auto-detects Apple)
         // - Samsung_GalaxyS24_M-174.jpg
         // - Oppo_15Pro_M-174.jpg
         const parts = filename.split('_');
         
-        if (parts.length < 3) {
+        if (parts.length < 2) {
           skipped++;
           continue;
         }
         
-        const brand = parts[0];
-        const sku = parts[parts.length - 1];
-        const model = parts.slice(1, -1).join(' '); // Everything between brand and SKU
+        let brand = parts[0];
+        let sku = parts[parts.length - 1];
+        let model = parts.slice(1, -1).join(' '); // Everything between brand and SKU
+        
+        // Auto-detect Apple for iPhone/iPad files
+        const filenameLower = filename.toLowerCase();
+        if (filenameLower.includes('iphone') || filenameLower.includes('ipad')) {
+          if (brand.toLowerCase() === 'iphone' || brand.toLowerCase() === 'ipad') {
+            // Filename is like "iPhone16_M-75", reconstruct as Apple_iPhone16_M-75
+            brand = 'Apple';
+            model = parts.slice(0, -1).join(' ');
+          } else {
+            // Brand is something else but contains iPhone/iPad
+            brand = 'Apple';
+          }
+        }
+        
+        if (!brand || !model || !sku) {
+          skipped++;
+          continue;
+        }
         
         csvLines.push(`${brand},${model},${sku},${fileId}`);
         parsed++;
       }
       
       if (parsed === 0) {
-        toast.error("No valid files parsed. Check your file naming convention: Brand_Model_SKU.jpg");
+        toast.error("No valid files parsed. Check your file naming convention: Brand_Model_SKU.jpg or iPhone_Model_SKU.jpg");
         return;
       }
       
@@ -408,9 +430,13 @@ export default function MockupsPage() {
                 <p className="font-semibold mb-1">Examples:</p>
                 <ul className="space-y-0.5 ml-4 list-disc">
                   <li><code>Apple_iPhone15Pro_M-174.jpg</code></li>
+                  <li><code>iPhone16_M-174.jpg</code> <span className="text-amber-700">(Auto-detects Apple)</span></li>
                   <li><code>Samsung_GalaxyS24_M-174.jpg</code></li>
                   <li><code>Oppo_15Pro_M-174.jpg</code></li>
                 </ul>
+                <p className="mt-2 text-amber-800 font-medium">
+                  💡 Tip: Files with "iPhone" or "iPad" automatically assign to Apple brand
+                </p>
               </div>
             </div>
             
@@ -529,7 +555,7 @@ export default function MockupsPage() {
               <div>
                 <h4 className="font-semibold mb-2">📋 Quick Method (Recommended):</h4>
                 <ol className="space-y-1 list-decimal list-inside ml-2">
-                  <li>Name files: <code className="bg-white px-1">Brand_Model_SKU.jpg</code></li>
+                  <li>Name files: <code className="bg-white px-1">Brand_Model_SKU.jpg</code> or <code className="bg-white px-1">iPhone_Model_SKU.jpg</code></li>
                   <li>Upload to Files & Media tab</li>
                   <li>Open browser console (F12 or Right-click → Inspect)</li>
                   <li>Paste this script and press Enter:</li>
