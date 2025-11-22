@@ -1606,7 +1606,7 @@ export default function Index() {
                               const mockup = mockupsForModel.find(m => 
                                 product.variants.some(v => v.title.toLowerCase().includes(m.sku.toLowerCase()))
                               );
-                              const mockupUrl = mockup ? `https://cdn.hercules.app/${mockup.fileId}` : null;
+                              const mockupUrl = mockup?.imageUrl || null;
                               
                               return (
                                 <Link

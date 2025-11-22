@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 /**
- * Get mockup file ID for a specific brand, model, and SKU
+ * Get mockup file URL for a specific brand, model, and SKU
+ * Returns the actual storage URL, not just the file ID
  */
 export const getMockupFileId = query({
   args: {
@@ -18,7 +19,11 @@ export const getMockupFileId = query({
       )
       .first();
 
-    return mockup?.fileId || null;
+    if (!mockup) return null;
+    
+    // Get the actual storage URL
+    const url = await ctx.storage.getUrl(mockup.fileId);
+    return url;
   },
 });
 
@@ -119,7 +124,7 @@ export const generateUploadUrl = mutation({
 
 /**
  * Get all products (SKUs) that have mockups for a specific model
- * Returns array of { sku, fileId }
+ * Returns array of { sku, imageUrl }
  */
 export const getProductsWithMockupsForModel = query({
   args: {
@@ -139,17 +144,20 @@ export const getProductsWithMockupsForModel = query({
              normalizedSearch.includes(normalizedMockupModel);
     });
     
-    // Group by SKU to get unique products
+    // Group by SKU to get unique products with their image URLs
     const uniqueProducts = new Map<string, string>();
-    matchingMockups.forEach((mockup) => {
+    for (const mockup of matchingMockups) {
       if (!uniqueProducts.has(mockup.sku)) {
-        uniqueProducts.set(mockup.sku, mockup.fileId);
+        const url = await ctx.storage.getUrl(mockup.fileId);
+        if (url) {
+          uniqueProducts.set(mockup.sku, url);
+        }
       }
-    });
+    }
     
-    return Array.from(uniqueProducts.entries()).map(([sku, fileId]) => ({
+    return Array.from(uniqueProducts.entries()).map(([sku, imageUrl]) => ({
       sku,
-      fileId,
+      imageUrl,
     }));
   },
 });

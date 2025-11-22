@@ -187,8 +187,8 @@ export default function ProductDetailPage() {
   // Fetch active coupons
   const activeCoupons = useQuery(api.coupons.getActiveCoupons);
   
-  // Query mockup file ID from database
-  const mockupFileId = useQuery(
+  // Query mockup file URL from database
+  const mockupFileUrl = useQuery(
     api.mockups.getMockupFileId,
     phoneModel && productData
       ? {
@@ -235,9 +235,14 @@ export default function ProductDetailPage() {
       
       setMockupLoading(true);
       try {
-        // Use database file ID if available (fast), otherwise try filename variations (slower)
-        const url = await findMockupImageUrl(phoneModel, sku, mockupFileId);
-        setMockupUrl(url);
+        // Use database URL if available (from Convex storage)
+        if (mockupFileUrl) {
+          setMockupUrl(mockupFileUrl);
+        } else {
+          // Fallback to legacy filename variations (for backward compatibility)
+          const url = await findMockupImageUrl(phoneModel, sku, null);
+          setMockupUrl(url);
+        }
       } catch (error) {
         console.error('Error loading mockup:', error);
         setMockupUrl(null);
@@ -247,7 +252,7 @@ export default function ProductDetailPage() {
     }
     
     loadMockup();
-  }, [phoneModel, productData, mockupFileId]);
+  }, [phoneModel, productData, mockupFileUrl]);
   
   // Filter images based on selected phone model and mockup URLs
   const displayImages = useMemo(() => {
