@@ -351,10 +351,13 @@ export default function ProductDetailPage() {
   const isLoading = productData === undefined;
   const product = productData;
   
-  // Set initial selected image when product loads or phone model changes
-  if (product && displayImages.length > 0 && (!selectedImage || !displayImages.find(img => img.url === selectedImage))) {
-    setSelectedImage(displayImages[0].url);
-  }
+  // Automatically select the first image when displayImages changes (e.g., when mockup loads)
+  useEffect(() => {
+    if (displayImages.length > 0) {
+      // Always select the first image (which will be the mockup if it exists)
+      setSelectedImage(displayImages[0].url);
+    }
+  }, [displayImages]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -556,7 +559,7 @@ export default function ProductDetailPage() {
                         }
                       }}
                     />
-                    {phoneModel && selectedImage.includes('/mockups/') && (
+                    {phoneModel && mockupUrl && selectedImage === mockupUrl && (
                       <div className="absolute top-3 right-3 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                         Preview on {phoneModel}
                       </div>
