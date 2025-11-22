@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon, FolderIcon } from "lucide-react";
+import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon, FolderIcon, ExternalLinkIcon } from "lucide-react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useConvex } from "convex/react";
@@ -157,6 +157,15 @@ export default function MockupsPage() {
         return;
       }
       
+      // Check if we're in an iframe (Hercules preview)
+      if (window !== window.top) {
+        toast.error("Folder upload doesn't work in preview mode", {
+          description: "Open this page in a new tab to use folder upload, or use 'Select Files' instead",
+          duration: 6000,
+        });
+        return;
+      }
+      
       // Show directory picker
       interface WindowWithDirectoryPicker extends Window {
         showDirectoryPicker: () => Promise<unknown>;
@@ -183,6 +192,16 @@ export default function MockupsPage() {
         // User cancelled the picker
         return;
       }
+      
+      // Check for iframe/security error
+      if ((error as Error).message?.includes('Cross origin') || (error as Error).message?.includes('sub frame')) {
+        toast.error("Folder upload requires opening in a new tab", {
+          description: "Right-click the page and select 'Open in new tab', or use 'Select Files' instead",
+          duration: 8000,
+        });
+        return;
+      }
+      
       console.error('Folder selection error:', error);
       toast.error("Failed to access folder");
     }
@@ -549,6 +568,27 @@ export default function MockupsPage() {
                   </p>
                 </div>
               </div>
+              
+              {/* Folder Upload Info */}
+              {window !== window.top && (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs">
+                  <p className="font-semibold text-blue-800 mb-1.5">
+                    📁 To use "Select Folder":
+                  </p>
+                  <p className="text-blue-700 mb-2">
+                    Folder upload requires opening this page in a new tab due to browser security restrictions.
+                  </p>
+                  <a 
+                    href={window.location.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-blue-800 font-semibold hover:text-blue-900 underline"
+                  >
+                    Open Admin Mockups in New Tab
+                    <ExternalLinkIcon className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              )}
             </div>
             
             <div className="border-2 border-dashed border-green-300 rounded-lg p-8 text-center bg-white">
