@@ -145,6 +145,18 @@ export const generateUploadUrl = mutation({
 });
 
 /**
+ * Keep-alive ping mutation
+ * Lightweight mutation to prevent dev machine from sleeping during uploads
+ */
+export const keepAlivePing = mutation({
+  args: {},
+  handler: async () => {
+    // Do nothing - just keep the connection alive
+    return { timestamp: Date.now() };
+  },
+});
+
+/**
  * Get all products (SKUs) that have mockups for a specific model
  * Returns array of { sku, imageUrl }
  */

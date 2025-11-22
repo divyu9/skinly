@@ -38,9 +38,11 @@ export default function MockupsPage() {
     broken: number;
     brokenMockups: BrokenMockup[];
   } | null>(null);
+  const [lastPingTime, setLastPingTime] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<unknown>(null);
   const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pingFailureCountRef = useRef<number>(0);
   
   const convex = useConvex();
   const mockups = useQuery(api.mockups.getAllMockups);
@@ -90,18 +92,45 @@ export default function MockupsPage() {
   
   /**
    * Start keep-alive pings to prevent dev machine from sleeping
-   * Makes a lightweight query every 30 seconds during upload
+   * Makes a lightweight mutation every 10 seconds during upload
    */
   const startKeepAlive = () => {
+    // Send first ping immediately
+    sendKeepAlivePing();
+    
+    // Then send every 10 seconds
     keepAliveIntervalRef.current = setInterval(async () => {
-      try {
-        // Make a lightweight query to keep connection alive
-        await convex.query(api.mockups.getAllMockups, {});
-        console.log('Keep-alive ping sent');
-      } catch (error) {
-        console.warn('Keep-alive ping failed:', error);
+      await sendKeepAlivePing();
+    }, 10000); // Every 10 seconds (more aggressive than 30s)
+  };
+  
+  /**
+   * Send a single keep-alive ping
+   */
+  const sendKeepAlivePing = async () => {
+    try {
+      // Make a lightweight mutation to keep connection alive
+      // Using mutation instead of query is more effective for keeping dev machine awake
+      await convex.mutation(api.mockups.keepAlivePing, {});
+      
+      const now = new Date().toLocaleTimeString();
+      setLastPingTime(now);
+      console.log('✓ Keep-alive ping successful at', now);
+      
+      // Reset failure count on success
+      pingFailureCountRef.current = 0;
+    } catch (error) {
+      console.error('✗ Keep-alive ping failed:', error);
+      pingFailureCountRef.current += 1;
+      
+      // Warn user if multiple consecutive failures
+      if (pingFailureCountRef.current >= 3) {
+        toast.error("Connection unstable - upload may fail", {
+          description: "Keep-alive pings are failing. Consider saving your progress.",
+          duration: 5000,
+        });
       }
-    }, 30000); // Every 30 seconds
+    }
   };
   
   /**
@@ -111,6 +140,8 @@ export default function MockupsPage() {
     if (keepAliveIntervalRef.current) {
       clearInterval(keepAliveIntervalRef.current);
       keepAliveIntervalRef.current = null;
+      pingFailureCountRef.current = 0;
+      setLastPingTime("");
       console.log('Keep-alive stopped');
     }
   };
@@ -710,7 +741,7 @@ export default function MockupsPage() {
                   </div>
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-                    <p>Keep-alive active • Device staying awake</p>
+                    <p>Keep-alive active • Device staying awake {lastPingTime && `• Last ping: ${lastPingTime}`}</p>
                   </div>
                 </div>
               ) : (
