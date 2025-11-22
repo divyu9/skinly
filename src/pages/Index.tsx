@@ -1348,6 +1348,7 @@ export default function Index() {
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchedModel, setSearchedModel] = useState<string>("");
+  const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
   
   // Query mockups for the searched model
   const mockupsForModel = useQuery(
@@ -1442,6 +1443,8 @@ export default function Index() {
                   setShowSearchResults(query.trim().length > 0);
                   // Set searched model for mockup query
                   setSearchedModel(query.trim());
+                  // Reset expanded brands when search changes
+                  setExpandedBrands(new Set());
                 }}
                 className="pl-14 h-16 text-lg border-2 focus:border-primary"
               />
@@ -1513,41 +1516,61 @@ export default function Index() {
                                 <span>{category.icon}</span>
                                 <span>{category.name}</span>
                               </div>
-                              {category.matchingBrands.map(({ brand, models }) => (
-                                <div key={brand} className="mb-3 last:mb-0">
-                                  <div className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2 pl-6">
-                                    <span>{brand}</span>
-                                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
-                                      {models.length}
-                                    </span>
+                              {category.matchingBrands.map(({ brand, models }) => {
+                                const brandKey = `${category.name}-${brand}`;
+                                const isExpanded = expandedBrands.has(brandKey);
+                                const displayModels = isExpanded ? models : models.slice(0, 5);
+                                
+                                return (
+                                  <div key={brand} className="mb-3 last:mb-0">
+                                    <div className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2 pl-6">
+                                      <span>{brand}</span>
+                                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
+                                        {models.length}
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1 pl-6">
+                                      {displayModels.map((model: string, idx: number) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => {
+                                            setHomeSearchQuery("");
+                                            setShowSearchResults(false);
+                                            window.location.href = `/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
+                                          }}
+                                          className="w-full text-left p-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-all group"
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span className="text-sm font-medium">{model}</span>
+                                            <span className="text-xs text-muted-foreground group-hover:text-primary">
+                                              Select →
+                                            </span>
+                                          </div>
+                                        </button>
+                                      ))}
+                                      {models.length > 5 && (
+                                        <button
+                                          onClick={() => {
+                                            const newExpanded = new Set(expandedBrands);
+                                            if (isExpanded) {
+                                              newExpanded.delete(brandKey);
+                                            } else {
+                                              newExpanded.add(brandKey);
+                                            }
+                                            setExpandedBrands(newExpanded);
+                                          }}
+                                          className="w-full text-left p-2 text-xs text-primary hover:bg-primary/10 rounded-lg transition-all font-medium"
+                                        >
+                                          {isExpanded 
+                                            ? `Show less ↑` 
+                                            : `Show ${models.length - 5} more models ↓`
+                                          }
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
-                                  <div className="space-y-1 pl-6">
-                                    {models.slice(0, 3).map((model: string, idx: number) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => {
-                                          setHomeSearchQuery("");
-                                          setShowSearchResults(false);
-                                          window.location.href = `/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
-                                        }}
-                                        className="w-full text-left p-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-all group"
-                                      >
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-sm font-medium">{model}</span>
-                                          <span className="text-xs text-muted-foreground group-hover:text-primary">
-                                            Select →
-                                          </span>
-                                        </div>
-                                      </button>
-                                    ))}
-                                    {models.length > 3 && (
-                                      <div className="text-xs text-muted-foreground pl-2 pt-1">
-                                        +{models.length - 3} more
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           ))}
                         </>
