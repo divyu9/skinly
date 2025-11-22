@@ -219,39 +219,45 @@ export default function ProductDetailPage() {
   
   // Fetch mockup image URL asynchronously when phone model or product changes
   useEffect(() => {
-    async function loadMockup() {
-      if (!phoneModel || !productData) {
-        setMockupUrl(null);
-        return;
-      }
-      
-      const firstVariantSku = productData.variants[0]?.sku;
-      const sku = extractSKU(productData.title, firstVariantSku);
-      
-      if (!sku) {
-        setMockupUrl(null);
-        return;
-      }
-      
-      setMockupLoading(true);
-      try {
-        // Use database URL if available (from Convex storage)
-        if (mockupFileUrl) {
-          setMockupUrl(mockupFileUrl);
-        } else {
-          // Fallback to legacy filename variations (for backward compatibility)
-          const url = await findMockupImageUrl(phoneModel, sku, null);
-          setMockupUrl(url);
-        }
-      } catch (error) {
-        console.error('Error loading mockup:', error);
-        setMockupUrl(null);
-      } finally {
-        setMockupLoading(false);
-      }
+    if (!phoneModel || !productData) {
+      setMockupUrl(null);
+      setMockupLoading(false);
+      return;
     }
     
-    loadMockup();
+    const firstVariantSku = productData.variants[0]?.sku;
+    const sku = extractSKU(productData.title, firstVariantSku);
+    
+    if (!sku) {
+      setMockupUrl(null);
+      setMockupLoading(false);
+      return;
+    }
+    
+    // If mockupFileUrl is undefined, it's still loading - don't reset mockupUrl
+    if (mockupFileUrl === undefined) {
+      setMockupLoading(true);
+      return;
+    }
+    
+    // mockupFileUrl is either null (not found) or a string (found)
+    if (mockupFileUrl) {
+      setMockupUrl(mockupFileUrl);
+      setMockupLoading(false);
+    } else {
+      // No mockup in database, try legacy fallback
+      setMockupLoading(true);
+      findMockupImageUrl(phoneModel, sku, null)
+        .then(url => {
+          setMockupUrl(url);
+          setMockupLoading(false);
+        })
+        .catch(error => {
+          console.error('Error loading mockup:', error);
+          setMockupUrl(null);
+          setMockupLoading(false);
+        });
+    }
   }, [phoneModel, productData, mockupFileUrl]);
   
   // Filter images based on selected phone model and mockup URLs
