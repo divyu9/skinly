@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon } from "lucide-react";
+import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon } from "lucide-react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useConvex } from "convex/react";
@@ -16,6 +16,14 @@ interface FailedFile {
   reason: string;
 }
 
+interface BrokenMockup {
+  id: string;
+  brand: string;
+  model: string;
+  sku: string;
+  fileId: string;
+}
+
 export default function MockupsPage() {
   const [csvData, setCsvData] = useState("");
   const [importing, setImporting] = useState(false);
@@ -24,6 +32,12 @@ export default function MockupsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [failedFiles, setFailedFiles] = useState<FailedFile[]>([]);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationResult, setVerificationResult] = useState<{
+    total: number;
+    broken: number;
+    brokenMockups: BrokenMockup[];
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const convex = useConvex();
@@ -297,6 +311,51 @@ export default function MockupsPage() {
     window.URL.revokeObjectURL(url);
     
     toast.success(`Downloaded report with ${failedFiles.length} failed files`);
+  };
+  
+  const handleVerifyMockups = async () => {
+    setVerifying(true);
+    try {
+      const result = await convex.query(api.mockups.verifyMockupFiles, {});
+      setVerificationResult(result);
+      
+      if (result.broken === 0) {
+        toast.success(`✓ All ${result.total} mockups verified successfully!`);
+      } else {
+        toast.error(`Found ${result.broken} broken mockup links out of ${result.total} total`);
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast.error("Failed to verify mockups");
+    } finally {
+      setVerifying(false);
+    }
+  };
+  
+  const handleDownloadBrokenReport = () => {
+    if (!verificationResult || verificationResult.broken === 0) {
+      toast.error("No broken mockups to download");
+      return;
+    }
+    
+    // Generate CSV report
+    const csvLines = ['Brand,Model,SKU,FileID'];
+    verificationResult.brokenMockups.forEach(mockup => {
+      csvLines.push(`${mockup.brand},${mockup.model},${mockup.sku},${mockup.fileId}`);
+    });
+    
+    const csvContent = csvLines.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mockup-broken-links-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    toast.success(`Downloaded report with ${verificationResult.broken} broken mockups`);
   };
   
   return (
@@ -659,6 +718,117 @@ Samsung_GalaxyS24_M-174.jpg"
             </CardContent>
           </Card>
         </div>
+        
+        {/* Verification Card */}
+        {mockups && mockups.length > 0 && (
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircleIcon className="h-5 w-5" />
+                Verify Mockup Files
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded p-4 text-sm">
+                <p className="font-semibold text-blue-800 mb-2">
+                  🔍 Check for broken mockup links
+                </p>
+                <p className="text-blue-700">
+                  This will verify that all mockup file IDs in your database actually exist in storage.
+                  Broken links occur when files are deleted or when file IDs are incorrect.
+                </p>
+              </div>
+              
+              <Button
+                onClick={handleVerifyMockups}
+                disabled={verifying}
+                className="w-full"
+                size="lg"
+              >
+                {verifying ? "Verifying..." : "Verify All Mockups"}
+              </Button>
+              
+              {verificationResult && (
+                <div className={`border rounded p-4 ${
+                  verificationResult.broken === 0 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <div className="flex items-center gap-2 mb-3">
+                    {verificationResult.broken === 0 ? (
+                      <>
+                        <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                        <h3 className="font-semibold text-green-800">
+                          ✓ All mockups verified!
+                        </h3>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircleIcon className="h-5 w-5 text-red-600" />
+                        <h3 className="font-semibold text-red-800">
+                          Found {verificationResult.broken} broken link{verificationResult.broken !== 1 ? 's' : ''}
+                        </h3>
+                      </>
+                    )}
+                  </div>
+                  
+                  <div className="text-sm mb-3">
+                    <p>Total mockups: <strong>{verificationResult.total}</strong></p>
+                    <p className={verificationResult.broken === 0 ? 'text-green-700' : 'text-red-700'}>
+                      Broken links: <strong>{verificationResult.broken}</strong>
+                    </p>
+                  </div>
+                  
+                  {verificationResult.broken > 0 && (
+                    <>
+                      <div className="max-h-48 overflow-y-auto border border-red-100 rounded mb-3 bg-white">
+                        <table className="w-full text-xs">
+                          <thead className="bg-red-100 sticky top-0">
+                            <tr>
+                              <th className="text-left p-2 font-semibold">Brand</th>
+                              <th className="text-left p-2 font-semibold">Model</th>
+                              <th className="text-left p-2 font-semibold">SKU</th>
+                              <th className="text-left p-2 font-semibold">File ID</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {verificationResult.brokenMockups.map((mockup) => (
+                              <tr key={mockup.id} className="border-t border-red-100">
+                                <td className="p-2">{mockup.brand}</td>
+                                <td className="p-2">{mockup.model}</td>
+                                <td className="p-2">{mockup.sku}</td>
+                                <td className="p-2 font-mono text-xs">{mockup.fileId}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleDownloadBrokenReport}
+                          variant="destructive"
+                          className="flex-1"
+                          size="sm"
+                        >
+                          <DownloadIcon className="h-4 w-4 mr-2" />
+                          Download Report (CSV)
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setVerificationResult(null)}
+                          size="sm"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         
         {/* Preview Recent Mockups */}
         {mockups && mockups.length > 0 && (

@@ -153,3 +153,46 @@ export const getProductsWithMockupsForModel = query({
     }));
   },
 });
+
+/**
+ * Verify all mockup file IDs and identify broken links
+ * Returns list of mockups with broken file links
+ */
+export const verifyMockupFiles = query({
+  args: {},
+  handler: async (ctx) => {
+    const mockups = await ctx.db.query("mockups").collect();
+    const brokenMockups = [];
+    
+    for (const mockup of mockups) {
+      try {
+        // Try to get the storage URL - if file doesn't exist, this will be null
+        const url = await ctx.storage.getUrl(mockup.fileId);
+        if (!url) {
+          brokenMockups.push({
+            id: mockup._id,
+            brand: mockup.brand,
+            model: mockup.model,
+            sku: mockup.sku,
+            fileId: mockup.fileId,
+          });
+        }
+      } catch (error) {
+        // File definitely doesn't exist
+        brokenMockups.push({
+          id: mockup._id,
+          brand: mockup.brand,
+          model: mockup.model,
+          sku: mockup.sku,
+          fileId: mockup.fileId,
+        });
+      }
+    }
+    
+    return {
+      total: mockups.length,
+      broken: brokenMockups.length,
+      brokenMockups,
+    };
+  },
+});
