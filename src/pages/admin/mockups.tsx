@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
@@ -39,12 +39,81 @@ export default function MockupsPage() {
     brokenMockups: BrokenMockup[];
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const wakeLockRef = useRef<unknown>(null);
+  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   const convex = useConvex();
   const mockups = useQuery(api.mockups.getAllMockups);
   const bulkImport = useMutation(api.mockups.bulkImportMockups);
   const clearAll = useMutation(api.mockups.clearAllMockups);
   const storeMockupFile = useMutation(api.mockupsUpload.storeMockupFile);
+  
+  /**
+   * Request wake lock to prevent browser/device from sleeping during upload
+   */
+  const requestWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        interface WakeLockAPI {
+          request: (type: 'screen') => Promise<unknown>;
+        }
+        interface NavigatorWithWakeLock {
+          wakeLock: WakeLockAPI;
+        }
+        const nav = navigator as unknown as NavigatorWithWakeLock;
+        wakeLockRef.current = await nav.wakeLock.request('screen');
+        console.log('Wake lock acquired - device will stay awake during upload');
+      }
+    } catch (error) {
+      console.warn('Wake lock not supported or failed:', error);
+      // Not critical, continue without wake lock
+    }
+  };
+  
+  /**
+   * Release wake lock when upload is complete
+   */
+  const releaseWakeLock = async () => {
+    try {
+      if (wakeLockRef.current) {
+        interface WakeLockSentinel {
+          release: () => Promise<void>;
+        }
+        await (wakeLockRef.current as WakeLockSentinel).release();
+        wakeLockRef.current = null;
+        console.log('Wake lock released');
+      }
+    } catch (error) {
+      console.warn('Failed to release wake lock:', error);
+    }
+  };
+  
+  /**
+   * Start keep-alive pings to prevent dev machine from sleeping
+   * Makes a lightweight query every 30 seconds during upload
+   */
+  const startKeepAlive = () => {
+    keepAliveIntervalRef.current = setInterval(async () => {
+      try {
+        // Make a lightweight query to keep connection alive
+        await convex.query(api.mockups.getAllMockups, {});
+        console.log('Keep-alive ping sent');
+      } catch (error) {
+        console.warn('Keep-alive ping failed:', error);
+      }
+    }, 30000); // Every 30 seconds
+  };
+  
+  /**
+   * Stop keep-alive pings
+   */
+  const stopKeepAlive = () => {
+    if (keepAliveIntervalRef.current) {
+      clearInterval(keepAliveIntervalRef.current);
+      keepAliveIntervalRef.current = null;
+      console.log('Keep-alive stopped');
+    }
+  };
   
   const handleBulkImport = async () => {
     if (!csvData.trim()) {
@@ -217,6 +286,14 @@ export default function MockupsPage() {
     setUploadProgress({ current: 0, total: fileArray.length });
     setFailedFiles([]); // Reset failed files
     
+    // Acquire wake lock and start keep-alive to prevent dev machine from sleeping
+    await requestWakeLock();
+    startKeepAlive();
+    
+    toast.info("Keep-alive activated - device will stay awake during upload", {
+      duration: 3000,
+    });
+    
     let imported = 0;
     let updated = 0;
     let skipped = 0;
@@ -299,8 +376,13 @@ export default function MockupsPage() {
         `Upload complete! ${imported} new, ${updated} updated, ${skipped} skipped, ${failed} failed`
       );
     } catch (error) {
+      console.error('Upload error:', error);
       toast.error("Bulk upload failed");
     } finally {
+      // Release wake lock and stop keep-alive
+      await releaseWakeLock();
+      stopKeepAlive();
+      
       setUploading(false);
       setUploadProgress({ current: 0, total: 0 });
       if (fileInputRef.current) {
@@ -504,6 +586,19 @@ export default function MockupsPage() {
     toast.success(`Downloaded report with ${verificationResult.broken} broken mockups`);
   };
   
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Release wake lock and stop keep-alive if component unmounts
+      if (wakeLockRef.current) {
+        releaseWakeLock();
+      }
+      if (keepAliveIntervalRef.current) {
+        stopKeepAlive();
+      }
+    };
+  }, []);
+  
   return (
     <>
       <Unauthenticated>
@@ -613,7 +708,10 @@ export default function MockupsPage() {
                       style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                     />
                   </div>
-                  <p className="text-sm text-muted-foreground">Please wait...</p>
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                    <p>Keep-alive active • Device staying awake</p>
+                  </div>
                 </div>
               ) : (
                 <>
