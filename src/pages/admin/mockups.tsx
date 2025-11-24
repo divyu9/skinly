@@ -92,16 +92,16 @@ export default function MockupsPage() {
   
   /**
    * Start keep-alive pings to prevent dev machine from sleeping
-   * Makes a lightweight mutation every 10 seconds during upload
+   * Makes a lightweight mutation every 5 seconds during upload
    */
   const startKeepAlive = () => {
     // Send first ping immediately
     sendKeepAlivePing();
     
-    // Then send every 10 seconds
+    // Then send every 5 seconds (very aggressive)
     keepAliveIntervalRef.current = setInterval(async () => {
       await sendKeepAlivePing();
-    }, 10000); // Every 10 seconds (more aggressive than 30s)
+    }, 5000); // Every 5 seconds
   };
   
   /**
@@ -332,9 +332,17 @@ export default function MockupsPage() {
     const failedList: FailedFile[] = [];
     
     try {
+      const BATCH_SIZE = 50; // Process in batches to prevent timeouts
+      
       for (let i = 0; i < fileArray.length; i++) {
         const file = fileArray[i];
         setUploadProgress({ current: i + 1, total: fileArray.length });
+        
+        // Add small delay every BATCH_SIZE files to prevent overwhelming the system
+        if (i > 0 && i % BATCH_SIZE === 0) {
+          console.log(`Processed ${i} files, taking brief pause...`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second pause
+        }
         
         try {
           // Validate filename format - allow Brand_Model_SKU.jpg or Model_SKU.jpg (for iPhone/iPad auto-detection)
@@ -393,9 +401,21 @@ export default function MockupsPage() {
           
         } catch (error) {
           console.error(`Failed to upload ${file.name}:`, error);
+          
+          // Check for authentication errors
+          const errorMessage = error instanceof Error ? error.message : "Upload or processing error";
+          if (errorMessage.includes('Unauthenticated') || errorMessage.includes('401') || errorMessage.includes('authentication')) {
+            toast.error("Session expired - please refresh and sign in again", {
+              description: "Your upload progress has been saved. Refresh the page to continue.",
+              duration: 10000,
+            });
+            // Stop the upload process
+            throw new Error("Authentication expired");
+          }
+          
           failedList.push({
             filename: file.name,
-            reason: error instanceof Error ? error.message : "Upload or processing error"
+            reason: errorMessage
           });
           failed++;
         }
@@ -657,6 +677,41 @@ export default function MockupsPage() {
               Upload mockup images with automatic parsing and import
             </p>
           </div>
+        
+        {/* Large Upload Warning */}
+        <Card className="mb-6 border-orange-200 bg-orange-50/50">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <AlertCircleIcon className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="space-y-2 text-sm">
+                <p className="font-semibold text-orange-900">
+                  ⚠️ Uploading 1,000+ files? Use your published app instead!
+                </p>
+                <p className="text-orange-800">
+                  The preview environment has session timeouts that can interrupt large uploads. For bulk uploads over 1,000 files, <strong>publish your app first</strong> and upload through the live site for best reliability.
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <Button 
+                    size="sm" 
+                    variant="secondary"
+                    className="border-orange-300"
+                    onClick={() => window.open('/admin/mockups', '_blank')}
+                  >
+                    Open in New Tab
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="secondary"
+                    className="border-orange-300"
+                    onClick={() => toast.info("Click the 'Publish' button in the top right of the App Builder")}
+                  >
+                    How to Publish
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
         {/* Recommended Method: Direct Upload */}
         <Card className="mb-6 border-green-200 bg-green-50/50">
