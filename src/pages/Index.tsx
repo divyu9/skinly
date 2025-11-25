@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   Dialog,
@@ -1349,6 +1349,17 @@ export default function Index() {
   const [searchedModel, setSearchedModel] = useState<string>("");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
   
+  // Ref for scrolling to device selector
+  const deviceSelectorRef = useRef<HTMLElement>(null);
+  
+  // Function to scroll to device selector
+  const scrollToDeviceSelector = () => {
+    deviceSelectorRef.current?.scrollIntoView({ 
+      behavior: 'smooth',
+      block: 'start'
+    });
+  };
+  
   // Query mockups for the searched model
   const mockupsForModel = useQuery(
     api.mockups.getProductsWithMockupsForModel,
@@ -1922,7 +1933,7 @@ export default function Index() {
       </section>
 
       {/* Device Selector Section */}
-      <section className="py-20 px-4">
+      <section ref={deviceSelectorRef} className="py-20 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-16 space-y-4">
             <h2 className="text-4xl lg:text-5xl font-bold text-balance">
@@ -2056,8 +2067,12 @@ export default function Index() {
                     <div className="text-6xl">🎨</div>
                   </div>
                 )}
-                <Button className="w-full" variant="outline" asChild>
-                  <a href="/products?finish=matte">Shop Matte</a>
+                <Button 
+                  className="w-full" 
+                  variant="outline" 
+                  onClick={scrollToDeviceSelector}
+                >
+                  Shop Matte
                 </Button>
               </CardContent>
             </Card>
@@ -2102,8 +2117,12 @@ export default function Index() {
                     <div className="text-6xl">✨</div>
                   </div>
                 )}
-                <Button className="w-full" variant="outline" asChild>
-                  <a href="/products?finish=embossed">Shop 3D Embossed</a>
+                <Button 
+                  className="w-full" 
+                  variant="outline" 
+                  onClick={scrollToDeviceSelector}
+                >
+                  Shop 3D Embossed
                 </Button>
               </CardContent>
             </Card>
@@ -2148,8 +2167,12 @@ export default function Index() {
                     <div className="text-6xl">💎</div>
                   </div>
                 )}
-                <Button className="w-full" variant="outline" asChild>
-                  <a href="/products?finish=transparent">Shop Transparent</a>
+                <Button 
+                  className="w-full" 
+                  variant="outline" 
+                  onClick={scrollToDeviceSelector}
+                >
+                  Shop Transparent
                 </Button>
               </CardContent>
             </Card>
