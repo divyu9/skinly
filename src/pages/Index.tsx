@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import {
   Dialog,
@@ -1332,6 +1332,9 @@ export default function Index() {
   const products = paginatedProducts || [];
   const isLoadingProducts = !paginatedProducts;
   
+  // Fetch latest supported models for marquee
+  const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
+  
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
@@ -1434,6 +1437,24 @@ export default function Index() {
           </div>
         </div>
       </nav>
+
+      {/* Latest Models Marquee */}
+      {latestModels && latestModels.length > 0 && (
+        <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-[72px] overflow-hidden">
+          <div className="relative flex">
+            <div className="animate-marquee flex gap-8 whitespace-nowrap">
+              {[...latestModels, ...latestModels].map((model, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm font-medium">
+                  <span className="text-primary">✨</span>
+                  <span className="text-foreground/80">
+                    Now supporting: {model.brandName} {model.modelName}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4">

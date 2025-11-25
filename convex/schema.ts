@@ -252,4 +252,23 @@ export default defineSchema({
     key: v.string(), // Unique setting key
     value: v.union(v.boolean(), v.string(), v.number()), // Setting value
   }).index("by_key", ["key"]),
+
+  supportedModels: defineTable({
+    brandName: v.string(), // e.g., "Apple", "Samsung", "OnePlus"
+    modelName: v.string(), // e.g., "iPhone 15 Pro Max", "Galaxy S24 Ultra"
+    category: v.union(
+      v.literal("phone"),
+      v.literal("tablet"),
+      v.literal("laptop"),
+      v.literal("console"),
+      v.literal("charger"),
+      v.literal("drone"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("mac-mini")
+    ),
+    isActive: v.boolean(), // Control visibility
+  })
+    .index("by_brand", ["brandName"])
+    .index("by_category", ["category"]),
 });

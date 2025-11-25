@@ -32,6 +32,7 @@ import type * as settings from "../settings.js";
 import type * as shopify from "../shopify.js";
 import type * as stockNotifications from "../stockNotifications.js";
 import type * as stockNotificationsActions from "../stockNotificationsActions.js";
+import type * as supportedModels from "../supportedModels.js";
 import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as users from "../users.js";
 
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   shopify: typeof shopify;
   stockNotifications: typeof stockNotifications;
   stockNotificationsActions: typeof stockNotificationsActions;
+  supportedModels: typeof supportedModels;
   updateCollectionRules: typeof updateCollectionRules;
   users: typeof users;
 }>;
