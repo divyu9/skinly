@@ -184,9 +184,6 @@ export default function ProductDetailPage() {
     productData ? { productId: productData._id } : "skip"
   );
   
-  // Fetch active coupons
-  const activeCoupons = useQuery(api.coupons.getActiveCoupons);
-  
   // Query mockup file URL from database
   const mockupFileUrl = useQuery(
     api.mockups.getMockupFileId,
@@ -199,23 +196,13 @@ export default function ProductDetailPage() {
       : "skip"
   );
   
-  // Filter coupons to only show applicable ones for this product
-  const applicableCoupons = useMemo(() => {
-    if (!activeCoupons || !productData) return [];
-    
-    return activeCoupons.filter((coupon) => {
-      // If coupon has no product restrictions, show it for all products
-      if (!coupon.applicableProductKeywords || coupon.applicableProductKeywords.length === 0) {
-        return true;
-      }
-      
-      // Check if current product matches any of the keywords
-      const productTitle = productData.title.toLowerCase();
-      return coupon.applicableProductKeywords.some((keyword) =>
-        productTitle.includes(keyword.toLowerCase())
-      );
-    });
-  }, [activeCoupons, productData]);
+  // Fetch applicable coupons for this product
+  const applicableCoupons = useQuery(
+    api.coupons.getCouponsForProduct,
+    productData && productData.variants[0]
+      ? { productId: productData._id, variantId: productData.variants[0]._id }
+      : "skip"
+  );
   
   // Fetch mockup image URL asynchronously when phone model or product changes
   useEffect(() => {
@@ -853,7 +840,7 @@ export default function ProductDetailPage() {
                       <span>Active Offers</span>
                     </div>
                     <div className="space-y-2">
-                      {applicableCoupons.map((coupon) => {
+                      {applicableCoupons.map((coupon: { _id: string; code: string; discountType: string; discountValue: number; maxDiscount?: number; description: string; minPurchase?: number }) => {
                         const discountText = coupon.discountType === "percentage" 
                           ? `${coupon.discountValue}% OFF${coupon.maxDiscount ? ` (max ₹${coupon.maxDiscount})` : ''}`
                           : `₹${coupon.discountValue} OFF`;

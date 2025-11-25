@@ -1,33 +1,236 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import type { Id } from "./_generated/dataModel.d.ts";
 
-// Get all active coupons
-export const getActiveCoupons = query({
+// Get all coupons (admin only)
+export const getAllCoupons = query({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    return await ctx.db.query("coupons").order("desc").collect();
+  },
+});
+
+// Get single coupon (admin only)
+export const getCoupon = query({
+  args: { couponId: v.id("coupons") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const coupon = await ctx.db.get(args.couponId);
+    if (!coupon) {
+      throw new ConvexError({
+        message: "Coupon not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    return coupon;
+  },
+});
+
+// Get eligible products for a coupon
+export const getEligibleProducts = query({
+  args: { couponId: v.id("coupons") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const coupon = await ctx.db.get(args.couponId);
+    if (!coupon) {
+      throw new ConvexError({
+        message: "Coupon not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const allProducts = await ctx.db.query("products").collect();
+    const allVariants = await ctx.db.query("variants").collect();
+
+    // Group variants by product
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+
+    const eligibleProducts = [];
+
+    for (const product of allProducts) {
+      if (product.status !== "active") continue;
+
+      const variants = variantsByProduct.get(product._id) || [];
+      const eligibleVariants = [];
+
+      for (const variant of variants) {
+        let isEligible = false;
+
+        // Check specific variant IDs
+        if (coupon.applicableVariantIds && coupon.applicableVariantIds.length > 0) {
+          if (coupon.applicableVariantIds.includes(variant._id)) {
+            isEligible = true;
+          }
+        }
+
+        // Check collections
+        if (coupon.applicableCollectionIds && coupon.applicableCollectionIds.length > 0) {
+          if (product.collectionId && coupon.applicableCollectionIds.includes(product.collectionId)) {
+            isEligible = true;
+          }
+        }
+
+        // Check product title keywords
+        if (coupon.applicableProductKeywords && coupon.applicableProductKeywords.length > 0) {
+          const titleLower = product.title.toLowerCase();
+          if (coupon.applicableProductKeywords.some((kw) => titleLower.includes(kw.toLowerCase()))) {
+            isEligible = true;
+          }
+        }
+
+        // Check min product value
+        if (coupon.minProductValue && variant.price >= coupon.minProductValue) {
+          isEligible = true;
+        }
+
+        // If no specific conditions are set, coupon applies to all products
+        if (
+          !coupon.applicableVariantIds &&
+          !coupon.applicableCollectionIds &&
+          !coupon.applicableProductKeywords &&
+          !coupon.minProductValue
+        ) {
+          isEligible = true;
+        }
+
+        if (isEligible) {
+          eligibleVariants.push(variant);
+        }
+      }
+
+      if (eligibleVariants.length > 0) {
+        eligibleProducts.push({
+          ...product,
+          variants: eligibleVariants,
+        });
+      }
+    }
+
+    return eligibleProducts;
+  },
+});
+
+// Get active coupons for a specific product
+export const getCouponsForProduct = query({
+  args: { 
+    productId: v.id("products"),
+    variantId: v.optional(v.id("variants")),
+  },
+  handler: async (ctx, args) => {
     const now = Date.now();
     
-    const coupons = await ctx.db
+    const allCoupons = await ctx.db
       .query("coupons")
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
     
     // Filter by date range
-    const activeCoupons = coupons.filter(
+    const activeCoupons = allCoupons.filter(
       (coupon) => coupon.startDate <= now && coupon.endDate >= now
     );
-    
-    return activeCoupons;
+
+    // Filter by usage limit
+    const availableCoupons = activeCoupons.filter(
+      (coupon) => !coupon.usageLimit || coupon.usageCount < coupon.usageLimit
+    );
+
+    const product = await ctx.db.get(args.productId);
+    if (!product) return [];
+
+    const applicableCoupons = [];
+
+    for (const coupon of availableCoupons) {
+      let isApplicable = false;
+
+      // Check specific variant
+      if (args.variantId && coupon.applicableVariantIds && coupon.applicableVariantIds.length > 0) {
+        if (coupon.applicableVariantIds.includes(args.variantId)) {
+          isApplicable = true;
+        }
+      }
+
+      // Check collection
+      if (coupon.applicableCollectionIds && coupon.applicableCollectionIds.length > 0) {
+        if (product.collectionId && coupon.applicableCollectionIds.includes(product.collectionId)) {
+          isApplicable = true;
+        }
+      }
+
+      // Check product title
+      if (coupon.applicableProductKeywords && coupon.applicableProductKeywords.length > 0) {
+        const titleLower = product.title.toLowerCase();
+        if (coupon.applicableProductKeywords.some((kw) => titleLower.includes(kw.toLowerCase()))) {
+          isApplicable = true;
+        }
+      }
+
+      // Check min product value
+      if (coupon.minProductValue && args.variantId) {
+        const variant = await ctx.db.get(args.variantId);
+        if (variant && variant.price >= coupon.minProductValue) {
+          isApplicable = true;
+        }
+      }
+
+      // If no specific conditions, coupon applies to all products
+      if (
+        !coupon.applicableVariantIds &&
+        !coupon.applicableCollectionIds &&
+        !coupon.applicableProductKeywords &&
+        !coupon.minProductValue
+      ) {
+        isApplicable = true;
+      }
+
+      if (isApplicable) {
+        applicableCoupons.push(coupon);
+      }
+    }
+
+    return applicableCoupons;
   },
 });
 
-// Validate and get coupon by code
+// Validate coupon
 export const validateCoupon = query({
   args: { 
     code: v.string(), 
     cartTotal: v.number(),
+    userEmail: v.optional(v.string()),
     cartItems: v.optional(v.array(v.object({
+      variantId: v.id("variants"),
+      productId: v.id("products"),
       productTitle: v.string(),
       price: v.number(),
       quantity: v.number(),
@@ -59,7 +262,7 @@ export const validateCoupon = query({
     // Check date range
     if (now < coupon.startDate || now > coupon.endDate) {
       throw new ConvexError({
-        message: "This coupon has expired",
+        message: "This coupon has expired or is not yet active",
         code: "BAD_REQUEST",
       });
     }
@@ -71,90 +274,127 @@ export const validateCoupon = query({
         code: "BAD_REQUEST",
       });
     }
-    
-    // Check product restrictions
-    if (coupon.applicableProductKeywords && coupon.applicableProductKeywords.length > 0) {
-      if (!args.cartItems || args.cartItems.length === 0) {
+
+    // Check customer email restrictions
+    if (coupon.allowedCustomerEmails && coupon.allowedCustomerEmails.length > 0) {
+      if (!args.userEmail) {
         throw new ConvexError({
-          message: "This coupon requires specific products in your cart",
+          message: "This coupon is only available for specific customers",
           code: "BAD_REQUEST",
         });
       }
-      
-      const hasMatchingProduct = args.cartItems.some((item) =>
-        coupon.applicableProductKeywords!.some((keyword) =>
-          item.productTitle.toLowerCase().includes(keyword.toLowerCase())
-        )
-      );
-      
-      if (!hasMatchingProduct) {
+      const emailLower = args.userEmail.toLowerCase();
+      const allowed = coupon.allowedCustomerEmails.some((email) => email.toLowerCase() === emailLower);
+      if (!allowed) {
         throw new ConvexError({
-          message: `This coupon is only valid for ${coupon.applicableProductKeywords.join(", ")} products`,
+          message: "This coupon is not available for your account",
           code: "BAD_REQUEST",
         });
       }
-      
-      // Calculate eligible total (only products matching keywords)
-      const eligibleTotal = args.cartItems
-        .filter((item) =>
-          coupon.applicableProductKeywords!.some((keyword) =>
-            item.productTitle.toLowerCase().includes(keyword.toLowerCase())
-          )
-        )
-        .reduce((sum, item) => sum + item.price * item.quantity, 0);
-      
-      // Check minimum purchase against eligible items only
-      if (coupon.minPurchase && eligibleTotal < coupon.minPurchase) {
-        throw new ConvexError({
-          message: `Minimum purchase of ₹${coupon.minPurchase} required for eligible products`,
-          code: "BAD_REQUEST",
-        });
-      }
-      
-      // Calculate discount on eligible items only
-      let discountAmount = 0;
-      if (coupon.discountType === "percentage") {
-        discountAmount = (eligibleTotal * coupon.discountValue) / 100;
-        if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
-          discountAmount = coupon.maxDiscount;
-        }
-      } else {
-        discountAmount = coupon.discountValue;
-      }
-      
-      return {
-        coupon,
-        discountAmount,
-      };
     }
-    
-    // Check minimum purchase for non-restricted coupons
-    if (coupon.minPurchase && args.cartTotal < coupon.minPurchase) {
+
+    // Check minimum cart value
+    if (coupon.minCartValue && args.cartTotal < coupon.minCartValue) {
       throw new ConvexError({
-        message: `Minimum purchase of ₹${coupon.minPurchase} required`,
+        message: `Minimum cart value of ₹${coupon.minCartValue} required`,
         code: "BAD_REQUEST",
       });
     }
-    
-    // Calculate discount on full cart for non-restricted coupons
+
+    // Check if cart has eligible items
+    if (!args.cartItems || args.cartItems.length === 0) {
+      throw new ConvexError({
+        message: "Cart is empty",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Determine eligible items
+    const eligibleItems = [];
+    for (const item of args.cartItems) {
+      let isEligible = false;
+
+      // Check specific variants
+      if (coupon.applicableVariantIds && coupon.applicableVariantIds.length > 0) {
+        if (coupon.applicableVariantIds.includes(item.variantId)) {
+          isEligible = true;
+        }
+      }
+
+      // Check collections
+      if (coupon.applicableCollectionIds && coupon.applicableCollectionIds.length > 0) {
+        const product = await ctx.db.get(item.productId);
+        if (product?.collectionId && coupon.applicableCollectionIds.includes(product.collectionId)) {
+          isEligible = true;
+        }
+      }
+
+      // Check product title
+      if (coupon.applicableProductKeywords && coupon.applicableProductKeywords.length > 0) {
+        const titleLower = item.productTitle.toLowerCase();
+        if (coupon.applicableProductKeywords.some((kw) => titleLower.includes(kw.toLowerCase()))) {
+          isEligible = true;
+        }
+      }
+
+      // Check min product value
+      if (coupon.minProductValue && item.price >= coupon.minProductValue) {
+        isEligible = true;
+      }
+
+      // If no specific conditions, all items are eligible
+      if (
+        !coupon.applicableVariantIds &&
+        !coupon.applicableCollectionIds &&
+        !coupon.applicableProductKeywords &&
+        !coupon.minProductValue
+      ) {
+        isEligible = true;
+      }
+
+      if (isEligible) {
+        eligibleItems.push(item);
+      }
+    }
+
+    if (eligibleItems.length === 0) {
+      throw new ConvexError({
+        message: "No items in your cart are eligible for this coupon",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Calculate eligible total
+    const eligibleTotal = eligibleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    // Check minimum purchase against eligible items
+    if (coupon.minPurchase && eligibleTotal < coupon.minPurchase) {
+      throw new ConvexError({
+        message: `Minimum purchase of ₹${coupon.minPurchase} required for eligible products`,
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Calculate discount
     let discountAmount = 0;
     if (coupon.discountType === "percentage") {
-      discountAmount = (args.cartTotal * coupon.discountValue) / 100;
+      discountAmount = (eligibleTotal * coupon.discountValue) / 100;
       if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
         discountAmount = coupon.maxDiscount;
       }
     } else {
-      discountAmount = coupon.discountValue;
+      discountAmount = Math.min(coupon.discountValue, eligibleTotal);
     }
     
     return {
       coupon,
       discountAmount,
+      eligibleItemsCount: eligibleItems.length,
     };
   },
 });
 
-// Create coupon (admin only)
+// Create coupon
 export const createCoupon = mutation({
   args: {
     code: v.string(),
@@ -167,7 +407,12 @@ export const createCoupon = mutation({
     endDate: v.number(),
     isActive: v.boolean(),
     usageLimit: v.optional(v.number()),
+    applicableVariantIds: v.optional(v.array(v.id("variants"))),
+    applicableCollectionIds: v.optional(v.array(v.id("collections"))),
     applicableProductKeywords: v.optional(v.array(v.string())),
+    minCartValue: v.optional(v.number()),
+    minProductValue: v.optional(v.number()),
+    allowedCustomerEmails: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -203,16 +448,109 @@ export const createCoupon = mutation({
       isActive: args.isActive,
       usageLimit: args.usageLimit,
       usageCount: 0,
+      applicableVariantIds: args.applicableVariantIds,
+      applicableCollectionIds: args.applicableCollectionIds,
       applicableProductKeywords: args.applicableProductKeywords,
+      minCartValue: args.minCartValue,
+      minProductValue: args.minProductValue,
+      allowedCustomerEmails: args.allowedCustomerEmails?.map((e) => e.toLowerCase()),
     });
     
     return couponId;
   },
 });
 
-// Increment coupon usage
-export const incrementCouponUsage = mutation({
+// Update coupon
+export const updateCoupon = mutation({
+  args: {
+    couponId: v.id("coupons"),
+    code: v.optional(v.string()),
+    description: v.optional(v.string()),
+    discountType: v.optional(v.union(v.literal("percentage"), v.literal("fixed"))),
+    discountValue: v.optional(v.number()),
+    minPurchase: v.optional(v.union(v.number(), v.null())),
+    maxDiscount: v.optional(v.union(v.number(), v.null())),
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+    isActive: v.optional(v.boolean()),
+    usageLimit: v.optional(v.union(v.number(), v.null())),
+    applicableVariantIds: v.optional(v.union(v.array(v.id("variants")), v.null())),
+    applicableCollectionIds: v.optional(v.union(v.array(v.id("collections")), v.null())),
+    applicableProductKeywords: v.optional(v.union(v.array(v.string()), v.null())),
+    minCartValue: v.optional(v.union(v.number(), v.null())),
+    minProductValue: v.optional(v.union(v.number(), v.null())),
+    allowedCustomerEmails: v.optional(v.union(v.array(v.string()), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const { couponId, ...rawUpdates } = args;
+
+    // Build clean updates object, converting null to undefined
+    const updates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(rawUpdates)) {
+      if (value !== undefined) {
+        updates[key] = value === null ? undefined : value;
+      }
+    }
+
+    // If updating code, check for conflicts
+    if (updates.code && typeof updates.code === "string") {
+      const upperCode = updates.code.toUpperCase();
+      const existing = await ctx.db
+        .query("coupons")
+        .withIndex("by_code", (q) => q.eq("code", upperCode))
+        .first();
+      
+      if (existing && existing._id !== couponId) {
+        throw new ConvexError({
+          message: "A coupon with this code already exists",
+          code: "CONFLICT",
+        });
+      }
+      updates.code = upperCode;
+    }
+
+    // Normalize emails
+    if (updates.allowedCustomerEmails && Array.isArray(updates.allowedCustomerEmails)) {
+      updates.allowedCustomerEmails = (updates.allowedCustomerEmails as string[]).map((e) => e.toLowerCase());
+    }
+
+    await ctx.db.patch(couponId, updates);
+  },
+});
+
+// Delete coupon
+export const deleteCoupon = mutation({
   args: { couponId: v.id("coupons") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    await ctx.db.delete(args.couponId);
+  },
+});
+
+// Increment coupon usage (called when order is placed)
+export const incrementCouponUsage = mutation({
+  args: { 
+    couponId: v.id("coupons"),
+    userId: v.id("users"),
+    userEmail: v.string(),
+    orderId: v.id("orders"),
+    discountAmount: v.number(),
+  },
   handler: async (ctx, args) => {
     const coupon = await ctx.db.get(args.couponId);
     if (!coupon) {
@@ -225,16 +563,22 @@ export const incrementCouponUsage = mutation({
     await ctx.db.patch(args.couponId, {
       usageCount: coupon.usageCount + 1,
     });
+
+    // Track usage
+    await ctx.db.insert("couponUsage", {
+      couponId: args.couponId,
+      userId: args.userId,
+      userEmail: args.userEmail.toLowerCase(),
+      orderId: args.orderId,
+      discountAmount: args.discountAmount,
+      usedAt: Date.now(),
+    });
   },
 });
 
-// Update coupon dates (admin only)
-export const updateCouponDates = mutation({
-  args: {
-    couponId: v.id("coupons"),
-    startDate: v.number(),
-    endDate: v.number(),
-  },
+// Get coupon usage stats
+export const getCouponUsageStats = query({
+  args: { couponId: v.id("coupons") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
@@ -243,10 +587,20 @@ export const updateCouponDates = mutation({
         code: "UNAUTHENTICATED",
       });
     }
-    
-    await ctx.db.patch(args.couponId, {
-      startDate: args.startDate,
-      endDate: args.endDate,
-    });
+
+    const usages = await ctx.db
+      .query("couponUsage")
+      .withIndex("by_coupon", (q) => q.eq("couponId", args.couponId))
+      .collect();
+
+    const totalDiscount = usages.reduce((sum, usage) => sum + usage.discountAmount, 0);
+    const uniqueUsers = new Set(usages.map((u) => u.userEmail)).size;
+
+    return {
+      totalUsages: usages.length,
+      totalDiscount,
+      uniqueUsers,
+      recentUsages: usages.slice(-10).reverse(),
+    };
   },
 });

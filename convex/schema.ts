@@ -162,12 +162,31 @@ export default defineSchema({
     startDate: v.number(), // timestamp
     endDate: v.number(), // timestamp
     isActive: v.boolean(),
-    usageLimit: v.optional(v.number()),
+    usageLimit: v.optional(v.number()), // Total usage limit
     usageCount: v.number(),
-    applicableProductKeywords: v.optional(v.array(v.string())), // restrict to products containing these keywords in title
+    // Applicability conditions (at least one must be set)
+    applicableVariantIds: v.optional(v.array(v.id("variants"))), // Specific variants
+    applicableCollectionIds: v.optional(v.array(v.id("collections"))), // Specific collections
+    applicableProductKeywords: v.optional(v.array(v.string())), // Product title contains
+    minCartValue: v.optional(v.number()), // Minimum cart value
+    minProductValue: v.optional(v.number()), // Minimum individual product value
+    // Customer restrictions
+    allowedCustomerEmails: v.optional(v.array(v.string())), // Specific customer emails
   })
     .index("by_code", ["code"])
     .index("by_active", ["isActive"]),
+
+  couponUsage: defineTable({
+    couponId: v.id("coupons"),
+    userId: v.id("users"),
+    userEmail: v.string(),
+    orderId: v.id("orders"),
+    discountAmount: v.number(),
+    usedAt: v.number(),
+  })
+    .index("by_coupon", ["couponId"])
+    .index("by_user", ["userId"])
+    .index("by_coupon_and_user", ["couponId", "userId"]),
 
   mockups: defineTable({
     brand: v.string(), // e.g., "Apple", "Samsung"
