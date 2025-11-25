@@ -1445,19 +1445,25 @@ export default function Index() {
       {latestModels && latestModels.length > 0 && (
         <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-[72px] overflow-hidden">
           <div className="flex items-center gap-4">
-            {/* Fixed Label */}
-            <div className="flex items-center gap-2 text-sm font-bold px-4 flex-shrink-0 bg-primary/5">
-              <span className="text-primary">✨</span>
-              <span className="text-foreground whitespace-nowrap">Now supporting:</span>
+            {/* Fixed Label with Contrasting Background */}
+            <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
+              <span>✨</span>
+              <span className="whitespace-nowrap">Now supporting:</span>
             </div>
             {/* Scrolling Content Container */}
             <div className="flex-1 overflow-hidden">
               <div className="animate-marquee flex gap-3 whitespace-nowrap">
-                {[...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => (
-                  <span key={idx} className="text-sm text-foreground/80 font-medium">
-                    {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
-                  </span>
-                ))}
+                {(() => {
+                  const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
+                  return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
+                    const emoji = emojis[idx % emojis.length];
+                    return (
+                      <span key={idx} className="text-sm text-foreground/80 font-medium">
+                        {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
+                      </span>
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>
