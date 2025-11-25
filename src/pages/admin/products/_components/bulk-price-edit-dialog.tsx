@@ -52,6 +52,7 @@ export function BulkPriceEditDialog({
     new Set()
   );
   const [hasCalculated, setHasCalculated] = useState(false);
+  const [selectionMode, setSelectionMode] = useState<"all" | "manual">("all");
 
   const bulkUpdatePrices = useMutation(api.products.bulkUpdateVariantPrices);
 
@@ -113,14 +114,20 @@ export function BulkPriceEditDialog({
       return;
     }
     setHasCalculated(true);
-    // Auto-select all variants after calculation
-    const allVariantIds = new Set<Id<"variants">>();
-    products.forEach((product) => {
-      product.variants.forEach((variant) => {
-        allVariantIds.add(variant._id);
+    
+    // If "Apply to all" mode, auto-select all variants
+    if (selectionMode === "all") {
+      const allVariantIds = new Set<Id<"variants">>();
+      products.forEach((product) => {
+        product.variants.forEach((variant) => {
+          allVariantIds.add(variant._id);
+        });
       });
-    });
-    setSelectedVariants(allVariantIds);
+      setSelectedVariants(allVariantIds);
+    } else {
+      // If "Manual selection" mode, start with nothing selected
+      setSelectedVariants(new Set());
+    }
   };
 
   const handleSelectAll = () => {
@@ -206,6 +213,7 @@ export function BulkPriceEditDialog({
       setChangeValue("");
       setSelectedVariants(new Set());
       setHasCalculated(false);
+      setSelectionMode("all");
     } catch (error) {
       toast.error(
         `Failed to update prices: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -218,6 +226,7 @@ export function BulkPriceEditDialog({
     setChangeValue("");
     setSelectedVariants(new Set());
     setHasCalculated(false);
+    setSelectionMode("all");
   };
 
   return (
@@ -298,6 +307,33 @@ export function BulkPriceEditDialog({
                 )}
               </div>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Apply changes to:</Label>
+            <RadioGroup
+              value={selectionMode}
+              onValueChange={(value) => {
+                setSelectionMode(value as "all" | "manual");
+                setHasCalculated(false);
+              }}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="all" id="apply-all" />
+                <Label htmlFor="apply-all" className="font-normal cursor-pointer">
+                  All variants in preview (apply to all filtered products)
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="manual" id="apply-manual" />
+                <Label htmlFor="apply-manual" className="font-normal cursor-pointer">
+                  Let me select specific variants (choose from list)
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          <div className="flex justify-end">
             <Button onClick={handleCalculate} disabled={!changeValue}>
               Calculate Preview
             </Button>
@@ -309,26 +345,30 @@ export function BulkPriceEditDialog({
           <>
             <div className="flex items-center justify-between px-6 py-2">
               <div className="text-sm text-muted-foreground">
-                Select variants to update
+                {selectionMode === "all" 
+                  ? "All variants will be updated"
+                  : "Select variants to update"}
               </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleSelectAll}
-                  className="h-8"
-                >
-                  Select All
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleDeselectAll}
-                  className="h-8"
-                >
-                  Deselect All
-                </Button>
-              </div>
+              {selectionMode === "manual" && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleSelectAll}
+                    className="h-8"
+                  >
+                    Select All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleDeselectAll}
+                    className="h-8"
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-hidden px-6">
@@ -346,18 +386,20 @@ export function BulkPriceEditDialog({
                     <Card key={product._id}>
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={allSelected}
-                            onCheckedChange={() => handleToggleProduct(product)}
-                            className={someSelected && !allSelected ? "data-[state=checked]:bg-muted" : ""}
-                          />
+                          {selectionMode === "manual" && (
+                            <Checkbox
+                              checked={allSelected}
+                              onCheckedChange={() => handleToggleProduct(product)}
+                              className={someSelected && !allSelected ? "data-[state=checked]:bg-muted" : ""}
+                            />
+                          )}
                           <h4 className="font-semibold">{product.title}</h4>
                           <span className="text-xs text-muted-foreground">
                             ({product.variants.length} variants)
                           </span>
                         </div>
 
-                        <div className="space-y-2 pl-6">
+                        <div className={`space-y-2 ${selectionMode === "manual" ? "pl-6" : ""}`}>
                           {product.variants.map((variant) => {
                             const isSelected = selectedVariants.has(variant._id);
                             const changeColor =
@@ -373,12 +415,14 @@ export function BulkPriceEditDialog({
                                 className="flex items-center justify-between py-2 border-b last:border-0"
                               >
                                 <div className="flex items-center gap-2 flex-1">
-                                  <Checkbox
-                                    checked={isSelected}
-                                    onCheckedChange={() =>
-                                      handleToggleVariant(variant._id)
-                                    }
-                                  />
+                                  {selectionMode === "manual" && (
+                                    <Checkbox
+                                      checked={isSelected}
+                                      onCheckedChange={() =>
+                                        handleToggleVariant(variant._id)
+                                      }
+                                    />
+                                  )}
                                   <div className="flex-1">
                                     <div className="text-sm font-medium">
                                       {variant.title}
