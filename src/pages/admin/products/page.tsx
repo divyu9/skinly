@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { BulkPriceEditDialog } from "./_components/bulk-price-edit-dialog.tsx";
+import { RollsManagement } from "./_components/rolls-management.tsx";
 
 // Inline editable cell component
 function EditableCell({
@@ -592,19 +593,30 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-muted-foreground">
-            {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all"
-              ? `${filteredProducts.length} of ${products.length} products`
-              : `Manage your product catalog (${products.length} products)`}
-            {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
-            {skuLetterFilter !== "all" && ` • SKU: ${skuLetterFilter}`}
-            {gadgetCategoryFilter !== "all" && ` • Category: ${gadgetCategoryFilter.charAt(0).toUpperCase() + gadgetCategoryFilter.slice(1).replace("-", " ")}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <div>
+        <h1 className="text-3xl font-bold">Products</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage your product catalog and vinyl rolls inventory
+        </p>
+      </div>
+
+      <Tabs defaultValue="products" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="rolls">Rolls Management</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="products" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all"
+                ? `${filteredProducts.length} of ${products.length} products`
+                : `${products.length} products`}
+              {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
+              {skuLetterFilter !== "all" && ` • SKU: ${skuLetterFilter}`}
+              {gadgetCategoryFilter !== "all" && ` • Category: ${gadgetCategoryFilter.charAt(0).toUpperCase() + gadgetCategoryFilter.slice(1).replace("-", " ")}`}
+            </p>
+            <div className="flex items-center gap-2">
           {selectedProducts.length > 0 && (
             <>
               <Button
@@ -1097,6 +1109,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="rolls" className="space-y-6">
+          <RollsManagement />
+        </TabsContent>
+      </Tabs>
 
       {/* Image Preview Dialog */}
       <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>

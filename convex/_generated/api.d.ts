@@ -28,6 +28,7 @@ import type * as phonepe from "../phonepe.js";
 import type * as products from "../products.js";
 import type * as rapidshyp from "../rapidshyp.js";
 import type * as reviews from "../reviews.js";
+import type * as rollsManagement from "../rollsManagement.js";
 import type * as seedModels from "../seedModels.js";
 import type * as settings from "../settings.js";
 import type * as shopify from "../shopify.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   products: typeof products;
   rapidshyp: typeof rapidshyp;
   reviews: typeof reviews;
+  rollsManagement: typeof rollsManagement;
   seedModels: typeof seedModels;
   settings: typeof settings;
   shopify: typeof shopify;

@@ -275,4 +275,19 @@ export default defineSchema({
   })
     .index("by_brand", ["brandName"])
     .index("by_category", ["category"]),
+
+  gadgetConsumption: defineTable({
+    categoryName: v.string(), // e.g., "Phone", "Laptop Top", "Mac Mini"
+    lengthCm: v.number(), // Length in cm
+    widthCm: v.number(), // Width in cm
+    notes: v.optional(v.string()), // Optional notes (e.g., "Standard iPhone size")
+  }).index("by_category", ["categoryName"]),
+
+  rollInventory: defineTable({
+    rNumber: v.string(), // e.g., "R-1", "R-59"
+    designName: v.string(), // e.g., "Carbon Fiber Black", "Marble White"
+    isContinuous: v.boolean(), // True = can cut any direction, False = must respect orientation
+    metersAvailable: v.number(), // Available vinyl in meters
+    notes: v.optional(v.string()), // Optional notes
+  }).index("by_r_number", ["rNumber"]),
 });
