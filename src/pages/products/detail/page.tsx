@@ -44,6 +44,7 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView, trackAddToCart } from "@/lib/analytics.ts";
+import { StockNotification } from "./_components/stock-notification.tsx";
 
 // Phone models data
 const phoneModels: Record<string, string[]> = {
@@ -803,29 +804,36 @@ export default function ProductDetailPage() {
                 </div>
               )}
               
-              {/* Add to Cart */}
-              <Button
-                className="w-full"
-                size="lg"
-                onClick={() => {
-                  // Only require phone model for phone skins
-                  if (isPhoneSkin && !phoneModel) {
-                    toast.error("Please select your phone model first");
-                    return;
-                  }
-                  
-                  // Show cross-sell dialog if products available, otherwise add directly
-                  if (crossSellProducts && crossSellProducts.length > 0) {
-                    setCrossSellDialogOpen(true);
-                  } else {
-                    handleAddToCart();
-                  }
-                }}
-                disabled={isAdding || (isPhoneSkin && !phoneModel)}
-              >
-                <ShoppingCartIcon className="size-5 mr-2" />
-                {isAdding ? "Adding..." : "Add to Cart"}
-              </Button>
+              {/* Add to Cart or Out of Stock Notification */}
+              {productData.variants[selectedVariant].inventoryQuantity > 0 ? (
+                <Button
+                  className="w-full"
+                  size="lg"
+                  onClick={() => {
+                    // Only require phone model for phone skins
+                    if (isPhoneSkin && !phoneModel) {
+                      toast.error("Please select your phone model first");
+                      return;
+                    }
+                    
+                    // Show cross-sell dialog if products available, otherwise add directly
+                    if (crossSellProducts && crossSellProducts.length > 0) {
+                      setCrossSellDialogOpen(true);
+                    } else {
+                      handleAddToCart();
+                    }
+                  }}
+                  disabled={isAdding || (isPhoneSkin && !phoneModel)}
+                >
+                  <ShoppingCartIcon className="size-5 mr-2" />
+                  {isAdding ? "Adding..." : "Add to Cart"}
+                </Button>
+              ) : (
+                <StockNotification
+                  variantId={productData.variants[selectedVariant]._id}
+                  variantTitle={productData.variants[selectedVariant].title}
+                />
+              )}
 
               {/* Shipping & Delivery Info */}
               <div className="border-t border-border pt-6">
