@@ -33,6 +33,19 @@ export const createCollection = mutation({
     slug: v.string(),
     description: v.optional(v.string()),
     image: v.optional(v.string()),
+    isAuto: v.optional(v.boolean()),
+    rules: v.optional(v.array(v.object({
+      field: v.union(
+        v.literal("productName"),
+        v.literal("sku")
+      ),
+      condition: v.union(
+        v.literal("contains"),
+        v.literal("startsWith"),
+        v.literal("notContains")
+      ),
+      value: v.string(),
+    }))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -61,6 +74,8 @@ export const createCollection = mutation({
       slug: args.slug,
       description: args.description,
       image: args.image,
+      isAuto: args.isAuto,
+      rules: args.rules,
     });
 
     return collectionId;
@@ -119,5 +134,82 @@ export const deleteCollection = mutation({
     }
 
     await ctx.db.delete(args.collectionId);
+  },
+});
+
+// Get products matching collection rules
+export const getCollectionProducts = query({
+  args: { collectionId: v.id("collections") },
+  handler: async (ctx, args) => {
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection) {
+      throw new ConvexError({
+        message: "Collection not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // If not an auto collection, return empty
+    if (!collection.isAuto || !collection.rules || collection.rules.length === 0) {
+      return [];
+    }
+
+    // Get all products and variants
+    const allProducts = await ctx.db.query("products").collect();
+    const allVariants = await ctx.db.query("variants").collect();
+
+    // Group variants by product
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+
+    // Filter products based on rules
+    const matchingProducts = allProducts.filter((product) => {
+      const variants = variantsByProduct.get(product._id) || [];
+      
+      // All rules must match (AND logic)
+      return collection.rules!.every((rule) => {
+        const value = rule.value.toLowerCase();
+        
+        if (rule.field === "productName") {
+          const productName = product.title.toLowerCase();
+          
+          if (rule.condition === "contains") {
+            return productName.includes(value);
+          } else if (rule.condition === "startsWith") {
+            return productName.startsWith(value);
+          } else if (rule.condition === "notContains") {
+            return !productName.includes(value);
+          }
+        } else if (rule.field === "sku") {
+          // Check if any variant matches the SKU condition
+          return variants.some((variant) => {
+            const sku = variant.sku.toLowerCase();
+            
+            if (rule.condition === "contains") {
+              return sku.includes(value);
+            } else if (rule.condition === "startsWith") {
+              return sku.startsWith(value);
+            } else if (rule.condition === "notContains") {
+              return !sku.includes(value);
+            }
+            return false;
+          });
+        }
+        
+        return false;
+      });
+    });
+
+    // Return products with their variants
+    return matchingProducts.map((product) => ({
+      ...product,
+      variants: variantsByProduct.get(product._id) || [],
+    }));
   },
 });

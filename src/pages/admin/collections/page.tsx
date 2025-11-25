@@ -3,7 +3,7 @@ import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Link } from "react-router-dom";
-import { FolderIcon, PlusIcon, EditIcon, TrashIcon } from "lucide-react";
+import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -22,36 +22,86 @@ import {
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { useState } from "react";
+
+type CollectionRule = {
+  field: "productName" | "sku";
+  condition: "contains" | "startsWith" | "notContains";
+  value: string;
+};
 
 function AdminCollectionsPageInner() {
   const collections = useQuery(api.collections.getAllCollections, {});
   const createCollection = useMutation(api.collections.createCollection);
   const deleteCollection = useMutation(api.collections.deleteCollection);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAutoCollection, setIsAutoCollection] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
     description: "",
     image: "",
   });
+  const [rules, setRules] = useState<CollectionRule[]>([
+    { field: "productName", condition: "contains", value: "" },
+  ]);
+  const [previewCollectionId, setPreviewCollectionId] = useState<Id<"collections"> | null>(null);
+
+  const previewProducts = useQuery(
+    api.collections.getCollectionProducts,
+    previewCollectionId ? { collectionId: previewCollectionId } : "skip"
+  );
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    try {
-      await createCollection({
-        name: formData.name,
-        slug: formData.slug,
-        description: formData.description || undefined,
-        image: formData.image || undefined,
-      });
-      toast.success("Collection created successfully");
-      setIsDialogOpen(false);
-      setFormData({ name: "", slug: "", description: "", image: "" });
-    } catch (error) {
-      toast.error("Failed to create collection");
+    // Validate rules if auto collection
+    if (isAutoCollection) {
+      const validRules = rules.filter((rule) => rule.value.trim() !== "");
+      if (validRules.length === 0) {
+        toast.error("Please add at least one rule with a value");
+        return;
+      }
+
+      try {
+        await createCollection({
+          name: formData.name,
+          slug: formData.slug,
+          description: formData.description || undefined,
+          image: formData.image || undefined,
+          isAuto: true,
+          rules: validRules,
+        });
+        toast.success("Auto-collection created successfully");
+        setIsDialogOpen(false);
+        resetForm();
+      } catch (error) {
+        toast.error("Failed to create collection");
+      }
+    } else {
+      try {
+        await createCollection({
+          name: formData.name,
+          slug: formData.slug,
+          description: formData.description || undefined,
+          image: formData.image || undefined,
+          isAuto: false,
+        });
+        toast.success("Collection created successfully");
+        setIsDialogOpen(false);
+        resetForm();
+      } catch (error) {
+        toast.error("Failed to create collection");
+      }
     }
+  };
+
+  const resetForm = () => {
+    setFormData({ name: "", slug: "", description: "", image: "" });
+    setRules([{ field: "productName", condition: "contains", value: "" }]);
+    setIsAutoCollection(false);
   };
 
   const handleDelete = async (collectionId: Id<"collections">) => {
@@ -64,6 +114,37 @@ function AdminCollectionsPageInner() {
       toast.success("Collection deleted successfully");
     } catch (error) {
       toast.error("Failed to delete collection");
+    }
+  };
+
+  const addRule = () => {
+    setRules([...rules, { field: "productName", condition: "contains", value: "" }]);
+  };
+
+  const removeRule = (index: number) => {
+    if (rules.length === 1) {
+      toast.error("At least one rule is required");
+      return;
+    }
+    setRules(rules.filter((_, i) => i !== index));
+  };
+
+  const updateRule = (index: number, updates: Partial<CollectionRule>) => {
+    const newRules = [...rules];
+    newRules[index] = { ...newRules[index], ...updates };
+    setRules(newRules);
+  };
+
+  const getConditionLabel = (condition: string) => {
+    switch (condition) {
+      case "contains":
+        return "contains";
+      case "startsWith":
+        return "starts with";
+      case "notContains":
+        return "does not contain";
+      default:
+        return condition;
     }
   };
 
@@ -82,16 +163,24 @@ function AdminCollectionsPageInner() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Collections</h1>
-          <p className="text-muted-foreground">Organize products into collections</p>
+          <p className="text-muted-foreground">
+            Organize products into collections or use smart auto-collections
+          </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (!open) resetForm();
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <PlusIcon className="size-4 mr-2" />
               Add Collection
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleCreate}>
               <DialogHeader>
                 <DialogTitle>Create Collection</DialogTitle>
@@ -100,27 +189,50 @@ function AdminCollectionsPageInner() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                {/* Collection Type Toggle */}
+                <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="autoCollection"
+                      checked={isAutoCollection}
+                      onChange={(e) => setIsAutoCollection(e.target.checked)}
+                      className="size-4 rounded"
+                    />
+                    <Label htmlFor="autoCollection" className="cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <SparklesIcon className="size-4 text-primary" />
+                        <span className="font-semibold">Smart Auto-Collection</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Automatically populate based on rules
+                      </p>
+                    </Label>
+                  </div>
+                </div>
+
                 <div>
-                  <Label htmlFor="name">Collection Name</Label>
+                  <Label htmlFor="name">Collection Name *</Label>
                   <Input
                     id="name"
                     required
                     placeholder="Matte Finish"
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="slug">Slug</Label>
+                  <Label htmlFor="slug">Slug *</Label>
                   <Input
                     id="slug"
                     required
                     placeholder="matte-finish"
                     value={formData.slug}
                     onChange={(e) =>
-                      setFormData({ ...formData, slug: e.target.value })
+                      setFormData({
+                        ...formData,
+                        slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                      })
                     }
                   />
                 </div>
@@ -141,14 +253,89 @@ function AdminCollectionsPageInner() {
                     id="image"
                     placeholder="https://..."
                     value={formData.image}
-                    onChange={(e) =>
-                      setFormData({ ...formData, image: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
                   />
                 </div>
+
+                {/* Conditional Rules Section */}
+                {isAutoCollection && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <Label className="text-base">Collection Rules</Label>
+                        <p className="text-xs text-muted-foreground">
+                          All rules must match for a product to be included
+                        </p>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" onClick={addRule}>
+                        <PlusIcon className="size-3 mr-1" />
+                        Add Rule
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {rules.map((rule, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-2 p-3 border rounded-lg bg-muted/20"
+                        >
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <Select
+                              value={rule.field}
+                              onValueChange={(value: "productName" | "sku") =>
+                                updateRule(index, { field: value })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="productName">Product Name</SelectItem>
+                                <SelectItem value="sku">SKU</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={rule.condition}
+                              onValueChange={(
+                                value: "contains" | "startsWith" | "notContains"
+                              ) => updateRule(index, { condition: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="contains">contains</SelectItem>
+                                <SelectItem value="startsWith">starts with</SelectItem>
+                                <SelectItem value="notContains">does not contain</SelectItem>
+                              </SelectContent>
+                            </Select>
+
+                            <Input
+                              placeholder="value"
+                              value={rule.value}
+                              onChange={(e) => updateRule(index, { value: e.target.value })}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeRule(index)}
+                            disabled={rules.length === 1}
+                          >
+                            <XIcon className="size-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               <DialogFooter>
-                <Button type="submit">Create Collection</Button>
+                <Button type="submit">
+                  {isAutoCollection ? "Create Auto-Collection" : "Create Collection"}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -187,12 +374,46 @@ function AdminCollectionsPageInner() {
                     />
                   </div>
                 )}
-                <h3 className="font-semibold text-lg mb-2">{collection.name}</h3>
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-semibold text-lg">{collection.name}</h3>
+                  {collection.isAuto && (
+                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
+                      <SparklesIcon className="size-3 mr-1" />
+                      Auto
+                    </Badge>
+                  )}
+                </div>
                 {collection.description && (
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                     {collection.description}
                   </p>
                 )}
+
+                {/* Show rules for auto-collections */}
+                {collection.isAuto && collection.rules && collection.rules.length > 0 && (
+                  <div className="mb-4 p-3 bg-muted/30 rounded-lg space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+                      Rules
+                    </p>
+                    {collection.rules.map((rule, idx) => (
+                      <p key={idx} className="text-xs">
+                        {rule.field === "productName" ? "Product name" : "SKU"}{" "}
+                        <span className="font-medium">{getConditionLabel(rule.condition)}</span>{" "}
+                        &quot;{rule.value}&quot;
+                      </p>
+                    ))}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="w-full mt-2 text-xs"
+                      onClick={() => setPreviewCollectionId(collection._id)}
+                    >
+                      <PackageIcon className="size-3 mr-1" />
+                      Preview Products
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <Button
                     size="sm"
@@ -209,6 +430,72 @@ function AdminCollectionsPageInner() {
           ))}
         </div>
       )}
+
+      {/* Preview Dialog */}
+      <Dialog
+        open={!!previewCollectionId}
+        onOpenChange={() => setPreviewCollectionId(null)}
+      >
+        <DialogContent className="max-w-4xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle>Matching Products</DialogTitle>
+            <DialogDescription>
+              {previewProducts === undefined
+                ? "Loading..."
+                : `${previewProducts.length} product${previewProducts.length !== 1 ? "s" : ""} match the collection rules`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto max-h-[60vh]">
+            {previewProducts === undefined ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : previewProducts.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <PackageIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>No matching products</EmptyTitle>
+                  <EmptyDescription>
+                    No products match the current collection rules
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <div className="space-y-3">
+                {previewProducts.map((product) => (
+                  <div
+                    key={product._id}
+                    className="flex items-center gap-4 p-4 border rounded-lg"
+                  >
+                    {product.images.length > 0 && (
+                      <div className="size-16 bg-muted rounded overflow-hidden shrink-0">
+                        <img
+                          src={product.images[0].url}
+                          alt={product.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{product.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {product.variants.length} variant
+                        {product.variants.length !== 1 ? "s" : ""}
+                        {product.variants.length > 0 &&
+                          ` • SKU: ${product.variants[0].sku}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -228,13 +515,19 @@ export default function AdminCollectionsPage() {
               />
             </Link>
             <nav className="flex items-center gap-6">
-              <Link to="/admin/products" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/admin/products"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Products
               </Link>
               <Link to="/admin/collections" className="text-sm font-medium text-primary">
                 Collections
               </Link>
-              <Link to="/admin/orders" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/admin/orders"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Orders
               </Link>
               <Link to="/">

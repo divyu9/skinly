@@ -93,6 +93,19 @@ export default defineSchema({
     slug: v.string(),
     description: v.optional(v.string()),
     image: v.optional(v.string()),
+    isAuto: v.optional(v.boolean()), // Whether this is an auto-collection with rules
+    rules: v.optional(v.array(v.object({
+      field: v.union(
+        v.literal("productName"),
+        v.literal("sku")
+      ),
+      condition: v.union(
+        v.literal("contains"),
+        v.literal("startsWith"),
+        v.literal("notContains")
+      ),
+      value: v.string(),
+    }))),
   }).index("by_slug", ["slug"]),
 
   products: defineTable({
