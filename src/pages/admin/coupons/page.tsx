@@ -414,16 +414,16 @@ function AdminCouponsPageInner() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh]">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingCoupon ? "Edit Coupon" : "Create Coupon"}</DialogTitle>
             <DialogDescription>
               Configure discount codes with custom conditions and restrictions
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit}>
-            <ScrollArea className="max-h-[60vh] pr-4">
-              <div className="space-y-6">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-6 pb-4">
                 {/* Basic Info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold">Basic Information</h3>
@@ -687,7 +687,7 @@ function AdminCouponsPageInner() {
               </div>
             </ScrollArea>
 
-            <DialogFooter className="mt-6">
+            <DialogFooter className="mt-4 pt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
