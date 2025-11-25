@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.t
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { ImageManager } from "./_components/image-manager.tsx";
 
 // Inline editable cell component
 function EditableCell({
@@ -128,6 +129,7 @@ function AdminProductsPageInner() {
   const [isCheckingCount, setIsCheckingCount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [managingImagesProduct, setManagingImagesProduct] = useState<{id: Id<"products">; title: string; images: Array<{url: string; alt?: string}>} | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Array<Id<"products">>>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -681,22 +683,32 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                           />
                         </td>
                         <td className="p-3">
-                          {product.images.length > 0 ? (
-                            <button
-                              onClick={() => setSelectedImage(product.images[0].url)}
-                              className="size-12 bg-muted rounded overflow-hidden hover:ring-2 hover:ring-primary transition-all"
-                            >
-                              <img
-                                src={product.images[0].url}
-                                alt={product.images[0].alt || product.title}
-                                className="w-full h-full object-cover"
-                              />
-                            </button>
-                          ) : (
-                            <div className="size-12 bg-muted rounded flex items-center justify-center">
-                              <ImageIcon className="size-5 text-muted-foreground" />
-                            </div>
-                          )}
+                          <div className="relative">
+                            {product.images.length > 0 ? (
+                              <button
+                                onClick={() => setSelectedImage(product.images[0].url)}
+                                className="size-12 bg-muted rounded overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                              >
+                                <img
+                                  src={product.images[0].url}
+                                  alt={product.images[0].alt || product.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              </button>
+                            ) : (
+                              <div className="size-12 bg-muted rounded flex items-center justify-center">
+                                <ImageIcon className="size-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            {product.images.length > 1 && (
+                              <Badge 
+                                className="absolute -bottom-1 -right-1 size-5 flex items-center justify-center p-0 text-[10px]"
+                                variant="secondary"
+                              >
+                                {product.images.length}
+                              </Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3">
                           <div>
@@ -791,6 +803,18 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setManagingImagesProduct({
+                                id: product._id,
+                                title: product.title,
+                                images: product.images,
+                              })}
+                              title="Manage Images"
+                            >
+                              <ImagesIcon className="size-3" />
+                            </Button>
                             <Link to={`/admin/products/${product._id}`}>
                               <Button size="sm" variant="outline">
                                 <EditIcon className="size-3" />
@@ -830,6 +854,31 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                 className="w-full h-auto rounded-lg"
               />
             </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Manager Dialog */}
+      <Dialog open={!!managingImagesProduct} onOpenChange={() => setManagingImagesProduct(null)}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Product Images</DialogTitle>
+            <DialogDescription>
+              {managingImagesProduct?.title}
+            </DialogDescription>
+          </DialogHeader>
+          {managingImagesProduct && (
+            <ImageManager
+              productId={managingImagesProduct.id}
+              images={managingImagesProduct.images}
+              onImagesUpdate={(updatedImages) => {
+                // Update the local state to reflect changes
+                setManagingImagesProduct({
+                  ...managingImagesProduct,
+                  images: updatedImages,
+                });
+              }}
+            />
           )}
         </DialogContent>
       </Dialog>

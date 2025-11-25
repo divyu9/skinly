@@ -711,3 +711,121 @@ export const getAllVariantsWithProducts = query({
     });
   },
 });
+
+// Generate upload URL for product images
+export const generateImageUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Add images to product
+export const addProductImages = mutation({
+  args: {
+    productId: v.id("products"),
+    images: v.array(v.object({
+      url: v.string(),
+      alt: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const product = await ctx.db.get(args.productId);
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Append new images to existing ones
+    const updatedImages = [...product.images, ...args.images];
+    await ctx.db.patch(args.productId, { images: updatedImages });
+
+    return updatedImages;
+  },
+});
+
+// Remove image from product
+export const removeProductImage = mutation({
+  args: {
+    productId: v.id("products"),
+    imageIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const product = await ctx.db.get(args.productId);
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    if (args.imageIndex < 0 || args.imageIndex >= product.images.length) {
+      throw new ConvexError({
+        message: "Invalid image index",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Remove image at index
+    const updatedImages = product.images.filter((_, i) => i !== args.imageIndex);
+    await ctx.db.patch(args.productId, { images: updatedImages });
+
+    return updatedImages;
+  },
+});
+
+// Reorder product images (first image is always primary)
+export const reorderProductImages = mutation({
+  args: {
+    productId: v.id("products"),
+    images: v.array(v.object({
+      url: v.string(),
+      alt: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const product = await ctx.db.get(args.productId);
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    await ctx.db.patch(args.productId, { images: args.images });
+    return args.images;
+  },
+});
