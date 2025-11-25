@@ -27,6 +27,7 @@ import type * as products from "../products.js";
 import type * as rapidshyp from "../rapidshyp.js";
 import type * as reviews from "../reviews.js";
 import type * as shopify from "../shopify.js";
+import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as users from "../users.js";
 
 import type {
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   rapidshyp: typeof rapidshyp;
   reviews: typeof reviews;
   shopify: typeof shopify;
+  updateCollectionRules: typeof updateCollectionRules;
   users: typeof users;
 }>;
 

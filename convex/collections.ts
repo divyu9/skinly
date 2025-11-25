@@ -26,19 +26,18 @@ export const getCollection = query({
   },
 });
 
-// Get collection by name
+// Get collection by name (case-insensitive)
 export const getCollectionByName = query({
   args: { name: v.string() },
   handler: async (ctx, args) => {
-    const collection = await ctx.db
-      .query("collections")
-      .filter((q) => 
-        q.or(
-          q.eq(q.field("name"), args.name),
-          q.eq(q.field("slug"), args.name)
-        )
-      )
-      .first();
+    const searchName = args.name.toLowerCase().trim();
+    
+    // Get all collections and find a match (case-insensitive)
+    const collections = await ctx.db.query("collections").collect();
+    const collection = collections.find((c) => 
+      c.name.toLowerCase() === searchName || 
+      c.slug.toLowerCase() === searchName
+    );
     
     if (!collection) {
       return null;
