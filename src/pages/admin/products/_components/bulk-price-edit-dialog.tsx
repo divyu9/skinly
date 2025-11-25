@@ -222,18 +222,20 @@ export function BulkPriceEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Bulk Edit Prices</DialogTitle>
-          <DialogDescription>
-            {products.length} products with{" "}
-            {products.reduce((sum, p) => sum + p.variants.length, 0)} total
-            variants
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
+        <div className="px-6 pt-6">
+          <DialogHeader>
+            <DialogTitle>Bulk Edit Prices</DialogTitle>
+            <DialogDescription>
+              {products.length} products with{" "}
+              {products.reduce((sum, p) => sum + p.variants.length, 0)} total
+              variants
+            </DialogDescription>
+          </DialogHeader>
+        </div>
 
         {/* Price Change Settings */}
-        <div className="space-y-4 border-b pb-4">
+        <div className="space-y-4 border-b pb-4 px-6">
           <RadioGroup
             value={changeType}
             onValueChange={(value) => {
@@ -305,7 +307,7 @@ export function BulkPriceEditDialog({
         {/* Preview List */}
         {hasCalculated && (
           <>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between px-6 py-2">
               <div className="text-sm text-muted-foreground">
                 Select variants to update
               </div>
@@ -329,8 +331,9 @@ export function BulkPriceEditDialog({
               </div>
             </div>
 
-            <ScrollArea className="flex-1 border rounded-lg">
-              <div className="p-4 space-y-4">
+            <div className="flex-1 overflow-hidden px-6">
+              <ScrollArea className="h-full border rounded-lg">
+                <div className="p-4 space-y-4">
                 {previewData.map((product) => {
                   const allSelected = product.variants.every((v) =>
                     selectedVariants.has(v._id)
@@ -409,12 +412,13 @@ export function BulkPriceEditDialog({
                     </Card>
                   );
                 })}
-              </div>
-            </ScrollArea>
+                </div>
+              </ScrollArea>
+            </div>
           </>
         )}
 
-        <DialogFooter className="border-t pt-4">
+        <DialogFooter className="border-t pt-4 px-6 pb-6">
           <div className="flex items-center justify-between w-full">
             <div className="text-sm">
               {hasCalculated && (
