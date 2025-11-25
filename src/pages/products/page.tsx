@@ -1,4 +1,4 @@
-import { usePaginatedQuery, useAction } from "convex/react";
+import { usePaginatedQuery, useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
@@ -82,10 +82,23 @@ export default function ProductsPage() {
   const modelFilter = urlParams.get('model');
   const showFinish = urlParams.get('showFinish') === 'true';
   const urlSearchQuery = urlParams.get('search') || '';
+  const collectionParam = urlParams.get('collection') || '';
   
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
+  
+  // Get collection if collection parameter is present
+  const collection = useQuery(
+    api.collections.getCollectionByName,
+    collectionParam ? { name: collectionParam } : "skip"
+  );
+  
+  // Get collection products if we have a collection
+  const collectionProducts = useQuery(
+    api.collections.getCollectionProducts,
+    collection?._id ? { collectionId: collection._id } : "skip"
+  );
 
   const testConnection = async () => {
     try {
@@ -100,6 +113,29 @@ export default function ProductsPage() {
 
   // Convert Convex products to the format needed
   const allProducts = useMemo(() => {
+    // If we have a collection, use collection products instead
+    if (collectionParam && collectionProducts) {
+      return collectionProducts.map((product) => ({
+        _id: product._id,
+        slug: product.slug,
+        title: product.title,
+        description: product.description,
+        status: product.status,
+        tags: product.tags.join(", "),
+        images: product.images,
+        variants: product.variants.map((v) => ({
+          _id: v._id,
+          title: v.title,
+          price: v.price,
+          compareAtPrice: v.compareAtPrice,
+          sku: v.sku,
+          inventory_quantity: v.inventoryQuantity,
+          available: v.inventoryQuantity > 0,
+        })),
+      }));
+    }
+    
+    // Otherwise use regular paginated products
     if (!productsData || productsData.length === 0) return [];
     
     return productsData.map((product) => ({
@@ -120,7 +156,7 @@ export default function ProductsPage() {
         available: v.inventoryQuantity > 0,
       })),
     }));
-  }, [productsData]);
+  }, [productsData, collectionProducts, collectionParam]);
 
   // Apply filters
   const filteredProducts = useMemo(() => {
@@ -305,7 +341,7 @@ export default function ProductsPage() {
     );
   }
 
-  const isInitialLoading = status === "LoadingFirstPage";
+  const isInitialLoading = status === "LoadingFirstPage" || (collectionParam && collection === undefined);
   
   if (isInitialLoading) {
     return (
@@ -424,6 +460,7 @@ export default function ProductsPage() {
           <div className="text-center mb-3 sm:mb-12 space-y-1 sm:space-y-4">
             <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
               {searchQuery ? `Search Results` :
+               collectionParam && collection ? collection.name :
                deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
                'All Products'}
@@ -475,7 +512,7 @@ export default function ProductsPage() {
               </Select>
             </div>
             
-            {(deviceFilter || finishFilter || searchQuery || sortBy !== "default" || stockFilter !== "all") && (
+            {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
               <div className="pt-1 sm:pt-4">
                 <Button variant="outline" size="sm" onClick={() => {
                   setSortBy("default");
@@ -558,29 +595,31 @@ export default function ProductsPage() {
             })}
           </div>
           
-          {/* Infinite scroll trigger */}
-          <div ref={observerTarget} className="py-8 flex justify-center">
-            {status === "LoadingMore" && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2Icon className="size-5 animate-spin" />
-                <span>Loading more products...</span>
-              </div>
-            )}
-            {status === "CanLoadMore" && (
-              <Button 
-                onClick={handleLoadMore} 
-                variant="outline" 
-                size="lg"
-              >
-                Load More Products
-              </Button>
-            )}
-            {status === "Exhausted" && allProducts.length > 30 && (
-              <p className="text-muted-foreground text-sm">
-                You've reached the end! 🎉
-              </p>
-            )}
-          </div>
+          {/* Infinite scroll trigger - only show if not using collection filtering */}
+          {!collectionParam && (
+            <div ref={observerTarget} className="py-8 flex justify-center">
+              {status === "LoadingMore" && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2Icon className="size-5 animate-spin" />
+                  <span>Loading more products...</span>
+                </div>
+              )}
+              {status === "CanLoadMore" && (
+                <Button 
+                  onClick={handleLoadMore} 
+                  variant="outline" 
+                  size="lg"
+                >
+                  Load More Products
+                </Button>
+              )}
+              {status === "Exhausted" && allProducts.length > 30 && (
+                <p className="text-muted-foreground text-sm">
+                  You've reached the end! 🎉
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </div>

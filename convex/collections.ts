@@ -26,6 +26,28 @@ export const getCollection = query({
   },
 });
 
+// Get collection by name
+export const getCollectionByName = query({
+  args: { name: v.string() },
+  handler: async (ctx, args) => {
+    const collection = await ctx.db
+      .query("collections")
+      .filter((q) => 
+        q.or(
+          q.eq(q.field("name"), args.name),
+          q.eq(q.field("slug"), args.name)
+        )
+      )
+      .first();
+    
+    if (!collection) {
+      return null;
+    }
+    
+    return collection;
+  },
+});
+
 // Create collection
 export const createCollection = mutation({
   args: {
