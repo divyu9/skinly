@@ -166,3 +166,118 @@ export const calculateUnitsFromRoll = query({
     }
   },
 });
+
+// SKU Mapping Functions
+
+/**
+ * Extract R-number from SKU
+ * Examples: "R-59-MM" → "R-59", "M-174" → "R-174", "L-12-LPT" → "R-12"
+ */
+function extractRNumber(sku: string): string | null {
+  if (!sku) return null;
+  
+  const normalizedSku = sku.toUpperCase().trim();
+  
+  // Pattern 1: Already starts with R-
+  const rPattern = /^R-(\d+)/i;
+  const rMatch = normalizedSku.match(rPattern);
+  if (rMatch) {
+    return `R-${rMatch[1]}`;
+  }
+  
+  // Pattern 2: Starts with M-, L-, or T-
+  const mlPattern = /^[MLT]-(\d+)/i;
+  const mlMatch = normalizedSku.match(mlPattern);
+  if (mlMatch) {
+    return `R-${mlMatch[1]}`;
+  }
+  
+  // Pattern 3: Just a number
+  const numPattern = /^(\d+)/;
+  const numMatch = normalizedSku.match(numPattern);
+  if (numMatch) {
+    return `R-${numMatch[1]}`;
+  }
+  
+  return null;
+}
+
+export const getProductsByRNumber = query({
+  args: {},
+  handler: async (ctx) => {
+    const products = await ctx.db.query("products").collect();
+    const variants = await ctx.db.query("variants").collect();
+    
+    // Group variants by R-number
+    const rNumberGroups: Record<string, Array<{
+      variantId: string;
+      productId: string;
+      productTitle: string;
+      sku: string;
+      variantTitle: string;
+      isManual: boolean;
+    }>> = {};
+    
+    const unmapped: Array<{
+      variantId: string;
+      productId: string;
+      productTitle: string;
+      sku: string;
+      variantTitle: string;
+    }> = [];
+    
+    for (const variant of variants) {
+      const product = products.find((p) => p._id === variant.productId);
+      if (!product) continue;
+      
+      // Use manual R-number if set, otherwise auto-detect
+      const rNumber = variant.rNumber || extractRNumber(variant.sku);
+      
+      const item = {
+        variantId: variant._id,
+        productId: product._id,
+        productTitle: product.title,
+        sku: variant.sku,
+        variantTitle: variant.title,
+        isManual: !!variant.rNumber,
+      };
+      
+      if (rNumber) {
+        if (!rNumberGroups[rNumber]) {
+          rNumberGroups[rNumber] = [];
+        }
+        rNumberGroups[rNumber].push(item);
+      } else {
+        unmapped.push(item);
+      }
+    }
+    
+    return {
+      groups: rNumberGroups,
+      unmapped,
+    };
+  },
+});
+
+export const assignRNumber = mutation({
+  args: {
+    variantId: v.id("variants"),
+    rNumber: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.variantId, {
+      rNumber: args.rNumber,
+    });
+  },
+});
+
+export const removeRNumberAssignment = mutation({
+  args: {
+    variantId: v.id("variants"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.variantId, {
+      rNumber: undefined,
+    });
+  },
+});

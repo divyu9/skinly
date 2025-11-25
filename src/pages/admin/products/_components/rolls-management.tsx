@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog.tsx";
-import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon } from "lucide-react";
+import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -33,9 +33,18 @@ const ROLL_WIDTH_CM = 29.5;
 export function RollsManagement() {
   const gadgets = useQuery(api.rollsManagement.getGadgetConsumption);
   const rolls = useQuery(api.rollsManagement.getRollInventory);
+  const productsByRNumber = useQuery(api.rollsManagement.getProductsByRNumber);
 
   const [showGadgetDialog, setShowGadgetDialog] = useState(false);
   const [showRollDialog, setShowRollDialog] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assigningVariant, setAssigningVariant] = useState<{
+    variantId: Id<"variants">;
+    currentSku: string;
+    currentRNumber?: string;
+  } | null>(null);
+  const [newRNumber, setNewRNumber] = useState("");
+  
   const [editingGadget, setEditingGadget] = useState<{
     _id: Id<"gadgetConsumption">;
     categoryName: string;
@@ -59,6 +68,9 @@ export function RollsManagement() {
   const addRoll = useMutation(api.rollsManagement.addRollInventory);
   const updateRoll = useMutation(api.rollsManagement.updateRollInventory);
   const deleteRoll = useMutation(api.rollsManagement.deleteRollInventory);
+  
+  const assignRNumber = useMutation(api.rollsManagement.assignRNumber);
+  const removeRNumberAssignment = useMutation(api.rollsManagement.removeRNumberAssignment);
 
   const calculateMaterialUsed = (lengthCm: number, widthCm: number) => {
     return (lengthCm / 100).toFixed(3);
@@ -195,7 +207,36 @@ export function RollsManagement() {
     }
   };
 
-  if (!gadgets || !rolls) {
+  const handleAssignRNumber = async () => {
+    if (!assigningVariant || !newRNumber.trim()) {
+      toast.error("Please enter an R-number");
+      return;
+    }
+
+    try {
+      await assignRNumber({
+        variantId: assigningVariant.variantId,
+        rNumber: newRNumber.trim().toUpperCase(),
+      });
+      toast.success("R-number assigned successfully");
+      setShowAssignDialog(false);
+      setAssigningVariant(null);
+      setNewRNumber("");
+    } catch (error) {
+      toast.error("Failed to assign R-number");
+    }
+  };
+
+  const handleRemoveAssignment = async (variantId: Id<"variants">) => {
+    try {
+      await removeRNumberAssignment({ variantId });
+      toast.success("R-number assignment removed");
+    } catch (error) {
+      toast.error("Failed to remove assignment");
+    }
+  };
+
+  if (!gadgets || !rolls || !productsByRNumber) {
     return <div className="text-center py-8">Loading...</div>;
   }
 
@@ -498,6 +539,202 @@ export function RollsManagement() {
           </CardContent>
         </Card>
       )}
+
+      {/* SKU Mapping Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <LinkIcon className="size-5" />
+            SKU to R-Number Mapping
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Products are automatically grouped by R-number extracted from SKUs. You can manually override any assignment.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* R-Number Groups */}
+          {Object.keys(productsByRNumber.groups).length > 0 ? (
+            <div className="space-y-4">
+              {Object.entries(productsByRNumber.groups)
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([rNumber, items]) => (
+                  <Card key={rNumber} className="border-2">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-mono font-bold text-lg">{rNumber}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {items.length} {items.length === 1 ? "variant" : "variants"}
+                          </p>
+                        </div>
+                        {rolls?.find((r) => r.rNumber === rNumber) ? (
+                          <Badge variant="default">Roll exists</Badge>
+                        ) : (
+                          <Badge variant="secondary">No roll yet</Badge>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {items.map((item) => (
+                          <div
+                            key={item.variantId}
+                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">{item.productTitle}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {item.sku}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {item.variantTitle}
+                                </span>
+                                {item.isManual && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Manual
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setAssigningVariant({
+                                    variantId: item.variantId as Id<"variants">,
+                                    currentSku: item.sku,
+                                    currentRNumber: rNumber,
+                                  });
+                                  setNewRNumber(rNumber);
+                                  setShowAssignDialog(true);
+                                }}
+                              >
+                                <EditIcon className="size-4" />
+                              </Button>
+                              {item.isManual && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    handleRemoveAssignment(item.variantId as Id<"variants">)
+                                  }
+                                >
+                                  <XIcon className="size-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No products with R-numbers yet
+            </div>
+          )}
+
+          {/* Unmapped SKUs */}
+          {productsByRNumber.unmapped.length > 0 && (
+            <Card className="border-2 border-orange-200 dark:border-orange-900">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <AlertCircleIcon className="size-5 text-orange-600" />
+                  <div>
+                    <h4 className="font-semibold">Unmapped SKUs</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {productsByRNumber.unmapped.length} variants without R-numbers
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {productsByRNumber.unmapped.map((item) => (
+                    <div
+                      key={item.variantId}
+                      className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{item.productTitle}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="font-mono text-xs">
+                            {item.sku}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {item.variantTitle}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setAssigningVariant({
+                            variantId: item.variantId as Id<"variants">,
+                            currentSku: item.sku,
+                          });
+                          setNewRNumber("");
+                          setShowAssignDialog(true);
+                        }}
+                      >
+                        <PlusIcon className="size-4 mr-2" />
+                        Assign
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Assign R-Number Dialog */}
+      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign R-Number</DialogTitle>
+            <DialogDescription>
+              {assigningVariant?.currentSku && (
+                <span className="font-mono">{assigningVariant.currentSku}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rNumber">R-Number *</Label>
+              <Input
+                id="rNumber"
+                value={newRNumber}
+                onChange={(e) => setNewRNumber(e.target.value)}
+                placeholder="e.g., R-1, R-59"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter the R-number this SKU should be mapped to
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowAssignDialog(false);
+                setAssigningVariant(null);
+                setNewRNumber("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAssignRNumber}>Assign</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Gadget Dialog */}
       <Dialog open={showGadgetDialog} onOpenChange={setShowGadgetDialog}>

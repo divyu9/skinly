@@ -136,9 +136,11 @@ export default defineSchema({
     inventoryQuantity: v.number(),
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
+    rNumber: v.optional(v.string()), // Manual override for R-number (e.g., "R-1", "R-59")
   })
     .index("by_product", ["productId"])
-    .index("by_sku", ["sku"]),
+    .index("by_sku", ["sku"])
+    .index("by_r_number", ["rNumber"]),
 
   reviews: defineTable({
     productId: v.id("products"),
