@@ -14,6 +14,7 @@ import EditProductPage from "./pages/admin/products/edit/page.tsx";
 import AdminOrdersPage from "./pages/admin/orders/page.tsx";
 import AdminMockupsPage from "./pages/admin/mockups.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
+import TaxExportPage from "./pages/admin/tax-export.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/admin/orders" element={<AdminOrdersPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/admin/gst-migration" element={<GstMigrationPage />} />
+          <Route path="/admin/tax-export" element={<TaxExportPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

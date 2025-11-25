@@ -181,11 +181,19 @@ function AdminOrdersPageInner() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Order Management</h1>
-        <p className="text-muted-foreground">
-          Manage all customer orders and track payments
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Order Management</h1>
+          <p className="text-muted-foreground">
+            Manage all customer orders and track payments
+          </p>
+        </div>
+        <Link to="/admin/tax-export">
+          <Button variant="outline">
+            <FileTextIcon className="size-4 mr-2" />
+            Export for Tax Filing
+          </Button>
+        </Link>
       </div>
 
       {/* Statistics Cards */}

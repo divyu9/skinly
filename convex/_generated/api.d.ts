@@ -12,6 +12,7 @@ import type * as admin_orders from "../admin/orders.js";
 import type * as cart from "../cart.js";
 import type * as collections from "../collections.js";
 import type * as coupons from "../coupons.js";
+import type * as exports from "../exports.js";
 import type * as fixCoupon from "../fixCoupon.js";
 import type * as gst from "../gst.js";
 import type * as http from "../http.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   cart: typeof cart;
   collections: typeof collections;
   coupons: typeof coupons;
+  exports: typeof exports;
   fixCoupon: typeof fixCoupon;
   gst: typeof gst;
   http: typeof http;
