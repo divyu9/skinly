@@ -172,34 +172,22 @@ export const calculateUnitsFromRoll = query({
 
 /**
  * Extract R-number from SKU
- * Examples: "R-59-MM" → "R-59", "M-174" → "R-174", "L-12-LPT" → "R-12"
+ * Only extracts R-numbers from SKUs that explicitly start with "R-"
+ * Examples: "R-59-MM" → "R-59", "R-174" → "R-174", "M-12" → null
  */
 function extractRNumber(sku: string): string | null {
   if (!sku) return null;
   
   const normalizedSku = sku.toUpperCase().trim();
   
-  // Pattern 1: Already starts with R-
+  // Only match SKUs that start with R-
   const rPattern = /^R-(\d+)/i;
   const rMatch = normalizedSku.match(rPattern);
   if (rMatch) {
     return `R-${rMatch[1]}`;
   }
   
-  // Pattern 2: Starts with M-, L-, or T-
-  const mlPattern = /^[MLT]-(\d+)/i;
-  const mlMatch = normalizedSku.match(mlPattern);
-  if (mlMatch) {
-    return `R-${mlMatch[1]}`;
-  }
-  
-  // Pattern 3: Just a number
-  const numPattern = /^(\d+)/;
-  const numMatch = normalizedSku.match(numPattern);
-  if (numMatch) {
-    return `R-${numMatch[1]}`;
-  }
-  
+  // No match - M-, L-, T- and other prefixes are NOT related to R-numbers
   return null;
 }
 
