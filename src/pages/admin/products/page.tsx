@@ -160,6 +160,7 @@ function AdminProductsPageInner() {
   // Queries and mutations
   const products = useQuery(api.products.getAllProducts, {});
   const collections = useQuery(api.collections.getAllCollections, {});
+  const stockLevels = useQuery(api.rollsManagement.getStockLevels, {});
   const exportData = useQuery(api.products.exportProductsForBulkEdit, 
     selectedProducts.length > 0 ? { productIds: selectedProducts } : "skip"
   );
@@ -927,6 +928,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                     <th className="p-3 text-left text-sm font-medium w-32">SKU</th>
                     <th className="p-3 text-left text-sm font-medium w-28">Price</th>
                     <th className="p-3 text-left text-sm font-medium w-24">Inventory</th>
+                    <th className="p-3 text-left text-sm font-medium w-28">Material Stock</th>
                     <th className="p-3 text-left text-sm font-medium w-32">Collection</th>
                     <th className="p-3 text-left text-sm font-medium w-28">Status</th>
                     <th className="p-3 text-left text-sm font-medium w-32">Actions</th>
@@ -1043,6 +1045,47 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                                 </p>
                               )}
                             </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {firstVariant && stockLevels ? (
+                            (() => {
+                              const stock = stockLevels[firstVariant._id];
+                              if (!stock) return <span className="text-muted-foreground text-sm">-</span>;
+                              
+                              if (stock.rNumber === null) {
+                                // No R-number = accessories with no material tracking
+                                return <span className="text-muted-foreground text-sm">N/A</span>;
+                              }
+                              
+                              const { availableUnits } = stock;
+                              const isLowStock = availableUnits <= 10 && availableUnits > 0;
+                              const isOutOfStock = availableUnits === 0;
+                              
+                              return (
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-sm font-medium ${
+                                    isOutOfStock ? "text-destructive" : 
+                                    isLowStock ? "text-orange-600" : 
+                                    "text-foreground"
+                                  }`}>
+                                    {availableUnits >= 999999 ? "∞" : availableUnits}
+                                  </span>
+                                  {isOutOfStock && (
+                                    <Badge variant="destructive" className="text-[10px] px-1 py-0">
+                                      Out
+                                    </Badge>
+                                  )}
+                                  {isLowStock && (
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-600 text-orange-600">
+                                      Low
+                                    </Badge>
+                                  )}
+                                </div>
+                              );
+                            })()
                           ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}

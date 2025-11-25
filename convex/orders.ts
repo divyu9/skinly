@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { calculateGST } from "./gst";
+import { internal } from "./_generated/api";
 
 // Create a new order
 export const createOrder = mutation({
@@ -269,6 +270,38 @@ export const updatePaymentStatus = mutation({
         message: "Order not found",
         code: "NOT_FOUND",
       });
+    }
+
+    // If payment successful and order was not already confirmed, deduct roll inventory
+    if (args.paymentStatus === "success" && order.paymentStatus !== "success") {
+      // Get all variants to map productId + variant title to variant ID
+      const allVariants = await ctx.db.query("variants").collect();
+      
+      // Prepare items for inventory deduction by finding the variant ID
+      const items = order.items
+        .map((item) => {
+          // Find the variant by matching productId and variant title
+          const variant = allVariants.find(
+            (v) => v.productId === item.productId && v.title === item.variant
+          );
+          
+          if (!variant) {
+            return null;
+          }
+          
+          return {
+            variantId: variant._id,
+            quantity: item.quantity,
+          };
+        })
+        .filter((item) => item !== null);
+
+      // Deduct roll inventory (run asynchronously to avoid blocking order confirmation)
+      if (items.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.rollsManagement.deductRollInventory, {
+          items,
+        });
+      }
     }
 
     await ctx.db.patch(order._id, {

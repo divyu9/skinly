@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel.d.ts";
 
 // Gadget Consumption Queries and Mutations
 
@@ -279,5 +280,345 @@ export const removeRNumberAssignment = mutation({
     await ctx.db.patch(args.variantId, {
       rNumber: undefined,
     });
+  },
+});
+
+// Real-time Stock Calculation
+
+/**
+ * Calculate available stock for all variants based on roll inventory
+ * Returns: { variantId: availableUnits }
+ */
+export const getStockLevels = query({
+  args: {},
+  handler: async (ctx) => {
+    const variants = await ctx.db.query("variants").collect();
+    const products = await ctx.db.query("products").collect();
+    const rolls = await ctx.db.query("rollInventory").collect();
+    const gadgets = await ctx.db.query("gadgetConsumption").collect();
+    
+    // Build maps for quick lookup
+    const productsMap = new Map<string, typeof products[0]>();
+    for (const product of products) {
+      productsMap.set(product._id, product);
+    }
+    
+    const rollsMap = new Map<string, typeof rolls[0]>();
+    for (const roll of rolls) {
+      rollsMap.set(roll.rNumber, roll);
+    }
+    
+    // Build gadget dimensions map by category name
+    const gadgetsMap = new Map<string, typeof gadgets[0]>();
+    for (const gadget of gadgets) {
+      gadgetsMap.set(gadget.categoryName.toLowerCase(), gadget);
+    }
+    
+    // Calculate stock for each variant
+    const stockLevels: Record<string, {
+      availableUnits: number;
+      rollMeters: number;
+      rNumber: string | null;
+      designName: string | null;
+    }> = {};
+    
+    for (const variant of variants) {
+      const product = productsMap.get(variant.productId);
+      if (!product) continue;
+      
+      // Get R-number (manual or auto-detected)
+      const rNumber = variant.rNumber || extractRNumber(variant.sku);
+      
+      if (!rNumber) {
+        // No R-number means infinite stock (accessories, etc.)
+        stockLevels[variant._id] = {
+          availableUnits: 999999,
+          rollMeters: 0,
+          rNumber: null,
+          designName: null,
+        };
+        continue;
+      }
+      
+      // Get roll inventory for this R-number
+      const roll = rollsMap.get(rNumber);
+      
+      if (!roll || roll.metersAvailable <= 0) {
+        // No roll or out of stock
+        stockLevels[variant._id] = {
+          availableUnits: 0,
+          rollMeters: 0,
+          rNumber,
+          designName: roll?.designName || null,
+        };
+        continue;
+      }
+      
+      // Detect gadget category from product title
+      let gadgetCategory: string | null = null;
+      const titleLower = product.title.toLowerCase();
+      
+      if (titleLower.includes("phone skin") || titleLower.includes("mobile skin")) {
+        gadgetCategory = "phone skin";
+      } else if (titleLower.includes("laptop")) {
+        gadgetCategory = "laptop skin";
+      } else if (titleLower.includes("tablet") || titleLower.includes("ipad")) {
+        gadgetCategory = "tablet skin";
+      } else if (titleLower.includes("camera")) {
+        gadgetCategory = "camera skin";
+      } else if (titleLower.includes("mac mini")) {
+        gadgetCategory = "mac mini skin";
+      } else if (titleLower.includes("console") || titleLower.includes("playstation") || titleLower.includes("ps5") || titleLower.includes("xbox")) {
+        gadgetCategory = "console skin";
+      } else if (titleLower.includes("lens")) {
+        gadgetCategory = "camera lens skin";
+      } else if (titleLower.includes("drone")) {
+        gadgetCategory = "drone skin";
+      } else if (titleLower.includes("charger")) {
+        gadgetCategory = "charger skin";
+      }
+      
+      if (!gadgetCategory) {
+        // Unknown category, assume infinite stock
+        stockLevels[variant._id] = {
+          availableUnits: 999999,
+          rollMeters: roll.metersAvailable,
+          rNumber,
+          designName: roll.designName,
+        };
+        continue;
+      }
+      
+      // Get gadget dimensions
+      const gadget = gadgetsMap.get(gadgetCategory);
+      
+      if (!gadget) {
+        // No dimensions defined, assume infinite stock
+        stockLevels[variant._id] = {
+          availableUnits: 999999,
+          rollMeters: roll.metersAvailable,
+          rNumber,
+          designName: roll.designName,
+        };
+        continue;
+      }
+      
+      // Calculate units from roll
+      const ROLL_WIDTH_CM = 29.5;
+      const rollLengthCm = roll.metersAvailable * 100;
+      const totalAreaCm2 = ROLL_WIDTH_CM * rollLengthCm;
+      const gadgetAreaCm2 = gadget.lengthCm * gadget.widthCm;
+      
+      let availableUnits = 0;
+      
+      if (roll.isContinuous) {
+        // Continuous design: area-based calculation
+        availableUnits = Math.floor(totalAreaCm2 / gadgetAreaCm2);
+      } else {
+        // Non-continuous: orientation-based calculation
+        const units1Width = Math.floor(ROLL_WIDTH_CM / gadget.widthCm);
+        const units1Length = Math.floor(rollLengthCm / gadget.lengthCm);
+        const totalUnits1 = units1Width * units1Length;
+        
+        let totalUnits2 = 0;
+        if (gadget.lengthCm <= ROLL_WIDTH_CM) {
+          const units2Width = Math.floor(ROLL_WIDTH_CM / gadget.lengthCm);
+          const units2Length = Math.floor(rollLengthCm / gadget.widthCm);
+          totalUnits2 = units2Width * units2Length;
+        }
+        
+        availableUnits = Math.max(totalUnits1, totalUnits2);
+      }
+      
+      stockLevels[variant._id] = {
+        availableUnits,
+        rollMeters: roll.metersAvailable,
+        rNumber,
+        designName: roll.designName,
+      };
+    }
+    
+    return stockLevels;
+  },
+});
+
+/**
+ * Deduct roll inventory when order is confirmed
+ */
+export const deductRollInventory = internalMutation({
+  args: {
+    items: v.array(v.object({
+      variantId: v.id("variants"),
+      quantity: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const variants = await ctx.db.query("variants").collect();
+    const products = await ctx.db.query("products").collect();
+    const rolls = await ctx.db.query("rollInventory").collect();
+    const gadgets = await ctx.db.query("gadgetConsumption").collect();
+    
+    // Build maps
+    const variantsMap = new Map<string, typeof variants[0]>();
+    for (const variant of variants) {
+      variantsMap.set(variant._id, variant);
+    }
+    
+    const productsMap = new Map<string, typeof products[0]>();
+    for (const product of products) {
+      productsMap.set(product._id, product);
+    }
+    
+    const rollsMap = new Map<string, typeof rolls[0]>();
+    for (const roll of rolls) {
+      rollsMap.set(roll.rNumber, roll);
+    }
+    
+    const gadgetsMap = new Map<string, typeof gadgets[0]>();
+    for (const gadget of gadgets) {
+      gadgetsMap.set(gadget.categoryName.toLowerCase(), gadget);
+    }
+    
+    // Calculate total meters needed per R-number
+    const metersNeeded = new Map<string, { rollId: Id<"rollInventory">; meters: number }>();
+    
+    for (const item of args.items) {
+      const variant = variantsMap.get(item.variantId);
+      if (!variant) continue;
+      
+      const product = productsMap.get(variant.productId);
+      if (!product) continue;
+      
+      // Get R-number
+      const rNumber = variant.rNumber || extractRNumber(variant.sku);
+      if (!rNumber) continue; // Skip non-material products
+      
+      const roll = rollsMap.get(rNumber);
+      if (!roll) continue; // Skip if no roll exists
+      
+      // Detect category
+      let gadgetCategory: string | null = null;
+      const titleLower = product.title.toLowerCase();
+      
+      if (titleLower.includes("phone skin") || titleLower.includes("mobile skin")) {
+        gadgetCategory = "phone skin";
+      } else if (titleLower.includes("laptop")) {
+        gadgetCategory = "laptop skin";
+      } else if (titleLower.includes("tablet") || titleLower.includes("ipad")) {
+        gadgetCategory = "tablet skin";
+      } else if (titleLower.includes("camera")) {
+        gadgetCategory = "camera skin";
+      } else if (titleLower.includes("mac mini")) {
+        gadgetCategory = "mac mini skin";
+      } else if (titleLower.includes("console") || titleLower.includes("playstation") || titleLower.includes("ps5") || titleLower.includes("xbox")) {
+        gadgetCategory = "console skin";
+      } else if (titleLower.includes("lens")) {
+        gadgetCategory = "camera lens skin";
+      } else if (titleLower.includes("drone")) {
+        gadgetCategory = "drone skin";
+      } else if (titleLower.includes("charger")) {
+        gadgetCategory = "charger skin";
+      }
+      
+      if (!gadgetCategory) continue;
+      
+      const gadget = gadgetsMap.get(gadgetCategory);
+      if (!gadget) continue;
+      
+      // Calculate meters needed for this quantity
+      const ROLL_WIDTH_CM = 29.5;
+      const gadgetAreaCm2 = gadget.lengthCm * gadget.widthCm;
+      const totalAreaNeeded = gadgetAreaCm2 * item.quantity;
+      
+      // Convert area to meters (roll width is constant 29.5cm)
+      const metersForThisItem = totalAreaNeeded / (ROLL_WIDTH_CM * 100);
+      
+      // Add to total for this R-number
+      const existing = metersNeeded.get(rNumber);
+      if (existing) {
+        existing.meters += metersForThisItem;
+      } else {
+        metersNeeded.set(rNumber, {
+          rollId: roll._id,
+          meters: metersForThisItem,
+        });
+      }
+    }
+    
+    // Deduct meters from rolls
+    const deductions: Array<{ rNumber: string; meters: number }> = [];
+    
+    for (const [rNumber, data] of metersNeeded) {
+      const roll = await ctx.db.get(data.rollId);
+      if (!roll || !("metersAvailable" in roll)) continue; // Type guard for rollInventory
+      
+      const newMeters = Math.max(0, roll.metersAvailable - data.meters);
+      await ctx.db.patch(data.rollId, {
+        metersAvailable: newMeters,
+      });
+      
+      deductions.push({
+        rNumber,
+        meters: data.meters,
+      });
+    }
+    
+    return { deductions };
+  },
+});
+
+/**
+ * Get low stock alerts
+ * Returns R-numbers with less than 10 units available
+ */
+export const getLowStockAlerts = query({
+  args: {},
+  handler: async (ctx) => {
+    const rolls = await ctx.db.query("rollInventory").collect();
+    const gadgets = await ctx.db.query("gadgetConsumption").collect();
+    
+    const alerts: Array<{
+      rNumber: string;
+      designName: string;
+      metersAvailable: number;
+      estimatedUnits: number;
+      categories: string[];
+    }> = [];
+    
+    for (const roll of rolls) {
+      if (roll.metersAvailable <= 0) continue;
+      
+      // Calculate estimated units for phone skins (most common)
+      const phoneGadget = gadgets.find(g => g.categoryName.toLowerCase() === "phone skin");
+      
+      if (!phoneGadget) continue;
+      
+      const ROLL_WIDTH_CM = 29.5;
+      const rollLengthCm = roll.metersAvailable * 100;
+      const totalAreaCm2 = ROLL_WIDTH_CM * rollLengthCm;
+      const gadgetAreaCm2 = phoneGadget.lengthCm * phoneGadget.widthCm;
+      
+      let estimatedUnits = 0;
+      if (roll.isContinuous) {
+        estimatedUnits = Math.floor(totalAreaCm2 / gadgetAreaCm2);
+      } else {
+        const units1Width = Math.floor(ROLL_WIDTH_CM / phoneGadget.widthCm);
+        const units1Length = Math.floor(rollLengthCm / phoneGadget.lengthCm);
+        estimatedUnits = units1Width * units1Length;
+      }
+      
+      // Alert if less than 10 units or less than 1 meter
+      if (estimatedUnits < 10 || roll.metersAvailable < 1) {
+        alerts.push({
+          rNumber: roll.rNumber,
+          designName: roll.designName,
+          metersAvailable: roll.metersAvailable,
+          estimatedUnits,
+          categories: ["Phone Skin"], // Could expand to calculate for all categories
+        });
+      }
+    }
+    
+    return alerts.sort((a, b) => a.estimatedUnits - b.estimatedUnits);
   },
 });

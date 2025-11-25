@@ -34,6 +34,7 @@ export function RollsManagement() {
   const gadgets = useQuery(api.rollsManagement.getGadgetConsumption);
   const rolls = useQuery(api.rollsManagement.getRollInventory);
   const productsByRNumber = useQuery(api.rollsManagement.getProductsByRNumber);
+  const lowStockAlerts = useQuery(api.rollsManagement.getLowStockAlerts);
 
   const [showGadgetDialog, setShowGadgetDialog] = useState(false);
   const [showRollDialog, setShowRollDialog] = useState(false);
@@ -236,12 +237,49 @@ export function RollsManagement() {
     }
   };
 
-  if (!gadgets || !rolls || !productsByRNumber) {
+  if (!gadgets || !rolls || !productsByRNumber || !lowStockAlerts) {
     return <div className="text-center py-8">Loading...</div>;
   }
 
   return (
     <div className="space-y-8">
+      {/* Low Stock Alerts */}
+      {lowStockAlerts.length > 0 && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-orange-900">
+              <AlertCircleIcon className="size-5" />
+              Low Stock Alerts ({lowStockAlerts.length})
+            </CardTitle>
+            <p className="text-sm text-orange-800 mt-1">
+              Materials running low or out of stock
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {lowStockAlerts.map((alert) => (
+                <div
+                  key={alert.rNumber}
+                  className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-200"
+                >
+                  <div>
+                    <p className="font-medium text-orange-900">
+                      {alert.rNumber} - {alert.designName}
+                    </p>
+                    <p className="text-sm text-orange-700">
+                      {alert.metersAvailable.toFixed(2)}m available • ~{alert.estimatedUnits} units
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="border-orange-600 text-orange-700">
+                    {alert.estimatedUnits === 0 ? "Out of Stock" : "Low Stock"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Gadget Consumption Section */}
       <Card>
         <CardHeader>
