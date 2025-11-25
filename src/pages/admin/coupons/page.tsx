@@ -60,6 +60,7 @@ function AdminCouponsPageInner() {
   const coupons = useQuery(api.coupons.getAllCoupons, {});
   const collections = useQuery(api.collections.getAllCollections, {});
   const products = useQuery(api.products.getAllProducts, {});
+  const variants = useQuery(api.products.getAllVariantsWithProducts, {});
   const deleteCoupon = useMutation(api.coupons.deleteCoupon);
   const createCoupon = useMutation(api.coupons.createCoupon);
   const updateCoupon = useMutation(api.coupons.updateCoupon);
@@ -207,7 +208,16 @@ function AdminCouponsPageInner() {
     }));
   };
 
-  if (coupons === undefined || collections === undefined || products === undefined) {
+  const handleToggleVariant = (variantId: Id<"variants">) => {
+    setFormData((prev) => ({
+      ...prev,
+      applicableVariantIds: prev.applicableVariantIds.includes(variantId)
+        ? prev.applicableVariantIds.filter((id) => id !== variantId)
+        : [...prev.applicableVariantIds, variantId],
+    }));
+  };
+
+  if (coupons === undefined || collections === undefined || products === undefined || variants === undefined) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -355,6 +365,7 @@ function AdminCouponsPageInner() {
                   {(coupon.minPurchase ||
                     coupon.minCartValue ||
                     coupon.minProductValue ||
+                    coupon.applicableVariantIds?.length ||
                     coupon.applicableCollectionIds?.length ||
                     coupon.applicableProductKeywords?.length ||
                     coupon.allowedCustomerEmails?.length) && (
@@ -369,6 +380,11 @@ function AdminCouponsPageInner() {
                         )}
                         {coupon.minProductValue && (
                           <Badge variant="outline">Min product: ₹{coupon.minProductValue}</Badge>
+                        )}
+                        {coupon.applicableVariantIds && coupon.applicableVariantIds.length > 0 && (
+                          <Badge variant="outline">
+                            {coupon.applicableVariantIds.length} specific variant(s)
+                          </Badge>
                         )}
                         {coupon.applicableCollectionIds && coupon.applicableCollectionIds.length > 0 && (
                           <Badge variant="outline">
@@ -550,9 +566,44 @@ function AdminCouponsPageInner() {
                 {/* Applicability */}
                 <div className="space-y-4">
                   <h3 className="font-semibold">Applicability Conditions</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Choose at least one condition. If multiple conditions are set, the coupon applies to products matching ANY condition.
+                  </p>
+                  
+                  <div>
+                    <Label>Specific Variants (SKUs)</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Select specific product variants this coupon applies to
+                    </p>
+                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                      {variants.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No variants available</p>
+                      ) : (
+                        variants.map((variant) => (
+                          <div key={variant._id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`variant-${variant._id}`}
+                              checked={formData.applicableVariantIds.includes(variant._id)}
+                              onChange={() => handleToggleVariant(variant._id)}
+                              className="rounded"
+                            />
+                            <Label htmlFor={`variant-${variant._id}`} className="font-normal text-sm">
+                              <span className="font-medium">{variant.productTitle}</span>
+                              <span className="text-muted-foreground"> - {variant.title}</span>
+                              <span className="text-xs text-muted-foreground"> (SKU: {variant.sku})</span>
+                            </Label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
                   
                   <div>
                     <Label>Collections</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Apply to all products in selected collections
+                    </p>
                     <div className="mt-2 space-y-2 max-h-40 overflow-y-auto border rounded-md p-3">
                       {collections.map((collection) => (
                         <div key={collection._id} className="flex items-center gap-2">

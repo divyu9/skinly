@@ -3,6 +3,7 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel.d.ts";
 import { Resend } from "resend";
 import twilio from "twilio";
 
@@ -132,11 +133,10 @@ export const processAbandonedCarts = action({
     const results: unknown[] = [];
 
     for (const cart of cartsNeedingReminders) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await ctx.runAction(
+      const result: unknown = await ctx.runAction(
         api.abandonedCartsActions.sendAbandonedCartReminder,
         {
-          cartId: cart._id as any,
+          cartId: cart._id as Id<"abandonedCarts">,
         }
       );
       results.push(result);

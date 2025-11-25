@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
+import type { Doc } from "./_generated/dataModel.d.ts";
 
 // Get all products with pagination
 export const getAllProductsPaginated = query({
@@ -686,5 +687,27 @@ export const bulkUpdateVariants = mutation({
       errorCount,
       errors,
     };
+  },
+});
+
+// Get all variants with their product information
+export const getAllVariantsWithProducts = query({
+  args: {},
+  handler: async (ctx) => {
+    const variants = await ctx.db.query("variants").collect();
+    const products = await ctx.db.query("products").collect();
+    
+    const productsMap = new Map<string, Doc<"products">>();
+    for (const product of products) {
+      productsMap.set(product._id, product);
+    }
+    
+    return variants.map((variant) => {
+      const product = productsMap.get(variant.productId);
+      return {
+        ...variant,
+        productTitle: product?.title || "Unknown Product",
+      };
+    });
   },
 });
