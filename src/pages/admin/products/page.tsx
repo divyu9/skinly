@@ -136,6 +136,7 @@ function AdminProductsPageInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T">("all");
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
+  const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<"all" | "phone" | "laptop" | "camera" | "mac-mini" | "tablet" | "console" | "lens" | "drone" | "charger">("all");
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -492,6 +493,23 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     return { letter: "", number: 0 };
   };
 
+  // Helper function to detect gadget category from product title
+  const detectGadgetCategory = (title: string): string | null => {
+    const lowerTitle = title.toLowerCase();
+    
+    if (lowerTitle.includes("phone")) return "phone";
+    if (lowerTitle.includes("laptop")) return "laptop";
+    if (lowerTitle.includes("camera")) return "camera";
+    if (lowerTitle.includes("mac mini")) return "mac-mini";
+    if (lowerTitle.includes("tablet")) return "tablet";
+    if (lowerTitle.includes("console") || lowerTitle.includes("playstation") || lowerTitle.includes("xbox")) return "console";
+    if (lowerTitle.includes("lens")) return "lens";
+    if (lowerTitle.includes("drone")) return "drone";
+    if (lowerTitle.includes("charger")) return "charger";
+    
+    return null;
+  };
+
   // Filter products based on search query, SKU letter filter, and sort order
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -522,6 +540,14 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       });
     }
 
+    // Apply gadget category filter
+    if (gadgetCategoryFilter !== "all") {
+      filtered = filtered.filter((product) => {
+        const category = detectGadgetCategory(product.title);
+        return category === gadgetCategoryFilter;
+      });
+    }
+
     // Sort by SKU numeric value
     const sorted = [...filtered].sort((a, b) => {
       const aFirstVariant = a.variants[0];
@@ -538,7 +564,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     });
 
     return sorted;
-  }, [products, searchQuery, skuLetterFilter, skuSortOrder]);
+  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter]);
 
   // Build collections map
   const collectionsMap = useMemo(() => {
@@ -562,11 +588,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         <div>
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-muted-foreground">
-            {searchQuery || skuLetterFilter !== "all"
+            {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all"
               ? `${filteredProducts.length} of ${products.length} products`
               : `Manage your product catalog (${products.length} products)`}
             {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
             {skuLetterFilter !== "all" && ` • SKU: ${skuLetterFilter}`}
+            {gadgetCategoryFilter !== "all" && ` • Category: ${gadgetCategoryFilter.charAt(0).toUpperCase() + gadgetCategoryFilter.slice(1).replace("-", " ")}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -654,73 +681,157 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       {products.length > 0 && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-6 flex-wrap">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground">SKU Filter:</span>
-                <div className="flex items-center gap-2">
+            <div className="space-y-4">
+              {/* SKU and Sort Filters */}
+              <div className="flex items-center gap-6 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">SKU Filter:</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={skuLetterFilter === "all" ? "default" : "outline"}
+                      onClick={() => setSkuLetterFilter("all")}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={skuLetterFilter === "M" ? "default" : "outline"}
+                      onClick={() => setSkuLetterFilter("M")}
+                    >
+                      M
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={skuLetterFilter === "L" ? "default" : "outline"}
+                      onClick={() => setSkuLetterFilter("L")}
+                    >
+                      L
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={skuLetterFilter === "T" ? "default" : "outline"}
+                      onClick={() => setSkuLetterFilter("T")}
+                    >
+                      T
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Sort Order:</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={skuSortOrder === "asc" ? "default" : "outline"}
+                      onClick={() => setSkuSortOrder("asc")}
+                    >
+                      Ascending ↑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={skuSortOrder === "desc" ? "default" : "outline"}
+                      onClick={() => setSkuSortOrder("desc")}
+                    >
+                      Descending ↓
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-medium text-muted-foreground">Category:</span>
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     size="sm"
-                    variant={skuLetterFilter === "all" ? "default" : "outline"}
-                    onClick={() => setSkuLetterFilter("all")}
+                    variant={gadgetCategoryFilter === "all" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("all")}
                   >
                     All
                   </Button>
                   <Button
                     size="sm"
-                    variant={skuLetterFilter === "M" ? "default" : "outline"}
-                    onClick={() => setSkuLetterFilter("M")}
+                    variant={gadgetCategoryFilter === "phone" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("phone")}
                   >
-                    M
+                    Phone
                   </Button>
                   <Button
                     size="sm"
-                    variant={skuLetterFilter === "L" ? "default" : "outline"}
-                    onClick={() => setSkuLetterFilter("L")}
+                    variant={gadgetCategoryFilter === "laptop" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("laptop")}
                   >
-                    L
+                    Laptop
                   </Button>
                   <Button
                     size="sm"
-                    variant={skuLetterFilter === "T" ? "default" : "outline"}
-                    onClick={() => setSkuLetterFilter("T")}
+                    variant={gadgetCategoryFilter === "camera" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("camera")}
                   >
-                    T
+                    Camera
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={gadgetCategoryFilter === "mac-mini" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("mac-mini")}
+                  >
+                    Mac Mini
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={gadgetCategoryFilter === "tablet" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("tablet")}
+                  >
+                    Tablet
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={gadgetCategoryFilter === "console" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("console")}
+                  >
+                    Console
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={gadgetCategoryFilter === "lens" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("lens")}
+                  >
+                    Lens
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={gadgetCategoryFilter === "drone" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("drone")}
+                  >
+                    Drone
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={gadgetCategoryFilter === "charger" ? "default" : "outline"}
+                    onClick={() => setGadgetCategoryFilter("charger")}
+                  >
+                    Charger
                   </Button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground">Sort Order:</span>
-                <div className="flex items-center gap-2">
+              {/* Reset Button */}
+              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all") && (
+                <div className="flex justify-end">
                   <Button
                     size="sm"
-                    variant={skuSortOrder === "asc" ? "default" : "outline"}
-                    onClick={() => setSkuSortOrder("asc")}
+                    variant="ghost"
+                    onClick={() => {
+                      setSkuLetterFilter("all");
+                      setSkuSortOrder("asc");
+                      setGadgetCategoryFilter("all");
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
                   >
-                    Ascending ↑
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={skuSortOrder === "desc" ? "default" : "outline"}
-                    onClick={() => setSkuSortOrder("desc")}
-                  >
-                    Descending ↓
+                    Reset Filters
                   </Button>
                 </div>
-              </div>
-
-              {(skuLetterFilter !== "all" || skuSortOrder !== "asc") && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setSkuLetterFilter("all");
-                    setSkuSortOrder("asc");
-                  }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Reset Filters
-                </Button>
               )}
             </div>
           </CardContent>
