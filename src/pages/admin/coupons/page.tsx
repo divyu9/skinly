@@ -70,6 +70,8 @@ function AdminCouponsPageInner() {
   const [editingCoupon, setEditingCoupon] = useState<Id<"coupons"> | null>(null);
   const [viewingEligibleProducts, setViewingEligibleProducts] = useState<Id<"coupons"> | null>(null);
   const [viewingStats, setViewingStats] = useState<Id<"coupons"> | null>(null);
+  const [variantSearchQuery, setVariantSearchQuery] = useState("");
+  const [collectionSearchQuery, setCollectionSearchQuery] = useState("");
 
   const eligibleProducts = useQuery(
     api.coupons.getEligibleProducts,
@@ -177,6 +179,8 @@ function AdminCouponsPageInner() {
 
       setShowCreateDialog(false);
       setEditingCoupon(null);
+      setVariantSearchQuery("");
+      setCollectionSearchQuery("");
       setFormData({
         code: "",
         description: "",
@@ -229,6 +233,20 @@ function AdminCouponsPageInner() {
   }
 
   const now = Date.now();
+
+  // Filter variants and collections based on search
+  const filteredVariants = variants.filter((variant) => {
+    const searchLower = variantSearchQuery.toLowerCase();
+    return (
+      variant.productTitle.toLowerCase().includes(searchLower) ||
+      variant.title.toLowerCase().includes(searchLower) ||
+      variant.sku.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const filteredCollections = collections.filter((collection) => {
+    return collection.name.toLowerCase().includes(collectionSearchQuery.toLowerCase());
+  });
 
   return (
     <div className="space-y-6">
@@ -421,9 +439,9 @@ function AdminCouponsPageInner() {
               Configure discount codes with custom conditions and restrictions
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-6 pb-4">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto pr-4">
+              <div className="space-y-6 py-4">
                 {/* Basic Info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold">Basic Information</h3>
@@ -576,11 +594,24 @@ function AdminCouponsPageInner() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Select specific product variants this coupon applies to
                     </p>
-                    <div className="mt-2 space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                    <Input
+                      placeholder="Search by product name, variant, or SKU..."
+                      value={variantSearchQuery}
+                      onChange={(e) => setVariantSearchQuery(e.target.value)}
+                      className="mb-2"
+                    />
+                    {formData.applicableVariantIds.length > 0 && (
+                      <div className="mb-2 text-sm text-muted-foreground">
+                        {formData.applicableVariantIds.length} variant(s) selected
+                      </div>
+                    )}
+                    <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
                       {variants.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No variants available</p>
+                      ) : filteredVariants.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No variants match your search</p>
                       ) : (
-                        variants.map((variant) => (
+                        filteredVariants.map((variant) => (
                           <div key={variant._id} className="flex items-center gap-2">
                             <input
                               type="checkbox"
@@ -589,7 +620,7 @@ function AdminCouponsPageInner() {
                               onChange={() => handleToggleVariant(variant._id)}
                               className="rounded"
                             />
-                            <Label htmlFor={`variant-${variant._id}`} className="font-normal text-sm">
+                            <Label htmlFor={`variant-${variant._id}`} className="font-normal text-sm cursor-pointer flex-1">
                               <span className="font-medium">{variant.productTitle}</span>
                               <span className="text-muted-foreground"> - {variant.title}</span>
                               <span className="text-xs text-muted-foreground"> (SKU: {variant.sku})</span>
@@ -605,21 +636,38 @@ function AdminCouponsPageInner() {
                     <p className="text-xs text-muted-foreground mb-2">
                       Apply to all products in selected collections
                     </p>
-                    <div className="mt-2 space-y-2 max-h-40 overflow-y-auto border rounded-md p-3">
-                      {collections.map((collection) => (
-                        <div key={collection._id} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id={`collection-${collection._id}`}
-                            checked={formData.applicableCollectionIds.includes(collection._id)}
-                            onChange={() => handleToggleCollection(collection._id)}
-                            className="rounded"
-                          />
-                          <Label htmlFor={`collection-${collection._id}`} className="font-normal">
-                            {collection.name}
-                          </Label>
-                        </div>
-                      ))}
+                    <Input
+                      placeholder="Search collections..."
+                      value={collectionSearchQuery}
+                      onChange={(e) => setCollectionSearchQuery(e.target.value)}
+                      className="mb-2"
+                    />
+                    {formData.applicableCollectionIds.length > 0 && (
+                      <div className="mb-2 text-sm text-muted-foreground">
+                        {formData.applicableCollectionIds.length} collection(s) selected
+                      </div>
+                    )}
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                      {collections.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No collections available</p>
+                      ) : filteredCollections.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No collections match your search</p>
+                      ) : (
+                        filteredCollections.map((collection) => (
+                          <div key={collection._id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`collection-${collection._id}`}
+                              checked={formData.applicableCollectionIds.includes(collection._id)}
+                              onChange={() => handleToggleCollection(collection._id)}
+                              className="rounded"
+                            />
+                            <Label htmlFor={`collection-${collection._id}`} className="font-normal cursor-pointer flex-1">
+                              {collection.name}
+                            </Label>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
 
@@ -685,15 +733,17 @@ function AdminCouponsPageInner() {
                   </div>
                 </div>
               </div>
-            </ScrollArea>
+            </div>
 
-            <DialogFooter className="mt-4 pt-4 border-t">
+            <DialogFooter className="pt-4 border-t flex-shrink-0">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => {
                   setShowCreateDialog(false);
                   setEditingCoupon(null);
+                  setVariantSearchQuery("");
+                  setCollectionSearchQuery("");
                 }}
               >
                 Cancel
