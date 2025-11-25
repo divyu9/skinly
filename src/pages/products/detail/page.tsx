@@ -25,7 +25,8 @@ import {
   PackageCheckIcon,
   AlertTriangleIcon,
   TagIcon,
-  CopyIcon
+  CopyIcon,
+  MessageCircleIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -908,6 +909,21 @@ export default function ProductDetailPage() {
                     </span>
                   </div>
                 )}
+                
+                {/* WhatsApp Support Button */}
+                <Button
+                  variant="outline"
+                  className="w-full mt-4"
+                  size="lg"
+                  onClick={() => {
+                    const phoneNumber = "917505273504";
+                    const message = encodeURIComponent("Hey Skinly Team , I have a query regarding my purchase");
+                    window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+                  }}
+                >
+                  <MessageCircleIcon className="size-5 mr-2" />
+                  Message on WhatsApp for Product Queries
+                </Button>
                 
                 {/* Active Offers Section */}
                 {applicableCoupons && applicableCoupons.length > 0 && (
