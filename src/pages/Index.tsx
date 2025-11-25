@@ -1335,6 +1335,9 @@ export default function Index() {
   // Fetch latest supported models for marquee
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
   
+  // Fetch ALL supported models for search
+  const allSupportedModels = useQuery(api.supportedModels.listAll, { isActive: true });
+  
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
@@ -1441,15 +1444,16 @@ export default function Index() {
       {/* Latest Models Marquee */}
       {latestModels && latestModels.length > 0 && (
         <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-[72px] overflow-hidden">
-          <div className="relative flex">
-            <div className="animate-marquee flex gap-8 whitespace-nowrap">
-              {[...latestModels, ...latestModels].map((model, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm font-medium">
-                  <span className="text-primary">✨</span>
-                  <span className="text-foreground/80">
-                    Now supporting: {model.brandName} {model.modelName}
-                  </span>
-                </div>
+          <div className="relative flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm font-bold px-4 flex-shrink-0">
+              <span className="text-primary">✨</span>
+              <span className="text-foreground">Now supporting:</span>
+            </div>
+            <div className="animate-marquee flex gap-3 whitespace-nowrap">
+              {[...latestModels, ...latestModels, ...latestModels].map((model, idx) => (
+                <span key={idx} className="text-sm text-foreground/80 font-medium">
+                  {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
+                </span>
               ))}
             </div>
           </div>
@@ -1492,7 +1496,7 @@ export default function Index() {
                   {(() => {
                     const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
                     
-                    // Combine all device models with their categories
+                    // Combine hardcoded device models with their categories
                     const allDeviceCategories = [
                       { name: "Phones", icon: "📱", models: phoneModels, type: "phone" },
                       { name: "Cameras", icon: "📷", models: cameraModels, type: "camera" },
@@ -1503,6 +1507,51 @@ export default function Index() {
                       { name: "Drones", icon: "🚁", models: droneModels, type: "drone" },
                       { name: "Chargers", icon: "🔌", models: chargerModels, type: "charger" },
                     ] as const;
+                    
+                    // Add database models if available
+                    const dbModels = allSupportedModels || [];
+                    const dbModelsByCategory: Record<string, Record<string, string[]>> = {};
+                    
+                    dbModels.forEach(model => {
+                      const catName = model.category === "phone" ? "Phones"
+                        : model.category === "camera" ? "Cameras"
+                        : model.category === "lens" ? "Lenses"
+                        : model.category === "tablet" ? "Tablets"
+                        : model.category === "mac-mini" ? "Mac Mini"
+                        : model.category === "console" ? "Gaming Consoles"
+                        : model.category === "drone" ? "Drones"
+                        : model.category === "charger" ? "Chargers"
+                        : "Other";
+                      
+                      if (!dbModelsByCategory[catName]) {
+                        dbModelsByCategory[catName] = {};
+                      }
+                      if (!dbModelsByCategory[catName][model.brandName]) {
+                        dbModelsByCategory[catName][model.brandName] = [];
+                      }
+                      dbModelsByCategory[catName][model.brandName].push(model.modelName);
+                    });
+                    
+                    // Merge database models with hardcoded ones
+                    const mergedCategories = allDeviceCategories.map(cat => {
+                      const dbCatModels = dbModelsByCategory[cat.name] || {};
+                      const mergedModels = { ...cat.models };
+                      
+                      // Merge DB models into hardcoded models
+                      Object.keys(dbCatModels).forEach(brand => {
+                        if (!mergedModels[brand]) {
+                          mergedModels[brand] = [];
+                        }
+                        // Add DB models that aren't already in hardcoded list
+                        dbCatModels[brand].forEach((model: string) => {
+                          if (!mergedModels[brand].includes(model)) {
+                            mergedModels[brand].push(model);
+                          }
+                        });
+                      });
+                      
+                      return { ...cat, models: mergedModels };
+                    });
 
                     interface MatchingBrand {
                       brand: string;
@@ -1516,8 +1565,8 @@ export default function Index() {
                       matchingBrands: MatchingBrand[];
                     }
 
-                    // Find matching categories
-                    const matchingCategories = allDeviceCategories
+                    // Find matching categories using merged data
+                    const matchingCategories = mergedCategories
                       .map(category => {
                         const matchingBrands: MatchingBrand[] = Object.entries(category.models)
                           .map(([brand, models]) => {
@@ -1717,12 +1766,12 @@ export default function Index() {
                       return searchTerms.every(term => titleLower.includes(term));
                     });
 
-                    // Check if there are any device models
+                    // Check if there are any device models (hardcoded + database)
                     const allDeviceCategories = [
                       phoneModels, cameraModels, lensModels, tabletModels, 
                       macMiniModels, consoleModels, droneModels, chargerModels
                     ];
-                    const hasDeviceModels = allDeviceCategories.some(category =>
+                    const hasHardcodedModels = allDeviceCategories.some(category =>
                       Object.values(category).some(models =>
                         models.some(model => {
                           const modelLower = model.toLowerCase();
@@ -1730,6 +1779,11 @@ export default function Index() {
                         })
                       )
                     );
+                    const hasDbModels = (allSupportedModels || []).some(model => {
+                      const combined = `${model.brandName} ${model.modelName}`.toLowerCase();
+                      return searchTerms.every(term => combined.includes(term));
+                    });
+                    const hasDeviceModels = hasHardcodedModels || hasDbModels;
 
                     if (matchingProducts.length > 0) {
                       return (
@@ -1802,12 +1856,12 @@ export default function Index() {
                   {(() => {
                     const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
                     
-                    // Check all device categories
+                    // Check all device categories (hardcoded + database)
                     const allDeviceCategories = [
                       phoneModels, cameraModels, lensModels, tabletModels, 
                       macMiniModels, consoleModels, droneModels, chargerModels
                     ];
-                    const hasDeviceModels = allDeviceCategories.some(category =>
+                    const hasHardcodedModels = allDeviceCategories.some(category =>
                       Object.values(category).some(models =>
                         models.some(model => {
                           const modelLower = model.toLowerCase();
@@ -1815,6 +1869,11 @@ export default function Index() {
                         })
                       )
                     );
+                    const hasDbModels = (allSupportedModels || []).some(model => {
+                      const combined = `${model.brandName} ${model.modelName}`.toLowerCase();
+                      return searchTerms.every(term => combined.includes(term));
+                    });
+                    const hasDeviceModels = hasHardcodedModels || hasDbModels;
 
                     const matchingProducts = products.filter(product => {
                       const titleLower = product.title.toLowerCase();

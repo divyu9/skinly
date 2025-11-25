@@ -19,6 +19,7 @@ import AdminStockNotificationsPage from "./pages/admin/stock-notifications/page.
 import AdminOOSPage from "./pages/admin/oos/page.tsx";
 import AdminMockupsPage from "./pages/admin/mockups.tsx";
 import AdminModelsPage from "./pages/admin/models/page.tsx";
+import AdminSeedModelsPage from "./pages/admin/seed-models/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -49,6 +50,7 @@ export default function App() {
           <Route path="/admin/oos" element={<AdminOOSPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/admin/models" element={<AdminModelsPage />} />
+          <Route path="/admin/seed-models" element={<AdminSeedModelsPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/admin/gst-migration" element={<GstMigrationPage />} />
           <Route path="/admin/tax-export" element={<TaxExportPage />} />
