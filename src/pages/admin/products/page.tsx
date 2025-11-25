@@ -1,10 +1,10 @@
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -22,158 +22,108 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 
-// Variant editor component for inline editing
-function VariantEditor({ 
-  variant, 
-  onUpdate 
-}: { 
-  variant: { 
-    _id: Id<"variants">; 
-    title: string; 
-    sku: string; 
-    price: number; 
-    compareAtPrice?: number;
-    inventoryQuantity: number; 
-  }; 
-  onUpdate: () => void;
+// Inline editable cell component
+function EditableCell({
+  variantId,
+  value,
+  type,
+  field,
+}: {
+  variantId: Id<"variants">;
+  value: string | number;
+  type: "text" | "number";
+  field: "sku" | "price" | "inventoryQuantity";
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(String(value));
   const updateVariant = useMutation(api.products.updateVariant);
-  const [price, setPrice] = useState(variant.price.toString());
-  const [compareAtPrice, setCompareAtPrice] = useState(variant.compareAtPrice?.toString() || "");
-  const [stock, setStock] = useState(variant.inventoryQuantity.toString());
   const [isSaving, setIsSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
-
-  const handlePriceChange = (value: string) => {
-    setPrice(value);
-    setHasChanges(true);
-  };
-
-  const handleCompareAtPriceChange = (value: string) => {
-    setCompareAtPrice(value);
-    setHasChanges(true);
-  };
-
-  const handleStockChange = (value: string) => {
-    setStock(value);
-    setHasChanges(true);
-  };
 
   const handleSave = async () => {
-    const priceNum = parseFloat(price);
-    const stockNum = parseInt(stock, 10);
-    const compareAtPriceNum = compareAtPrice ? parseFloat(compareAtPrice) : undefined;
-
-    if (isNaN(priceNum) || priceNum < 0) {
-      toast.error("Please enter a valid price");
-      return;
-    }
-
-    if (compareAtPrice && (isNaN(compareAtPriceNum!) || compareAtPriceNum! < 0)) {
-      toast.error("Please enter a valid MRP");
-      return;
-    }
-
-    if (isNaN(stockNum) || stockNum < 0) {
-      toast.error("Please enter a valid stock quantity");
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await updateVariant({
-        variantId: variant._id,
-        price: priceNum,
-        compareAtPrice: compareAtPriceNum,
-        inventoryQuantity: stockNum,
-      });
-      toast.success("Variant updated successfully");
-      setHasChanges(false);
-      onUpdate();
-    } catch (error) {
-      toast.error("Failed to update variant");
-    } finally {
-      setIsSaving(false);
+    if (type === "number") {
+      const numValue = parseFloat(editValue);
+      if (isNaN(numValue) || numValue < 0) {
+        toast.error(`Please enter a valid ${field === "price" ? "price" : "quantity"}`);
+        return;
+      }
+      setIsSaving(true);
+      try {
+        await updateVariant({
+          variantId,
+          [field]: numValue,
+        });
+        toast.success("Updated successfully");
+        setIsEditing(false);
+      } catch (error) {
+        toast.error("Failed to update");
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      if (!editValue.trim()) {
+        toast.error("SKU cannot be empty");
+        return;
+      }
+      setIsSaving(true);
+      try {
+        await updateVariant({
+          variantId,
+          sku: editValue.trim(),
+        });
+        toast.success("SKU updated successfully");
+        setIsEditing(false);
+      } catch (error) {
+        toast.error("Failed to update SKU");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
+  if (!isEditing) {
+    return (
+      <button
+        onClick={() => setIsEditing(true)}
+        className="text-left hover:bg-muted/50 px-2 py-1 rounded transition-colors w-full"
+      >
+        {type === "number" && field === "price" ? `₹${value}` : value}
+      </button>
+    );
+  }
+
   return (
-    <div className="p-4 bg-muted/30 rounded-lg border">
-      <div className="mb-3">
-        <p className="text-sm font-medium">{variant.title}</p>
-        <p className="text-xs text-muted-foreground">SKU: {variant.sku}</p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Price */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Price</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              ₹
-            </span>
-            <Input
-              type="number"
-              value={price}
-              onChange={(e) => handlePriceChange(e.target.value)}
-              className="pl-8"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        {/* Compare-at Price (MRP) */}
-        <div>
-          <label className="block text-sm font-medium mb-2">MRP (Compare-at price)</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              ₹
-            </span>
-            <Input
-              type="number"
-              value={compareAtPrice}
-              onChange={(e) => handleCompareAtPriceChange(e.target.value)}
-              className="pl-8"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-
-        {/* Stock */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Quantity (On hand)</label>
-          <Input
-            type="number"
-            value={stock}
-            onChange={(e) => handleStockChange(e.target.value)}
-            min="0"
-            step="1"
-            placeholder="0"
-          />
-        </div>
-      </div>
-
-      <div className="mt-4 flex justify-end">
-        <Button
-          onClick={handleSave}
-          disabled={!hasChanges || isSaving}
-        >
-          <SaveIcon className="size-4 mr-2" />
-          {isSaving ? "Saving..." : "Save Changes"}
-        </Button>
-      </div>
+    <div className="flex items-center gap-1">
+      {type === "number" && field === "price" && (
+        <span className="text-muted-foreground">₹</span>
+      )}
+      <Input
+        type={type}
+        value={editValue}
+        onChange={(e) => setEditValue(e.target.value)}
+        onBlur={handleSave}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleSave();
+          } else if (e.key === "Escape") {
+            setEditValue(String(value));
+            setIsEditing(false);
+          }
+        }}
+        autoFocus
+        disabled={isSaving}
+        className="h-8 text-sm"
+      />
     </div>
   );
 }
 
 function AdminProductsPageInner() {
   const products = useQuery(api.products.getAllProducts, {});
+  const collections = useQuery(api.collections.getAllCollections, {});
   const deleteProduct = useMutation(api.products.deleteProduct);
+  const updateProduct = useMutation(api.products.updateProduct);
   const deleteAllProducts = useMutation(api.products.deleteAllProducts);
   const migrateFromShopify = useAction(api.migration.migrateFromShopify);
   const checkProductCount = useAction(api.migration.checkShopifyProductCount);
@@ -181,7 +131,7 @@ function AdminProductsPageInner() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCheckingCount, setIsCheckingCount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedProducts, setExpandedProducts] = useState<Set<string>>(new Set());
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -204,52 +154,64 @@ Missing: ${result.missing} products
 
 ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products." : "All products are synced!"}
       `.trim();
-      
+
       if (result.missing > 0) {
         toast.warning(message);
       } else {
         toast.success(message);
       }
     } catch (error) {
-      toast.error(`Failed to check product count: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to check product count: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setIsCheckingCount(false);
     }
   };
 
   const handleMigration = async () => {
-    if (!confirm("This will import all active products from Shopify. Products already in your database will be skipped automatically. Continue?")) {
+    if (
+      !confirm(
+        "This will import all active products from Shopify. Products already in your database will be skipped automatically. Continue?"
+      )
+    ) {
       return;
     }
 
     setIsMigrating(true);
     try {
       const result = await migrateFromShopify({ forceReimport: false });
-      
+
       // Store the full report
       setMigrationReport(result);
-      
+
       const parts = [
         `${result.successful} imported`,
         result.skipped > 0 ? `${result.skipped} skipped` : null,
         result.failed > 0 ? `${result.failed} failed` : null,
       ].filter(Boolean);
-      
+
       toast.success(
         `Migration complete! ${parts.join(", ")}. Click "View Details" to see full report.`
       );
-      
+
       // Show the dialog with detailed report
       setShowReportDialog(true);
     } catch (error) {
-      toast.error(`Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setIsMigrating(false);
     }
   };
 
   const handleClearAll = async () => {
-    if (!confirm("⚠️ WARNING: This will permanently delete ALL products and variants from your database. This action cannot be undone. Are you absolutely sure?")) {
+    if (
+      !confirm(
+        "⚠️ WARNING: This will permanently delete ALL products and variants from your database. This action cannot be undone. Are you absolutely sure?"
+      )
+    ) {
       return;
     }
 
@@ -271,14 +233,20 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         `All products cleared! Deleted ${result.deletedProducts} products and ${result.deletedVariants} variants.`
       );
     } catch (error) {
-      toast.error(`Failed to delete products: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to delete products: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     } finally {
       setIsDeleting(false);
     }
   };
 
   const handleDelete = async (productId: Id<"products">) => {
-    if (!confirm("Are you sure you want to delete this product? This will also delete all variants.")) {
+    if (
+      !confirm(
+        "Are you sure you want to delete this product? This will also delete all variants."
+      )
+    ) {
       return;
     }
 
@@ -287,6 +255,15 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       toast.success("Product deleted successfully");
     } catch (error) {
       toast.error("Failed to delete product");
+    }
+  };
+
+  const handleStatusChange = async (productId: Id<"products">, status: "active" | "draft" | "archived") => {
+    try {
+      await updateProduct({ productId, status });
+      toast.success("Status updated");
+    } catch (error) {
+      toast.error("Failed to update status");
     }
   };
 
@@ -303,39 +280,34 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     }
   };
 
-  const toggleProductExpanded = (productId: string) => {
-    setExpandedProducts((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        newSet.delete(productId);
-      } else {
-        newSet.add(productId);
-      }
-      return newSet;
-    });
-  };
-
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (!searchQuery.trim()) return products;
-    
+
     const query = searchQuery.toLowerCase().trim();
     return products.filter((product) => {
       return (
         product.title.toLowerCase().includes(query) ||
         product.description.toLowerCase().includes(query) ||
         product.slug.toLowerCase().includes(query) ||
-        product.tags.some((tag) => tag.toLowerCase().includes(query))
+        product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+        product.variants.some((v) => v.sku.toLowerCase().includes(query))
       );
     });
   }, [products, searchQuery]);
+
+  // Build collections map
+  const collectionsMap = useMemo(() => {
+    if (!collections) return new Map();
+    return new Map(collections.map((c) => [c._id, c]));
+  }, [collections]);
 
   if (products === undefined) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-32 w-full" />
+          <Skeleton key={i} className="h-20 w-full" />
         ))}
       </div>
     );
@@ -347,16 +319,16 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         <div>
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-muted-foreground">
-            {searchQuery 
-              ? `${filteredProducts.length} of ${products.length} products` 
+            {searchQuery
+              ? `${filteredProducts.length} of ${products.length} products`
               : `Manage your product catalog (${products.length} products)`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {products && products.length > 0 && (
-            <Button 
-              variant="outline" 
-              onClick={handleClearAll} 
+            <Button
+              variant="outline"
+              onClick={handleClearAll}
               disabled={isDeleting}
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
             >
@@ -373,8 +345,8 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             {isMigrating ? "Importing..." : "Import from Shopify"}
           </Button>
           {migrationReport && (
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               onClick={() => setShowReportDialog(true)}
               className="text-xs"
             >
@@ -397,7 +369,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search products by title, description, tags..."
+              placeholder="Search products by title, description, SKU, tags..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -413,9 +385,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               <PackageIcon />
             </EmptyMedia>
             <EmptyTitle>No products yet</EmptyTitle>
-            <EmptyDescription>
-              Create your first product to start selling
-            </EmptyDescription>
+            <EmptyDescription>Create your first product to start selling</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <Link to="/admin/products/new">
@@ -444,97 +414,188 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
           </EmptyContent>
         </Empty>
       ) : (
-        <div className="space-y-4">
-          {filteredProducts.map((product) => (
-            <Card key={product._id}>
-              <CardContent className="p-6">
-                <div className="flex gap-4">
-                  {/* Product Image */}
-                  {product.images.length > 0 && (
-                    <div className="size-24 bg-muted rounded-lg overflow-hidden shrink-0">
-                      <img
-                        src={product.images[0].url}
-                        alt={product.images[0].alt || product.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="p-3 text-left text-sm font-medium w-16">Image</th>
+                    <th className="p-3 text-left text-sm font-medium">Product Name</th>
+                    <th className="p-3 text-left text-sm font-medium w-32">SKU</th>
+                    <th className="p-3 text-left text-sm font-medium w-28">Price</th>
+                    <th className="p-3 text-left text-sm font-medium w-24">Inventory</th>
+                    <th className="p-3 text-left text-sm font-medium w-32">Collection</th>
+                    <th className="p-3 text-left text-sm font-medium w-28">Status</th>
+                    <th className="p-3 text-left text-sm font-medium w-32">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product) => {
+                    const firstVariant = product.variants[0];
+                    const totalInventory = product.variants.reduce(
+                      (sum, v) => sum + v.inventoryQuantity,
+                      0
+                    );
+                    const collection = product.collectionId
+                      ? collectionsMap.get(product.collectionId)
+                      : null;
 
-                  {/* Product Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-lg line-clamp-1">
-                          {product.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {product.description}
-                        </p>
-                      </div>
-                      <Badge className={getStatusBadgeColor(product.status)}>
-                        {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                      <span>{product.variants.length} variant(s)</span>
-                      <span>
-                        Total Stock:{" "}
-                        {product.variants.reduce(
-                          (sum, v) => sum + v.inventoryQuantity,
-                          0
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Variants - Inline Editing */}
-                    {expandedProducts.has(product._id) && product.variants.length > 0 && (
-                      <div className="space-y-3 mb-4">
-                        {product.variants.map((variant) => (
-                          <VariantEditor
-                            key={variant._id}
-                            variant={variant}
-                            onUpdate={() => {
-                              // The data will auto-refresh via Convex reactivity
-                            }}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      {product.variants.length > 0 && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => toggleProductExpanded(product._id)}
-                        >
-                          {expandedProducts.has(product._id) ? "Hide" : "Show"} Variants
-                        </Button>
-                      )}
-                      <Link to={`/admin/products/${product._id}`}>
-                        <Button size="sm" variant="outline">
-                          <EditIcon className="size-4 mr-2" />
-                          Edit
-                        </Button>
-                      </Link>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDelete(product._id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <TrashIcon className="size-4 mr-2" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    return (
+                      <tr key={product._id} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-3">
+                          {product.images.length > 0 ? (
+                            <button
+                              onClick={() => setSelectedImage(product.images[0].url)}
+                              className="size-12 bg-muted rounded overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                            >
+                              <img
+                                src={product.images[0].url}
+                                alt={product.images[0].alt || product.title}
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          ) : (
+                            <div className="size-12 bg-muted rounded flex items-center justify-center">
+                              <ImageIcon className="size-5 text-muted-foreground" />
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div>
+                            <p className="font-medium">{product.title}</p>
+                            {product.variants.length > 1 && (
+                              <p className="text-xs text-muted-foreground">
+                                {product.variants.length} variants
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          {firstVariant ? (
+                            <div>
+                              <EditableCell
+                                variantId={firstVariant._id}
+                                value={firstVariant.sku}
+                                type="text"
+                                field="sku"
+                              />
+                              {product.variants.length > 1 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  +{product.variants.length - 1} more
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {firstVariant ? (
+                            <div>
+                              <EditableCell
+                                variantId={firstVariant._id}
+                                value={firstVariant.price}
+                                type="number"
+                                field="price"
+                              />
+                              {product.variants.length > 1 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  +{product.variants.length - 1} more
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          {firstVariant ? (
+                            <div>
+                              <EditableCell
+                                variantId={firstVariant._id}
+                                value={firstVariant.inventoryQuantity}
+                                type="number"
+                                field="inventoryQuantity"
+                              />
+                              {product.variants.length > 1 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Total: {totalInventory}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">-</span>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className="text-sm">
+                            {collection ? collection.name : "-"}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <Select
+                            value={product.status}
+                            onValueChange={(value: "active" | "draft" | "archived") =>
+                              handleStatusChange(product._id, value)
+                            }
+                          >
+                            <SelectTrigger
+                              className={`h-8 text-xs ${getStatusBadgeColor(product.status)}`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="active">Active</SelectItem>
+                              <SelectItem value="draft">Draft</SelectItem>
+                              <SelectItem value="archived">Archived</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-1">
+                            <Link to={`/admin/products/${product._id}`}>
+                              <Button size="sm" variant="outline">
+                                <EditIcon className="size-3" />
+                              </Button>
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDelete(product._id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <TrashIcon className="size-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Product Image</DialogTitle>
+          </DialogHeader>
+          {selectedImage && (
+            <div className="w-full">
+              <img
+                src={selectedImage}
+                alt="Product preview"
+                className="w-full h-auto rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Migration Report Dialog */}
       <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
@@ -544,7 +605,8 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             <DialogDescription>
               {migrationReport && (
                 <>
-                  Imported {migrationReport.successful} of {migrationReport.total} products from Shopify
+                  Imported {migrationReport.successful} of {migrationReport.total} products from
+                  Shopify
                   {migrationReport.skipped > 0 && ` (${migrationReport.skipped} skipped)`}
                   {migrationReport.failed > 0 && ` (${migrationReport.failed} failed)`}
                 </>
@@ -606,7 +668,10 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                   ) : (
                     <div className="space-y-2">
                       {migrationReport.successfulProducts.map((title, idx) => (
-                        <div key={idx} className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50"
+                        >
                           <CheckCircleIcon className="size-4 text-green-500 flex-shrink-0" />
                           <span className="text-sm">{title}</span>
                         </div>
@@ -669,10 +734,16 @@ export default function AdminProductsPage() {
               <Link to="/admin/products" className="text-sm font-medium text-primary">
                 Products
               </Link>
-              <Link to="/admin/collections" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/admin/collections"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Collections
               </Link>
-              <Link to="/admin/orders" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/admin/orders"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Orders
               </Link>
               <Link to="/">
@@ -685,7 +756,7 @@ export default function AdminProductsPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Unauthenticated>
           <Empty>
             <EmptyHeader>
@@ -705,7 +776,7 @@ export default function AdminProductsPage() {
         <AuthLoading>
           <div className="space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-32 w-full" />
+              <Skeleton key={i} className="h-20 w-full" />
             ))}
           </div>
         </AuthLoading>
