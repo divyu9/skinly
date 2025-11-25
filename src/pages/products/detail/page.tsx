@@ -135,6 +135,9 @@ export default function ProductDetailPage() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewImages, setReviewImages] = useState<File[]>([]);
+  const [reviewVideos, setReviewVideos] = useState<File[]>([]);
+  const [uploadingReview, setUploadingReview] = useState(false);
   const [crossSellDialogOpen, setCrossSellDialogOpen] = useState(false);
   
   // Mockup image state
@@ -341,6 +344,7 @@ export default function ProductDetailPage() {
   
   const addToCart = useMutation(api.cart.addToCart);
   const addReview = useMutation(api.reviews.addReview);
+  const generateUploadUrl = useMutation(api.reviews.generateUploadUrl);
   const { user } = useAuth();
   const { addToGuestCart } = useGuestCart();
   const [selectedImage, setSelectedImage] = useState<string>("");
@@ -442,18 +446,52 @@ export default function ProductDetailPage() {
       return;
     }
     
+    setUploadingReview(true);
+    
     try {
+      // Upload images
+      const imageStorageIds: string[] = [];
+      for (const image of reviewImages) {
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": image.type },
+          body: image,
+        });
+        const { storageId } = await result.json();
+        imageStorageIds.push(storageId);
+      }
+      
+      // Upload videos
+      const videoStorageIds: string[] = [];
+      for (const video of reviewVideos) {
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": video.type },
+          body: video,
+        });
+        const { storageId } = await result.json();
+        videoStorageIds.push(storageId);
+      }
+      
+      // Submit review
       await addReview({
         productId: product._id,
         rating: reviewRating,
         title: reviewTitle,
         comment: reviewComment,
+        images: imageStorageIds.length > 0 ? imageStorageIds : undefined,
+        videos: videoStorageIds.length > 0 ? videoStorageIds : undefined,
       });
+      
       toast.success("Review added successfully!");
       setReviewDialogOpen(false);
       setReviewTitle("");
       setReviewComment("");
       setReviewRating(5);
+      setReviewImages([]);
+      setReviewVideos([]);
     } catch (error) {
       if (error instanceof ConvexError) {
         const { message } = error.data as { code: string; message: string };
@@ -461,6 +499,8 @@ export default function ProductDetailPage() {
       } else {
         toast.error("Failed to add review");
       }
+    } finally {
+      setUploadingReview(false);
     }
   };
 
@@ -1031,7 +1071,41 @@ export default function ProductDetailPage() {
                           </span>
                         </div>
                         <h4 className="font-semibold mb-2">{review.title}</h4>
-                        <p className="text-sm text-muted-foreground">{review.comment}</p>
+                        <p className="text-sm text-muted-foreground mb-3">{review.comment}</p>
+                        
+                        {/* Review Media */}
+                        {((review.imageUrls && review.imageUrls.length > 0) ||
+                          (review.videoUrls && review.videoUrls.length > 0)) && (
+                          <div className="space-y-3 mt-4">
+                            {/* Images */}
+                            {review.imageUrls && review.imageUrls.length > 0 && (
+                              <div className="flex gap-2 overflow-x-auto">
+                                {review.imageUrls.map((url, idx) => (
+                                  <img
+                                    key={idx}
+                                    src={url}
+                                    alt={`Review image ${idx + 1}`}
+                                    className="h-32 w-32 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => window.open(url, '_blank')}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {/* Videos */}
+                            {review.videoUrls && review.videoUrls.length > 0 && (
+                              <div className="flex gap-2 overflow-x-auto">
+                                {review.videoUrls.map((url, idx) => (
+                                  <video
+                                    key={idx}
+                                    src={url}
+                                    controls
+                                    className="h-40 rounded-lg"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))}
@@ -1144,7 +1218,7 @@ export default function ProductDetailPage() {
 
       {/* Add Review Dialog */}
       <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Write a Review</DialogTitle>
             <DialogDescription>Share your experience with this product</DialogDescription>
@@ -1187,12 +1261,98 @@ export default function ProductDetailPage() {
                 rows={4}
               />
             </div>
+            
+            {/* Image Upload */}
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Images {reviewImages.length > 0 && `(${reviewImages.length})`}
+              </label>
+              <Input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setReviewImages((prev) => [...prev, ...files]);
+                }}
+              />
+              {reviewImages.length > 0 && (
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {reviewImages.map((file, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Preview ${idx + 1}`}
+                        className="h-20 w-20 rounded object-cover"
+                      />
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="absolute -right-2 -top-2 size-6 rounded-full"
+                        onClick={() => {
+                          setReviewImages((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {/* Video Upload */}
+            <div>
+              <label className="text-sm font-semibold mb-2 block">
+                Videos {reviewVideos.length > 0 && `(${reviewVideos.length})`}
+              </label>
+              <Input
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setReviewVideos((prev) => [...prev, ...files]);
+                }}
+              />
+              {reviewVideos.length > 0 && (
+                <div className="mt-2 flex gap-2 flex-wrap">
+                  {reviewVideos.map((file, idx) => (
+                    <div key={idx} className="relative">
+                      <video
+                        src={URL.createObjectURL(file)}
+                        className="h-20 rounded"
+                        controls
+                      />
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="absolute -right-2 -top-2 size-6 rounded-full"
+                        onClick={() => {
+                          setReviewVideos((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setReviewDialogOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setReviewDialogOpen(false);
+                  setReviewImages([]);
+                  setReviewVideos([]);
+                }}
+              >
                 Cancel
               </Button>
-              <Button onClick={handleAddReview}>
-                Submit Review
+              <Button onClick={handleAddReview} disabled={uploadingReview}>
+                {uploadingReview ? "Uploading..." : "Submit Review"}
               </Button>
             </div>
           </div>

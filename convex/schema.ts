@@ -149,7 +149,8 @@ export default defineSchema({
     title: v.string(),
     comment: v.string(),
     verified: v.boolean(), // verified purchase
-    images: v.optional(v.array(v.string())), // Array of storage IDs
+    images: v.optional(v.array(v.string())), // Array of image storage IDs
+    videos: v.optional(v.array(v.string())), // Array of video storage IDs
   })
     .index("by_product", ["productId"])
     .index("by_user", ["userId"])

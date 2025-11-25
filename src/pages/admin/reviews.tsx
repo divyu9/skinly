@@ -196,17 +196,34 @@ export default function AdminReviews() {
                       <p className="mt-2 text-sm text-muted-foreground">{review.comment}</p>
                     </div>
 
-                    {/* Images */}
-                    {review.imageUrls && review.imageUrls.length > 0 && (
-                      <div className="flex gap-2 overflow-x-auto">
-                        {review.imageUrls.map((url, idx) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt={`Review image ${idx + 1}`}
-                            className="h-24 w-24 rounded-lg object-cover"
-                          />
-                        ))}
+                    {/* Media (Images & Videos) */}
+                    {((review.imageUrls && review.imageUrls.length > 0) ||
+                      (review.videoUrls && review.videoUrls.length > 0)) && (
+                      <div className="space-y-2">
+                        {review.imageUrls && review.imageUrls.length > 0 && (
+                          <div className="flex gap-2 overflow-x-auto">
+                            {review.imageUrls.map((url, idx) => (
+                              <img
+                                key={idx}
+                                src={url}
+                                alt={`Review image ${idx + 1}`}
+                                className="h-24 w-24 rounded-lg object-cover"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {review.videoUrls && review.videoUrls.length > 0 && (
+                          <div className="flex gap-2 overflow-x-auto">
+                            {review.videoUrls.map((url, idx) => (
+                              <video
+                                key={idx}
+                                src={url}
+                                controls
+                                className="h-32 rounded-lg"
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

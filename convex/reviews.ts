@@ -11,8 +11,8 @@ export const getProductReviews = query({
       .order("desc")
       .collect();
     
-    // Get image URLs if they exist
-    const reviewsWithImages = await Promise.all(
+    // Get image and video URLs if they exist
+    const reviewsWithMedia = await Promise.all(
       reviews.map(async (review) => {
         const imageUrls = review.images
           ? await Promise.all(
@@ -20,14 +20,21 @@ export const getProductReviews = query({
             )
           : [];
         
+        const videoUrls = review.videos
+          ? await Promise.all(
+              review.videos.map((storageId) => ctx.storage.getUrl(storageId))
+            )
+          : [];
+        
         return {
           ...review,
           imageUrls: imageUrls.filter((url): url is string => url !== null),
+          videoUrls: videoUrls.filter((url): url is string => url !== null),
         };
       })
     );
     
-    return reviewsWithImages;
+    return reviewsWithMedia;
   },
 });
 
@@ -38,6 +45,7 @@ export const addReview = mutation({
     title: v.string(),
     comment: v.string(),
     images: v.optional(v.array(v.string())),
+    videos: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -96,6 +104,7 @@ export const addReview = mutation({
       comment: args.comment,
       verified: hasPurchased,
       images: args.images,
+      videos: args.videos,
     });
 
     return reviewId;
@@ -166,10 +175,18 @@ export const getAllReviews = query({
             )
           : [];
         
+        // Get video URLs if they exist
+        const videoUrls = review.videos
+          ? await Promise.all(
+              review.videos.map((storageId) => ctx.storage.getUrl(storageId))
+            )
+          : [];
+        
         return {
           ...review,
           productTitle: product?.title || "Unknown Product",
           imageUrls: imageUrls.filter((url): url is string => url !== null),
+          videoUrls: videoUrls.filter((url): url is string => url !== null),
         };
       })
     );
@@ -192,8 +209,8 @@ export const getVerifiedReviews = query({
       .order("desc")
       .take(limit);
     
-    // Get image URLs if they exist
-    const reviewsWithImages = await Promise.all(
+    // Get image and video URLs if they exist
+    const reviewsWithMedia = await Promise.all(
       reviews.map(async (review) => {
         const imageUrls = review.images
           ? await Promise.all(
@@ -201,14 +218,21 @@ export const getVerifiedReviews = query({
             )
           : [];
         
+        const videoUrls = review.videos
+          ? await Promise.all(
+              review.videos.map((storageId) => ctx.storage.getUrl(storageId))
+            )
+          : [];
+        
         return {
           ...review,
           imageUrls: imageUrls.filter((url): url is string => url !== null),
+          videoUrls: videoUrls.filter((url): url is string => url !== null),
         };
       })
     );
     
-    return reviewsWithImages;
+    return reviewsWithMedia;
   },
 });
 
