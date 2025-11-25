@@ -888,15 +888,17 @@ export function RollsManagement() {
           <div className="space-y-4">
             <div>
               <Label htmlFor="rNumber">R-Number *</Label>
-              <Input
-                id="rNumber"
+              <Combobox
                 value={newRNumber}
-                onChange={(e) => setNewRNumber(e.target.value)}
-                placeholder="e.g., R-1, R-59"
-                className="font-mono"
+                onValueChange={setNewRNumber}
+                options={existingRNumbers}
+                placeholder="Select or create R-number"
+                emptyText="No R-numbers found"
+                searchPlaceholder="Search R-numbers..."
+                allowCustom
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Enter the R-number this SKU should be mapped to
+                Select an existing R-number or create a new one
               </p>
             </div>
           </div>
