@@ -646,7 +646,7 @@ export default function ProductsPage() {
                     {isOutOfStock && autoSortOOS && (
                       <div className="absolute top-2 left-2 right-2">
                         <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">
-                          OUT OF STOCK - REQUEST RESTOCK
+                          Sold Out
                         </Badge>
                       </div>
                     )}
