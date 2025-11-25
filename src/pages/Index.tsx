@@ -1420,7 +1420,7 @@ export default function Index() {
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
-              className="h-10"
+              className="h-16"
             />
           </div>
           <div className="flex items-center gap-6">
@@ -2525,7 +2525,7 @@ export default function Index() {
                 <img 
                   src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                   alt="Skinly" 
-                  className="h-10"
+                  className="h-16"
                 />
               </div>
               <p className="text-sm text-muted-foreground">

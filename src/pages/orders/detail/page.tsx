@@ -72,7 +72,7 @@ function OrderDetailPageInner() {
               <img
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
                 alt="Skinly"
-                className="h-8"
+                className="h-12"
               />
             </Link>
           </div>

@@ -287,7 +287,7 @@ export default function ProductsPage() {
               <img 
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                 alt="Skinly" 
-                className="h-10"
+                className="h-16"
               />
             </Link>
             <Button size="sm" asChild>
@@ -389,7 +389,7 @@ export default function ProductsPage() {
               <img 
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                 alt="Skinly" 
-                className="h-10"
+                className="h-16"
               />
             </Link>
           </div>

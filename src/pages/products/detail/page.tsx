@@ -514,7 +514,7 @@ export default function ProductDetailPage() {
               <img 
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                 alt="Skinly" 
-                className="h-10"
+                className="h-16"
               />
             </Link>
           </div>
@@ -548,7 +548,7 @@ export default function ProductDetailPage() {
                 <img 
                   src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                   alt="Skinly" 
-                  className="h-10"
+                  className="h-16"
                 />
               </Link>
             </div>
@@ -584,7 +584,7 @@ export default function ProductDetailPage() {
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
-              className="h-10"
+              className="h-16"
             />
           </Link>
           <div className="flex items-center gap-6">

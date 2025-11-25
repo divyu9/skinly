@@ -139,7 +139,7 @@ function CheckoutPageInner() {
               <img
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
                 alt="Skinly"
-                className="h-8"
+                className="h-12"
               />
             </Link>
             <h1 className="text-2xl font-bold">Checkout</h1>
