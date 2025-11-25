@@ -3,9 +3,10 @@ import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
@@ -41,6 +42,9 @@ interface ConvexProduct {
 
 export default function ProductsPage() {
   const verifyConnection = useAction(api.shopify.verifyConnection);
+  
+  // Get OOS sorting setting
+  const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
   
   // Use paginated query - load 30 products at a time
   const { results: productsData, status, loadMore } = usePaginatedQuery(
@@ -242,8 +246,21 @@ export default function ProductsPage() {
       });
     }
     
+    // Auto-sort by stock status if enabled (in-stock first, OOS last)
+    if (autoSortOOS === true) {
+      result.sort((a, b) => {
+        const aInStock = a.variants.some(v => v.available && v.inventory_quantity > 0);
+        const bInStock = b.variants.some(v => v.available && v.inventory_quantity > 0);
+        
+        // In-stock products come first
+        if (aInStock && !bInStock) return -1;
+        if (!aInStock && bInStock) return 1;
+        return 0;
+      });
+    }
+    
     return result;
-  }, [filteredProducts, sortBy, stockFilter, allProducts]);
+  }, [filteredProducts, sortBy, stockFilter, allProducts, autoSortOOS]);
   
   // Track search events
   useEffect(() => {
@@ -608,10 +625,13 @@ export default function ProductsPage() {
               const priceDisplay = minPrice === maxPrice 
                 ? `₹${minPrice.toFixed(0)}`
                 : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
+              
+              // Check if all variants are out of stock
+              const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
 
               return (
                 <Card key={product._id} className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0">
-                  <div className="aspect-square overflow-hidden bg-muted">
+                  <div className="relative aspect-square overflow-hidden bg-muted">
                     {mainImage ? (
                       <img
                         src={mainImage.url}
@@ -623,16 +643,37 @@ export default function ProductsPage() {
                         <PackageIcon className="size-8 sm:size-16 text-muted-foreground" />
                       </div>
                     )}
+                    {isOutOfStock && autoSortOOS && (
+                      <div className="absolute top-2 left-2 right-2">
+                        <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">
+                          OUT OF STOCK - REQUEST RESTOCK
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
                     <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-lg sm:leading-normal line-clamp-2">{product.title}</h3>
                     <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
-                    <Button className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4" asChild>
-                      <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
-                        <span className="hidden sm:inline">Select My Phone Model</span>
-                        <span className="sm:hidden">Select</span>
-                      </Link>
-                    </Button>
+                    {isOutOfStock && autoSortOOS ? (
+                      <Button 
+                        className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4" 
+                        variant="outline"
+                        asChild
+                      >
+                        <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
+                          <BellIcon className="size-3 sm:size-4 mr-1" />
+                          <span className="hidden sm:inline">Request Restock</span>
+                          <span className="sm:hidden">Restock</span>
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4" asChild>
+                        <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
+                          <span className="hidden sm:inline">Select My Phone Model</span>
+                          <span className="sm:hidden">Select</span>
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </Card>
               );

@@ -28,6 +28,7 @@ import type * as phonepe from "../phonepe.js";
 import type * as products from "../products.js";
 import type * as rapidshyp from "../rapidshyp.js";
 import type * as reviews from "../reviews.js";
+import type * as settings from "../settings.js";
 import type * as shopify from "../shopify.js";
 import type * as stockNotifications from "../stockNotifications.js";
 import type * as stockNotificationsActions from "../stockNotificationsActions.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   products: typeof products;
   rapidshyp: typeof rapidshyp;
   reviews: typeof reviews;
+  settings: typeof settings;
   shopify: typeof shopify;
   stockNotifications: typeof stockNotifications;
   stockNotificationsActions: typeof stockNotificationsActions;

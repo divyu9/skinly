@@ -247,4 +247,9 @@ export default defineSchema({
     .index("by_variant", ["variantId"])
     .index("by_status", ["status"])
     .index("by_variant_and_status", ["variantId", "status"]),
+
+  settings: defineTable({
+    key: v.string(), // Unique setting key
+    value: v.union(v.boolean(), v.string(), v.number()), // Setting value
+  }).index("by_key", ["key"]),
 });

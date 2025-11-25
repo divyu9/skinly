@@ -16,6 +16,7 @@ export function AdminHeader() {
     { path: "/admin/coupons", label: "Coupons" },
     { path: "/admin/abandoned-carts", label: "Abandoned Carts" },
     { path: "/admin/stock-notifications", label: "Stock Alerts" },
+    { path: "/admin/oos", label: "OOS Settings" },
     { path: "/admin/mockups", label: "Mockups" },
   ];
   
