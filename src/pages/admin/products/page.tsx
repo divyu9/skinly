@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -26,6 +26,13 @@ import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { ImageManager } from "./_components/image-manager.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
+import { BulkPriceEditDialog } from "./_components/bulk-price-edit-dialog.tsx";
 
 // Inline editable cell component
 function EditableCell({
@@ -137,6 +144,7 @@ function AdminProductsPageInner() {
   const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T">("all");
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
   const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<"all" | "phone" | "laptop" | "camera" | "mac-mini" | "tablet" | "console" | "lens" | "drone" | "charger">("all");
+  const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -625,15 +633,31 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             </>
           )}
           {products && products.length > 0 && (
-            <Button
-              variant="outline"
-              onClick={handleClearAll}
-              disabled={isDeleting}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              <TrashIcon className="size-4 mr-2" />
-              {isDeleting ? "Clearing..." : "Clear All"}
-            </Button>
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <MoreVerticalIcon className="size-4 mr-2" />
+                    Bulk Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowBulkPriceEdit(true)}>
+                    <DollarSignIcon className="size-4 mr-2" />
+                    Bulk Edit Prices
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                variant="outline"
+                onClick={handleClearAll}
+                disabled={isDeleting}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <TrashIcon className="size-4 mr-2" />
+                {isDeleting ? "Clearing..." : "Clear All"}
+              </Button>
+            </>
           )}
           <Button variant="secondary" onClick={handleCheckCount} disabled={isCheckingCount}>
             <PackageIcon className="size-4 mr-2" />
@@ -1232,6 +1256,13 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Price Edit Dialog */}
+      <BulkPriceEditDialog
+        open={showBulkPriceEdit}
+        onOpenChange={setShowBulkPriceEdit}
+        products={filteredProducts}
+      />
     </div>
   );
 }

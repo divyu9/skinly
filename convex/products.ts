@@ -829,3 +829,65 @@ export const reorderProductImages = mutation({
     return args.images;
   },
 });
+
+// Bulk update variant prices
+export const bulkUpdateVariantPrices = mutation({
+  args: {
+    updates: v.array(v.object({
+      variantId: v.id("variants"),
+      newPrice: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: Array<{ variantId: string; error: string }> = [];
+
+    for (const update of args.updates) {
+      try {
+        // Validate price
+        if (update.newPrice < 0) {
+          errors.push({
+            variantId: update.variantId,
+            error: "Price cannot be negative",
+          });
+          errorCount++;
+          continue;
+        }
+
+        const variant = await ctx.db.get(update.variantId);
+        if (!variant) {
+          errors.push({
+            variantId: update.variantId,
+            error: "Variant not found",
+          });
+          errorCount++;
+          continue;
+        }
+
+        await ctx.db.patch(update.variantId, { price: update.newPrice });
+        successCount++;
+      } catch (error) {
+        errors.push({
+          variantId: update.variantId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        errorCount++;
+      }
+    }
+
+    return {
+      successCount,
+      errorCount,
+      errors,
+    };
+  },
+});
