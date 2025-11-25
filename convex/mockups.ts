@@ -248,3 +248,94 @@ export const verifyMockupFiles = query({
     };
   },
 });
+
+/**
+ * Get missing mockups by checking which phone model + SKU combinations lack mockup images
+ * Returns models grouped by brand with their missing SKUs
+ */
+export const getMissingMockups = query({
+  args: { 
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const category = args.category || "phone";
+    
+    // Get all supported models for the category
+    const supportedModels = await ctx.db
+      .query("supportedModels")
+      .filter((q) => q.and(
+        q.eq(q.field("category"), category),
+        q.eq(q.field("isActive"), true)
+      ))
+      .collect();
+    
+    // Get all product variants (SKUs)
+    const variants = await ctx.db.query("variants").collect();
+    const allSKUs = new Set<string>();
+    for (const variant of variants) {
+      allSKUs.add(variant.sku);
+    }
+    
+    // Get all existing mockups
+    const existingMockups = await ctx.db.query("mockups").collect();
+    
+    // Create a set of existing mockup combinations (normalized model + SKU)
+    const existingCombos = new Set<string>();
+    for (const mockup of existingMockups) {
+      const key = `${normalizeModelName(mockup.model)}|${mockup.sku}`;
+      existingCombos.add(key);
+    }
+    
+    // Find missing combinations
+    const missingByModel: Record<string, {
+      brand: string;
+      model: string;
+      missingSKUs: string[];
+      totalMissing: number;
+    }> = {};
+    
+    for (const supportedModel of supportedModels) {
+      const normalizedModel = normalizeModelName(supportedModel.modelName);
+      const missingSKUs: string[] = [];
+      
+      for (const sku of allSKUs) {
+        const key = `${normalizedModel}|${sku}`;
+        if (!existingCombos.has(key)) {
+          missingSKUs.push(sku);
+        }
+      }
+      
+      if (missingSKUs.length > 0) {
+        const modelKey = `${supportedModel.brandName}|${supportedModel.modelName}`;
+        missingByModel[modelKey] = {
+          brand: supportedModel.brandName,
+          model: supportedModel.modelName,
+          missingSKUs,
+          totalMissing: missingSKUs.length,
+        };
+      }
+    }
+    
+    // Convert to array and sort by brand then model
+    const results = Object.values(missingByModel).sort((a, b) => {
+      if (a.brand !== b.brand) {
+        return a.brand.localeCompare(b.brand);
+      }
+      return a.model.localeCompare(b.model);
+    });
+    
+    // Calculate stats
+    const totalMissingCombinations = results.reduce((sum, r) => sum + r.totalMissing, 0);
+    const uniqueBrands = new Set(results.map(r => r.brand)).size;
+    
+    return {
+      results,
+      stats: {
+        totalMissingCombinations,
+        modelsAffected: results.length,
+        brandsAffected: uniqueBrands,
+        totalSKUs: allSKUs.size,
+      }
+    };
+  },
+});

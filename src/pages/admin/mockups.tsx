@@ -686,11 +686,20 @@ export default function MockupsPage() {
       
       <Authenticated>
         <div className="container mx-auto py-8 px-4">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold">Mockup Management</h1>
-            <p className="text-muted-foreground mt-2">
-              Upload mockup images with automatic parsing and import
-            </p>
+          <div className="mb-6 flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Mockup Management</h1>
+              <p className="text-muted-foreground mt-2">
+                Upload mockup images with automatic parsing and import
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => window.location.href = '/admin/mockups/missing'}
+            >
+              <AlertCircleIcon className="h-4 w-4 mr-2" />
+              Check Missing Mockups
+            </Button>
           </div>
         
         {/* Large Upload Warning */}
