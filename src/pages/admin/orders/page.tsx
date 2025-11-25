@@ -1,33 +1,28 @@
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Link } from "react-router-dom";
-import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, SendIcon, FileTextIcon } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Spinner } from "@/components/ui/spinner.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 function AdminOrdersPageInner() {
+  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [editingShipping, setEditingShipping] = useState<Id<"orders"> | null>(null);
-  const [shippingForm, setShippingForm] = useState({
-    awbNumber: "",
-    trackingUrl: "",
-    shippingStatus: "",
-  });
+  const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
 
   const stats = useQuery(api.admin.orders.getOrderStats);
   const allOrders = useQuery(api.admin.orders.getAllOrders, {
@@ -38,86 +33,8 @@ function AdminOrdersPageInner() {
     api.admin.orders.searchOrders,
     searchTerm.length >= 3 ? { searchTerm } : "skip"
   );
-  const updateOrderStatus = useMutation(api.admin.orders.updateOrderStatus);
-  const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
-  const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
-  const createShipment = useAction(api.rapidshyp.createShipment);
-  const generateLabel = useAction(api.rapidshyp.generateShippingLabel);
-  
-  const [creatingShipment, setCreatingShipment] = useState<Id<"orders"> | null>(null);
 
   const displayOrders = searchTerm.length >= 3 ? searchResults : allOrders;
-
-  const handleStatusChange = async (
-    orderId: Id<"orders">,
-    status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
-  ) => {
-    try {
-      await updateOrderStatus({ orderId, status });
-      toast.success("Order status updated");
-    } catch (error) {
-      toast.error("Failed to update status");
-    }
-  };
-
-  const handlePaymentStatusChange = async (
-    orderId: Id<"orders">,
-    paymentStatus: "pending" | "success" | "failed"
-  ) => {
-    try {
-      await updatePaymentStatus({ orderId, paymentStatus });
-      toast.success("Payment status updated");
-    } catch (error) {
-      toast.error("Failed to update payment status");
-    }
-  };
-
-  const handleShippingUpdate = async (orderId: Id<"orders">) => {
-    try {
-      await updateShippingInfo({
-        orderId,
-        ...shippingForm,
-      });
-      toast.success("Shipping information updated");
-      setEditingShipping(null);
-      setShippingForm({ awbNumber: "", trackingUrl: "", shippingStatus: "" });
-    } catch (error) {
-      toast.error("Failed to update shipping info");
-    }
-  };
-
-  const handleCreateShipment = async (orderId: Id<"orders">) => {
-    setCreatingShipment(orderId);
-    try {
-      const result = await createShipment({ orderId });
-      if (result.success) {
-        toast.success(`Shipment created! AWB: ${result.awbNumber}`);
-      } else {
-        toast.error("Failed to create shipment");
-      }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create shipment";
-      toast.error(errorMessage);
-    } finally {
-      setCreatingShipment(null);
-    }
-  };
-
-  const handleGenerateLabel = async (awbNumber: string) => {
-    try {
-      toast.loading("Generating shipping label...");
-      const result = await generateLabel({ awbNumber });
-      if (result.success && result.labelUrl) {
-        window.open(result.labelUrl, "_blank");
-        toast.success("Label generated successfully");
-      } else {
-        toast.error("Failed to generate label");
-      }
-    } catch (error) {
-      toast.error("Failed to generate label");
-    }
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -161,6 +78,98 @@ function AdminOrdersPageInner() {
     });
   };
 
+  const handleSelectOrder = (orderId: Id<"orders">, checked: boolean) => {
+    const newSelected = new Set(selectedOrders);
+    if (checked) {
+      newSelected.add(orderId);
+    } else {
+      newSelected.delete(orderId);
+    }
+    setSelectedOrders(newSelected);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && displayOrders) {
+      setSelectedOrders(new Set(displayOrders.map((o) => o._id)));
+    } else {
+      setSelectedOrders(new Set());
+    }
+  };
+
+  const generatePackList = () => {
+    if (!displayOrders || selectedOrders.size === 0) {
+      toast.error("Please select orders to generate pack list");
+      return;
+    }
+
+    const selectedOrdersList = displayOrders.filter((o) =>
+      selectedOrders.has(o._id)
+    );
+
+    // Create a consolidated SKU list with quantities
+    const skuMap: Record<string, { sku: string; quantity: number; orders: string[] }> = {};
+
+    selectedOrdersList.forEach((order) => {
+      order.items.forEach((item) => {
+        const sku = item.variant; // Using variant as SKU
+        if (skuMap[sku]) {
+          skuMap[sku].quantity += item.quantity;
+          skuMap[sku].orders.push(order.orderNumber);
+        } else {
+          skuMap[sku] = {
+            sku,
+            quantity: item.quantity,
+            orders: [order.orderNumber],
+          };
+        }
+      });
+    });
+
+    // Generate text content
+    let packListText = `PACK LIST - Generated ${new Date().toLocaleString("en-IN")}\n`;
+    packListText += `Total Orders: ${selectedOrders.size}\n`;
+    packListText += `Total Unique SKUs: ${Object.keys(skuMap).length}\n`;
+    packListText += `\n${"=".repeat(80)}\n\n`;
+
+    packListText += `SKU\t\tQuantity\tOrder Numbers\n`;
+    packListText += `${"-".repeat(80)}\n`;
+
+    Object.values(skuMap).forEach((item) => {
+      packListText += `${item.sku}\t\t${item.quantity}\t\t${item.orders.join(", ")}\n`;
+    });
+
+    packListText += `\n${"=".repeat(80)}\n\n`;
+    packListText += `DETAILED ORDER ITEMS:\n\n`;
+
+    selectedOrdersList.forEach((order) => {
+      packListText += `Order: ${order.orderNumber}\n`;
+      packListText += `Customer: ${order.shippingAddress.fullName}\n`;
+      packListText += `Phone: ${order.shippingAddress.phone}\n`;
+      packListText += `City: ${order.shippingAddress.city}, ${order.shippingAddress.state}\n`;
+      packListText += `Items:\n`;
+      order.items.forEach((item) => {
+        packListText += `  - SKU: ${item.variant} | ${item.productTitle} | Qty: ${item.quantity}`;
+        if (item.phoneModel) packListText += ` | Model: ${item.phoneModel}`;
+        if (item.coverage) packListText += ` | Coverage: ${item.coverage}`;
+        packListText += `\n`;
+      });
+      packListText += `\n`;
+    });
+
+    // Download as text file
+    const blob = new Blob([packListText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `pack-list-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Pack list generated for ${selectedOrders.size} orders`);
+  };
+
   if (!stats || displayOrders === undefined) {
     return (
       <div className="space-y-6">
@@ -169,11 +178,7 @@ function AdminOrdersPageInner() {
             <Skeleton key={i} className="h-32 w-full" />
           ))}
         </div>
-        <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-64 w-full" />
-          ))}
-        </div>
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
@@ -325,7 +330,26 @@ function AdminOrdersPageInner() {
         </CardContent>
       </Card>
 
-      {/* Orders List */}
+      {/* Pack List Button */}
+      {displayOrders && displayOrders.length > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            {selectedOrders.size > 0
+              ? `${selectedOrders.size} order${selectedOrders.size > 1 ? "s" : ""} selected`
+              : "Select orders to create pack list"}
+          </div>
+          <Button
+            onClick={generatePackList}
+            disabled={selectedOrders.size === 0}
+            variant="default"
+          >
+            <ListChecksIcon className="size-4 mr-2" />
+            Generate Pack List ({selectedOrders.size})
+          </Button>
+        </div>
+      )}
+
+      {/* Orders Table */}
       {displayOrders.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -343,327 +367,100 @@ function AdminOrdersPageInner() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <div className="space-y-4">
-          {displayOrders.map((order) => (
-            <Card key={order._id}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(order._creationTime)}
-                    </p>
-                    {order.user && (
-                      <p className="text-xs text-muted-foreground">
-                        {order.user.email}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 justify-end">
-                    <Select
-                      value={order.status}
-                      onValueChange={(value: typeof order.status) =>
-                        handleStatusChange(order._id, value)
-                      }
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="border-b bg-muted/50">
+                  <tr>
+                    <th className="p-3 text-left">
+                      <Checkbox
+                        checked={
+                          displayOrders.length > 0 &&
+                          selectedOrders.size === displayOrders.length
+                        }
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </th>
+                    <th className="p-3 text-left text-sm font-medium">Order Number</th>
+                    <th className="p-3 text-left text-sm font-medium">Date & Time</th>
+                    <th className="p-3 text-left text-sm font-medium">Customer</th>
+                    <th className="p-3 text-left text-sm font-medium">Phone</th>
+                    <th className="p-3 text-left text-sm font-medium">City</th>
+                    <th className="p-3 text-left text-sm font-medium">Order Value</th>
+                    <th className="p-3 text-left text-sm font-medium">Items</th>
+                    <th className="p-3 text-left text-sm font-medium">Order Status</th>
+                    <th className="p-3 text-left text-sm font-medium">Payment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayOrders.map((order) => (
+                    <tr
+                      key={order._id}
+                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        // Don't navigate if clicking checkbox
+                        if ((e.target as HTMLElement).closest('button[role="checkbox"]')) {
+                          return;
+                        }
+                        navigate(`/admin/orders/${order._id}`);
+                      }}
                     >
-                      <SelectTrigger
-                        className={`w-32 ${getStatusColor(order.status)}`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="shipped">Shipped</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select
-                      value={order.paymentStatus || "pending"}
-                      onValueChange={(value: "pending" | "success" | "failed") =>
-                        handlePaymentStatusChange(order._id, value)
-                      }
-                    >
-                      <SelectTrigger
-                        className={`w-32 ${getPaymentStatusColor(order.paymentStatus)}`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Payment Pending</SelectItem>
-                        <SelectItem value="success">Paid</SelectItem>
-                        <SelectItem value="failed">Payment Failed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Customer & Shipping Info */}
-                  <div className="grid md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium text-xs text-muted-foreground uppercase mb-1">
-                        Customer
-                      </p>
-                      <p className="font-medium">{order.shippingAddress.fullName}</p>
-                      <p className="text-muted-foreground">
-                        {order.shippingAddress.phone}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-xs text-muted-foreground uppercase mb-1">
-                        Shipping Address
-                      </p>
-                      <p className="text-muted-foreground">
-                        {order.shippingAddress.addressLine1}
-                        {order.shippingAddress.addressLine2 &&
-                          `, ${order.shippingAddress.addressLine2}`}
-                      </p>
-                      <p className="text-muted-foreground">
-                        {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
-                        {order.shippingAddress.pincode}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Order Items */}
-                  <div>
-                    <p className="font-medium text-xs text-muted-foreground uppercase mb-2">
-                      Order Items ({order.items.length})
-                    </p>
-                    <div className="space-y-2">
-                      {order.items.slice(0, 3).map((item, idx) => (
-                        <div key={idx} className="flex gap-3">
-                          {item.productImage && (
-                            <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
-                              <img
-                                src={item.productImage}
-                                alt={item.productTitle}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium line-clamp-1">
-                              {item.productTitle}
-                            </p>
-                            {item.phoneModel && (
-                              <p className="text-xs text-muted-foreground">
-                                Model: {item.phoneModel}
-                              </p>
-                            )}
-                            {item.coverage && (
-                              <p className="text-xs text-muted-foreground">
-                                Coverage: {item.coverage === "full_body_wrap" ? "Full Body Wrap" : "Only Back"}
-                              </p>
-                            )}
-                            <p className="text-sm font-medium">
-                              Qty: {item.quantity} × ₹{item.price.toFixed(0)} = ₹
-                              {(item.quantity * item.price).toFixed(0)}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                      {order.items.length > 3 && (
-                        <p className="text-sm text-muted-foreground">
-                          +{order.items.length - 3} more item(s)
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Shipping Information */}
-                  {(order.awbNumber || order.trackingUrl) && (
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="font-medium text-xs text-muted-foreground uppercase mb-1">
-                        Shipping Details
-                      </p>
-                      {order.awbNumber && (
-                        <p className="text-sm">
-                          <span className="font-medium">AWB:</span> {order.awbNumber}
-                        </p>
-                      )}
-                      {order.trackingUrl && (
-                        <a
-                          href={order.trackingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline"
-                        >
-                          Track Shipment →
-                        </a>
-                      )}
-                      {order.shippingStatus && (
-                        <p className="text-sm text-muted-foreground">
-                          Status: {order.shippingStatus}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Order Total & Actions */}
-                  <div className="flex flex-col gap-4 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Order Total</p>
-                        <p className="text-2xl font-bold text-primary">
+                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedOrders.has(order._id)}
+                          onCheckedChange={(checked) =>
+                            handleSelectOrder(order._id, checked as boolean)
+                          }
+                        />
+                      </td>
+                      <td className="p-3">
+                        <span className="font-mono text-sm font-medium">
+                          {order.orderNumber}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm">{formatDate(order._creationTime)}</span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm font-medium">
+                          {order.shippingAddress.fullName}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm">{order.shippingAddress.phone}</span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm">{order.shippingAddress.city}</span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm font-medium">
                           ₹{order.total.toFixed(0)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Subtotal: ₹{order.subtotal.toFixed(0)} + Shipping: ₹
-                          {order.shippingFee.toFixed(0)}
-                        </p>
-                        {/* GST Information */}
-                        {order.totalGstAmount !== undefined && (
-                          <div className="mt-2 pt-2 border-t">
-                            <p className="text-xs font-medium text-muted-foreground mb-1">
-                              GST (Included)
-                            </p>
-                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-                              {order.cgstAmount !== undefined && order.sgstAmount !== undefined ? (
-                                <>
-                                  <span>CGST: ₹{order.cgstAmount.toFixed(2)}</span>
-                                  <span>SGST: ₹{order.sgstAmount.toFixed(2)}</span>
-                                </>
-                              ) : order.igstAmount !== undefined ? (
-                                <span>IGST: ₹{order.igstAmount.toFixed(2)}</span>
-                              ) : null}
-                              <span className="font-medium">
-                                Total: ₹{order.totalGstAmount.toFixed(2)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <Link to={`/orders/${order._id}`}>
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                      </Link>
-                    </div>
-
-                    {/* RapidShyp Actions */}
-                    <div className="flex flex-wrap gap-2">
-                      {!order.awbNumber ? (
-                        <Button
-                          onClick={() => handleCreateShipment(order._id)}
-                          disabled={creatingShipment === order._id}
-                          size="sm"
-                          className="flex-1"
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span className="text-sm">{order.items.length}</span>
+                      </td>
+                      <td className="p-3">
+                        <Badge variant="outline" className={getStatusColor(order.status)}>
+                          {order.status}
+                        </Badge>
+                      </td>
+                      <td className="p-3">
+                        <Badge
+                          variant="outline"
+                          className={getPaymentStatusColor(order.paymentStatus)}
                         >
-                          {creatingShipment === order._id ? (
-                            <>
-                              <Spinner className="size-4 mr-2" />
-                              Creating...
-                            </>
-                          ) : (
-                            <>
-                              <SendIcon className="size-4 mr-2" />
-                              Create Shipment
-                            </>
-                          )}
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            onClick={() => handleGenerateLabel(order.awbNumber!)}
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                          >
-                            <FileTextIcon className="size-4 mr-2" />
-                            Get Label
-                          </Button>
-                          <Dialog
-                            open={editingShipping === order._id}
-                            onOpenChange={(open) => {
-                              if (open) {
-                                setEditingShipping(order._id);
-                                setShippingForm({
-                                  awbNumber: order.awbNumber || "",
-                                  trackingUrl: order.trackingUrl || "",
-                                  shippingStatus: order.shippingStatus || "",
-                                });
-                              } else {
-                                setEditingShipping(null);
-                              }
-                            }}
-                          >
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="flex-1">
-                                <TruckIcon className="size-4 mr-2" />
-                                Edit Shipping
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Update Shipping Information</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <Label htmlFor="awb">AWB / Tracking Number</Label>
-                                  <Input
-                                    id="awb"
-                                    placeholder="Enter AWB number"
-                                    value={shippingForm.awbNumber}
-                                    onChange={(e) =>
-                                      setShippingForm({
-                                        ...shippingForm,
-                                        awbNumber: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="tracking">Tracking URL</Label>
-                                  <Input
-                                    id="tracking"
-                                    placeholder="https://..."
-                                    value={shippingForm.trackingUrl}
-                                    onChange={(e) =>
-                                      setShippingForm({
-                                        ...shippingForm,
-                                        trackingUrl: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor="status">Shipping Status</Label>
-                                  <Input
-                                    id="status"
-                                    placeholder="e.g., In Transit, Out for Delivery"
-                                    value={shippingForm.shippingStatus}
-                                    onChange={(e) =>
-                                      setShippingForm({
-                                        ...shippingForm,
-                                        shippingStatus: e.target.value,
-                                      })
-                                    }
-                                  />
-                                </div>
-                                <Button
-                                  onClick={() => handleShippingUpdate(order._id)}
-                                  className="w-full"
-                                >
-                                  Save Shipping Info
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                          {order.paymentStatus || "pending"}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
@@ -742,11 +539,7 @@ export default function AdminOrdersPage() {
                 <Skeleton key={i} className="h-32 w-full" />
               ))}
             </div>
-            <div className="space-y-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-64 w-full" />
-              ))}
-            </div>
+            <Skeleton className="h-96 w-full" />
           </div>
         </AuthLoading>
         <Authenticated>
