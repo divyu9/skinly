@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/table.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { Combobox } from "@/components/ui/combobox.tsx";
 import { toast } from "sonner";
 import {
   PlusIcon,
@@ -71,6 +72,7 @@ interface ModelFormData {
 export default function AdminModelsPage() {
   const models = useQuery(api.supportedModels.listAll, {});
   const stats = useQuery(api.supportedModels.getStats, {});
+  const brands = useQuery(api.supportedModels.getBrands, {});
   const createModel = useMutation(api.supportedModels.create);
   const updateModel = useMutation(api.supportedModels.update);
   const deleteModel = useMutation(api.supportedModels.remove);
@@ -341,13 +343,17 @@ export default function AdminModelsPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="brandName">Brand Name *</Label>
-              <Input
-                id="brandName"
-                placeholder="e.g., Apple, Samsung, OnePlus"
+              <Combobox
+                options={brands || []}
                 value={formData.brandName}
-                onChange={(e) =>
-                  setFormData({ ...formData, brandName: e.target.value })
+                onValueChange={(value) =>
+                  setFormData({ ...formData, brandName: value })
                 }
+                placeholder="Select or add brand..."
+                searchPlaceholder="Search brands..."
+                emptyText="No brands found."
+                allowCustom={true}
+                customText="+ Add new brand:"
               />
             </div>
 
