@@ -92,7 +92,7 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
           <CardTitle className="text-lg">Out of Stock</CardTitle>
         </div>
         <CardDescription>
-          Get notified on WhatsApp when <strong>{variantTitle}</strong> is back in stock
+          Get notified on WhatsApp when this product is back in stock
         </CardDescription>
       </CardHeader>
       <CardContent>
