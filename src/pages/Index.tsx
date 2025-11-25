@@ -2206,7 +2206,7 @@ export default function Index() {
           <div className="grid md:grid-cols-3 gap-8 lg:gap-10">
             {/* Magneto X */}
             <Link 
-              to="/products?search=magneto"
+              to="/products?collection=magneto"
               className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
               <div className="absolute top-4 right-4 z-10">
@@ -2249,7 +2249,7 @@ export default function Index() {
 
             {/* Magsafe Covers */}
             <Link 
-              to="/products?search=Magsafe+Cover+%26+Case"
+              to="/products?collection=Covers+And+Cases"
               className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
               <div className="absolute top-4 right-4 z-10">
@@ -2292,7 +2292,7 @@ export default function Index() {
 
             {/* AutoApply Tempered Glass */}
             <Link 
-              to="/products?search=autoapply"
+              to="/products?collection=HQ+Tempered+Glasses"
               className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
               <div className="absolute top-4 right-4 z-10">
