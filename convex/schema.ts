@@ -94,6 +94,7 @@ export default defineSchema({
     description: v.optional(v.string()),
     image: v.optional(v.string()),
     isAuto: v.optional(v.boolean()), // Whether this is an auto-collection with rules
+    matchLogic: v.optional(v.union(v.literal("all"), v.literal("any"))), // "all" = AND, "any" = OR
     rules: v.optional(v.array(v.object({
       field: v.union(
         v.literal("productName"),

@@ -35,9 +35,12 @@ type CollectionRule = {
 function AdminCollectionsPageInner() {
   const collections = useQuery(api.collections.getAllCollections, {});
   const createCollection = useMutation(api.collections.createCollection);
+  const updateCollection = useMutation(api.collections.updateCollection);
   const deleteCollection = useMutation(api.collections.deleteCollection);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<Id<"collections"> | null>(null);
   const [isAutoCollection, setIsAutoCollection] = useState(false);
+  const [matchLogic, setMatchLogic] = useState<"all" | "any">("all");
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -59,8 +62,26 @@ function AdminCollectionsPageInner() {
   // Preview products while creating collection
   const createPreviewProducts = useQuery(
     api.collections.previewCollectionProducts,
-    isAutoCollection && showCreatePreview ? { rules } : "skip"
+    isAutoCollection && showCreatePreview ? { rules, matchLogic } : "skip"
   );
+
+  const handleEdit = (collection: NonNullable<typeof collections>[0]) => {
+    setEditingCollection(collection._id);
+    setFormData({
+      name: collection.name,
+      slug: collection.slug,
+      description: collection.description || "",
+      image: collection.image || "",
+    });
+    setIsAutoCollection(collection.isAuto || false);
+    setMatchLogic(collection.matchLogic || "all");
+    setRules(
+      collection.rules && collection.rules.length > 0
+        ? collection.rules
+        : [{ field: "productName", condition: "contains", value: "" }]
+    );
+    setIsDialogOpen(true);
+  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,34 +95,61 @@ function AdminCollectionsPageInner() {
       }
 
       try {
-        await createCollection({
-          name: formData.name,
-          slug: formData.slug,
-          description: formData.description || undefined,
-          image: formData.image || undefined,
-          isAuto: true,
-          rules: validRules,
-        });
-        toast.success("Auto-collection created successfully");
+        if (editingCollection) {
+          await updateCollection({
+            collectionId: editingCollection,
+            name: formData.name,
+            slug: formData.slug,
+            description: formData.description || undefined,
+            image: formData.image || undefined,
+            isAuto: true,
+            matchLogic,
+            rules: validRules,
+          });
+          toast.success("Collection updated successfully");
+        } else {
+          await createCollection({
+            name: formData.name,
+            slug: formData.slug,
+            description: formData.description || undefined,
+            image: formData.image || undefined,
+            isAuto: true,
+            matchLogic,
+            rules: validRules,
+          });
+          toast.success("Auto-collection created successfully");
+        }
         setIsDialogOpen(false);
         resetForm();
       } catch (error) {
-        toast.error("Failed to create collection");
+        toast.error(editingCollection ? "Failed to update collection" : "Failed to create collection");
       }
     } else {
       try {
-        await createCollection({
-          name: formData.name,
-          slug: formData.slug,
-          description: formData.description || undefined,
-          image: formData.image || undefined,
-          isAuto: false,
-        });
-        toast.success("Collection created successfully");
+        if (editingCollection) {
+          await updateCollection({
+            collectionId: editingCollection,
+            name: formData.name,
+            slug: formData.slug,
+            description: formData.description || undefined,
+            image: formData.image || undefined,
+            isAuto: false,
+          });
+          toast.success("Collection updated successfully");
+        } else {
+          await createCollection({
+            name: formData.name,
+            slug: formData.slug,
+            description: formData.description || undefined,
+            image: formData.image || undefined,
+            isAuto: false,
+          });
+          toast.success("Collection created successfully");
+        }
         setIsDialogOpen(false);
         resetForm();
       } catch (error) {
-        toast.error("Failed to create collection");
+        toast.error(editingCollection ? "Failed to update collection" : "Failed to create collection");
       }
     }
   };
@@ -110,8 +158,10 @@ function AdminCollectionsPageInner() {
     setFormData({ name: "", slug: "", description: "", image: "" });
     setRules([{ field: "productName", condition: "contains", value: "" }]);
     setIsAutoCollection(false);
+    setMatchLogic("all");
     setShowCreatePreview(false);
     setPreviewSearch("");
+    setEditingCollection(null);
   };
 
   // Filter preview products by search query
@@ -203,9 +253,9 @@ function AdminCollectionsPageInner() {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleCreate}>
               <DialogHeader>
-                <DialogTitle>Create Collection</DialogTitle>
+                <DialogTitle>{editingCollection ? "Edit Collection" : "Create Collection"}</DialogTitle>
                 <DialogDescription>
-                  Add a new collection to organize your products
+                  {editingCollection ? "Update your collection details" : "Add a new collection to organize your products"}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -284,13 +334,35 @@ function AdminCollectionsPageInner() {
                       <div>
                         <Label className="text-base">Collection Rules</Label>
                         <p className="text-xs text-muted-foreground">
-                          All rules must match for a product to be included
+                          Configure which products are automatically included
                         </p>
                       </div>
                       <Button type="button" size="sm" variant="outline" onClick={addRule}>
                         <PlusIcon className="size-3 mr-1" />
                         Add Rule
                       </Button>
+                    </div>
+
+                    {/* Match Logic Selector */}
+                    <div className="p-3 bg-muted/30 rounded-lg">
+                      <Label className="text-sm mb-2 block">Match Logic</Label>
+                      <Select
+                        value={matchLogic}
+                        onValueChange={(value: "all" | "any") => setMatchLogic(value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All conditions must match (AND)</SelectItem>
+                          <SelectItem value="any">Any condition matches (OR)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {matchLogic === "all"
+                          ? "Products must satisfy all rules below"
+                          : "Products need to satisfy at least one rule below"}
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -366,7 +438,11 @@ function AdminCollectionsPageInner() {
               </div>
               <DialogFooter>
                 <Button type="submit">
-                  {isAutoCollection ? "Create Auto-Collection" : "Create Collection"}
+                  {editingCollection
+                    ? "Update Collection"
+                    : isAutoCollection
+                      ? "Create Auto-Collection"
+                      : "Create Collection"}
                 </Button>
               </DialogFooter>
             </form>
@@ -424,9 +500,14 @@ function AdminCollectionsPageInner() {
                 {/* Show rules for auto-collections */}
                 {collection.isAuto && collection.rules && collection.rules.length > 0 && (
                   <div className="mb-4 p-3 bg-muted/30 rounded-lg space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
-                      Rules
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-medium text-muted-foreground uppercase">
+                        Rules
+                      </p>
+                      <Badge variant="secondary" className="text-xs">
+                        {collection.matchLogic === "any" ? "Any match" : "All match"}
+                      </Badge>
+                    </div>
                     {collection.rules.map((rule, idx) => (
                       <p key={idx} className="text-xs">
                         {rule.field === "productName" ? "Product name" : "SKU"}{" "}
@@ -447,6 +528,14 @@ function AdminCollectionsPageInner() {
                 )}
 
                 <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleEdit(collection)}
+                  >
+                    <EditIcon className="size-4 mr-2" />
+                    Edit
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"

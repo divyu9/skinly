@@ -34,6 +34,7 @@ export const createCollection = mutation({
     description: v.optional(v.string()),
     image: v.optional(v.string()),
     isAuto: v.optional(v.boolean()),
+    matchLogic: v.optional(v.union(v.literal("all"), v.literal("any"))),
     rules: v.optional(v.array(v.object({
       field: v.union(
         v.literal("productName"),
@@ -75,6 +76,7 @@ export const createCollection = mutation({
       description: args.description,
       image: args.image,
       isAuto: args.isAuto,
+      matchLogic: args.matchLogic || "all",
       rules: args.rules,
     });
 
@@ -90,6 +92,20 @@ export const updateCollection = mutation({
     slug: v.optional(v.string()),
     description: v.optional(v.string()),
     image: v.optional(v.string()),
+    isAuto: v.optional(v.boolean()),
+    matchLogic: v.optional(v.union(v.literal("all"), v.literal("any"))),
+    rules: v.optional(v.array(v.object({
+      field: v.union(
+        v.literal("productName"),
+        v.literal("sku")
+      ),
+      condition: v.union(
+        v.literal("contains"),
+        v.literal("startsWith"),
+        v.literal("notContains")
+      ),
+      value: v.string(),
+    }))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -169,11 +185,16 @@ export const getCollectionProducts = query({
     }
 
     // Filter products based on rules
+    const matchLogic = collection.matchLogic || "all";
     const matchingProducts = allProducts.filter((product) => {
       const variants = variantsByProduct.get(product._id) || [];
       
-      // All rules must match (AND logic)
-      return collection.rules!.every((rule) => {
+      // Helper function to check if a rule matches
+      const ruleMatches = (rule: {
+        field: "productName" | "sku";
+        condition: "contains" | "startsWith" | "notContains";
+        value: string;
+      }) => {
         const value = rule.value.toLowerCase();
         
         if (rule.field === "productName") {
@@ -203,7 +224,14 @@ export const getCollectionProducts = query({
         }
         
         return false;
-      });
+      };
+      
+      // Apply match logic: "all" = AND, "any" = OR
+      if (matchLogic === "any") {
+        return collection.rules!.some(ruleMatches);
+      } else {
+        return collection.rules!.every(ruleMatches);
+      }
     });
 
     // Return products with their variants
@@ -229,6 +257,7 @@ export const previewCollectionProducts = query({
       ),
       value: v.string(),
     })),
+    matchLogic: v.optional(v.union(v.literal("all"), v.literal("any"))),
   },
   handler: async (ctx, args) => {
     // If no rules, return empty
@@ -257,11 +286,16 @@ export const previewCollectionProducts = query({
     }
 
     // Filter products based on rules
+    const matchLogic = args.matchLogic || "all";
     const matchingProducts = allProducts.filter((product) => {
       const variants = variantsByProduct.get(product._id) || [];
       
-      // All rules must match (AND logic)
-      return validRules.every((rule) => {
+      // Helper function to check if a rule matches
+      const ruleMatches = (rule: {
+        field: "productName" | "sku";
+        condition: "contains" | "startsWith" | "notContains";
+        value: string;
+      }) => {
         const value = rule.value.toLowerCase();
         
         if (rule.field === "productName") {
@@ -291,7 +325,14 @@ export const previewCollectionProducts = query({
         }
         
         return false;
-      });
+      };
+      
+      // Apply match logic: "all" = AND, "any" = OR
+      if (matchLogic === "any") {
+        return validRules.some(ruleMatches);
+      } else {
+        return validRules.every(ruleMatches);
+      }
     });
 
     // Return products with their variants
