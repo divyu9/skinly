@@ -220,8 +220,8 @@ export const getProductsByRNumber = query({
       const product = products.find((p) => p._id === variant.productId);
       if (!product) continue;
       
-      // Use manual R-number if set, otherwise auto-detect
-      const rNumber = variant.rNumber || extractRNumber(variant.sku);
+      // Only use manually assigned R-number (no auto-detection)
+      const rNumber = variant.rNumber;
       
       const item = {
         variantId: variant._id,
@@ -362,8 +362,8 @@ export const getStockLevels = query({
       const product = productsMap.get(variant.productId);
       if (!product) continue;
       
-      // Get R-number (manual or auto-detected)
-      const rNumber = variant.rNumber || extractRNumber(variant.sku);
+      // Only use manually assigned R-number (no auto-detection)
+      const rNumber = variant.rNumber;
       
       if (!rNumber) {
         // No R-number means infinite stock (accessories, etc.)
@@ -534,8 +534,8 @@ export const deductRollInventory = internalMutation({
       const product = productsMap.get(variant.productId);
       if (!product) continue;
       
-      // Get R-number
-      const rNumber = variant.rNumber || extractRNumber(variant.sku);
+      // Only use manually assigned R-number (no auto-detection)
+      const rNumber = variant.rNumber;
       if (!rNumber) continue; // Skip non-material products
       
       const roll = rollsMap.get(rNumber);
