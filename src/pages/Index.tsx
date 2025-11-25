@@ -1444,16 +1444,16 @@ export default function Index() {
       {/* Latest Models Marquee */}
       {latestModels && latestModels.length > 0 && (
         <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-[72px] overflow-hidden">
-          <div className="relative">
+          <div className="flex items-center gap-4">
             {/* Fixed Label */}
-            <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center gap-2 text-sm font-bold px-4 bg-gradient-to-r from-primary/5 via-primary/5 to-transparent pr-6">
+            <div className="flex items-center gap-2 text-sm font-bold px-4 flex-shrink-0 bg-primary/5">
               <span className="text-primary">✨</span>
               <span className="text-foreground whitespace-nowrap">Now supporting:</span>
             </div>
-            {/* Scrolling Content */}
-            <div className="pl-44">
+            {/* Scrolling Content Container */}
+            <div className="flex-1 overflow-hidden">
               <div className="animate-marquee flex gap-3 whitespace-nowrap">
-                {[...latestModels, ...latestModels, ...latestModels].map((model, idx) => (
+                {[...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => (
                   <span key={idx} className="text-sm text-foreground/80 font-medium">
                     {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
                   </span>
