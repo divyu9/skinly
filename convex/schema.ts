@@ -137,6 +137,7 @@ export default defineSchema({
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
     rNumber: v.optional(v.string()), // Manual override for R-number (e.g., "R-1", "R-59")
+    materialMultiplier: v.optional(v.number()), // Material usage multiplier (1x, 2x, 3x, etc.) - defaults to 1
   })
     .index("by_product", ["productId"])
     .index("by_sku", ["sku"])

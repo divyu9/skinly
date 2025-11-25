@@ -205,6 +205,7 @@ export const getProductsByRNumber = query({
       sku: string;
       variantTitle: string;
       isManual: boolean;
+      materialMultiplier: number;
     }>> = {};
     
     const unmapped: Array<{
@@ -229,6 +230,7 @@ export const getProductsByRNumber = query({
         sku: variant.sku,
         variantTitle: variant.title,
         isManual: !!variant.rNumber,
+        materialMultiplier: variant.materialMultiplier || 1,
       };
       
       if (rNumber) {
@@ -267,6 +269,51 @@ export const removeRNumberAssignment = mutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.variantId, {
       rNumber: undefined,
+    });
+  },
+});
+
+/**
+ * Bulk assign R-number to all variants of selected products
+ */
+export const bulkAssignRNumber = mutation({
+  args: {
+    productIds: v.array(v.id("products")),
+    rNumber: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const variants = await ctx.db.query("variants").collect();
+    
+    let assignedCount = 0;
+    
+    for (const variant of variants) {
+      if (args.productIds.includes(variant.productId)) {
+        await ctx.db.patch(variant._id, {
+          rNumber: args.rNumber,
+        });
+        assignedCount++;
+      }
+    }
+    
+    return { assignedCount };
+  },
+});
+
+/**
+ * Update material multiplier for a variant
+ */
+export const updateMaterialMultiplier = mutation({
+  args: {
+    variantId: v.id("variants"),
+    multiplier: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (args.multiplier <= 0) {
+      throw new Error("Multiplier must be greater than 0");
+    }
+    
+    await ctx.db.patch(args.variantId, {
+      materialMultiplier: args.multiplier,
     });
   },
 });
@@ -400,7 +447,8 @@ export const getStockLevels = query({
       const ROLL_WIDTH_CM = 29.5;
       const rollLengthCm = roll.metersAvailable * 100;
       const totalAreaCm2 = ROLL_WIDTH_CM * rollLengthCm;
-      const gadgetAreaCm2 = gadget.lengthCm * gadget.widthCm;
+      const materialMultiplier = variant.materialMultiplier || 1; // Default to 1x if not set
+      const gadgetAreaCm2 = gadget.lengthCm * gadget.widthCm * materialMultiplier;
       
       let availableUnits = 0;
       
@@ -408,15 +456,18 @@ export const getStockLevels = query({
         // Continuous design: area-based calculation
         availableUnits = Math.floor(totalAreaCm2 / gadgetAreaCm2);
       } else {
-        // Non-continuous: orientation-based calculation
-        const units1Width = Math.floor(ROLL_WIDTH_CM / gadget.widthCm);
-        const units1Length = Math.floor(rollLengthCm / gadget.lengthCm);
+        // Non-continuous: orientation-based calculation (multiplier affects effective dimensions)
+        const effectiveLength = gadget.lengthCm * Math.sqrt(materialMultiplier);
+        const effectiveWidth = gadget.widthCm * Math.sqrt(materialMultiplier);
+        
+        const units1Width = Math.floor(ROLL_WIDTH_CM / effectiveWidth);
+        const units1Length = Math.floor(rollLengthCm / effectiveLength);
         const totalUnits1 = units1Width * units1Length;
         
         let totalUnits2 = 0;
-        if (gadget.lengthCm <= ROLL_WIDTH_CM) {
-          const units2Width = Math.floor(ROLL_WIDTH_CM / gadget.lengthCm);
-          const units2Length = Math.floor(rollLengthCm / gadget.widthCm);
+        if (effectiveLength <= ROLL_WIDTH_CM) {
+          const units2Width = Math.floor(ROLL_WIDTH_CM / effectiveLength);
+          const units2Length = Math.floor(rollLengthCm / effectiveWidth);
           totalUnits2 = units2Width * units2Length;
         }
         
@@ -521,8 +572,9 @@ export const deductRollInventory = internalMutation({
       
       // Calculate meters needed for this quantity
       const ROLL_WIDTH_CM = 29.5;
+      const materialMultiplier = variant.materialMultiplier || 1; // Default to 1x if not set
       const gadgetAreaCm2 = gadget.lengthCm * gadget.widthCm;
-      const totalAreaNeeded = gadgetAreaCm2 * item.quantity;
+      const totalAreaNeeded = gadgetAreaCm2 * item.quantity * materialMultiplier;
       
       // Convert area to meters (roll width is constant 29.5cm)
       const metersForThisItem = totalAreaNeeded / (ROLL_WIDTH_CM * 100);
