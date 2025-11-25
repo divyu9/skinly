@@ -391,6 +391,114 @@ export function RollsManagement() {
         </CardContent>
       </Card>
 
+      {/* Material Calculator Section */}
+      {gadgets.length > 0 && rolls.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PackageIcon className="size-5" />
+              Material Calculator
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              See how many units of each gadget can be made from available vinyl rolls
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[200px]">Gadget Type</TableHead>
+                    {rolls.map((roll) => (
+                      <TableHead key={roll._id} className="text-center min-w-[150px]">
+                        <div className="space-y-1">
+                          <div className="font-mono font-semibold">{roll.rNumber}</div>
+                          <div className="text-xs text-muted-foreground font-normal">
+                            {roll.designName}
+                          </div>
+                          <Badge
+                            variant={roll.isContinuous ? "default" : "secondary"}
+                            className="text-xs"
+                          >
+                            {roll.isContinuous ? "Continuous" : "Oriented"}
+                          </Badge>
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {gadgets.map((gadget) => (
+                    <TableRow key={gadget._id}>
+                      <TableCell className="font-medium">
+                        <div>
+                          <div>{gadget.categoryName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {gadget.lengthCm}cm × {gadget.widthCm}cm
+                          </div>
+                        </div>
+                      </TableCell>
+                      {rolls.map((roll) => {
+                        const units = calculateUnitsAvailable(
+                          gadget.lengthCm,
+                          gadget.widthCm,
+                          roll.metersAvailable,
+                          roll.isContinuous
+                        );
+                        
+                        const bgColor = units === 0
+                          ? "bg-red-50 dark:bg-red-950"
+                          : units <= 5
+                            ? "bg-yellow-50 dark:bg-yellow-950"
+                            : "bg-green-50 dark:bg-green-950";
+                        
+                        const textColor = units === 0
+                          ? "text-red-700 dark:text-red-300"
+                          : units <= 5
+                            ? "text-yellow-700 dark:text-yellow-300"
+                            : "text-green-700 dark:text-green-300";
+
+                        return (
+                          <TableCell
+                            key={roll._id}
+                            className={`text-center ${bgColor}`}
+                          >
+                            <div className="space-y-1">
+                              <div className={`text-2xl font-bold ${textColor}`}>
+                                {units}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {units === 1 ? "unit" : "units"}
+                              </div>
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center gap-6 mt-4 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="size-4 rounded bg-green-100 dark:bg-green-900 border" />
+                <span className="text-muted-foreground">&gt; 5 units available</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="size-4 rounded bg-yellow-100 dark:bg-yellow-900 border" />
+                <span className="text-muted-foreground">1-5 units (low stock)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="size-4 rounded bg-red-100 dark:bg-red-900 border" />
+                <span className="text-muted-foreground">Out of stock</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Gadget Dialog */}
       <Dialog open={showGadgetDialog} onOpenChange={setShowGadgetDialog}>
         <DialogContent>
