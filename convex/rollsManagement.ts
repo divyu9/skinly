@@ -275,7 +275,7 @@ export const removeRNumberAssignment = mutation({
 
 /**
  * Calculate available stock for all variants based on roll inventory
- * Returns: { variantId: availableUnits }
+ * Returns: Array of { variantId, availableUnits, ... }
  */
 export const getStockLevels = query({
   args: {},
@@ -303,12 +303,13 @@ export const getStockLevels = query({
     }
     
     // Calculate stock for each variant
-    const stockLevels: Record<string, {
+    const stockLevels: Array<{
+      variantId: string;
       availableUnits: number;
       rollMeters: number;
       rNumber: string | null;
       designName: string | null;
-    }> = {};
+    }> = [];
     
     for (const variant of variants) {
       const product = productsMap.get(variant.productId);
@@ -319,12 +320,13 @@ export const getStockLevels = query({
       
       if (!rNumber) {
         // No R-number means infinite stock (accessories, etc.)
-        stockLevels[variant._id] = {
+        stockLevels.push({
+          variantId: variant._id,
           availableUnits: 999999,
           rollMeters: 0,
           rNumber: null,
           designName: null,
-        };
+        });
         continue;
       }
       
@@ -333,12 +335,13 @@ export const getStockLevels = query({
       
       if (!roll || roll.metersAvailable <= 0) {
         // No roll or out of stock
-        stockLevels[variant._id] = {
+        stockLevels.push({
+          variantId: variant._id,
           availableUnits: 0,
           rollMeters: 0,
           rNumber,
           designName: roll?.designName || null,
-        };
+        });
         continue;
       }
       
@@ -368,12 +371,13 @@ export const getStockLevels = query({
       
       if (!gadgetCategory) {
         // Unknown category, assume infinite stock
-        stockLevels[variant._id] = {
+        stockLevels.push({
+          variantId: variant._id,
           availableUnits: 999999,
           rollMeters: roll.metersAvailable,
           rNumber,
           designName: roll.designName,
-        };
+        });
         continue;
       }
       
@@ -382,12 +386,13 @@ export const getStockLevels = query({
       
       if (!gadget) {
         // No dimensions defined, assume infinite stock
-        stockLevels[variant._id] = {
+        stockLevels.push({
+          variantId: variant._id,
           availableUnits: 999999,
           rollMeters: roll.metersAvailable,
           rNumber,
           designName: roll.designName,
-        };
+        });
         continue;
       }
       
@@ -418,12 +423,13 @@ export const getStockLevels = query({
         availableUnits = Math.max(totalUnits1, totalUnits2);
       }
       
-      stockLevels[variant._id] = {
+      stockLevels.push({
+        variantId: variant._id,
         availableUnits,
         rollMeters: roll.metersAvailable,
         rNumber,
         designName: roll.designName,
-      };
+      });
     }
     
     return stockLevels;

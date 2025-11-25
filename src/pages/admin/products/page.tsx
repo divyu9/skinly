@@ -160,10 +160,20 @@ function AdminProductsPageInner() {
   // Queries and mutations
   const products = useQuery(api.products.getAllProducts, {});
   const collections = useQuery(api.collections.getAllCollections, {});
-  const stockLevels = useQuery(api.rollsManagement.getStockLevels, {});
+  const stockLevelsArray = useQuery(api.rollsManagement.getStockLevels, {});
   const exportData = useQuery(api.products.exportProductsForBulkEdit, 
     selectedProducts.length > 0 ? { productIds: selectedProducts } : "skip"
   );
+  
+  // Convert stock levels array to map for easy lookup
+  const stockLevels = useMemo(() => {
+    if (!stockLevelsArray) return null;
+    const map: Record<string, typeof stockLevelsArray[0]> = {};
+    for (const level of stockLevelsArray) {
+      map[level.variantId] = level;
+    }
+    return map;
+  }, [stockLevelsArray]);
   const deleteProduct = useMutation(api.products.deleteProduct);
   const updateProduct = useMutation(api.products.updateProduct);
   const deleteAllProducts = useMutation(api.products.deleteAllProducts);

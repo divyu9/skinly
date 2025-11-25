@@ -1,11 +1,13 @@
 /**
  * Extracts R-number from SKU
+ * Only extracts R-numbers from SKUs that explicitly start with "R-"
+ * M-, L-, T- prefixes are NOT related to R-numbers
+ * 
  * Examples:
  * - "R-59-MM" → "R-59"
- * - "M-174" → "R-174" (convert M to R)
- * - "L-12-LPT" → "R-12" (convert L to R)
- * - "T-5" → "R-5" (convert T to R)
  * - "R-1" → "R-1"
+ * - "M-174" → null (M-SKUs are separate from R-numbers)
+ * - "L-12-LPT" → null (L-SKUs are separate from R-numbers)
  */
 export function extractRNumber(sku: string): string | null {
   if (!sku) return null;
@@ -13,27 +15,14 @@ export function extractRNumber(sku: string): string | null {
   // Normalize to uppercase
   const normalizedSku = sku.toUpperCase().trim();
   
-  // Pattern 1: Already starts with R- (e.g., "R-59", "R-1-MM")
+  // Only match SKUs that start with R-
   const rPattern = /^R-(\d+)/i;
   const rMatch = normalizedSku.match(rPattern);
   if (rMatch) {
     return `R-${rMatch[1]}`;
   }
   
-  // Pattern 2: Starts with M-, L-, or T- (e.g., "M-174", "L-12-LPT", "T-5")
-  const mlPattern = /^[MLT]-(\d+)/i;
-  const mlMatch = normalizedSku.match(mlPattern);
-  if (mlMatch) {
-    return `R-${mlMatch[1]}`;
-  }
-  
-  // Pattern 3: Just a number (e.g., "174")
-  const numPattern = /^(\d+)/;
-  const numMatch = normalizedSku.match(numPattern);
-  if (numMatch) {
-    return `R-${numMatch[1]}`;
-  }
-  
+  // No match - M-, L-, T- and other prefixes are NOT related to R-numbers
   return null;
 }
 
