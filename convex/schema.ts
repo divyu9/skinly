@@ -60,6 +60,16 @@ export default defineSchema({
       pincode: v.string(),
     }),
     paymentMethod: v.string(),
+    // GST fields (tax-inclusive pricing)
+    taxableAmount: v.optional(v.number()), // Amount before tax (price / 1.18)
+    gstRate: v.optional(v.number()), // 18% (0.18)
+    cgstRate: v.optional(v.number()), // 9% (0.09) for Uttar Pradesh orders
+    sgstRate: v.optional(v.number()), // 9% (0.09) for Uttar Pradesh orders
+    igstRate: v.optional(v.number()), // 18% (0.18) for other state orders
+    cgstAmount: v.optional(v.number()), // CGST amount
+    sgstAmount: v.optional(v.number()), // SGST amount
+    igstAmount: v.optional(v.number()), // IGST amount
+    totalGstAmount: v.optional(v.number()), // Total GST amount
     // Payment fields
     paymentStatus: v.optional(v.union(
       v.literal("pending"),

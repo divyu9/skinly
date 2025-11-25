@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { PackageIcon, TruckIcon, CreditCardIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { calculateGST } from "@/lib/gst";
 
 function CheckoutPageInner() {
   const navigate = useNavigate();
@@ -33,6 +34,22 @@ function CheckoutPageInner() {
     pincode: "",
     paymentMethod: "phonepe",
   });
+
+  // Calculate totals and GST (before early returns)
+  const subtotal = cartItems ? cartItems.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  ) : 0;
+  const shippingFee = subtotal > 500 ? 0 : 50;
+  const total = subtotal + shippingFee;
+
+  // Calculate GST breakdown based on customer's state
+  const gstBreakdown = useMemo(() => {
+    if (!formData.state || total === 0) {
+      return null;
+    }
+    return calculateGST(total, formData.state);
+  }, [total, formData.state]);
 
   if (cartItems === undefined) {
     return (
@@ -64,13 +81,6 @@ function CheckoutPageInner() {
       </div>
     );
   }
-
-  const subtotal = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
-  const shippingFee = subtotal > 500 ? 0 : 50;
-  const total = subtotal + shippingFee;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,6 +375,43 @@ function CheckoutPageInner() {
                     ₹{total.toFixed(0)}
                   </span>
                 </div>
+
+                {/* GST Breakdown */}
+                {gstBreakdown && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        GST Breakdown (Tax Included)
+                      </p>
+                      <div className="flex justify-between text-xs">
+                        <span>Taxable Amount</span>
+                        <span>₹{gstBreakdown.taxableAmount.toFixed(2)}</span>
+                      </div>
+                      {gstBreakdown.isUttarPradesh ? (
+                        <>
+                          <div className="flex justify-between text-xs">
+                            <span>CGST (9%)</span>
+                            <span>₹{gstBreakdown.cgstAmount?.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span>SGST (9%)</span>
+                            <span>₹{gstBreakdown.sgstAmount?.toFixed(2)}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between text-xs">
+                          <span>IGST (18%)</span>
+                          <span>₹{gstBreakdown.igstAmount?.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-xs font-medium pt-1 border-t">
+                        <span>Total GST</span>
+                        <span>₹{gstBreakdown.totalGstAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>

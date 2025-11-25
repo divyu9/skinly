@@ -237,6 +237,43 @@ function OrderDetailPageInner() {
                   </span>
                 </div>
 
+                {/* GST Breakdown */}
+                {order.totalGstAmount !== undefined && order.taxableAmount !== undefined && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        GST Breakdown (Tax Included)
+                      </p>
+                      <div className="flex justify-between text-xs">
+                        <span>Taxable Amount</span>
+                        <span>₹{order.taxableAmount.toFixed(2)}</span>
+                      </div>
+                      {order.cgstAmount !== undefined && order.sgstAmount !== undefined ? (
+                        <>
+                          <div className="flex justify-between text-xs">
+                            <span>CGST (9%)</span>
+                            <span>₹{order.cgstAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span>SGST (9%)</span>
+                            <span>₹{order.sgstAmount.toFixed(2)}</span>
+                          </div>
+                        </>
+                      ) : order.igstAmount !== undefined ? (
+                        <div className="flex justify-between text-xs">
+                          <span>IGST (18%)</span>
+                          <span>₹{order.igstAmount.toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-between text-xs font-medium pt-1 border-t">
+                        <span>Total GST</span>
+                        <span>₹{order.totalGstAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 <Separator />
 
                 <div className="space-y-2">

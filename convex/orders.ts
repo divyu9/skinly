@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { calculateGST } from "./gst";
 
 // Create a new order
 export const createOrder = mutation({
@@ -60,6 +61,9 @@ export const createOrder = mutation({
     const shippingFee = subtotal > 500 ? 0 : 50; // Free shipping over ₹500
     const total = subtotal + shippingFee;
 
+    // Calculate GST breakdown (tax-inclusive pricing)
+    const gstCalculation = calculateGST(total, args.shippingAddress.state);
+
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
@@ -85,6 +89,16 @@ export const createOrder = mutation({
       shippingAddress: args.shippingAddress,
       paymentMethod: args.paymentMethod,
       paymentStatus: "pending",
+      // GST fields
+      taxableAmount: gstCalculation.taxableAmount,
+      gstRate: gstCalculation.gstRate,
+      cgstRate: gstCalculation.cgstRate,
+      sgstRate: gstCalculation.sgstRate,
+      igstRate: gstCalculation.igstRate,
+      cgstAmount: gstCalculation.cgstAmount,
+      sgstAmount: gstCalculation.sgstAmount,
+      igstAmount: gstCalculation.igstAmount,
+      totalGstAmount: gstCalculation.totalGstAmount,
     });
 
     // Clear cart

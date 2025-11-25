@@ -509,6 +509,27 @@ function AdminOrdersPageInner() {
                           Subtotal: ₹{order.subtotal.toFixed(0)} + Shipping: ₹
                           {order.shippingFee.toFixed(0)}
                         </p>
+                        {/* GST Information */}
+                        {order.totalGstAmount !== undefined && (
+                          <div className="mt-2 pt-2 border-t">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">
+                              GST (Included)
+                            </p>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                              {order.cgstAmount !== undefined && order.sgstAmount !== undefined ? (
+                                <>
+                                  <span>CGST: ₹{order.cgstAmount.toFixed(2)}</span>
+                                  <span>SGST: ₹{order.sgstAmount.toFixed(2)}</span>
+                                </>
+                              ) : order.igstAmount !== undefined ? (
+                                <span>IGST: ₹{order.igstAmount.toFixed(2)}</span>
+                              ) : null}
+                              <span className="font-medium">
+                                Total: ₹{order.totalGstAmount.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <Link to={`/orders/${order._id}`}>
                         <Button variant="outline" size="sm">
