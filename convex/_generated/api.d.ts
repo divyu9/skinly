@@ -21,6 +21,7 @@ import type * as mockupsUpload from "../mockupsUpload.js";
 import type * as orders from "../orders.js";
 import type * as phonepe from "../phonepe.js";
 import type * as products from "../products.js";
+import type * as rapidshyp from "../rapidshyp.js";
 import type * as reviews from "../reviews.js";
 import type * as shopify from "../shopify.js";
 import type * as users from "../users.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   orders: typeof orders;
   phonepe: typeof phonepe;
   products: typeof products;
+  rapidshyp: typeof rapidshyp;
   reviews: typeof reviews;
   shopify: typeof shopify;
   users: typeof users;

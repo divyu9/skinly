@@ -1,11 +1,11 @@
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon } from "lucide-react";
+import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, SendIcon, FileTextIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -13,6 +13,7 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Spinner } from "@/components/ui/spinner.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -40,6 +41,10 @@ function AdminOrdersPageInner() {
   const updateOrderStatus = useMutation(api.admin.orders.updateOrderStatus);
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
+  const createShipment = useAction(api.rapidshyp.createShipment);
+  const generateLabel = useAction(api.rapidshyp.generateShippingLabel);
+  
+  const [creatingShipment, setCreatingShipment] = useState<Id<"orders"> | null>(null);
 
   const displayOrders = searchTerm.length >= 3 ? searchResults : allOrders;
 
@@ -78,6 +83,39 @@ function AdminOrdersPageInner() {
       setShippingForm({ awbNumber: "", trackingUrl: "", shippingStatus: "" });
     } catch (error) {
       toast.error("Failed to update shipping info");
+    }
+  };
+
+  const handleCreateShipment = async (orderId: Id<"orders">) => {
+    setCreatingShipment(orderId);
+    try {
+      const result = await createShipment({ orderId });
+      if (result.success) {
+        toast.success(`Shipment created! AWB: ${result.awbNumber}`);
+      } else {
+        toast.error("Failed to create shipment");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create shipment";
+      toast.error(errorMessage);
+    } finally {
+      setCreatingShipment(null);
+    }
+  };
+
+  const handleGenerateLabel = async (awbNumber: string) => {
+    try {
+      toast.loading("Generating shipping label...");
+      const result = await generateLabel({ awbNumber });
+      if (result.success && result.labelUrl) {
+        window.open(result.labelUrl, "_blank");
+        toast.success("Label generated successfully");
+      } else {
+        toast.error("Failed to generate label");
+      }
+    } catch (error) {
+      toast.error("Failed to generate label");
     }
   };
 
@@ -460,101 +498,136 @@ function AdminOrdersPageInner() {
                   )}
 
                   {/* Order Total & Actions */}
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Order Total</p>
-                      <p className="text-2xl font-bold text-primary">
-                        ₹{order.total.toFixed(0)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Subtotal: ₹{order.subtotal.toFixed(0)} + Shipping: ₹
-                        {order.shippingFee.toFixed(0)}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Dialog
-                        open={editingShipping === order._id}
-                        onOpenChange={(open) => {
-                          if (open) {
-                            setEditingShipping(order._id);
-                            setShippingForm({
-                              awbNumber: order.awbNumber || "",
-                              trackingUrl: order.trackingUrl || "",
-                              shippingStatus: order.shippingStatus || "",
-                            });
-                          } else {
-                            setEditingShipping(null);
-                          }
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <TruckIcon className="size-4 mr-2" />
-                            Shipping
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Update Shipping Information</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="awb">AWB / Tracking Number</Label>
-                              <Input
-                                id="awb"
-                                placeholder="Enter AWB number"
-                                value={shippingForm.awbNumber}
-                                onChange={(e) =>
-                                  setShippingForm({
-                                    ...shippingForm,
-                                    awbNumber: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="tracking">Tracking URL</Label>
-                              <Input
-                                id="tracking"
-                                placeholder="https://..."
-                                value={shippingForm.trackingUrl}
-                                onChange={(e) =>
-                                  setShippingForm({
-                                    ...shippingForm,
-                                    trackingUrl: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="status">Shipping Status</Label>
-                              <Input
-                                id="status"
-                                placeholder="e.g., In Transit, Out for Delivery"
-                                value={shippingForm.shippingStatus}
-                                onChange={(e) =>
-                                  setShippingForm({
-                                    ...shippingForm,
-                                    shippingStatus: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
-                            <Button
-                              onClick={() => handleShippingUpdate(order._id)}
-                              className="w-full"
-                            >
-                              Save Shipping Info
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-
+                  <div className="flex flex-col gap-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Order Total</p>
+                        <p className="text-2xl font-bold text-primary">
+                          ₹{order.total.toFixed(0)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Subtotal: ₹{order.subtotal.toFixed(0)} + Shipping: ₹
+                          {order.shippingFee.toFixed(0)}
+                        </p>
+                      </div>
                       <Link to={`/orders/${order._id}`}>
                         <Button variant="outline" size="sm">
                           View Details
                         </Button>
                       </Link>
+                    </div>
+
+                    {/* RapidShyp Actions */}
+                    <div className="flex flex-wrap gap-2">
+                      {!order.awbNumber ? (
+                        <Button
+                          onClick={() => handleCreateShipment(order._id)}
+                          disabled={creatingShipment === order._id}
+                          size="sm"
+                          className="flex-1"
+                        >
+                          {creatingShipment === order._id ? (
+                            <>
+                              <Spinner className="size-4 mr-2" />
+                              Creating...
+                            </>
+                          ) : (
+                            <>
+                              <SendIcon className="size-4 mr-2" />
+                              Create Shipment
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={() => handleGenerateLabel(order.awbNumber!)}
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            <FileTextIcon className="size-4 mr-2" />
+                            Get Label
+                          </Button>
+                          <Dialog
+                            open={editingShipping === order._id}
+                            onOpenChange={(open) => {
+                              if (open) {
+                                setEditingShipping(order._id);
+                                setShippingForm({
+                                  awbNumber: order.awbNumber || "",
+                                  trackingUrl: order.trackingUrl || "",
+                                  shippingStatus: order.shippingStatus || "",
+                                });
+                              } else {
+                                setEditingShipping(null);
+                              }
+                            }}
+                          >
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="flex-1">
+                                <TruckIcon className="size-4 mr-2" />
+                                Edit Shipping
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Update Shipping Information</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div>
+                                  <Label htmlFor="awb">AWB / Tracking Number</Label>
+                                  <Input
+                                    id="awb"
+                                    placeholder="Enter AWB number"
+                                    value={shippingForm.awbNumber}
+                                    onChange={(e) =>
+                                      setShippingForm({
+                                        ...shippingForm,
+                                        awbNumber: e.target.value,
+                                      })
+                                    }
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="tracking">Tracking URL</Label>
+                                  <Input
+                                    id="tracking"
+                                    placeholder="https://..."
+                                    value={shippingForm.trackingUrl}
+                                    onChange={(e) =>
+                                      setShippingForm({
+                                        ...shippingForm,
+                                        trackingUrl: e.target.value,
+                                      })
+                                    }
+                                  />
+                                </div>
+                                <div>
+                                  <Label htmlFor="status">Shipping Status</Label>
+                                  <Input
+                                    id="status"
+                                    placeholder="e.g., In Transit, Out for Delivery"
+                                    value={shippingForm.shippingStatus}
+                                    onChange={(e) =>
+                                      setShippingForm({
+                                        ...shippingForm,
+                                        shippingStatus: e.target.value,
+                                      })
+                                    }
+                                  />
+                                </div>
+                                <Button
+                                  onClick={() => handleShippingUpdate(order._id)}
+                                  className="w-full"
+                                >
+                                  Save Shipping Info
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
