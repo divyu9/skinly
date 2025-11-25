@@ -9,6 +9,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyCont
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { AdminHeader } from "@/components/admin-header.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { useState, useMemo, useRef } from "react";
@@ -955,42 +956,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 export default function AdminProductsPage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
-                alt="Skinly"
-                className="h-8"
-              />
-            </Link>
-            <nav className="flex items-center gap-6">
-              <Link to="/admin/products" className="text-sm font-medium text-primary">
-                Products
-              </Link>
-              <Link
-                to="/admin/collections"
-                className="text-sm font-medium hover:text-primary transition-colors"
-              >
-                Collections
-              </Link>
-              <Link
-                to="/admin/orders"
-                className="text-sm font-medium hover:text-primary transition-colors"
-              >
-                Orders
-              </Link>
-              <Link to="/">
-                <Button variant="outline" size="sm">
-                  View Store
-                </Button>
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <AdminHeader />
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Unauthenticated>

@@ -23,8 +23,12 @@ import { ShoppingCartIcon, MailIcon, MessageSquareIcon, TrendingUpIcon } from "l
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link } from "react-router-dom";
+import { AdminHeader } from "@/components/admin-header.tsx";
+import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
-export default function AbandonedCartsPage() {
+function AbandonedCartsPageInner() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const processAllCarts = useAction(api.abandonedCartsActions.processAbandonedCarts);
   const sendReminder = useAction(api.abandonedCartsActions.sendAbandonedCartReminder);
@@ -257,6 +261,43 @@ export default function AbandonedCartsPage() {
           </Table>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+export default function AbandonedCartsPage() {
+  return (
+    <div className="min-h-screen bg-background">
+      <AdminHeader />
+
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <Unauthenticated>
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <ShoppingCartIcon />
+              </EmptyMedia>
+              <EmptyTitle>Please sign in to access admin</EmptyTitle>
+              <EmptyDescription>
+                You need to be logged in to manage abandoned carts
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <SignInButton />
+            </EmptyContent>
+          </Empty>
+        </Unauthenticated>
+        <AuthLoading>
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </div>
+        </AuthLoading>
+        <Authenticated>
+          <AbandonedCartsPageInner />
+        </Authenticated>
+      </div>
     </div>
   );
 }

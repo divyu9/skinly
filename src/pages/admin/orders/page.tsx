@@ -8,6 +8,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { AdminHeader } from "@/components/admin-header.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -469,51 +470,7 @@ function AdminOrdersPageInner() {
 export default function AdminOrdersPage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b bg-card sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
-                alt="Skinly"
-                className="h-8"
-              />
-            </Link>
-            <nav className="flex items-center gap-6">
-              <Link
-                to="/admin/products"
-                className="text-sm font-medium hover:text-primary transition-colors"
-              >
-                Products
-              </Link>
-              <Link
-                to="/admin/collections"
-                className="text-sm font-medium hover:text-primary transition-colors"
-              >
-                Collections
-              </Link>
-              <Link
-                to="/admin/orders"
-                className="text-sm font-medium text-primary"
-              >
-                Orders
-              </Link>
-              <Link
-                to="/admin/mockups"
-                className="text-sm font-medium hover:text-primary transition-colors"
-              >
-                Mockups
-              </Link>
-              <Link to="/">
-                <Button variant="outline" size="sm">
-                  View Store
-                </Button>
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <AdminHeader />
 
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Unauthenticated>
