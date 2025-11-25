@@ -2189,117 +2189,6 @@ export default function Index() {
       </section>
 
       {/* Premium Products Showcase */}
-      <section className="py-20 px-4 bg-gradient-to-br from-background via-muted/20 to-background">
-        <div className="container mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Explore Our Premium Collection
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Beyond skins – innovative accessories for your tech lifestyle
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-            {/* Magneto X */}
-            <Link 
-              to="/products?search=magneto" 
-              className="group relative overflow-hidden rounded-3xl bg-card border-2 border-border hover:border-primary transition-all hover:shadow-2xl"
-            >
-              <div className="aspect-[4/5] relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 z-10" />
-                <img 
-                  src="https://images.unsplash.com/photo-1609081219090-a6d81d3085bf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800"
-                  alt="Magneto X Magnetic Mount"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute top-4 right-4 z-20">
-                  <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-xs font-bold uppercase">
-                    New
-                  </div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-6 z-20 space-y-2">
-                  <h3 className="text-2xl font-bold text-white">Magneto X</h3>
-                  <p className="text-white/90 text-sm">
-                    Revolutionary magnetic mount system for seamless device mounting
-                  </p>
-                  <div className="flex items-center gap-2 text-primary-foreground pt-2">
-                    <span className="text-sm font-semibold">Shop Now</span>
-                    <svg className="size-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* Phone Covers */}
-            <Link 
-              to="/products?search=cover" 
-              className="group relative overflow-hidden rounded-3xl bg-card border-2 border-border hover:border-primary transition-all hover:shadow-2xl"
-            >
-              <div className="aspect-[4/5] relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 z-10" />
-                <img 
-                  src="https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800"
-                  alt="Premium Phone Covers"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute top-4 right-4 z-20">
-                  <div className="bg-secondary text-secondary-foreground px-3 py-1.5 rounded-full text-xs font-bold uppercase">
-                    Popular
-                  </div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-6 z-20 space-y-2">
-                  <h3 className="text-2xl font-bold text-white">Premium Covers</h3>
-                  <p className="text-white/90 text-sm">
-                    Durable protection meets stunning design for iPhone & Samsung
-                  </p>
-                  <div className="flex items-center gap-2 text-primary-foreground pt-2">
-                    <span className="text-sm font-semibold">Shop Now</span>
-                    <svg className="size-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </Link>
-
-            {/* AutoApply */}
-            <Link 
-              to="/products?search=autoapply" 
-              className="group relative overflow-hidden rounded-3xl bg-card border-2 border-border hover:border-primary transition-all hover:shadow-2xl"
-            >
-              <div className="aspect-[4/5] relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/80 z-10" />
-                <img 
-                  src="https://images.unsplash.com/photo-1565849904461-04ab60b2a56b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=800"
-                  alt="AutoApply Application Tool"
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                />
-                <div className="absolute top-4 right-4 z-20">
-                  <div className="bg-accent text-accent-foreground px-3 py-1.5 rounded-full text-xs font-bold uppercase">
-                    Essential
-                  </div>
-                </div>
-                <div className="absolute bottom-0 left-0 right-0 p-6 z-20 space-y-2">
-                  <h3 className="text-2xl font-bold text-white">AutoApply</h3>
-                  <p className="text-white/90 text-sm">
-                    Perfect skin application every time with our precision tool
-                  </p>
-                  <div className="flex items-center gap-2 text-primary-foreground pt-2">
-                    <span className="text-sm font-semibold">Shop Now</span>
-                    <svg className="size-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Premium Products Showcase */}
       <section className="py-24 px-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
         <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-16 space-y-4">
@@ -2315,9 +2204,9 @@ export default function Index() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8 lg:gap-10">
-            {/* Magneto Pro */}
+            {/* Magneto X */}
             <Link 
-              to="/products/magneto-pro-multifunctional-hub-with-m-2-nvme-support"
+              to="/products?search=magneto"
               className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
               <div className="absolute top-4 right-4 z-10">
@@ -2329,14 +2218,14 @@ export default function Index() {
                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgwLDAsMCwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
                 <div className="absolute inset-0 flex items-center justify-center p-8">
                   <div className="text-8xl group-hover:scale-110 transition-transform duration-300">
-                    🚀
+                    🧲
                   </div>
                 </div>
               </div>
               <div className="p-6 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">
-                    Magneto Pro
+                    Magneto X
                   </h3>
                   <div className="shrink-0 size-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                     <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2345,14 +2234,14 @@ export default function Index() {
                   </div>
                 </div>
                 <p className="text-muted-foreground text-sm line-clamp-2">
-                  Multi-functional Type-C hub with M.2 NVMe support. Expand your connectivity possibilities.
+                  Revolutionary magnetic accessories and mounts for seamless device connectivity.
                 </p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    USB Hub
+                    Magnetic
                   </span>
                   <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    NVMe Support
+                    Universal
                   </span>
                 </div>
               </div>
@@ -2360,7 +2249,7 @@ export default function Index() {
 
             {/* Magsafe Covers */}
             <Link 
-              to="/products/black-magsafe-cover-case-for-iphone-all-models"
+              to="/products?search=Magsafe+Cover+%26+Case"
               className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
               <div className="absolute top-4 right-4 z-10">
@@ -2401,9 +2290,9 @@ export default function Index() {
               </div>
             </Link>
 
-            {/* AutoApply Screen Guard */}
+            {/* AutoApply Tempered Glass */}
             <Link 
-              to="/products/screen-guard-twin-pack-2x-hd-glass"
+              to="/products?search=autoapply"
               className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
             >
               <div className="absolute top-4 right-4 z-10">
