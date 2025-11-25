@@ -91,7 +91,7 @@ http.route({
 
       // Find order by AWB number
       const orders = await ctx.runQuery(api.admin.orders.getAllOrders, {});
-      const order = orders.find((o) => o.awbNumber === awbNumber);
+      const order = orders.find((o: { awbNumber?: string }) => o.awbNumber === awbNumber);
 
       if (!order) {
         return new Response(

@@ -106,6 +106,24 @@ export const createOrder = mutation({
       await ctx.db.delete(item._id);
     }
 
+    // Mark any abandoned carts as recovered
+    const abandonedCarts = await ctx.db
+      .query("abandonedCarts")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "reminded")
+        )
+      )
+      .collect();
+
+    for (const cart of abandonedCarts) {
+      await ctx.db.patch(cart._id, {
+        status: "recovered",
+      });
+    }
+
     return { orderId, orderNumber };
   },
 });

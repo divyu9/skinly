@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as abandonedCarts from "../abandonedCarts.js";
+import type * as abandonedCartsActions from "../abandonedCartsActions.js";
 import type * as admin_orders from "../admin/orders.js";
 import type * as cart from "../cart.js";
 import type * as collections from "../collections.js";
@@ -27,6 +29,8 @@ import type * as products from "../products.js";
 import type * as rapidshyp from "../rapidshyp.js";
 import type * as reviews from "../reviews.js";
 import type * as shopify from "../shopify.js";
+import type * as stockNotifications from "../stockNotifications.js";
+import type * as stockNotificationsActions from "../stockNotificationsActions.js";
 import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as users from "../users.js";
 
@@ -37,6 +41,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  abandonedCarts: typeof abandonedCarts;
+  abandonedCartsActions: typeof abandonedCartsActions;
   "admin/orders": typeof admin_orders;
   cart: typeof cart;
   collections: typeof collections;
@@ -56,6 +62,8 @@ declare const fullApi: ApiFromModules<{
   rapidshyp: typeof rapidshyp;
   reviews: typeof reviews;
   shopify: typeof shopify;
+  stockNotifications: typeof stockNotifications;
+  stockNotificationsActions: typeof stockNotificationsActions;
   updateCollectionRules: typeof updateCollectionRules;
   users: typeof users;
 }>;

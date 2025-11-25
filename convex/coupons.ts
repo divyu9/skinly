@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import type { Id } from "./_generated/dataModel.d.ts";
 
@@ -423,6 +423,64 @@ export const createCoupon = mutation({
       });
     }
     
+    // Check if code already exists
+    const existing = await ctx.db
+      .query("coupons")
+      .withIndex("by_code", (q) => q.eq("code", args.code.toUpperCase()))
+      .first();
+    
+    if (existing) {
+      throw new ConvexError({
+        message: "A coupon with this code already exists",
+        code: "CONFLICT",
+      });
+    }
+    
+    const couponId = await ctx.db.insert("coupons", {
+      code: args.code.toUpperCase(),
+      description: args.description,
+      discountType: args.discountType,
+      discountValue: args.discountValue,
+      minPurchase: args.minPurchase,
+      maxDiscount: args.maxDiscount,
+      startDate: args.startDate,
+      endDate: args.endDate,
+      isActive: args.isActive,
+      usageLimit: args.usageLimit,
+      usageCount: 0,
+      applicableVariantIds: args.applicableVariantIds,
+      applicableCollectionIds: args.applicableCollectionIds,
+      applicableProductKeywords: args.applicableProductKeywords,
+      minCartValue: args.minCartValue,
+      minProductValue: args.minProductValue,
+      allowedCustomerEmails: args.allowedCustomerEmails?.map((e) => e.toLowerCase()),
+    });
+    
+    return couponId;
+  },
+});
+
+// Create coupon (internal - for automated systems like abandoned cart recovery)
+export const createCouponInternal = internalMutation({
+  args: {
+    code: v.string(),
+    description: v.string(),
+    discountType: v.union(v.literal("percentage"), v.literal("fixed")),
+    discountValue: v.number(),
+    minPurchase: v.optional(v.number()),
+    maxDiscount: v.optional(v.number()),
+    startDate: v.number(),
+    endDate: v.number(),
+    isActive: v.boolean(),
+    usageLimit: v.optional(v.number()),
+    applicableVariantIds: v.optional(v.array(v.id("variants"))),
+    applicableCollectionIds: v.optional(v.array(v.id("collections"))),
+    applicableProductKeywords: v.optional(v.array(v.string())),
+    minCartValue: v.optional(v.number()),
+    minProductValue: v.optional(v.number()),
+    allowedCustomerEmails: v.optional(v.array(v.string())),
+  },
+  handler: async (ctx, args) => {
     // Check if code already exists
     const existing = await ctx.db
       .query("coupons")

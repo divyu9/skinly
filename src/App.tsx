@@ -14,6 +14,7 @@ import EditProductPage from "./pages/admin/products/edit/page.tsx";
 import AdminOrdersPage from "./pages/admin/orders/page.tsx";
 import AdminOrderDetailPage from "./pages/admin/orders/detail.tsx";
 import AdminCouponsPage from "./pages/admin/coupons/page.tsx";
+import AdminAbandonedCartsPage from "./pages/admin/abandoned-carts/page.tsx";
 import AdminMockupsPage from "./pages/admin/mockups.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/admin/orders" element={<AdminOrdersPage />} />
           <Route path="/admin/orders/:orderId" element={<AdminOrderDetailPage />} />
           <Route path="/admin/coupons" element={<AdminCouponsPage />} />
+          <Route path="/admin/abandoned-carts" element={<AdminAbandonedCartsPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/admin/gst-migration" element={<GstMigrationPage />} />
           <Route path="/admin/tax-export" element={<TaxExportPage />} />

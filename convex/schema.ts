@@ -196,4 +196,55 @@ export default defineSchema({
   })
     .index("by_brand_model_sku", ["brand", "model", "sku"])
     .index("by_sku", ["sku"]),
+
+  abandonedCarts: defineTable({
+    userId: v.id("users"),
+    userEmail: v.string(),
+    userPhone: v.optional(v.string()),
+    items: v.array(
+      v.object({
+        productId: v.string(),
+        productTitle: v.string(),
+        productImage: v.optional(v.string()),
+        variant: v.string(),
+        price: v.number(),
+        quantity: v.number(),
+        phoneModel: v.optional(v.string()),
+        phoneBrand: v.optional(v.string()),
+        coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
+      })
+    ),
+    cartTotal: v.number(),
+    abandonedAt: v.number(), // timestamp when cart was abandoned
+    reminderSentAt: v.optional(v.number()), // timestamp when reminder was sent
+    couponCode: v.optional(v.string()), // Custom coupon generated for this cart
+    status: v.union(
+      v.literal("pending"), // Abandoned but no reminder sent yet
+      v.literal("reminded"), // Reminder sent
+      v.literal("recovered"), // User completed checkout
+      v.literal("expired") // Too old or no longer relevant
+    ),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_abandoned_at", ["abandonedAt"]),
+
+  stockNotifications: defineTable({
+    variantId: v.id("variants"),
+    productId: v.id("products"),
+    productTitle: v.string(),
+    variantTitle: v.string(),
+    sku: v.string(),
+    phoneNumber: v.string(), // User's phone number
+    subscribedAt: v.number(), // timestamp when subscribed
+    notifiedAt: v.optional(v.number()), // timestamp when notification was sent
+    status: v.union(
+      v.literal("waiting"), // Waiting for restock
+      v.literal("notified"), // Notification sent
+      v.literal("expired") // User no longer interested or expired
+    ),
+  })
+    .index("by_variant", ["variantId"])
+    .index("by_status", ["status"])
+    .index("by_variant_and_status", ["variantId", "status"]),
 });
