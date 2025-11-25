@@ -3,19 +3,45 @@ import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, ChevronRightIcon } from "lucide-react";
+import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { toast } from "sonner";
+import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 function AdminOrdersPageInner() {
-  const allOrders = useQuery(api.orders.getOrders, {});
-  const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [editingShipping, setEditingShipping] = useState<Id<"orders"> | null>(null);
+  const [shippingForm, setShippingForm] = useState({
+    awbNumber: "",
+    trackingUrl: "",
+    shippingStatus: "",
+  });
+
+  const stats = useQuery(api.admin.orders.getOrderStats);
+  const allOrders = useQuery(api.admin.orders.getAllOrders, {
+    status: statusFilter,
+    paymentStatus: paymentFilter,
+  });
+  const searchResults = useQuery(
+    api.admin.orders.searchOrders,
+    searchTerm.length >= 3 ? { searchTerm } : "skip"
+  );
+  const updateOrderStatus = useMutation(api.admin.orders.updateOrderStatus);
+  const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
+  const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
+
+  const displayOrders = searchTerm.length >= 3 ? searchResults : allOrders;
 
   const handleStatusChange = async (
     orderId: Id<"orders">,
@@ -29,22 +55,61 @@ function AdminOrdersPageInner() {
     }
   };
 
+  const handlePaymentStatusChange = async (
+    orderId: Id<"orders">,
+    paymentStatus: "pending" | "success" | "failed"
+  ) => {
+    try {
+      await updatePaymentStatus({ orderId, paymentStatus });
+      toast.success("Payment status updated");
+    } catch (error) {
+      toast.error("Failed to update payment status");
+    }
+  };
+
+  const handleShippingUpdate = async (orderId: Id<"orders">) => {
+    try {
+      await updateShippingInfo({
+        orderId,
+        ...shippingForm,
+      });
+      toast.success("Shipping information updated");
+      setEditingShipping(null);
+      setShippingForm({ awbNumber: "", trackingUrl: "", shippingStatus: "" });
+    } catch (error) {
+      toast.error("Failed to update shipping info");
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
       case "confirmed":
-        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "processing":
-        return "bg-purple-500/10 text-purple-500 border-purple-500/20";
+        return "bg-purple-500/10 text-purple-600 border-purple-500/20";
       case "shipped":
-        return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
+        return "bg-indigo-500/10 text-indigo-600 border-indigo-500/20";
       case "delivered":
-        return "bg-green-500/10 text-green-500 border-green-500/20";
+        return "bg-green-500/10 text-green-600 border-green-500/20";
       case "cancelled":
-        return "bg-red-500/10 text-red-500 border-red-500/20";
+        return "bg-red-500/10 text-red-600 border-red-500/20";
       default:
         return "";
+    }
+  };
+
+  const getPaymentStatusColor = (status?: string) => {
+    switch (status) {
+      case "success":
+        return "bg-green-500/10 text-green-600 border-green-500/20";
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      case "failed":
+        return "bg-red-500/10 text-red-600 border-red-500/20";
+      default:
+        return "bg-gray-500/10 text-gray-600 border-gray-500/20";
     }
   };
 
@@ -53,134 +118,444 @@ function AdminOrdersPageInner() {
       year: "numeric",
       month: "short",
       day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  if (allOrders === undefined) {
+  if (!stats || displayOrders === undefined) {
     return (
-      <div className="space-y-4">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 w-full" />
-        ))}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-64 w-full" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Orders</h1>
-          <p className="text-muted-foreground">
-            Manage all customer orders ({allOrders.length} total)
-          </p>
-        </div>
+      {/* Page Header */}
+      <div>
+        <h1 className="text-3xl font-bold">Order Management</h1>
+        <p className="text-muted-foreground">
+          Manage all customer orders and track payments
+        </p>
       </div>
 
-      {allOrders.length === 0 ? (
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Orders
+              </CardTitle>
+              <PackageIcon className="size-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.pending} pending
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total Revenue
+              </CardTitle>
+              <IndianRupeeIcon className="size-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₹{stats.totalRevenue.toFixed(0)}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.successfulPayments} paid orders
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Payments
+              </CardTitle>
+              <CreditCardIcon className="size-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {stats.successfulPayments}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.pendingPayments} pending, {stats.failedPayments} failed
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Shipped
+              </CardTitle>
+              <TruckIcon className="size-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-indigo-600">
+              {stats.shipped}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.delivered} delivered
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters and Search */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
+              <Label htmlFor="search">Search Orders</Label>
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  id="search"
+                  placeholder="Search by order #, name, or phone..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Order Status</Label>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Payment Status</Label>
+              <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Payments</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Orders List */}
+      {displayOrders.length === 0 ? (
         <Empty>
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <PackageIcon />
             </EmptyMedia>
-            <EmptyTitle>No orders yet</EmptyTitle>
+            <EmptyTitle>
+              {searchTerm ? "No orders found" : "No orders yet"}
+            </EmptyTitle>
             <EmptyDescription>
-              Orders will appear here when customers make purchases
+              {searchTerm
+                ? "Try adjusting your search or filters"
+                : "Orders will appear here when customers make purchases"}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
         <div className="space-y-4">
-          {allOrders.map((order) => (
+          {displayOrders.map((order) => (
             <Card key={order._id}>
               <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
                     <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Placed on {formatDate(order._creationTime)}
+                    <p className="text-sm text-muted-foreground">
+                      {formatDate(order._creationTime)}
                     </p>
+                    {order.user && (
+                      <p className="text-xs text-muted-foreground">
+                        {order.user.email}
+                      </p>
+                    )}
                   </div>
-                  <Select
-                    value={order.status}
-                    onValueChange={(value: typeof order.status) =>
-                      handleStatusChange(order._id, value)
-                    }
-                  >
-                    <SelectTrigger className={`w-40 ${getStatusColor(order.status)}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="confirmed">Confirmed</SelectItem>
-                      <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="shipped">Shipped</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <Select
+                      value={order.status}
+                      onValueChange={(value: typeof order.status) =>
+                        handleStatusChange(order._id, value)
+                      }
+                    >
+                      <SelectTrigger
+                        className={`w-32 ${getStatusColor(order.status)}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="processing">Processing</SelectItem>
+                        <SelectItem value="shipped">Shipped</SelectItem>
+                        <SelectItem value="delivered">Delivered</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select
+                      value={order.paymentStatus || "pending"}
+                      onValueChange={(value: "pending" | "success" | "failed") =>
+                        handlePaymentStatusChange(order._id, value)
+                      }
+                    >
+                      <SelectTrigger
+                        className={`w-32 ${getPaymentStatusColor(order.paymentStatus)}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Payment Pending</SelectItem>
+                        <SelectItem value="success">Paid</SelectItem>
+                        <SelectItem value="failed">Payment Failed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {/* Customer Info */}
-                  <div className="text-sm">
-                    <p className="font-medium">{order.shippingAddress.fullName}</p>
-                    <p className="text-muted-foreground">{order.shippingAddress.phone}</p>
-                    <p className="text-muted-foreground">
-                      {order.shippingAddress.city}, {order.shippingAddress.state}
-                    </p>
+                  {/* Customer & Shipping Info */}
+                  <div className="grid md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="font-medium text-xs text-muted-foreground uppercase mb-1">
+                        Customer
+                      </p>
+                      <p className="font-medium">{order.shippingAddress.fullName}</p>
+                      <p className="text-muted-foreground">
+                        {order.shippingAddress.phone}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="font-medium text-xs text-muted-foreground uppercase mb-1">
+                        Shipping Address
+                      </p>
+                      <p className="text-muted-foreground">
+                        {order.shippingAddress.addressLine1}
+                        {order.shippingAddress.addressLine2 &&
+                          `, ${order.shippingAddress.addressLine2}`}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {order.shippingAddress.city}, {order.shippingAddress.state}{" "}
+                        {order.shippingAddress.pincode}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Order Items */}
-                  <div className="space-y-2">
-                    {order.items.slice(0, 2).map((item, idx) => (
-                      <div key={idx} className="flex gap-3">
-                        {item.productImage && (
-                          <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
-                            <img
-                              src={item.productImage}
-                              alt={item.productTitle}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium line-clamp-1">
-                            {item.productTitle}
-                          </p>
-                          {item.phoneModel && (
-                            <p className="text-xs text-muted-foreground">
-                              {item.phoneModel}
-                            </p>
+                  <div>
+                    <p className="font-medium text-xs text-muted-foreground uppercase mb-2">
+                      Order Items ({order.items.length})
+                    </p>
+                    <div className="space-y-2">
+                      {order.items.slice(0, 3).map((item, idx) => (
+                        <div key={idx} className="flex gap-3">
+                          {item.productImage && (
+                            <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
+                              <img
+                                src={item.productImage}
+                                alt={item.productTitle}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
                           )}
-                          <p className="text-sm text-muted-foreground">
-                            Qty: {item.quantity} × ₹{item.price.toFixed(0)}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium line-clamp-1">
+                              {item.productTitle}
+                            </p>
+                            {item.phoneModel && (
+                              <p className="text-xs text-muted-foreground">
+                                Model: {item.phoneModel}
+                              </p>
+                            )}
+                            {item.coverage && (
+                              <p className="text-xs text-muted-foreground">
+                                Coverage: {item.coverage === "full_body_wrap" ? "Full Body Wrap" : "Only Back"}
+                              </p>
+                            )}
+                            <p className="text-sm font-medium">
+                              Qty: {item.quantity} × ₹{item.price.toFixed(0)} = ₹
+                              {(item.quantity * item.price).toFixed(0)}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                    {order.items.length > 2 && (
-                      <p className="text-sm text-muted-foreground">
-                        +{order.items.length - 2} more item(s)
-                      </p>
-                    )}
+                      ))}
+                      {order.items.length > 3 && (
+                        <p className="text-sm text-muted-foreground">
+                          +{order.items.length - 3} more item(s)
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Order Total */}
+                  {/* Shipping Information */}
+                  {(order.awbNumber || order.trackingUrl) && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="font-medium text-xs text-muted-foreground uppercase mb-1">
+                        Shipping Details
+                      </p>
+                      {order.awbNumber && (
+                        <p className="text-sm">
+                          <span className="font-medium">AWB:</span> {order.awbNumber}
+                        </p>
+                      )}
+                      {order.trackingUrl && (
+                        <a
+                          href={order.trackingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline"
+                        >
+                          Track Shipment →
+                        </a>
+                      )}
+                      {order.shippingStatus && (
+                        <p className="text-sm text-muted-foreground">
+                          Status: {order.shippingStatus}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Order Total & Actions */}
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
                       <p className="text-sm text-muted-foreground">Order Total</p>
-                      <p className="text-xl font-bold text-primary">
+                      <p className="text-2xl font-bold text-primary">
                         ₹{order.total.toFixed(0)}
                       </p>
+                      <p className="text-xs text-muted-foreground">
+                        Subtotal: ₹{order.subtotal.toFixed(0)} + Shipping: ₹
+                        {order.shippingFee.toFixed(0)}
+                      </p>
                     </div>
-                    <Link to={`/orders/${order._id}`}>
-                      <Button variant="outline">
-                        View Details
-                        <ChevronRightIcon className="size-4 ml-2" />
-                      </Button>
-                    </Link>
+                    <div className="flex gap-2">
+                      <Dialog
+                        open={editingShipping === order._id}
+                        onOpenChange={(open) => {
+                          if (open) {
+                            setEditingShipping(order._id);
+                            setShippingForm({
+                              awbNumber: order.awbNumber || "",
+                              trackingUrl: order.trackingUrl || "",
+                              shippingStatus: order.shippingStatus || "",
+                            });
+                          } else {
+                            setEditingShipping(null);
+                          }
+                        }}
+                      >
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <TruckIcon className="size-4 mr-2" />
+                            Shipping
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Update Shipping Information</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div>
+                              <Label htmlFor="awb">AWB / Tracking Number</Label>
+                              <Input
+                                id="awb"
+                                placeholder="Enter AWB number"
+                                value={shippingForm.awbNumber}
+                                onChange={(e) =>
+                                  setShippingForm({
+                                    ...shippingForm,
+                                    awbNumber: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="tracking">Tracking URL</Label>
+                              <Input
+                                id="tracking"
+                                placeholder="https://..."
+                                value={shippingForm.trackingUrl}
+                                onChange={(e) =>
+                                  setShippingForm({
+                                    ...shippingForm,
+                                    trackingUrl: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="status">Shipping Status</Label>
+                              <Input
+                                id="status"
+                                placeholder="e.g., In Transit, Out for Delivery"
+                                value={shippingForm.shippingStatus}
+                                onChange={(e) =>
+                                  setShippingForm({
+                                    ...shippingForm,
+                                    shippingStatus: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <Button
+                              onClick={() => handleShippingUpdate(order._id)}
+                              className="w-full"
+                            >
+                              Save Shipping Info
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+
+                      <Link to={`/orders/${order._id}`}>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -207,14 +582,29 @@ export default function AdminOrdersPage() {
               />
             </Link>
             <nav className="flex items-center gap-6">
-              <Link to="/admin/products" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/admin/products"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Products
               </Link>
-              <Link to="/admin/collections" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/admin/collections"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Collections
               </Link>
-              <Link to="/admin/orders" className="text-sm font-medium text-primary">
+              <Link
+                to="/admin/orders"
+                className="text-sm font-medium text-primary"
+              >
                 Orders
+              </Link>
+              <Link
+                to="/admin/mockups"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
+                Mockups
               </Link>
               <Link to="/">
                 <Button variant="outline" size="sm">
@@ -226,7 +616,7 @@ export default function AdminOrdersPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Unauthenticated>
           <Empty>
             <EmptyHeader>
@@ -244,10 +634,17 @@ export default function AdminOrdersPage() {
           </Empty>
         </Unauthenticated>
         <AuthLoading>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full" />
-            ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-64 w-full" />
+              ))}
+            </div>
           </div>
         </AuthLoading>
         <Authenticated>
