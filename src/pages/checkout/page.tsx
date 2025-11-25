@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -20,6 +20,7 @@ function CheckoutPageInner() {
   const navigate = useNavigate();
   const cartItems = useQuery(api.cart.getCart);
   const createOrder = useMutation(api.orders.createOrder);
+  const initiatePayment = useAction(api.phonepe.initiatePayment);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -30,7 +31,7 @@ function CheckoutPageInner() {
     city: "",
     state: "",
     pincode: "",
-    paymentMethod: "cod",
+    paymentMethod: "phonepe",
   });
 
   if (cartItems === undefined) {
@@ -76,6 +77,7 @@ function CheckoutPageInner() {
     setIsSubmitting(true);
 
     try {
+      // Create order first
       const result = await createOrder({
         shippingAddress: {
           fullName: formData.fullName,
@@ -89,11 +91,30 @@ function CheckoutPageInner() {
         paymentMethod: formData.paymentMethod,
       });
 
-      toast.success("Order placed successfully!");
-      navigate(`/orders/${result.orderId}`);
+      // If PhonePe payment, initiate payment flow
+      if (formData.paymentMethod === "phonepe") {
+        toast.loading("Redirecting to payment gateway...");
+        
+        const paymentResult = await initiatePayment({
+          orderId: result.orderId,
+          orderNumber: result.orderNumber,
+          amount: total,
+          customerPhone: formData.phone,
+        });
+
+        if (paymentResult.success && paymentResult.paymentUrl) {
+          // Redirect to PhonePe payment page
+          window.location.href = paymentResult.paymentUrl;
+        } else {
+          throw new Error("Failed to initiate payment");
+        }
+      } else {
+        // For COD or other methods, go directly to order page
+        toast.success("Order placed successfully!");
+        navigate(`/orders/${result.orderId}`);
+      }
     } catch (error) {
       toast.error("Failed to place order. Please try again.");
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -228,21 +249,34 @@ function CheckoutPageInner() {
               {/* Payment Method */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Payment Method</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCardIcon className="size-5" />
+                    Payment Method
+                  </CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
                   <RadioGroup
                     value={formData.paymentMethod}
                     onValueChange={(value) =>
                       setFormData({ ...formData, paymentMethod: value })
                     }
                   >
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="cod" id="cod" />
-                      <Label htmlFor="cod" className="flex-1 cursor-pointer">
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="phonepe" id="phonepe" />
+                      <Label htmlFor="phonepe" className="flex-1 cursor-pointer">
+                        <div className="font-medium">PhonePe Payment Gateway</div>
+                        <div className="text-sm text-muted-foreground">
+                          Pay securely with UPI, Cards, Net Banking & more
+                        </div>
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors opacity-50">
+                      <RadioGroupItem value="cod" id="cod" disabled />
+                      <Label htmlFor="cod" className="flex-1 cursor-not-allowed">
                         <div className="font-medium">Cash on Delivery</div>
                         <div className="text-sm text-muted-foreground">
-                          Pay when you receive your order
+                          Currently not available
                         </div>
                       </Label>
                     </div>

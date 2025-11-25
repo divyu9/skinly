@@ -60,9 +60,23 @@ export default defineSchema({
       pincode: v.string(),
     }),
     paymentMethod: v.string(),
+    // Payment fields
+    paymentStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("success"),
+      v.literal("failed")
+    )),
+    phonepeTransactionId: v.optional(v.string()),
+    phonepeMerchantTransactionId: v.optional(v.string()),
+    phonepePaymentUrl: v.optional(v.string()),
+    // Shipping fields
+    awbNumber: v.optional(v.string()), // Airway Bill Number from RapidShyp
+    trackingUrl: v.optional(v.string()),
+    shippingStatus: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
-    .index("by_order_number", ["orderNumber"]),
+    .index("by_order_number", ["orderNumber"])
+    .index("by_merchant_transaction", ["phonepeMerchantTransactionId"]),
 
   collections: defineTable({
     name: v.string(),

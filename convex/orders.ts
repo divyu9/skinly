@@ -84,6 +84,7 @@ export const createOrder = mutation({
       total,
       shippingAddress: args.shippingAddress,
       paymentMethod: args.paymentMethod,
+      paymentStatus: "pending",
     });
 
     // Clear cart
@@ -193,5 +194,78 @@ export const updateOrderStatus = mutation({
     }
 
     await ctx.db.patch(args.orderId, { status: args.status });
+  },
+});
+
+// Update payment details
+export const updatePaymentDetails = mutation({
+  args: {
+    orderId: v.id("orders"),
+    phonepeMerchantTransactionId: v.string(),
+    phonepeTransactionId: v.string(),
+    phonepePaymentUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.orderId, {
+      phonepeMerchantTransactionId: args.phonepeMerchantTransactionId,
+      phonepeTransactionId: args.phonepeTransactionId,
+      phonepePaymentUrl: args.phonepePaymentUrl,
+    });
+  },
+});
+
+// Update payment status (called by webhook or after status check)
+export const updatePaymentStatus = mutation({
+  args: {
+    merchantTransactionId: v.string(),
+    paymentStatus: v.union(
+      v.literal("pending"),
+      v.literal("success"),
+      v.literal("failed")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_merchant_transaction", (q) =>
+        q.eq("phonepeMerchantTransactionId", args.merchantTransactionId)
+      )
+      .unique();
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    await ctx.db.patch(order._id, {
+      paymentStatus: args.paymentStatus,
+      status: args.paymentStatus === "success" ? "confirmed" : order.status,
+    });
+
+    return { orderId: order._id };
+  },
+});
+
+// Get order by merchant transaction ID
+export const getOrderByMerchantTransaction = query({
+  args: { merchantTransactionId: v.string() },
+  handler: async (ctx, args) => {
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_merchant_transaction", (q) =>
+        q.eq("phonepeMerchantTransactionId", args.merchantTransactionId)
+      )
+      .unique();
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    return order;
   },
 });
