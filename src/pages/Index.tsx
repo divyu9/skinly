@@ -1443,7 +1443,7 @@ export default function Index() {
 
       {/* Latest Models Marquee */}
       {latestModels && latestModels.length > 0 && (
-        <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-[72px] overflow-hidden">
+        <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-24 overflow-hidden">
           <div className="flex items-center gap-4">
             {/* Fixed Label with Contrasting Background */}
             <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
