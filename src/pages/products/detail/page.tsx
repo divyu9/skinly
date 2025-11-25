@@ -358,6 +358,13 @@ export default function ProductDetailPage() {
       setSelectedImage(displayImages[0].url);
     }
   }, [displayImages]);
+  
+  // Automatically select "Full Body Wrap" when a mockup preview is loaded
+  useEffect(() => {
+    if (phoneModel && mockupFileUrl && isPhoneSkin) {
+      setSelectedCoverage("full_body_wrap");
+    }
+  }, [phoneModel, mockupFileUrl, isPhoneSkin]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -560,8 +567,9 @@ export default function ProductDetailPage() {
                       }}
                     />
                     {phoneModel && mockupUrl && selectedImage === mockupUrl && (
-                      <div className="absolute top-3 right-3 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
-                        Preview on {phoneModel}
+                      <div className="absolute top-3 right-3 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg text-center leading-tight">
+                        <div>Preview on {phoneModel}</div>
+                        <div className="text-[10px] mt-0.5 opacity-90">Full Body Wrap</div>
                       </div>
                     )}
                   </>
