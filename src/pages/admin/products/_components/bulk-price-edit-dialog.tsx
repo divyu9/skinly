@@ -39,12 +39,14 @@ interface BulkPriceEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: Product[];
+  selectedProductIds: Array<Id<"products">>;
 }
 
 export function BulkPriceEditDialog({
   open,
   onOpenChange,
   products,
+  selectedProductIds,
 }: BulkPriceEditDialogProps) {
   const [changeType, setChangeType] = useState<ChangeType>("percentage");
   const [changeValue, setChangeValue] = useState("");
@@ -55,6 +57,14 @@ export function BulkPriceEditDialog({
   const [selectionMode, setSelectionMode] = useState<"all" | "manual">("all");
 
   const bulkUpdatePrices = useMutation(api.products.bulkUpdateVariantPrices);
+
+  // Filter products: if user has selected specific products via checkboxes, show only those
+  const displayProducts = useMemo(() => {
+    if (selectedProductIds.length > 0) {
+      return products.filter((p) => selectedProductIds.includes(p._id));
+    }
+    return products;
+  }, [products, selectedProductIds]);
 
   // Build preview data
   const previewData = useMemo(() => {
@@ -75,7 +85,7 @@ export function BulkPriceEditDialog({
       }
     };
 
-    return products.map((product) => {
+    return displayProducts.map((product) => {
       const variants = product.variants.map((variant) => {
         const newPrice = calculateNewPrice(variant.price);
         const change = newPrice - variant.price;
@@ -87,7 +97,7 @@ export function BulkPriceEditDialog({
       });
       return { ...product, variants };
     });
-  }, [products, changeType, changeValue]);
+  }, [displayProducts, changeType, changeValue]);
 
   // Calculate summary
   const summary = useMemo(() => {
@@ -118,21 +128,32 @@ export function BulkPriceEditDialog({
     // If "Apply to all" mode, auto-select all variants
     if (selectionMode === "all") {
       const allVariantIds = new Set<Id<"variants">>();
-      products.forEach((product) => {
+      displayProducts.forEach((product) => {
         product.variants.forEach((variant) => {
           allVariantIds.add(variant._id);
         });
       });
       setSelectedVariants(allVariantIds);
     } else {
-      // If "Manual selection" mode, start with nothing selected
-      setSelectedVariants(new Set());
+      // If "Manual selection" mode, pre-select variants from checkboxed products
+      if (selectedProductIds.length > 0) {
+        const preSelectedVariantIds = new Set<Id<"variants">>();
+        displayProducts.forEach((product) => {
+          product.variants.forEach((variant) => {
+            preSelectedVariantIds.add(variant._id);
+          });
+        });
+        setSelectedVariants(preSelectedVariantIds);
+      } else {
+        // No products were checkboxed, start with nothing selected
+        setSelectedVariants(new Set());
+      }
     }
   };
 
   const handleSelectAll = () => {
     const allVariantIds = new Set<Id<"variants">>();
-    products.forEach((product) => {
+    displayProducts.forEach((product) => {
       product.variants.forEach((variant) => {
         allVariantIds.add(variant._id);
       });
@@ -236,9 +257,10 @@ export function BulkPriceEditDialog({
           <DialogHeader>
             <DialogTitle>Bulk Edit Prices</DialogTitle>
             <DialogDescription>
-              {products.length} products with{" "}
-              {products.reduce((sum, p) => sum + p.variants.length, 0)} total
+              {displayProducts.length} products with{" "}
+              {displayProducts.reduce((sum, p) => sum + p.variants.length, 0)} total
               variants
+              {selectedProductIds.length > 0 && " (from your selection)"}
             </DialogDescription>
           </DialogHeader>
         </div>

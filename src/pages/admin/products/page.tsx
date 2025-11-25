@@ -1262,6 +1262,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         open={showBulkPriceEdit}
         onOpenChange={setShowBulkPriceEdit}
         products={filteredProducts}
+        selectedProductIds={selectedProducts}
       />
     </div>
   );
