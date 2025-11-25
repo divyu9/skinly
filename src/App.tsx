@@ -18,6 +18,7 @@ import AdminAbandonedCartsPage from "./pages/admin/abandoned-carts/page.tsx";
 import AdminStockNotificationsPage from "./pages/admin/stock-notifications/page.tsx";
 import AdminOOSPage from "./pages/admin/oos/page.tsx";
 import AdminMockupsPage from "./pages/admin/mockups.tsx";
+import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
 import FixCollectionsPage from "./pages/admin/fix-collections.tsx";
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/admin/stock-notifications" element={<AdminStockNotificationsPage />} />
           <Route path="/admin/oos" element={<AdminOOSPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
+          <Route path="/devices" element={<DevicesPage />} />
           <Route path="/admin/gst-migration" element={<GstMigrationPage />} />
           <Route path="/admin/tax-export" element={<TaxExportPage />} />
           <Route path="/admin/fix-collections" element={<FixCollectionsPage />} />

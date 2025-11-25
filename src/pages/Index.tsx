@@ -1424,6 +1424,9 @@ export default function Index() {
             <a href="/products" className="text-sm font-medium hover:text-primary transition-colors">
               All Products
             </a>
+            <Link to="/devices" className="text-sm font-medium hover:text-primary transition-colors">
+              Devices
+            </Link>
             <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
               My Orders
             </Link>

@@ -483,6 +483,9 @@ export default function ProductsPage() {
             <Link to="/products" className="text-[10px] sm:text-sm font-medium text-primary hidden sm:inline">
               All Products
             </Link>
+            <Link to="/devices" className="text-[10px] sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
+              Devices
+            </Link>
             <Link to="/orders" className="text-[10px] sm:text-sm font-medium hover:text-primary transition-colors">
               Orders
             </Link>
