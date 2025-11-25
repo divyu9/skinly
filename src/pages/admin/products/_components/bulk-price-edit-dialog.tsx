@@ -253,7 +253,7 @@ export function BulkPriceEditDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
-        <div className="px-6 pt-6">
+        <div className="px-6 pt-6 flex-shrink-0">
           <DialogHeader>
             <DialogTitle>Bulk Edit Prices</DialogTitle>
             <DialogDescription>
@@ -266,7 +266,7 @@ export function BulkPriceEditDialog({
         </div>
 
         {/* Price Change Settings */}
-        <div className="space-y-4 border-b pb-4 px-6">
+        <div className="space-y-4 border-b pb-4 px-6 flex-shrink-0">
           <RadioGroup
             value={changeType}
             onValueChange={(value) => {
@@ -364,8 +364,8 @@ export function BulkPriceEditDialog({
 
         {/* Preview List */}
         {hasCalculated && (
-          <>
-            <div className="flex items-center justify-between px-6 py-2">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center justify-between px-6 py-2 flex-shrink-0">
               <div className="text-sm text-muted-foreground">
                 {selectionMode === "all" 
                   ? "All variants will be updated"
@@ -393,8 +393,8 @@ export function BulkPriceEditDialog({
               )}
             </div>
 
-            <ScrollArea className="flex-1 px-6">
-              <div className="border rounded-lg">
+            <div className="flex-1 min-h-0 px-6 pb-4">
+              <ScrollArea className="h-full border rounded-lg">
                 <div className="p-4 space-y-4">
                 {previewData.map((product) => {
                   const allSelected = product.variants.every((v) =>
@@ -479,12 +479,12 @@ export function BulkPriceEditDialog({
                   );
                 })}
                 </div>
-              </div>
-            </ScrollArea>
-          </>
+              </ScrollArea>
+            </div>
+          </div>
         )}
 
-        <DialogFooter className="border-t pt-4 px-6 pb-6">
+        <DialogFooter className="border-t pt-4 px-6 pb-6 flex-shrink-0">
           <div className="flex items-center justify-between w-full">
             <div className="text-sm">
               {hasCalculated && (
