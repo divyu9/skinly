@@ -3,7 +3,7 @@ import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Link } from "react-router-dom";
-import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon } from "lucide-react";
+import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon, SearchIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -48,10 +48,18 @@ function AdminCollectionsPageInner() {
     { field: "productName", condition: "contains", value: "" },
   ]);
   const [previewCollectionId, setPreviewCollectionId] = useState<Id<"collections"> | null>(null);
+  const [showCreatePreview, setShowCreatePreview] = useState(false);
+  const [previewSearch, setPreviewSearch] = useState("");
 
   const previewProducts = useQuery(
     api.collections.getCollectionProducts,
     previewCollectionId ? { collectionId: previewCollectionId } : "skip"
+  );
+
+  // Preview products while creating collection
+  const createPreviewProducts = useQuery(
+    api.collections.previewCollectionProducts,
+    isAutoCollection && showCreatePreview ? { rules } : "skip"
   );
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -102,7 +110,19 @@ function AdminCollectionsPageInner() {
     setFormData({ name: "", slug: "", description: "", image: "" });
     setRules([{ field: "productName", condition: "contains", value: "" }]);
     setIsAutoCollection(false);
+    setShowCreatePreview(false);
+    setPreviewSearch("");
   };
+
+  // Filter preview products by search query
+  const filteredCreatePreviewProducts = createPreviewProducts?.filter((product) => {
+    if (!previewSearch.trim()) return true;
+    const query = previewSearch.toLowerCase();
+    return (
+      product.title.toLowerCase().includes(query) ||
+      product.variants.some((v) => v.sku.toLowerCase().includes(query))
+    );
+  }) || [];
 
   const handleDelete = async (collectionId: Id<"collections">) => {
     if (!confirm("Are you sure you want to delete this collection?")) {
@@ -329,6 +349,18 @@ function AdminCollectionsPageInner() {
                         </div>
                       ))}
                     </div>
+
+                    {/* Preview Button */}
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="w-full"
+                      onClick={() => setShowCreatePreview(true)}
+                      disabled={rules.every((rule) => !rule.value.trim())}
+                    >
+                      <PackageIcon className="size-4 mr-2" />
+                      Preview Matching Products
+                    </Button>
                   </div>
                 )}
               </div>
@@ -431,7 +463,7 @@ function AdminCollectionsPageInner() {
         </div>
       )}
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog for existing collections */}
       <Dialog
         open={!!previewCollectionId}
         onOpenChange={() => setPreviewCollectionId(null)}
@@ -494,6 +526,120 @@ function AdminCollectionsPageInner() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dialog for creating collection */}
+      <Dialog
+        open={showCreatePreview}
+        onOpenChange={(open) => {
+          setShowCreatePreview(open);
+          if (!open) setPreviewSearch("");
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Preview Matching Products</DialogTitle>
+            <DialogDescription>
+              {createPreviewProducts === undefined
+                ? "Loading..."
+                : `${createPreviewProducts.length} product${createPreviewProducts.length !== 1 ? "s" : ""} will be added to this collection`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Search Bar */}
+          {createPreviewProducts && createPreviewProducts.length > 0 && (
+            <div className="relative">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <Input
+                placeholder="Search products by name or SKU..."
+                value={previewSearch}
+                onChange={(e) => setPreviewSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
+
+          <div className="overflow-y-auto max-h-[55vh]">
+            {createPreviewProducts === undefined ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : filteredCreatePreviewProducts.length === 0 ? (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <PackageIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    {previewSearch ? "No matching products" : "No products match"}
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {previewSearch
+                      ? `No products match your search "${previewSearch}"`
+                      : "No products match the current rules. Try adjusting the rules or adding products to your catalog."}
+                  </EmptyDescription>
+                </EmptyHeader>
+                {previewSearch && (
+                  <EmptyContent>
+                    <Button variant="outline" onClick={() => setPreviewSearch("")}>
+                      Clear Search
+                    </Button>
+                  </EmptyContent>
+                )}
+              </Empty>
+            ) : (
+              <div className="space-y-3">
+                {filteredCreatePreviewProducts.map((product) => (
+                  <div
+                    key={product._id}
+                    className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/30 transition-colors"
+                  >
+                    {product.images.length > 0 && (
+                      <div className="size-16 bg-muted rounded overflow-hidden shrink-0">
+                        <img
+                          src={product.images[0].url}
+                          alt={product.title}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{product.title}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {product.variants.length} variant
+                        {product.variants.length !== 1 ? "s" : ""}
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {product.variants.slice(0, 3).map((variant) => (
+                          <Badge key={variant._id} variant="outline" className="text-xs">
+                            {variant.sku}
+                          </Badge>
+                        ))}
+                        {product.variants.length > 3 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{product.variants.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {createPreviewProducts && createPreviewProducts.length > 0 && (
+            <DialogFooter>
+              <p className="text-sm text-muted-foreground">
+                {previewSearch && filteredCreatePreviewProducts.length !== createPreviewProducts.length
+                  ? `Showing ${filteredCreatePreviewProducts.length} of ${createPreviewProducts.length} products`
+                  : `${createPreviewProducts.length} total product${createPreviewProducts.length !== 1 ? "s" : ""}`}
+              </p>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>

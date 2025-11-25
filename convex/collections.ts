@@ -213,3 +213,91 @@ export const getCollectionProducts = query({
     }));
   },
 });
+
+// Preview products matching rules (before collection is created)
+export const previewCollectionProducts = query({
+  args: {
+    rules: v.array(v.object({
+      field: v.union(
+        v.literal("productName"),
+        v.literal("sku")
+      ),
+      condition: v.union(
+        v.literal("contains"),
+        v.literal("startsWith"),
+        v.literal("notContains")
+      ),
+      value: v.string(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // If no rules, return empty
+    if (args.rules.length === 0) {
+      return [];
+    }
+
+    // Filter out rules with empty values
+    const validRules = args.rules.filter((rule) => rule.value.trim() !== "");
+    if (validRules.length === 0) {
+      return [];
+    }
+
+    // Get all products and variants
+    const allProducts = await ctx.db.query("products").collect();
+    const allVariants = await ctx.db.query("variants").collect();
+
+    // Group variants by product
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+
+    // Filter products based on rules
+    const matchingProducts = allProducts.filter((product) => {
+      const variants = variantsByProduct.get(product._id) || [];
+      
+      // All rules must match (AND logic)
+      return validRules.every((rule) => {
+        const value = rule.value.toLowerCase();
+        
+        if (rule.field === "productName") {
+          const productName = product.title.toLowerCase();
+          
+          if (rule.condition === "contains") {
+            return productName.includes(value);
+          } else if (rule.condition === "startsWith") {
+            return productName.startsWith(value);
+          } else if (rule.condition === "notContains") {
+            return !productName.includes(value);
+          }
+        } else if (rule.field === "sku") {
+          // Check if any variant matches the SKU condition
+          return variants.some((variant) => {
+            const sku = variant.sku.toLowerCase();
+            
+            if (rule.condition === "contains") {
+              return sku.includes(value);
+            } else if (rule.condition === "startsWith") {
+              return sku.startsWith(value);
+            } else if (rule.condition === "notContains") {
+              return !sku.includes(value);
+            }
+            return false;
+          });
+        }
+        
+        return false;
+      });
+    });
+
+    // Return products with their variants
+    return matchingProducts.map((product) => ({
+      ...product,
+      variants: variantsByProduct.get(product._id) || [],
+    }));
+  },
+});
