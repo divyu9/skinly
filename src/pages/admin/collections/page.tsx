@@ -3,7 +3,7 @@ import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Link } from "react-router-dom";
-import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon, SearchIcon } from "lucide-react";
+import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon, SearchIcon, ImageIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -24,7 +24,15 @@ import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table.tsx";
 
 type CollectionRule = {
   field: "productName" | "sku";
@@ -41,6 +49,7 @@ function AdminCollectionsPageInner() {
   const [editingCollection, setEditingCollection] = useState<Id<"collections"> | null>(null);
   const [isAutoCollection, setIsAutoCollection] = useState(false);
   const [matchLogic, setMatchLogic] = useState<"all" | "any">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -64,6 +73,29 @@ function AdminCollectionsPageInner() {
     api.collections.previewCollectionProducts,
     isAutoCollection && showCreatePreview ? { rules, matchLogic } : "skip"
   );
+
+  // Get product counts for all collections
+  const collectionProductCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    collections?.forEach((collection) => {
+      // We'll fetch this individually for each collection
+      counts[collection._id] = 0;
+    });
+    return counts;
+  }, [collections]);
+
+  // Filter collections by search query
+  const filteredCollections = useMemo(() => {
+    if (!collections) return [];
+    if (!searchQuery.trim()) return collections;
+    
+    const query = searchQuery.toLowerCase();
+    return collections.filter((collection) =>
+      collection.name.toLowerCase().includes(query) ||
+      collection.slug.toLowerCase().includes(query) ||
+      collection.description?.toLowerCase().includes(query)
+    );
+  }, [collections, searchQuery]);
 
   const handleEdit = (collection: NonNullable<typeof collections>[0]) => {
     setEditingCollection(collection._id);
@@ -218,19 +250,29 @@ function AdminCollectionsPageInner() {
     }
   };
 
+  // Component for fetching product count for a collection
+  function CollectionProductCount({ collectionId }: { collectionId: Id<"collections"> }) {
+    const products = useQuery(api.collections.getCollectionProducts, { collectionId });
+    
+    if (products === undefined) {
+      return <span className="text-muted-foreground">Loading...</span>;
+    }
+    
+    return <span className="font-medium">{products.length}</span>;
+  }
+
   if (collections === undefined) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-48 w-full" />
-        ))}
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full max-w-md" />
+        <Skeleton className="h-64 w-full" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Collections</h1>
           <p className="text-muted-foreground">
@@ -450,6 +492,19 @@ function AdminCollectionsPageInner() {
         </Dialog>
       </div>
 
+      {/* Search Bar */}
+      {collections.length > 0 && (
+        <div className="relative max-w-md">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search collections..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      )}
+
       {collections.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -468,88 +523,143 @@ function AdminCollectionsPageInner() {
             </Button>
           </EmptyContent>
         </Empty>
+      ) : filteredCollections.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SearchIcon />
+            </EmptyMedia>
+            <EmptyTitle>No collections found</EmptyTitle>
+            <EmptyDescription>
+              No collections match your search &quot;{searchQuery}&quot;
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button variant="outline" onClick={() => setSearchQuery("")}>
+              Clear Search
+            </Button>
+          </EmptyContent>
+        </Empty>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {collections.map((collection) => (
-            <Card key={collection._id}>
-              <CardContent className="p-6">
-                {collection.image && (
-                  <div className="aspect-video bg-muted rounded-lg overflow-hidden mb-4">
-                    <img
-                      src={collection.image}
-                      alt={collection.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="font-semibold text-lg">{collection.name}</h3>
-                  {collection.isAuto && (
-                    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">
-                      <SparklesIcon className="size-3 mr-1" />
-                      Auto
-                    </Badge>
-                  )}
-                </div>
-                {collection.description && (
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                    {collection.description}
-                  </p>
-                )}
-
-                {/* Show rules for auto-collections */}
-                {collection.isAuto && collection.rules && collection.rules.length > 0 && (
-                  <div className="mb-4 p-3 bg-muted/30 rounded-lg space-y-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-medium text-muted-foreground uppercase">
-                        Rules
-                      </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {collection.matchLogic === "any" ? "Any match" : "All match"}
-                      </Badge>
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[80px]">Image</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Products</TableHead>
+                <TableHead>Conditions</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCollections.map((collection) => (
+                <TableRow key={collection._id}>
+                  <TableCell>
+                    {collection.image ? (
+                      <div className="size-16 bg-muted rounded overflow-hidden">
+                        <img
+                          src={collection.image}
+                          alt={collection.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="size-16 bg-muted rounded flex items-center justify-center">
+                        <ImageIcon className="size-6 text-muted-foreground" />
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold">{collection.name}</p>
+                        {collection.isAuto && (
+                          <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs">
+                            <SparklesIcon className="size-3 mr-1" />
+                            Auto
+                          </Badge>
+                        )}
+                      </div>
+                      {collection.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {collection.description}
+                        </p>
+                      )}
                     </div>
-                    {collection.rules.map((rule, idx) => (
-                      <p key={idx} className="text-xs">
-                        {rule.field === "productName" ? "Product name" : "SKU"}{" "}
-                        <span className="font-medium">{getConditionLabel(rule.condition)}</span>{" "}
-                        &quot;{rule.value}&quot;
-                      </p>
-                    ))}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="w-full mt-2 text-xs"
-                      onClick={() => setPreviewCollectionId(collection._id)}
-                    >
-                      <PackageIcon className="size-3 mr-1" />
-                      Preview Products
-                    </Button>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleEdit(collection)}
-                  >
-                    <EditIcon className="size-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDelete(collection._id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <TrashIcon className="size-4 mr-2" />
-                    Delete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </TableCell>
+                  <TableCell>
+                    {collection.isAuto ? (
+                      <CollectionProductCount collectionId={collection._id} />
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {collection.isAuto && collection.rules && collection.rules.length > 0 ? (
+                      <div className="space-y-1">
+                        <Badge variant="secondary" className="text-xs mb-1">
+                          {collection.matchLogic === "any" ? "Any" : "All"}
+                        </Badge>
+                        {collection.rules.map((rule, idx) => (
+                          <div key={idx} className="text-xs text-muted-foreground">
+                            {rule.field === "productName" ? "Name" : "SKU"}{" "}
+                            <span className="font-medium text-foreground">
+                              {getConditionLabel(rule.condition)}
+                            </span>{" "}
+                            &quot;{rule.value}&quot;
+                          </div>
+                        ))}
+                        {collection.rules.length > 2 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 text-xs px-2 mt-1"
+                            onClick={() => setPreviewCollectionId(collection._id)}
+                          >
+                            View all rules
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">No conditions</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center gap-2 justify-end">
+                      {collection.isAuto && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setPreviewCollectionId(collection._id)}
+                        >
+                          <PackageIcon className="size-4 mr-1" />
+                          Preview
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEdit(collection)}
+                      >
+                        <EditIcon className="size-4 mr-1" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDelete(collection._id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <TrashIcon className="size-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
       )}
 
       {/* Preview Dialog for existing collections */}
@@ -775,7 +885,7 @@ export default function AdminCollectionsPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         <Unauthenticated>
           <Empty>
             <EmptyHeader>
@@ -793,10 +903,9 @@ export default function AdminCollectionsPage() {
           </Empty>
         </Unauthenticated>
         <AuthLoading>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full" />
-            ))}
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-full max-w-md" />
+            <Skeleton className="h-64 w-full" />
           </div>
         </AuthLoading>
         <Authenticated>
