@@ -99,6 +99,9 @@ export default function ProductsPage() {
     api.collections.getCollectionProducts,
     collection?._id ? { collectionId: collection._id } : "skip"
   );
+  
+  // Get all collections for the dropdown
+  const allCollections = useQuery(api.collections.getAllCollections, {});
 
   const testConnection = async () => {
     try {
@@ -488,6 +491,30 @@ export default function ProductsPage() {
             
             {/* Sorting and Filtering - Compact on mobile */}
             <div className="max-w-4xl mx-auto pt-1 sm:pt-6 flex flex-wrap gap-1.5 sm:gap-3 justify-center items-center">
+              {/* Collections Filter */}
+              <Select 
+                value={collectionParam || "all"} 
+                onValueChange={(value) => {
+                  if (value === "all") {
+                    window.location.href = '/products';
+                  } else {
+                    window.location.href = `/products?collection=${encodeURIComponent(value)}`;
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[110px] sm:w-[180px] h-7 sm:h-10 text-[10px] sm:text-sm">
+                  <SelectValue placeholder="Collection" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Collections</SelectItem>
+                  {allCollections?.map((col) => (
+                    <SelectItem key={col._id} value={col.name}>
+                      {col.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-[110px] sm:w-[200px] h-7 sm:h-10 text-[10px] sm:text-sm">
                   <SelectValue placeholder="Sort" />
