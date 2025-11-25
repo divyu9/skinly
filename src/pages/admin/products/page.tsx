@@ -134,6 +134,8 @@ function AdminProductsPageInner() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T">("all");
+  const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -478,22 +480,65 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     }
   };
 
-  // Filter products based on search query
+  // Helper function to parse SKU
+  const parseSku = (sku: string): { letter: string; number: number } => {
+    const match = sku.match(/^([A-Z]+)-?(\d+)/i);
+    if (match) {
+      return {
+        letter: match[1].toUpperCase(),
+        number: parseInt(match[2], 10),
+      };
+    }
+    return { letter: "", number: 0 };
+  };
+
+  // Filter products based on search query, SKU letter filter, and sort order
   const filteredProducts = useMemo(() => {
     if (!products) return [];
-    if (!searchQuery.trim()) return products;
+    
+    let filtered = products;
 
-    const query = searchQuery.toLowerCase().trim();
-    return products.filter((product) => {
-      return (
-        product.title.toLowerCase().includes(query) ||
-        product.description.toLowerCase().includes(query) ||
-        product.slug.toLowerCase().includes(query) ||
-        product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-        product.variants.some((v) => v.sku.toLowerCase().includes(query))
-      );
+    // Apply text search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((product) => {
+        return (
+          product.title.toLowerCase().includes(query) ||
+          product.description.toLowerCase().includes(query) ||
+          product.slug.toLowerCase().includes(query) ||
+          product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
+          product.variants.some((v) => v.sku.toLowerCase().includes(query))
+        );
+      });
+    }
+
+    // Apply SKU letter filter
+    if (skuLetterFilter !== "all") {
+      filtered = filtered.filter((product) => {
+        return product.variants.some((v) => {
+          const { letter } = parseSku(v.sku);
+          return letter === skuLetterFilter;
+        });
+      });
+    }
+
+    // Sort by SKU numeric value
+    const sorted = [...filtered].sort((a, b) => {
+      const aFirstVariant = a.variants[0];
+      const bFirstVariant = b.variants[0];
+      
+      if (!aFirstVariant || !bFirstVariant) return 0;
+      
+      const aParsed = parseSku(aFirstVariant.sku);
+      const bParsed = parseSku(bFirstVariant.sku);
+      
+      // Sort by number
+      const diff = aParsed.number - bParsed.number;
+      return skuSortOrder === "asc" ? diff : -diff;
     });
-  }, [products, searchQuery]);
+
+    return sorted;
+  }, [products, searchQuery, skuLetterFilter, skuSortOrder]);
 
   // Build collections map
   const collectionsMap = useMemo(() => {
@@ -517,10 +562,11 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         <div>
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-muted-foreground">
-            {searchQuery
+            {searchQuery || skuLetterFilter !== "all"
               ? `${filteredProducts.length} of ${products.length} products`
               : `Manage your product catalog (${products.length} products)`}
             {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
+            {skuLetterFilter !== "all" && ` • SKU: ${skuLetterFilter}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -602,6 +648,83 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             />
           </div>
         </div>
+      )}
+
+      {/* SKU Filters */}
+      {products.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-6 flex-wrap">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">SKU Filter:</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={skuLetterFilter === "all" ? "default" : "outline"}
+                    onClick={() => setSkuLetterFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={skuLetterFilter === "M" ? "default" : "outline"}
+                    onClick={() => setSkuLetterFilter("M")}
+                  >
+                    M
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={skuLetterFilter === "L" ? "default" : "outline"}
+                    onClick={() => setSkuLetterFilter("L")}
+                  >
+                    L
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={skuLetterFilter === "T" ? "default" : "outline"}
+                    onClick={() => setSkuLetterFilter("T")}
+                  >
+                    T
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground">Sort Order:</span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={skuSortOrder === "asc" ? "default" : "outline"}
+                    onClick={() => setSkuSortOrder("asc")}
+                  >
+                    Ascending ↑
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={skuSortOrder === "desc" ? "default" : "outline"}
+                    onClick={() => setSkuSortOrder("desc")}
+                  >
+                    Descending ↓
+                  </Button>
+                </div>
+              </div>
+
+              {(skuLetterFilter !== "all" || skuSortOrder !== "asc") && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setSkuLetterFilter("all");
+                    setSkuSortOrder("asc");
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Reset Filters
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {products.length === 0 ? (
