@@ -269,11 +269,23 @@ export const getMissingMockups = query({
       ))
       .collect();
     
-    // Get all product variants (SKUs)
+    // Get all products first
+    const allProducts = await ctx.db.query("products").collect();
+    
+    // Filter to only products with "Skins" in the title
+    const skinProducts = allProducts.filter(p => 
+      p.title.toLowerCase().includes("skins")
+    );
+    const skinProductIds = new Set(skinProducts.map(p => p._id));
+    
+    // Get all product variants (SKUs) for skin products only
     const variants = await ctx.db.query("variants").collect();
     const allSKUs = new Set<string>();
     for (const variant of variants) {
-      allSKUs.add(variant.sku);
+      // Only include SKUs from products with "Skins" in the name
+      if (skinProductIds.has(variant.productId)) {
+        allSKUs.add(variant.sku);
+      }
     }
     
     // Get all existing mockups
