@@ -144,13 +144,16 @@ export default defineSchema({
     productId: v.id("products"),
     userId: v.id("users"),
     userName: v.string(),
+    userEmail: v.optional(v.string()),
     rating: v.number(), // 1-5
     title: v.string(),
     comment: v.string(),
     verified: v.boolean(), // verified purchase
+    images: v.optional(v.array(v.string())), // Array of storage IDs
   })
     .index("by_product", ["productId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_verified", ["verified"]),
 
   coupons: defineTable({
     code: v.string(),

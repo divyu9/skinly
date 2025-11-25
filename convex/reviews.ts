@@ -11,7 +11,23 @@ export const getProductReviews = query({
       .order("desc")
       .collect();
     
-    return reviews;
+    // Get image URLs if they exist
+    const reviewsWithImages = await Promise.all(
+      reviews.map(async (review) => {
+        const imageUrls = review.images
+          ? await Promise.all(
+              review.images.map((storageId) => ctx.storage.getUrl(storageId))
+            )
+          : [];
+        
+        return {
+          ...review,
+          imageUrls: imageUrls.filter((url): url is string => url !== null),
+        };
+      })
+    );
+    
+    return reviewsWithImages;
   },
 });
 
@@ -21,6 +37,7 @@ export const addReview = mutation({
     rating: v.number(),
     title: v.string(),
     comment: v.string(),
+    images: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -73,10 +90,12 @@ export const addReview = mutation({
       productId: args.productId,
       userId: user._id,
       userName: user.name || "Anonymous",
+      userEmail: user.email,
       rating: args.rating,
       title: args.title,
       comment: args.comment,
       verified: hasPurchased,
+      images: args.images,
     });
 
     return reviewId;
@@ -114,5 +133,91 @@ export const getReviewStats = query({
       totalReviews,
       ratingDistribution,
     };
+  },
+});
+
+/**
+ * Generate upload URL for review images
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Get all reviews with product info for admin
+ */
+export const getAllReviews = query({
+  args: {},
+  handler: async (ctx) => {
+    const reviews = await ctx.db.query("reviews").order("desc").collect();
+    
+    // Get product info for each review
+    const reviewsWithProducts = await Promise.all(
+      reviews.map(async (review) => {
+        const product = await ctx.db.get(review.productId);
+        
+        // Get image URLs if they exist
+        const imageUrls = review.images
+          ? await Promise.all(
+              review.images.map((storageId) => ctx.storage.getUrl(storageId))
+            )
+          : [];
+        
+        return {
+          ...review,
+          productTitle: product?.title || "Unknown Product",
+          imageUrls: imageUrls.filter((url): url is string => url !== null),
+        };
+      })
+    );
+    
+    return reviewsWithProducts;
+  },
+});
+
+/**
+ * Get verified reviews for homepage showcase
+ */
+export const getVerifiedReviews = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+    
+    const reviews = await ctx.db
+      .query("reviews")
+      .withIndex("by_verified", (q) => q.eq("verified", true))
+      .order("desc")
+      .take(limit);
+    
+    // Get image URLs if they exist
+    const reviewsWithImages = await Promise.all(
+      reviews.map(async (review) => {
+        const imageUrls = review.images
+          ? await Promise.all(
+              review.images.map((storageId) => ctx.storage.getUrl(storageId))
+            )
+          : [];
+        
+        return {
+          ...review,
+          imageUrls: imageUrls.filter((url): url is string => url !== null),
+        };
+      })
+    );
+    
+    return reviewsWithImages;
+  },
+});
+
+/**
+ * Delete a review (admin only)
+ */
+export const deleteReview = mutation({
+  args: { reviewId: v.id("reviews") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.reviewId);
   },
 });

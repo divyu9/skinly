@@ -14,6 +14,7 @@ export function AdminHeader() {
     { path: "/admin/collections", label: "Collections" },
     { path: "/admin/orders", label: "Orders" },
     { path: "/admin/coupons", label: "Coupons" },
+    { path: "/admin/reviews", label: "Reviews" },
     { path: "/admin/abandoned-carts", label: "Abandoned Carts" },
     { path: "/admin/stock-notifications", label: "Stock Alerts" },
     { path: "/admin/models", label: "Models" },

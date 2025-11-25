@@ -14,6 +14,7 @@ import EditProductPage from "./pages/admin/products/edit/page.tsx";
 import AdminOrdersPage from "./pages/admin/orders/page.tsx";
 import AdminOrderDetailPage from "./pages/admin/orders/detail.tsx";
 import AdminCouponsPage from "./pages/admin/coupons/page.tsx";
+import AdminReviewsPage from "./pages/admin/reviews.tsx";
 import AdminAbandonedCartsPage from "./pages/admin/abandoned-carts/page.tsx";
 import AdminStockNotificationsPage from "./pages/admin/stock-notifications/page.tsx";
 import AdminOOSPage from "./pages/admin/oos/page.tsx";
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/admin/orders" element={<AdminOrdersPage />} />
           <Route path="/admin/orders/:orderId" element={<AdminOrderDetailPage />} />
           <Route path="/admin/coupons" element={<AdminCouponsPage />} />
+          <Route path="/admin/reviews" element={<AdminReviewsPage />} />
           <Route path="/admin/abandoned-carts" element={<AdminAbandonedCartsPage />} />
           <Route path="/admin/stock-notifications" element={<AdminStockNotificationsPage />} />
           <Route path="/admin/oos" element={<AdminOOSPage />} />
