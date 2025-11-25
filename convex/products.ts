@@ -553,3 +553,138 @@ export const getCrossSellProducts = query({
     return crossSells;
   },
 });
+
+// Export products for bulk editing
+export const exportProductsForBulkEdit = query({
+  args: {
+    productIds: v.array(v.id("products")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const exportData = [];
+
+    for (const productId of args.productIds) {
+      const product = await ctx.db.get(productId);
+      if (!product) continue;
+
+      const variants = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", productId))
+        .collect();
+
+      const collection = product.collectionId
+        ? await ctx.db.get(product.collectionId)
+        : null;
+
+      // Each variant gets its own row
+      for (const variant of variants) {
+        exportData.push({
+          productId: product._id,
+          productTitle: product.title,
+          productSlug: product.slug,
+          productStatus: product.status,
+          collectionName: collection?.name || "",
+          variantId: variant._id,
+          variantTitle: variant.title,
+          sku: variant.sku,
+          price: variant.price,
+          compareAtPrice: variant.compareAtPrice || "",
+          inventoryQuantity: variant.inventoryQuantity,
+          weight: variant.weight || "",
+          weightUnit: variant.weightUnit || "",
+        });
+      }
+    }
+
+    return exportData;
+  },
+});
+
+// Bulk update variants from import
+export const bulkUpdateVariants = mutation({
+  args: {
+    updates: v.array(v.object({
+      variantId: v.id("variants"),
+      sku: v.optional(v.string()),
+      variantTitle: v.optional(v.string()),
+      price: v.optional(v.number()),
+      compareAtPrice: v.optional(v.union(v.number(), v.null())),
+      inventoryQuantity: v.optional(v.number()),
+      weight: v.optional(v.union(v.number(), v.null())),
+      weightUnit: v.optional(v.union(v.string(), v.null())),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: Array<{ variantId: string; error: string }> = [];
+
+    for (const update of args.updates) {
+      try {
+        const { variantId, ...fields } = update;
+        
+        // Check if variant exists
+        const variant = await ctx.db.get(variantId);
+        if (!variant) {
+          errors.push({ variantId, error: "Variant not found" });
+          errorCount++;
+          continue;
+        }
+
+        // If SKU is being updated, check for duplicates
+        if (fields.sku !== undefined && fields.sku !== variant.sku) {
+          const existingVariant = await ctx.db
+            .query("variants")
+            .withIndex("by_sku", (q) => q.eq("sku", fields.sku!))
+            .first();
+
+          if (existingVariant && existingVariant._id !== variantId) {
+            errors.push({ variantId, error: `SKU ${fields.sku} already exists` });
+            errorCount++;
+            continue;
+          }
+        }
+
+        // Build update object
+        const updateObj: Record<string, string | number | null | undefined> = {};
+        if (fields.sku !== undefined) updateObj.sku = fields.sku;
+        if (fields.variantTitle !== undefined) updateObj.title = fields.variantTitle;
+        if (fields.price !== undefined) updateObj.price = fields.price;
+        if (fields.compareAtPrice !== undefined) updateObj.compareAtPrice = fields.compareAtPrice;
+        if (fields.inventoryQuantity !== undefined) updateObj.inventoryQuantity = fields.inventoryQuantity;
+        if (fields.weight !== undefined) updateObj.weight = fields.weight;
+        if (fields.weightUnit !== undefined) updateObj.weightUnit = fields.weightUnit;
+
+        await ctx.db.patch(variantId, updateObj);
+        successCount++;
+      } catch (error) {
+        errors.push({
+          variantId: update.variantId,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+        errorCount++;
+      }
+    }
+
+    return {
+      successCount,
+      errorCount,
+      errors,
+    };
+  },
+});

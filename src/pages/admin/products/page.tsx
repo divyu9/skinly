@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Dialog,
@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 
 // Inline editable cell component
 function EditableCell({
@@ -120,18 +121,16 @@ function EditableCell({
 }
 
 function AdminProductsPageInner() {
-  const products = useQuery(api.products.getAllProducts, {});
-  const collections = useQuery(api.collections.getAllCollections, {});
-  const deleteProduct = useMutation(api.products.deleteProduct);
-  const updateProduct = useMutation(api.products.updateProduct);
-  const deleteAllProducts = useMutation(api.products.deleteAllProducts);
-  const migrateFromShopify = useAction(api.migration.migrateFromShopify);
-  const checkProductCount = useAction(api.migration.checkShopifyProductCount);
+  // State declarations first
   const [isMigrating, setIsMigrating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCheckingCount, setIsCheckingCount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedProducts, setSelectedProducts] = useState<Array<Id<"products">>>([]);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -142,6 +141,19 @@ function AdminProductsPageInner() {
     failedProducts: Array<{ title: string; reason: string }>;
   } | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
+
+  // Queries and mutations
+  const products = useQuery(api.products.getAllProducts, {});
+  const collections = useQuery(api.collections.getAllCollections, {});
+  const exportData = useQuery(api.products.exportProductsForBulkEdit, 
+    selectedProducts.length > 0 ? { productIds: selectedProducts } : "skip"
+  );
+  const deleteProduct = useMutation(api.products.deleteProduct);
+  const updateProduct = useMutation(api.products.updateProduct);
+  const deleteAllProducts = useMutation(api.products.deleteAllProducts);
+  const bulkUpdateVariants = useMutation(api.products.bulkUpdateVariants);
+  const migrateFromShopify = useAction(api.migration.migrateFromShopify);
+  const checkProductCount = useAction(api.migration.checkShopifyProductCount);
 
   const handleCheckCount = async () => {
     setIsCheckingCount(true);
@@ -280,6 +292,189 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     }
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(filteredProducts.map((p) => p._id));
+    } else {
+      setSelectedProducts([]);
+    }
+  };
+
+  const handleSelectProduct = (productId: Id<"products">, checked: boolean) => {
+    if (checked) {
+      setSelectedProducts((prev) => [...prev, productId]);
+    } else {
+      setSelectedProducts((prev) => prev.filter((id) => id !== productId));
+    }
+  };
+
+  const handleExport = () => {
+    if (selectedProducts.length === 0) {
+      toast.error("Please select products to export");
+      return;
+    }
+
+    if (!exportData) {
+      toast.error("Export data not ready");
+      return;
+    }
+
+    setIsExporting(true);
+    
+    try {
+      // Create CSV content with UTF-8 BOM
+      const headers = [
+        "Product ID",
+        "Product Title",
+        "Product Slug",
+        "Product Status",
+        "Collection Name",
+        "Variant ID",
+        "Variant Title",
+        "SKU",
+        "Price",
+        "Compare At Price",
+        "Inventory Quantity",
+        "Weight",
+        "Weight Unit",
+      ];
+
+      const csvContent = [
+        headers.join(","),
+        ...exportData.map((row) =>
+          [
+            row.productId,
+            `"${row.productTitle.replace(/"/g, '""')}"`,
+            row.productSlug,
+            row.productStatus,
+            `"${row.collectionName.replace(/"/g, '""')}"`,
+            row.variantId,
+            `"${row.variantTitle.replace(/"/g, '""')}"`,
+            row.sku,
+            row.price,
+            row.compareAtPrice,
+            row.inventoryQuantity,
+            row.weight,
+            row.weightUnit,
+          ].join(",")
+        ),
+      ].join("\n");
+
+      // Add UTF-8 BOM
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `products-export-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${exportData.length} variant rows`);
+    } catch (error) {
+      toast.error("Failed to export products");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter((line) => line.trim());
+      
+      if (lines.length < 2) {
+        toast.error("CSV file is empty or invalid");
+        setIsImporting(false);
+        return;
+      }
+
+      // Parse CSV (skip header)
+      const updates = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Simple CSV parsing (handles quoted fields)
+        const fields: string[] = [];
+        let currentField = "";
+        let inQuotes = false;
+
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === "," && !inQuotes) {
+            fields.push(currentField);
+            currentField = "";
+          } else {
+            currentField += char;
+          }
+        }
+        fields.push(currentField);
+
+        if (fields.length < 13) continue;
+
+        const variantId = fields[5].trim();
+        const variantTitle = fields[6].replace(/^"|"$/g, "");
+        const sku = fields[7].trim();
+        const price = parseFloat(fields[8]);
+        const compareAtPrice = fields[9].trim() ? parseFloat(fields[9]) : null;
+        const inventoryQuantity = parseInt(fields[10], 10);
+        const weight = fields[11].trim() ? parseFloat(fields[11]) : null;
+        const weightUnit = fields[12].trim() || null;
+
+        updates.push({
+          variantId: variantId as Id<"variants">,
+          variantTitle,
+          sku,
+          price,
+          compareAtPrice,
+          inventoryQuantity,
+          weight,
+          weightUnit,
+        });
+      }
+
+      if (updates.length === 0) {
+        toast.error("No valid data found in CSV");
+        setIsImporting(false);
+        return;
+      }
+
+      const result = await bulkUpdateVariants({ updates });
+      
+      if (result.errorCount > 0) {
+        toast.warning(
+          `Updated ${result.successCount} variants, ${result.errorCount} errors. Check console for details.`
+        );
+        console.error("Import errors:", result.errors);
+      } else {
+        toast.success(`Successfully updated ${result.successCount} variants`);
+      }
+
+      // Clear selection and reset file input
+      setSelectedProducts([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      toast.error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   // Filter products based on search query
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -322,9 +517,37 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             {searchQuery
               ? `${filteredProducts.length} of ${products.length} products`
               : `Manage your product catalog (${products.length} products)`}
+            {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {selectedProducts.length > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleExport}
+                disabled={isExporting}
+              >
+                <FileSpreadsheetIcon className="size-4 mr-2" />
+                {isExporting ? "Exporting..." : "Export CSV"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleImport}
+                disabled={isImporting}
+              >
+                <UploadIcon className="size-4 mr-2" />
+                {isImporting ? "Importing..." : "Import CSV"}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </>
+          )}
           {products && products.length > 0 && (
             <Button
               variant="outline"
@@ -420,6 +643,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               <table className="w-full">
                 <thead className="border-b bg-muted/50">
                   <tr>
+                    <th className="p-3 text-left text-sm font-medium w-12">
+                      <Checkbox
+                        checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </th>
                     <th className="p-3 text-left text-sm font-medium w-16">Image</th>
                     <th className="p-3 text-left text-sm font-medium">Product Name</th>
                     <th className="p-3 text-left text-sm font-medium w-32">SKU</th>
@@ -440,9 +669,16 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                     const collection = product.collectionId
                       ? collectionsMap.get(product.collectionId)
                       : null;
+                    const isSelected = selectedProducts.includes(product._id);
 
                     return (
                       <tr key={product._id} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="p-3">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(checked) => handleSelectProduct(product._id, !!checked)}
+                          />
+                        </td>
                         <td className="p-3">
                           {product.images.length > 0 ? (
                             <button
