@@ -272,9 +272,9 @@ export const getMissingMockups = query({
     // Get all products first
     const allProducts = await ctx.db.query("products").collect();
     
-    // Filter to only products with "Skins" in the title
+    // Filter to only products with "Phone Skin" in the title
     const skinProducts = allProducts.filter(p => 
-      p.title.toLowerCase().includes("skins")
+      p.title.toLowerCase().includes("phone skin")
     );
     const skinProductIds = new Set(skinProducts.map(p => p._id));
     
