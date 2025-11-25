@@ -121,16 +121,26 @@ export const deleteMockup = mutation({
 });
 
 /**
- * Clear all mockups
+ * Clear a batch of mockups (up to 1000 at a time)
+ * Returns number deleted and whether more remain
  */
 export const clearAllMockups = mutation({
   args: {},
   handler: async (ctx) => {
-    const mockups = await ctx.db.query("mockups").collect();
+    const BATCH_SIZE = 1000;
+    const mockups = await ctx.db.query("mockups").take(BATCH_SIZE);
+    
     for (const mockup of mockups) {
       await ctx.db.delete(mockup._id);
     }
-    return { deleted: mockups.length };
+    
+    // Check if there are more mockups remaining
+    const remaining = await ctx.db.query("mockups").first();
+    
+    return { 
+      deleted: mockups.length,
+      hasMore: remaining !== null
+    };
   },
 });
 

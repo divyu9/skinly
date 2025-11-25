@@ -210,9 +210,24 @@ export default function MockupsPage() {
     }
     
     try {
-      const result = await clearAll();
-      toast.success(`Deleted ${result.deleted} mockups`);
+      let totalDeleted = 0;
+      let hasMore = true;
+      
+      // Keep calling the mutation until all mockups are deleted
+      while (hasMore) {
+        const result = await clearAll();
+        totalDeleted += result.deleted;
+        hasMore = result.hasMore;
+        
+        // Show progress
+        if (hasMore) {
+          toast.loading(`Deleting mockups... ${totalDeleted} deleted so far`);
+        }
+      }
+      
+      toast.success(`Deleted ${totalDeleted} mockups successfully`);
     } catch (error) {
+      console.error('Clear error:', error);
       toast.error("Failed to clear mockups");
     }
   };
