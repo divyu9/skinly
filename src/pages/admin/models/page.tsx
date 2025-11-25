@@ -33,6 +33,7 @@ import {
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Combobox } from "@/components/ui/combobox.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { toast } from "sonner";
 import {
   PlusIcon,
@@ -46,6 +47,8 @@ import {
   PlaneIcon,
   CameraIcon,
   PackageIcon,
+  TagIcon,
+  MergeIcon,
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -73,9 +76,13 @@ export default function AdminModelsPage() {
   const models = useQuery(api.supportedModels.listAll, {});
   const stats = useQuery(api.supportedModels.getStats, {});
   const brands = useQuery(api.supportedModels.getBrands, {});
+  const brandsWithCounts = useQuery(api.supportedModels.getBrandsWithCounts, {});
   const createModel = useMutation(api.supportedModels.create);
   const updateModel = useMutation(api.supportedModels.update);
   const deleteModel = useMutation(api.supportedModels.remove);
+  const renameBrand = useMutation(api.supportedModels.renameBrand);
+  const mergeBrands = useMutation(api.supportedModels.mergeBrands);
+  const deleteBrand = useMutation(api.supportedModels.deleteBrand);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
@@ -87,6 +94,14 @@ export default function AdminModelsPage() {
     category: "phone",
     isActive: true,
   });
+
+  // Brand management state
+  const [brandSearchQuery, setBrandSearchQuery] = useState("");
+  const [renameDialog, setRenameDialog] = useState<{ open: boolean; brand: string | null }>({ open: false, brand: null });
+  const [newBrandName, setNewBrandName] = useState("");
+  const [mergeDialog, setMergeDialog] = useState(false);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [targetBrandName, setTargetBrandName] = useState("");
 
   // Filter models
   const filteredModels = models
@@ -176,13 +191,100 @@ export default function AdminModelsPage() {
     return <Icon className="size-4" />;
   };
 
+  // Brand management handlers
+  const handleRenameBrand = async () => {
+    if (!renameDialog.brand || !newBrandName.trim()) {
+      toast.error("Please enter a valid brand name");
+      return;
+    }
+
+    try {
+      const count = await renameBrand({
+        oldName: renameDialog.brand,
+        newName: newBrandName.trim(),
+      });
+      toast.success(`Updated ${count} model(s) to "${newBrandName}"`);
+      setRenameDialog({ open: false, brand: null });
+      setNewBrandName("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to rename brand");
+      console.error(error);
+    }
+  };
+
+  const handleMergeBrands = async () => {
+    if (selectedBrands.length < 2) {
+      toast.error("Please select at least 2 brands to merge");
+      return;
+    }
+    if (!targetBrandName.trim()) {
+      toast.error("Please enter a target brand name");
+      return;
+    }
+
+    try {
+      const count = await mergeBrands({
+        sourceNames: selectedBrands,
+        targetName: targetBrandName.trim(),
+      });
+      toast.success(`Merged ${selectedBrands.length} brands into "${targetBrandName}" (${count} models updated)`);
+      setMergeDialog(false);
+      setSelectedBrands([]);
+      setTargetBrandName("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to merge brands");
+      console.error(error);
+    }
+  };
+
+  const handleDeleteBrand = async (brandName: string, count: number) => {
+    if (count > 0) {
+      toast.error(`Cannot delete "${brandName}" because ${count} model(s) are using it`);
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the brand "${brandName}"?`)) {
+      return;
+    }
+
+    try {
+      await deleteBrand({ name: brandName });
+      toast.success(`Deleted brand "${brandName}"`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete brand");
+      console.error(error);
+    }
+  };
+
+  // Filter brands
+  const filteredBrands = brandsWithCounts?.filter((b) => {
+    if (brandSearchQuery) {
+      return b.brand.toLowerCase().includes(brandSearchQuery.toLowerCase());
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <AdminHeader />
 
       <div className="container mx-auto px-4 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Tabs defaultValue="models" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="models">
+              <SmartphoneIcon className="size-4 mr-2" />
+              Models
+            </TabsTrigger>
+            <TabsTrigger value="brands">
+              <TagIcon className="size-4 mr-2" />
+              Brands
+            </TabsTrigger>
+          </TabsList>
+
+          {/* MODELS TAB */}
+          <TabsContent value="models" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -317,6 +419,157 @@ export default function AdminModelsPage() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          {/* BRANDS TAB */}
+          <TabsContent value="brands" className="space-y-6">
+            {/* Brand Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Brands
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{brandsWithCounts?.length || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Models
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">{stats?.total || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Avg Models/Brand
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">
+                    {brandsWithCounts?.length ? Math.round((stats?.total || 0) / brandsWithCounts.length) : 0}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Brand Controls */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                  <div className="flex-1 w-full md:max-w-md">
+                    <Input
+                      placeholder="Search brands..."
+                      value={brandSearchQuery}
+                      onChange={(e) => setBrandSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <Button onClick={() => setMergeDialog(true)} disabled={selectedBrands.length < 2}>
+                    <MergeIcon className="size-4 mr-2" />
+                    Merge Brands ({selectedBrands.length})
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Brands Table */}
+            <Card>
+              <CardContent className="pt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Input
+                          type="checkbox"
+                          className="size-4"
+                          checked={selectedBrands.length === brandsWithCounts?.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBrands(brandsWithCounts?.map((b) => b.brand) || []);
+                            } else {
+                              setSelectedBrands([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>Brand Name</TableHead>
+                      <TableHead>Model Count</TableHead>
+                      <TableHead>Categories</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBrands?.map((brand) => (
+                      <TableRow key={brand.brand}>
+                        <TableCell>
+                          <Input
+                            type="checkbox"
+                            className="size-4"
+                            checked={selectedBrands.includes(brand.brand)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBrands([...selectedBrands, brand.brand]);
+                              } else {
+                                setSelectedBrands(selectedBrands.filter((b) => b !== brand.brand));
+                              }
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{brand.brand}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{brand.count}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {brand.categories.map((cat) => (
+                              <Badge key={cat} variant="secondary" className="text-xs">
+                                {cat}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setRenameDialog({ open: true, brand: brand.brand });
+                                setNewBrandName(brand.brand);
+                              }}
+                            >
+                              <PencilIcon className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteBrand(brand.brand, brand.count)}
+                              disabled={brand.count > 0}
+                            >
+                              <TrashIcon className="size-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {filteredBrands?.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No brands found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Create/Edit Dialog */}
@@ -416,6 +669,106 @@ export default function AdminModelsPage() {
             <Button onClick={editingModel ? handleUpdate : handleCreate}>
               {editingModel ? "Update" : "Create"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Brand Dialog */}
+      <Dialog open={renameDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setRenameDialog({ open: false, brand: null });
+          setNewBrandName("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Brand</DialogTitle>
+            <DialogDescription>
+              Rename "{renameDialog.brand}" across all models
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="newBrandName">New Brand Name</Label>
+              <Input
+                id="newBrandName"
+                placeholder="Enter new brand name"
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRenameDialog({ open: false, brand: null });
+                setNewBrandName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleRenameBrand}>Rename</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Merge Brands Dialog */}
+      <Dialog open={mergeDialog} onOpenChange={(open) => {
+        if (!open) {
+          setMergeDialog(false);
+          setTargetBrandName("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Merge Brands</DialogTitle>
+            <DialogDescription>
+              Merge {selectedBrands.length} selected brands into one
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Selected Brands ({selectedBrands.length})</Label>
+              <div className="flex flex-wrap gap-2">
+                {selectedBrands.map((brand) => (
+                  <Badge key={brand} variant="secondary">
+                    {brand}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="targetBrandName">Target Brand Name</Label>
+              <Input
+                id="targetBrandName"
+                placeholder="Enter the final brand name"
+                value={targetBrandName}
+                onChange={(e) => setTargetBrandName(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">
+                All selected brands will be renamed to this name
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMergeDialog(false);
+                setTargetBrandName("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleMergeBrands}>Merge Brands</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -185,3 +185,111 @@ export const getStats = query({
     };
   },
 });
+
+// Get brands with counts and categories
+export const getBrandsWithCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const models = await ctx.db.query("supportedModels").collect();
+    
+    const brandMap = new Map<string, { count: number; categories: Set<string> }>();
+    
+    models.forEach((model) => {
+      const existing = brandMap.get(model.brandName);
+      if (existing) {
+        existing.count++;
+        existing.categories.add(model.category);
+      } else {
+        brandMap.set(model.brandName, {
+          count: 1,
+          categories: new Set([model.category]),
+        });
+      }
+    });
+
+    return Array.from(brandMap.entries())
+      .map(([brand, data]) => ({
+        brand,
+        count: data.count,
+        categories: Array.from(data.categories),
+      }))
+      .sort((a, b) => a.brand.localeCompare(b.brand));
+  },
+});
+
+// Rename a brand across all models
+export const renameBrand = mutation({
+  args: {
+    oldName: v.string(),
+    newName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (args.oldName === args.newName) {
+      throw new Error("Old and new brand names are the same");
+    }
+    
+    if (!args.newName.trim()) {
+      throw new Error("New brand name cannot be empty");
+    }
+
+    const modelsToUpdate = await ctx.db
+      .query("supportedModels")
+      .filter((q) => q.eq(q.field("brandName"), args.oldName))
+      .collect();
+
+    let count = 0;
+    for (const model of modelsToUpdate) {
+      await ctx.db.patch(model._id, { brandName: args.newName });
+      count++;
+    }
+
+    return count;
+  },
+});
+
+// Merge multiple brands into one
+export const mergeBrands = mutation({
+  args: {
+    sourceNames: v.array(v.string()),
+    targetName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!args.targetName.trim()) {
+      throw new Error("Target brand name cannot be empty");
+    }
+
+    let totalCount = 0;
+    for (const sourceName of args.sourceNames) {
+      const modelsToUpdate = await ctx.db
+        .query("supportedModels")
+        .filter((q) => q.eq(q.field("brandName"), sourceName))
+        .collect();
+
+      for (const model of modelsToUpdate) {
+        await ctx.db.patch(model._id, { brandName: args.targetName });
+        totalCount++;
+      }
+    }
+
+    return totalCount;
+  },
+});
+
+// Delete a brand (only if no models use it)
+export const deleteBrand = mutation({
+  args: {
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const modelsWithBrand = await ctx.db
+      .query("supportedModels")
+      .filter((q) => q.eq(q.field("brandName"), args.name))
+      .collect();
+
+    if (modelsWithBrand.length > 0) {
+      throw new Error(`Cannot delete brand "${args.name}" because ${modelsWithBrand.length} model(s) are using it`);
+    }
+
+    return { success: true };
+  },
+});
