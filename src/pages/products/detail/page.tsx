@@ -43,6 +43,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
+import { trackProductView, trackAddToCart } from "@/lib/analytics.ts";
 
 // Phone models data
 const phoneModels: Record<string, string[]> = {
@@ -203,6 +204,17 @@ export default function ProductDetailPage() {
       ? { productId: productData._id, variantId: productData.variants[0]._id }
       : "skip"
   );
+  
+  // Track product view
+  useEffect(() => {
+    if (productData && productData.variants.length > 0) {
+      trackProductView(
+        productData._id,
+        productData.title,
+        productData.variants[0].price
+      );
+    }
+  }, [productData]);
   
   // Fetch mockup image URL asynchronously when phone model or product changes
   useEffect(() => {
@@ -379,6 +391,14 @@ export default function ProductDetailPage() {
         addToGuestCart(cartItem);
       }
       
+      // Track add to cart event
+      trackAddToCart(
+        product._id,
+        `${product.title} - ${product.variants[selectedVariant].title}`,
+        product.variants[selectedVariant].price,
+        1
+      );
+      
       toast.success("Added to cart!");
       setCrossSellDialogOpen(false);
     } catch (error) {
@@ -394,6 +414,15 @@ export default function ProductDetailPage() {
           phoneBrand: phoneBrand || undefined,
           coverage: isPhoneSkin ? selectedCoverage : undefined,
         });
+        
+        // Track add to cart event
+        trackAddToCart(
+          product._id,
+          `${product.title} - ${product.variants[selectedVariant].title}`,
+          product.variants[selectedVariant].price,
+          1
+        );
+        
         toast.success("Added to cart!");
         setCrossSellDialogOpen(false);
       } else {

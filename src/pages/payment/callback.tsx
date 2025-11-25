@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { CheckCircle2Icon, XCircleIcon, AlertCircleIcon } from "lucide-react";
+import { trackPurchase } from "@/lib/analytics.ts";
 
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
@@ -19,6 +20,25 @@ export default function PaymentCallback() {
     api.orders.getOrderByMerchantTransaction,
     status === "success" && merchantTransactionId ? { merchantTransactionId } : "skip"
   );
+  
+  // Track purchase when order is loaded
+  const [hasTracked, setHasTracked] = useState(false);
+  useEffect(() => {
+    if (order && status === "success" && !hasTracked) {
+      // Track the purchase
+      trackPurchase(
+        order._id,
+        order.total,
+        order.items.map(item => ({
+          id: item.productId,
+          name: `${item.productTitle} - ${item.variant}`,
+          price: item.price,
+          quantity: item.quantity
+        }))
+      );
+      setHasTracked(true);
+    }
+  }, [order, status, hasTracked]);
 
   // Get merchant transaction ID from URL params
   useEffect(() => {

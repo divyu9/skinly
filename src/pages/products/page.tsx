@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import { trackSearch, trackCollectionView } from "@/lib/analytics.ts";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
@@ -87,6 +88,7 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
+  const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
   
   // Get collection if collection parameter is present
   const collection = useQuery(
@@ -242,6 +244,21 @@ export default function ProductsPage() {
     
     return result;
   }, [filteredProducts, sortBy, stockFilter, allProducts]);
+  
+  // Track search events
+  useEffect(() => {
+    if (searchQuery.trim() && searchQuery !== lastTrackedSearch) {
+      trackSearch(searchQuery, sortedAndFilteredProducts.length);
+      setLastTrackedSearch(searchQuery);
+    }
+  }, [searchQuery, sortedAndFilteredProducts.length, lastTrackedSearch]);
+  
+  // Track collection views
+  useEffect(() => {
+    if (collectionParam && collection) {
+      trackCollectionView(collection.name, collectionProducts?.length);
+    }
+  }, [collectionParam, collection, collectionProducts]);
 
   // Show finish selector when brand is selected and showFinish is true
   if (showFinish && brandFilter) {
