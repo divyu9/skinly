@@ -303,19 +303,7 @@ export const createVariant = mutation({
       });
     }
 
-    // Check if SKU already exists
-    const existingVariant = await ctx.db
-      .query("variants")
-      .withIndex("by_sku", (q) => q.eq("sku", args.sku))
-      .first();
-
-    if (existingVariant) {
-      throw new ConvexError({
-        message: "A variant with this SKU already exists",
-        code: "CONFLICT",
-      });
-    }
-
+    // Duplicate SKUs are allowed
     const variantId = await ctx.db.insert("variants", {
       productId: args.productId,
       sku: args.sku,
@@ -354,21 +342,7 @@ export const updateVariant = mutation({
 
     const { variantId, ...updates } = args;
 
-    // If updating SKU, check it's not taken
-    if (updates.sku !== undefined) {
-      const existingVariant = await ctx.db
-        .query("variants")
-        .withIndex("by_sku", (q) => q.eq("sku", updates.sku!))
-        .first();
-
-      if (existingVariant && existingVariant._id !== variantId) {
-        throw new ConvexError({
-          message: "A variant with this SKU already exists",
-          code: "CONFLICT",
-        });
-      }
-    }
-
+    // Duplicate SKUs are allowed
     await ctx.db.patch(variantId, updates);
   },
 });
@@ -647,19 +621,7 @@ export const bulkUpdateVariants = mutation({
           continue;
         }
 
-        // If SKU is being updated, check for duplicates
-        if (fields.sku !== undefined && fields.sku !== variant.sku) {
-          const existingVariant = await ctx.db
-            .query("variants")
-            .withIndex("by_sku", (q) => q.eq("sku", fields.sku!))
-            .first();
-
-          if (existingVariant && existingVariant._id !== variantId) {
-            errors.push({ variantId, error: `SKU ${fields.sku} already exists` });
-            errorCount++;
-            continue;
-          }
-        }
+        // Duplicate SKUs are allowed - skip validation
 
         // Build update object
         const updateObj: Record<string, string | number | null | undefined> = {};
