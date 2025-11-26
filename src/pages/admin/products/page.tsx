@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -151,6 +151,7 @@ function AdminProductsPageInner() {
   const [productNameCondition, setProductNameCondition] = useState<"starts-with" | "contains">("contains");
   const [productNameValue, setProductNameValue] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [expandedProducts, setExpandedProducts] = useState<Set<Id<"products">>>(new Set());
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -1068,13 +1069,41 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       : null;
                     const isSelected = selectedProducts.includes(product._id);
 
+                    const isExpanded = expandedProducts.has(product._id);
+                    const hasMultipleVariants = product.variants.length > 1;
+
                     return (
+                      <>
                       <tr key={product._id} className="border-b hover:bg-muted/30 transition-colors">
                         <td className="p-3">
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={(checked) => handleSelectProduct(product._id, !!checked)}
-                          />
+                          <div className="flex items-center gap-2">
+                            {hasMultipleVariants ? (
+                              <button
+                                onClick={() => {
+                                  const newExpanded = new Set(expandedProducts);
+                                  if (isExpanded) {
+                                    newExpanded.delete(product._id);
+                                  } else {
+                                    newExpanded.add(product._id);
+                                  }
+                                  setExpandedProducts(newExpanded);
+                                }}
+                                className="p-0.5 hover:bg-muted rounded"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDownIcon className="size-4 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRightIcon className="size-4 text-muted-foreground" />
+                                )}
+                              </button>
+                            ) : (
+                              <div className="size-5" />
+                            )}
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={(checked) => handleSelectProduct(product._id, !!checked)}
+                            />
+                          </div>
                         </td>
                         <td className="p-3">
                           <div className="relative">
@@ -1266,6 +1295,98 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                           </div>
                         </td>
                       </tr>
+
+                      {/* Variant Rows - Only show when expanded and has multiple variants */}
+                      {isExpanded && hasMultipleVariants && product.variants.slice(1).map((variant) => {
+                        const variantStock = stockLevels?.[variant._id];
+                        
+                        return (
+                          <tr key={variant._id} className="border-b bg-muted/20 hover:bg-muted/30 transition-colors">
+                            <td className="p-3 pl-12">
+                              {/* Empty cell for indentation */}
+                            </td>
+                            <td className="p-3">
+                              {/* Empty image cell */}
+                            </td>
+                            <td className="p-3">
+                              <div className="text-sm text-muted-foreground pl-4">
+                                ↳ {variant.title}
+                              </div>
+                            </td>
+                            <td className="p-3">
+                              <EditableCell
+                                variantId={variant._id}
+                                value={variant.sku}
+                                type="text"
+                                field="sku"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <EditableCell
+                                variantId={variant._id}
+                                value={variant.price}
+                                type="number"
+                                field="price"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <EditableCell
+                                variantId={variant._id}
+                                value={variant.inventoryQuantity}
+                                type="number"
+                                field="inventoryQuantity"
+                              />
+                            </td>
+                            <td className="p-3">
+                              {variantStock ? (
+                                (() => {
+                                  if (variantStock.rNumber === null) {
+                                    return <span className="text-muted-foreground text-sm">N/A</span>;
+                                  }
+                                  
+                                  const { availableUnits } = variantStock;
+                                  const isLowStock = availableUnits <= 10 && availableUnits > 0;
+                                  const isOutOfStock = availableUnits === 0;
+                                  
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <span className={`text-sm font-medium ${
+                                        isOutOfStock ? "text-destructive" : 
+                                        isLowStock ? "text-orange-600" : 
+                                        "text-foreground"
+                                      }`}>
+                                        {availableUnits >= 999999 ? "∞" : availableUnits}
+                                      </span>
+                                      {isOutOfStock && (
+                                        <Badge variant="destructive" className="text-[10px] px-1 py-0">
+                                          Out
+                                        </Badge>
+                                      )}
+                                      {isLowStock && (
+                                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-600 text-orange-600">
+                                          Low
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </td>
+                            <td className="p-3">
+                              {/* Empty collection cell for variant rows */}
+                            </td>
+                            <td className="p-3">
+                              {/* Empty status cell for variant rows */}
+                            </td>
+                            <td className="p-3">
+                              {/* Empty actions cell for variant rows */}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      </>
                     );
                   })}
                 </tbody>
