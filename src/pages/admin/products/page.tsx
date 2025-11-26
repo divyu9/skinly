@@ -12,7 +12,7 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminHeader } from "@/components/admin-header.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Dialog,
@@ -165,6 +165,10 @@ function AdminProductsPageInner() {
 
   // State for active tab
   const [activeTab, setActiveTab] = useState<"products" | "rolls">("products");
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 100;
 
   // Queries and mutations
   const products = useQuery(api.products.getAllProducts, {});
@@ -333,9 +337,18 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedProducts(filteredProducts.map((p) => p._id));
+      // Select all products on current page
+      setSelectedProducts((prev) => {
+        const newSelection = new Set(prev);
+        paginatedProducts.forEach((p) => newSelection.add(p._id));
+        return Array.from(newSelection);
+      });
     } else {
-      setSelectedProducts([]);
+      // Deselect all products on current page
+      setSelectedProducts((prev) => {
+        const pageIds = new Set(paginatedProducts.map((p) => p._id));
+        return prev.filter((id) => !pageIds.has(id));
+      });
     }
   };
 
@@ -626,6 +639,20 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
     return sorted;
   }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition]);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition]);
+
+  // Paginate filtered products
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
   // Build collections map
   const collectionsMap = useMemo(() => {
@@ -1049,7 +1076,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                   <tr>
                     <th className="p-3 text-left text-sm font-medium w-12">
                       <Checkbox
-                        checked={selectedProducts.length === filteredProducts.length && filteredProducts.length > 0}
+                        checked={paginatedProducts.length > 0 && paginatedProducts.every((p) => selectedProducts.includes(p._id))}
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
@@ -1065,7 +1092,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => {
+                  {paginatedProducts.map((product) => {
                     const firstVariant = product.variants[0];
                     const totalInventory = product.variants.reduce(
                       (sum, v) => sum + v.inventoryQuantity,
@@ -1401,6 +1428,75 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Pagination Controls */}
+      {filteredProducts.length > itemsPerPage && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Show first 3, last 2, or pages around current
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="min-w-9"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+              {totalPages > 5 && currentPage < totalPages - 2 && (
+                <>
+                  <span className="px-2 text-muted-foreground">...</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    className="min-w-9"
+                  >
+                    {totalPages}
+                  </Button>
+                </>
+              )}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
       )}
         </TabsContent>
 
