@@ -19,6 +19,27 @@ export const getAllImportJobs = query({
   },
 });
 
+// PUBLIC API - Get active import jobs (running or pending)
+export const getActiveImportJobs = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+    
+    const allJobs = await ctx.db.query("importJobs").order("desc").collect();
+    return allJobs.filter(job => 
+      job.status === "running" || 
+      job.status === "pending" || 
+      job.status === "paused"
+    );
+  },
+});
+
 // PUBLIC API - Get specific import job status
 export const getImportJobStatus = query({
   args: {
@@ -120,6 +141,87 @@ export const cancelImportJob = mutation({
       errorMessage: "Cancelled by user",
       completedAt: Date.now(),
     });
+  },
+});
+
+// PUBLIC API - Retry failed files in an import job
+export const retryFailedFiles = mutation({
+  args: {
+    jobId: v.id("importJobs"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+    
+    const job = await ctx.db.get(args.jobId);
+    if (!job) {
+      throw new ConvexError({
+        message: "Import job not found",
+        code: "NOT_FOUND",
+      });
+    }
+    
+    if (!job.failedFiles || job.failedFiles.length === 0) {
+      throw new ConvexError({
+        message: "No failed files to retry",
+        code: "BAD_REQUEST",
+      });
+    }
+    
+    // Reset failed files count and clear failed files list
+    await ctx.db.patch(args.jobId, {
+      filesFailed: 0,
+      failedFiles: [],
+      status: "pending",
+      errorMessage: undefined,
+      lastActivityAt: Date.now(),
+    });
+    
+    // Restart processing from last checkpoint
+    await ctx.scheduler.runAfter(0, internal.googleDriveImport.processImportJob, {
+      jobId: args.jobId,
+    });
+    
+    return { retriedCount: job.failedFiles.length };
+  },
+});
+
+// PUBLIC API - Delete completed/failed import job
+export const deleteImportJob = mutation({
+  args: {
+    jobId: v.id("importJobs"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+    
+    const job = await ctx.db.get(args.jobId);
+    if (!job) {
+      throw new ConvexError({
+        message: "Import job not found",
+        code: "NOT_FOUND",
+      });
+    }
+    
+    // Only allow deletion of completed or failed jobs
+    if (job.status === "running" || job.status === "pending") {
+      throw new ConvexError({
+        message: "Cannot delete active import job. Cancel it first.",
+        code: "BAD_REQUEST",
+      });
+    }
+    
+    await ctx.db.delete(args.jobId);
   },
 });
 
