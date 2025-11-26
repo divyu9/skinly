@@ -229,7 +229,7 @@ function AdminCouponsPageInner() {
     }));
   };
 
-  if (coupons === undefined || collections === undefined || products === undefined || variants === undefined) {
+  if (coupons === undefined || collections === undefined) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 5 }).map((_, i) => (
@@ -242,14 +242,14 @@ function AdminCouponsPageInner() {
   const now = Date.now();
 
   // Filter variants and collections based on search
-  const filteredVariants = variants.filter((variant) => {
+  const filteredVariants = variants ? variants.filter((variant) => {
     const searchLower = variantSearchQuery.toLowerCase();
     return (
       variant.productTitle.toLowerCase().includes(searchLower) ||
       variant.title.toLowerCase().includes(searchLower) ||
       variant.sku.toLowerCase().includes(searchLower)
     );
-  });
+  }) : [];
 
   const filteredCollections = collections.filter((collection) => {
     return collection.name.toLowerCase().includes(collectionSearchQuery.toLowerCase());
@@ -613,7 +613,13 @@ function AdminCouponsPageInner() {
                       </div>
                     )}
                     <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
-                      {variants.length === 0 ? (
+                      {variants === undefined ? (
+                        <div className="space-y-2">
+                          {Array.from({ length: 3 }).map((_, i) => (
+                            <Skeleton key={i} className="h-8 w-full" />
+                          ))}
+                        </div>
+                      ) : variants.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No variants available</p>
                       ) : filteredVariants.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No variants match your search</p>
