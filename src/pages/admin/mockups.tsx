@@ -737,13 +737,22 @@ export default function MockupsPage() {
                 Upload mockup images with automatic parsing and import
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => window.location.href = '/admin/mockups/missing'}
-            >
-              <AlertCircleIcon className="h-4 w-4 mr-2" />
-              Check Missing Mockups
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/admin/google-drive-import'}
+              >
+                <FolderIcon className="h-4 w-4 mr-2" />
+                Google Drive Import
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/admin/mockups/missing'}
+              >
+                <AlertCircleIcon className="h-4 w-4 mr-2" />
+                Check Missing Mockups
+              </Button>
+            </div>
           </div>
         
         {/* Large Upload Warning */}

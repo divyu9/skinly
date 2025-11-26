@@ -20,6 +20,7 @@ import AdminStockNotificationsPage from "./pages/admin/stock-notifications/page.
 import AdminOOSPage from "./pages/admin/oos/page.tsx";
 import AdminMockupsPage from "./pages/admin/mockups.tsx";
 import AdminMockupsMissingPage from "./pages/admin/mockups-missing.tsx";
+import AdminGoogleDriveImportPage from "./pages/admin/google-drive-import.tsx";
 import AdminModelsPage from "./pages/admin/models/page.tsx";
 import AdminSeedModelsPage from "./pages/admin/seed-models/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
@@ -53,6 +54,7 @@ export default function App() {
           <Route path="/admin/oos" element={<AdminOOSPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/admin/mockups/missing" element={<AdminMockupsMissingPage />} />
+          <Route path="/admin/google-drive-import" element={<AdminGoogleDriveImportPage />} />
           <Route path="/admin/models" element={<AdminModelsPage />} />
           <Route path="/admin/seed-models" element={<AdminSeedModelsPage />} />
           <Route path="/devices" element={<DevicesPage />} />
