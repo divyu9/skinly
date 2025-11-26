@@ -146,6 +146,10 @@ function AdminProductsPageInner() {
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
   const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<"all" | "phone" | "laptop" | "camera" | "mac-mini" | "tablet" | "console" | "lens" | "drone" | "charger">("all");
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
+  const [skuFilterCondition, setSkuFilterCondition] = useState<"starts-with" | "contains">("starts-with");
+  const [skuFilterValue, setSkuFilterValue] = useState("");
+  const [productNameCondition, setProductNameCondition] = useState<"starts-with" | "contains">("contains");
+  const [productNameValue, setProductNameValue] = useState("");
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -568,6 +572,34 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       });
     }
 
+    // Apply advanced SKU filter
+    if (skuFilterValue.trim()) {
+      const value = skuFilterValue.toLowerCase().trim();
+      filtered = filtered.filter((product) => {
+        return product.variants.some((v) => {
+          const sku = v.sku.toLowerCase();
+          if (skuFilterCondition === "starts-with") {
+            return sku.startsWith(value);
+          } else {
+            return sku.includes(value);
+          }
+        });
+      });
+    }
+
+    // Apply advanced product name filter
+    if (productNameValue.trim()) {
+      const value = productNameValue.toLowerCase().trim();
+      filtered = filtered.filter((product) => {
+        const title = product.title.toLowerCase();
+        if (productNameCondition === "starts-with") {
+          return title.startsWith(value);
+        } else {
+          return title.includes(value);
+        }
+      });
+    }
+
     // Sort by SKU numeric value
     const sorted = [...filtered].sort((a, b) => {
       const aFirstVariant = a.variants[0];
@@ -584,7 +616,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     });
 
     return sorted;
-  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter]);
+  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterCondition, skuFilterValue, productNameCondition, productNameValue]);
 
   // Build collections map
   const collectionsMap = useMemo(() => {
@@ -620,12 +652,14 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         <TabsContent value="products" className="space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all"
+              {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim()
                 ? `${filteredProducts.length} of ${products.length} products`
                 : `${products.length} products`}
               {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
               {skuLetterFilter !== "all" && ` • SKU: ${skuLetterFilter}`}
               {gadgetCategoryFilter !== "all" && ` • Category: ${gadgetCategoryFilter.charAt(0).toUpperCase() + gadgetCategoryFilter.slice(1).replace("-", " ")}`}
+              {skuFilterValue.trim() && ` • SKU ${skuFilterCondition === "starts-with" ? "starts with" : "contains"}: "${skuFilterValue}"`}
+              {productNameValue.trim() && ` • Name ${productNameCondition === "starts-with" ? "starts with" : "contains"}: "${productNameValue}"`}
             </p>
             <div className="flex items-center gap-2">
           {selectedProducts.length > 0 && (
@@ -870,8 +904,48 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                 </div>
               </div>
 
+              {/* Advanced SKU Filter */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground w-32">SKU Filter:</span>
+                <Select value={skuFilterCondition} onValueChange={(v) => setSkuFilterCondition(v as "starts-with" | "contains")}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="starts-with">Starts with</SelectItem>
+                    <SelectItem value="contains">Contains</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Enter SKU value..."
+                  value={skuFilterValue}
+                  onChange={(e) => setSkuFilterValue(e.target.value)}
+                  className="max-w-xs"
+                />
+              </div>
+
+              {/* Advanced Product Name Filter */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-muted-foreground w-32">Product Name:</span>
+                <Select value={productNameCondition} onValueChange={(v) => setProductNameCondition(v as "starts-with" | "contains")}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="starts-with">Starts with</SelectItem>
+                    <SelectItem value="contains">Contains</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder="Enter product name..."
+                  value={productNameValue}
+                  onChange={(e) => setProductNameValue(e.target.value)}
+                  className="max-w-xs"
+                />
+              </div>
+
               {/* Reset Button */}
-              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all") && (
+              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim()) && (
                 <div className="flex justify-end">
                   <Button
                     size="sm"
@@ -880,10 +954,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       setSkuLetterFilter("all");
                       setSkuSortOrder("asc");
                       setGadgetCategoryFilter("all");
+                      setSkuFilterValue("");
+                      setProductNameValue("");
                     }}
                     className="text-muted-foreground hover:text-foreground"
                   >
-                    Reset Filters
+                    Reset All Filters
                   </Button>
                 </div>
               )}
