@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -150,6 +150,7 @@ function AdminProductsPageInner() {
   const [skuFilterValue, setSkuFilterValue] = useState("");
   const [productNameCondition, setProductNameCondition] = useState<"starts-with" | "contains">("contains");
   const [productNameValue, setProductNameValue] = useState("");
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
     successful: number;
@@ -616,7 +617,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     });
 
     return sorted;
-  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterCondition, skuFilterValue, productNameCondition, productNameValue]);
+  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition]);
 
   // Build collections map
   const collectionsMap = useMemo(() => {
@@ -904,45 +905,72 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                 </div>
               </div>
 
-              {/* Advanced SKU Filter */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground w-32">SKU Filter:</span>
-                <Select value={skuFilterCondition} onValueChange={(v) => setSkuFilterCondition(v as "starts-with" | "contains")}>
-                  <SelectTrigger className="w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="starts-with">Starts with</SelectItem>
-                    <SelectItem value="contains">Contains</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Enter SKU value..."
-                  value={skuFilterValue}
-                  onChange={(e) => setSkuFilterValue(e.target.value)}
-                  className="max-w-xs"
-                />
+              {/* Advanced Filters Toggle */}
+              <div className="flex items-center justify-between pt-2 border-t">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {showAdvancedFilters ? (
+                    <>
+                      <ChevronUpIcon className="size-4 mr-2" />
+                      Hide Advanced Filters
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDownIcon className="size-4 mr-2" />
+                      Show Advanced Filters
+                    </>
+                  )}
+                </Button>
               </div>
 
-              {/* Advanced Product Name Filter */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground w-32">Product Name:</span>
-                <Select value={productNameCondition} onValueChange={(v) => setProductNameCondition(v as "starts-with" | "contains")}>
-                  <SelectTrigger className="w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="starts-with">Starts with</SelectItem>
-                    <SelectItem value="contains">Contains</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder="Enter product name..."
-                  value={productNameValue}
-                  onChange={(e) => setProductNameValue(e.target.value)}
-                  className="max-w-xs"
-                />
-              </div>
+              {/* Advanced Filters - Only render when expanded */}
+              {showAdvancedFilters && (
+                <>
+                  {/* Advanced SKU Filter */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-muted-foreground w-32">SKU Filter:</span>
+                    <Select value={skuFilterCondition} onValueChange={(v) => setSkuFilterCondition(v as "starts-with" | "contains")}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="starts-with">Starts with</SelectItem>
+                        <SelectItem value="contains">Contains</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      placeholder="Enter SKU value..."
+                      value={skuFilterValue}
+                      onChange={(e) => setSkuFilterValue(e.target.value)}
+                      className="max-w-xs"
+                    />
+                  </div>
+
+                  {/* Advanced Product Name Filter */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-muted-foreground w-32">Product Name:</span>
+                    <Select value={productNameCondition} onValueChange={(v) => setProductNameCondition(v as "starts-with" | "contains")}>
+                      <SelectTrigger className="w-36">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="starts-with">Starts with</SelectItem>
+                        <SelectItem value="contains">Contains</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      placeholder="Enter product name..."
+                      value={productNameValue}
+                      onChange={(e) => setProductNameValue(e.target.value)}
+                      className="max-w-xs"
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Reset Button */}
               {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim()) && (
@@ -956,6 +984,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       setGadgetCategoryFilter("all");
                       setSkuFilterValue("");
                       setProductNameValue("");
+                      setShowAdvancedFilters(false);
                     }}
                     className="text-muted-foreground hover:text-foreground"
                   >
