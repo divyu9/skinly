@@ -293,4 +293,37 @@ export default defineSchema({
     metersAvailable: v.number(), // Available vinyl in meters
     notes: v.optional(v.string()), // Optional notes
   }).index("by_r_number", ["rNumber"]),
+
+  importJobs: defineTable({
+    folderId: v.string(), // Google Drive folder ID
+    folderUrl: v.string(), // Original folder URL provided by user
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("paused"),
+      v.literal("completed"),
+      v.literal("failed")
+    ),
+    // Progress tracking
+    totalFiles: v.optional(v.number()), // Total files found in folder
+    filesChecked: v.number(), // Files checked for duplicates
+    filesSkipped: v.number(), // Files already uploaded (duplicates)
+    filesUploaded: v.number(), // Successfully uploaded new files
+    filesFailed: v.number(), // Failed uploads
+    // Current state
+    currentFile: v.optional(v.string()), // Currently processing filename
+    lastCheckpoint: v.optional(v.number()), // Last processed file index for resume
+    // Timing
+    startedAt: v.optional(v.number()), // When job started
+    completedAt: v.optional(v.number()), // When job completed
+    lastActivityAt: v.optional(v.number()), // Last activity timestamp
+    // Error tracking
+    errorMessage: v.optional(v.string()),
+    failedFiles: v.optional(v.array(v.object({
+      filename: v.string(),
+      reason: v.string(),
+    }))),
+  })
+    .index("by_status", ["status"])
+    .index("by_started_at", ["startedAt"]),
 });
