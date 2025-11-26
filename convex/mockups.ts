@@ -250,6 +250,59 @@ export const verifyMockupFiles = query({
 });
 
 /**
+ * Check which filenames already exist in the database
+ * Used to resume interrupted uploads by skipping already uploaded files
+ */
+export const checkExistingMockupFilenames = query({
+  args: {
+    filenames: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Get all mockups
+    const allMockups = await ctx.db.query("mockups").collect();
+    
+    // Create a set of existing filename combinations for fast lookup
+    // Normalize filenames: brand_model_sku format (case-insensitive, no extension)
+    const existingSet = new Set<string>();
+    
+    for (const mockup of allMockups) {
+      // Reconstruct the filename pattern from database records
+      // Handle both formats: Brand_Model_SKU and Model_SKU (for Apple auto-detection)
+      const normalizedModel = mockup.model.replace(/\s+/g, '_');
+      const filename1 = `${mockup.brand}_${normalizedModel}_${mockup.sku}`.toLowerCase();
+      const filename2 = `${normalizedModel}_${mockup.sku}`.toLowerCase(); // Without brand
+      existingSet.add(filename1);
+      existingSet.add(filename2);
+    }
+    
+    // Check which input filenames already exist
+    const existingFilenames: string[] = [];
+    const missingFilenames: string[] = [];
+    
+    for (const filename of args.filenames) {
+      // Remove extension and normalize
+      const normalized = filename
+        .replace(/\.(jpg|jpeg|png|webp)$/i, '')
+        .toLowerCase();
+      
+      if (existingSet.has(normalized)) {
+        existingFilenames.push(filename);
+      } else {
+        missingFilenames.push(filename);
+      }
+    }
+    
+    return {
+      total: args.filenames.length,
+      existing: existingFilenames.length,
+      missing: missingFilenames.length,
+      existingFilenames,
+      missingFilenames,
+    };
+  },
+});
+
+/**
  * Get missing mockups by checking which phone model + SKU combinations lack mockup images
  * Returns models grouped by brand with their missing SKUs
  */

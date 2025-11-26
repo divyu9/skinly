@@ -332,6 +332,44 @@ export default function MockupsPage() {
     setUploadProgress({ current: 0, total: fileArray.length });
     setFailedFiles([]); // Reset failed files
     
+    // Check which files already exist in the database
+    toast.info("Checking which files are already uploaded...", { duration: 2000 });
+    
+    let filesToUpload = fileArray;
+    let alreadyUploaded = 0;
+    
+    try {
+      const filenames = fileArray.map(f => f.name);
+      const checkResult = await convex.query(api.mockups.checkExistingMockupFilenames, {
+        filenames,
+      });
+      
+      // Filter to only upload missing files
+      const missingSet = new Set(checkResult.missingFilenames);
+      filesToUpload = fileArray.filter(file => missingSet.has(file.name));
+      alreadyUploaded = checkResult.existing;
+      
+      if (alreadyUploaded > 0) {
+        toast.success(
+          `${alreadyUploaded} files already uploaded! Uploading ${filesToUpload.length} remaining files.`,
+          { duration: 5000 }
+        );
+      }
+      
+      if (filesToUpload.length === 0) {
+        toast.info("All files have already been uploaded!");
+        setUploading(false);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to check existing mockups:", error);
+      toast.warning("Could not check for existing files. Uploading all files...");
+      // Continue with all files if check fails
+    }
+    
+    // Update progress to show only files that will be uploaded
+    setUploadProgress({ current: 0, total: filesToUpload.length });
+    
     // Acquire wake lock and start keep-alive to prevent dev machine from sleeping
     await requestWakeLock();
     startKeepAlive();
@@ -349,9 +387,9 @@ export default function MockupsPage() {
     try {
       const BATCH_SIZE = 50; // Process in batches to prevent timeouts
       
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i];
-        setUploadProgress({ current: i + 1, total: fileArray.length });
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setUploadProgress({ current: i + 1, total: filesToUpload.length });
         
         // Add small delay every BATCH_SIZE files to prevent overwhelming the system
         if (i > 0 && i % BATCH_SIZE === 0) {
@@ -438,9 +476,15 @@ export default function MockupsPage() {
       
       setFailedFiles(failedList);
       
-      toast.success(
-        `Upload complete! ${imported} new, ${updated} updated, ${skipped} skipped, ${failed} failed`
-      );
+      const summary = [
+        alreadyUploaded > 0 ? `${alreadyUploaded} already existed` : null,
+        imported > 0 ? `${imported} new` : null,
+        updated > 0 ? `${updated} updated` : null,
+        skipped > 0 ? `${skipped} skipped` : null,
+        failed > 0 ? `${failed} failed` : null,
+      ].filter(Boolean).join(", ");
+      
+      toast.success(`Upload complete! ${summary}`);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error("Bulk upload failed");

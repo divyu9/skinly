@@ -163,10 +163,17 @@ function AdminProductsPageInner() {
   } | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
 
+  // State for active tab
+  const [activeTab, setActiveTab] = useState<"products" | "rolls">("products");
+
   // Queries and mutations
   const products = useQuery(api.products.getAllProducts, {});
   const collections = useQuery(api.collections.getAllCollections, {});
-  const stockLevelsArray = useQuery(api.rollsManagement.getStockLevels, {});
+  // Only load stock levels when Rolls Management tab is active
+  const stockLevelsArray = useQuery(
+    api.rollsManagement.getStockLevels, 
+    activeTab === "rolls" ? {} : "skip"
+  );
   const exportData = useQuery(api.products.exportProductsForBulkEdit, 
     selectedProducts.length > 0 ? { productIds: selectedProducts } : "skip"
   );
@@ -645,7 +652,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         </p>
       </div>
 
-      <Tabs defaultValue="products" className="space-y-6">
+      <Tabs defaultValue="products" className="space-y-6" onValueChange={(value) => setActiveTab(value as "products" | "rolls")}>
         <TabsList>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="rolls">Rolls Management</TabsTrigger>
