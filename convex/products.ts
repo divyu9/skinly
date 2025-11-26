@@ -53,7 +53,97 @@ export const getAllProductsPaginated = query({
   },
 });
 
+// Get all products with only basic info and variant count (ultra-lightweight)
+export const getAllProductsBasic = query({
+  args: {
+    status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),
+  },
+  handler: async (ctx, args) => {
+    let products;
+
+    if (args.status) {
+      products = await ctx.db
+        .query("products")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .collect();
+    } else {
+      products = await ctx.db.query("products").collect();
+    }
+
+    // Fetch ALL variants
+    const allVariants = await ctx.db.query("variants").collect();
+    
+    // Count variants per product and build SKU list for search
+    const variantDataByProduct = new Map<string, {
+      count: number;
+      skus: string[];
+      firstVariant: typeof allVariants[0] | null;
+      totalInventory: number;
+    }>();
+    
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantDataByProduct.has(productId)) {
+        variantDataByProduct.set(productId, {
+          count: 0,
+          skus: [],
+          firstVariant: null,
+          totalInventory: 0,
+        });
+      }
+      const data = variantDataByProduct.get(productId)!;
+      data.count++;
+      data.skus.push(variant.sku);
+      data.totalInventory += variant.inventoryQuantity;
+      if (data.firstVariant === null) {
+        data.firstVariant = variant;
+      }
+    }
+
+    // Build products with variant metadata
+    return products.map((product) => {
+      const variantData = variantDataByProduct.get(product._id) || {
+        count: 0,
+        skus: [],
+        firstVariant: null,
+        totalInventory: 0,
+      };
+      return {
+        _id: product._id,
+        _creationTime: product._creationTime,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        status: product.status,
+        images: product.images,
+        tags: product.tags,
+        collectionId: product.collectionId,
+        metaDescription: product.metaDescription,
+        // Variant summary data
+        variantCount: variantData.count,
+        variantSkus: variantData.skus,
+        firstVariant: variantData.firstVariant,
+        totalInventory: variantData.totalInventory,
+        collection: null,
+      };
+    });
+  },
+});
+
+// Get variants for a specific product
+export const getProductVariants = query({
+  args: { productId: v.id("products") },
+  handler: async (ctx, args) => {
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", args.productId))
+      .collect();
+    return variants;
+  },
+});
+
 // Get all products (non-paginated - keep for backward compatibility)
+// WARNING: This query can exceed response size limits with large datasets
 export const getAllProducts = query({
   args: {
     status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),

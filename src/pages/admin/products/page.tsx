@@ -171,7 +171,7 @@ function AdminProductsPageInner() {
   const itemsPerPage = 100;
 
   // Queries and mutations
-  const products = useQuery(api.products.getAllProducts, {});
+  const products = useQuery(api.products.getAllProductsBasic, {});
   const collections = useQuery(api.collections.getAllCollections, {});
   // Only load stock levels when Rolls Management tab is active
   const stockLevelsArray = useQuery(
@@ -571,7 +571,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
           product.description.toLowerCase().includes(query) ||
           product.slug.toLowerCase().includes(query) ||
           product.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-          product.variants.some((v) => v.sku.toLowerCase().includes(query))
+          product.variantSkus.some((sku) => sku.toLowerCase().includes(query))
         );
       });
     }
@@ -579,8 +579,8 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     // Apply SKU letter filter
     if (skuLetterFilter !== "all") {
       filtered = filtered.filter((product) => {
-        return product.variants.some((v) => {
-          const { letter } = parseSku(v.sku);
+        return product.variantSkus.some((sku) => {
+          const { letter } = parseSku(sku);
           return letter === skuLetterFilter;
         });
       });
@@ -598,12 +598,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     if (skuFilterValue.trim()) {
       const value = skuFilterValue.toLowerCase().trim();
       filtered = filtered.filter((product) => {
-        return product.variants.some((v) => {
-          const sku = v.sku.toLowerCase();
+        return product.variantSkus.some((sku) => {
+          const skuLower = sku.toLowerCase();
           if (skuFilterCondition === "starts-with") {
-            return sku.startsWith(value);
+            return skuLower.startsWith(value);
           } else {
-            return sku.includes(value);
+            return skuLower.includes(value);
           }
         });
       });
@@ -624,13 +624,13 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
     // Sort by SKU numeric value
     const sorted = [...filtered].sort((a, b) => {
-      const aFirstVariant = a.variants[0];
-      const bFirstVariant = b.variants[0];
+      const aFirstSku = a.variantSkus[0];
+      const bFirstSku = b.variantSkus[0];
       
-      if (!aFirstVariant || !bFirstVariant) return 0;
+      if (!aFirstSku || !bFirstSku) return 0;
       
-      const aParsed = parseSku(aFirstVariant.sku);
-      const bParsed = parseSku(bFirstVariant.sku);
+      const aParsed = parseSku(aFirstSku);
+      const bParsed = parseSku(bFirstSku);
       
       // Sort by number
       const diff = aParsed.number - bParsed.number;
@@ -1093,18 +1093,15 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                 </thead>
                 <tbody>
                   {paginatedProducts.map((product) => {
-                    const firstVariant = product.variants[0];
-                    const totalInventory = product.variants.reduce(
-                      (sum, v) => sum + v.inventoryQuantity,
-                      0
-                    );
+                    const firstVariant = product.firstVariant;
+                    const totalInventory = product.totalInventory;
                     const collection = product.collectionId
                       ? collectionsMap.get(product.collectionId)
                       : null;
                     const isSelected = selectedProducts.includes(product._id);
 
                     const isExpanded = expandedProducts.has(product._id);
-                    const hasMultipleVariants = product.variants.length > 1;
+                    const hasMultipleVariants = product.variantCount > 1;
 
                     return (
                       <>
@@ -1170,9 +1167,9 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                         <td className="p-3">
                           <div>
                             <p className="font-medium">{product.title}</p>
-                            {product.variants.length > 1 && (
+                            {product.variantCount > 1 && (
                               <p className="text-xs text-muted-foreground">
-                                {product.variants.length} variants
+                                {product.variantCount} variants
                               </p>
                             )}
                           </div>
@@ -1186,9 +1183,9 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                                 type="text"
                                 field="sku"
                               />
-                              {product.variants.length > 1 && (
+                              {product.variantCount > 1 && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  +{product.variants.length - 1} more
+                                  +{product.variantCount - 1} more
                                 </p>
                               )}
                             </div>
@@ -1205,9 +1202,9 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                                 type="number"
                                 field="price"
                               />
-                              {product.variants.length > 1 && (
+                              {product.variantCount > 1 && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  +{product.variants.length - 1} more
+                                  +{product.variantCount - 1} more
                                 </p>
                               )}
                             </div>
@@ -1224,7 +1221,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                                 type="number"
                                 field="inventoryQuantity"
                               />
-                              {product.variants.length > 1 && (
+                              {product.variantCount > 1 && (
                                 <p className="text-xs text-muted-foreground mt-1">
                                   Total: {totalInventory}
                                 </p>
@@ -1329,99 +1326,10 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                           </div>
                         </td>
                       </tr>
-
-                      {/* Variant Rows - Only show when expanded and has multiple variants */}
-                      {isExpanded && hasMultipleVariants && product.variants.slice(1).map((variant) => {
-                        const variantStock = stockLevels?.[variant._id];
-                        
-                        return (
-                          <tr key={variant._id} className="border-b bg-muted/20 hover:bg-muted/30 transition-colors">
-                            <td className="p-3 pl-12">
-                              {/* Empty cell for indentation */}
-                            </td>
-                            <td className="p-3">
-                              {/* Empty image cell */}
-                            </td>
-                            <td className="p-3">
-                              <div className="text-sm text-muted-foreground pl-4">
-                                ↳ {variant.title}
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <EditableCell
-                                variantId={variant._id}
-                                value={variant.sku}
-                                type="text"
-                                field="sku"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <EditableCell
-                                variantId={variant._id}
-                                value={variant.price}
-                                type="number"
-                                field="price"
-                              />
-                            </td>
-                            <td className="p-3">
-                              <EditableCell
-                                variantId={variant._id}
-                                value={variant.inventoryQuantity}
-                                type="number"
-                                field="inventoryQuantity"
-                              />
-                            </td>
-                            <td className="p-3">
-                              {variantStock ? (
-                                (() => {
-                                  if (variantStock.rNumber === null) {
-                                    return <span className="text-muted-foreground text-sm">N/A</span>;
-                                  }
-                                  
-                                  const { availableUnits } = variantStock;
-                                  const isLowStock = availableUnits <= 10 && availableUnits > 0;
-                                  const isOutOfStock = availableUnits === 0;
-                                  
-                                  return (
-                                    <div className="flex items-center gap-2">
-                                      <span className={`text-sm font-medium ${
-                                        isOutOfStock ? "text-destructive" : 
-                                        isLowStock ? "text-orange-600" : 
-                                        "text-foreground"
-                                      }`}>
-                                        {availableUnits >= 999999 ? "∞" : availableUnits}
-                                      </span>
-                                      {isOutOfStock && (
-                                        <Badge variant="destructive" className="text-[10px] px-1 py-0">
-                                          Out
-                                        </Badge>
-                                      )}
-                                      {isLowStock && (
-                                        <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-600 text-orange-600">
-                                          Low
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  );
-                                })()
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </td>
-                            <td className="p-3">
-                              {/* Empty collection cell for variant rows */}
-                            </td>
-                            <td className="p-3">
-                              {/* Empty status cell for variant rows */}
-                            </td>
-                            <td className="p-3">
-                              {/* Empty actions cell for variant rows */}
-                            </td>
-                          </tr>
-                        );
-                      })}
                       </>
                     );
+
+                      {/* TODO: Add back expandable variant rows - fetch variants on demand */}
                   })}
                 </tbody>
               </table>
@@ -1664,13 +1572,13 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Price Edit Dialog */}
+      {/* Bulk Price Edit Dialog - Temporarily disabled (needs full product data with variants) 
       <BulkPriceEditDialog
         open={showBulkPriceEdit}
         onOpenChange={setShowBulkPriceEdit}
-        products={filteredProducts}
+        products={[]}
         selectedProductIds={selectedProducts}
-      />
+      /> */}
     </div>
   );
 }

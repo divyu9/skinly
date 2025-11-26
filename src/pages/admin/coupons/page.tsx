@@ -63,8 +63,11 @@ function AdminCouponsPageInner() {
   
   const coupons = useQuery(api.coupons.getAllCoupons, {});
   const collections = useQuery(api.collections.getAllCollections, {});
-  const products = useQuery(api.products.getAllProducts, {});
-  // Only load variants when dialog is open to avoid massive query on page load
+  // Only load products and variants when dialog is open to avoid massive query on page load
+  const products = useQuery(
+    api.products.getAllProductsBasic,
+    showCreateDialog ? {} : "skip"
+  );
   const variants = useQuery(
     api.products.getAllVariantsWithProducts, 
     showCreateDialog ? {} : "skip"
