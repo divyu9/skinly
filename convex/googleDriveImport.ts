@@ -214,10 +214,8 @@ export const processImportJob = internalAction({
       });
       
       // Process files in chunks to avoid timeout
-      // Instead of processing all files in one action, we'll process a small chunk
-      // and schedule the next chunk to continue
+      // Process one file at a time for 100% reliability (no race conditions)
       const CHUNK_SIZE = 50; // Process 50 files per action invocation
-      const CONCURRENT_UPLOADS = 5;
       
       const startIndex = job.lastCheckpoint || 0;
       const endIndex = Math.min(startIndex + CHUNK_SIZE, files.length);
@@ -242,59 +240,59 @@ export const processImportJob = internalAction({
         filesSkipped: skippedInChunk,
       });
       
-      // Upload files in parallel (limited concurrency)
-      for (let j = 0; j < filesToUpload.length; j += CONCURRENT_UPLOADS) {
-        const uploadGroup = filesToUpload.slice(j, Math.min(j + CONCURRENT_UPLOADS, filesToUpload.length));
+      // Process files sequentially (one at a time for reliability)
+      for (let j = 0; j < filesToUpload.length; j++) {
+        const file = filesToUpload[j];
         
-        await Promise.all(uploadGroup.map(async (file) => {
-          try {
-            // Update current file
-            await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCurrentFile, {
-              jobId: args.jobId,
-              currentFile: file.name,
-            });
-            
-            // Download file from Google Drive
-            const fileData = await downloadGoogleDriveFile(file.id, apiKey);
-            
-            // Upload to Convex storage
-            const blob = new Blob([fileData]);
-            const uploadUrl = await ctx.runMutation(internal.googleDriveImportPublic.generateUploadUrl, {});
-            
-            const uploadResult = await fetch(uploadUrl, {
-              method: "POST",
-              body: blob,
-            });
-            
-            if (!uploadResult.ok) {
-              throw new Error(`Upload failed: ${uploadResult.status}`);
-            }
-            
-            const { storageId } = await uploadResult.json();
-            
-            // Store mockup with filename
-            await ctx.runMutation(internal.googleDriveImportPublic.storeMockupFile, {
-              storageId,
-              filename: file.name,
-            });
-            
-            // Increment uploaded count
-            await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
-              jobId: args.jobId,
-              filesUploaded: 1,
-            });
-            
-          } catch (error) {
-            console.error(`Failed to process ${file.name}:`, error);
-            
-            // Record failed file
-            await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
-              jobId: args.jobId,
-              filename: file.name,
-              reason: error instanceof Error ? error.message : "Unknown error",
-            });
+        try {
+          // Update current file
+          await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCurrentFile, {
+            jobId: args.jobId,
+            currentFile: file.name,
+          });
+          
+          // Download file from Google Drive
+          const fileData = await downloadGoogleDriveFile(file.id, apiKey);
+          
+          // Upload to Convex storage
+          const blob = new Blob([fileData]);
+          const uploadUrl = await ctx.runMutation(internal.googleDriveImportPublic.generateUploadUrl, {});
+          
+          const uploadResult = await fetch(uploadUrl, {
+            method: "POST",
+            body: blob,
+          });
+          
+          if (!uploadResult.ok) {
+            throw new Error(`Upload failed: ${uploadResult.status}`);
           }
-        }));
+          
+          const { storageId } = await uploadResult.json();
+          
+          // Store mockup with filename
+          await ctx.runMutation(internal.googleDriveImportPublic.storeMockupFile, {
+            storageId,
+            filename: file.name,
+          });
+          
+          // Increment uploaded count (safe since processing one at a time)
+          await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
+            jobId: args.jobId,
+            filesUploaded: 1,
+          });
+          
+          console.log(`Successfully uploaded ${file.name} (${j + 1}/${filesToUpload.length} in chunk)`);
+          
+        } catch (error) {
+          console.error(`Failed to process ${file.name}:`, error);
+          
+          // Record failed file
+          await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
+            jobId: args.jobId,
+            filename: file.name,
+            reason: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
       }
       
       // Update checkpoint
