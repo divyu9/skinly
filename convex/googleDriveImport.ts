@@ -65,7 +65,13 @@ async function fetchAllFilesFromFolder(
     const response = await fetch(url);
     
     if (!response.ok) {
-      throw new Error(`Google Drive API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      if (response.status === 403) {
+        throw new Error(`Google Drive API access denied. Please check your API key permissions and ensure the folder is public.`);
+      } else if (response.status === 404) {
+        throw new Error(`Folder not found. Please ensure the folder URL is correct and the folder is set to "Anyone with the link can view".`);
+      }
+      throw new Error(`Google Drive API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
     
     const data: DriveListResponse = await response.json();
@@ -103,6 +109,28 @@ async function downloadGoogleDriveFile(fileId: string, apiKey: string | undefine
   return response.arrayBuffer();
 }
 
+// Check if Google Drive API key is configured
+export const checkApiKeyStatus = action({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+    
+    const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+    return {
+      isConfigured: !!apiKey,
+      message: apiKey 
+        ? "Google Drive API key is configured" 
+        : "Google Drive API key is not configured. Please add GOOGLE_DRIVE_API_KEY to your secrets.",
+    };
+  },
+});
+
 // Start a new Google Drive import job
 export const startGoogleDriveImport = action({
   args: {
@@ -114,6 +142,15 @@ export const startGoogleDriveImport = action({
       throw new ConvexError({
         message: "User not logged in",
         code: "UNAUTHENTICATED",
+      });
+    }
+    
+    // Check if API key is configured
+    const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+    if (!apiKey) {
+      throw new ConvexError({
+        message: "Google Drive API key not configured. Please add GOOGLE_DRIVE_API_KEY to your Hercules Secrets.",
+        code: "NOT_IMPLEMENTED",
       });
     }
     

@@ -61,16 +61,39 @@ function AdminGoogleDriveImportInner() {
   const [folderUrl, setFolderUrl] = useState("");
   const [isStarting, setIsStarting] = useState(false);
   const [selectedJobFailures, setSelectedJobFailures] = useState<ImportJob | null>(null);
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [isCheckingApiKey, setIsCheckingApiKey] = useState(false);
+  const [apiKeyStatus, setApiKeyStatus] = useState<{ isConfigured: boolean; message: string } | null>(null);
   
   const allJobs = useQuery(api.googleDriveImportPublic.getAllImportJobs) as ImportJob[] | undefined;
   const activeJobs = useQuery(api.googleDriveImportPublic.getActiveImportJobs) as ImportJob[] | undefined;
   
   const startImport = useAction(api.googleDriveImport.startGoogleDriveImport);
+  const checkApiKey = useAction(api.googleDriveImport.checkApiKeyStatus);
   const pauseJob = useMutation(api.googleDriveImportPublic.pauseImportJob);
   const resumeJob = useMutation(api.googleDriveImportPublic.resumeImportJob);
   const cancelJob = useMutation(api.googleDriveImportPublic.cancelImportJob);
   const retryFailed = useMutation(api.googleDriveImportPublic.retryFailedFiles);
   const deleteJob = useMutation(api.googleDriveImportPublic.deleteImportJob);
+
+  const handleCheckApiKey = async () => {
+    setIsCheckingApiKey(true);
+    try {
+      const status = await checkApiKey({});
+      setApiKeyStatus(status as { isConfigured: boolean; message: string });
+      if (status.isConfigured) {
+        toast.success("API key is configured!");
+      } else {
+        toast.error("API key not found. Please follow the setup guide.");
+        setShowSetupGuide(true);
+      }
+    } catch (error) {
+      console.error("Failed to check API key:", error);
+      toast.error("Failed to check API key status");
+    } finally {
+      setIsCheckingApiKey(false);
+    }
+  };
 
   const handleStartImport = async () => {
     if (!folderUrl.trim()) {
@@ -85,7 +108,13 @@ function AdminGoogleDriveImportInner() {
       setFolderUrl("");
     } catch (error) {
       console.error("Failed to start import:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to start import");
+      const errorMessage = error instanceof Error ? error.message : "Failed to start import";
+      toast.error(errorMessage);
+      
+      // If API key not configured, show setup guide
+      if (errorMessage.includes("API key not configured")) {
+        setShowSetupGuide(true);
+      }
     } finally {
       setIsStarting(false);
     }
@@ -191,12 +220,220 @@ function AdminGoogleDriveImportInner() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl space-y-8 p-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Google Drive Import</h1>
-          <p className="mt-2 text-muted-foreground">
-            Import mockup images directly from Google Drive folders
-          </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Google Drive Import</h1>
+            <p className="mt-2 text-muted-foreground">
+              Import mockup images directly from Google Drive folders
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleCheckApiKey}
+            disabled={isCheckingApiKey}
+          >
+            {isCheckingApiKey ? (
+              <>
+                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
+                Checking...
+              </>
+            ) : (
+              <>
+                <CheckCircleIcon className="mr-2 h-4 w-4" />
+                Check API Key
+              </>
+            )}
+          </Button>
         </div>
+
+        {/* API Key Status Alert */}
+        {apiKeyStatus && !apiKeyStatus.isConfigured && (
+          <Card className="border-destructive/50 bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <AlertTriangleIcon className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-2">
+                  <p className="font-semibold text-destructive">
+                    Google Drive API Key Not Configured
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {apiKeyStatus.message}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowSetupGuide(!showSetupGuide)}
+                  >
+                    {showSetupGuide ? "Hide" : "Show"} Setup Instructions
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Setup Guide */}
+        {showSetupGuide && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Google Drive API Setup Guide</CardTitle>
+              <CardDescription>
+                Follow these steps to enable Google Drive import functionality
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Step 1 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    1
+                  </div>
+                  <h3 className="font-semibold">Create a Google Cloud Project</h3>
+                </div>
+                <p className="ml-8 text-sm text-muted-foreground">
+                  Go to{" "}
+                  <a
+                    href="https://console.cloud.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary underline"
+                  >
+                    Google Cloud Console
+                  </a>{" "}
+                  and create a new project (or select an existing one).
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    2
+                  </div>
+                  <h3 className="font-semibold">Enable Google Drive API</h3>
+                </div>
+                <p className="ml-8 text-sm text-muted-foreground">
+                  In the Google Cloud Console, navigate to <strong>APIs & Services → Library</strong>. 
+                  Search for "Google Drive API" and click <strong>Enable</strong>.
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    3
+                  </div>
+                  <h3 className="font-semibold">Create API Key</h3>
+                </div>
+                <div className="ml-8 space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    Go to <strong>APIs & Services → Credentials</strong> and click{" "}
+                    <strong>Create Credentials → API Key</strong>.
+                  </p>
+                  <p>
+                    Copy the generated API key - you'll need it in the next step.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    4
+                  </div>
+                  <h3 className="font-semibold">Restrict API Key (Recommended)</h3>
+                </div>
+                <div className="ml-8 space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    Click on the API key you just created and set the following restrictions:
+                  </p>
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li>
+                      <strong>Application restrictions:</strong> None (or IP addresses if you prefer)
+                    </li>
+                    <li>
+                      <strong>API restrictions:</strong> Select "Restrict key" and choose "Google Drive API"
+                    </li>
+                  </ul>
+                  <p>Click <strong>Save</strong>.</p>
+                </div>
+              </div>
+
+              {/* Step 5 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    5
+                  </div>
+                  <h3 className="font-semibold">Add API Key to Hercules Secrets</h3>
+                </div>
+                <div className="ml-8 space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    In your Hercules App Builder, go to the <strong>Secrets</strong> tab in the left sidebar.
+                  </p>
+                  <p>Add a new secret with:</p>
+                  <div className="rounded-lg border bg-muted/50 p-3 font-mono text-xs">
+                    <p>
+                      <strong>Key:</strong> GOOGLE_DRIVE_API_KEY
+                    </p>
+                    <p>
+                      <strong>Value:</strong> [Your API key from step 3]
+                    </p>
+                  </div>
+                  <p className="text-yellow-600">
+                    <strong>Important:</strong> After adding the secret, refresh this page for the changes to take effect.
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 6 */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    6
+                  </div>
+                  <h3 className="font-semibold">Make Your Folder Public</h3>
+                </div>
+                <div className="ml-8 space-y-2 text-sm text-muted-foreground">
+                  <p>
+                    In Google Drive, right-click your folder and select <strong>Share</strong>.
+                  </p>
+                  <p>
+                    Click "Change to anyone with the link" and set permissions to <strong>Viewer</strong>.
+                  </p>
+                  <p>Copy the folder link and paste it below to start importing!</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={handleCheckApiKey}
+                  disabled={isCheckingApiKey}
+                >
+                  {isCheckingApiKey ? (
+                    <>
+                      <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircleIcon className="mr-2 h-4 w-4" />
+                      Verify API Key
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSetupGuide(false)}
+                >
+                  Close Guide
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Active Jobs Summary */}
         {activeJobs && activeJobs.length > 0 && (
@@ -294,6 +531,17 @@ function AdminGoogleDriveImportInner() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {apiKeyStatus && !apiKeyStatus.isConfigured && (
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm">
+                <p className="font-medium text-yellow-900">
+                  ⚠️ Google Drive API key required
+                </p>
+                <p className="mt-1 text-yellow-700">
+                  Please configure your API key using the setup guide above before starting an import.
+                </p>
+              </div>
+            )}
+            
             <div className="space-y-2">
               <Label htmlFor="folderUrl">Google Drive Folder URL</Label>
               <Input
