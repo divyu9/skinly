@@ -213,12 +213,99 @@ export const processImportJob = internalAction({
         totalFiles: files.length,
       });
       
-      // Process files in batches
-      const BATCH_SIZE = 100;
+      // Process files in chunks to avoid timeout
+      // Instead of processing all files in one action, we'll process a small chunk
+      // and schedule the next chunk to continue
+      const CHUNK_SIZE = 50; // Process 50 files per action invocation
       const CONCURRENT_UPLOADS = 5;
       
-      for (let i = 0; i < files.length; i += BATCH_SIZE) {
-        // Check if job was paused
+      const startIndex = job.lastCheckpoint || 0;
+      const endIndex = Math.min(startIndex + CHUNK_SIZE, files.length);
+      const chunk = files.slice(startIndex, endIndex);
+      
+      console.log(`Processing chunk ${startIndex}-${endIndex} of ${files.length} files`);
+      
+      // Check for duplicates in this chunk
+      const filenames = chunk.map(f => f.name);
+      const duplicateCheck = await ctx.runMutation(internal.googleDriveImportPublic.checkDuplicatesQuery, {
+        filenames,
+      });
+      
+      const missingSet = new Set(duplicateCheck.missingFilenames);
+      const filesToUpload = chunk.filter(f => missingSet.has(f.name));
+      
+      // Update skipped count
+      const skippedInChunk = chunk.length - filesToUpload.length;
+      await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
+        jobId: args.jobId,
+        filesChecked: chunk.length,
+        filesSkipped: skippedInChunk,
+      });
+      
+      // Upload files in parallel (limited concurrency)
+      for (let j = 0; j < filesToUpload.length; j += CONCURRENT_UPLOADS) {
+        const uploadGroup = filesToUpload.slice(j, Math.min(j + CONCURRENT_UPLOADS, filesToUpload.length));
+        
+        await Promise.all(uploadGroup.map(async (file) => {
+          try {
+            // Update current file
+            await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCurrentFile, {
+              jobId: args.jobId,
+              currentFile: file.name,
+            });
+            
+            // Download file from Google Drive
+            const fileData = await downloadGoogleDriveFile(file.id, apiKey);
+            
+            // Upload to Convex storage
+            const blob = new Blob([fileData]);
+            const uploadUrl = await ctx.runMutation(internal.googleDriveImportPublic.generateUploadUrl, {});
+            
+            const uploadResult = await fetch(uploadUrl, {
+              method: "POST",
+              body: blob,
+            });
+            
+            if (!uploadResult.ok) {
+              throw new Error(`Upload failed: ${uploadResult.status}`);
+            }
+            
+            const { storageId } = await uploadResult.json();
+            
+            // Store mockup with filename
+            await ctx.runMutation(internal.googleDriveImportPublic.storeMockupFile, {
+              storageId,
+              filename: file.name,
+            });
+            
+            // Increment uploaded count
+            await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
+              jobId: args.jobId,
+              filesUploaded: 1,
+            });
+            
+          } catch (error) {
+            console.error(`Failed to process ${file.name}:`, error);
+            
+            // Record failed file
+            await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
+              jobId: args.jobId,
+              filename: file.name,
+              reason: error instanceof Error ? error.message : "Unknown error",
+            });
+          }
+        }));
+      }
+      
+      // Update checkpoint
+      await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCheckpoint, {
+        jobId: args.jobId,
+        checkpoint: endIndex,
+      });
+      
+      // Check if there are more files to process
+      if (endIndex < files.length) {
+        // Check if job was paused before scheduling next chunk
         const currentJob = await ctx.runMutation(internal.googleDriveImportPublic.getImportJob, {
           jobId: args.jobId,
         });
@@ -228,93 +315,20 @@ export const processImportJob = internalAction({
           return;
         }
         
-        const batch = files.slice(i, Math.min(i + BATCH_SIZE, files.length));
-        
-        // Check for duplicates in this batch
-        const filenames = batch.map(f => f.name);
-        const duplicateCheck = await ctx.runMutation(internal.googleDriveImportPublic.checkDuplicatesQuery, {
-          filenames,
-        });
-        
-        const missingSet = new Set(duplicateCheck.missingFilenames);
-        const filesToUpload = batch.filter(f => missingSet.has(f.name));
-        
-        // Update skipped count
-        const skippedInBatch = batch.length - filesToUpload.length;
-        await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
+        // Schedule next chunk
+        console.log(`Scheduling next chunk starting at index ${endIndex}`);
+        await ctx.scheduler.runAfter(0, internal.googleDriveImport.processImportJob, {
           jobId: args.jobId,
-          filesChecked: batch.length,
-          filesSkipped: skippedInBatch,
         });
-        
-        // Upload files in parallel (limited concurrency)
-        for (let j = 0; j < filesToUpload.length; j += CONCURRENT_UPLOADS) {
-          const uploadGroup = filesToUpload.slice(j, Math.min(j + CONCURRENT_UPLOADS, filesToUpload.length));
-          
-          await Promise.all(uploadGroup.map(async (file) => {
-            try {
-              // Update current file
-              await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCurrentFile, {
-                jobId: args.jobId,
-                currentFile: file.name,
-              });
-              
-              // Download file from Google Drive
-              const fileData = await downloadGoogleDriveFile(file.id, apiKey);
-              
-              // Upload to Convex storage
-              const blob = new Blob([fileData]);
-              const uploadUrl = await ctx.runMutation(internal.googleDriveImportPublic.generateUploadUrl, {});
-              
-              const uploadResult = await fetch(uploadUrl, {
-                method: "POST",
-                body: blob,
-              });
-              
-              if (!uploadResult.ok) {
-                throw new Error(`Upload failed: ${uploadResult.status}`);
-              }
-              
-              const { storageId } = await uploadResult.json();
-              
-              // Store mockup with filename
-              await ctx.runMutation(internal.googleDriveImportPublic.storeMockupFile, {
-                storageId,
-                filename: file.name,
-              });
-              
-              // Increment uploaded count
-              await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
-                jobId: args.jobId,
-                filesUploaded: 1,
-              });
-              
-            } catch (error) {
-              console.error(`Failed to process ${file.name}:`, error);
-              
-              // Record failed file
-              await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
-                jobId: args.jobId,
-                filename: file.name,
-                reason: error instanceof Error ? error.message : "Unknown error",
-              });
-            }
-          }));
-        }
-        
-        // Update checkpoint
-        await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCheckpoint, {
+      } else {
+        // All files processed - mark job as completed
+        console.log("All files processed, marking job as completed");
+        await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobStatus, {
           jobId: args.jobId,
-          checkpoint: i + batch.length,
+          status: "completed",
+          completedAt: Date.now(),
         });
       }
-      
-      // Mark job as completed
-      await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobStatus, {
-        jobId: args.jobId,
-        status: "completed",
-        completedAt: Date.now(),
-      });
       
     } catch (error) {
       console.error("Import job failed:", error);

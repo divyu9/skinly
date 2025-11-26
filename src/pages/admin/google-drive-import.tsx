@@ -216,6 +216,27 @@ function AdminGoogleDriveImportInner() {
     return Math.round((processed / job.totalFiles) * 100);
   };
 
+  const isJobStalled = (job: ImportJob) => {
+    // A job is stalled if it's running/pending but hasn't had activity in 5+ minutes
+    if (job.status !== "running" && job.status !== "pending") return false;
+    if (!job.lastActivityAt) return false;
+    
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    return job.lastActivityAt < fiveMinutesAgo;
+  };
+
+  const getJobStatusDisplay = (job: ImportJob) => {
+    if (isJobStalled(job)) {
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <AlertTriangleIcon className="h-3 w-3" />
+          Stalled
+        </Badge>
+      );
+    }
+    return getStatusBadge(job.status);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl space-y-8 p-6">
@@ -449,13 +470,23 @@ function AdminGoogleDriveImportInner() {
                 <div key={job._id} className="space-y-2 rounded-lg border bg-background p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {getStatusBadge(job.status)}
+                      {getJobStatusDisplay(job)}
                       <span className="font-mono text-sm text-muted-foreground">
                         {job.folderId.slice(0, 12)}...
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {job.status === "running" && (
+                      {isJobStalled(job) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleResume(job._id)}
+                        >
+                          <RefreshCwIcon className="h-4 w-4" />
+                          Resume
+                        </Button>
+                      )}
+                      {job.status === "running" && !isJobStalled(job) && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -482,6 +513,18 @@ function AdminGoogleDriveImportInner() {
                       </Button>
                     </div>
                   </div>
+                  
+                  {isJobStalled(job) && (
+                    <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm">
+                      <p className="font-medium text-yellow-900">
+                        ⚠️ This job appears to be stalled
+                      </p>
+                      <p className="mt-1 text-yellow-700">
+                        No activity detected for over 5 minutes. This usually happens when the import
+                        action times out. Click "Resume" to continue from where it left off.
+                      </p>
+                    </div>
+                  )}
                   
                   {job.currentFile && (
                     <p className="text-sm text-muted-foreground">
@@ -608,7 +651,7 @@ function AdminGoogleDriveImportInner() {
                         <div className="flex items-start justify-between">
                           <div className="space-y-1">
                             <div className="flex items-center gap-3">
-                              {getStatusBadge(job.status)}
+                              {getJobStatusDisplay(job)}
                               <span className="font-mono text-sm text-muted-foreground">
                                 ID: {job.folderId.slice(0, 16)}...
                               </span>
@@ -621,7 +664,17 @@ function AdminGoogleDriveImportInner() {
                           
                           {/* Action Buttons */}
                           <div className="flex items-center gap-2">
-                            {job.status === "running" && (
+                            {isJobStalled(job) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleResume(job._id)}
+                              >
+                                <RefreshCwIcon className="h-4 w-4" />
+                                Resume
+                              </Button>
+                            )}
+                            {job.status === "running" && !isJobStalled(job) && (
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -678,6 +731,18 @@ function AdminGoogleDriveImportInner() {
                             </a>
                           </div>
                         </div>
+
+                        {/* Stalled Warning */}
+                        {isJobStalled(job) && (
+                          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm">
+                            <p className="font-medium text-yellow-900">
+                              ⚠️ This job appears to be stalled
+                            </p>
+                            <p className="mt-1 text-yellow-700">
+                              No activity for over 5 minutes. Click "Resume" to continue from checkpoint (file {job.lastCheckpoint || 0}).
+                            </p>
+                          </div>
+                        )}
 
                         {/* Progress Bar */}
                         {job.totalFiles && job.totalFiles > 0 && (
