@@ -58,16 +58,20 @@ interface CouponFormData {
 }
 
 function AdminCouponsPageInner() {
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [editingCoupon, setEditingCoupon] = useState<Id<"coupons"> | null>(null);
+  
   const coupons = useQuery(api.coupons.getAllCoupons, {});
   const collections = useQuery(api.collections.getAllCollections, {});
   const products = useQuery(api.products.getAllProducts, {});
-  const variants = useQuery(api.products.getAllVariantsWithProducts, {});
+  // Only load variants when dialog is open to avoid massive query on page load
+  const variants = useQuery(
+    api.products.getAllVariantsWithProducts, 
+    showCreateDialog ? {} : "skip"
+  );
   const deleteCoupon = useMutation(api.coupons.deleteCoupon);
   const createCoupon = useMutation(api.coupons.createCoupon);
   const updateCoupon = useMutation(api.coupons.updateCoupon);
-
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [editingCoupon, setEditingCoupon] = useState<Id<"coupons"> | null>(null);
   const [viewingEligibleProducts, setViewingEligibleProducts] = useState<Id<"coupons"> | null>(null);
   const [viewingStats, setViewingStats] = useState<Id<"coupons"> | null>(null);
   const [variantSearchQuery, setVariantSearchQuery] = useState("");
