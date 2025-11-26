@@ -142,7 +142,7 @@ function AdminProductsPageInner() {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T">("all");
+  const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T" | "R">("all");
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
   const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<"all" | "phone" | "laptop" | "camera" | "mac-mini" | "tablet" | "console" | "lens" | "drone" | "charger">("all");
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
@@ -761,6 +761,13 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       onClick={() => setSkuLetterFilter("T")}
                     >
                       T
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={skuLetterFilter === "R" ? "default" : "outline"}
+                      onClick={() => setSkuLetterFilter("R")}
+                    >
+                      R
                     </Button>
                   </div>
                 </div>
