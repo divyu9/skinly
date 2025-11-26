@@ -94,6 +94,47 @@ async function fetchAllFilesFromFolder(
   return allFiles;
 }
 
+// Helper function to sleep for a given duration
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Retry helper with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxAttempts: number = 4,
+  retryableErrors: number[] = [403, 429]
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Check if error is retryable (403 or 429)
+      const errorMessage = lastError.message;
+      const statusMatch = errorMessage.match(/Failed to download file: (\d+)/);
+      const statusCode = statusMatch ? parseInt(statusMatch[1]) : null;
+      
+      const isRetryable = statusCode && retryableErrors.includes(statusCode);
+      
+      // If not retryable or last attempt, throw immediately
+      if (!isRetryable || attempt === maxAttempts) {
+        throw lastError;
+      }
+      
+      // Calculate backoff delay: 2s, 4s, 8s
+      const delayMs = Math.pow(2, attempt) * 1000;
+      console.log(`Attempt ${attempt} failed with ${statusCode}, retrying in ${delayMs}ms...`);
+      await sleep(delayMs);
+    }
+  }
+  
+  throw lastError;
+}
+
 // Download file from Google Drive
 async function downloadGoogleDriveFile(fileId: string, apiKey: string | undefined): Promise<ArrayBuffer> {
   const url = apiKey
@@ -251,8 +292,12 @@ export const processImportJob = internalAction({
             currentFile: file.name,
           });
           
-          // Download file from Google Drive
-          const fileData = await downloadGoogleDriveFile(file.id, apiKey);
+          // Download file from Google Drive with automatic retry
+          const fileData = await retryWithBackoff(
+            () => downloadGoogleDriveFile(file.id, apiKey),
+            4, // Max 4 attempts
+            [403, 429] // Retry on 403 Forbidden and 429 Rate Limit
+          );
           
           // Upload to Convex storage
           const blob = new Blob([fileData]);
@@ -284,11 +329,12 @@ export const processImportJob = internalAction({
           console.log(`Successfully uploaded ${file.name} (${j + 1}/${filesToUpload.length} in chunk)`);
           
         } catch (error) {
-          console.error(`Failed to process ${file.name}:`, error);
+          console.error(`Failed to process ${file.name} after retries:`, error);
           
-          // Record failed file
+          // Record failed file with Google Drive file ID for targeted retry
           await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
             jobId: args.jobId,
+            fileId: file.id,
             filename: file.name,
             reason: error instanceof Error ? error.message : "Unknown error",
           });
@@ -330,6 +376,140 @@ export const processImportJob = internalAction({
       
     } catch (error) {
       console.error("Import job failed:", error);
+      
+      // Mark job as failed
+      await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobStatus, {
+        jobId: args.jobId,
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  },
+});
+
+// Retry only failed files (internal action)
+export const retryFailedFilesOnly = internalAction({
+  args: {
+    jobId: v.id("importJobs"),
+  },
+  handler: async (ctx, args) => {
+    try {
+      // Get job details
+      const job = await ctx.runMutation(internal.googleDriveImportPublic.getImportJob, {
+        jobId: args.jobId,
+      });
+      
+      if (!job) {
+        throw new Error("Import job not found");
+      }
+      
+      if (!job.failedFiles || job.failedFiles.length === 0) {
+        throw new Error("No failed files to retry");
+      }
+      
+      // Update status to running
+      await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobStatus, {
+        jobId: args.jobId,
+        status: "running",
+      });
+      
+      // Get Google Drive API key from environment
+      const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+      
+      const failedFiles = job.failedFiles;
+      console.log(`Retrying ${failedFiles.length} failed files...`);
+      
+      // Clear the failed files list (will re-add any that still fail)
+      await ctx.runMutation(internal.googleDriveImportPublic.clearFailedFiles, {
+        jobId: args.jobId,
+      });
+      
+      // Process each failed file sequentially
+      for (let i = 0; i < failedFiles.length; i++) {
+        const failedFile = failedFiles[i];
+        
+        // Skip files without fileId (old failed files from before fileId was added)
+        if (!failedFile.fileId) {
+          console.log(`Skipping ${failedFile.filename} - no file ID available for retry`);
+          await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
+            jobId: args.jobId,
+            fileId: "",
+            filename: failedFile.filename,
+            reason: "Cannot retry: File ID not available (recorded before retry feature)",
+          });
+          continue;
+        }
+        
+        try {
+          // Update current file
+          await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobCurrentFile, {
+            jobId: args.jobId,
+            currentFile: failedFile.filename,
+          });
+          
+          console.log(`Retrying ${failedFile.filename} (${i + 1}/${failedFiles.length})...`);
+          
+          // Download file from Google Drive with automatic retry
+          // Safe to use non-null assertion because we checked above
+          const fileData = await retryWithBackoff(
+            () => downloadGoogleDriveFile(failedFile.fileId!, apiKey),
+            4, // Max 4 attempts
+            [403, 429] // Retry on 403 Forbidden and 429 Rate Limit
+          );
+          
+          // Upload to Convex storage
+          const blob = new Blob([fileData]);
+          const uploadUrl = await ctx.runMutation(internal.googleDriveImportPublic.generateUploadUrl, {});
+          
+          const uploadResult = await fetch(uploadUrl, {
+            method: "POST",
+            body: blob,
+          });
+          
+          if (!uploadResult.ok) {
+            throw new Error(`Upload failed: ${uploadResult.status}`);
+          }
+          
+          const { storageId } = await uploadResult.json();
+          
+          // Store mockup with filename
+          await ctx.runMutation(internal.googleDriveImportPublic.storeMockupFile, {
+            storageId,
+            filename: failedFile.filename,
+          });
+          
+          // Increment uploaded count
+          await ctx.runMutation(internal.googleDriveImportPublic.incrementJobProgress, {
+            jobId: args.jobId,
+            filesUploaded: 1,
+          });
+          
+          console.log(`Successfully uploaded ${failedFile.filename} on retry`);
+          
+        } catch (error) {
+          console.error(`Failed to retry ${failedFile.filename}:`, error);
+          
+          // Re-record as failed
+          await ctx.runMutation(internal.googleDriveImportPublic.recordFailedFile, {
+            jobId: args.jobId,
+            fileId: failedFile.fileId,
+            filename: failedFile.filename,
+            reason: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      }
+      
+      // Mark as completed
+      await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobStatus, {
+        jobId: args.jobId,
+        status: "completed",
+        completedAt: Date.now(),
+      });
+      
+      console.log("Retry completed");
+      
+    } catch (error) {
+      console.error("Retry failed files job failed:", error);
       
       // Mark job as failed
       await ctx.runMutation(internal.googleDriveImportPublic.updateImportJobStatus, {

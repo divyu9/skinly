@@ -320,6 +320,7 @@ export default defineSchema({
     // Error tracking
     errorMessage: v.optional(v.string()),
     failedFiles: v.optional(v.array(v.object({
+      fileId: v.optional(v.string()), // Google Drive file ID for retry (optional for backward compatibility)
       filename: v.string(),
       reason: v.string(),
     }))),

@@ -144,7 +144,7 @@ export const cancelImportJob = mutation({
   },
 });
 
-// PUBLIC API - Retry failed files in an import job
+// PUBLIC API - Retry failed files in an import job (targets only failed files)
 export const retryFailedFiles = mutation({
   args: {
     jobId: v.id("importJobs"),
@@ -173,21 +173,14 @@ export const retryFailedFiles = mutation({
       });
     }
     
-    // Reset failed files count and clear failed files list
-    await ctx.db.patch(args.jobId, {
-      filesFailed: 0,
-      failedFiles: [],
-      status: "pending",
-      errorMessage: undefined,
-      lastActivityAt: Date.now(),
-    });
+    const failedCount = job.failedFiles.length;
     
-    // Restart processing from last checkpoint
-    await ctx.scheduler.runAfter(0, internal.googleDriveImport.processImportJob, {
+    // Start retry process (targets only failed files)
+    await ctx.scheduler.runAfter(0, internal.googleDriveImport.retryFailedFilesOnly, {
       jobId: args.jobId,
     });
     
-    return { retriedCount: job.failedFiles.length };
+    return { retriedCount: failedCount };
   },
 });
 
@@ -457,6 +450,7 @@ export const updateImportJobCheckpoint = internalMutation({
 export const recordFailedFile = internalMutation({
   args: {
     jobId: v.id("importJobs"),
+    fileId: v.string(),
     filename: v.string(),
     reason: v.string(),
   },
@@ -466,6 +460,7 @@ export const recordFailedFile = internalMutation({
     
     const failedFiles = job.failedFiles || [];
     failedFiles.push({
+      fileId: args.fileId,
       filename: args.filename,
       reason: args.reason,
     });
@@ -473,6 +468,20 @@ export const recordFailedFile = internalMutation({
     await ctx.db.patch(args.jobId, {
       filesFailed: job.filesFailed + 1,
       failedFiles,
+      lastActivityAt: Date.now(),
+    });
+  },
+});
+
+// INTERNAL - Clear failed files list
+export const clearFailedFiles = internalMutation({
+  args: {
+    jobId: v.id("importJobs"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.jobId, {
+      filesFailed: 0,
+      failedFiles: [],
       lastActivityAt: Date.now(),
     });
   },
