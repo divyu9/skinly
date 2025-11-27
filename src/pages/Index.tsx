@@ -339,8 +339,31 @@ export default function Index() {
 
       {/* Latest Models Marquee */}
       {latestModels && latestModels.length > 0 && (
-        <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-24 overflow-hidden">
-          <div className="flex items-center gap-4">
+        <div className="w-full bg-primary/5 border-y border-primary/10 mt-24 overflow-hidden">
+          {/* Mobile: Vertical Marquee */}
+          <div className="md:hidden">
+            <div className="text-center py-2 bg-primary text-primary-foreground text-xs font-bold">
+              ✨ Now supporting:
+            </div>
+            <div className="h-16 overflow-hidden relative">
+              <div className="animate-marquee-vertical space-y-2 py-2">
+                {(() => {
+                  const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
+                  return [...latestModels.slice(0, 15), ...latestModels.slice(0, 15), ...latestModels.slice(0, 15)].map((model, idx) => {
+                    const emoji = emojis[idx % emojis.length];
+                    return (
+                      <div key={idx} className="text-center text-base font-semibold text-foreground px-4">
+                        {emoji} {model.brandName} {model.modelName}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop: Horizontal Marquee */}
+          <div className="hidden md:flex items-center gap-4 py-3">
             <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
               <span>✨</span>
               <span className="whitespace-nowrap">Now supporting:</span>
