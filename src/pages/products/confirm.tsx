@@ -65,7 +65,7 @@ export default function ProductConfirmPage() {
           </div>
 
           {/* Finish Categories */}
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 lg:gap-8">
             {/* Matte Finish */}
             <Card 
               className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
