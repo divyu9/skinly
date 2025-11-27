@@ -1,0 +1,336 @@
+import { useState, useMemo } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { SearchIcon, XIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { phoneModels } from "@/lib/phone-models.ts";
+import {
+  macMiniModels,
+  lensModels,
+  cameraModels,
+  tabletModels,
+  consoleModels,
+  chargerModels,
+  droneModels
+} from "@/lib/device-models.ts";
+
+type DeviceType = "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
+
+interface DeviceSelectorDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialDeviceType?: DeviceType;
+}
+
+// Brand logo mapping
+const brandLogos: Record<string, string> = {
+  "Apple": "https://cdn.hercules.app/file_54FjDV0bMGUJ9N5uWOHBlwYx",
+  "Samsung": "https://cdn.hercules.app/file_8eVkxycD51p7VEELLLP3bxSy",
+  "OnePlus": "https://cdn.hercules.app/file_FbXR6g2WQASC01Y3octztLhA",
+  "Nothing": "https://cdn.hercules.app/file_fL533mZxpk2ay0q8AXPMvuRY",
+  "CMF": "https://cdn.hercules.app/file_7h7knJlwFVqgbBOHAJjHTI0w",
+  "Oppo": "https://cdn.hercules.app/file_MCp4r3Jyw8KP6WtCI1D2DuRD",
+  "Realme": "https://cdn.hercules.app/file_JNqnBiKQWZzvQKqF4gd1mzRR",
+  "Vivo": "https://cdn.hercules.app/file_hvtV8uEVRQisJNhlD61R9kdR",
+  "iQOO": "https://cdn.hercules.app/file_xcVXF74gr4T2yPKx6ORu7NBz",
+  "Xiaomi": "https://cdn.hercules.app/file_0lIeCdPQqf7QAo7N6nysd5X5",
+  "Lava": "https://cdn.hercules.app/file_s9hzIBK6UB038BycBaNvFk6K",
+  "Infinix": "https://cdn.hercules.app/file_Pjj5THd5TS0SHK2RAhDceiD4",
+  "Asus": "https://cdn.hercules.app/file_3gojHhsqgDme3d6XcYPI927X",
+  "HMD": "https://cdn.hercules.app/file_IoeAItMLvooxgFhpKthzUhZD",
+};
+
+export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: DeviceSelectorDialogProps) {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<1 | 2 | 3>(initialDeviceType ? 2 : 1);
+  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(initialDeviceType || null);
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Get device models based on type
+  const deviceModels = useMemo(() => {
+    if (!selectedDeviceType) return {};
+    
+    switch (selectedDeviceType) {
+      case "phone": return phoneModels;
+      case "camera": return cameraModels;
+      case "lens": return lensModels;
+      case "tablet": return tabletModels;
+      case "macmini": return macMiniModels;
+      case "console": return consoleModels;
+      case "drone": return droneModels;
+      case "charger": return chargerModels;
+      default: return {};
+    }
+  }, [selectedDeviceType]);
+
+  // Get brands for selected device type
+  const availableBrands = useMemo(() => {
+    return Object.keys(deviceModels).sort();
+  }, [deviceModels]);
+
+  // Get models for selected brand with search filter
+  const availableModels = useMemo(() => {
+    if (!selectedBrand) return [];
+    const models = deviceModels[selectedBrand] || [];
+    
+    if (!searchQuery) return models;
+    
+    const query = searchQuery.toLowerCase();
+    return models.filter(model => model.toLowerCase().includes(query));
+  }, [selectedBrand, deviceModels, searchQuery]);
+
+  const handleDeviceTypeSelect = (type: DeviceType) => {
+    setSelectedDeviceType(type);
+    setStep(2);
+  };
+
+  const handleBrandSelect = (brand: string) => {
+    setSelectedBrand(brand);
+    setSearchQuery("");
+    setStep(3);
+  };
+
+  const handleModelSelect = (model: string) => {
+    if (!selectedBrand) return;
+    
+    // Navigate to products page with brand, model, and showFinish params
+    navigate(`/products?brand=${encodeURIComponent(selectedBrand)}&model=${encodeURIComponent(model)}&showFinish=true`);
+    onOpenChange(false);
+    
+    // Reset state
+    setStep(1);
+    setSelectedDeviceType(null);
+    setSelectedBrand(null);
+    setSearchQuery("");
+  };
+
+  const handleBack = () => {
+    if (step === 3) {
+      setStep(2);
+      setSelectedBrand(null);
+      setSearchQuery("");
+    } else if (step === 2) {
+      setStep(1);
+      setSelectedDeviceType(null);
+    }
+  };
+
+  const handleClose = () => {
+    onOpenChange(false);
+    // Reset after animation
+    setTimeout(() => {
+      setStep(1);
+      setSelectedDeviceType(null);
+      setSelectedBrand(null);
+      setSearchQuery("");
+    }, 200);
+  };
+
+  const getDeviceTypeLabel = (type: DeviceType): string => {
+    switch (type) {
+      case "phone": return "Phone";
+      case "camera": return "Camera";
+      case "lens": return "Lens";
+      case "tablet": return "Tablet";
+      case "macmini": return "Mac Mini";
+      case "console": return "Gaming Console";
+      case "drone": return "Drone";
+      case "charger": return "Charger";
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-3xl">
+              {step === 1 && "What Needs a Makeover?"}
+              {step === 2 && `Select Your ${getDeviceTypeLabel(selectedDeviceType!)} Brand`}
+              {step === 3 && `Select Your ${selectedBrand} Model`}
+            </DialogTitle>
+            <button
+              onClick={handleClose}
+              className="rounded-full p-2 hover:bg-muted transition-colors"
+            >
+              <XIcon className="size-5" />
+            </button>
+          </div>
+          <p className="text-muted-foreground">
+            {step === 1 && "Choose your device type to continue"}
+            {step === 2 && "Choose your device brand to continue"}
+            {step === 3 && "Choose your phone model to see compatible skins"}
+          </p>
+        </DialogHeader>
+
+        <div className="py-6">
+          {/* Step 1: Device Type Selection */}
+          {step === 1 && (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => handleDeviceTypeSelect("phone")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  📱
+                </div>
+                <span className="font-semibold">Phones</span>
+              </button>
+              
+              <button
+                onClick={() => handleDeviceTypeSelect("camera")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  📷
+                </div>
+                <span className="font-semibold">Camera</span>
+              </button>
+
+              <button
+                onClick={() => handleDeviceTypeSelect("lens")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  🔍
+                </div>
+                <span className="font-semibold">Lenses</span>
+              </button>
+
+              <button
+                onClick={() => handleDeviceTypeSelect("tablet")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  📱
+                </div>
+                <span className="font-semibold">iPad/Tablet</span>
+              </button>
+
+              <button
+                onClick={() => handleDeviceTypeSelect("macmini")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  💻
+                </div>
+                <span className="font-semibold">Mac Mini</span>
+              </button>
+
+              <button
+                onClick={() => handleDeviceTypeSelect("drone")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  🚁
+                </div>
+                <span className="font-semibold">Drones</span>
+              </button>
+
+              <button
+                onClick={() => handleDeviceTypeSelect("charger")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  🔌
+                </div>
+                <span className="font-semibold">Chargers</span>
+              </button>
+
+              <button
+                onClick={() => handleDeviceTypeSelect("console")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  🎮
+                </div>
+                <span className="font-semibold">Gaming Console</span>
+              </button>
+            </div>
+          )}
+
+          {/* Step 2: Brand Selection */}
+          {step === 2 && (
+            <div>
+              <Button variant="ghost" onClick={handleBack} className="mb-4">
+                ← Back
+              </Button>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {availableBrands.map(brand => (
+                  <button
+                    key={brand}
+                    onClick={() => handleBrandSelect(brand)}
+                    className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+                  >
+                    {brandLogos[brand] ? (
+                      <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
+                        <img 
+                          src={brandLogos[brand]} 
+                          alt={brand}
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
+                        {brand[0]}
+                      </div>
+                    )}
+                    <span className="font-semibold text-center">{brand}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Model Selection */}
+          {step === 3 && (
+            <div>
+              <Button variant="ghost" onClick={handleBack} className="mb-4">
+                ← Back
+              </Button>
+              
+              {/* Search Input */}
+              <div className="relative mb-6">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search models..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Model List */}
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {availableModels.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    No models found
+                  </p>
+                ) : (
+                  availableModels.map((model, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleModelSelect(model)}
+                      className="w-full flex items-center justify-between p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-muted/50 transition-all text-left"
+                    >
+                      <span className="font-medium">{model}</span>
+                      <span className="text-primary">Select →</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

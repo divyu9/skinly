@@ -10,7 +10,6 @@ import {
   ChevronRightIcon,
   LaptopIcon,
   SmartphoneIcon,
-  MonitorIcon,
   PlaneIcon,
   CameraIcon,
   CircleDotIcon,
@@ -35,6 +34,7 @@ import {
   chargerModels,
   droneModels
 } from "@/lib/device-models.ts";
+import { DeviceSelectorDialog } from "./_components/device-selector-dialog.tsx";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
@@ -76,7 +76,8 @@ export default function Index() {
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogDeviceType, setDialogDeviceType] = useState<DeviceType | undefined>(undefined);
   
   // Ref for scrolling to device selector
   const deviceSelectorRef = useRef<HTMLElement>(null);
@@ -115,25 +116,11 @@ export default function Index() {
     return [magneto, autoapply, magsafe].filter(Boolean) as ConvexProduct[];
   }, [products]);
 
-  // Device types with icons
-  const deviceTypes = [
-    { type: "phone" as DeviceType, icon: SmartphoneIcon, label: "Phones", models: phoneModels },
-    { type: "camera" as DeviceType, icon: CameraIcon, label: "Cameras", models: cameraModels },
-    { type: "lens" as DeviceType, icon: CircleDotIcon, label: "Lenses", models: lensModels },
-    { type: "tablet" as DeviceType, icon: TabletSmartphoneIcon, label: "Tablets", models: tabletModels },
-    { type: "macmini" as DeviceType, icon: LaptopIcon, label: "Mac Mini", models: macMiniModels },
-    { type: "console" as DeviceType, icon: GamepadIcon, label: "Gaming Consoles", models: consoleModels },
-    { type: "drone" as DeviceType, icon: PlaneIcon, label: "Drones", models: droneModels },
-    { type: "charger" as DeviceType, icon: BatteryChargingIcon, label: "Chargers", models: chargerModels }
-  ];
-
-  // Get brands for selected device type
-  const selectedDeviceBrands = useMemo(() => {
-    if (!selectedDeviceType) return [];
-    const deviceInfo = deviceTypes.find(d => d.type === selectedDeviceType);
-    if (!deviceInfo) return [];
-    return Object.keys(deviceInfo.models).sort();
-  }, [selectedDeviceType]);
+  // Function to open dialog with specific device type
+  const openDialogForDevice = (deviceType: DeviceType) => {
+    setDialogDeviceType(deviceType);
+    setDialogOpen(true);
+  };
 
   // Enhanced search results - searches devices, products, and SKUs
   const searchResults = useMemo(() => {
@@ -517,51 +504,105 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Device & Brand Selector */}
+      {/* Device Selector - What Needs a Makeover */}
       <section ref={deviceSelectorRef} className="py-16 px-4 bg-muted/20">
         <div className="container mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-black mb-4">Select Your Device</h2>
-            <p className="text-xl text-muted-foreground">Choose your gadget type and brand</p>
+            <h2 className="text-4xl font-black mb-4">What Needs a Makeover?</h2>
+            <p className="text-xl text-muted-foreground">We've got skins for all your tech</p>
           </div>
 
-          {/* Device Type Selector */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
-            {deviceTypes.map(({ type, icon: Icon, label }) => (
-              <button
-                key={type}
-                onClick={() => setSelectedDeviceType(type)}
-                className={`p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3 hover:shadow-lg ${
-                  selectedDeviceType === type
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:border-primary/50'
-                }`}
-              >
-                <Icon className={`size-8 ${selectedDeviceType === type ? 'text-primary' : 'text-muted-foreground'}`} />
-                <span className="text-sm font-medium text-center">{label}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Brand Selector */}
-          {selectedDeviceType && selectedDeviceBrands.length > 0 && (
-            <div className="mt-8">
-              <h3 className="text-2xl font-bold mb-6 text-center">Choose Your Brand</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {selectedDeviceBrands.map(brand => (
-                  <Link
-                    key={brand}
-                    to={`/products?brand=${encodeURIComponent(brand)}`}
-                    className="p-6 rounded-lg border-2 border-border hover:border-primary hover:shadow-lg transition-all text-center font-semibold"
-                  >
-                    {brand}
-                  </Link>
-                ))}
+          {/* Gadget Type Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-5xl mx-auto">
+            <button
+              onClick={() => openDialogForDevice("phone")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <SmartphoneIcon className="size-8 text-primary" />
               </div>
-            </div>
-          )}
+              <span className="font-semibold">Phones</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("tablet")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <TabletSmartphoneIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">iPad/Tablet</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("macmini")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <LaptopIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">Mac Mini</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("drone")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <PlaneIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">Drones</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("camera")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <CameraIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">Camera</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("lens")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <CircleDotIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">Lenses</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("charger")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <BatteryChargingIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">Chargers</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("console")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <GamepadIcon className="size-8 text-primary" />
+              </div>
+              <span className="font-semibold">Gaming Console</span>
+            </button>
+          </div>
         </div>
       </section>
+      
+      {/* Device Selector Dialog */}
+      <DeviceSelectorDialog 
+        open={dialogOpen} 
+        onOpenChange={setDialogOpen}
+        initialDeviceType={dialogDeviceType}
+      />
 
       {/* Product Categories - Horizontal Layout */}
       <section id="products" className="py-20 px-4">
