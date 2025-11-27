@@ -17,7 +17,7 @@ export function DefaultProviders({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               <ThemeProvider
                 attribute="class"
-                defaultTheme="system"
+                defaultTheme="light"
                 enableSystem
               >
                 <Toaster />

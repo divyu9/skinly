@@ -436,22 +436,23 @@ export default function ProductsPage() {
             </div>
 
             {/* Finish Selection */}
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl"
                 onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=matte`}
               >
-                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   CLASSIC
                 </div>
-                <CardContent className="pt-8 space-y-6 text-center">
-                  <div className="text-6xl mb-4">🎨</div>
-                  <h3 className="text-2xl font-bold">Matte Finish</h3>
-                  <p className="text-muted-foreground">
+                <CardContent className="pt-4 sm:pt-6 md:pt-8 space-y-2 sm:space-y-4 md:space-y-6 text-center px-2 sm:px-4 md:px-6">
+                  <div className="text-3xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 md:mb-4">🎨</div>
+                  <h3 className="text-xs sm:text-lg md:text-2xl font-bold leading-tight">Matte Finish</h3>
+                  <p className="text-muted-foreground text-[9px] sm:text-sm md:text-base leading-tight hidden sm:block">
                     Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
                   </p>
-                  <Button className="w-full" variant="outline">
-                    Choose Matte
+                  <Button className="w-full text-[9px] sm:text-sm h-6 sm:h-9 md:h-10" variant="outline">
+                    <span className="hidden sm:inline">Choose Matte</span>
+                    <span className="sm:hidden">Matte</span>
                   </Button>
                 </CardContent>
               </Card>
@@ -460,17 +461,18 @@ export default function ProductsPage() {
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl"
                 onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=embossed`}
               >
-                <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   PREMIUM
                 </div>
-                <CardContent className="pt-8 space-y-6 text-center">
-                  <div className="text-6xl mb-4">✨</div>
-                  <h3 className="text-2xl font-bold">3D Embossed Finish</h3>
-                  <p className="text-muted-foreground">
+                <CardContent className="pt-4 sm:pt-6 md:pt-8 space-y-2 sm:space-y-4 md:space-y-6 text-center px-2 sm:px-4 md:px-6">
+                  <div className="text-3xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 md:mb-4">✨</div>
+                  <h3 className="text-xs sm:text-lg md:text-2xl font-bold leading-tight">3D Embossed</h3>
+                  <p className="text-muted-foreground text-[9px] sm:text-sm md:text-base leading-tight hidden sm:block">
                     Raised textures you can feel. Touch meets art in the most satisfying way.
                   </p>
-                  <Button className="w-full" variant="outline">
-                    Choose 3D Embossed
+                  <Button className="w-full text-[9px] sm:text-sm h-6 sm:h-9 md:h-10" variant="outline">
+                    <span className="hidden sm:inline">Choose 3D Embossed</span>
+                    <span className="sm:hidden">3D</span>
                   </Button>
                 </CardContent>
               </Card>
@@ -479,17 +481,18 @@ export default function ProductsPage() {
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl"
                 onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=transparent`}
               >
-                <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   SLEEK
                 </div>
-                <CardContent className="pt-8 space-y-6 text-center">
-                  <div className="text-6xl mb-4">💎</div>
-                  <h3 className="text-2xl font-bold">Transparent Finish</h3>
-                  <p className="text-muted-foreground">
+                <CardContent className="pt-4 sm:pt-6 md:pt-8 space-y-2 sm:space-y-4 md:space-y-6 text-center px-2 sm:px-4 md:px-6">
+                  <div className="text-3xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 md:mb-4">💎</div>
+                  <h3 className="text-xs sm:text-lg md:text-2xl font-bold leading-tight">Transparent</h3>
+                  <p className="text-muted-foreground text-[9px] sm:text-sm md:text-base leading-tight hidden sm:block">
                     Show off your phone's original color with our crystal-clear protective layer.
                   </p>
-                  <Button className="w-full" variant="outline">
-                    Choose Transparent
+                  <Button className="w-full text-[9px] sm:text-sm h-6 sm:h-9 md:h-10" variant="outline">
+                    <span className="hidden sm:inline">Choose Transparent</span>
+                    <span className="sm:hidden">Clear</span>
                   </Button>
                 </CardContent>
               </Card>
