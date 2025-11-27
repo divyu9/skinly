@@ -155,3 +155,50 @@ export const createPhoneCollectionsAndAssign = internalAction({
     }
   },
 });
+
+// Public action to trigger the migration
+export const runPhoneCollectionsMigration = action({
+  args: {},
+  handler: async (ctx): Promise<{ collectionsCreated: number; productsAssigned: number; errors: string[] }> => {
+    return await ctx.runAction(internal.phoneCollections.createPhoneCollectionsAndAssign, {});
+  },
+});
+
+// Get all phone collections
+export const getPhoneCollections = query({
+  args: {},
+  handler: async (ctx) => {
+    const collections = await ctx.db
+      .query("collections")
+      .filter((q) => q.eq(q.field("category"), "phone"))
+      .collect();
+    return collections;
+  },
+});
+
+// Get collection with product count
+export const getPhoneCollectionsWithCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const collections = await ctx.db
+      .query("collections")
+      .filter((q) => q.eq(q.field("category"), "phone"))
+      .collect();
+    
+    const collectionsWithCounts = await Promise.all(
+      collections.map(async (collection) => {
+        const productLinks = await ctx.db
+          .query("collectionProducts")
+          .withIndex("by_collection", (q) => q.eq("collectionId", collection._id))
+          .collect();
+        
+        return {
+          ...collection,
+          productCount: productLinks.length,
+        };
+      })
+    );
+    
+    return collectionsWithCounts;
+  },
+});
