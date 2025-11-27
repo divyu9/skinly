@@ -68,76 +68,85 @@ export default function ProductConfirmPage() {
           <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 lg:gap-8">
             {/* Matte Finish */}
             <Card 
-              className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
+              className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all duration-300 hover:shadow-xl"
               onClick={() => handleFinishSelect('matte')}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-50 to-cyan-50 dark:from-pink-950/20 dark:to-cyan-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="absolute top-4 right-4 bg-primary text-primary-foreground px-4 py-1.5 text-xs font-bold rounded-full shadow-lg">
-                CLASSIC
-              </div>
-              <CardContent className="relative pt-12 pb-8 space-y-6 text-center">
-                <div className="size-28 mx-auto bg-gradient-to-br from-pink-100 to-cyan-100 dark:from-pink-900/30 dark:to-cyan-900/30 rounded-3xl flex items-center justify-center text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  🎨
+              <CardContent className="p-0">
+                {/* Image */}
+                <div className="relative aspect-square w-full overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1657935937312-1ad849214aea?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400"
+                    alt="Matte Finish Texture"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute top-2 right-2 bg-primary text-primary-foreground px-2 py-1 text-[8px] sm:text-xs font-bold rounded-full">
+                    CLASSIC
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <h3 className="text-3xl font-bold">Matte Finish</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
+                
+                {/* Content */}
+                <div className="p-2 sm:p-3 md:p-4 lg:p-6 space-y-1 sm:space-y-2 md:space-y-3 text-center">
+                  <h3 className="text-sm sm:text-lg md:text-2xl lg:text-3xl font-bold leading-tight">Matte</h3>
+                  <p className="text-[8px] sm:text-xs md:text-sm text-muted-foreground leading-snug hidden sm:block">
+                    Smooth & velvety
                   </p>
                 </div>
-                <Button className="w-full h-12 text-base font-semibold" size="lg">
-                  Choose Matte →
-                </Button>
               </CardContent>
             </Card>
 
             {/* 3D Embossed Finish */}
             <Card 
-              className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
+              className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all duration-300 hover:shadow-xl"
               onClick={() => handleFinishSelect('embossed')}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-50 to-orange-50 dark:from-purple-950/20 dark:to-orange-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="absolute top-4 right-4 bg-secondary text-secondary-foreground px-4 py-1.5 text-xs font-bold rounded-full shadow-lg">
-                PREMIUM
-              </div>
-              <CardContent className="relative pt-12 pb-8 space-y-6 text-center">
-                <div className="size-28 mx-auto bg-gradient-to-br from-purple-100 to-orange-100 dark:from-purple-900/30 dark:to-orange-900/30 rounded-3xl flex items-center justify-center text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  ✨
+              <CardContent className="p-0">
+                {/* Image */}
+                <div className="relative aspect-square w-full overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1567642704760-475ed58df1e1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400"
+                    alt="3D Embossed Texture"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute top-2 right-2 bg-secondary text-secondary-foreground px-2 py-1 text-[8px] sm:text-xs font-bold rounded-full">
+                    PREMIUM
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <h3 className="text-3xl font-bold">3D Embossed</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Raised textures you can feel. Touch meets art in the most satisfying way.
+                
+                {/* Content */}
+                <div className="p-2 sm:p-3 md:p-4 lg:p-6 space-y-1 sm:space-y-2 md:space-y-3 text-center">
+                  <h3 className="text-sm sm:text-lg md:text-2xl lg:text-3xl font-bold leading-tight">3D Embossed</h3>
+                  <p className="text-[8px] sm:text-xs md:text-sm text-muted-foreground leading-snug hidden sm:block">
+                    Raised & tactile
                   </p>
                 </div>
-                <Button className="w-full h-12 text-base font-semibold" size="lg" variant="secondary">
-                  Choose 3D Embossed →
-                </Button>
               </CardContent>
             </Card>
 
             {/* Transparent Finish */}
             <Card 
-              className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
+              className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all duration-300 hover:shadow-xl"
               onClick={() => handleFinishSelect('transparent')}
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-teal-50 dark:from-blue-950/20 dark:to-teal-950/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="absolute top-4 right-4 bg-accent text-accent-foreground px-4 py-1.5 text-xs font-bold rounded-full shadow-lg">
-                SLEEK
-              </div>
-              <CardContent className="relative pt-12 pb-8 space-y-6 text-center">
-                <div className="size-28 mx-auto bg-gradient-to-br from-blue-100 to-teal-100 dark:from-blue-900/30 dark:to-teal-900/30 rounded-3xl flex items-center justify-center text-6xl mb-4 group-hover:scale-110 transition-transform duration-300">
-                  💎
+              <CardContent className="p-0">
+                {/* Image */}
+                <div className="relative aspect-square w-full overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1753522222838-3dd35017ea15?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=400"
+                    alt="Transparent Crystal"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute top-2 right-2 bg-accent text-accent-foreground px-2 py-1 text-[8px] sm:text-xs font-bold rounded-full">
+                    SLEEK
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  <h3 className="text-3xl font-bold">Transparent</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    Show off your phone's original color with our crystal-clear protective layer.
+                
+                {/* Content */}
+                <div className="p-2 sm:p-3 md:p-4 lg:p-6 space-y-1 sm:space-y-2 md:space-y-3 text-center">
+                  <h3 className="text-sm sm:text-lg md:text-2xl lg:text-3xl font-bold leading-tight">Transparent</h3>
+                  <p className="text-[8px] sm:text-xs md:text-sm text-muted-foreground leading-snug hidden sm:block">
+                    Crystal clear
                   </p>
                 </div>
-                <Button className="w-full h-12 text-base font-semibold" size="lg" variant="outline">
-                  Choose Transparent →
-                </Button>
               </CardContent>
             </Card>
           </div>
