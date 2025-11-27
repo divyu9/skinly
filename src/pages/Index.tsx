@@ -144,7 +144,7 @@ export default function Index() {
   // Handle phone model selection
   const handlePhoneModelSelect = (model: string) => {
     if (!selectedPhoneBrand) return;
-    navigate(`/products?brand=${encodeURIComponent(selectedPhoneBrand)}&model=${encodeURIComponent(model)}`);
+    navigate(`/products/confirm?brand=${encodeURIComponent(selectedPhoneBrand)}&model=${encodeURIComponent(model)}`);
   };
 
   // Product category filters - reduced to 3 per category for horizontal layout
@@ -476,7 +476,10 @@ export default function Index() {
                                       {devices.map((device, idx) => (
                                         <Link
                                           key={idx}
-                                          to={`/products?model=${encodeURIComponent(device.model)}`}
+                                          to={device.category === "Phones" 
+                                            ? `/products/confirm?brand=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}`
+                                            : `/products?brand=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}&showFinish=true`
+                                          }
                                           className="block p-2 hover:bg-muted rounded-md text-sm"
                                           onClick={() => setShowSearchResults(false)}
                                         >
