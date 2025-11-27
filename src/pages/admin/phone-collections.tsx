@@ -148,36 +148,39 @@ export default function PhoneCollections() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {collections.map((collection) => (
-                    <Card key={collection._id}>
-                      <CardContent className="pt-6">
-                        <div className="space-y-2">
-                          <h3 className="font-semibold">{collection.name}</h3>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Products:</span>
-                            <Badge variant="secondary">{collection.productCount}</Badge>
-                          </div>
-                          {collection.keywords && collection.keywords.length > 0 && (
-                            <div className="pt-2">
-                              <p className="text-xs text-muted-foreground mb-1">Keywords:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {collection.keywords.slice(0, 5).map((keyword) => (
-                                  <Badge key={keyword} variant="outline" className="text-xs">
-                                    {keyword}
-                                  </Badge>
-                                ))}
-                                {collection.keywords.length > 5 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{collection.keywords.length - 5} more
-                                  </Badge>
-                                )}
-                              </div>
+                  {collections.map((collection) => {
+                    const keywords = collection.keywords || [];
+                    return (
+                      <Card key={collection._id}>
+                        <CardContent className="pt-6">
+                          <div className="space-y-2">
+                            <h3 className="font-semibold">{collection.name}</h3>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Products:</span>
+                              <Badge variant="secondary">{collection.productCount}</Badge>
                             </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                            {keywords.length > 0 && (
+                              <div className="pt-2">
+                                <p className="text-xs text-muted-foreground mb-1">Keywords:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {keywords.slice(0, 5).map((keyword, idx) => (
+                                    <Badge key={`${keyword}-${idx}`} variant="outline" className="text-xs">
+                                      {keyword}
+                                    </Badge>
+                                  ))}
+                                  {keywords.length > 5 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{keywords.length - 5} more
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
