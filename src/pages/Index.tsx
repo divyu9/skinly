@@ -56,6 +56,7 @@ export default function Index() {
   const products = paginatedProducts || [];
   const isLoadingProducts = !paginatedProducts;
   
+  
   // Fetch latest supported models for marquee
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
   
