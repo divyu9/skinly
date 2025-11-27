@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
-import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon, FolderIcon, ExternalLinkIcon } from "lucide-react";
+import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon, FolderIcon, ExternalLinkIcon, PlayIcon, PauseIcon, XIcon, RefreshCwIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useConvex } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import type { Id } from "@/convex/_generated/dataModel";
 
 interface FailedFile {
   filename: string;
@@ -29,20 +30,19 @@ export default function MockupsPage() {
   const [importing, setImporting] = useState(false);
   const [fileListData, setFileListData] = useState("");
   const [generatedCsv, setGeneratedCsv] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
-  const [failedFiles, setFailedFiles] = useState<FailedFile[]>([]);
   const [verifying, setVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     total: number;
     broken: number;
     brokenMockups: BrokenMockup[];
   } | null>(null);
-  const [lastPingTime, setLastPingTime] = useState<string>("");
+  const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
+  const [currentJobId, setCurrentJobId] = useState<Id<"uploadJobs"> | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<unknown>(null);
-  const keepAliveIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pingFailureCountRef = useRef<number>(0);
+  const uploadAbortRef = useRef<boolean>(false);
   
   const convex = useConvex();
   const mockupsCount = useQuery(api.mockups.getMockupsCount);
@@ -50,6 +50,18 @@ export default function MockupsPage() {
   const bulkImport = useMutation(api.mockups.bulkImportMockups);
   const clearAll = useMutation(api.mockups.clearAllMockups);
   const storeMockupFile = useMutation(api.mockupsUpload.storeMockupFile);
+  
+  // Upload job queries and mutations
+  const activeJobs = useQuery(api.uploadJobs.getActiveUploadJobs);
+  const allJobs = useQuery(api.uploadJobs.getAllUploadJobs);
+  const createJob = useMutation(api.uploadJobs.createUploadJob);
+  const updateJobStatus = useMutation(api.uploadJobs.updateJobStatus);
+  const updateJobProgress = useMutation(api.uploadJobs.updateJobProgress);
+  const addFailedFile = useMutation(api.uploadJobs.addFailedFile);
+  const pauseJob = useMutation(api.uploadJobs.pauseUploadJob);
+  const resumeJob = useMutation(api.uploadJobs.resumeUploadJob);
+  const cancelJob = useMutation(api.uploadJobs.cancelUploadJob);
+  const deleteJob = useMutation(api.uploadJobs.deleteUploadJob);
   
   /**
    * Request wake lock to prevent browser/device from sleeping during upload
@@ -69,7 +81,6 @@ export default function MockupsPage() {
       }
     } catch (error) {
       console.warn('Wake lock not supported or failed:', error);
-      // Not critical, continue without wake lock
     }
   };
   
@@ -88,62 +99,6 @@ export default function MockupsPage() {
       }
     } catch (error) {
       console.warn('Failed to release wake lock:', error);
-    }
-  };
-  
-  /**
-   * Start keep-alive pings to prevent dev machine from sleeping
-   * Makes a lightweight mutation every 5 seconds during upload
-   */
-  const startKeepAlive = () => {
-    // Send first ping immediately
-    sendKeepAlivePing();
-    
-    // Then send every 5 seconds (very aggressive)
-    keepAliveIntervalRef.current = setInterval(async () => {
-      await sendKeepAlivePing();
-    }, 5000); // Every 5 seconds
-  };
-  
-  /**
-   * Send a single keep-alive ping
-   */
-  const sendKeepAlivePing = async () => {
-    try {
-      // Make a lightweight mutation to keep connection alive
-      // Using mutation instead of query is more effective for keeping dev machine awake
-      await convex.mutation(api.mockups.keepAlivePing, {});
-      
-      const now = new Date().toLocaleTimeString();
-      setLastPingTime(now);
-      console.log('✓ Keep-alive ping successful at', now);
-      
-      // Reset failure count on success
-      pingFailureCountRef.current = 0;
-    } catch (error) {
-      console.error('✗ Keep-alive ping failed:', error);
-      pingFailureCountRef.current += 1;
-      
-      // Warn user if multiple consecutive failures
-      if (pingFailureCountRef.current >= 3) {
-        toast.error("Connection unstable - upload may fail", {
-          description: "Keep-alive pings are failing. Consider saving your progress.",
-          duration: 5000,
-        });
-      }
-    }
-  };
-  
-  /**
-   * Stop keep-alive pings
-   */
-  const stopKeepAlive = () => {
-    if (keepAliveIntervalRef.current) {
-      clearInterval(keepAliveIntervalRef.current);
-      keepAliveIntervalRef.current = null;
-      pingFailureCountRef.current = 0;
-      setLastPingTime("");
-      console.log('Keep-alive stopped');
     }
   };
   
@@ -324,20 +279,17 @@ export default function MockupsPage() {
   };
 
   /**
-   * Process file upload (extracted from handleBulkUpload for reuse)
+   * Process file upload with job tracking (batched)
    */
-  const processFilesUpload = async (files: File[] | FileList) => {
+  const processFilesUpload = async (files: File[] | FileList, resumeFromBatch?: number) => {
     const fileArray = Array.from(files);
-    
-    setUploading(true);
-    setUploadProgress({ current: 0, total: fileArray.length });
-    setFailedFiles([]); // Reset failed files
+    const BATCH_SIZE = 50;
     
     // Check which files already exist in the database
-    toast.info("Checking which files are already uploaded...", { duration: 2000 });
+    toast.info("Checking for duplicate files...", { duration: 2000 });
     
     let filesToUpload = fileArray;
-    let alreadyUploaded = 0;
+    let alreadySkipped = 0;
     
     try {
       const filenames = fileArray.map(f => f.name);
@@ -348,154 +300,169 @@ export default function MockupsPage() {
       // Filter to only upload missing files
       const missingSet = new Set(checkResult.missingFilenames);
       filesToUpload = fileArray.filter(file => missingSet.has(file.name));
-      alreadyUploaded = checkResult.existing;
+      alreadySkipped = checkResult.existing;
       
-      if (alreadyUploaded > 0) {
+      if (alreadySkipped > 0) {
         toast.success(
-          `${alreadyUploaded} files already uploaded! Uploading ${filesToUpload.length} remaining files.`,
+          `${alreadySkipped} files already uploaded! Processing ${filesToUpload.length} remaining files.`,
           { duration: 5000 }
         );
       }
       
       if (filesToUpload.length === 0) {
         toast.info("All files have already been uploaded!");
-        setUploading(false);
         return;
       }
     } catch (error) {
       console.error("Failed to check existing mockups:", error);
       toast.warning("Could not check for existing files. Uploading all files...");
-      // Continue with all files if check fails
     }
     
-    // Update progress to show only files that will be uploaded
-    setUploadProgress({ current: 0, total: filesToUpload.length });
-    
-    // Acquire wake lock and start keep-alive to prevent dev machine from sleeping
-    await requestWakeLock();
-    startKeepAlive();
-    
-    toast.info("Keep-alive activated - device will stay awake during upload", {
-      duration: 3000,
+    // Create upload job
+    const jobId = await createJob({
+      jobName: `Upload ${filesToUpload.length} files`,
+      totalFiles: filesToUpload.length,
     });
     
-    let imported = 0;
-    let updated = 0;
-    let skipped = 0;
-    let failed = 0;
-    const failedList: FailedFile[] = [];
+    setCurrentJobId(jobId);
+    uploadAbortRef.current = false;
+    
+    // Acquire wake lock
+    await requestWakeLock();
+    
+    // Update job to running
+    await updateJobStatus({ jobId, status: "running" });
+    
+    const startBatch = resumeFromBatch || 0;
+    let filesUploaded = 0;
+    let filesFailed = 0;
     
     try {
-      const BATCH_SIZE = 50; // Process in batches to prevent timeouts
-      
-      for (let i = 0; i < filesToUpload.length; i++) {
-        const file = filesToUpload[i];
-        setUploadProgress({ current: i + 1, total: filesToUpload.length });
-        
-        // Add small delay every BATCH_SIZE files to prevent overwhelming the system
-        if (i > 0 && i % BATCH_SIZE === 0) {
-          console.log(`Processed ${i} files, taking brief pause...`);
-          await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second pause
+      // Process files in batches
+      for (let batchNum = startBatch; batchNum < Math.ceil(filesToUpload.length / BATCH_SIZE); batchNum++) {
+        // Check if upload was paused or cancelled
+        if (uploadAbortRef.current) {
+          await updateJobStatus({ 
+            jobId, 
+            status: isPaused ? "paused" : "cancelled" 
+          });
+          break;
         }
         
-        try {
-          // Validate filename format - allow Brand_Model_SKU.jpg or Model_SKU.jpg (for iPhone/iPad auto-detection)
-          const filename = file.name;
+        const startIdx = batchNum * BATCH_SIZE;
+        const endIdx = Math.min(startIdx + BATCH_SIZE, filesToUpload.length);
+        const batch = filesToUpload.slice(startIdx, endIdx);
+        
+        console.log(`Processing batch ${batchNum + 1}/${Math.ceil(filesToUpload.length / BATCH_SIZE)}: ${batch.length} files`);
+        
+        // Process each file in the batch
+        for (let i = 0; i < batch.length; i++) {
+          // Check pause/cancel again
+          if (uploadAbortRef.current) {
+            break;
+          }
           
-          // Check for valid image extension
-          const hasValidExtension = /\.(jpg|jpeg|png|webp)$/i.test(filename);
-          if (!hasValidExtension) {
-            console.warn(`Skipping invalid extension: ${filename}`);
-            failedList.push({
+          const file = batch[i];
+          const fileIndex = startIdx + i;
+          
+          try {
+            // Update current file
+            await updateJobProgress({
+              jobId,
+              currentFile: file.name,
+              currentBatch: batchNum,
+              filesChecked: fileIndex + 1,
+            });
+            
+            // Validate filename
+            const filename = file.name;
+            const hasValidExtension = /\.(jpg|jpeg|png|webp)$/i.test(filename);
+            if (!hasValidExtension) {
+              await addFailedFile({
+                jobId,
+                filename,
+                reason: "Invalid file extension. Expected: .jpg, .jpeg, .png, or .webp"
+              });
+              filesFailed++;
+              continue;
+            }
+            
+            const nameWithoutExt = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+            const hasMinimumParts = nameWithoutExt.split('_').length >= 2;
+            if (!hasMinimumParts) {
+              await addFailedFile({
+                jobId,
+                filename,
+                reason: "Invalid filename format. Expected at least: Model_SKU.jpg"
+              });
+              filesFailed++;
+              continue;
+            }
+            
+            // Upload to storage
+            const uploadUrl = await convex.mutation(api.mockups.generateUploadUrl, {});
+            const uploadResult = await fetch(uploadUrl, {
+              method: "POST",
+              headers: { "Content-Type": file.type },
+              body: file,
+            });
+            
+            if (!uploadResult.ok) {
+              throw new Error(`Upload failed with status ${uploadResult.status}`);
+            }
+            
+            const { storageId } = await uploadResult.json();
+            
+            // Store mockup
+            const result = await storeMockupFile({
+              fileId: storageId,
               filename,
-              reason: "Invalid file extension. Expected: .jpg, .jpeg, .png, or .webp"
             });
-            failed++;
-            continue;
-          }
-          
-          // Check for minimum underscore-separated parts (at least Model_SKU)
-          const nameWithoutExt = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
-          const hasMinimumParts = nameWithoutExt.split('_').length >= 2;
-          
-          if (!hasMinimumParts) {
-            console.warn(`Skipping invalid filename: ${filename}`);
-            failedList.push({
-              filename,
-              reason: "Invalid filename format. Expected at least: Model_SKU.jpg (use underscores to separate)"
+            
+            if (result.action === "created" || result.action === "updated") {
+              filesUploaded++;
+              await updateJobProgress({
+                jobId,
+                filesUploaded,
+              });
+            }
+            
+          } catch (error) {
+            console.error(`Failed to upload ${file.name}:`, error);
+            const errorMessage = error instanceof Error ? error.message : "Upload or processing error";
+            
+            await addFailedFile({
+              jobId,
+              filename: file.name,
+              reason: errorMessage
             });
-            failed++;
-            continue;
+            filesFailed++;
           }
-          
-          // Upload to storage
-          const uploadUrl = await convex.mutation(api.mockups.generateUploadUrl, {});
-          
-          const uploadResult = await fetch(uploadUrl, {
-            method: "POST",
-            headers: { "Content-Type": file.type },
-            body: file,
-          });
-          
-          if (!uploadResult.ok) {
-            throw new Error(`Upload failed with status ${uploadResult.status}`);
-          }
-          
-          const { storageId } = await uploadResult.json();
-          
-          // Store mockup with filename
-          const result = await storeMockupFile({
-            fileId: storageId,
-            filename,
-          });
-          
-          if (result.action === "created") imported++;
-          else if (result.action === "updated") updated++;
-          else skipped++;
-          
-        } catch (error) {
-          console.error(`Failed to upload ${file.name}:`, error);
-          
-          // Check for authentication errors
-          const errorMessage = error instanceof Error ? error.message : "Upload or processing error";
-          if (errorMessage.includes('Unauthenticated') || errorMessage.includes('401') || errorMessage.includes('authentication')) {
-            toast.error("Session expired - please refresh and sign in again", {
-              description: "Your upload progress has been saved. Refresh the page to continue.",
-              duration: 10000,
-            });
-            // Stop the upload process
-            throw new Error("Authentication expired");
-          }
-          
-          failedList.push({
-            filename: file.name,
-            reason: errorMessage
-          });
-          failed++;
+        }
+        
+        // Small pause between batches
+        if (batchNum < Math.ceil(filesToUpload.length / BATCH_SIZE) - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
-      setFailedFiles(failedList);
+      // Mark job as complete if not cancelled/paused
+      if (!uploadAbortRef.current) {
+        await updateJobStatus({ jobId, status: "completed" });
+        toast.success(`Upload complete! ${filesUploaded} uploaded, ${filesFailed} failed`);
+      }
       
-      const summary = [
-        alreadyUploaded > 0 ? `${alreadyUploaded} already existed` : null,
-        imported > 0 ? `${imported} new` : null,
-        updated > 0 ? `${updated} updated` : null,
-        skipped > 0 ? `${skipped} skipped` : null,
-        failed > 0 ? `${failed} failed` : null,
-      ].filter(Boolean).join(", ");
-      
-      toast.success(`Upload complete! ${summary}`);
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error("Bulk upload failed");
+      await updateJobStatus({ 
+        jobId, 
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "Unknown error"
+      });
+      toast.error("Upload job failed");
     } finally {
-      // Release wake lock and stop keep-alive
       await releaseWakeLock();
-      stopKeepAlive();
-      
-      setUploading(false);
-      setUploadProgress({ current: 0, total: 0 });
+      setCurrentJobId(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -507,7 +474,81 @@ export default function MockupsPage() {
    */
   const handleBulkUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
+    setPendingFiles(Array.from(files));
     await processFilesUpload(files);
+  };
+
+  /**
+   * Handle pause button
+   */
+  const handlePause = async (jobId: Id<"uploadJobs">) => {
+    setIsPaused(true);
+    uploadAbortRef.current = true;
+    await pauseJob({ jobId });
+    toast.info("Upload paused");
+  };
+
+  /**
+   * Handle resume button
+   */
+  const handleResume = async (jobId: Id<"uploadJobs">) => {
+    const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
+    if (!job) return;
+    
+    setIsPaused(false);
+    uploadAbortRef.current = false;
+    await resumeJob({ jobId });
+    
+    // Resume from the last batch
+    if (pendingFiles.length > 0) {
+      await processFilesUpload(pendingFiles, job.currentBatch);
+    }
+  };
+
+  /**
+   * Handle cancel button
+   */
+  const handleCancel = async (jobId: Id<"uploadJobs">) => {
+    uploadAbortRef.current = true;
+    await cancelJob({ jobId });
+    setCurrentJobId(null);
+    setPendingFiles([]);
+    toast.info("Upload cancelled");
+  };
+
+  /**
+   * Handle retry failed files
+   */
+  const handleRetryFailed = async (jobId: Id<"uploadJobs">) => {
+    const failedFiles = await convex.query(api.uploadJobs.getFailedFilesForRetry, { jobId });
+    
+    if (failedFiles.length === 0) {
+      toast.info("No failed files to retry");
+      return;
+    }
+    
+    toast.info(`Retrying ${failedFiles.length} failed files...`);
+    
+    // Since we can't recreate File objects from filenames, we'll need to ask user to reselect
+    toast.warning("Please reselect the failed files to retry upload", {
+      description: "The system cannot retry files automatically. Please select them again.",
+      duration: 8000,
+    });
+  };
+
+  /**
+   * Toggle job expansion
+   */
+  const toggleJobExpansion = (jobId: string) => {
+    setExpandedJobs(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
   };
   
   const handleParseFileList = () => {
@@ -623,35 +664,7 @@ export default function MockupsPage() {
     }
   };
   
-  const handleDownloadFailedReport = () => {
-    if (failedFiles.length === 0) {
-      toast.error("No failed files to download");
-      return;
-    }
-    
-    // Generate CSV report
-    const csvLines = ['Filename,Reason'];
-    failedFiles.forEach(file => {
-      // Escape commas in filename and reason
-      const escapedFilename = file.filename.includes(',') ? `"${file.filename}"` : file.filename;
-      const escapedReason = file.reason.includes(',') ? `"${file.reason}"` : file.reason;
-      csvLines.push(`${escapedFilename},${escapedReason}`);
-    });
-    
-    const csvContent = csvLines.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mockup-failed-files-${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    toast.success(`Downloaded report with ${failedFiles.length} failed files`);
-  };
-  
+
   const handleVerifyMockups = async () => {
     setVerifying(true);
     try {
@@ -700,12 +713,9 @@ export default function MockupsPage() {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Release wake lock and stop keep-alive if component unmounts
+      // Release wake lock if component unmounts
       if (wakeLockRef.current) {
         releaseWakeLock();
-      }
-      if (keepAliveIntervalRef.current) {
-        stopKeepAlive();
       }
     };
   }, []);
@@ -858,106 +868,237 @@ export default function MockupsPage() {
                 multiple
                 className="hidden"
                 onChange={(e) => handleBulkUpload(e.target.files)}
-                disabled={uploading}
+                disabled={currentJobId !== null}
               />
               
-              {uploading ? (
-                <div className="space-y-3">
-                  <div className="text-lg font-medium">
-                    Uploading {uploadProgress.current} / {uploadProgress.total}
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
-                    <p>Keep-alive active • Device staying awake {lastPingTime && `• Last ping: ${lastPingTime}`}</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <ImageIcon className="h-12 w-12 mx-auto text-green-600 mb-3" />
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button
-                      size="lg"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <UploadIcon className="h-5 w-5 mr-2" />
-                      Select Files
-                    </Button>
-                    <Button
-                      size="lg"
-                      onClick={handleFolderUpload}
-                      variant="secondary"
-                      className="border-2 border-green-600"
-                    >
-                      <FolderIcon className="h-5 w-5 mr-2" />
-                      Select Folder
-                    </Button>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-3">
-                    Supports JPG, PNG, WEBP • Folder selection scans all subfolders
-                  </p>
-                </>
-              )}
+              <ImageIcon className="h-12 w-12 mx-auto text-green-600 mb-3" />
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button
+                  size="lg"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={currentJobId !== null}
+                >
+                  <UploadIcon className="h-5 w-5 mr-2" />
+                  Select Files
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={handleFolderUpload}
+                  variant="secondary"
+                  className="border-2 border-green-600"
+                  disabled={currentJobId !== null}
+                >
+                  <FolderIcon className="h-5 w-5 mr-2" />
+                  Select Folder
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mt-3">
+                Supports JPG, PNG, WEBP • Folder selection scans all subfolders
+              </p>
             </div>
           </CardContent>
         </Card>
         
-        {/* Failed Files Report */}
-        {failedFiles.length > 0 && (
-          <Card className="mb-6 border-red-200 bg-red-50/50">
+        {/* Active Upload Jobs */}
+        {activeJobs && activeJobs.length > 0 && (
+          <Card className="mb-6 border-blue-200 bg-blue-50/50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-700">
-                <AlertCircleIcon className="h-5 w-5" />
-                Failed Files Report ({failedFiles.length})
+              <CardTitle className="flex items-center gap-2 text-blue-700">
+                <UploadIcon className="h-5 w-5" />
+                Active Upload Jobs ({activeJobs.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-white border border-red-200 rounded p-4 text-sm">
-                <p className="font-semibold text-red-800 mb-3">
-                  The following files failed to upload or had naming issues:
-                </p>
-                <div className="max-h-48 overflow-y-auto border border-red-100 rounded">
-                  <table className="w-full text-xs">
-                    <thead className="bg-red-100 sticky top-0">
-                      <tr>
-                        <th className="text-left p-2 font-semibold">Filename</th>
-                        <th className="text-left p-2 font-semibold">Reason</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {failedFiles.map((file, idx) => (
-                        <tr key={idx} className="border-t border-red-100">
-                          <td className="p-2 font-mono">{file.filename}</td>
-                          <td className="p-2 text-muted-foreground">{file.reason}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleDownloadFailedReport}
-                  variant="destructive"
-                  className="flex-1"
-                >
-                  <DownloadIcon className="h-4 w-4 mr-2" />
-                  Download Failed Files Report (CSV)
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setFailedFiles([])}
-                >
-                  Clear
-                </Button>
-              </div>
+              {activeJobs.map((job) => {
+                const progress = job.totalFiles > 0 
+                  ? ((job.filesChecked / job.totalFiles) * 100).toFixed(1)
+                  : 0;
+                const isRunning = job.status === "running";
+                const isPaused = job.status === "paused";
+                
+                return (
+                  <div key={job._id} className="bg-white border border-blue-200 rounded p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold">{job.jobName}</h3>
+                          {isRunning && (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
+                              Running
+                            </span>
+                          )}
+                          {isPaused && (
+                            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">
+                              Paused
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {job.filesChecked} / {job.totalFiles} files checked
+                          {job.currentFile && <span className="ml-2">• Current: {job.currentFile}</span>}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {isRunning && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePause(job._id)}
+                          >
+                            <PauseIcon className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {isPaused && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleResume(job._id)}
+                          >
+                            <PlayIcon className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCancel(job._id)}
+                        >
+                          <XIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div className="text-center">
+                        <div className="font-semibold text-green-600">{job.filesUploaded}</div>
+                        <div className="text-muted-foreground">Uploaded</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-gray-600">{job.filesSkipped}</div>
+                        <div className="text-muted-foreground">Skipped</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-red-600">{job.filesFailed}</div>
+                        <div className="text-muted-foreground">Failed</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-blue-600">{progress}%</div>
+                        <div className="text-muted-foreground">Progress</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Upload Job History */}
+        {allJobs && allJobs.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileTextIcon className="h-5 w-5" />
+                Upload Job History
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {allJobs.slice(0, 10).map((job) => {
+                const isExpanded = expandedJobs.has(job._id);
+                const statusColor = 
+                  job.status === "completed" ? "text-green-600" :
+                  job.status === "failed" ? "text-red-600" :
+                  job.status === "cancelled" ? "text-gray-600" :
+                  "text-blue-600";
+                
+                return (
+                  <div key={job._id} className="border rounded p-3">
+                    <div 
+                      className="flex items-center justify-between cursor-pointer"
+                      onClick={() => toggleJobExpansion(job._id)}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium">{job.jobName}</h4>
+                          <span className={`text-xs font-semibold ${statusColor} capitalize`}>
+                            {job.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(job.startedAt || 0).toLocaleString()} • 
+                          {job.filesUploaded} uploaded, {job.filesFailed} failed
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm">
+                        {isExpanded ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    
+                    {isExpanded && (
+                      <div className="mt-3 pt-3 border-t space-y-3">
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <div className="font-semibold">Total Files</div>
+                            <div className="text-muted-foreground">{job.totalFiles}</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold">Uploaded</div>
+                            <div className="text-green-600">{job.filesUploaded}</div>
+                          </div>
+                          <div>
+                            <div className="font-semibold">Failed</div>
+                            <div className="text-red-600">{job.filesFailed}</div>
+                          </div>
+                        </div>
+                        
+                        {job.failedFiles.length > 0 && (
+                          <div className="bg-red-50 border border-red-200 rounded p-2">
+                            <p className="text-xs font-semibold text-red-800 mb-2">
+                              Failed Files ({job.failedFiles.length})
+                            </p>
+                            <div className="max-h-32 overflow-y-auto space-y-1">
+                              {job.failedFiles.map((file, idx) => (
+                                <div key={idx} className="text-xs">
+                                  <span className="font-mono">{file.filename}</span>
+                                  <span className="text-muted-foreground ml-2">- {file.reason}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex gap-2">
+                          {job.filesFailed > 0 && job.status === "completed" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRetryFailed(job._id)}
+                            >
+                              <RefreshCwIcon className="h-3 w-3 mr-1" />
+                              Retry Failed
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => deleteJob({ jobId: job._id })}
+                          >
+                            <TrashIcon className="h-3 w-3 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         )}

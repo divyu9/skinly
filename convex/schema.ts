@@ -327,4 +327,37 @@ export default defineSchema({
   })
     .index("by_status", ["status"])
     .index("by_started_at", ["startedAt"]),
+
+  uploadJobs: defineTable({
+    jobName: v.string(), // User-friendly name for the job
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("paused"),
+      v.literal("completed"),
+      v.literal("failed"),
+      v.literal("cancelled")
+    ),
+    // Progress tracking
+    totalFiles: v.number(), // Total files to upload
+    filesChecked: v.number(), // Files checked for duplicates
+    filesSkipped: v.number(), // Files already uploaded (duplicates)
+    filesUploaded: v.number(), // Successfully uploaded new files
+    filesFailed: v.number(), // Failed uploads
+    // Current state
+    currentFile: v.optional(v.string()), // Currently processing filename
+    currentBatch: v.number(), // Current batch number (for resume)
+    // Timing
+    startedAt: v.optional(v.number()), // When job started
+    completedAt: v.optional(v.number()), // When job completed
+    lastActivityAt: v.optional(v.number()), // Last activity timestamp
+    // Error tracking
+    errorMessage: v.optional(v.string()),
+    failedFiles: v.array(v.object({
+      filename: v.string(),
+      reason: v.string(),
+    })),
+  })
+    .index("by_status", ["status"])
+    .index("by_started_at", ["startedAt"]),
 });

@@ -38,6 +38,7 @@ import type * as stockNotifications from "../stockNotifications.js";
 import type * as stockNotificationsActions from "../stockNotificationsActions.js";
 import type * as supportedModels from "../supportedModels.js";
 import type * as updateCollectionRules from "../updateCollectionRules.js";
+import type * as uploadJobs from "../uploadJobs.js";
 import type * as users from "../users.js";
 
 import type {
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   stockNotificationsActions: typeof stockNotificationsActions;
   supportedModels: typeof supportedModels;
   updateCollectionRules: typeof updateCollectionRules;
+  uploadJobs: typeof uploadJobs;
   users: typeof users;
 }>;
 
