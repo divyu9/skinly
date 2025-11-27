@@ -14,7 +14,6 @@ function determineGadgetCategory(title: string): GadgetCategory | null {
     titleLower.includes("cover") ||
     titleLower.includes("case") ||
     titleLower.includes("ring") ||
-    titleLower.includes("charger") ||
     titleLower.includes("stand") ||
     titleLower.includes("holder") ||
     titleLower.includes("magsafe") ||
@@ -37,11 +36,13 @@ function determineGadgetCategory(title: string): GadgetCategory | null {
     return "cover";
   }
   
-  // Accessory
-  if (titleLower.includes("ring") || 
+  // Accessory: Only if it contains accessory keywords AND does NOT contain "skin"
+  const hasAccessoryKeyword = titleLower.includes("ring") || 
       titleLower.includes("stand") || 
       titleLower.includes("holder") || 
-      titleLower.includes("charger")) {
+      titleLower.includes("charger");
+  
+  if (hasAccessoryKeyword && !titleLower.includes("skin")) {
     return "accessory";
   }
   
