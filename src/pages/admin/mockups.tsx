@@ -45,7 +45,8 @@ export default function MockupsPage() {
   const pingFailureCountRef = useRef<number>(0);
   
   const convex = useConvex();
-  const mockups = useQuery(api.mockups.getAllMockups);
+  const mockupsCount = useQuery(api.mockups.getMockupsCount);
+  const recentMockups = useQuery(api.mockups.getRecentMockups, { limit: 10 });
   const bulkImport = useMutation(api.mockups.bulkImportMockups);
   const clearAll = useMutation(api.mockups.clearAllMockups);
   const storeMockupFile = useMutation(api.mockupsUpload.storeMockupFile);
@@ -1133,12 +1134,12 @@ Samsung_GalaxyS24_M-174.jpg"
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {mockups === undefined ? (
+              {mockupsCount === undefined ? (
                 <Skeleton className="h-20 w-full" />
               ) : (
                 <>
                   <div className="bg-muted p-4 rounded">
-                    <div className="text-3xl font-bold">{mockups.length.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">{mockupsCount.toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Total mockups in database</div>
                   </div>
                   
@@ -1152,7 +1153,7 @@ Samsung_GalaxyS24_M-174.jpg"
                     </ol>
                   </div>
                   
-                  {mockups.length > 0 && (
+                  {mockupsCount > 0 && (
                     <Button
                       variant="destructive"
                       onClick={handleClearAll}
@@ -1169,7 +1170,7 @@ Samsung_GalaxyS24_M-174.jpg"
         </div>
         
         {/* Verification Card */}
-        {mockups && mockups.length > 0 && (
+        {mockupsCount && mockupsCount > 0 && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1280,7 +1281,7 @@ Samsung_GalaxyS24_M-174.jpg"
         )}
         
         {/* Preview Recent Mockups */}
-        {mockups && mockups.length > 0 && (
+        {recentMockups && recentMockups.length > 0 && (
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Recent Mockups (Last 10)</CardTitle>
@@ -1297,7 +1298,7 @@ Samsung_GalaxyS24_M-174.jpg"
                     </tr>
                   </thead>
                   <tbody>
-                    {mockups.slice(-10).reverse().map((mockup) => (
+                    {recentMockups.map((mockup) => (
                       <tr key={mockup._id} className="border-b">
                         <td className="p-2">{mockup.brand}</td>
                         <td className="p-2">{mockup.model}</td>

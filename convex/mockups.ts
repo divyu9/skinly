@@ -55,6 +55,28 @@ export const getAllMockups = query({
 });
 
 /**
+ * Get mockups count (lightweight - doesn't load all data)
+ */
+export const getMockupsCount = query({
+  args: {},
+  handler: async (ctx) => {
+    const mockups = await ctx.db.query("mockups").collect();
+    return mockups.length;
+  },
+});
+
+/**
+ * Get recent mockups (last N mockups)
+ */
+export const getRecentMockups = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+    return await ctx.db.query("mockups").order("desc").take(limit);
+  },
+});
+
+/**
  * Bulk import mockups from CSV data
  * Expected format: brand,model,sku,fileId
  * Uses space-insensitive matching for model names
