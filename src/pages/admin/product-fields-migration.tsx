@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 export default function ProductFieldsMigration() {
   const [isRunning, setIsRunning] = useState(false);
   const [isRunningQuick, setIsRunningQuick] = useState(false);
+  const [isRunningForce, setIsRunningForce] = useState(false);
   const [results, setResults] = useState<{
     totalProducts: number;
     categoriesAssigned: number;
@@ -26,9 +27,21 @@ export default function ProductFieldsMigration() {
     alreadySet: number;
     message: string;
   } | null>(null);
+  const [forceResults, setForceResults] = useState<{
+    totalProducts: number;
+    categoriesChanged: number;
+    categoriesUnchanged: number;
+    finishesAssigned: number;
+    beforeCounts: Record<string, number>;
+    afterCounts: Record<string, number>;
+    unmatchedProducts: string[];
+    unmatchedCount: number;
+    changedSamples: Array<{title: string; before: string; after: string}>;
+  } | null>(null);
 
   const runMigration = useMutation(api.migrateProductFields.migrateProductFields);
   const ensureCategories = useMutation(api.ensureGadgetCategory.ensureAllProductsHaveCategory);
+  const forceRecategorize = useMutation(api.migrateProductFields.forceRecategorizeAllProducts);
 
   const handleRunMigration = async () => {
     setIsRunning(true);
@@ -60,6 +73,21 @@ export default function ProductFieldsMigration() {
     }
   };
 
+  const handleForceRecategorize = async () => {
+    setIsRunningForce(true);
+    setForceResults(null);
+    try {
+      const result = await forceRecategorize({});
+      setForceResults(result);
+      toast.success(`Fixed ${result.categoriesChanged} miscategorized products!`);
+    } catch (error) {
+      toast.error("Force recategorization failed: " + (error as Error).message);
+      console.error(error);
+    } finally {
+      setIsRunningForce(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminHeader />
@@ -72,6 +100,116 @@ export default function ProductFieldsMigration() {
               Auto-assign gadgetCategory and finishType fields to all products based on their titles
             </p>
           </div>
+
+          {/* Force Recategorization Card - MAIN ACTION */}
+          <Card className="border-primary bg-primary/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-primary">
+                <Sparkles className="size-5" />
+                Fix Miscategorized Products (Recommended)
+              </CardTitle>
+              <CardDescription>
+                Re-categorize ALL products using the improved detection logic. This fixes camera skins, lens skins, charger skins, iPad skins, controller skins, PS5/Xbox skins, and more.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-background p-4 rounded-lg space-y-2 border">
+                <p className="text-sm font-semibold">This will fix:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• iPad/Tablet skins (currently categorized as phone)</li>
+                  <li>• Controller skins (currently categorized as phone)</li>
+                  <li>• PS5/Xbox/Console skins (currently categorized as phone)</li>
+                  <li>• Camera skins (currently categorized as phone)</li>
+                  <li>• Lens skins (currently categorized as phone)</li>
+                  <li>• Charger skins (currently categorized as accessory)</li>
+                  <li>• Drone skins (currently categorized as phone)</li>
+                  <li>• Mac Mini skins (currently categorized as phone)</li>
+                </ul>
+              </div>
+
+              <Button
+                onClick={handleForceRecategorize}
+                disabled={isRunningForce}
+                size="lg"
+                className="w-full"
+                variant="default"
+              >
+                {isRunningForce ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Recategorizing Products...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 size-4" />
+                    Fix All Miscategorized Products
+                  </>
+                )}
+              </Button>
+
+              {forceResults && (
+                <div className="space-y-3 mt-4 pt-4 border-t">
+                  <div className="flex items-start gap-3 text-sm">
+                    <CheckCircle2 className="size-5 text-green-500 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold">Recategorization Complete!</p>
+                      <ul className="space-y-1 text-muted-foreground mt-1">
+                        <li>• Total products: <strong>{forceResults.totalProducts}</strong></li>
+                        <li>• Categories fixed: <strong className="text-green-600">{forceResults.categoriesChanged}</strong></li>
+                        <li>• Already correct: <strong>{forceResults.categoriesUnchanged}</strong></li>
+                        <li>• Finishes assigned: <strong>{forceResults.finishesAssigned}</strong></li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Before/After Counts */}
+                  <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    <div className="bg-muted/50 p-3 rounded-lg border">
+                      <p className="font-semibold text-sm mb-2 text-muted-foreground">Before:</p>
+                      <ul className="text-xs space-y-1">
+                        {Object.entries(forceResults.beforeCounts).map(([cat, count]) => (
+                          <li key={cat}>
+                            <Badge variant="outline" className="text-xs mr-2">{cat}</Badge>
+                            {count}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-lg border">
+                      <p className="font-semibold text-sm mb-2 text-green-600">After:</p>
+                      <ul className="text-xs space-y-1">
+                        {Object.entries(forceResults.afterCounts).map(([cat, count]) => (
+                          <li key={cat}>
+                            <Badge variant="outline" className="text-xs mr-2">{cat}</Badge>
+                            {count}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Sample Changes */}
+                  {forceResults.changedSamples.length > 0 && (
+                    <div className="bg-muted/30 p-3 rounded-lg border">
+                      <p className="font-semibold text-sm mb-2">Sample Changes:</p>
+                      <ul className="text-xs space-y-2">
+                        {forceResults.changedSamples.map((sample, i) => (
+                          <li key={i} className="flex flex-col gap-1">
+                            <span className="font-medium">{sample.title}</span>
+                            <span className="text-muted-foreground">
+                              <Badge variant="outline" className="text-[10px]">{sample.before}</Badge>
+                              {' → '}
+                              <Badge variant="default" className="text-[10px]">{sample.after}</Badge>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Quick Safety Check Card */}
           <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
