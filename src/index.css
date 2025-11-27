@@ -164,18 +164,9 @@
   animation: marquee 15s linear infinite;
 }
 
-/* Vertical marquee animation for mobile */
-@keyframes marquee-vertical {
-  0% {
-    transform: translateY(0%);
-  }
-  100% {
-    transform: translateY(-50%);
-  }
-}
-
-.animate-marquee-vertical {
-  animation: marquee-vertical 7.5s linear infinite;
+/* Mobile marquee - 2x faster */
+.animate-marquee-mobile {
+  animation: marquee 7.5s linear infinite;
 }
 
 /* Hide scrollbar for horizontal tabs */

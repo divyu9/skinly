@@ -340,21 +340,21 @@ export default function Index() {
       {/* Latest Models Marquee */}
       {latestModels && latestModels.length > 0 && (
         <div className="w-full bg-primary/5 border-y border-primary/10 mt-24 overflow-hidden">
-          {/* Mobile: Vertical Marquee */}
+          {/* Mobile: Stacked Horizontal Marquee */}
           <div className="md:hidden">
             <div className="text-center py-2 bg-primary text-primary-foreground text-xs font-bold">
               ✨ Now supporting:
             </div>
-            <div className="h-16 overflow-hidden relative">
-              <div className="animate-marquee-vertical space-y-2 py-2">
+            <div className="py-3 overflow-hidden">
+              <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap">
                 {(() => {
                   const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
-                  return [...latestModels.slice(0, 15), ...latestModels.slice(0, 15), ...latestModels.slice(0, 15)].map((model, idx) => {
+                  return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
                     const emoji = emojis[idx % emojis.length];
                     return (
-                      <div key={idx} className="text-center text-base font-semibold text-foreground px-4">
-                        {emoji} {model.brandName} {model.modelName}
-                      </div>
+                      <span key={idx} className="text-base text-foreground font-semibold">
+                        {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
+                      </span>
                     );
                   });
                 })()}
