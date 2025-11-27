@@ -21,6 +21,7 @@ import type * as googleDriveImportPublic from "../googleDriveImportPublic.js";
 import type * as gst from "../gst.js";
 import type * as http from "../http.js";
 import type * as migrateGst from "../migrateGst.js";
+import type * as migrateProductFields from "../migrateProductFields.js";
 import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
 import type * as mockups from "../mockups.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   gst: typeof gst;
   http: typeof http;
   migrateGst: typeof migrateGst;
+  migrateProductFields: typeof migrateProductFields;
   migration: typeof migration;
   migrationInternal: typeof migrationInternal;
   mockups: typeof mockups;

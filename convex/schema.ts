@@ -141,6 +141,24 @@ export default defineSchema({
       phoneModel: v.optional(v.string()), // e.g., "iPhone 14 Pro", "Realme 11", etc.
     })),
     tags: v.array(v.string()),
+    gadgetCategory: v.optional(v.union(
+      v.literal("phone"),
+      v.literal("laptop"),
+      v.literal("tablet"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("drone"),
+      v.literal("charger"),
+      v.literal("console"),
+      v.literal("mac-mini"),
+      v.literal("cover"),
+      v.literal("accessory")
+    )),
+    finishType: v.optional(v.union(
+      v.literal("matte"),
+      v.literal("embossed"),
+      v.literal("transparent")
+    )),
   })
     .index("by_slug", ["slug"])
     .index("by_collection", ["collectionId"])

@@ -74,6 +74,8 @@ interface ConvexProduct {
   status: "active" | "draft" | "archived";
   images: Array<{ url: string; alt?: string }>;
   tags: string[];
+  gadgetCategory?: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
+  finishType?: "matte" | "embossed" | "transparent";
   variants: Array<{
     _id: Id<"variants">;
     title: string;
@@ -184,6 +186,8 @@ export default function ProductsPage() {
         status: product.status,
         tags: product.tags.join(", "),
         images: product.images,
+        gadgetCategory: product.gadgetCategory,
+        finishType: product.finishType,
         variants: product.variants.map((v) => ({
           _id: v._id,
           title: v.title,
@@ -207,6 +211,8 @@ export default function ProductsPage() {
       status: product.status,
       tags: product.tags.join(", "),
       images: product.images,
+      gadgetCategory: product.gadgetCategory,
+      finishType: product.finishType,
       variants: product.variants.map((v) => ({
         _id: v._id,
         title: v.title,
@@ -223,8 +229,31 @@ export default function ProductsPage() {
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
     
-    // Filter by device
-    if (deviceFilter) {
+    // PRIORITY FILTER: When coming from phone selector (brand + model present), show only phone skins
+    if (brandFilter && modelFilter) {
+      filtered = filtered.filter(p => {
+        // Use gadgetCategory field if available
+        if (p.gadgetCategory) {
+          return p.gadgetCategory === "phone";
+        }
+        // Fallback to title matching if gadgetCategory not set
+        const title = p.title.toLowerCase();
+        const hasSkin = title.includes("skin") || title.includes("phone skin");
+        const hasExclusions = 
+          title.includes("cover") ||
+          title.includes("case") ||
+          title.includes("ring") ||
+          title.includes("charger") ||
+          title.includes("stand") ||
+          title.includes("holder") ||
+          title.includes("magsafe") ||
+          title.includes("autoapply");
+        return hasSkin && !hasExclusions;
+      });
+    }
+    
+    // Filter by device (when not coming from phone selector)
+    if (deviceFilter && !brandFilter) {
       filtered = filtered.filter(p => {
         const title = p.title.toLowerCase();
         if (deviceFilter === 'phone') return title.includes('phone') || title.includes('iphone') || title.includes('samsung') || title.includes('oneplus');
@@ -243,6 +272,11 @@ export default function ProductsPage() {
     // Filter by finish
     if (finishFilter) {
       filtered = filtered.filter(p => {
+        // Use finishType field if available
+        if (p.finishType) {
+          return p.finishType === finishFilter;
+        }
+        // Fallback to title matching if finishType not set
         const title = p.title.toLowerCase();
         if (finishFilter === 'matte') return title.includes('matte');
         if (finishFilter === 'embossed') return title.includes('3d textured') || title.includes('3d embossed');
@@ -262,7 +296,7 @@ export default function ProductsPage() {
     }
     
     return filtered;
-  }, [allProducts, deviceFilter, finishFilter, searchQuery]);
+  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter]);
   
   // Apply sorting and stock filtering
   const sortedAndFilteredProducts = useMemo(() => {

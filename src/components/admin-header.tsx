@@ -13,6 +13,7 @@ export function AdminHeader() {
     { path: "/admin/products", label: "Products" },
     { path: "/admin/collections", label: "Collections" },
     { path: "/admin/phone-collections", label: "Phone Collections" },
+    { path: "/admin/product-fields-migration", label: "Fields Migration" },
     { path: "/admin/orders", label: "Orders" },
     { path: "/admin/coupons", label: "Coupons" },
     { path: "/admin/reviews", label: "Reviews" },

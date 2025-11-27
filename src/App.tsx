@@ -25,6 +25,7 @@ import AdminGoogleDriveImportPage from "./pages/admin/google-drive-import.tsx";
 import AdminModelsPage from "./pages/admin/models/page.tsx";
 import AdminSeedModelsPage from "./pages/admin/seed-models/page.tsx";
 import AdminPhoneCollectionsPage from "./pages/admin/phone-collections.tsx";
+import AdminProductFieldsMigrationPage from "./pages/admin/product-fields-migration.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/admin/models" element={<AdminModelsPage />} />
           <Route path="/admin/seed-models" element={<AdminSeedModelsPage />} />
           <Route path="/admin/phone-collections" element={<AdminPhoneCollectionsPage />} />
+          <Route path="/admin/product-fields-migration" element={<AdminProductFieldsMigrationPage />} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/admin/gst-migration" element={<GstMigrationPage />} />
           <Route path="/admin/tax-export" element={<TaxExportPage />} />
