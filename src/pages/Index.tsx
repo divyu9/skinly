@@ -5,20 +5,13 @@ import {
   SparklesIcon, 
   PackageIcon, 
   TruckIcon,
-  LaptopIcon,
-  SmartphoneIcon,
-  MonitorIcon,
-  PlaneIcon,
-  CameraIcon,
-  CircleDotIcon,
-  BatteryChargingIcon,
-  TabletSmartphoneIcon,
-  GamepadIcon,
-  SearchIcon
+  SearchIcon,
+  ChevronDownIcon,
+  ChevronRightIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
@@ -49,741 +42,9 @@ interface ConvexProduct {
     title: string;
     price: number;
     inventoryQuantity: number;
+    sku?: string;
   }>;
 }
-
-export default function Index() {
-  // Query products from Convex database - use pagination for better performance
-  const { results: paginatedProducts } = usePaginatedQuery(
-    api.products.getAllProductsPaginated,
-    { status: "active" },
-    "Samsung Galaxy S22 Plus",
-    "Samsung Galaxy S22",
-    "Samsung Galaxy S21 Ultra 5G",
-    "Samsung Galaxy S21 Plus 5G",
-    "Samsung Galaxy S21 FE 5G",
-    "Samsung Galaxy S21 5G",
-    "Samsung Galaxy S20 Ultra",
-    "Samsung Galaxy S20 Plus",
-    "Samsung Galaxy S20 FE",
-    "Samsung Galaxy S20",
-    "Samsung Galaxy S10E",
-    "Samsung Galaxy S10 Plus",
-    "Samsung Galaxy S10 Lite",
-    "Samsung Galaxy S10",
-    "Samsung Galaxy S9 Plus",
-    "Samsung Galaxy S9",
-    // Z series
-    "Samsung Galaxy Z Fold 5",
-    "Samsung Galaxy Z Fold 4",
-    "Samsung Galaxy Z Fold 3",
-    "Samsung Galaxy Z Fold 2",
-    "Samsung Galaxy Fold",
-    "Samsung Galaxy Z Flip 5",
-    "Samsung Galaxy Z Flip 4",
-    "Samsung Galaxy Z Flip 3 (5G)",
-    // A series
-    "Samsung Galaxy A80",
-    "Samsung Galaxy A73",
-    "Samsung Galaxy A72",
-    "Samsung Galaxy A71",
-    "Samsung Galaxy A70s",
-    "Samsung Galaxy A70",
-    "Samsung Galaxy A55 (5G)",
-    "Samsung Galaxy A54 (5G)",
-    "Samsung Galaxy A53 (5G)",
-    "Samsung Galaxy A52s (5G)",
-    "Samsung Galaxy A51",
-    "Samsung Galaxy A50S",
-    "Samsung Galaxy A50",
-    "Samsung Galaxy A42",
-    "Samsung Galaxy A41",
-    "Samsung Galaxy A35 (5G)",
-    "Samsung Galaxy A34 (5G)",
-    "Samsung Galaxy A33(5G)",
-    "Samsung Galaxy A31",
-    "Samsung Galaxy A30s",
-    "Samsung Galaxy A30",
-    "Samsung Galaxy A25 (5G)",
-    "Samsung Galaxy A23 (5G)",
-    "Samsung Galaxy A22 (5G)",
-    "Samsung Galaxy A22",
-    "Samsung Galaxy A21S",
-    "Samsung Galaxy A21",
-    "Samsung Galaxy A20S",
-    "Samsung Galaxy A20E",
-    "Samsung Galaxy A20",
-    "Samsung Galaxy A16",
-    "Samsung Galaxy A15 (5G)",
-    "Samsung Galaxy A14 (5G)",
-    "Samsung Galaxy A13 (5G)",
-    "Samsung Galaxy A13 4G",
-    "Samsung Galaxy A12",
-    "Samsung Galaxy A10S",
-    "Samsung Galaxy A10",
-    "Samsung Galaxy A9 Pro",
-    "Samsung Galaxy A9 2018",
-    "Samsung Galaxy A9 2016",
-    "Samsung Galaxy A9",
-    "Samsung Galaxy A8 Star",
-    "Samsung Galaxy A8 Plus",
-    "Samsung Galaxy A Plus 2018",
-    "Samsung Galaxy A04S",
-    "Samsung Galaxy A04E",
-    "Samsung Galaxy A03",
-    // Alpha
-    "Samsung Galaxy Alpha",
-    // M series
-    "Samsung Galaxy M62",
-    "Samsung Galaxy M56",
-    "Samsung Galaxy M53 (5G)",
-    "Samsung Galaxy M52 (5G)",
-    "Samsung Galaxy M51",
-    "Samsung Galaxy M42",
-    "Samsung Galaxy M40",
-    "Samsung Galaxy M35 (5G)",
-    "Samsung Galaxy M34 (5G)",
-    "Samsung Galaxy M33 (5G)",
-    "Samsung Galaxy M32 (5G)",
-    "Samsung Galaxy M32",
-    "Samsung Galaxy M31s",
-    "Samsung Galaxy M31",
-    "Samsung Galaxy M30S",
-    "Samsung Galaxy M30",
-    "Samsung Galaxy M21 2021",
-    "Samsung Galaxy M21",
-    "Samsung Galaxy M20",
-    "Samsung Galaxy M14 (5G)",
-    "Samsung Galaxy M13 (5G)",
-    "Samsung Galaxy M12",
-    "Samsung Galaxy M11",
-    "Samsung Galaxy M10",
-    "Samsung Galaxy M02",
-    // Note series
-    "Samsung Galaxy Note 20 Ultra",
-    "Samsung Galaxy Note 20",
-    "Samsung Galaxy Note 10 Plus",
-    "Samsung Galaxy Note 10 Lite",
-    "Samsung Galaxy Note 10",
-    "Samsung Galaxy Note 9 Pro",
-    // F series
-    "Samsung Galaxy F62",
-    "Samsung Galaxy F54 (5G)",
-    "Samsung Galaxy F42 (5G)",
-    "Samsung Galaxy F41",
-    "Samsung Galaxy F23",
-    "Samsung Galaxy F22",
-    "Samsung Galaxy F15 (5G)",
-    "Samsung Galaxy F14 (5G)",
-    "Samsung Galaxy F13",
-    "Samsung Galaxy F12",
-    // J series
-    "Samsung Galaxy J8 2018",
-    "Samsung Galaxy J7 Pro",
-    "Samsung Galaxy J7 Prime",
-    "Samsung Galaxy J7 Next",
-    // C series
-    "Samsung Galaxy C9 Pro",
-    "Samsung Galaxy C7 Pro",
-    // E series
-    "Samsung Galaxy E7",
-    "Samsung Galaxy E5",
-    // On series
-    "Samsung Galaxy On Next",
-    "Samsung Galaxy On 8"
-  ],
-  "Nothing": [
-    "Nothing Phone 3A Pro",
-    "Nothing Phone 3A", 
-    "Nothing Phone 2A",
-    "Nothing Phone 2",
-    "Nothing Phone 1 5G"
-  ],
-  "Oppo": [
-    // Find series
-    "Oppo Find 8X Pro (5G)",
-    "Oppo Find 8X (5G)",
-    "Oppo Find X2",
-    "Oppo Find X",
-    "Oppo Find N",
-    // Reno series
-    "Oppo Reno 14 Pro 5G",
-    "Oppo Reno 14 5G",
-    "Oppo Reno 14F 5G",
-    "Oppo Reno 13 Pro (5G)",
-    "Oppo Reno 13 (5G)",
-    "Oppo Reno 12 Pro (5G)",
-    "Oppo Reno 12F",
-    "Oppo Reno 12 (5G)",
-    "Oppo Reno 11 Pro (5G)",
-    "Oppo Reno 10X Zoom",
-    "Oppo Reno 10 Pro Plus (5G)",
-    "Oppo Reno 10 Pro (5G)",
-    "Oppo Reno 10 (5G)",
-    "Oppo Reno 8 Pro (5G)",
-    "Oppo Reno 8T (5G)",
-    "Oppo Reno 8 (5G)",
-    "Oppo Reno 7 Pro (5G)",
-    "Oppo Reno 7 (5G)",
-    "Oppo Reno 6 Pro (5G)",
-    "Oppo Reno 6",
-    "Oppo Reno 5Z",
-    "Oppo Reno 5 Pro",
-    "Oppo Reno 5",
-    "Oppo Reno 4 Pro",
-    "Oppo Reno 4",
-    "Oppo Reno 3 Pro",
-    "Oppo Reno 2Z",
-    "Oppo Reno 2",
-    "Oppo Reno",
-    // F series
-    "Oppo F31 Pro Plus 5G",
-    "Oppo F31 Pro 5G",
-    "Oppo F31 5G",
-    "Oppo F29 Pro (5G)",
-    "Oppo F29 (5G)",
-    "Oppo F27 Pro Plus (5G)",
-    "Oppo F27 (5G)",
-    "Oppo F25 Pro (5G)",
-    "Oppo F23 (5G)",
-    "Oppo F21s Pro (5G)",
-    "Oppo F21 Pro (5G)",
-    "Oppo F21s Pro",
-    "Oppo F21 Pro (4G)",
-    "Oppo F19S",
-    "Oppo F19 Pro Plus",
-    "Oppo F19 Pro",
-    "Oppo F19",
-    "Oppo F17 Pro",
-    "Oppo F17",
-    "Oppo F15",
-    "Oppo F11 Pro",
-    "Oppo F11",
-    "Oppo F9 Pro Plus",
-    "Oppo F9 Pro",
-    "Oppo F9",
-    "Oppo F7",
-    "Oppo F5",
-    "Oppo F3 Plus",
-    "Oppo F3",
-    "Oppo F1 Plus",
-    "Oppo F1S",
-    "Oppo F1",
-    // K series
-    "Oppo K13 Turbo 5G",
-    "Oppo K13x 5G",
-    "Oppo K13 5G",
-    "Oppo K12X (5G)",
-    "Oppo K10 (5G)",
-    "Oppo K9 Pro 5G",
-    "Oppo K9S",
-    "Oppo K9 5G",
-    "Oppo K3",
-    "Oppo K1",
-    // A series
-    "Oppo A96",
-    "Oppo A95 (5G)",
-    "Oppo A83",
-    "Oppo A79 (5G)",
-    "Oppo A78 (5G)",
-    "Oppo A78 (4G)",
-    "Oppo A77S",
-    "Oppo A77 (4G)",
-    "Oppo A76",
-    "Oppo A74 (5G)",
-    "Oppo A71",
-    "Oppo A58 (4G)",
-    "Oppo A57",
-    "Oppo A55 4G",
-    "Oppo A54 (5G)",
-    "Oppo A53s (5G)",
-    "Oppo A53",
-    "Oppo A52",
-    "Oppo A51",
-    "Oppo A37",
-    "Oppo A33",
-    "Oppo A31",
-    "Oppo A1K",
-    // R series
-    "Oppo R17 Pro",
-    "Oppo R15 Pro",
-    "Oppo R15",
-    "Oppo R9",
-    "Oppo R7",
-    // Neo series
-    "Oppo Neo 7",
-    "Oppo Neo 5"
-  ],
-  "Realme": [
-    // GT series
-    "Realme GT 7T 5G",
-    "Realme GT7 Pro 5G",
-    "Realme GT7 5G",
-    "Realme GT Neo 7 Pro",
-    "Realme GT 6T (5G)",
-    "Realme GT6 (5G)",
-    "Realme GT Neo 3T",
-    "Realme GT Neo 3 (5G)",
-    "Realme GT Neo 2 (5G)",
-    "Realme GT 2 Pro",
-    "Realme GT 2",
-    "Realme GT Edition (5G)",
-    "Realme GT (5G)",
-    // P series
-    "Realme P4 Pro 5G",
-    "Realme P4 5G",
-    "Realme P3X",
-    "Realme P3 Ultra (5G)",
-    "Realme P3 Pro",
-    "Realme P3 (5G)",
-    "Realme P2 Pro 5G",
-    "Realme P1 Speed 5G",
-    "Realme P1 Pro",
-    "Realme P1 (5G)",
-    // X series
-    "Realme X7 Pro (5G)",
-    "Realme X7 Max (5G)",
-    "Realme X7 5G",
-    "Realme X50 PRO",
-    "Realme X50",
-    "Realme X3 Super Zoom",
-    "Realme X3",
-    "Realme X2 Pro",
-    "Realme X2",
-    "Realme XT",
-    "Realme X",
-    // Number series
-    "Realme 15 Pro 5G",
-    "Realme 15 5G",
-    "Realme 14T 5G",
-    "Realme 14 Pro Lite",
-    "Realme 14 Pro Plus (5G)",
-    "Realme 14 Pro (5G)",
-    "Realme 14X (5G)",
-    "Realme 13 Pro Plus 5G",
-    "Realme 13 Plus 5G",
-    "Realme 13 Pro 5G",
-    "Realme 13 5G",
-    "Realme 13",
-    "Realme 12 5G",
-    "Realme 12 Pro Plus (5G)",
-    "Realme 12 PRO (5G)",
-    "Realme 12X (5G)",
-    "Realme 11Z",
-    "Realme 11 Pro Plus",
-    "Realme 11 PRO",
-    "Realme 11X (5G)",
-    "Realme 11 (5G)",
-    "Realme 10 Pro Plus (5G)",
-    "Realme 10 Pro (5G)",
-    "Realme 10",
-    "Realme 9 Pro Plus (5G)",
-    "Realme 9 Pro (5G)",
-    "Realme 9 5G SE",
-    "Realme 9i",
-    "Realme 9",
-    "Realme 8S (5G)",
-    "Realme 8i",
-    "Realme 8 Pro",
-    "Realme 8",
-    "Realme 8 (4G)",
-    "Realme 7 Pro",
-    "Realme 7i",
-    "Realme 7",
-    // Other models
-    "Realme U1",
-    "Realme 50A Prime",
-    "Realme 50A"
-  ],
-  "CMF": [
-    "CMF Phone 2 Pro",
-    "CMF Phone 1"
-  ],
-  "Vivo": [
-    // X series
-    "Vivo X200 Pro (5G)",
-    "Vivo X200 FE",
-    "Vivo X200 (5G)",
-    "Vivo X100 Pro",
-    "Vivo X100 (5G)",
-    "Vivo X90 Pro",
-    "Vivo X90",
-    "Vivo X80 Pro (5G)",
-    "Vivo X80 (5G)",
-    "Vivo X70 Pro Plus (5G)",
-    "Vivo X70 Pro (5G)",
-    "Vivo X60 Pro Plus",
-    "Vivo X60 Pro",
-    "Vivo X60",
-    "Vivo X50 Pro",
-    "Vivo X50",
-    "Vivo X21",
-    "Vivo X20 Plus",
-    "Vivo X20",
-    "Vivo X7",
-    "Vivo X5 Pro",
-    "Vivo X5 Max",
-    "Vivo X3 S",
-    // V series
-    "Vivo V60 5G",
-    "Vivo V50 5G",
-    "Vivo V40 Lite",
-    "Vivo V40 5G",
-    "Vivo V40E (5G)",
-    "Vivo V30E",
-    "Vivo V30 5G",
-    "Vivo V30 Pro (5G)",
-    "Vivo V30 Pro",
-    "Vivo V30",
-    "Vivo V29e (5G)",
-    "Vivo V29 Pro (5G)",
-    "Vivo V29 (5G)",
-    "Vivo V29 Pro",
-    "Vivo V29",
-    "Vivo V27E",
-    "Vivo V27 Pro (5G)",
-    "Vivo V27 (5G)",
-    "Vivo V25 (5G)",
-    "Vivo V25 Pro",
-    "Vivo V23e (5G)",
-    "Vivo V23 Pro (5G)",
-    "Vivo V23 (5G)",
-    "Vivo V21e (5G)",
-    "Vivo V21e (4G)",
-    "Vivo V21 5G",
-    "Vivo V21",
-    "Vivo V20 SE",
-    "Vivo V20 Pro",
-    "Vivo V20",
-    "Vivo V19",
-    "Vivo V17 Pro",
-    "Vivo V17",
-    "Vivo V15 Pro",
-    "Vivo V15",
-    "Vivo V11 Pro",
-    "Vivo V11",
-    "Vivo V9 Youth",
-    "Vivo V9 Pro",
-    "Vivo V9",
-    "Vivo V7 Plus",
-    "Vivo V5 S",
-    "Vivo V5 Plus",
-    "Vivo V5",
-    "Vivo V3 Max",
-    "Vivo V3",
-    "Vivo V1 Max",
-    // Y400 series
-    "Vivo Y400 Pro 5G",
-    "Vivo Y400 5G",
-    // Y300 series
-    "Vivo Y300 Plus (5G)",
-    "Vivo Y300 (5G)",
-    // Y200 series
-    "Vivo Y200 Pro",
-    "Vivo Y200e (5G)",
-    "Vivo Y200 (5G)",
-    // Y100 series
-    "Vivo Y100A",
-    "Vivo Y100 (5G)",
-    // Y series
-    "Vivo Y95",
-    "Vivo Y93",
-    "Vivo Y91i",
-    "Vivo Y91",
-    "Vivo Y90",
-    "Vivo Y83 Pro",
-    "Vivo Y83",
-    "Vivo Y81i",
-    "Vivo Y81",
-    "Vivo Y79",
-    "Vivo Y75 (5G)",
-    "Vivo Y75",
-    "Vivo Y73",
-    "Vivo Y72 (5G)",
-    "Vivo Y71",
-    "Vivo Y69",
-    "Vivo Y66",
-    "Vivo Y58 5G",
-    "Vivo Y56 (5G)",
-    "Vivo Y55S",
-    "Vivo Y55L",
-    "Vivo Y55",
-    "Vivo Y53S",
-    "Vivo Y53",
-    "Vivo Y51A",
-    "Vivo Y51",
-    "Vivo 50",
-    "Vivo Y50",
-    "Vivo Y39 5G",
-    "Vivo Y36",
-    "Vivo Y35 2022",
-    "Vivo Y33T",
-    "Vivo Y33 S",
-    "Vivo Y31 Pro 5G",
-    "Vivo Y31",
-    "Vivo Y30",
-    "Vivo Y28S (5G)",
-    "Vivo Y28 5G",
-    "Vivo Y28",
-    "Vivo Y27 4G",
-    "Vivo Y27",
-    "Vivo Y22 2022",
-    "Vivo Y21L",
-    "Vivo Y21T",
-    "Vivo Y21E 5G",
-    "Vivo Y21E",
-    "Vivo Y21 G",
-    "Vivo Y21 2021",
-    "Vivo Y21",
-    "Vivo Y20T",
-    "Vivo Y20i",
-    "Vivo Y20G 2021",
-    "Vivo Y20A",
-    "Vivo Y20",
-    "Vivo Y19E",
-    "Vivo Y19 5G",
-    "Vivo Y19",
-    "Vivo Y18",
-    "Vivo Y17S",
-    "Vivo Y17",
-    "Vivo Y16",
-    "Vivo Y15S",
-    "Vivo Y15C",
-    "Vivo Y15 2019",
-    "Vivo Y15",
-    "Vivo Y12s",
-    "Vivo Y12",
-    "Vivo Y11",
-    "Vivo Y02T",
-    "Vivo Y02",
-    "Vivo Y3S",
-    // T series
-    "Vivo T45 5G",
-    "Vivo T4X 5G",
-    "Vivo T4R 5G",
-    "Vivo T4 Ultra",
-    "Vivo T4 Lite",
-    "Vivo T4 pro",
-    "Vivo T4 5G",
-    "Vivo T3 Ultra (5G)",
-    "Vivo T3 Pro (5G)",
-    "Vivo T3 X (5G)",
-    "Vivo T3 (5G)",
-    "Vivo T2 X (5G)",
-    "Vivo T2 Pro (5G)",
-    "Vivo T2 (5G)",
-    "Vivo T1X",
-    "Vivo T1 Pro (5G)",
-    "Vivo T1 (5G)",
-    "Vivo T1",
-    // Z series
-    "Vivo Z1 X",
-    "Vivo Z1 Pro",
-    "Vivo Z10",
-    // S series
-    "Vivo S1 Pro",
-    "Vivo S1",
-    // U series
-    "Vivo U20",
-    "Vivo U10",
-    "Vivo U3",
-    // Nex series
-    "Vivo Nex S",
-    "Vivo Nex A",
-    "Vivo Nex",
-    // A series
-    "Vivo A33S"
-  ],
-  "iQOO": [
-    // Number series
-    "IQOO 13 5G",
-    "IQOO 12 5G",
-    "IQOO 11 5G",
-    "IQOO 9T",
-    "IQOO 9 Pro 5G",
-    "IQOO 9 SE 5G",
-    "IQOO 9 5G",
-    "IQOO 7 Legend",
-    "IQOO 7",
-    "IQOO 3",
-    // Neo series
-    "IQOO Neo 10R",
-    "IQOO Neo 9 Pro",
-    "IQOO Neo 7 PRO",
-    "IQOO Neo 7 PR",
-    "IQOO Neo 7 5G",
-    "IQOO Neo 6 5G",
-    "IQOO Neo 3",
-    // Z series
-    "IQOO Z9X",
-    "IQOO Z9S",
-    "IQOO Z9",
-    "IQOO Z7 S 5G",
-    "IQOO Z7 Pro",
-    "IQOO Z7",
-    "IQOO Z6 Lite 5G",
-    "IQOO Z6 PRO 5G",
-    "IQOO Z6 44W",
-    "IQOO Z6 5G",
-    "IQOO Z5",
-    "IQOO Z3 5G",
-    "IQOO Z3",
-    "IQOO Z1X"
-  ],
-  "Xiaomi": [
-    // Mi series
-    "Mi 14 Civi",
-    "Mi 14",
-    "Mi 12S Ultra 5G",
-    "Mi 12 Lite",
-    "Mi 11X Pro",
-    "Mi 11 X",
-    "Mi 11 Ultra",
-    "Mi 11 T Pro",
-    "Mi 11i 5G",
-    "Mi 11 Lite",
-    "Mi 10T 5G",
-    "Mi 10 T Lite",
-    "Mi 10i",
-    "Mi 10 5G",
-    // Redmi Note series
-    "Redmi Note 14 Pro Plus 5G",
-    "Redmi Note 14 Pro 5G",
-    "Redmi Note 14 5G",
-    "Redmi Note 13 Pro Plus 5G",
-    "Redmi Note 13 Pro 5G",
-    "Redmi Note 13 5G",
-    "Redmi Note 12 Pro Plus 5G",
-    "Redmi Note 12 Pro 5G",
-    "Redmi Note 12 5G",
-    "Redmi Note 11 Pro Plus 5G",
-    "Redmi Note 11 Pro",
-    "Redmi Note 11T 5G",
-    "Redmi Note 11SE",
-    "Redmi Note 11",
-    "Redmi Note 10T 5G",
-    "Redmi Note 10 Pro Max",
-    "Redmi Note 10 Pro",
-    "Redmi Note 10S",
-    "Redmi Note 10",
-    "Redmi Note 9T 5G",
-    "Redmi Note 9 Pro Max",
-    "Redmi Note 9 Pro",
-    "Redmi Note 9",
-    "Redmi Note 8 Pro",
-    "Redmi Note 8",
-    "Redmi Note 6 Pro",
-    // Redmi number series
-    "Redmi 13C 5G",
-    "Redmi 13C",
-    "Redmi 12 PRO",
-    "Redmi 12 5G",
-    "Redmi 12 4G",
-    "Redmi 11i Hyper Charge",
-    "Redmi 11 Prime 5G",
-    "Redmi 11 Lite NE 5G",
-    "Redmi 10 Power",
-    "Redmi 10 Prime",
-    "Redmi 10",
-    "Redmi 9i",
-    "Redmi 9 Power",
-    "Redmi 9 Prime",
-    // Redmi K series
-    "Redmi K50i 5G",
-    "Redmi K20 Pro",
-    // Redmi Y series
-    "Redmi Y3",
-    "Redmi Y2",
-    "Redmi Y1 Lite",
-    "Redmi Y1",
-    // Other Xiaomi
-    "Xiaomi Black Shark 2"
-  ],
-  "Lava": [
-    "LAVA Agni 3 (5G)",
-    "LAVA Agni 2 (5G)",
-    "LAVA Blaze Curve (5G)",
-    "LAVA Blaze Pro",
-    "LAVA Blaze (5G)"
-  ],
-  "Infinix": [
-    // GT series
-    "Infinix GT 20 PRO (5G)",
-    "Infinix GT 10 PRO",
-    // Zero series
-    "Infinix Zero 30 (5G)",
-    "Infinix Zero 30 4G",
-    "Infinix Zero 8i",
-    "Infinix Zero 5G",
-    "Infinix Zero (5G)",
-    // Note series
-    "Infinix Note 40X (5G)",
-    "Infinix Note 40 PRO PLUS",
-    "Infinix Note 40 PRO (5G)",
-    "Infinix Note 40 PRO 4G",
-    "Infinix Note 40",
-    "Infinix Note 30 (5G)",
-    "Infinix Note 12 Pro (5G)",
-    "Infinix Note 12 G96",
-    "Infinix Note 11S",
-    "Infinix Note 11",
-    "Infinix Note 10 PRO",
-    "Infinix Note 10",
-    "Infinix Note 8",
-    "Infinix Note 7",
-    "Infinix Note 5",
-    "Infinix Note 4 Pro",
-    // Hot series
-    "Infinix Hot 30i",
-    "Infinix Hot 30",
-    "Infinix Hot 12 Play",
-    "Infinix Hot 11S",
-    "Infinix Hot 11",
-    "Infinix Hot 10S",
-    "Infinix Hot 10",
-    "Infinix Hot 9 PRO",
-    "Infinix Hot 9",
-    "Infinix Hot 7",
-    "Infinix Hot 6",
-    "Infinix Hot 4 PRO",
-    "Infinix Hot 4",
-    // Other models
-    "Infinix 10 Play",
-    "Infinix Smart 5A"
-  ],
-  "Asus": [
-    // ROG Phone series
-    "Asus ROG Phone 9 FE",
-    "Asus ROG Phone 8 Pro",
-    "Asus ROG Phone 8",
-    "Asus ROG Phone 7 (5G)",
-    "Asus ROG Phone 6 PRO (5G)",
-    "Asus ROG Phone 6 (5G)",
-    "Asus ROG Phone 5",
-    "Asus ROG Phone 4",
-    "Asus ROG Phone 3",
-    "Asus ROG Phone 2",
-    // Zenfone series
-    "Asus Zenfone 12 Ultra",
-    "Asus Zenfone 11 Ultra",
-    "Asus ZENFONE MAX PRO (M1)"
-  ],
-  "HMD": [
-    "HMD Nokia C300",
-    "HMD Nokia G60",
-    "HMD Nokia G42 5G",
-    "HMD Nokia G21",
-    "HMD Nokia G20",
-    "HMD Nokia X30",
-    "HMD Nokia C32",
-    "HMD Nokia C31",
-    "HMD Nokia C30",
-    "HMD Nokia C22",
-    "HMD Nokia C21 Plus",
-    "HMD Nokia C12 Pro",
-    "HMD Nokia 9"
-  ]
-};
 
 export default function Index() {
   // Query products from Convex database - use pagination for better performance
@@ -801,22 +62,9 @@ export default function Index() {
   // Fetch ALL supported models for search
   const allSupportedModels = useQuery(api.supportedModels.listAll, { isActive: true });
   
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showBrandSelectorDialog, setShowBrandSelectorDialog] = useState(false);
-  const [showDroneBrandSelectorDialog, setShowDroneBrandSelectorDialog] = useState(false);
-  const [showChargerBrandSelectorDialog, setShowChargerBrandSelectorDialog] = useState(false);
-  const [showConsoleBrandSelectorDialog, setShowConsoleBrandSelectorDialog] = useState(false);
-  const [showTabletBrandSelectorDialog, setShowTabletBrandSelectorDialog] = useState(false);
-  const [showMacMiniBrandSelectorDialog, setShowMacMiniBrandSelectorDialog] = useState(false);
-  const [showCameraBrandSelectorDialog, setShowCameraBrandSelectorDialog] = useState(false);
-  const [showLensBrandSelectorDialog, setShowLensBrandSelectorDialog] = useState(false);
-  const [deviceType, setDeviceType] = useState<"phone" | "drone" | "charger" | "console" | "tablet" | "macmini" | "camera" | "lens">("phone");
-  const [searchQuery, setSearchQuery] = useState("");
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [searchedModel, setSearchedModel] = useState<string>("");
-  const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
   // Ref for scrolling to device selector
   const deviceSelectorRef = useRef<HTMLElement>(null);
@@ -828,12 +76,6 @@ export default function Index() {
       block: 'start'
     });
   };
-  
-  // Query mockups for the searched model
-  const mockupsForModel = useQuery(
-    api.mockups.getProductsWithMockupsForModel,
-    searchedModel ? { model: searchedModel } : "skip"
-  );
 
   const matteProducts = useMemo(() => 
     products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4),
@@ -850,6 +92,111 @@ export default function Index() {
     products.filter(p => p.title.toLowerCase().includes('tranzy')).slice(0, 4),
     [products]
   );
+
+  // Enhanced search results - searches devices, products, and SKUs
+  const searchResults = useMemo(() => {
+    const query = homeSearchQuery.toLowerCase().trim();
+    if (!query) return { devices: [], designs: [], skus: [] };
+
+    const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
+    
+    // 1. Search Device Models
+    const allDeviceCategories = [
+      { name: "Phones", icon: "📱", models: phoneModels },
+      { name: "Cameras", icon: "📷", models: cameraModels },
+      { name: "Lenses", icon: "🔍", models: lensModels },
+      { name: "Tablets", icon: "📱", models: tabletModels },
+      { name: "Mac Mini", icon: "💻", models: macMiniModels },
+      { name: "Gaming Consoles", icon: "🎮", models: consoleModels },
+      { name: "Drones", icon: "🚁", models: droneModels },
+      { name: "Chargers", icon: "🔌", models: chargerModels },
+    ];
+
+    const deviceMatches: Array<{ category: string; brand: string; model: string; icon: string }> = [];
+    
+    allDeviceCategories.forEach(category => {
+      Object.entries(category.models).forEach(([brand, models]) => {
+        models.forEach(model => {
+          const modelLower = model.toLowerCase();
+          const brandLower = brand.toLowerCase();
+          const matchesAll = searchTerms.every(term => 
+            modelLower.includes(term) || brandLower.includes(term)
+          );
+          if (matchesAll) {
+            deviceMatches.push({
+              category: category.name,
+              brand,
+              model,
+              icon: category.icon
+            });
+          }
+        });
+      });
+    });
+
+    // Also search database models
+    const dbModels = allSupportedModels || [];
+    dbModels.forEach(dbModel => {
+      const modelLower = dbModel.modelName.toLowerCase();
+      const brandLower = dbModel.brandName.toLowerCase();
+      const matchesAll = searchTerms.every(term => 
+        modelLower.includes(term) || brandLower.includes(term)
+      );
+      if (matchesAll) {
+        const categoryName = 
+          dbModel.category === "phone" ? "Phones" :
+          dbModel.category === "camera" ? "Cameras" :
+          dbModel.category === "lens" ? "Lenses" :
+          dbModel.category === "tablet" ? "Tablets" :
+          dbModel.category === "mac-mini" ? "Mac Mini" :
+          dbModel.category === "console" ? "Gaming Consoles" :
+          dbModel.category === "drone" ? "Drones" :
+          dbModel.category === "charger" ? "Chargers" : "Other";
+        
+        // Avoid duplicates
+        const exists = deviceMatches.some(d => 
+          d.brand === dbModel.brandName && d.model === dbModel.modelName
+        );
+        if (!exists) {
+          deviceMatches.push({
+            category: categoryName,
+            brand: dbModel.brandName,
+            model: dbModel.modelName,
+            icon: "📱"
+          });
+        }
+      }
+    });
+
+    // 2. Search Product Designs (titles)
+    const designMatches = products.filter(product => {
+      const titleLower = product.title.toLowerCase();
+      return searchTerms.some(term => titleLower.includes(term));
+    }).slice(0, 10);
+
+    // 3. Search SKUs
+    const skuMatches: Array<{ product: ConvexProduct; variant: ConvexProduct['variants'][0] }> = [];
+    products.forEach(product => {
+      product.variants.forEach(variant => {
+        if (variant.sku) {
+          const skuLower = variant.sku.toLowerCase();
+          if (searchTerms.some(term => skuLower.includes(term))) {
+            skuMatches.push({ product, variant });
+          }
+        }
+      });
+    });
+
+    return {
+      devices: deviceMatches.slice(0, 15),
+      designs: designMatches,
+      skus: skuMatches.slice(0, 10)
+    };
+  }, [homeSearchQuery, products, allSupportedModels]);
+
+  const hasSearchResults = searchResults.devices.length > 0 || 
+                          searchResults.designs.length > 0 || 
+                          searchResults.skus.length > 0;
 
   const features = [
     {
@@ -873,6 +220,16 @@ export default function Index() {
       description: "Free shipping, always. Your new phone vibe arrives in 2-3 days"
     }
   ];
+
+  const toggleCategory = (category: string) => {
+    const newExpanded = new Set(expandedCategories);
+    if (newExpanded.has(category)) {
+      newExpanded.delete(category);
+    } else {
+      newExpanded.add(category);
+    }
+    setExpandedCategories(newExpanded);
+  };
 
   return (
     <div className="min-h-screen">
@@ -940,22 +297,23 @@ export default function Index() {
           <div className="max-w-3xl mx-auto mb-16">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold mb-2">Find Your Device or Design</h2>
-              <p className="text-muted-foreground">Search across all devices and design patterns</p>
+              <p className="text-muted-foreground">Search across devices, designs, and SKUs</p>
             </div>
             <div className="relative">
               <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-6 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="iPhone 15 Pro, Canon EOS R5, Mac Mini M4, matte black..."
+                placeholder="iPhone 15 Pro, matte black, SKU-12345..."
                 value={homeSearchQuery}
                 onChange={(e) => {
                   const query = e.target.value;
                   setHomeSearchQuery(query);
                   setShowSearchResults(query.trim().length > 0);
-                  // Set searched model for mockup query
-                  setSearchedModel(query.trim());
-                  // Reset expanded brands when search changes
-                  setExpandedBrands(new Set());
+                }}
+                onFocus={() => {
+                  if (homeSearchQuery.trim().length > 0) {
+                    setShowSearchResults(true);
+                  }
                 }}
                 className="pl-14 h-16 text-lg border-2 focus:border-primary"
               />
@@ -963,954 +321,171 @@ export default function Index() {
             
             {/* Search Results Dropdown */}
             {showSearchResults && homeSearchQuery.trim().length > 0 && (
-              <Card className="mt-2 max-h-96 overflow-y-auto border-2">
+              <Card className="mt-2 max-h-[500px] overflow-y-auto border-2">
                 <CardContent className="p-4">
-                  {/* Device Models Section - All Categories */}
-                  {(() => {
-                    const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-                    
-                    // Combine hardcoded device models with their categories
-                    const allDeviceCategories = [
-                      { name: "Phones", icon: "📱", models: phoneModels, type: "phone" },
-                      { name: "Cameras", icon: "📷", models: cameraModels, type: "camera" },
-                      { name: "Lenses", icon: "🔍", models: lensModels, type: "lens" },
-                      { name: "Tablets", icon: "📱", models: tabletModels, type: "tablet" },
-                      { name: "Mac Mini", icon: "💻", models: macMiniModels, type: "macmini" },
-                      { name: "Gaming Consoles", icon: "🎮", models: consoleModels, type: "console" },
-                      { name: "Drones", icon: "🚁", models: droneModels, type: "drone" },
-                      { name: "Chargers", icon: "🔌", models: chargerModels, type: "charger" },
-                    ] as const;
-                    
-                    // Add database models if available
-                    const dbModels = allSupportedModels || [];
-                    const dbModelsByCategory: Record<string, Record<string, string[]>> = {};
-                    
-                    dbModels.forEach(model => {
-                      const catName = model.category === "phone" ? "Phones"
-                        : model.category === "camera" ? "Cameras"
-                        : model.category === "lens" ? "Lenses"
-                        : model.category === "tablet" ? "Tablets"
-                        : model.category === "mac-mini" ? "Mac Mini"
-                        : model.category === "console" ? "Gaming Consoles"
-                        : model.category === "drone" ? "Drones"
-                        : model.category === "charger" ? "Chargers"
-                        : "Other";
-                      
-                      if (!dbModelsByCategory[catName]) {
-                        dbModelsByCategory[catName] = {};
-                      }
-                      if (!dbModelsByCategory[catName][model.brandName]) {
-                        dbModelsByCategory[catName][model.brandName] = [];
-                      }
-                      dbModelsByCategory[catName][model.brandName].push(model.modelName);
-                    });
-                    
-                    // Merge database models with hardcoded ones
-                    const mergedCategories = allDeviceCategories.map(cat => {
-                      const dbCatModels = dbModelsByCategory[cat.name] || {};
-                      const mergedModels = { ...cat.models };
-                      
-                      // Merge DB models into hardcoded models
-                      Object.keys(dbCatModels).forEach(brand => {
-                        if (!mergedModels[brand]) {
-                          mergedModels[brand] = [];
-                        }
-                        // Add DB models that aren't already in hardcoded list
-                        dbCatModels[brand].forEach((model: string) => {
-                          if (!mergedModels[brand].includes(model)) {
-                            mergedModels[brand].push(model);
-                          }
-                        });
-                      });
-                      
-                      return { ...cat, models: mergedModels };
-                    });
-
-                    interface MatchingBrand {
-                      brand: string;
-                      models: string[];
-                    }
-
-                    interface MatchingCategory {
-                      name: string;
-                      icon: string;
-                      type: string;
-                      matchingBrands: MatchingBrand[];
-                    }
-
-                    // Find matching categories using merged data
-                    const matchingCategories = mergedCategories
-                      .map(category => {
-                        const matchingBrands: MatchingBrand[] = Object.entries(category.models)
-                          .map(([brand, models]) => {
-                            const filteredModels = models.filter((model: string) => {
-                              const modelLower = model.toLowerCase();
-                              return searchTerms.every(term => modelLower.includes(term));
-                            });
-                            return filteredModels.length > 0 ? { brand, models: filteredModels } : null;
-                          })
-                          .filter((item): item is MatchingBrand => item !== null);
-                        
-                        return matchingBrands.length > 0 ? { 
-                          name: category.name, 
-                          icon: category.icon, 
-                          type: category.type,
-                          matchingBrands 
-                        } : null;
-                      })
-                      .filter((item): item is NonNullable<typeof item> => item !== null);
-
-                    if (matchingCategories.length > 0) {
-                      return (
-                        <>
-                          <div className="text-xs font-bold text-primary mb-3 uppercase tracking-wide">
-                            Device Models
-                          </div>
-                          {matchingCategories.map((category) => (
-                            <div key={category.name} className="mb-4">
-                              <div className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-2">
-                                <span>{category.icon}</span>
-                                <span>{category.name}</span>
-                              </div>
-                              {category.matchingBrands.map(({ brand, models }) => {
-                                const brandKey = `${category.name}-${brand}`;
-                                const isExpanded = expandedBrands.has(brandKey);
-                                const displayModels = isExpanded ? models : models.slice(0, 5);
-                                
-                                return (
-                                  <div key={brand} className="mb-3 last:mb-0">
-                                    <div className="text-sm font-semibold text-muted-foreground mb-2 flex items-center gap-2 pl-6">
-                                      <span>{brand}</span>
-                                      <span className="text-xs bg-muted px-2 py-0.5 rounded-full">
-                                        {models.length}
-                                      </span>
-                                    </div>
-                                    <div className="space-y-1 pl-6">
-                                      {displayModels.map((model: string, idx: number) => (
-                                        <button
-                                          key={idx}
-                                          onClick={() => {
-                                            setHomeSearchQuery("");
-                                            setShowSearchResults(false);
-                                            window.location.href = `/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
-                                          }}
-                                          className="w-full text-left p-2 rounded-lg hover:bg-primary/10 hover:text-primary transition-all group"
-                                        >
-                                          <div className="flex items-center justify-between">
-                                            <span className="text-sm font-medium">{model}</span>
-                                            <span className="text-xs text-muted-foreground group-hover:text-primary">
-                                              Select →
-                                            </span>
-                                          </div>
-                                        </button>
-                                      ))}
-                                      {models.length > 5 && (
-                                        <button
-                                          onClick={() => {
-                                            const newExpanded = new Set(expandedBrands);
-                                            if (isExpanded) {
-                                              newExpanded.delete(brandKey);
-                                            } else {
-                                              newExpanded.add(brandKey);
-                                            }
-                                            setExpandedBrands(newExpanded);
-                                          }}
-                                          className="w-full text-left p-2 text-xs text-primary hover:bg-primary/10 rounded-lg transition-all font-medium"
-                                        >
-                                          {isExpanded 
-                                            ? `Show less ↑` 
-                                            : `Show ${models.length - 5} more models ↓`
-                                          }
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
-                        </>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  {/* Products with Mockups Section */}
-                  {mockupsForModel && mockupsForModel.length > 0 && (() => {
-                    // Filter products that have mockups for this model
-                    const productsWithMockups = products.filter(product => {
-                      // Check if any variant SKU matches mockup SKUs
-                      return product.variants.some(variant => 
-                        mockupsForModel.some(mockup => 
-                          variant.title.toLowerCase().includes(mockup.sku.toLowerCase())
-                        )
-                      );
-                    });
-
-                    if (productsWithMockups.length > 0) {
-                      return (
-                        <>
-                          <div className="text-xs font-bold text-green-600 mb-3 uppercase tracking-wide flex items-center gap-2">
-                            🎨 Products with Mockup Preview for {searchedModel}
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-normal">
-                              {productsWithMockups.length}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                            {productsWithMockups.slice(0, 8).map((product) => {
-                              // Find the mockup for this product
-                              const mockup = mockupsForModel.find(m => 
-                                product.variants.some(v => v.title.toLowerCase().includes(m.sku.toLowerCase()))
-                              );
-                              const mockupUrl = mockup?.imageUrl || null;
-                              
-                              return (
-                                <Link
-                                  key={product._id}
-                                  to={`/products/detail?id=${product.slug}&model=${encodeURIComponent(searchedModel)}`}
-                                  onClick={() => {
-                                    setHomeSearchQuery("");
-                                    setShowSearchResults(false);
-                                  }}
-                                  className="group relative"
-                                >
-                                  <Card className="overflow-hidden hover:shadow-lg transition-all border-green-200 hover:border-green-400">
-                                    <div className="aspect-square bg-muted relative overflow-hidden">
-                                      {mockupUrl ? (
-                                        <>
-                                          <img 
-                                            src={mockupUrl} 
-                                            alt={`${product.title} on ${searchedModel}`}
-                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                          />
-                                          <div className="absolute top-2 right-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded">
-                                            Preview on {searchedModel}
-                                          </div>
-                                        </>
-                                      ) : product.images[0] ? (
-                                        <img 
-                                          src={product.images[0].url} 
-                                          alt={product.images[0].alt || product.title}
-                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                        />
-                                      ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                          <PackageIcon className="size-8 text-muted-foreground" />
-                                        </div>
-                                      )}
-                                    </div>
-                                    <CardContent className="p-3">
-                                      <div className="font-medium text-sm truncate group-hover:text-primary">
-                                        {product.title}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground mt-1">
-                                        ₹{product.variants[0]?.price || "N/A"}
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                </Link>
-                              );
-                            })}
-                          </div>
-                          {productsWithMockups.length > 8 && (
-                            <Link
-                              to={`/products?model=${encodeURIComponent(searchedModel)}`}
-                              onClick={() => {
-                                setHomeSearchQuery("");
-                                setShowSearchResults(false);
-                              }}
-                              className="block text-center p-3 text-sm text-green-600 hover:bg-green-50 rounded-lg transition-all mb-4"
-                            >
-                              View all {productsWithMockups.length} products with mockups →
-                            </Link>
-                          )}
-                          <div className="my-4 border-t border-border" />
-                        </>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  {/* Products Section */}
-                  {(() => {
-                    const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-                    const matchingProducts = products.filter(product => {
-                      const titleLower = product.title.toLowerCase();
-                      return searchTerms.every(term => titleLower.includes(term));
-                    });
-
-                    // Check if there are any device models (hardcoded + database)
-                    const allDeviceCategories = [
-                      phoneModels, cameraModels, lensModels, tabletModels, 
-                      macMiniModels, consoleModels, droneModels, chargerModels
-                    ];
-                    const hasHardcodedModels = allDeviceCategories.some(category =>
-                      Object.values(category).some(models =>
-                        models.some(model => {
-                          const modelLower = model.toLowerCase();
-                          return searchTerms.every(term => modelLower.includes(term));
-                        })
-                      )
-                    );
-                    const hasDbModels = (allSupportedModels || []).some(model => {
-                      const combined = `${model.brandName} ${model.modelName}`.toLowerCase();
-                      return searchTerms.every(term => combined.includes(term));
-                    });
-                    const hasDeviceModels = hasHardcodedModels || hasDbModels;
-
-                    if (matchingProducts.length > 0) {
-                      return (
-                        <>
-                          {hasDeviceModels && <div className="my-4 border-t border-border" />}
-                          
-                          <div className="text-xs font-bold text-secondary mb-3 uppercase tracking-wide flex items-center gap-2">
-                            Design Patterns & Products
-                            <span className="text-xs bg-secondary/10 text-secondary px-2 py-0.5 rounded-full font-normal">
-                              {matchingProducts.length}
-                            </span>
-                          </div>
+                  {!hasSearchResults ? (
+                    <p className="text-muted-foreground text-center py-4">No results found</p>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Device Models Section */}
+                      {searchResults.devices.length > 0 && (
+                        <div>
+                          <h3 className="text-sm font-semibold text-muted-foreground mb-3">DEVICES</h3>
                           <div className="space-y-1">
-                            {matchingProducts.slice(0, 8).map((product) => (
-                              <Link
-                                key={product._id}
-                                to={`/products/detail?id=${product.slug}`}
-                                onClick={() => {
-                                  setHomeSearchQuery("");
-                                  setShowSearchResults(false);
-                                }}
-                                className="flex items-center gap-3 p-3 rounded-lg hover:bg-secondary/10 hover:text-secondary transition-all group"
-                              >
-                                <div className="size-12 bg-muted rounded overflow-hidden flex-shrink-0">
-                                  {product.images[0] ? (
-                                    <img 
-                                      src={product.images[0].url} 
-                                      alt={product.images[0].alt || product.title}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                      <PackageIcon className="size-5 text-muted-foreground" />
+                            {(() => {
+                              const groupedByCategory: Record<string, typeof searchResults.devices> = {};
+                              searchResults.devices.forEach(device => {
+                                if (!groupedByCategory[device.category]) {
+                                  groupedByCategory[device.category] = [];
+                                }
+                                groupedByCategory[device.category].push(device);
+                              });
+
+                              return Object.entries(groupedByCategory).map(([category, devices]) => (
+                                <div key={category}>
+                                  <button
+                                    onClick={() => toggleCategory(category)}
+                                    className="w-full flex items-center justify-between p-2 hover:bg-muted rounded-md text-left"
+                                  >
+                                    <span className="font-medium flex items-center gap-2">
+                                      <span>{devices[0].icon}</span>
+                                      <span>{category}</span>
+                                      <span className="text-xs text-muted-foreground">({devices.length})</span>
+                                    </span>
+                                    {expandedCategories.has(category) ? (
+                                      <ChevronDownIcon className="size-4" />
+                                    ) : (
+                                      <ChevronRightIcon className="size-4" />
+                                    )}
+                                  </button>
+                                  {expandedCategories.has(category) && (
+                                    <div className="ml-8 space-y-1 mt-1">
+                                      {devices.map((device, idx) => (
+                                        <Link
+                                          key={idx}
+                                          to={`/products?model=${encodeURIComponent(device.model)}`}
+                                          className="block p-2 hover:bg-muted rounded-md text-sm"
+                                          onClick={() => setShowSearchResults(false)}
+                                        >
+                                          {device.brand} {device.model}
+                                        </Link>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium truncate group-hover:text-secondary">
-                                    {product.title}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    ₹{product.variants[0]?.price || "N/A"}
-                                  </div>
+                              ));
+                            })()}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Product Designs Section */}
+                      {searchResults.designs.length > 0 && (
+                        <div>
+                          <h3 className="text-sm font-semibold text-muted-foreground mb-3">DESIGNS</h3>
+                          <div className="space-y-1">
+                            {searchResults.designs.map(product => (
+                              <Link
+                                key={product._id}
+                                to={`/products/${product.slug}`}
+                                className="flex items-center gap-3 p-2 hover:bg-muted rounded-md"
+                                onClick={() => setShowSearchResults(false)}
+                              >
+                                {product.images[0] && (
+                                  <img 
+                                    src={product.images[0].url} 
+                                    alt={product.title}
+                                    className="size-12 object-cover rounded"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{product.title}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
+                                  </p>
                                 </div>
-                                <span className="text-xs text-muted-foreground group-hover:text-secondary flex-shrink-0">
-                                  View Product →
-                                </span>
                               </Link>
                             ))}
-                            {matchingProducts.length > 8 && (
-                              <Link
-                                to={`/products?search=${encodeURIComponent(homeSearchQuery)}`}
-                                onClick={() => {
-                                  setHomeSearchQuery("");
-                                  setShowSearchResults(false);
-                                }}
-                                className="block text-center p-3 text-sm text-secondary hover:bg-secondary/10 rounded-lg transition-all"
-                              >
-                                View all {matchingProducts.length} products →
-                              </Link>
-                            )}
                           </div>
-                        </>
-                      );
-                    }
-                    return null;
-                  })()}
-                  
-                  {/* No Results */}
-                  {(() => {
-                    const searchTerms = homeSearchQuery.toLowerCase().split(/\s+/).filter(term => term.length > 0);
-                    
-                    // Check all device categories (hardcoded + database)
-                    const allDeviceCategories = [
-                      phoneModels, cameraModels, lensModels, tabletModels, 
-                      macMiniModels, consoleModels, droneModels, chargerModels
-                    ];
-                    const hasHardcodedModels = allDeviceCategories.some(category =>
-                      Object.values(category).some(models =>
-                        models.some(model => {
-                          const modelLower = model.toLowerCase();
-                          return searchTerms.every(term => modelLower.includes(term));
-                        })
-                      )
-                    );
-                    const hasDbModels = (allSupportedModels || []).some(model => {
-                      const combined = `${model.brandName} ${model.modelName}`.toLowerCase();
-                      return searchTerms.every(term => combined.includes(term));
-                    });
-                    const hasDeviceModels = hasHardcodedModels || hasDbModels;
-
-                    const matchingProducts = products.filter(product => {
-                      const titleLower = product.title.toLowerCase();
-                      return searchTerms.every(term => titleLower.includes(term));
-                    });
-
-                    if (!hasDeviceModels && matchingProducts.length === 0) {
-                      return (
-                        <div className="text-center py-8 space-y-4">
-                          <div>
-                            <div className="text-muted-foreground mb-2">
-                              No results found for &quot;{homeSearchQuery}&quot;
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Try searching for a device model or design pattern
-                            </div>
-                          </div>
-                          <Button
-                            asChild
-                            variant="outline"
-                            className="gap-2"
-                          >
-                            <a 
-                              href="https://wa.me/919761011121?text=I%20Want%20to%20request%20a%20model%20on%20Skinly" 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                            >
-                              <PackageIcon className="size-4" />
-                              Request Your Model
-                            </a>
-                          </Button>
                         </div>
-                      );
-                    }
-                    return null;
-                  })()}
+                      )}
+
+                      {/* SKUs Section */}
+                      {searchResults.skus.length > 0 && (
+                        <div>
+                          <h3 className="text-sm font-semibold text-muted-foreground mb-3">SKUs</h3>
+                          <div className="space-y-1">
+                            {searchResults.skus.map(({ product, variant }) => (
+                              <Link
+                                key={variant._id}
+                                to={`/products/${product.slug}`}
+                                className="flex items-center gap-3 p-2 hover:bg-muted rounded-md"
+                                onClick={() => setShowSearchResults(false)}
+                              >
+                                {product.images[0] && (
+                                  <img 
+                                    src={product.images[0].url} 
+                                    alt={product.title}
+                                    className="size-12 object-cover rounded"
+                                  />
+                                )}
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{product.title}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    SKU: {variant.sku} • {variant.title}
+                                  </p>
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="inline-block">
-                <div className="bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-semibold">
-                  ✨ New Quirky Drops
-                </div>
-              </div>
-              <h1 className="text-5xl lg:text-7xl font-bold text-balance leading-tight">
-                Boring Phones?
-                <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                  {" "}Not On Our Watch!
-                </span>
-              </h1>
-              <p className="text-xl text-muted-foreground text-balance max-w-xl">
-                Wildly creative phone skins that'll make your friends jealous. 
-                Why blend in when you were born to stand out?
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <Button size="lg" className="text-base" asChild>
-                  <a href="/products">Browse Collection</a>
-                </Button>
-                <Button size="lg" variant="secondary" className="text-base">
-                  Custom Design
-                </Button>
-              </div>
-              <div className="flex items-center gap-8 pt-4">
-                <div>
-                  <div className="text-3xl font-bold">10K+</div>
-                  <div className="text-sm text-muted-foreground">Happy Customers</div>
-                </div>
-                <div className="h-12 w-px bg-border" />
-                <div>
-                  <div className="text-3xl font-bold">500+</div>
-                  <div className="text-sm text-muted-foreground">Unique Designs</div>
-                </div>
-                <div className="h-12 w-px bg-border" />
-                <div>
-                  <div className="text-3xl font-bold">4.9★</div>
-                  <div className="text-sm text-muted-foreground">Average Rating</div>
-                </div>
-              </div>
-            </div>
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-secondary/20 to-accent/20 rounded-3xl blur-3xl" />
-              <img 
-                src="https://images.unsplash.com/photo-1576110771045-a7711d8aab8e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHw0fHxjb2xvcmZ1bCUyMHBob25lJTIwY2FzZXMlMjBza2lucyUyMG1vZGVybnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
-                alt="Colorful phone cases"
-                className="relative rounded-3xl shadow-2xl w-full object-cover aspect-square"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Brand Selector Section */}
-      <section className="py-20 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Pick Your Device Brand
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Select your brand and we'll show you the perfect skin
+          {/* Hero Content */}
+          <div className="text-center max-w-4xl mx-auto">
+            <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight text-balance">
+              Your Phone. <br />
+              <span className="text-primary">Your Vibe.</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-muted-foreground mb-10 text-balance">
+              Custom skins that actually slap. Premium protection with designs that don't suck.
             </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-5xl mx-auto">
-            {[
-              { name: "Apple", logo: "🍎" },
-              { name: "Samsung", logo: "📱" },
-              { name: "Nothing", logo: "⚫" },
-              { name: "Oppo", logo: "🔷" },
-              { name: "Realme", logo: "🟡" },
-              { name: "CMF", logo: "🔸" },
-              { name: "Vivo", logo: "🔵" },
-              { name: "iQOO", logo: "⚡" },
-              { name: "Xiaomi", logo: "🦊" },
-              { name: "Lava", logo: "🌋" },
-              { name: "Infinix", logo: "♾️" },
-              { name: "Asus", logo: "🎮" },
-              { name: "HMD", logo: "📞" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg" 
+                className="text-lg px-8 py-6"
+                onClick={scrollToDeviceSelector}
               >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Device Selector Section */}
-      <section ref={deviceSelectorRef} className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              What Needs a Makeover?
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              We've got skins for all your tech
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-9 gap-4">
-            {[
-              { icon: LaptopIcon, label: "Laptop", filter: "laptop" },
-              { icon: SmartphoneIcon, label: "Phones", filter: "phone", showBrandSelector: true, type: "phone" as const },
-              { icon: (props: { className?: string }) => (
-                <svg className={props.className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2" y="14" width="20" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                  <circle cx="12" cy="17.5" r="0.8" fill="currentColor"/>
-                  <path d="M14.5 3.5C14.5 2.67157 13.8284 2 13 2H11C10.1716 2 9.5 2.67157 9.5 3.5V5C9.5 5.55228 9.94772 6 10.5 6H13.5C14.0523 6 14.5 5.55228 14.5 5V3.5Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                  <path d="M10 9.5C10.8284 9.5 11.5 8.82843 11.5 8C11.5 7.17157 10.8284 6.5 10 6.5C9.17157 6.5 8.5 7.17157 8.5 8C8.5 8.82843 9.17157 9.5 10 9.5Z" fill="currentColor"/>
-                  <path d="M12 11C13.1046 11 14 10.1046 14 9C14 7.89543 13.1046 7 12 7C10.8954 7 10 7.89543 10 9C10 10.1046 10.8954 11 12 11Z" fill="currentColor"/>
-                </svg>
-              ), label: "Mac Mini", filter: "mac mini", showBrandSelector: true, type: "macmini" as const },
-              { icon: PlaneIcon, label: "Drones", filter: "drone", showBrandSelector: true, type: "drone" as const },
-              { icon: CameraIcon, label: "Camera", filter: "camera", showBrandSelector: true, type: "camera" as const },
-              { icon: CircleDotIcon, label: "Lenses", filter: "lens", showBrandSelector: true, type: "lens" as const },
-              { icon: BatteryChargingIcon, label: "Chargers", filter: "charger", showBrandSelector: true, type: "charger" as const },
-              { icon: TabletSmartphoneIcon, label: "iPad/Tablet", filter: "ipad", showBrandSelector: true, type: "tablet" as const },
-              { icon: GamepadIcon, label: "Gaming Console", filter: "console", showBrandSelector: true, type: "console" as const }
-            ].map((device, index) => {
-              // Special handling for Phones, Drones, Chargers, Tablets, Consoles, Mac Mini, and Camera - open brand selector instead of filtering
-              if (device.showBrandSelector) {
-                return (
-                  <button
-                    key={index}
-                    onClick={() => {
-                      if (device.type === "phone") {
-                        setDeviceType("phone");
-                        setShowBrandSelectorDialog(true);
-                      } else if (device.type === "drone") {
-                        setDeviceType("drone");
-                        setShowDroneBrandSelectorDialog(true);
-                      } else if (device.type === "charger") {
-                        setDeviceType("charger");
-                        setShowChargerBrandSelectorDialog(true);
-                      } else if (device.type === "console") {
-                        setDeviceType("console");
-                        setShowConsoleBrandSelectorDialog(true);
-                      } else if (device.type === "tablet") {
-                        setDeviceType("tablet");
-                        setShowTabletBrandSelectorDialog(true);
-                      } else if (device.type === "macmini") {
-                        setDeviceType("macmini");
-                        setShowMacMiniBrandSelectorDialog(true);
-                      } else if (device.type === "camera") {
-                        setDeviceType("camera");
-                        setShowCameraBrandSelectorDialog(true);
-                      } else if (device.type === "lens") {
-                        setDeviceType("lens");
-                        setShowLensBrandSelectorDialog(true);
-                      }
-                    }}
-                    className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-                  >
-                    <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <device.icon className="size-8 text-primary" />
-                    </div>
-                    <span className="text-sm font-semibold text-center">{device.label}</span>
-                  </button>
-                );
-              }
-              
-              // Regular devices - navigate to filtered products page
-              return (
-                <a
-                  key={index}
-                  href={`/products?device=${device.filter}`}
-                  className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-                >
-                  <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <device.icon className="size-8 text-primary" />
-                  </div>
-                  <span className="text-sm font-semibold text-center">{device.label}</span>
-                </a>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Categories Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Pick Your Finish
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Three unique finishes, endless personality
-            </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <Card className="group relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl">
-              <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                CLASSIC
-              </div>
-              <CardContent className="pt-8 space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold">Matte Finish</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
-                  </p>
-                </div>
-                {isLoadingProducts ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="aspect-square w-full rounded-lg" />
-                    ))}
-                  </div>
-                ) : matteProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {matteProducts.map((product) => (
-                      <div key={product._id} className="aspect-square overflow-hidden rounded-lg bg-muted">
-                        {product.images[0] ? (
-                          <img 
-                            src={product.images[0].url} 
-                            alt={product.images[0].alt || product.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <PackageIcon className="size-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="aspect-square bg-gradient-to-br from-muted to-muted/50 rounded-2xl flex items-center justify-center">
-                    <div className="text-6xl">🎨</div>
-                  </div>
-                )}
-                <Button 
-                  className="w-full" 
-                  variant="outline" 
-                  onClick={scrollToDeviceSelector}
-                >
-                  Shop Matte
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="group relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl">
-              <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                PREMIUM
-              </div>
-              <CardContent className="pt-8 space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold">3D Embossed Finish</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Raised textures you can feel. Touch meets art in the most satisfying way.
-                  </p>
-                </div>
-                {isLoadingProducts ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="aspect-square w-full rounded-lg" />
-                    ))}
-                  </div>
-                ) : embossedProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {embossedProducts.map((product) => (
-                      <div key={product._id} className="aspect-square overflow-hidden rounded-lg bg-muted">
-                        {product.images[0] ? (
-                          <img 
-                            src={product.images[0].url} 
-                            alt={product.images[0].alt || product.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <PackageIcon className="size-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="aspect-square bg-gradient-to-br from-secondary/20 to-secondary/5 rounded-2xl flex items-center justify-center">
-                    <div className="text-6xl">✨</div>
-                  </div>
-                )}
-                <Button 
-                  className="w-full" 
-                  variant="outline" 
-                  onClick={scrollToDeviceSelector}
-                >
-                  Shop 3D Embossed
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="group relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl">
-              <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                SLEEK
-              </div>
-              <CardContent className="pt-8 space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold">Transparent Finish</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Show off your phone's original color with our crystal-clear protective layer.
-                  </p>
-                </div>
-                {isLoadingProducts ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <Skeleton key={i} className="aspect-square w-full rounded-lg" />
-                    ))}
-                  </div>
-                ) : transparentProducts.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    {transparentProducts.map((product) => (
-                      <div key={product._id} className="aspect-square overflow-hidden rounded-lg bg-muted">
-                        {product.images[0] ? (
-                          <img 
-                            src={product.images[0].url} 
-                            alt={product.images[0].alt || product.title}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <PackageIcon className="size-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="aspect-square bg-gradient-to-br from-accent/20 to-accent/5 rounded-2xl flex items-center justify-center">
-                    <div className="text-6xl">💎</div>
-                  </div>
-                )}
-                <Button 
-                  className="w-full" 
-                  variant="outline" 
-                  onClick={scrollToDeviceSelector}
-                >
-                  Shop Transparent
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Premium Products Showcase */}
-      <section className="py-24 px-4 bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <div className="container mx-auto max-w-7xl">
-          <div className="text-center mb-16 space-y-4">
-            <div className="inline-block px-4 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-semibold mb-4">
-              PREMIUM COLLECTION
+                Find Your Device
+              </Button>
+              <Button 
+                size="lg" 
+                variant="outline" 
+                className="text-lg px-8 py-6"
+                asChild
+              >
+                <Link to="/products">Browse All Designs</Link>
+              </Button>
             </div>
-            <h2 className="text-4xl lg:text-6xl font-bold text-balance">
-              Beyond Skins
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Elevate your entire tech ecosystem with our signature accessories
-            </p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8 lg:gap-10">
-            {/* Magneto X */}
-            <Link 
-              to="/products?collection=Magneto"
-              className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
-            >
-              <div className="absolute top-4 right-4 z-10">
-                <div className="bg-primary text-primary-foreground px-3 py-1 text-xs font-bold rounded-full shadow-lg">
-                  NEW
-                </div>
-              </div>
-              <div className="aspect-square bg-gradient-to-br from-primary/10 to-secondary/10 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgwLDAsMCwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
-                <div className="absolute inset-0 flex items-center justify-center p-8">
-                  <div className="text-8xl group-hover:scale-110 transition-transform duration-300">
-                    🧲
-                  </div>
-                </div>
-              </div>
-              <div className="p-6 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">
-                    Magneto X
-                  </h3>
-                  <div className="shrink-0 size-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-                <p className="text-muted-foreground text-sm line-clamp-2">
-                  Revolutionary magnetic accessories and mounts for seamless device connectivity.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    Magnetic
-                  </span>
-                  <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    Universal
-                  </span>
-                </div>
-              </div>
-            </Link>
-
-            {/* Magsafe Covers */}
-            <Link 
-              to="/products?collection=Covers%20And%20Cases"
-              className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
-            >
-              <div className="absolute top-4 right-4 z-10">
-                <div className="bg-accent text-accent-foreground px-3 py-1 text-xs font-bold rounded-full shadow-lg">
-                  POPULAR
-                </div>
-              </div>
-              <div className="aspect-square bg-gradient-to-br from-accent/10 to-primary/10 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgwLDAsMCwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
-                <div className="absolute inset-0 flex items-center justify-center p-8">
-                  <div className="text-8xl group-hover:scale-110 transition-transform duration-300">
-                    📱
-                  </div>
-                </div>
-              </div>
-              <div className="p-6 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">
-                    MagSafe Covers
-                  </h3>
-                  <div className="shrink-0 size-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-                <p className="text-muted-foreground text-sm line-clamp-2">
-                  Premium black covers for iPhone & Samsung. Magnetic precision meets sleek protection.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    MagSafe
-                  </span>
-                  <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    Universal Fit
-                  </span>
-                </div>
-              </div>
-            </Link>
-
-            {/* AutoApply Tempered Glass */}
-            <Link 
-              to="/products?collection=HQ%20Tempered%20Glasses"
-              className="group relative bg-card rounded-3xl overflow-hidden border-2 border-border hover:border-primary transition-all duration-300 hover:shadow-2xl hover:-translate-y-2"
-            >
-              <div className="absolute top-4 right-4 z-10">
-                <div className="bg-secondary text-secondary-foreground px-3 py-1 text-xs font-bold rounded-full shadow-lg">
-                  BEST VALUE
-                </div>
-              </div>
-              <div className="aspect-square bg-gradient-to-br from-secondary/10 to-accent/10 relative overflow-hidden">
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgwLDAsMCwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50" />
-                <div className="absolute inset-0 flex items-center justify-center p-8">
-                  <div className="text-8xl group-hover:scale-110 transition-transform duration-300">
-                    ✨
-                  </div>
-                </div>
-              </div>
-              <div className="p-6 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-2xl font-bold group-hover:text-primary transition-colors">
-                    AutoApply Guard
-                  </h3>
-                  <div className="shrink-0 size-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-                <p className="text-muted-foreground text-sm line-clamp-2">
-                  Super HQ armoured tempered glass with auto-apply tool. Bubble-free perfection, every time.
-                </p>
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    Twin Pack
-                  </span>
-                  <span className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-medium">
-                    HD Glass
-                  </span>
-                </div>
-              </div>
-            </Link>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-20 px-4 bg-muted/30">
+      {/* Features Grid */}
+      <section className="py-16 px-4 bg-muted/30">
         <div className="container mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Why We're Different
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              Because your phone deserves more than another boring case
-            </p>
-          </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="border-2 hover:border-primary transition-all hover:shadow-lg">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="size-12 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl flex items-center justify-center">
-                    <feature.icon className="size-6 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-bold">{feature.title}</h3>
+              <Card key={index} className="border-2">
+                <CardContent className="pt-6">
+                  <feature.icon className="size-12 text-primary mb-4" />
+                  <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                   <p className="text-muted-foreground">{feature.description}</p>
                 </CardContent>
               </Card>
@@ -1919,536 +494,192 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Gallery Section */}
-      <section className="py-20 px-4">
+      {/* Product Categories */}
+      <section id="products" className="py-20 px-4" ref={deviceSelectorRef}>
         <div className="container mx-auto">
-          <div className="text-center mb-16 space-y-4">
-            <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-              Fan Favorites
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-              The designs everyone's obsessed with right now
-            </p>
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Browse by Style</h2>
+            <p className="text-xl text-muted-foreground">Find the perfect finish for your device</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {[
-              "https://images.unsplash.com/photo-1582000129759-dc56c7b45cde?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHw5fHxjb2xvcmZ1bCUyMHBob25lJTIwY2FzZXMlMjBza2lucyUyMG1vZGVybnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1636703781874-ffa0c5de09aa?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHw3fHxjb2xvcmZ1bCUyMHBob25lJTIwY2FzZXMlMjBza2lucyUyMG1vZGVybnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1636703782057-cdda1439bc2c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHwzfHxjb2xvcmZ1bCUyMHBob25lJTIwY2FzZXMlMjBza2lucyUyMG1vZGVybnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1743670827800-61375c99e7a7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHw2fHxjb2xvcmZ1bCUyMHBob25lJTIwY2FzZXMlMjBza2lucyUyMG1vZGVybnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1580013989584-8c3aa8b17263?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHwyfHxjb2xvcmZ1bCUyMHBob25lJTIwY2FzZXMlMjBza2lucyUyMG1vZGVybnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1636267863852-a4897886ee2f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHwxMHx8Y29sb3JmdWwlMjBwaG9uZSUyMGNhc2VzJTIwc2tpbnMlMjBtb2Rlcm58ZW58MHx8fHwxNjYzNzIxMjUxfDA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1731039918160-a26b2b9ff126?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHw4fHxzbWFydHBob25lJTIwcHJvdGVjdGlvbiUyMHRyZW5keSUyMGRlc2lnbnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080",
-              "https://images.unsplash.com/photo-1744646355003-2f61f09b9f18?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NzIwMTN8MHwxfHNlYXJjaHw3fHxzbWFydHBob25lJTIwcHJvdGVjdGlvbiUyMHRyZW5keSUyMGRlc2lnbnxlbnwwfHx8fDE3NjM3MjEyNTF8MA&ixlib=rb-4.1.0&q=80&w=1080"
-            ].map((image, index) => (
-              <div key={index} className="group relative aspect-square overflow-hidden rounded-xl">
-                <img 
-                  src={image} 
-                  alt={`Phone skin design ${index + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+          {/* Matte Category */}
+          <div className="mb-16">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold">Matte Skins</h3>
+                <p className="text-muted-foreground">Smooth, premium, fingerprint-proof</p>
               </div>
-            ))}
+              <Button variant="ghost" asChild>
+                <Link to="/products?filter=matte">View All</Link>
+              </Button>
+            </div>
+            {isLoadingProducts ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-80 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {matteProducts.map(product => (
+                  <Link key={product._id} to={`/products/${product.slug}`}>
+                    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2">
+                      {product.images[0] && (
+                        <img 
+                          src={product.images[0].url} 
+                          alt={product.title}
+                          className="w-full h-64 object-cover"
+                        />
+                      )}
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold mb-2">{product.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          From ₹{Math.min(...product.variants.map(v => v.price))}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3D Embossed Category */}
+          <div className="mb-16">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold">3D Embossed</h3>
+                <p className="text-muted-foreground">Textured designs you can feel</p>
+              </div>
+              <Button variant="ghost" asChild>
+                <Link to="/products?filter=embossed">View All</Link>
+              </Button>
+            </div>
+            {isLoadingProducts ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-80 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {embossedProducts.map(product => (
+                  <Link key={product._id} to={`/products/${product.slug}`}>
+                    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2">
+                      {product.images[0] && (
+                        <img 
+                          src={product.images[0].url} 
+                          alt={product.title}
+                          className="w-full h-64 object-cover"
+                        />
+                      )}
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold mb-2">{product.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          From ₹{Math.min(...product.variants.map(v => v.price))}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Transparent Category */}
+          <div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-bold">Transparent (Tranzy)</h3>
+                <p className="text-muted-foreground">Show off your phone's original color</p>
+              </div>
+              <Button variant="ghost" asChild>
+                <Link to="/products?filter=transparent">View All</Link>
+              </Button>
+            </div>
+            {isLoadingProducts ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[1, 2, 3, 4].map(i => (
+                  <Skeleton key={i} className="h-80 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {transparentProducts.map(product => (
+                  <Link key={product._id} to={`/products/${product.slug}`}>
+                    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2">
+                      {product.images[0] && (
+                        <img 
+                          src={product.images[0].url} 
+                          alt={product.title}
+                          className="w-full h-64 object-cover"
+                        />
+                      )}
+                      <CardContent className="p-4">
+                        <h4 className="font-semibold mb-2">{product.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          From ₹{Math.min(...product.variants.map(v => v.price))}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto">
-          <Card className="relative overflow-hidden border-2">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-secondary/10 to-accent/10" />
-            <CardContent className="relative py-16 text-center space-y-6">
-              <h2 className="text-4xl lg:text-5xl font-bold text-balance">
-                Your Phone Called. It Wants Personality.
-              </h2>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
-                Join 10,000+ happy humans who ditched boring for bold
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center pt-4">
-                <Button size="lg" className="text-base">
-                  Shop Now
-                </Button>
-                <Button size="lg" variant="outline" className="text-base">
-                  Learn More
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <section className="py-20 px-4 bg-primary text-primary-foreground">
+        <div className="container mx-auto text-center">
+          <h2 className="text-4xl font-black mb-4">Ready to Transform Your Device?</h2>
+          <p className="text-xl mb-8 opacity-90">
+            Join thousands of happy customers rocking unique designs
+          </p>
+          <Button 
+            size="lg" 
+            variant="secondary"
+            className="text-lg px-8 py-6"
+            asChild
+          >
+            <Link to="/products">Shop Now</Link>
+          </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 px-4">
-        <div className="container mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <img 
-                  src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                  alt="Skinly" 
-                  className="h-16"
-                />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Quirky wear for your gadgets
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Shop</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">All Products</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">New Arrivals</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Best Sellers</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Support</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">Contact Us</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Shipping Info</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Returns</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="hover:text-foreground transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-foreground transition-colors">Terms of Service</a></li>
-              </ul>
-            </div>
+      <footer className="py-12 px-4 bg-muted/30 border-t">
+        <div className="container mx-auto text-center">
+          <img 
+            src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+            alt="Skinly" 
+            className="h-12 mx-auto mb-4"
+          />
+          <p className="text-muted-foreground mb-4">
+            Premium device skins with personality
+          </p>
+          <div className="flex justify-center gap-6 mb-4">
+            <Link to="/devices" className="text-sm hover:text-primary transition-colors">
+              Supported Devices
+            </Link>
+            <Link to="/orders" className="text-sm hover:text-primary transition-colors">
+              Track Order
+            </Link>
+            <a 
+              href="https://wa.me/917505273504" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-sm hover:text-primary transition-colors"
+            >
+              Contact Us
+            </a>
           </div>
-          <div className="pt-8 border-t border-border text-center text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} Skinly. All rights reserved.
-          </div>
+          </p>
         </div>
       </footer>
-
-      {/* Brand Selector Dialog */}
-      <Dialog open={showBrandSelectorDialog} onOpenChange={setShowBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Phone Brand</DialogTitle>
-            <DialogDescription>
-              Choose your phone brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "Apple", logo: "🍎" },
-              { name: "Samsung", logo: "📱" },
-              { name: "Nothing", logo: "⚫" },
-              { name: "Oppo", logo: "🔷" },
-              { name: "Realme", logo: "🟡" },
-              { name: "CMF", logo: "🔸" },
-              { name: "Vivo", logo: "🔵" },
-              { name: "iQOO", logo: "⚡" },
-              { name: "Xiaomi", logo: "🦊" },
-              { name: "Lava", logo: "🌋" },
-              { name: "Infinix", logo: "♾️" },
-              { name: "Asus", logo: "🎮" },
-              { name: "HMD", logo: "📞" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("phone");
-                  setShowBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-3 p-6 bg-card rounded-xl border-2 border-border hover:border-primary transition-all hover:shadow-lg"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Drone Brand Selector Dialog */}
-      <Dialog open={showDroneBrandSelectorDialog} onOpenChange={setShowDroneBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Drone Brand</DialogTitle>
-            <DialogDescription>
-              Choose your drone brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "DJI", logo: "🛸" },
-              { name: "Xiaomi", logo: "🦊" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("drone");
-                  setShowDroneBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Charger Brand Selector Dialog */}
-      <Dialog open={showChargerBrandSelectorDialog} onOpenChange={setShowChargerBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Charger Brand</DialogTitle>
-            <DialogDescription>
-              Choose your charger brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "Apple", logo: "🍎" },
-              { name: "OnePlus", logo: "➕" },
-              { name: "Realme", logo: "🟡" },
-              { name: "Vivo", logo: "🔵" },
-              { name: "Xiaomi", logo: "🦊" },
-              { name: "iQOO", logo: "⚡" },
-              { name: "Samsung", logo: "📱" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("charger");
-                  setShowChargerBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Tablet Brand Selector Dialog */}
-      <Dialog open={showTabletBrandSelectorDialog} onOpenChange={setShowTabletBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Tablet Brand</DialogTitle>
-            <DialogDescription>
-              Choose your tablet brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "Apple", logo: "🍎" },
-              { name: "Samsung", logo: "📱" },
-              { name: "Lenovo", logo: "💻" },
-              { name: "Xiaomi", logo: "🦊" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("tablet");
-                  setShowTabletBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Console Brand Selector Dialog */}
-      <Dialog open={showConsoleBrandSelectorDialog} onOpenChange={setShowConsoleBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Gaming Console Brand</DialogTitle>
-            <DialogDescription>
-              Choose your gaming console brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "PlayStation", logo: "🎮" },
-              { name: "Xbox", logo: "🎯" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("console");
-                  setShowConsoleBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Mac Mini Brand Selector Dialog */}
-      <Dialog open={showMacMiniBrandSelectorDialog} onOpenChange={setShowMacMiniBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Mac Mini Brand</DialogTitle>
-            <DialogDescription>
-              Choose your Mac Mini brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "Apple", logo: "🍎" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("macmini");
-                  setShowMacMiniBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Camera Brand Selector Dialog */}
-      <Dialog open={showCameraBrandSelectorDialog} onOpenChange={setShowCameraBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Camera Brand</DialogTitle>
-            <DialogDescription>
-              Choose your camera brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "Sony", logo: "📷" },
-              { name: "Nikon", logo: "📸" },
-              { name: "Canon", logo: "📹" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("camera");
-                  setShowCameraBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Lens Brand Selector Dialog */}
-      <Dialog open={showLensBrandSelectorDialog} onOpenChange={setShowLensBrandSelectorDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Select Your Lens Brand</DialogTitle>
-            <DialogDescription>
-              Choose your camera lens brand to continue
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 py-4 max-h-[60vh] overflow-y-auto">
-            {[
-              { name: "Sony", logo: "🔴" },
-              { name: "Nikon", logo: "🟡" },
-              { name: "Canon", logo: "🔵" },
-              { name: "Sigma", logo: "⚫" },
-              { name: "Tamron", logo: "🟢" },
-              { name: "Samyang", logo: "🟣" },
-              { name: "Vitrox", logo: "🟠" },
-              { name: "Tokina", logo: "🟤" },
-              { name: "Zeiss", logo: "⚪" },
-              { name: "Olympus", logo: "🔷" },
-              { name: "Fujifilm", logo: "🟥" }
-            ].map((brand, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  setSelectedBrand(brand.name);
-                  setSearchQuery("");
-                  setDeviceType("lens");
-                  setShowLensBrandSelectorDialog(false);
-                  setIsDialogOpen(true);
-                }}
-                className="group flex flex-col items-center gap-4 p-6 bg-card rounded-2xl border-2 border-border hover:border-primary transition-all hover:shadow-lg hover:-translate-y-1"
-              >
-                <div className="size-16 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform text-3xl">
-                  {brand.logo}
-                </div>
-                <span className="text-sm font-semibold text-center">{brand.name}</span>
-              </button>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Model Selector Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">
-              Select Your {selectedBrand} {
-                deviceType === "phone" ? "Model" : 
-                deviceType === "drone" ? "Drone" : 
-                deviceType === "charger" ? "Charger" : 
-                deviceType === "console" ? "Console" : 
-                deviceType === "tablet" ? "Tablet" :
-                deviceType === "macmini" ? "Mac Mini" :
-                deviceType === "lens" ? "Lens" :
-                "Camera"
-              }
-            </DialogTitle>
-            <DialogDescription>
-              Choose your {
-                deviceType === "phone" ? "phone model" : 
-                deviceType === "drone" ? "drone model" : 
-                deviceType === "charger" ? "charger model" : 
-                deviceType === "console" ? "console model" : 
-                deviceType === "tablet" ? "tablet model" :
-                deviceType === "macmini" ? "Mac Mini model" :
-                deviceType === "lens" ? "lens model" :
-                "camera model"
-              } to see compatible skins
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search Bar */}
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search models..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Model List */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-            {selectedBrand && (
-              deviceType === "phone" ? phoneModels[selectedBrand] : 
-              deviceType === "drone" ? droneModels[selectedBrand] : 
-              deviceType === "charger" ? chargerModels[selectedBrand] :
-              deviceType === "console" ? consoleModels[selectedBrand] :
-              deviceType === "tablet" ? tabletModels[selectedBrand] :
-              deviceType === "macmini" ? macMiniModels[selectedBrand] :
-              deviceType === "lens" ? lensModels[selectedBrand] :
-              cameraModels[selectedBrand]
-            )
-              ?.filter(model => 
-                searchQuery.trim() === "" || 
-                model.toLowerCase().includes(searchQuery.toLowerCase())
-              )
-              .map((model, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    window.location.href = `/products?brand=${selectedBrand.toLowerCase()}&model=${encodeURIComponent(model)}&showFinish=true`;
-                  }}
-                  className="w-full text-left p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium group-hover:text-primary transition-colors">
-                      {model}
-                    </span>
-                    <span className="text-sm text-muted-foreground group-hover:text-primary transition-colors">
-                      Select →
-                    </span>
-                  </div>
-                </button>
-              ))}
-            
-            {selectedBrand && (
-              deviceType === "phone" ? phoneModels[selectedBrand] : 
-              deviceType === "drone" ? droneModels[selectedBrand] : 
-              deviceType === "charger" ? chargerModels[selectedBrand] :
-              deviceType === "console" ? consoleModels[selectedBrand] :
-              deviceType === "tablet" ? tabletModels[selectedBrand] :
-              deviceType === "macmini" ? macMiniModels[selectedBrand] :
-              deviceType === "lens" ? lensModels[selectedBrand] :
-              cameraModels[selectedBrand]
-            )
-              ?.filter(model => 
-                searchQuery.trim() === "" || 
-                model.toLowerCase().includes(searchQuery.toLowerCase())
-              ).length === 0 && searchQuery.trim() !== "" && (
-                <div className="text-center py-8 space-y-4">
-                  <div className="text-muted-foreground">
-                    No models found matching &quot;{searchQuery}&quot;
-                  </div>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <a 
-                      href="https://wa.me/919761011121?text=I%20Want%20to%20request%20a%20model%20on%20Skinly" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <PackageIcon className="size-4" />
-                      Request Your Model
-                    </a>
-                  </Button>
-                </div>
-              )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
     </div>
   );
 }
