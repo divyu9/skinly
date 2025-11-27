@@ -150,8 +150,16 @@ export default function ProductsPage() {
     collection?._id ? { collectionId: collection._id } : "skip"
   );
   
-  // Get all collections for the dropdown
-  const allCollections = useQuery(api.collections.getAllCollections, {});
+  // Get all collections - filter by phone category if brand/model selected
+  const phoneCollections = useQuery(
+    api.collections.getCollectionsByCategory,
+    brandFilter && modelFilter ? { category: "phone" } : "skip"
+  );
+  const allCollectionsGeneral = useQuery(
+    api.collections.getAllCollections,
+    !brandFilter || !modelFilter ? {} : "skip"
+  );
+  const allCollections = brandFilter && modelFilter ? phoneCollections : allCollectionsGeneral;
 
   const testConnection = async () => {
     try {
@@ -571,49 +579,9 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Filters Section */}
-          <div className="mb-4 sm:mb-8 space-y-3 sm:space-y-4">
-            {/* Combined Sort & Stock Filter (left aligned) */}
-            <div className="flex items-center gap-3">
-              <Select 
-                value={`${sortBy}|${stockFilter}`}
-                onValueChange={(value) => {
-                  const [sort, stock] = value.split('|');
-                  setSortBy(sort);
-                  setStockFilter(stock);
-                }}
-              >
-                <SelectTrigger className="w-[120px] sm:w-[140px] h-8 sm:h-10 text-xs sm:text-sm">
-                  <SelectValue placeholder="Filters" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">SORT BY</p>
-                    <SelectItem value="default|all">Default</SelectItem>
-                    <SelectItem value="price-low-high|all">Price: Low to High</SelectItem>
-                    <SelectItem value="price-high-low|all">Price: High to Low</SelectItem>
-                    <SelectItem value="latest|all">Latest</SelectItem>
-                    <div className="border-t my-2"></div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">STOCK</p>
-                    <SelectItem value="default|in-stock">In Stock Only</SelectItem>
-                    <SelectItem value="default|out-of-stock">Out of Stock Only</SelectItem>
-                  </div>
-                </SelectContent>
-              </Select>
-
-              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
-                <Button variant="ghost" size="sm" onClick={() => {
-                  setSortBy("default");
-                  setStockFilter("all");
-                  window.location.href = '/products';
-                }} className="h-8 sm:h-10 text-xs sm:text-sm">
-                  Clear All
-                </Button>
-              )}
-            </div>
-
-            {/* Finish Tabs - Only show if brand and model are selected */}
-            {brandFilter && modelFilter && (
+          {/* Finish Tabs - Only show if brand and model are selected */}
+          {brandFilter && modelFilter && (
+            <div className="mb-4 sm:mb-6">
               <div className="border-b">
                 <div className="flex gap-1 overflow-x-auto no-scrollbar">
                   <button
@@ -662,42 +630,42 @@ export default function ProductsPage() {
                   </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Collection Tabs - Horizontal Scrollable */}
-            {allCollections && allCollections.length > 0 && (
-              <div className="overflow-x-auto no-scrollbar">
-                <div className="flex gap-2 pb-2">
+          {/* Collection Tabs - Show only phone collections when brand/model selected */}
+          {allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
+            <div className="mb-4 sm:mb-6">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}`}
+                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
+                    !collectionParam 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  All Categories
+                </button>
+                {allCollections.map((col) => (
                   <button
-                    onClick={() => window.location.href = '/products'}
+                    key={col._id}
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}`}
                     className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-                      !collectionParam 
+                      collectionParam === col.name 
                         ? 'bg-primary text-primary-foreground' 
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
                   >
-                    All Collections
+                    {col.name}
                   </button>
-                  {allCollections.map((col) => (
-                    <button
-                      key={col._id}
-                      onClick={() => window.location.href = `/products?collection=${encodeURIComponent(col.name)}`}
-                      className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
-                        collectionParam === col.name 
-                          ? 'bg-primary text-primary-foreground' 
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      {col.name}
-                    </button>
-                  ))}
-                </div>
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* Important Notice for Finish Pages */}
-          {finishFilter && (
+          {finishFilter && brandFilter && modelFilter && (
             <Card className="mb-2 sm:mb-8 border border-primary bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
               <CardContent className="p-2 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-6">
@@ -725,6 +693,48 @@ export default function ProductsPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Filters Section - Below info card */}
+          <div className="mb-4 sm:mb-8">
+            {/* Combined Sort & Stock Filter (left aligned) */}
+            <div className="flex items-center gap-3">
+              <Select 
+                value={`${sortBy}|${stockFilter}`}
+                onValueChange={(value) => {
+                  const [sort, stock] = value.split('|');
+                  setSortBy(sort);
+                  setStockFilter(stock);
+                }}
+              >
+                <SelectTrigger className="w-[120px] sm:w-[140px] h-8 sm:h-10 text-xs sm:text-sm">
+                  <SelectValue placeholder="Filters" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="p-2">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">SORT BY</p>
+                    <SelectItem value="default|all">Default</SelectItem>
+                    <SelectItem value="price-low-high|all">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high-low|all">Price: High to Low</SelectItem>
+                    <SelectItem value="latest|all">Latest</SelectItem>
+                    <div className="border-t my-2"></div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">STOCK</p>
+                    <SelectItem value="default|in-stock">In Stock Only</SelectItem>
+                    <SelectItem value="default|out-of-stock">Out of Stock Only</SelectItem>
+                  </div>
+                </SelectContent>
+              </Select>
+
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
+                <Button variant="ghost" size="sm" onClick={() => {
+                  setSortBy("default");
+                  setStockFilter("all");
+                  window.location.href = '/products';
+                }} className="h-8 sm:h-10 text-xs sm:text-sm">
+                  Clear All
+                </Button>
+              )}
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
             {sortedAndFilteredProducts.map((product) => {

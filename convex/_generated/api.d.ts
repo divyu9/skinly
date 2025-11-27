@@ -26,6 +26,8 @@ import type * as migrationInternal from "../migrationInternal.js";
 import type * as mockups from "../mockups.js";
 import type * as mockupsUpload from "../mockupsUpload.js";
 import type * as orders from "../orders.js";
+import type * as phoneCollections from "../phoneCollections.js";
+import type * as phoneCollectionsHelpers from "../phoneCollectionsHelpers.js";
 import type * as phonepe from "../phonepe.js";
 import type * as products from "../products.js";
 import type * as rapidshyp from "../rapidshyp.js";
@@ -66,6 +68,8 @@ declare const fullApi: ApiFromModules<{
   mockups: typeof mockups;
   mockupsUpload: typeof mockupsUpload;
   orders: typeof orders;
+  phoneCollections: typeof phoneCollections;
+  phoneCollectionsHelpers: typeof phoneCollectionsHelpers;
   phonepe: typeof phonepe;
   products: typeof products;
   rapidshyp: typeof rapidshyp;

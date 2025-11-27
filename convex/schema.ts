@@ -93,6 +93,15 @@ export default defineSchema({
     slug: v.string(),
     description: v.optional(v.string()),
     image: v.optional(v.string()),
+    category: v.optional(v.union(
+      v.literal("phone"),
+      v.literal("laptop"),
+      v.literal("camera"),
+      v.literal("accessory"),
+      v.literal("other")
+    )),
+    deviceType: v.optional(v.string()), // e.g., "phone", "laptop", "camera"
+    keywords: v.optional(v.array(v.string())), // Keywords for auto-assignment
     isAuto: v.optional(v.boolean()), // Whether this is an auto-collection with rules
     matchLogic: v.optional(v.union(v.literal("all"), v.literal("any"))), // "all" = AND, "any" = OR
     rules: v.optional(v.array(v.object({
@@ -107,7 +116,17 @@ export default defineSchema({
       ),
       value: v.string(),
     }))),
-  }).index("by_slug", ["slug"]),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_category", ["category"]),
+
+  collectionProducts: defineTable({
+    collectionId: v.id("collections"),
+    productId: v.id("products"),
+  })
+    .index("by_collection", ["collectionId"])
+    .index("by_product", ["productId"])
+    .index("by_collection_and_product", ["collectionId", "productId"]),
 
   products: defineTable({
     title: v.string(),

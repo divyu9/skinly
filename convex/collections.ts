@@ -11,6 +11,17 @@ export const getAllCollections = query({
   },
 });
 
+// Get collections by category
+export const getCollectionsByCategory = query({
+  args: { category: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("collections")
+      .withIndex("by_category", (q) => q.eq("category", args.category as "phone" | "laptop" | "camera" | "accessory" | "other"))
+      .collect();
+  },
+});
+
 // Get single collection
 export const getCollection = query({
   args: { collectionId: v.id("collections") },
@@ -174,7 +185,7 @@ export const deleteCollection = mutation({
   },
 });
 
-// Get products matching collection rules
+// Get products in a collection (using collectionProducts table)
 export const getCollectionProducts = query({
   args: { collectionId: v.id("collections") },
   handler: async (ctx, args) => {
@@ -186,80 +197,32 @@ export const getCollectionProducts = query({
       });
     }
 
-    // If not an auto collection, return empty
-    if (!collection.isAuto || !collection.rules || collection.rules.length === 0) {
-      return [];
-    }
+    // Get all product IDs in this collection
+    const collectionProductLinks = await ctx.db
+      .query("collectionProducts")
+      .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId))
+      .collect();
 
     // Get all products and variants
-    const allProducts = await ctx.db.query("products").collect();
-    const allVariants = await ctx.db.query("variants").collect();
-
-    // Group variants by product
-    const variantsByProduct = new Map<string, typeof allVariants>();
-    for (const variant of allVariants) {
-      const productId = variant.productId;
-      if (!variantsByProduct.has(productId)) {
-        variantsByProduct.set(productId, []);
-      }
-      variantsByProduct.get(productId)!.push(variant);
-    }
-
-    // Filter products based on rules
-    const matchLogic = collection.matchLogic || "all";
-    const matchingProducts = allProducts.filter((product) => {
-      const variants = variantsByProduct.get(product._id) || [];
-      
-      // Helper function to check if a rule matches
-      const ruleMatches = (rule: {
-        field: "productName" | "sku";
-        condition: "contains" | "startsWith" | "notContains";
-        value: string;
-      }) => {
-        const value = rule.value.toLowerCase();
+    const products = await Promise.all(
+      collectionProductLinks.map(async (link) => {
+        const product = await ctx.db.get(link.productId);
+        if (!product) return null;
         
-        if (rule.field === "productName") {
-          const productName = product.title.toLowerCase();
-          
-          if (rule.condition === "contains") {
-            return productName.includes(value);
-          } else if (rule.condition === "startsWith") {
-            return productName.startsWith(value);
-          } else if (rule.condition === "notContains") {
-            return !productName.includes(value);
-          }
-        } else if (rule.field === "sku") {
-          // Check if any variant matches the SKU condition
-          return variants.some((variant) => {
-            const sku = variant.sku.toLowerCase();
-            
-            if (rule.condition === "contains") {
-              return sku.includes(value);
-            } else if (rule.condition === "startsWith") {
-              return sku.startsWith(value);
-            } else if (rule.condition === "notContains") {
-              return !sku.includes(value);
-            }
-            return false;
-          });
-        }
+        const variants = await ctx.db
+          .query("variants")
+          .withIndex("by_product", (q) => q.eq("productId", link.productId))
+          .collect();
         
-        return false;
-      };
-      
-      // Apply match logic: "all" = AND, "any" = OR
-      if (matchLogic === "any") {
-        return collection.rules!.some(ruleMatches);
-      } else {
-        return collection.rules!.every(ruleMatches);
-      }
-    });
+        return {
+          ...product,
+          variants,
+        };
+      })
+    );
 
-    // Return products with their variants
-    return matchingProducts.map((product) => ({
-      ...product,
-      variants: variantsByProduct.get(product._id) || [],
-    }));
+    // Filter out null products
+    return products.filter((p) => p !== null);
   },
 });
 
