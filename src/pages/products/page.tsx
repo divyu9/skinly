@@ -1,4 +1,4 @@
-import { usePaginatedQuery, useAction, useQuery } from "convex/react";
+import { usePaginatedQuery, useAction, useQuery, useQueries } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
@@ -21,6 +21,50 @@ import {
 import { trackSearch, trackCollectionView } from "@/lib/analytics.ts";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
+// Component to show mockup or fallback to original image
+function ProductImage({ 
+  product, 
+  brandFilter, 
+  modelFilter 
+}: { 
+  product: { 
+    images: Array<{ url: string; alt?: string }>; 
+    title: string;
+    variants: Array<{ sku: string }>;
+  }; 
+  brandFilter: string | null; 
+  modelFilter: string | null;
+}) {
+  // Try to get mockup if brand and model are selected
+  const firstSku = product.variants[0]?.sku;
+  const mockupUrl = useQuery(
+    api.mockups.getMockupFileId,
+    brandFilter && modelFilter && firstSku
+      ? { brand: brandFilter, model: modelFilter, sku: firstSku }
+      : "skip"
+  );
+  
+  const mainImage = product.images[0];
+  const imageUrl = mockupUrl || mainImage?.url;
+  const imageAlt = mainImage?.alt || product.title;
+  
+  if (!imageUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <PackageIcon className="size-8 sm:size-16 text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  return (
+    <img
+      src={imageUrl}
+      alt={imageAlt}
+      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+    />
+  );
+}
 
 interface ConvexProduct {
   _id: Id<"products">;
@@ -635,17 +679,11 @@ export default function ProductsPage() {
               return (
                 <Card key={product._id} className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0">
                   <div className="relative aspect-square overflow-hidden bg-muted">
-                    {mainImage ? (
-                      <img
-                        src={mainImage.url}
-                        alt={mainImage.alt || product.title}
-                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <PackageIcon className="size-8 sm:size-16 text-muted-foreground" />
-                      </div>
-                    )}
+                    <ProductImage 
+                      product={product} 
+                      brandFilter={brandFilter} 
+                      modelFilter={modelFilter}
+                    />
                     {isOutOfStock && autoSortOOS && (
                       <div className="absolute top-2 left-2 right-2">
                         <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">

@@ -3,6 +3,7 @@ import { DefaultProviders } from "./components/providers/default.tsx";
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import ProductsPage from "./pages/products/page.tsx";
+import ProductConfirmPage from "./pages/products/confirm.tsx";
 import ProductDetailPage from "./pages/products/detail/page.tsx";
 import CheckoutPage from "./pages/checkout/page.tsx";
 import OrdersPage from "./pages/orders/page.tsx";
@@ -37,6 +38,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products/confirm" element={<ProductConfirmPage />} />
           <Route path="/products/detail" element={<ProductDetailPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />
