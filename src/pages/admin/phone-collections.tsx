@@ -17,7 +17,7 @@ export default function PhoneCollections() {
   } | null>(null);
 
   const runMigration = useAction(api.phoneCollections.runPhoneCollectionsMigration);
-  const collections = useQuery(api.phoneCollections.getPhoneCollectionsWithCounts);
+  const collections = useQuery(api.phoneCollectionsQueries.getPhoneCollectionsWithCounts);
 
   const handleRunMigration = async () => {
     setIsRunning(true);
