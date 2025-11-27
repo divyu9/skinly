@@ -26,7 +26,9 @@ import {
   AlertTriangleIcon,
   TagIcon,
   CopyIcon,
-  MessageCircleIcon
+  MessageCircleIcon,
+  CheckCircleIcon,
+  ClockIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -144,6 +146,10 @@ export default function ProductDetailPage() {
   // Mockup image state
   const [mockupUrl, setMockupUrl] = useState<string | null>(null);
   const [mockupLoading, setMockupLoading] = useState(false);
+  
+  // Pincode state
+  const [pincode, setPincode] = useState("");
+  const [pincodeChecked, setPincodeChecked] = useState(false);
   
   // Filter models based on search
   const filteredModels = useMemo(() => {
@@ -597,7 +603,7 @@ export default function ProductDetailPage() {
       </nav>
 
       {/* Product Detail Section */}
-      <section className="pt-20 pb-12 px-4">
+      <section className="pt-28 pb-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <Button variant="ghost" size="sm" asChild className="mb-6">
             <Link to="/products">
@@ -875,6 +881,55 @@ export default function ProductDetailPage() {
                   variantTitle={productData.variants[selectedVariant].title}
                 />
               )}
+              
+              {/* Pincode Delivery Checker */}
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    type="text"
+                    placeholder="Enter Pincode"
+                    value={pincode}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                      setPincode(value);
+                      setPincodeChecked(false);
+                    }}
+                    maxLength={6}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!/^\d{6}$/.test(pincode)) {
+                        toast.error("Please enter a valid 6-digit pincode");
+                        return;
+                      }
+                      setPincodeChecked(true);
+                    }}
+                  >
+                    Check
+                  </Button>
+                </div>
+                
+                {pincodeChecked && /^\d{6}$/.test(pincode) && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <CheckCircleIcon className="size-4 text-green-600 shrink-0" />
+                      <span className="text-green-700 font-semibold">Yay, delivery is available!</span>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm">
+                      <TruckIcon className="size-4 text-green-600 shrink-0 mt-0.5" />
+                      <span className="text-green-700">
+                        Estimated delivery: {new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} - {new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <ClockIcon className="size-4 text-green-600 shrink-0" />
+                      <span className="text-green-700">Dispatches next working day</span>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Shipping & Delivery Info */}
               <div className="border-t border-border pt-6">

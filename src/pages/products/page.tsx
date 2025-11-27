@@ -46,6 +46,16 @@ function ProductImage({
   );
   
   const mainImage = product.images[0];
+  
+  // Show loading spinner while mockup is being fetched
+  if (brandFilter && modelFilter && mockupUrl === undefined) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-muted">
+        <Loader2Icon className="size-8 sm:size-12 text-muted-foreground animate-spin" />
+      </div>
+    );
+  }
+  
   const imageUrl = mockupUrl || mainImage?.url;
   const imageAlt = mainImage?.alt || product.title;
   
@@ -58,11 +68,19 @@ function ProductImage({
   }
   
   return (
-    <img
-      src={imageUrl}
-      alt={imageAlt}
-      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-    />
+    <div className="relative w-full h-full">
+      <img
+        src={imageUrl}
+        alt={imageAlt}
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+      />
+      {/* Show "Generic Image" badge when no mockup exists but device is selected */}
+      {brandFilter && modelFilter && mockupUrl === null && (
+        <div className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-black/80 text-white rounded px-2 py-1 text-[8px] md:text-[10px] leading-tight text-center">
+          Generic Image<br />Exact Design Available
+        </div>
+      )}
+    </div>
   );
 }
 
