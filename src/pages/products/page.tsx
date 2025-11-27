@@ -706,10 +706,40 @@ export default function ProductsPage() {
           {/* Collection Tabs - Show only phone collections when brand/model selected */}
           {allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
             <div className="mb-4 sm:mb-6">
-              <div className="flex flex-wrap gap-2">
+              {/* Mobile: 2 rows max with horizontal scroll */}
+              <div className="sm:hidden overflow-x-auto no-scrollbar">
+                <div className="grid grid-flow-col auto-cols-max grid-rows-2 gap-2">
+                  <button
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}`}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+                      !collectionParam 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    All Categories
+                  </button>
+                  {allCollections.map((col) => (
+                    <button
+                      key={col._id}
+                      onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}`}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
+                        collectionParam === col.name 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {col.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Desktop: Normal flex wrap */}
+              <div className="hidden sm:flex flex-wrap gap-2">
                 <button
                   onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}`}
-                  className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
+                  className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
                     !collectionParam 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -721,7 +751,7 @@ export default function ProductsPage() {
                   <button
                     key={col._id}
                     onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}`}
-                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
                       collectionParam === col.name 
                         ? 'bg-primary text-primary-foreground' 
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'

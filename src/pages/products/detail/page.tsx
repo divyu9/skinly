@@ -631,7 +631,7 @@ export default function ProductDetailPage() {
                       }}
                     />
                     {phoneModel && mockupUrl && selectedImage === mockupUrl && (
-                      <div className="absolute top-3 right-3 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg text-center leading-tight">
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 md:bottom-auto md:top-3 md:left-auto md:right-3 md:translate-x-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg text-center leading-tight">
                         <div>Preview on {phoneModel}</div>
                         <div className="text-[10px] mt-0.5 opacity-90">Full Body Wrap</div>
                       </div>
