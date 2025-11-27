@@ -18,20 +18,30 @@ import {
 } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, lazy, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { Link } from "react-router-dom";
+import { phoneModels } from "@/lib/phone-models.ts";
+import {
+  macMiniModels,
+  lensModels,
+  cameraModels,
+  tabletModels,
+  consoleModels,
+  chargerModels,
+  droneModels
+} from "@/lib/device-models.ts";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
+// Lazy load dialogs for better initial load performance
+const Dialog = lazy(() => import("@/components/ui/dialog.tsx").then(m => ({ default: m.Dialog })));
+const DialogContent = lazy(() => import("@/components/ui/dialog.tsx").then(m => ({ default: m.DialogContent })));
+const DialogDescription = lazy(() => import("@/components/ui/dialog.tsx").then(m => ({ default: m.DialogDescription })));
+const DialogHeader = lazy(() => import("@/components/ui/dialog.tsx").then(m => ({ default: m.DialogHeader })));
+const DialogTitle = lazy(() => import("@/components/ui/dialog.tsx").then(m => ({ default: m.DialogTitle })));
 
 interface ConvexProduct {
   _id: Id<"products">;
@@ -49,247 +59,52 @@ interface ConvexProduct {
   }>;
 }
 
-// Mac Mini models data
-const macMiniModels: Record<string, string[]> = {
-  "Apple": [
-    "Mac Mini Intel (2018)",
-    "Mac Mini M1 / M1 Pro (2020)",
-    "Mac Mini M2 (2023)",
-    "Mac Mini M2 Pro (2023)",
-    "Mac Mini M4 / M4 Pro (2024)"
-  ]
-};
+export default function Index() {
+  // Query products from Convex database - optimize with smaller initial page size
+  const { results: paginatedProducts } = usePaginatedQuery(
+    api.products.getAllProductsPaginated,
+    { status: "active" },
+    { initialNumItems: 12 } // Reduced from 50 for faster FCP
+  );
+  const products = paginatedProducts || [];
+  const isLoadingProducts = !paginatedProducts;
+  
+  // Defer non-critical queries for better initial load
+  const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
+  const allSupportedModels = useQuery(api.supportedModels.listAll, { isActive: true });
+  
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [homeSearchQuery, setHomeSearchQuery] = useState("");
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
+  const deviceSelectorRef = useRef<HTMLDivElement>(null);
 
-// Camera Lens models data
-const lensModels: Record<string, string[]> = {
-  "Sony": [
-    "FE 20mm F1.8 Lens",
-    "FE 24-70mm GM Lens",
-    "FE 24-105mm F4 Lens",
-    "FE 28-70mm F3.5-5.6 Lens",
-    "24-70mm F4 Lens",
-    "10-18mm F4 Lens",
-    "12-24mm F4 G Lens",
-    "16-35mm F2.8 GM Lens",
-    "16-35mm F2.8 ZA Lens",
-    "16-35mm F4 CZ Lens",
-    "16-50mm Kit Lens",
-    "16-70mm F4 Lens",
-    "18-55mm F3.5-5.6 Lens",
-    "18-105mm F4 Lens",
-    "18-135mm F3.5-5.6 OSS Lens",
-    "18-200mm F3.5-6.3 OSS Lens",
-    "24-70mm F2.8 GM Lens",
-    "24-240mm F3.5-6.3 Lens",
-    "24mm F1.4 GM Lens",
-    "24mm F2 Lens",
-    "24mm GM Lens",
-    "25mm F2 Batis Lens",
-    "35mm F1.8 Lens",
-    "35mm F2.8 Lens",
-    "40mm F2 Batis Lens",
-    "50mm F2.8 Macro Lens",
-    "55mm F1.8 Z Lens",
-    "55mm F1.8 ZA Lens",
-    "70-200 GM SX Lens"
-  ],
-  "Nikon": [
-    "AF-S DX 18-105mm 3.5-5.6 ED Lens",
-    "AF-S DX Nikkor 18-105mm F3.5-5.6G ED VR Lens",
-    "AF-S DX Nikkor 18-200mm f3.5-5.6G ED VR II Lens",
-    "AF-S DX Nikkor 35 mm f1.8G Lens",
-    "AF-S DX Nikkor 35mm f1.8G Lens",
-    "AF-S DX Zoom-Nikkor 17-55mm f2.8G IF-ED Lens",
-    "AF-S Nikkor 14-24mm f2.8 8G ED Lens",
-    "AF-S Nikkor 16-35mm f4G ED VR Lens",
-    "AF-S Nikkor 20mm f1.8G ED Lens",
-    "AF-S Nikkor 50mm f1.4G Lens",
-    "AF-S Nikkor 50mm f1.8G Lens",
-    "AF-S Nikkor 58mm f1.4G Lens",
-    "AF-S Nikkor 70-200mm f4G ED VR Lens",
-    "AF-S Nikkor 85mm f1.8G Lens",
-    "AF-S Nikkor 105mm f1 4E ED Lens",
-    "AF-S Nikkor 105mm f2.8 VR Micro Lens",
-    "AF-S Nikkor 200-500mm f5.6E ED VR Lens",
-    "AF-S Nikkor 300 mm f4D Lens",
-    "AF-S Zoom-Nikkor 17-35mm f2.8 IF-ED Lens",
-    "Nikkor 35mm f2D Lens",
-    "Nikkor 58mm f1.4G Lens",
-    "Nikkor 85mm f1.8D Lens",
-    "Nikkor AF-S DX 18-140 mm f3.5-5.6G ED VR Lens",
-    "Nikkor Z 14-24mm f2.8 S Lens",
-    "Nikkor Z 14-30mm f4 S Lens",
-    "Nikkor Z 20mm f1.8 S Lens",
-    "Nikkor Z 24-70mm F4 S Lens",
-    "Nikkor Z 50mm f1.2 S Lens",
-    "Nikkor Z 70-200mm f2.8 VR Lens",
-    "Nikkor Z 85mm f1.8 S Lens",
-    "DX 16-50 mm 3.5-6.3 Lens"
-  ],
-  "Canon": [
-    "EF_M 18-150mm f3.5-6.3 IS STM Lens",
-    "EF-M 22mm f2 STM Lens",
-    "EF-M 55-200mm f4.5-6.3 IS STM Lens",
-    "EF-S 10-18MM f4.5-5.6 IS STM Zoom Lens",
-    "EF-S 10-22mm F3.5-4.5 UMS SIR Lens",
-    "EF-S 10-22MM F3.5-4.5 USM Wide Angle Zoom Lens",
-    "EF-S 17-55 F2.8 EFS Lens",
-    "EF-S 17-85mm f4-5.6 IS USM Lens",
-    "EF-S 18-55 F3.5-5.6 IS II Lens",
-    "EF-S 18-55 STM Lens",
-    "EF-S 18-55mm f4-5.6 IS STM Lens",
-    "EF-S 18-135 Nano USM Lens",
-    "EF-S 18-135mm f3.5-5.6 IS Lens",
-    "EF-S 18-200mm f3.5-5.6 IS Lens",
-    "EF-S 55-250mm f4.0-5.6 IS II Telephoto Zoom Lens",
-    "FF_S 55-250mm £4-5.6 IS STM Lens",
-    "FE 70-200 f2.8 Lens",
-    "RF 15-35mm F2.8L IS USM Lens",
-    "RF 18-150mm F3.5-6.3 IS STM (2022)",
-    "RF 16mm F2.8 STM",
-    "RF 24-70mm F2.8L IS USM Lens",
-    "RF 24-105mm F4-7.1 IS STM Lens",
-    "RE 24-105mm F4L IS USM Lens",
-    "RF 24-240mm f4-6.3 IS UMS Lens",
-    "RF 28-70mm F2L USM Lens",
-    "RF 35mm F1.8 Macro IS STM lens",
-    "RF 50mm F1.2L USM Lens",
-    "RF 50 mm F1.8 STM Lens",
-    "RF 70-200 F2.8 Lens",
-    "RF 85mm f1.2L USM Lens",
-    "RE 85mm f2 Macro IS STM Lens"
-  ],
-  "Sigma": [
-    "12-24mm F4 for Canon Lens Complate",
-    "14-24mm F2.8 Lens",
-    "15-30mm Lens",
-    "16mm F1.4 Lens",
-    "17-35mm F2.8 - 4 Lens",
-    "17-35mm F2.8-54 Lens",
-    "17-50mm F2.8 EX DC OS HSM Lens",
-    "18-35mm F1.8 DC for Canon - Nikon Lens Complate",
-    "18-200mm F3.5-6.3 DC for Canon - Nikon lens",
-    "20mm F1.4 Art Lens",
-    "20mm F1.4 Lens",
-    "20mm F1.8 EX DG Lens",
-    "24-35mm F2 Art Lens",
-    "24-70mm F2.8 Art for Sony Lens",
-    "24-70mm F2.8 EX DG Macro Lens",
-    "24-105mm F4 for Canon - Nikon Lens",
-    "24mm Art Lens",
-    "24mm F1.4 Art for Canon - Nikon Lens",
-    "24mm F1.4 Art for Sony Lens",
-    "28-300mm F3.5-6.3 Lens",
-    "30mm 1.4 DC DN Sony Lens",
-    "30mm F1.4 Art for Canon - Nikon Lens",
-    "30mm F1.4 DC HSM Lens",
-    "30mm F1.4 for Sony Lens",
-    "30mm F1.4 Lens",
-    "30mm F2.8 for Sony Lens",
-    "150-500mm Lens",
-    "150-600mm F5-6.3 DG Sport Lens"
-  ],
-  "Tamron": [
-    "17-28mm F2.8 Sony Lens",
-    "17-35mm F2.8 Lens",
-    "17-35mm F2.8-4 Di OSD for Nikon Lens",
-    "17-50mm F2.8 VC",
-    "17-50mm F2.8 VC for Canon Nikon Lens",
-    "17-70mm F2.8 Sony Lens",
-    "18-200mm F4.5 Lens",
-    "19-35mm F3.5-4.5 Lens",
-    "24 - 70mm G1 Lens",
-    "24-70mm F2.8 G1 Lens",
-    "24-70mm F2.8 G2 Lens",
-    "24mm F2.8 Lens",
-    "28-75mm for Canon & Nikon Lens",
-    "28-75mm for Sony Lens",
-    "28-200mm F2.8-5.6 for Sony Lens",
-    "28-300mm VC for Nikon Lens",
-    "70 -300mm F2.8 Lens",
-    "70-180mm F2.8 for Sony Lens",
-    "70-200mm 2.8 DI VC USD G2 Lens",
-    "70-200mm 2.8 Macro Lens",
-    "70-200mm F2.8 DI VC USD G1 Lens",
-    "770-300mm for Sony Lens",
-    "85mm F1.8 DI USD for Canon Nikon Lens",
-    "85mm F1.8 Di VC Lens",
-    "SP 24-70mm F2.8 G2 Lens",
-    "SP 35mm F1.4 DI USD Nikon Lens",
-    "SP 35mm F1.8 DI VC USD Lens",
-    "SP 45mm F1.8 DI VC USD for Canon Lens"
-  ],
-  "Samyang": [
-    "12mm F2.0 Lens",
-    "12mm F2.8 ED AS NCS Fisheye Lens",
-    "14mm F2.8 Sony Lens",
-    "35mm F1.4 Sony Lens",
-    "35mm F1.5 Sony Lens",
-    "85mm F1.4 Sony Lens",
-    "135mm F2.0 Lens",
-    "AF 24mm F2.8 FE Lens",
-    "AF 35mm F2.8 Lens",
-    "AF 85 F1.4 for Sony Lens",
-    "AF 85mm F1.4 EF Canon Lens",
-    "AF 85mm F1.4 Lens",
-    "AF 85mm F1.4 FE II MK2 Sony Lens",
-    "ED 12mm F2.8 Lena",
-    "FE 50mm F1.8 Lens"
-  ],
-  "Vitrox": [
-    "Vitrox Lens 85mm F1.8 Sony Lens",
-    "Vitrox Lens AF 33mm F1.4 XF Lens",
-    "Vitrox Lens 85mm F1.8 Lens",
-    "Vitrox Lens 56mm F1.4 XF Lens"
-  ],
-  "Tokina": [
-    "11-16mm Lens",
-    "16-28mm 2.8 Lens",
-    "16-28mm Fix Lens",
-    "50mm 1.4 FF Lens"
-  ],
-  "Zeiss": [
-    "Zeiss 35mm F1.4 FE Sony Lens",
-    "135mm F1.8 Zeiss Sony Lens",
-    "Carl Zeiss Sonnar 90mm F2.8 Sony Lens",
-    "24-70mm F4 Zeiss Sony Lens",
-    "32mm F1.8 Zeiss Touit Sony Lens",
-    "50mm 15 Zeiss Planar Sony Lens"
-  ],
-  "Olympus": [
-    "8mm F1",
-    "12-40mm f2",
-    "12-100mm f4",
-    "40-150mm f2"
-  ],
-  "Fujifilm": [
-    "120mm F4 Macro R LM OIS WR",
-    "GF 23mm f4 R LM WR",
-    "GF 32-64mm f4 R LM WR",
-    "GF 110 F2 R",
-    "GF 250mm f4 R LM OIS WR",
-    "XC 15-45mm F3.5-5",
-    "XC 16-50mm f3.5-5",
-    "XC 50-230mm",
-    "XF 10-24mm f4 R OIS",
-    "XF 16-55mm f2",
-    "XF 16mm F1",
-    "XF 18-55mm f2",
-    "XF 23mm f1",
-    "XF 23mm f2 R",
-    "XF 35mm f1",
-    "XF 50-140mm f2",
-    "XF 50mm F1",
-    "XF 56mm. f1",
-    "XF 60mm f2",
-    "XF 90mm f2 R LM WR",
-    "XF16-55mmF2",
-    "XF16-80mm F4 R OIS WR"
-  ]
-};
+  // Optimize initial product load - use smaller page size for faster FCP
+  const { results: products, status, loadMore } = usePaginatedQuery(
+    api.products.listProducts,
+    {},
+    { initialNumItems: 12 } // Reduced from default to improve FCP
+  );
 
-// Camera models data
-const cameraModels: Record<string, string[]> = {
+  // Defer non-critical data loads
+  const latestModels = useQuery(api.supportedModels.getLatestModels, { limit: 30 });
+  const allReviews = useQuery(api.reviews.getLatestVerifiedReviews, {});
+
+  // All device categories with models
+  const allDeviceCategories = useMemo(() => [
+    {
+      name: "Phones",
+      icon: "📱",
+      type: "phone",
+      models: phoneModels,
+    },
+    {
+      name: "Laptops",
+      icon: "💻",
+      type: "laptop",
+      models: {
   "Sony": [
     "Sony A7r3",
     "Sony A1",
