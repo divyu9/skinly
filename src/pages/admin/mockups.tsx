@@ -37,12 +37,13 @@ export default function MockupsPage() {
     brokenMockups: BrokenMockup[];
   } | null>(null);
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
-  const [currentJobId, setCurrentJobId] = useState<Id<"uploadJobs"> | null>(null);
-  const [isPaused, setIsPaused] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [activeJobIds, setActiveJobIds] = useState<Set<string>>(new Set());
+  const [pausedJobs, setPausedJobs] = useState<Map<string, File[]>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<unknown>(null);
-  const uploadAbortRef = useRef<boolean>(false);
+  const uploadAbortRefs = useRef<Map<string, boolean>>(new Map());
+  
+  const MAX_CONCURRENT_JOBS = 3;
   
   const convex = useConvex();
   const mockupsCount = useQuery(api.mockups.getMockupsCount);
@@ -281,51 +282,60 @@ export default function MockupsPage() {
   /**
    * Process file upload with job tracking (batched)
    */
-  const processFilesUpload = async (files: File[] | FileList, resumeFromBatch?: number) => {
+  const processFilesUpload = async (files: File[] | FileList, resumeFromBatch?: number, existingJobId?: Id<"uploadJobs">) => {
+    // Check if at max concurrent jobs
+    if (!existingJobId && activeJobIds.size >= MAX_CONCURRENT_JOBS) {
+      toast.error(`Maximum ${MAX_CONCURRENT_JOBS} concurrent uploads. Please wait for one to finish.`);
+      return;
+    }
+    
     const fileArray = Array.from(files);
     const BATCH_SIZE = 50;
     
-    // Check which files already exist in the database
-    toast.info("Checking for duplicate files...", { duration: 2000 });
-    
+    // Check which files already exist in the database (only for new jobs)
     let filesToUpload = fileArray;
     let alreadySkipped = 0;
     
-    try {
-      const filenames = fileArray.map(f => f.name);
-      const checkResult = await convex.query(api.mockups.checkExistingMockupFilenames, {
-        filenames,
-      });
+    if (!existingJobId) {
+      toast.info("Checking for duplicate files...", { duration: 2000 });
       
-      // Filter to only upload missing files
-      const missingSet = new Set(checkResult.missingFilenames);
-      filesToUpload = fileArray.filter(file => missingSet.has(file.name));
-      alreadySkipped = checkResult.existing;
-      
-      if (alreadySkipped > 0) {
-        toast.success(
-          `${alreadySkipped} files already uploaded! Processing ${filesToUpload.length} remaining files.`,
-          { duration: 5000 }
-        );
+      try {
+        const filenames = fileArray.map(f => f.name);
+        const checkResult = await convex.query(api.mockups.checkExistingMockupFilenames, {
+          filenames,
+        });
+        
+        // Filter to only upload missing files
+        const missingSet = new Set(checkResult.missingFilenames);
+        filesToUpload = fileArray.filter(file => missingSet.has(file.name));
+        alreadySkipped = checkResult.existing;
+        
+        if (alreadySkipped > 0) {
+          toast.success(
+            `${alreadySkipped} files already uploaded! Processing ${filesToUpload.length} remaining files.`,
+            { duration: 5000 }
+          );
+        }
+        
+        if (filesToUpload.length === 0) {
+          toast.info("All files have already been uploaded!");
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to check existing mockups:", error);
+        toast.warning("Could not check for existing files. Uploading all files...");
       }
-      
-      if (filesToUpload.length === 0) {
-        toast.info("All files have already been uploaded!");
-        return;
-      }
-    } catch (error) {
-      console.error("Failed to check existing mockups:", error);
-      toast.warning("Could not check for existing files. Uploading all files...");
     }
     
-    // Create upload job
-    const jobId = await createJob({
+    // Create or use existing upload job
+    const jobId = existingJobId || await createJob({
       jobName: `Upload ${filesToUpload.length} files`,
       totalFiles: filesToUpload.length,
     });
     
-    setCurrentJobId(jobId);
-    uploadAbortRef.current = false;
+    // Track this job as active
+    setActiveJobIds(prev => new Set(prev).add(jobId));
+    uploadAbortRefs.current.set(jobId, false);
     
     // Acquire wake lock
     await requestWakeLock();
@@ -341,7 +351,8 @@ export default function MockupsPage() {
       // Process files in batches
       for (let batchNum = startBatch; batchNum < Math.ceil(filesToUpload.length / BATCH_SIZE); batchNum++) {
         // Check if upload was paused or cancelled
-        if (uploadAbortRef.current) {
+        if (uploadAbortRefs.current.get(jobId)) {
+          const isPaused = pausedJobs.has(jobId);
           await updateJobStatus({ 
             jobId, 
             status: isPaused ? "paused" : "cancelled" 
@@ -353,12 +364,12 @@ export default function MockupsPage() {
         const endIdx = Math.min(startIdx + BATCH_SIZE, filesToUpload.length);
         const batch = filesToUpload.slice(startIdx, endIdx);
         
-        console.log(`Processing batch ${batchNum + 1}/${Math.ceil(filesToUpload.length / BATCH_SIZE)}: ${batch.length} files`);
+        console.log(`[Job ${jobId}] Processing batch ${batchNum + 1}/${Math.ceil(filesToUpload.length / BATCH_SIZE)}: ${batch.length} files`);
         
         // Process each file in the batch
         for (let i = 0; i < batch.length; i++) {
           // Check pause/cancel again
-          if (uploadAbortRef.current) {
+          if (uploadAbortRefs.current.get(jobId)) {
             break;
           }
           
@@ -447,7 +458,7 @@ export default function MockupsPage() {
       }
       
       // Mark job as complete if not cancelled/paused
-      if (!uploadAbortRef.current) {
+      if (!uploadAbortRefs.current.get(jobId)) {
         await updateJobStatus({ jobId, status: "completed" });
         toast.success(`Upload complete! ${filesUploaded} uploaded, ${filesFailed} failed`);
       }
@@ -462,7 +473,13 @@ export default function MockupsPage() {
       toast.error("Upload job failed");
     } finally {
       await releaseWakeLock();
-      setCurrentJobId(null);
+      // Remove from active jobs
+      setActiveJobIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
+      uploadAbortRefs.current.delete(jobId);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -474,7 +491,6 @@ export default function MockupsPage() {
    */
   const handleBulkUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setPendingFiles(Array.from(files));
     await processFilesUpload(files);
   };
 
@@ -482,8 +498,17 @@ export default function MockupsPage() {
    * Handle pause button
    */
   const handlePause = async (jobId: Id<"uploadJobs">) => {
-    setIsPaused(true);
-    uploadAbortRef.current = true;
+    const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
+    if (!job) return;
+    
+    // Store files for this job
+    setPausedJobs(prev => {
+      const newMap = new Map(prev);
+      newMap.set(jobId, []); // Files will need to be re-selected on resume
+      return newMap;
+    });
+    
+    uploadAbortRefs.current.set(jobId, true);
     await pauseJob({ jobId });
     toast.info("Upload paused");
   };
@@ -495,24 +520,37 @@ export default function MockupsPage() {
     const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
     if (!job) return;
     
-    setIsPaused(false);
-    uploadAbortRef.current = false;
+    uploadAbortRefs.current.set(jobId, false);
     await resumeJob({ jobId });
     
-    // Resume from the last batch
-    if (pendingFiles.length > 0) {
-      await processFilesUpload(pendingFiles, job.currentBatch);
-    }
+    // Ask user to reselect files for resume
+    toast.info("Please reselect the files to resume upload", {
+      description: "The browser cannot retain file references after pause. Select the same files to continue.",
+      duration: 8000,
+    });
+    
+    // Clean up paused jobs map
+    setPausedJobs(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(jobId);
+      return newMap;
+    });
   };
 
   /**
    * Handle cancel button
    */
   const handleCancel = async (jobId: Id<"uploadJobs">) => {
-    uploadAbortRef.current = true;
+    uploadAbortRefs.current.set(jobId, true);
     await cancelJob({ jobId });
-    setCurrentJobId(null);
-    setPendingFiles([]);
+    
+    // Clean up
+    setPausedJobs(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(jobId);
+      return newMap;
+    });
+    
     toast.info("Upload cancelled");
   };
 
@@ -868,16 +906,27 @@ export default function MockupsPage() {
                 multiple
                 className="hidden"
                 onChange={(e) => handleBulkUpload(e.target.files)}
-                disabled={currentJobId !== null}
+                disabled={activeJobIds.size >= MAX_CONCURRENT_JOBS}
               />
               
               <ImageIcon className="h-12 w-12 mx-auto text-green-600 mb-3" />
+              
+              {/* Upload slots indicator */}
+              {activeJobIds.size > 0 && (
+                <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-sm">
+                  <UploadIcon className="h-4 w-4 text-blue-600" />
+                  <span className="font-medium text-blue-700">
+                    {activeJobIds.size} / {MAX_CONCURRENT_JOBS} upload slots used
+                  </span>
+                </div>
+              )}
+              
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button
                   size="lg"
                   onClick={() => fileInputRef.current?.click()}
                   className="bg-green-600 hover:bg-green-700"
-                  disabled={currentJobId !== null}
+                  disabled={activeJobIds.size >= MAX_CONCURRENT_JOBS}
                 >
                   <UploadIcon className="h-5 w-5 mr-2" />
                   Select Files
@@ -887,7 +936,7 @@ export default function MockupsPage() {
                   onClick={handleFolderUpload}
                   variant="secondary"
                   className="border-2 border-green-600"
-                  disabled={currentJobId !== null}
+                  disabled={activeJobIds.size >= MAX_CONCURRENT_JOBS}
                 >
                   <FolderIcon className="h-5 w-5 mr-2" />
                   Select Folder
@@ -896,6 +945,11 @@ export default function MockupsPage() {
               <p className="text-sm text-muted-foreground mt-3">
                 Supports JPG, PNG, WEBP • Folder selection scans all subfolders
               </p>
+              {activeJobIds.size >= MAX_CONCURRENT_JOBS && (
+                <p className="text-sm text-amber-600 font-medium mt-2">
+                  Maximum concurrent uploads reached. Wait for one to finish.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
