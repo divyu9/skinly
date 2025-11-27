@@ -52,19 +52,11 @@ interface ConvexProduct {
   }>;
 }
 
-
 export default function Index() {
   // Query products from Convex database - use pagination for better performance
   const { results: paginatedProducts } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
-    { status: "active",
-    "Samsung Galaxy S24 Ultra (5G)",
-    "Samsung Galaxy S24 Plus",
-    "Samsung Galaxy S24 (5G)",
-    "Samsung Galaxy S24 FE (5G)",
-    "Samsung Galaxy S23 FE (5G)",
-    "Samsung Galaxy S23 (5G)",
-    "Samsung Galaxy S22 Ultra",
+    { status: "active" },
     "Samsung Galaxy S22 Plus",
     "Samsung Galaxy S22",
     "Samsung Galaxy S21 Ultra 5G",
