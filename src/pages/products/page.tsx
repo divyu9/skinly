@@ -285,8 +285,10 @@ export default function ProductsPage() {
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
     
-    // Note: Phone filtering when brand+model present is now done in backend query
-    // No need to filter again here for that case
+    // Filter to only phones when coming from phone selector
+    if (brandFilter && modelFilter) {
+      filtered = filtered.filter(p => p.gadgetCategory === "phone");
+    }
     
     // Filter by device (when not coming from phone selector)
     if (deviceFilter && !brandFilter) {
@@ -439,7 +441,7 @@ export default function ProductsPage() {
             <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=matte`}
+                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=matte${collectionParam ? `&collection=${encodeURIComponent(collectionParam)}` : ''}`}
               >
                 <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   CLASSIC
@@ -459,7 +461,7 @@ export default function ProductsPage() {
 
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=embossed`}
+                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=embossed${collectionParam ? `&collection=${encodeURIComponent(collectionParam)}` : ''}`}
               >
                 <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   PREMIUM
@@ -479,7 +481,7 @@ export default function ProductsPage() {
 
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=transparent`}
+                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=transparent${collectionParam ? `&collection=${encodeURIComponent(collectionParam)}` : ''}`}
               >
                 <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   SLEEK
@@ -713,7 +715,7 @@ export default function ProductsPage() {
               <div className="sm:hidden overflow-x-auto no-scrollbar">
                 <div className="grid grid-flow-col auto-cols-max grid-rows-2 gap-2">
                   <button
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}`}
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
                       !collectionParam 
                         ? 'bg-primary text-primary-foreground' 
@@ -725,7 +727,7 @@ export default function ProductsPage() {
                   {allCollections.map((col) => (
                     <button
                       key={col._id}
-                      onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}`}
+                      onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
                       className={`px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors ${
                         collectionParam === col.name 
                           ? 'bg-primary text-primary-foreground' 
@@ -741,7 +743,7 @@ export default function ProductsPage() {
               {/* Desktop: Normal flex wrap */}
               <div className="hidden sm:flex flex-wrap gap-2">
                 <button
-                  onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}`}
+                  onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
                   className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
                     !collectionParam 
                       ? 'bg-primary text-primary-foreground' 
@@ -753,7 +755,7 @@ export default function ProductsPage() {
                 {allCollections.map((col) => (
                   <button
                     key={col._id}
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}`}
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
                     className={`px-4 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
                       collectionParam === col.name 
                         ? 'bg-primary text-primary-foreground' 
