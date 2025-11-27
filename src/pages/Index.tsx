@@ -7,7 +7,16 @@ import {
   TruckIcon,
   SearchIcon,
   ChevronDownIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  LaptopIcon,
+  SmartphoneIcon,
+  MonitorIcon,
+  PlaneIcon,
+  CameraIcon,
+  CircleDotIcon,
+  BatteryChargingIcon,
+  TabletSmartphoneIcon,
+  GamepadIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -46,16 +55,17 @@ interface ConvexProduct {
   }>;
 }
 
+type DeviceType = "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
+
 export default function Index() {
   // Query products from Convex database - use pagination for better performance
   const { results: paginatedProducts } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
     { status: "active" },
-    { initialNumItems: 50 }
+    { initialNumItems: 100 }
   );
   const products = paginatedProducts || [];
   const isLoadingProducts = !paginatedProducts;
-  
   
   // Fetch latest supported models for marquee
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
@@ -66,6 +76,7 @@ export default function Index() {
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(null);
   
   // Ref for scrolling to device selector
   const deviceSelectorRef = useRef<HTMLElement>(null);
@@ -78,21 +89,51 @@ export default function Index() {
     });
   };
 
+  // Product category filters - reduced to 3 per category for horizontal layout
   const matteProducts = useMemo(() => 
-    products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 4),
+    products.filter(p => p.title.toLowerCase().includes('matte')).slice(0, 3),
     [products]
   );
   const embossedProducts = useMemo(() =>
     products.filter(p => 
       p.title.toLowerCase().includes('3d textured') || 
       p.title.toLowerCase().includes('3d embossed')
-    ).slice(0, 4),
+    ).slice(0, 3),
     [products]
   );
   const transparentProducts = useMemo(() =>
-    products.filter(p => p.title.toLowerCase().includes('tranzy')).slice(0, 4),
+    products.filter(p => p.title.toLowerCase().includes('tranzy')).slice(0, 3),
     [products]
   );
+
+  // Featured products - search by specific keywords
+  const featuredProducts = useMemo(() => {
+    const magneto = products.find(p => p.title.toLowerCase().includes('magneto x'));
+    const autoapply = products.find(p => p.title.toLowerCase().includes('autoapply guard'));
+    const magsafe = products.find(p => p.title.toLowerCase().includes('magsafe'));
+    
+    return [magneto, autoapply, magsafe].filter(Boolean) as ConvexProduct[];
+  }, [products]);
+
+  // Device types with icons
+  const deviceTypes = [
+    { type: "phone" as DeviceType, icon: SmartphoneIcon, label: "Phones", models: phoneModels },
+    { type: "camera" as DeviceType, icon: CameraIcon, label: "Cameras", models: cameraModels },
+    { type: "lens" as DeviceType, icon: CircleDotIcon, label: "Lenses", models: lensModels },
+    { type: "tablet" as DeviceType, icon: TabletSmartphoneIcon, label: "Tablets", models: tabletModels },
+    { type: "macmini" as DeviceType, icon: LaptopIcon, label: "Mac Mini", models: macMiniModels },
+    { type: "console" as DeviceType, icon: GamepadIcon, label: "Gaming Consoles", models: consoleModels },
+    { type: "drone" as DeviceType, icon: PlaneIcon, label: "Drones", models: droneModels },
+    { type: "charger" as DeviceType, icon: BatteryChargingIcon, label: "Chargers", models: chargerModels }
+  ];
+
+  // Get brands for selected device type
+  const selectedDeviceBrands = useMemo(() => {
+    if (!selectedDeviceType) return [];
+    const deviceInfo = deviceTypes.find(d => d.type === selectedDeviceType);
+    if (!deviceInfo) return [];
+    return Object.keys(deviceInfo.models).sort();
+  }, [selectedDeviceType]);
 
   // Enhanced search results - searches devices, products, and SKUs
   const searchResults = useMemo(() => {
@@ -266,12 +307,10 @@ export default function Index() {
       {latestModels && latestModels.length > 0 && (
         <div className="w-full bg-primary/5 border-y border-primary/10 py-3 mt-24 overflow-hidden">
           <div className="flex items-center gap-4">
-            {/* Fixed Label with Contrasting Background */}
             <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
               <span>✨</span>
               <span className="whitespace-nowrap">Now supporting:</span>
             </div>
-            {/* Scrolling Content Container */}
             <div className="flex-1 overflow-hidden">
               <div className="animate-marquee flex gap-3 whitespace-nowrap">
                 {(() => {
@@ -478,8 +517,213 @@ export default function Index() {
         </div>
       </section>
 
+      {/* Device & Brand Selector */}
+      <section ref={deviceSelectorRef} className="py-16 px-4 bg-muted/20">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Select Your Device</h2>
+            <p className="text-xl text-muted-foreground">Choose your gadget type and brand</p>
+          </div>
+
+          {/* Device Type Selector */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+            {deviceTypes.map(({ type, icon: Icon, label }) => (
+              <button
+                key={type}
+                onClick={() => setSelectedDeviceType(type)}
+                className={`p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-3 hover:shadow-lg ${
+                  selectedDeviceType === type
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:border-primary/50'
+                }`}
+              >
+                <Icon className={`size-8 ${selectedDeviceType === type ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className="text-sm font-medium text-center">{label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Brand Selector */}
+          {selectedDeviceType && selectedDeviceBrands.length > 0 && (
+            <div className="mt-8">
+              <h3 className="text-2xl font-bold mb-6 text-center">Choose Your Brand</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {selectedDeviceBrands.map(brand => (
+                  <Link
+                    key={brand}
+                    to={`/products?brand=${encodeURIComponent(brand)}`}
+                    className="p-6 rounded-lg border-2 border-border hover:border-primary hover:shadow-lg transition-all text-center font-semibold"
+                  >
+                    {brand}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Product Categories - Horizontal Layout */}
+      <section id="products" className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Browse by Style</h2>
+            <p className="text-xl text-muted-foreground">Find the perfect finish for your device</p>
+          </div>
+
+          {isLoadingProducts ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-96 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Matte Category */}
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold mb-2">Matte Skins</h3>
+                    <p className="text-muted-foreground text-sm mb-4">Smooth, premium, fingerprint-proof</p>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    {matteProducts.map(product => (
+                      <Link key={product._id} to={`/products/${product.slug}`}>
+                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          {product.images[0] && (
+                            <img 
+                              src={product.images[0].url} 
+                              alt={product.title}
+                              className="size-20 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              From ₹{Math.min(...product.variants.map(v => v.price))}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/products?filter=matte">View All Matte</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* 3D Embossed Category */}
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold mb-2">3D Embossed</h3>
+                    <p className="text-muted-foreground text-sm mb-4">Textured designs you can feel</p>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    {embossedProducts.map(product => (
+                      <Link key={product._id} to={`/products/${product.slug}`}>
+                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          {product.images[0] && (
+                            <img 
+                              src={product.images[0].url} 
+                              alt={product.title}
+                              className="size-20 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              From ₹{Math.min(...product.variants.map(v => v.price))}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/products?filter=embossed">View All Embossed</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Transparent Category */}
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold mb-2">Transparent (Tranzy)</h3>
+                    <p className="text-muted-foreground text-sm mb-4">Show off your phone's original color</p>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    {transparentProducts.map(product => (
+                      <Link key={product._id} to={`/products/${product.slug}`}>
+                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          {product.images[0] && (
+                            <img 
+                              src={product.images[0].url} 
+                              alt={product.title}
+                              className="size-20 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              From ₹{Math.min(...product.variants.map(v => v.price))}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/products?filter=transparent">View All Transparent</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Featured Products */}
+      {featuredProducts.length > 0 && (
+        <section className="py-20 px-4 bg-muted/30">
+          <div className="container mx-auto">
+            <div className="text-center mb-12">
+              <h2 className="text-4xl font-black mb-4">Featured Products</h2>
+              <p className="text-xl text-muted-foreground">Our hero products you can't miss</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {featuredProducts.map(product => (
+                <Link key={product._id} to={`/products/${product.slug}`}>
+                  <Card className="overflow-hidden hover:shadow-xl transition-shadow border-2 h-full">
+                    {product.images[0] && (
+                      <img 
+                        src={product.images[0].url} 
+                        alt={product.title}
+                        className="w-full h-72 object-cover"
+                      />
+                    )}
+                    <CardContent className="p-6">
+                      <h3 className="text-2xl font-bold mb-3">{product.title}</h3>
+                      <p className="text-muted-foreground mb-4 line-clamp-3">{product.description}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-lg font-semibold">
+                          From ₹{Math.min(...product.variants.map(v => v.price))}
+                        </p>
+                        <Button size="sm">Shop Now</Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Features Grid */}
-      <section className="py-16 px-4 bg-muted/30">
+      <section className="py-16 px-4">
         <div className="container mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
@@ -491,142 +735,6 @@ export default function Index() {
                 </CardContent>
               </Card>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Product Categories */}
-      <section id="products" className="py-20 px-4" ref={deviceSelectorRef}>
-        <div className="container mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-black mb-4">Browse by Style</h2>
-            <p className="text-xl text-muted-foreground">Find the perfect finish for your device</p>
-          </div>
-
-          {/* Matte Category */}
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-2xl font-bold">Matte Skins</h3>
-                <p className="text-muted-foreground">Smooth, premium, fingerprint-proof</p>
-              </div>
-              <Button variant="ghost" asChild>
-                <Link to="/products?filter=matte">View All</Link>
-              </Button>
-            </div>
-            {isLoadingProducts ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-80 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {matteProducts.map(product => (
-                  <Link key={product._id} to={`/products/${product.slug}`}>
-                    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2">
-                      {product.images[0] && (
-                        <img 
-                          src={product.images[0].url} 
-                          alt={product.title}
-                          className="w-full h-64 object-cover"
-                        />
-                      )}
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold mb-2">{product.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          From ₹{Math.min(...product.variants.map(v => v.price))}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 3D Embossed Category */}
-          <div className="mb-16">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-2xl font-bold">3D Embossed</h3>
-                <p className="text-muted-foreground">Textured designs you can feel</p>
-              </div>
-              <Button variant="ghost" asChild>
-                <Link to="/products?filter=embossed">View All</Link>
-              </Button>
-            </div>
-            {isLoadingProducts ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-80 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {embossedProducts.map(product => (
-                  <Link key={product._id} to={`/products/${product.slug}`}>
-                    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2">
-                      {product.images[0] && (
-                        <img 
-                          src={product.images[0].url} 
-                          alt={product.title}
-                          className="w-full h-64 object-cover"
-                        />
-                      )}
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold mb-2">{product.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          From ₹{Math.min(...product.variants.map(v => v.price))}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Transparent Category */}
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-2xl font-bold">Transparent (Tranzy)</h3>
-                <p className="text-muted-foreground">Show off your phone's original color</p>
-              </div>
-              <Button variant="ghost" asChild>
-                <Link to="/products?filter=transparent">View All</Link>
-              </Button>
-            </div>
-            {isLoadingProducts ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} className="h-80 w-full" />
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {transparentProducts.map(product => (
-                  <Link key={product._id} to={`/products/${product.slug}`}>
-                    <Card className="overflow-hidden hover:shadow-lg transition-shadow border-2">
-                      {product.images[0] && (
-                        <img 
-                          src={product.images[0].url} 
-                          alt={product.title}
-                          className="w-full h-64 object-cover"
-                        />
-                      )}
-                      <CardContent className="p-4">
-                        <h4 className="font-semibold mb-2">{product.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          From ₹{Math.min(...product.variants.map(v => v.price))}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </section>
