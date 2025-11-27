@@ -569,66 +569,129 @@ export default function ProductsPage() {
                 />
               </div>
             </div>
-            
-            {/* Sorting and Filtering - Compact on mobile */}
-            <div className="max-w-4xl mx-auto pt-1 sm:pt-6 flex flex-wrap gap-1.5 sm:gap-3 justify-center items-center">
-              {/* Collections Filter */}
+          </div>
+
+          {/* Filters Section */}
+          <div className="mb-4 sm:mb-8 space-y-3 sm:space-y-4">
+            {/* Combined Sort & Stock Filter (left aligned) */}
+            <div className="flex items-center gap-3">
               <Select 
-                value={collectionParam || "all"} 
+                value={`${sortBy}|${stockFilter}`}
                 onValueChange={(value) => {
-                  if (value === "all") {
-                    window.location.href = '/products';
-                  } else {
-                    window.location.href = `/products?collection=${encodeURIComponent(value)}`;
-                  }
+                  const [sort, stock] = value.split('|');
+                  setSortBy(sort);
+                  setStockFilter(stock);
                 }}
               >
-                <SelectTrigger className="w-[110px] sm:w-[180px] h-7 sm:h-10 text-[10px] sm:text-sm">
-                  <SelectValue placeholder="Collection" />
+                <SelectTrigger className="w-[120px] sm:w-[140px] h-8 sm:h-10 text-xs sm:text-sm">
+                  <SelectValue placeholder="Filters" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Collections</SelectItem>
-                  {allCollections?.map((col) => (
-                    <SelectItem key={col._id} value={col.name}>
-                      {col.name}
-                    </SelectItem>
-                  ))}
+                  <div className="p-2">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">SORT BY</p>
+                    <SelectItem value="default|all">Default</SelectItem>
+                    <SelectItem value="price-low-high|all">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high-low|all">Price: High to Low</SelectItem>
+                    <SelectItem value="latest|all">Latest</SelectItem>
+                    <div className="border-t my-2"></div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">STOCK</p>
+                    <SelectItem value="default|in-stock">In Stock Only</SelectItem>
+                    <SelectItem value="default|out-of-stock">Out of Stock Only</SelectItem>
+                  </div>
                 </SelectContent>
               </Select>
-              
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[110px] sm:w-[200px] h-7 sm:h-10 text-[10px] sm:text-sm">
-                  <SelectValue placeholder="Sort" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="price-low-high">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high-low">Price: High to Low</SelectItem>
-                  <SelectItem value="latest">Latest</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={stockFilter} onValueChange={setStockFilter}>
-                <SelectTrigger className="w-[100px] sm:w-[180px] h-7 sm:h-10 text-[10px] sm:text-sm">
-                  <SelectValue placeholder="Stock" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="in-stock">In Stock</SelectItem>
-                  <SelectItem value="out-of-stock">Out of Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
-              <div className="pt-1 sm:pt-4">
-                <Button variant="outline" size="sm" onClick={() => {
+
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
+                <Button variant="ghost" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
                   window.location.href = '/products';
-                }} className="h-6 sm:h-10 text-[10px] sm:text-sm px-2 sm:px-4">
-                  Clear Filters
+                }} className="h-8 sm:h-10 text-xs sm:text-sm">
+                  Clear All
                 </Button>
+              )}
+            </div>
+
+            {/* Finish Tabs - Only show if brand and model are selected */}
+            {brandFilter && modelFilter && (
+              <div className="border-b">
+                <div className="flex gap-1 overflow-x-auto no-scrollbar">
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams(window.location.search);
+                      params.delete('finish');
+                      window.location.href = `/products?${params.toString()}`;
+                    }}
+                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                      !finishFilter 
+                        ? 'border-primary text-primary' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    All Finishes
+                  </button>
+                  <button
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=matte`}
+                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                      finishFilter === 'matte' 
+                        ? 'border-primary text-primary' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Matte
+                  </button>
+                  <button
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=embossed`}
+                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                      finishFilter === 'embossed' 
+                        ? 'border-primary text-primary' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    3D Embossed
+                  </button>
+                  <button
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=transparent`}
+                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                      finishFilter === 'transparent' 
+                        ? 'border-primary text-primary' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Transparent
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Collection Tabs - Horizontal Scrollable */}
+            {allCollections && allCollections.length > 0 && (
+              <div className="overflow-x-auto no-scrollbar">
+                <div className="flex gap-2 pb-2">
+                  <button
+                    onClick={() => window.location.href = '/products'}
+                    className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
+                      !collectionParam 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    All Collections
+                  </button>
+                  {allCollections.map((col) => (
+                    <button
+                      key={col._id}
+                      onClick={() => window.location.href = `/products?collection=${encodeURIComponent(col.name)}`}
+                      className={`px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full whitespace-nowrap transition-colors ${
+                        collectionParam === col.name 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {col.name}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

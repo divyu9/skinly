@@ -163,3 +163,13 @@
 .animate-marquee {
   animation: marquee 15s linear infinite;
 }
+
+/* Hide scrollbar for horizontal tabs */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
