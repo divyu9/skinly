@@ -31,6 +31,7 @@ import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
 import FixCollectionsPage from "./pages/admin/fix-collections.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
+import AccountPage from "./pages/account/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/account" element={<AccountPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/confirm" element={<ProductConfirmPage />} />
           <Route path="/products/detail" element={<ProductDetailPage />} />

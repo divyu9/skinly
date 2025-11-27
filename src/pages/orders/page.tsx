@@ -11,7 +11,7 @@ import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 
 function OrdersPageInner() {
-  const orders = useQuery(api.orders.getOrders);
+  const orders = useQuery(api.orders.getOrders, {});
 
   const getStatusColor = (status: string) => {
     switch (status) {

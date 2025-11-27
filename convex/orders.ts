@@ -131,8 +131,8 @@ export const createOrder = mutation({
 
 // Get all orders for the current user
 export const getOrders = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new ConvexError({
@@ -155,11 +155,12 @@ export const getOrders = query({
       });
     }
 
-    const orders = await ctx.db
+    let ordersQuery = ctx.db
       .query("orders")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .order("desc")
-      .collect();
+      .order("desc");
+    
+    const orders = args.limit ? await ordersQuery.take(args.limit) : await ordersQuery.collect();
 
     return orders;
   },

@@ -33,6 +33,7 @@ import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
+import { MobileNav } from "@/components/mobile-nav.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { phoneModels } from "@/lib/phone-models.ts";
 import {
@@ -322,28 +323,17 @@ export default function Index() {
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-2">
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
-              className="h-16"
+              className="h-12 md:h-16"
             />
-          </div>
-          <div className="flex items-center gap-6">
-            <a href="#products" className="text-sm font-medium hover:text-primary transition-colors">
-              Categories
-            </a>
-            <a href="/products" className="text-sm font-medium hover:text-primary transition-colors">
-              All Products
-            </a>
-            <Link to="/devices" className="text-sm font-medium hover:text-primary transition-colors">
-              Devices
-            </Link>
-            <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
-              My Orders
-            </Link>
-            <CartButton />
-          </div>
+          </Link>
+          <MobileNav 
+            onGadgetSelectorClick={() => setDialogOpen(true)}
+            onPhoneSelectorClick={() => phoneBrandSelectorRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          />
         </div>
       </nav>
 
