@@ -750,6 +750,128 @@ export default function Index() {
         </div>
       </section>
 
+      {/* Product Categories - Horizontal Layout */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Browse by Style</h2>
+            <p className="text-xl text-muted-foreground">Find the perfect finish for your device</p>
+          </div>
+
+          {isLoadingProducts ? (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map(i => (
+                <Skeleton key={i} className="h-96 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Matte Category */}
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold mb-2">Matte Skins</h3>
+                    <p className="text-muted-foreground text-sm mb-4">Smooth, premium, fingerprint-proof</p>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    {matteProducts.slice(0, 3).map(product => (
+                      <Link key={product._id} to={`/products/${product.slug}`}>
+                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          {product.images[0] && (
+                            <img 
+                              src={product.images[0].url} 
+                              alt={product.title}
+                              className="size-20 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              From ₹{Math.min(...product.variants.map(v => v.price))}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/products?filter=matte">View All Matte</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* 3D Embossed Category */}
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold mb-2">3D Embossed</h3>
+                    <p className="text-muted-foreground text-sm mb-4">Textured designs you can feel</p>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    {embossedProducts.slice(0, 3).map(product => (
+                      <Link key={product._id} to={`/products/${product.slug}`}>
+                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          {product.images[0] && (
+                            <img 
+                              src={product.images[0].url} 
+                              alt={product.title}
+                              className="size-20 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              From ₹{Math.min(...product.variants.map(v => v.price))}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/products?filter=embossed">View All Embossed</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Transparent Category */}
+              <Card className="border-2">
+                <CardContent className="p-6">
+                  <div className="mb-4">
+                    <h3 className="text-2xl font-bold mb-2">Transparent (Tranzy)</h3>
+                    <p className="text-muted-foreground text-sm mb-4">Show off your phone's original color</p>
+                  </div>
+                  <div className="space-y-3 mb-4">
+                    {transparentProducts.slice(0, 3).map(product => (
+                      <Link key={product._id} to={`/products/${product.slug}`}>
+                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                          {product.images[0] && (
+                            <img 
+                              src={product.images[0].url} 
+                              alt={product.title}
+                              className="size-20 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                            <p className="text-xs text-muted-foreground">
+                              From ₹{Math.min(...product.variants.map(v => v.price))}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  <Button variant="outline" className="w-full" asChild>
+                    <Link to="/products?filter=transparent">View All Transparent</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Beyond Skins - Premium Collection */}
       <section className="py-20 px-4 bg-gradient-to-br from-cyan-50 via-purple-50 to-pink-50">
         <div className="container mx-auto">

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -49,10 +49,24 @@ const brandLogos: Record<string, string> = {
 
 export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: DeviceSelectorDialogProps) {
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3>(initialDeviceType ? 2 : 1);
-  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(initialDeviceType || null);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Update state when dialog opens with initialDeviceType
+  useEffect(() => {
+    if (open && initialDeviceType) {
+      setSelectedDeviceType(initialDeviceType);
+      setStep(2);
+    } else if (!open) {
+      // Reset when dialog closes
+      setStep(1);
+      setSelectedDeviceType(null);
+      setSelectedBrand(null);
+      setSearchQuery("");
+    }
+  }, [open, initialDeviceType]);
 
   // Get device models based on type
   const deviceModels = useMemo(() => {
@@ -126,13 +140,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
 
   const handleClose = () => {
     onOpenChange(false);
-    // Reset after animation
-    setTimeout(() => {
-      setStep(1);
-      setSelectedDeviceType(null);
-      setSelectedBrand(null);
-      setSearchQuery("");
-    }, 200);
+    // Reset is handled by useEffect
   };
 
   const getDeviceTypeLabel = (type: DeviceType): string => {
