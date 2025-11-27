@@ -180,13 +180,12 @@ export const getPhoneCollections = query({
 export const getPhoneCollectionsWithCounts = query({
   args: {},
   handler: async (ctx) => {
-    const collections = await ctx.db
-      .query("collections")
-      .filter((q) => q.eq(q.field("category"), "phone"))
-      .collect();
+    // Get all collections and filter for phone category
+    const allCollections = await ctx.db.query("collections").collect();
+    const phoneCollections = allCollections.filter(c => c.category === "phone");
     
     const collectionsWithCounts = await Promise.all(
-      collections.map(async (collection) => {
+      phoneCollections.map(async (collection) => {
         const productLinks = await ctx.db
           .query("collectionProducts")
           .withIndex("by_collection", (q) => q.eq("collectionId", collection._id))
