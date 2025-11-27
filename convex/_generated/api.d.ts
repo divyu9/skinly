@@ -14,6 +14,7 @@ import type * as admin_orders from "../admin/orders.js";
 import type * as cart from "../cart.js";
 import type * as collections from "../collections.js";
 import type * as coupons from "../coupons.js";
+import type * as ensureGadgetCategory from "../ensureGadgetCategory.js";
 import type * as exports from "../exports.js";
 import type * as fixCoupon from "../fixCoupon.js";
 import type * as googleDriveImport from "../googleDriveImport.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   cart: typeof cart;
   collections: typeof collections;
   coupons: typeof coupons;
+  ensureGadgetCategory: typeof ensureGadgetCategory;
   exports: typeof exports;
   fixCoupon: typeof fixCoupon;
   googleDriveImport: typeof googleDriveImport;

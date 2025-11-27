@@ -39,6 +39,7 @@ function NewProductPageInner() {
     status: "active" | "draft" | "archived";
     images: Array<{ url: string; alt: string }>;
     tags: string;
+    gadgetCategory: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
   }>({
     title: "",
     slug: "",
@@ -48,6 +49,7 @@ function NewProductPageInner() {
     status: "active",
     images: [{ url: "", alt: "" }],
     tags: "",
+    gadgetCategory: "phone", // Default to phone
   });
 
   const [variants, setVariants] = useState<Variant[]>([
@@ -118,6 +120,7 @@ function NewProductPageInner() {
         status: formData.status,
         images: formData.images.filter((img) => img.url),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
+        gadgetCategory: formData.gadgetCategory,
       });
 
       // Create variants
@@ -394,6 +397,33 @@ function NewProductPageInner() {
                     </SelectContent>
                   </Select>
                 )}
+              </div>
+
+              <div>
+                <Label htmlFor="gadgetCategory">Gadget Category</Label>
+                <Select
+                  value={formData.gadgetCategory}
+                  onValueChange={(value: typeof formData.gadgetCategory) =>
+                    setFormData({ ...formData, gadgetCategory: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="phone">Phone</SelectItem>
+                    <SelectItem value="laptop">Laptop</SelectItem>
+                    <SelectItem value="tablet">Tablet</SelectItem>
+                    <SelectItem value="camera">Camera</SelectItem>
+                    <SelectItem value="lens">Lens</SelectItem>
+                    <SelectItem value="drone">Drone</SelectItem>
+                    <SelectItem value="charger">Charger</SelectItem>
+                    <SelectItem value="console">Console</SelectItem>
+                    <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                    <SelectItem value="cover">Cover</SelectItem>
+                    <SelectItem value="accessory">Accessory</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>

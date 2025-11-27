@@ -60,6 +60,7 @@ export const createProductInternal = internalMutation({
       status: args.status,
       images: args.images,
       tags: args.tags,
+      gadgetCategory: "phone", // Default to phone for imported products
     });
 
     return productId;

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 
 export default function ProductFieldsMigration() {
   const [isRunning, setIsRunning] = useState(false);
+  const [isRunningQuick, setIsRunningQuick] = useState(false);
   const [results, setResults] = useState<{
     totalProducts: number;
     categoriesAssigned: number;
@@ -19,8 +20,15 @@ export default function ProductFieldsMigration() {
     unmatchedProducts: string[];
     unmatchedCount: number;
   } | null>(null);
+  const [quickResults, setQuickResults] = useState<{
+    total: number;
+    updated: number;
+    alreadySet: number;
+    message: string;
+  } | null>(null);
 
   const runMigration = useMutation(api.migrateProductFields.migrateProductFields);
+  const ensureCategories = useMutation(api.ensureGadgetCategory.ensureAllProductsHaveCategory);
 
   const handleRunMigration = async () => {
     setIsRunning(true);
@@ -37,6 +45,21 @@ export default function ProductFieldsMigration() {
     }
   };
 
+  const handleEnsureCategories = async () => {
+    setIsRunningQuick(true);
+    setQuickResults(null);
+    try {
+      const result = await ensureCategories({});
+      setQuickResults(result);
+      toast.success("Category safety check completed!");
+    } catch (error) {
+      toast.error("Safety check failed: " + (error as Error).message);
+      console.error(error);
+    } finally {
+      setIsRunningQuick(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminHeader />
@@ -49,6 +72,65 @@ export default function ProductFieldsMigration() {
               Auto-assign gadgetCategory and finishType fields to all products based on their titles
             </p>
           </div>
+
+          {/* Quick Safety Check Card */}
+          <Card className="border-orange-200 bg-orange-50/50 dark:bg-orange-950/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                <AlertCircle className="size-5" />
+                Safety Check: Ensure All Products Have Category
+              </CardTitle>
+              <CardDescription>
+                Run this first to ensure all products have a gadgetCategory before enabling the database index
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-orange-100/50 dark:bg-orange-900/20 p-4 rounded-lg space-y-2 border border-orange-200 dark:border-orange-800">
+                <p className="text-sm">
+                  <strong>Purpose:</strong> This sets <code className="bg-background px-1.5 py-0.5 rounded">gadgetCategory = "phone"</code> for any products that don't have it yet.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  This is a required step before making gadgetCategory a required field in the database schema.
+                </p>
+              </div>
+
+              <Button
+                onClick={handleEnsureCategories}
+                disabled={isRunningQuick}
+                size="lg"
+                className="w-full"
+                variant="default"
+              >
+                {isRunningQuick ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Running Safety Check...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 size-4" />
+                    Run Safety Check Now
+                  </>
+                )}
+              </Button>
+
+              {quickResults && (
+                <div className="space-y-2 mt-4 pt-4 border-t border-orange-200">
+                  <div className="flex items-start gap-3 text-sm">
+                    <CheckCircle2 className="size-5 text-green-500 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">{quickResults.message}</p>
+                      <ul className="space-y-1 text-muted-foreground mt-1">
+                        <li>• Total products: <strong>{quickResults.total}</strong></li>
+                        <li>• Updated: <strong>{quickResults.updated}</strong></li>
+                        <li>• Already had category: <strong>{quickResults.alreadySet}</strong></li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Migration Card */}
           <Card>

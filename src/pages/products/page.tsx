@@ -716,37 +716,7 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Important Notice for Finish Pages */}
-          {finishFilter && brandFilter && modelFilter && (
-            <Card className="mb-2 sm:mb-8 border border-primary bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
-              <CardContent className="p-2 sm:p-6">
-                <div className="flex items-center gap-2 sm:gap-6">
-                  {/* Left side - Icons - Hidden on mobile */}
-                  <div className="hidden sm:flex gap-2 sm:gap-3 shrink-0">
-                    <div className="size-12 sm:size-16 bg-gradient-to-br from-primary to-secondary rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg">
-                      📱
-                    </div>
-                    <div className="size-12 sm:size-16 bg-gradient-to-br from-secondary to-accent rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg">
-                      ✨
-                    </div>
-                    <div className="size-12 sm:size-16 bg-gradient-to-br from-accent to-primary rounded-xl sm:rounded-2xl flex items-center justify-center text-2xl sm:text-3xl shadow-lg">
-                      ✓
-                    </div>
-                  </div>
-                  
-                  {/* Right side - Text */}
-                  <div className="flex-1 text-left space-y-0 sm:space-y-2">
-                    <div className="flex items-center gap-1 sm:gap-2">
-                      <InfoIcon className="size-3 sm:size-5 text-primary shrink-0" />
-                      <h3 className="text-xs sm:text-2xl font-bold text-primary">All designs available for your device!</h3>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Filters Section - Below info card */}
+          {/* Filters Section */}
           <div className="mb-4 sm:mb-8">
             {/* Combined Sort & Stock Filter (left aligned) */}
             <div className="flex items-center gap-3">

@@ -162,7 +162,8 @@ export default defineSchema({
   })
     .index("by_slug", ["slug"])
     .index("by_collection", ["collectionId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_status_and_category", ["status", "gadgetCategory"]),
 
   variants: defineTable({
     productId: v.id("products"),

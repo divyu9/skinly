@@ -26,7 +26,14 @@ export const getAllProductsPaginated = query({
   handler: async (ctx, args) => {
     let productsQuery;
 
-    if (args.status) {
+    // Use compound index when both status and gadgetCategory are specified
+    if (args.status && args.gadgetCategory) {
+      productsQuery = ctx.db
+        .query("products")
+        .withIndex("by_status_and_category", (q) => 
+          q.eq("status", args.status!).eq("gadgetCategory", args.gadgetCategory!)
+        );
+    } else if (args.status) {
       productsQuery = ctx.db
         .query("products")
         .withIndex("by_status", (q) => q.eq("status", args.status!));
@@ -35,32 +42,6 @@ export const getAllProductsPaginated = query({
     }
 
     const result = await productsQuery.paginate(args.paginationOpts);
-    
-    // Filter by gadgetCategory if specified
-    let filteredPage = result.page;
-    if (args.gadgetCategory) {
-      filteredPage = result.page.filter((product) => {
-        // If gadgetCategory is set, use it
-        if (product.gadgetCategory) {
-          return product.gadgetCategory === args.gadgetCategory;
-        }
-        // Fallback to title matching for products without gadgetCategory
-        const titleLower = product.title.toLowerCase();
-        if (args.gadgetCategory === "phone") {
-          const hasSkin = titleLower.includes("skin") || titleLower.includes("phone skin");
-          const hasExclusions = 
-            titleLower.includes("cover") ||
-            titleLower.includes("case") ||
-            titleLower.includes("ring") ||
-            titleLower.includes("stand") ||
-            titleLower.includes("holder") ||
-            titleLower.includes("magsafe") ||
-            titleLower.includes("autoapply");
-          return hasSkin && !hasExclusions;
-        }
-        return false;
-      });
-    }
     
     // Fetch ALL variants in one query and group by productId
     const allVariants = await ctx.db.query("variants").collect();
@@ -75,7 +56,7 @@ export const getAllProductsPaginated = query({
     }
 
     // Build products with their variants
-    const productsWithVariants = filteredPage.map((product) => {
+    const productsWithVariants = result.page.map((product) => {
       const variants = variantsByProduct.get(product._id) || [];
       return {
         ...product,
@@ -301,6 +282,19 @@ export const createProduct = mutation({
       alt: v.optional(v.string()),
     })),
     tags: v.array(v.string()),
+    gadgetCategory: v.union(
+      v.literal("phone"),
+      v.literal("laptop"),
+      v.literal("tablet"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("drone"),
+      v.literal("charger"),
+      v.literal("console"),
+      v.literal("mac-mini"),
+      v.literal("cover"),
+      v.literal("accessory")
+    ),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -333,6 +327,7 @@ export const createProduct = mutation({
       status: args.status,
       images: args.images,
       tags: args.tags,
+      gadgetCategory: args.gadgetCategory,
     });
 
     return productId;
