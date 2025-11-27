@@ -660,20 +660,6 @@ export default function ProductsPage() {
               <div className="border-b">
                 <div className="flex gap-1 overflow-x-auto no-scrollbar">
                   <button
-                    onClick={() => {
-                      const params = new URLSearchParams(window.location.search);
-                      params.delete('finish');
-                      window.location.href = `/products?${params.toString()}`;
-                    }}
-                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
-                      !finishFilter 
-                        ? 'border-primary text-primary' 
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    All Finishes
-                  </button>
-                  <button
                     onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=matte`}
                     className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
                       finishFilter === 'matte' 
@@ -702,6 +688,20 @@ export default function ProductsPage() {
                     }`}
                   >
                     Transparent
+                  </button>
+                  <button
+                    onClick={() => {
+                      const params = new URLSearchParams(window.location.search);
+                      params.delete('finish');
+                      window.location.href = `/products?${params.toString()}`;
+                    }}
+                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                      !finishFilter 
+                        ? 'border-primary text-primary' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    All Finishes
                   </button>
                 </div>
               </div>
