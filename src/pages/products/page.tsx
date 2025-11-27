@@ -92,10 +92,24 @@ export default function ProductsPage() {
   // Get OOS sorting setting
   const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
   
+  // Get URL parameters (must be before queries that depend on them)
+  const urlParams = new URLSearchParams(window.location.search);
+  const deviceFilter = urlParams.get('device');
+  const finishFilter = urlParams.get('finish');
+  const brandFilter = urlParams.get('brand');
+  const modelFilter = urlParams.get('model');
+  const showFinish = urlParams.get('showFinish') === 'true';
+  const urlSearchQuery = urlParams.get('search') || '';
+  const collectionParam = urlParams.get('collection') || '';
+  
   // Use paginated query - load 30 products at a time
+  // When coming from phone selector (brand + model), only load phone products
   const { results: productsData, status, loadMore } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
-    { status: "active" },
+    { 
+      status: "active",
+      ...(brandFilter && modelFilter ? { gadgetCategory: "phone" } : {})
+    },
     { initialNumItems: 30 }
   );
   
@@ -125,16 +139,6 @@ export default function ProductsPage() {
     return () => observer.disconnect();
   }, [handleLoadMore]);
   
-  // Get URL parameters
-  const urlParams = new URLSearchParams(window.location.search);
-  const deviceFilter = urlParams.get('device');
-  const finishFilter = urlParams.get('finish');
-  const brandFilter = urlParams.get('brand');
-  const modelFilter = urlParams.get('model');
-  const showFinish = urlParams.get('showFinish') === 'true';
-  const urlSearchQuery = urlParams.get('search') || '';
-  const collectionParam = urlParams.get('collection') || '';
-  
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
@@ -146,11 +150,29 @@ export default function ProductsPage() {
     collectionParam ? { name: collectionParam } : "skip"
   );
   
-  // Get collection products if we have a collection
-  const collectionProducts = useQuery(
-    api.collections.getCollectionProducts,
-    collection?._id ? { collectionId: collection._id } : "skip"
+  // State for collection pagination
+  const [collectionOffset, setCollectionOffset] = useState(0);
+  const collectionPageSize = 30;
+  
+  // Reset collection offset and accumulated products when collection changes
+  useEffect(() => {
+    setCollectionOffset(0);
+    setAccumulatedCollectionProducts([]);
+  }, [collectionParam]);
+  
+  // Get collection products if we have a collection (paginated)
+  const collectionProductsData = useQuery(
+    api.collections.getCollectionProductsPaginated,
+    collection?._id ? { 
+      collectionId: collection._id,
+      limit: collectionPageSize,
+      offset: collectionOffset 
+    } : "skip"
   );
+  
+  // Extract products and metadata
+  const collectionProducts = collectionProductsData?.products;
+  const hasMoreCollectionProducts = collectionProductsData?.hasMore || false;
   
   // Get all collections - filter by phone category if brand/model selected
   const phoneCollections = useQuery(
@@ -174,11 +196,27 @@ export default function ProductsPage() {
     }
   };
 
+  // State to accumulate collection products across pagination
+  const [accumulatedCollectionProducts, setAccumulatedCollectionProducts] = useState<ConvexProduct[]>([]);
+  
+  // Accumulate collection products as we paginate
+  useEffect(() => {
+    if (collectionProducts && Array.isArray(collectionProducts)) {
+      if (collectionOffset === 0) {
+        // First page - replace
+        setAccumulatedCollectionProducts(collectionProducts);
+      } else {
+        // Subsequent pages - append
+        setAccumulatedCollectionProducts(prev => [...prev, ...collectionProducts]);
+      }
+    }
+  }, [collectionProducts, collectionOffset]);
+  
   // Convert Convex products to the format needed
   const allProducts = useMemo(() => {
-    // If we have a collection, use collection products instead
-    if (collectionParam && collectionProducts) {
-      return collectionProducts.map((product) => ({
+    // If we have a collection, use accumulated collection products
+    if (collectionParam && accumulatedCollectionProducts.length > 0) {
+      return accumulatedCollectionProducts.map((product) => ({
         _id: product._id,
         slug: product.slug,
         title: product.title,
@@ -223,34 +261,14 @@ export default function ProductsPage() {
         available: v.inventoryQuantity > 0,
       })),
     }));
-  }, [productsData, collectionProducts, collectionParam]);
+  }, [productsData, accumulatedCollectionProducts, collectionParam]);
 
   // Apply filters
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
     
-    // PRIORITY FILTER: When coming from phone selector (brand + model present), show only phone skins
-    if (brandFilter && modelFilter) {
-      filtered = filtered.filter(p => {
-        // Use gadgetCategory field if available
-        if (p.gadgetCategory) {
-          return p.gadgetCategory === "phone";
-        }
-        // Fallback to title matching if gadgetCategory not set
-        const title = p.title.toLowerCase();
-        const hasSkin = title.includes("skin") || title.includes("phone skin");
-        const hasExclusions = 
-          title.includes("cover") ||
-          title.includes("case") ||
-          title.includes("ring") ||
-          title.includes("charger") ||
-          title.includes("stand") ||
-          title.includes("holder") ||
-          title.includes("magsafe") ||
-          title.includes("autoapply");
-        return hasSkin && !hasExclusions;
-      });
-    }
+    // Note: Phone filtering when brand+model present is now done in backend query
+    // No need to filter again here for that case
     
     // Filter by device (when not coming from phone selector)
     if (deviceFilter && !brandFilter) {
@@ -828,8 +846,28 @@ export default function ProductsPage() {
             })}
           </div>
           
-          {/* Infinite scroll trigger - only show if not using collection filtering */}
-          {!collectionParam && (
+          {/* Infinite scroll trigger */}
+          {collectionParam ? (
+            // Collection pagination
+            <div className="py-8 flex justify-center">
+              {hasMoreCollectionProducts && (
+                <Button 
+                  onClick={() => setCollectionOffset(prev => prev + collectionPageSize)} 
+                  variant="outline" 
+                  size="lg"
+                  disabled={!collectionProducts}
+                >
+                  {collectionProducts ? "Load More Products" : "Loading..."}
+                </Button>
+              )}
+              {!hasMoreCollectionProducts && allProducts.length > 30 && (
+                <p className="text-muted-foreground text-sm">
+                  You've reached the end! 🎉
+                </p>
+              )}
+            </div>
+          ) : (
+            // Regular product pagination
             <div ref={observerTarget} className="py-8 flex justify-center">
               {status === "LoadingMore" && (
                 <div className="flex items-center gap-2 text-muted-foreground">

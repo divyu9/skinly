@@ -226,6 +226,71 @@ export const getCollectionProducts = query({
   },
 });
 
+// Get products in a collection with pagination (optimized)
+export const getCollectionProductsPaginated = query({
+  args: { 
+    collectionId: v.id("collections"),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number())
+  },
+  handler: async (ctx, args) => {
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection) {
+      throw new ConvexError({
+        message: "Collection not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const limit = args.limit || 30;
+    const offset = args.offset || 0;
+
+    // Get product IDs in this collection
+    const collectionProductLinks = await ctx.db
+      .query("collectionProducts")
+      .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId))
+      .collect();
+
+    // Paginate the product links
+    const paginatedLinks = collectionProductLinks.slice(offset, offset + limit);
+
+    // Get all variants once
+    const allVariants = await ctx.db.query("variants").collect();
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+
+    // Get products for the current page
+    const products = await Promise.all(
+      paginatedLinks.map(async (link) => {
+        const product = await ctx.db.get(link.productId);
+        if (!product) return null;
+        
+        const variants = variantsByProduct.get(link.productId) || [];
+        
+        return {
+          ...product,
+          variants,
+        };
+      })
+    );
+
+    // Filter out null products
+    const validProducts = products.filter((p) => p !== null);
+
+    return {
+      products: validProducts,
+      hasMore: offset + limit < collectionProductLinks.length,
+      total: collectionProductLinks.length
+    };
+  },
+});
+
 // Preview products matching rules (before collection is created)
 export const previewCollectionProducts = query({
   args: {
