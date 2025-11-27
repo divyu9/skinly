@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
 import { 
   ShieldCheckIcon, 
   SparklesIcon, 
@@ -15,7 +21,11 @@ import {
   CircleDotIcon,
   BatteryChargingIcon,
   TabletSmartphoneIcon,
-  GamepadIcon
+  GamepadIcon,
+  MonitorIcon,
+  MagnetIcon,
+  ShieldIcon,
+  StarIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -23,9 +33,10 @@ import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { phoneModels } from "@/lib/phone-models.ts";
 import {
+  laptopModels,
   macMiniModels,
   lensModels,
   cameraModels,
@@ -55,9 +66,29 @@ interface ConvexProduct {
   }>;
 }
 
-type DeviceType = "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
+type DeviceType = "laptop" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
+
+// Brand logo mapping - matching the screenshots
+const brandLogos: Record<string, string> = {
+  "Apple": "https://cdn.hercules.app/file_54FjDV0bMGUJ9N5uWOHBlwYx",
+  "Samsung": "https://cdn.hercules.app/file_8eVkxycD51p7VEELLLP3bxSy",
+  "OnePlus": "https://cdn.hercules.app/file_FbXR6g2WQASC01Y3octztLhA",
+  "Nothing": "https://cdn.hercules.app/file_fL533mZxpk2ay0q8AXPMvuRY",
+  "CMF": "https://cdn.hercules.app/file_7h7knJlwFVqgbBOHAJjHTI0w",
+  "Oppo": "https://cdn.hercules.app/file_MCp4r3Jyw8KP6WtCI1D2DuRD",
+  "Realme": "https://cdn.hercules.app/file_JNqnBiKQWZzvQKqF4gd1mzRR",
+  "Vivo": "https://cdn.hercules.app/file_hvtV8uEVRQisJNhlD61R9kdR",
+  "iQOO": "https://cdn.hercules.app/file_xcVXF74gr4T2yPKx6ORu7NBz",
+  "Xiaomi": "https://cdn.hercules.app/file_0lIeCdPQqf7QAo7N6nysd5X5",
+  "Lava": "https://cdn.hercules.app/file_s9hzIBK6UB038BycBaNvFk6K",
+  "Infinix": "https://cdn.hercules.app/file_Pjj5THd5TS0SHK2RAhDceiD4",
+  "Asus": "https://cdn.hercules.app/file_3gojHhsqgDme3d6XcYPI927X",
+  "HMD": "https://cdn.hercules.app/file_IoeAItMLvooxgFhpKthzUhZD",
+};
 
 export default function Index() {
+  const navigate = useNavigate();
+  
   // Query products from Convex database - use pagination for better performance
   const { results: paginatedProducts } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
@@ -78,16 +109,42 @@ export default function Index() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDeviceType, setDialogDeviceType] = useState<DeviceType | undefined>(undefined);
+  const [selectedPhoneBrand, setSelectedPhoneBrand] = useState<string | null>(null);
+  const [phoneModelSearch, setPhoneModelSearch] = useState("");
   
-  // Ref for scrolling to device selector
-  const deviceSelectorRef = useRef<HTMLElement>(null);
+  // Refs for scrolling
+  const phoneBrandSelectorRef = useRef<HTMLElement>(null);
   
-  // Function to scroll to device selector
-  const scrollToDeviceSelector = () => {
-    deviceSelectorRef.current?.scrollIntoView({ 
+  // Function to scroll to phone brand selector
+  const scrollToPhoneBrandSelector = () => {
+    phoneBrandSelectorRef.current?.scrollIntoView({ 
       behavior: 'smooth',
       block: 'start'
     });
+  };
+  
+  // Get phone brands
+  const phoneBrands = useMemo(() => Object.keys(phoneModels).sort(), []);
+  
+  // Get filtered phone models for selected brand
+  const filteredPhoneModels = useMemo(() => {
+    if (!selectedPhoneBrand) return [];
+    const models = phoneModels[selectedPhoneBrand] || [];
+    if (!phoneModelSearch) return models;
+    const query = phoneModelSearch.toLowerCase();
+    return models.filter(model => model.toLowerCase().includes(query));
+  }, [selectedPhoneBrand, phoneModelSearch]);
+  
+  // Handle phone brand selection
+  const handlePhoneBrandSelect = (brand: string) => {
+    setSelectedPhoneBrand(brand);
+    setPhoneModelSearch("");
+  };
+  
+  // Handle phone model selection
+  const handlePhoneModelSelect = (model: string) => {
+    if (!selectedPhoneBrand) return;
+    navigate(`/products?brand=${encodeURIComponent(selectedPhoneBrand)}&model=${encodeURIComponent(model)}`);
   };
 
   // Product category filters - reduced to 3 per category for horizontal layout
@@ -318,10 +375,39 @@ export default function Index() {
       )}
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
+      <section className="pt-32 pb-20 px-4 bg-gradient-to-br from-cyan-50 via-purple-50 to-pink-50">
         <div className="container mx-auto">
+          {/* Hero Content */}
+          <div className="text-center max-w-4xl mx-auto mb-16">
+            <div className="bg-white/70 backdrop-blur-sm rounded-3xl p-12 shadow-xl border border-primary/20">
+              <h1 className="text-5xl md:text-6xl font-black mb-6 leading-tight text-balance">
+                Your Phone Called. It Wants Personality.
+              </h1>
+              <p className="text-xl text-muted-foreground mb-10 text-balance">
+                Join 10,000+ happy humans who ditched boring for bold
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button 
+                  size="lg" 
+                  className="text-lg px-8 py-6 bg-cyan-500 hover:bg-cyan-600"
+                  asChild
+                >
+                  <Link to="/products">Shop Now</Link>
+                </Button>
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="text-lg px-8 py-6"
+                  asChild
+                >
+                  <Link to="/devices">Learn More</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Universal Search Bar */}
-          <div className="max-w-3xl mx-auto mb-16">
+          <div className="max-w-3xl mx-auto">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold mb-2">Find Your Device or Design</h2>
               <p className="text-muted-foreground">Search across devices, designs, and SKUs</p>
@@ -473,123 +559,105 @@ export default function Index() {
               </Card>
             )}
           </div>
-
-          {/* Hero Content */}
-          <div className="text-center max-w-4xl mx-auto">
-            <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight text-balance">
-              Your Phone. <br />
-              <span className="text-primary">Your Vibe.</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 text-balance">
-              Custom skins that actually slap. Premium protection with designs that don't suck.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button 
-                size="lg" 
-                className="text-lg px-8 py-6"
-                onClick={scrollToDeviceSelector}
-              >
-                Find Your Device
-              </Button>
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="text-lg px-8 py-6"
-                asChild
-              >
-                <Link to="/products">Browse All Designs</Link>
-              </Button>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* Device Selector - What Needs a Makeover */}
-      <section ref={deviceSelectorRef} className="py-16 px-4 bg-muted/20">
+      {/* Gadget Selector - What Needs a Makeover */}
+      <section className="py-16 px-4 bg-muted/20">
         <div className="container mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-black mb-4">What Needs a Makeover?</h2>
             <p className="text-xl text-muted-foreground">We've got skins for all your tech</p>
           </div>
 
-          {/* Gadget Type Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-5xl mx-auto">
+          {/* Gadget Type Cards - 9 total */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 max-w-6xl mx-auto">
             <button
-              onClick={() => openDialogForDevice("phone")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              onClick={() => openDialogForDevice("laptop")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <SmartphoneIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <LaptopIcon className="size-8 text-cyan-500" />
+              </div>
+              <span className="font-semibold">Laptop</span>
+            </button>
+
+            <button
+              onClick={scrollToPhoneBrandSelector}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <SmartphoneIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Phones</span>
             </button>
 
             <button
-              onClick={() => openDialogForDevice("tablet")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-            >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <TabletSmartphoneIcon className="size-8 text-primary" />
-              </div>
-              <span className="font-semibold">iPad/Tablet</span>
-            </button>
-
-            <button
               onClick={() => openDialogForDevice("macmini")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <LaptopIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <MonitorIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Mac Mini</span>
             </button>
 
             <button
               onClick={() => openDialogForDevice("drone")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <PlaneIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <PlaneIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Drones</span>
             </button>
 
             <button
               onClick={() => openDialogForDevice("camera")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <CameraIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <CameraIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Camera</span>
             </button>
 
             <button
               onClick={() => openDialogForDevice("lens")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <CircleDotIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <CircleDotIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Lenses</span>
             </button>
 
             <button
               onClick={() => openDialogForDevice("charger")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <BatteryChargingIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <BatteryChargingIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Chargers</span>
             </button>
 
             <button
-              onClick={() => openDialogForDevice("console")}
-              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              onClick={() => openDialogForDevice("tablet")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
             >
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <GamepadIcon className="size-8 text-primary" />
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <TabletSmartphoneIcon className="size-8 text-cyan-500" />
+              </div>
+              <span className="font-semibold">iPad/Tablet</span>
+            </button>
+
+            <button
+              onClick={() => openDialogForDevice("console")}
+              className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
+            >
+              <div className="size-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                <GamepadIcon className="size-8 text-cyan-500" />
               </div>
               <span className="font-semibold">Gaming Console</span>
             </button>
@@ -604,173 +672,171 @@ export default function Index() {
         initialDeviceType={dialogDeviceType}
       />
 
-      {/* Product Categories - Horizontal Layout */}
-      <section id="products" className="py-20 px-4">
+      {/* Phone Brand Selector - On Page */}
+      <section ref={phoneBrandSelectorRef} className="py-16 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-black mb-4">Browse by Style</h2>
-            <p className="text-xl text-muted-foreground">Find the perfect finish for your device</p>
+            <h2 className="text-4xl font-black mb-4">Pick Your Device Brand</h2>
+            <p className="text-xl text-muted-foreground">Select your brand and we'll show you the perfect skin</p>
           </div>
 
-          {isLoadingProducts ? (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {[1, 2, 3].map(i => (
-                <Skeleton key={i} className="h-96 w-full" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Matte Category */}
-              <Card className="border-2">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-2xl font-bold mb-2">Matte Skins</h3>
-                    <p className="text-muted-foreground text-sm mb-4">Smooth, premium, fingerprint-proof</p>
+          {/* Brand Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
+            {phoneBrands.map(brand => (
+              <button
+                key={brand}
+                onClick={() => handlePhoneBrandSelect(brand)}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
+              >
+                {brandLogos[brand] ? (
+                  <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
+                    <img 
+                      src={brandLogos[brand]} 
+                      alt={brand}
+                      className="max-w-full max-h-full object-contain"
+                    />
                   </div>
-                  <div className="space-y-3 mb-4">
-                    {matteProducts.map(product => (
-                      <Link key={product._id} to={`/products/${product.slug}`}>
-                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          {product.images[0] && (
-                            <img 
-                              src={product.images[0].url} 
-                              alt={product.title}
-                              className="size-20 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              From ₹{Math.min(...product.variants.map(v => v.price))}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
+                ) : (
+                  <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
+                    {brand[0]}
                   </div>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/products?filter=matte">View All Matte</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                )}
+                <span className="font-semibold text-center">{brand}</span>
+              </button>
+            ))}
+          </div>
 
-              {/* 3D Embossed Category */}
-              <Card className="border-2">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-2xl font-bold mb-2">3D Embossed</h3>
-                    <p className="text-muted-foreground text-sm mb-4">Textured designs you can feel</p>
-                  </div>
-                  <div className="space-y-3 mb-4">
-                    {embossedProducts.map(product => (
-                      <Link key={product._id} to={`/products/${product.slug}`}>
-                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          {product.images[0] && (
-                            <img 
-                              src={product.images[0].url} 
-                              alt={product.title}
-                              className="size-20 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              From ₹{Math.min(...product.variants.map(v => v.price))}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/products?filter=embossed">View All Embossed</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+          {/* Phone Model Selection Dialog */}
+          {selectedPhoneBrand && (
+            <Dialog open={!!selectedPhoneBrand} onOpenChange={(open) => !open && setSelectedPhoneBrand(null)}>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-3xl">Select Your {selectedPhoneBrand} Model</DialogTitle>
+                  <p className="text-muted-foreground">Choose your phone model to see compatible skins</p>
+                </DialogHeader>
 
-              {/* Transparent Category */}
-              <Card className="border-2">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h3 className="text-2xl font-bold mb-2">Transparent (Tranzy)</h3>
-                    <p className="text-muted-foreground text-sm mb-4">Show off your phone's original color</p>
-                  </div>
-                  <div className="space-y-3 mb-4">
-                    {transparentProducts.map(product => (
-                      <Link key={product._id} to={`/products/${product.slug}`}>
-                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          {product.images[0] && (
-                            <img 
-                              src={product.images[0].url} 
-                              alt={product.title}
-                              className="size-20 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              From ₹{Math.min(...product.variants.map(v => v.price))}
-                            </p>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/products?filter=transparent">View All Transparent</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+                {/* Search Input */}
+                <div className="relative my-4">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search models..."
+                    value={phoneModelSearch}
+                    onChange={(e) => setPhoneModelSearch(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+
+                {/* Model List */}
+                <div className="space-y-2">
+                  {filteredPhoneModels.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No models found</p>
+                  ) : (
+                    filteredPhoneModels.map((model, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handlePhoneModelSelect(model)}
+                        className="w-full flex items-center justify-between p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-muted/50 transition-all text-left"
+                      >
+                        <span className="font-medium">{model}</span>
+                        <span className="text-primary">Select →</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </section>
 
-      {/* Featured Products */}
-      {featuredProducts.length > 0 && (
-        <section className="py-20 px-4 bg-muted/30">
-          <div className="container mx-auto">
-            <div className="text-center mb-12">
-              <h2 className="text-4xl font-black mb-4">Featured Products</h2>
-              <p className="text-xl text-muted-foreground">Our hero products you can't miss</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredProducts.map(product => (
-                <Link key={product._id} to={`/products/${product.slug}`}>
-                  <Card className="overflow-hidden hover:shadow-xl transition-shadow border-2 h-full">
-                    {product.images[0] && (
-                      <img 
-                        src={product.images[0].url} 
-                        alt={product.title}
-                        className="w-full h-72 object-cover"
-                      />
-                    )}
-                    <CardContent className="p-6">
-                      <h3 className="text-2xl font-bold mb-3">{product.title}</h3>
-                      <p className="text-muted-foreground mb-4 line-clamp-3">{product.description}</p>
-                      <div className="flex items-center justify-between">
-                        <p className="text-lg font-semibold">
-                          From ₹{Math.min(...product.variants.map(v => v.price))}
-                        </p>
-                        <Button size="sm">Shop Now</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Features Grid */}
-      <section className="py-16 px-4">
+      {/* Beyond Skins - Premium Collection */}
+      <section className="py-20 px-4 bg-gradient-to-br from-cyan-50 via-purple-50 to-pink-50">
         <div className="container mx-auto">
+          <div className="text-center mb-4">
+            <p className="text-sm font-bold text-cyan-500 tracking-wider uppercase">Premium Collection</p>
+          </div>
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Beyond Skins</h2>
+            <p className="text-xl text-muted-foreground">Elevate your entire tech ecosystem with our signature accessories</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Magneto X */}
+            <Card className="overflow-hidden hover:shadow-xl transition-all border-2 bg-gradient-to-br from-cyan-50 to-purple-100">
+              <CardContent className="p-8 text-center">
+                <div className="mb-6 flex justify-center">
+                  <div className="size-32 bg-pink-200 rounded-full flex items-center justify-center">
+                    <MagnetIcon className="size-16 text-pink-600" />
+                  </div>
+                </div>
+                <div className="absolute top-4 right-4 bg-cyan-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  NEW
+                </div>
+                <h3 className="text-2xl font-bold mb-3">Magneto X</h3>
+                <p className="text-muted-foreground mb-6">Revolutionary magnetic accessories and mounts for all your devices</p>
+                <Button className="w-full" variant="outline" asChild>
+                  <Link to="/products">Explore →</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* MagSafe Covers */}
+            <Card className="overflow-hidden hover:shadow-xl transition-all border-2 bg-gradient-to-br from-purple-50 to-pink-100">
+              <CardContent className="p-8 text-center">
+                <div className="mb-6 flex justify-center">
+                  <div className="size-32 bg-purple-300 rounded-full flex items-center justify-center">
+                    <SmartphoneIcon className="size-16 text-purple-700" />
+                  </div>
+                </div>
+                <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  POPULAR
+                </div>
+                <h3 className="text-2xl font-bold mb-3">MagSafe Covers</h3>
+                <p className="text-muted-foreground mb-6">Premium black covers for iPhone & Samsung. Seamless magnetic experience</p>
+                <Button className="w-full" variant="outline" asChild>
+                  <Link to="/products">Explore →</Link>
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* AutoApply Guard */}
+            <Card className="overflow-hidden hover:shadow-xl transition-all border-2 bg-gradient-to-br from-pink-50 to-orange-100">
+              <CardContent className="p-8 text-center">
+                <div className="mb-6 flex justify-center">
+                  <div className="size-32 bg-orange-200 rounded-full flex items-center justify-center">
+                    <StarIcon className="size-16 text-orange-600" />
+                  </div>
+                </div>
+                <div className="absolute top-4 right-4 bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                  BEST VALUE
+                </div>
+                <h3 className="text-2xl font-bold mb-3">AutoApply Guard</h3>
+                <p className="text-muted-foreground mb-6">Super HQ armoured tempered glass with auto-apply technology</p>
+                <Button className="w-full" variant="outline" asChild>
+                  <Link to="/products">Explore →</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Why We're Different */}
+      <section className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Why We're Different</h2>
+            <p className="text-xl text-muted-foreground">Because your phone deserves more than another boring case</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="border-2">
-                <CardContent className="pt-6">
-                  <feature.icon className="size-12 text-primary mb-4" />
+              <Card key={index} className="border-2 bg-white">
+                <CardContent className="pt-8 px-6 pb-6">
+                  <div className="size-12 rounded-full bg-cyan-50 flex items-center justify-center mb-4">
+                    <feature.icon className="size-6 text-cyan-500" />
+                  </div>
                   <h3 className="text-xl font-bold mb-2">{feature.title}</h3>
                   <p className="text-muted-foreground">{feature.description}</p>
                 </CardContent>
@@ -780,54 +846,145 @@ export default function Index() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 px-4 bg-primary text-primary-foreground">
-        <div className="container mx-auto text-center">
-          <h2 className="text-4xl font-black mb-4">Ready to Transform Your Device?</h2>
-          <p className="text-xl mb-8 opacity-90">
-            Join thousands of happy customers rocking unique designs
-          </p>
-          <Button 
-            size="lg" 
-            variant="secondary"
-            className="text-lg px-8 py-6"
-            asChild
-          >
-            <Link to="/products">Shop Now</Link>
-          </Button>
+      {/* Fan Favorites */}
+      <section className="py-20 px-4 bg-muted/20">
+        <div className="container mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black mb-4">Fan Favorites</h2>
+            <p className="text-xl text-muted-foreground">The designs everyone's obsessed with right now</p>
+          </div>
+
+          {isLoadingProducts ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <Skeleton key={i} className="h-64 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
+              {products.slice(0, 8).map(product => (
+                <Link key={product._id} to={`/products/${product.slug}`}>
+                  <Card className="overflow-hidden hover:shadow-xl transition-all border-2 h-full">
+                    {product.images[0] && (
+                      <img 
+                        src={product.images[0].url} 
+                        alt={product.title}
+                        className="w-full h-64 object-cover"
+                      />
+                    )}
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
+      {/* WhatsApp Button - Full Width */}
+      <section className="py-0">
+        <a
+          href="https://wa.me/917505273504"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white py-6 flex items-center justify-center gap-3 text-xl font-bold transition-colors"
+        >
+          <svg className="size-8" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+          </svg>
+          Chat with us on WhatsApp
+        </a>
+      </section>
+
       {/* Footer */}
-      <footer className="py-12 px-4 bg-muted/30 border-t">
-        <div className="container mx-auto text-center">
-          <img 
-            src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-            alt="Skinly" 
-            className="h-12 mx-auto mb-4"
-          />
-          <p className="text-muted-foreground mb-4">
-            Premium device skins with personality
-          </p>
-          <div className="flex justify-center gap-6 mb-4">
-            <Link to="/devices" className="text-sm hover:text-primary transition-colors">
-              Supported Devices
-            </Link>
-            <Link to="/orders" className="text-sm hover:text-primary transition-colors">
-              Track Order
-            </Link>
-            <a 
-              href="https://wa.me/917505273504" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-sm hover:text-primary transition-colors"
-            >
-              Contact Us
-            </a>
+      <footer className="py-16 px-4 bg-white border-t">
+        <div className="container mx-auto">
+          <div className="flex flex-col items-center mb-8">
+            <img 
+              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              alt="Skinly" 
+              className="h-16 mb-4"
+            />
+            <p className="text-muted-foreground text-center">
+              Quirky wear for your gadgets
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-4xl mx-auto mb-8">
+            {/* Shop */}
+            <div>
+              <h3 className="font-bold text-lg mb-4">Shop</h3>
+              <ul className="space-y-2">
+                <li>
+                  <Link to="/products" className="text-muted-foreground hover:text-primary transition-colors">
+                    All Products
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/products?filter=new" className="text-muted-foreground hover:text-primary transition-colors">
+                    New Arrivals
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/products?filter=best" className="text-muted-foreground hover:text-primary transition-colors">
+                    Best Sellers
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Support */}
+            <div>
+              <h3 className="font-bold text-lg mb-4">Support</h3>
+              <ul className="space-y-2">
+                <li>
+                  <a 
+                    href="https://wa.me/917505273504" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    Contact Us
+                  </a>
+                </li>
+                <li>
+                  <Link to="/devices" className="text-muted-foreground hover:text-primary transition-colors">
+                    Shipping Info
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/orders" className="text-muted-foreground hover:text-primary transition-colors">
+                    Returns
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Company */}
+            <div>
+              <h3 className="font-bold text-lg mb-4">Company</h3>
+              <ul className="space-y-2">
+                <li>
+                  <Link to="/devices" className="text-muted-foreground hover:text-primary transition-colors">
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/devices" className="text-muted-foreground hover:text-primary transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/devices" className="text-muted-foreground hover:text-primary transition-colors">
+                    Terms of Service
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="text-center text-sm text-muted-foreground border-t pt-8">
             © {new Date().getFullYear()} Skinly. All rights reserved.
-          </p>
+          </div>
         </div>
       </footer>
     </div>

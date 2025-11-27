@@ -1,6 +1,46 @@
 // Device models data for all gadget categories
 // Extracted from inline data for better code splitting and performance
 
+export const laptopModels: Record<string, string[]> = {
+  "Apple": [
+    "MacBook Air 13-inch M3 (2024)",
+    "MacBook Air 15-inch M3 (2024)",
+    "MacBook Air 13-inch M2 (2022)",
+    "MacBook Air 15-inch M2 (2023)",
+    "MacBook Pro 14-inch M3 (2023)",
+    "MacBook Pro 16-inch M3 (2023)",
+    "MacBook Pro 13-inch M2 (2022)",
+    "MacBook Pro 14-inch M2 (2023)",
+    "MacBook Pro 16-inch M2 (2023)"
+  ],
+  "Dell": [
+    "Dell XPS 13 (9310)",
+    "Dell XPS 13 (9320)",
+    "Dell XPS 15 (9520)",
+    "Dell XPS 17 (9720)",
+    "Dell Latitude 14 (5420)",
+    "Dell Inspiron 15 (3511)"
+  ],
+  "Lenovo": [
+    "Lenovo ThinkPad X1 Carbon Gen 11",
+    "Lenovo ThinkPad T14s Gen 4",
+    "Lenovo IdeaPad Slim 3",
+    "Lenovo Yoga 9i Gen 8"
+  ],
+  "HP": [
+    "HP Spectre x360 14",
+    "HP EliteBook 840 G9",
+    "HP Pavilion 15",
+    "HP Envy 13"
+  ],
+  "Asus": [
+    "Asus ZenBook 14 OLED",
+    "Asus ROG Zephyrus G14",
+    "Asus Vivobook 15",
+    "Asus TUF Gaming F15"
+  ]
+};
+
 export const macMiniModels: Record<string, string[]> = {
   "Apple": [
     "Mac Mini Intel (2018)",

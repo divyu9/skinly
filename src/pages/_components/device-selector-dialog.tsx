@@ -11,6 +11,7 @@ import { SearchIcon, XIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { phoneModels } from "@/lib/phone-models.ts";
 import {
+  laptopModels,
   macMiniModels,
   lensModels,
   cameraModels,
@@ -20,7 +21,7 @@ import {
   droneModels
 } from "@/lib/device-models.ts";
 
-type DeviceType = "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
+type DeviceType = "laptop" | "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
 interface DeviceSelectorDialogProps {
   open: boolean;
@@ -58,6 +59,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
     if (!selectedDeviceType) return {};
     
     switch (selectedDeviceType) {
+      case "laptop": return laptopModels;
       case "phone": return phoneModels;
       case "camera": return cameraModels;
       case "lens": return lensModels;
@@ -135,6 +137,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
 
   const getDeviceTypeLabel = (type: DeviceType): string => {
     switch (type) {
+      case "laptop": return "Laptop";
       case "phone": return "Phone";
       case "camera": return "Camera";
       case "lens": return "Lens";
@@ -174,6 +177,16 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
           {/* Step 1: Device Type Selection */}
           {step === 1 && (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <button
+                onClick={() => handleDeviceTypeSelect("laptop")}
+                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+              >
+                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                  💻
+                </div>
+                <span className="font-semibold">Laptop</span>
+              </button>
+
               <button
                 onClick={() => handleDeviceTypeSelect("phone")}
                 className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
