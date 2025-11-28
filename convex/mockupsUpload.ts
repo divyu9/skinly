@@ -14,7 +14,7 @@ function normalizeModelName(model: string): string {
  */
 export const storeMockupFile = mutation({
   args: {
-    fileId: v.string(),
+    fileId: v.id("_storage"),
     filename: v.string(),
   },
   handler: async (ctx, args) => {

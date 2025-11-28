@@ -269,7 +269,7 @@ export const generateUploadUrl = internalMutation({
 // INTERNAL - Store mockup file
 export const storeMockupFile = internalMutation({
   args: {
-    storageId: v.string(),
+    storageId: v.id("_storage"),
     filename: v.string(),
   },
   handler: async (ctx, args) => {

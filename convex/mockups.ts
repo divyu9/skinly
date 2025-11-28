@@ -88,7 +88,7 @@ export const bulkImportMockups = mutation({
         brand: v.string(),
         model: v.string(),
         sku: v.string(),
-        fileId: v.string(),
+        fileId: v.id("_storage"),
       })
     ),
   },
