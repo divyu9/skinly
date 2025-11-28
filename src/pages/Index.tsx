@@ -297,19 +297,19 @@ export default function Index() {
       }
     });
 
-    // 2. Search Product Designs (titles)
+    // 2. Search Product Designs (titles) - ALL terms must match
     const designMatches = products.filter(product => {
       const titleLower = product.title.toLowerCase();
-      return searchTerms.some(term => titleLower.includes(term));
+      return searchTerms.every(term => titleLower.includes(term));
     }).slice(0, 10);
 
-    // 3. Search SKUs
+    // 3. Search SKUs - ALL terms must match
     const skuMatches: Array<{ product: ConvexProduct; variant: ConvexProduct['variants'][0] }> = [];
     products.forEach(product => {
       product.variants.forEach(variant => {
         if (variant.sku) {
           const skuLower = variant.sku.toLowerCase();
-          if (searchTerms.some(term => skuLower.includes(term))) {
+          if (searchTerms.every(term => skuLower.includes(term))) {
             skuMatches.push({ product, variant });
           }
         }
@@ -326,6 +326,13 @@ export default function Index() {
   const hasSearchResults = searchResults.devices.length > 0 || 
                           searchResults.designs.length > 0 || 
                           searchResults.skus.length > 0;
+
+  // Auto-expand all device categories when there are search results
+  const categoriesInResults = useMemo(() => {
+    const categories = new Set<string>();
+    searchResults.devices.forEach(device => categories.add(device.category));
+    return categories;
+  }, [searchResults.devices]);
 
   const features = [
     {
@@ -509,42 +516,47 @@ export default function Index() {
                                 groupedByCategory[device.category].push(device);
                               });
 
-                              return Object.entries(groupedByCategory).map(([category, devices]) => (
-                                <div key={category}>
-                                  <button
-                                    onClick={() => toggleCategory(category)}
-                                    className="w-full flex items-center justify-between p-2 hover:bg-muted rounded-md text-left"
-                                  >
-                                    <span className="font-medium flex items-center gap-2">
-                                      <span>{devices[0].icon}</span>
-                                      <span>{category}</span>
-                                      <span className="text-xs text-muted-foreground">({devices.length})</span>
-                                    </span>
-                                    {expandedCategories.has(category) ? (
-                                      <ChevronDownIcon className="size-4" />
-                                    ) : (
-                                      <ChevronRightIcon className="size-4" />
+                              return Object.entries(groupedByCategory).map(([category, devices]) => {
+                                // Auto-expand categories that have search results
+                                const isExpanded = expandedCategories.has(category) || categoriesInResults.has(category);
+                                
+                                return (
+                                  <div key={category}>
+                                    <button
+                                      onClick={() => toggleCategory(category)}
+                                      className="w-full flex items-center justify-between p-2 hover:bg-muted rounded-md text-left"
+                                    >
+                                      <span className="font-medium flex items-center gap-2">
+                                        <span>{devices[0].icon}</span>
+                                        <span>{category}</span>
+                                        <span className="text-xs text-muted-foreground">({devices.length})</span>
+                                      </span>
+                                      {isExpanded ? (
+                                        <ChevronDownIcon className="size-4" />
+                                      ) : (
+                                        <ChevronRightIcon className="size-4" />
+                                      )}
+                                    </button>
+                                    {isExpanded && (
+                                      <div className="ml-8 space-y-1 mt-1">
+                                        {devices.map((device, idx) => (
+                                          <Link
+                                            key={idx}
+                                            to={device.category === "Phones" 
+                                              ? `/products/confirm?brand=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}`
+                                              : `/products?brand=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}&showFinish=true`
+                                            }
+                                            className="block p-2 hover:bg-muted rounded-md text-sm"
+                                            onClick={() => setShowSearchResults(false)}
+                                          >
+                                            {device.brand} {device.model}
+                                          </Link>
+                                        ))}
+                                      </div>
                                     )}
-                                  </button>
-                                  {expandedCategories.has(category) && (
-                                    <div className="ml-8 space-y-1 mt-1">
-                                      {devices.map((device, idx) => (
-                                        <Link
-                                          key={idx}
-                                          to={device.category === "Phones" 
-                                            ? `/products/confirm?brand=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}`
-                                            : `/products?brand=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}&showFinish=true`
-                                          }
-                                          className="block p-2 hover:bg-muted rounded-md text-sm"
-                                          onClick={() => setShowSearchResults(false)}
-                                        >
-                                          {device.brand} {device.model}
-                                        </Link>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ));
+                                  </div>
+                                );
+                              });
                             })()}
                           </div>
                         </div>
@@ -611,24 +623,27 @@ export default function Index() {
                           </div>
                         </div>
                       )}
+                      
+                      {/* Request Model Button - Inside search dropdown */}
+                      <div className="mt-6 pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          size="lg"
+                          onClick={() => {
+                            setRequestDialogOpen(true);
+                            setShowSearchResults(false);
+                          }}
+                          className="w-full border-2 border-primary/30 hover:border-primary"
+                        >
+                          <PlusCircleIcon className="size-5 mr-2" />
+                          Can't find your device? Request it
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </CardContent>
               </Card>
             )}
-            
-            {/* Request Model Button - Always visible */}
-            <div className="mt-6 text-center">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => setRequestDialogOpen(true)}
-                className="border-2 border-primary/30 hover:border-primary"
-              >
-                <PlusCircleIcon className="size-5 mr-2" />
-                Can't find your device? Request it
-              </Button>
-            </div>
           </div>
         </div>
       </section>
