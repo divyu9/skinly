@@ -248,12 +248,18 @@ export default function Index() {
     setDialogOpen(true);
   };
 
+  // Helper function to normalize text for search (removes spaces and special chars)
+  const normalizeForSearch = (text: string): string => {
+    return text.toLowerCase().replace(/[\s\-_]/g, '');
+  };
+
   // Enhanced search results - searches devices, products, and SKUs
   const searchResults = useMemo(() => {
     const query = homeSearchQuery.toLowerCase().trim();
     if (!query) return { devices: [], designs: [], skus: [] };
 
     const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
+    const normalizedSearchTerms = searchTerms.map(normalizeForSearch);
     
     // 1. Search Device Models
     const allDeviceCategories = [
@@ -272,10 +278,10 @@ export default function Index() {
     allDeviceCategories.forEach(category => {
       Object.entries(category.models).forEach(([brand, models]) => {
         models.forEach(model => {
-          const modelLower = model.toLowerCase();
-          const brandLower = brand.toLowerCase();
-          const matchesAll = searchTerms.every(term => 
-            modelLower.includes(term) || brandLower.includes(term)
+          const normalizedModel = normalizeForSearch(model);
+          const normalizedBrand = normalizeForSearch(brand);
+          const matchesAll = normalizedSearchTerms.every(term => 
+            normalizedModel.includes(term) || normalizedBrand.includes(term)
           );
           if (matchesAll) {
             deviceMatches.push({
@@ -292,10 +298,10 @@ export default function Index() {
     // Also search ALL database models (for any newly added categories not in static files)
     const dbModels = allSupportedModels || [];
     dbModels.forEach(dbModel => {
-      const modelLower = dbModel.modelName.toLowerCase();
-      const brandLower = dbModel.brandName.toLowerCase();
-      const matchesAll = searchTerms.every(term => 
-        modelLower.includes(term) || brandLower.includes(term)
+      const normalizedModel = normalizeForSearch(dbModel.modelName);
+      const normalizedBrand = normalizeForSearch(dbModel.brandName);
+      const matchesAll = normalizedSearchTerms.every(term => 
+        normalizedModel.includes(term) || normalizedBrand.includes(term)
       );
       if (matchesAll) {
         const categoryName = 
@@ -325,8 +331,8 @@ export default function Index() {
 
     // 2. Search Product Designs (titles) - ALL terms must match
     const designMatches = products.filter(product => {
-      const titleLower = product.title.toLowerCase();
-      return searchTerms.every(term => titleLower.includes(term));
+      const normalizedTitle = normalizeForSearch(product.title);
+      return normalizedSearchTerms.every(term => normalizedTitle.includes(term));
     }).slice(0, 10);
 
     // 3. Search SKUs - ALL terms must match
@@ -334,8 +340,8 @@ export default function Index() {
     products.forEach(product => {
       product.variants.forEach(variant => {
         if (variant.sku) {
-          const skuLower = variant.sku.toLowerCase();
-          if (searchTerms.every(term => skuLower.includes(term))) {
+          const normalizedSku = normalizeForSearch(variant.sku);
+          if (normalizedSearchTerms.every(term => normalizedSku.includes(term))) {
             skuMatches.push({ product, variant });
           }
         }
