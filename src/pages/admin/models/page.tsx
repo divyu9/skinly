@@ -49,6 +49,9 @@ import {
   PackageIcon,
   TagIcon,
   MergeIcon,
+  CheckIcon,
+  XIcon,
+  InboxIcon,
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -83,6 +86,11 @@ export default function AdminModelsPage() {
   const renameBrand = useMutation(api.supportedModels.renameBrand);
   const mergeBrands = useMutation(api.supportedModels.mergeBrands);
   const deleteBrand = useMutation(api.supportedModels.deleteBrand);
+  
+  // Model requests
+  const allModelRequests = useQuery(api.modelRequests.getAllModelRequests, {});
+  const approveRequests = useMutation(api.modelRequests.approveModelRequests);
+  const rejectRequest = useMutation(api.modelRequests.rejectModelRequest);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
@@ -102,6 +110,10 @@ export default function AdminModelsPage() {
   const [mergeDialog, setMergeDialog] = useState(false);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [targetBrandName, setTargetBrandName] = useState("");
+  
+  // Model requests state
+  const [requestStatusFilter, setRequestStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [selectedRequests, setSelectedRequests] = useState<Id<"modelRequests">[]>([]);
 
   // Filter models
   const filteredModels = models
@@ -263,6 +275,44 @@ export default function AdminModelsPage() {
     }
     return true;
   });
+  
+  // Filter model requests
+  const filteredRequests = allModelRequests?.filter((req) => {
+    if (requestStatusFilter !== "all" && req.status !== requestStatusFilter) {
+      return false;
+    }
+    return true;
+  });
+  
+  // Handle bulk approve requests
+  const handleBulkApprove = async () => {
+    if (selectedRequests.length === 0) {
+      toast.error("Please select at least one request");
+      return;
+    }
+    
+    try {
+      const result = await approveRequests({ requestIds: selectedRequests });
+      toast.success(`Approved ${result.successCount} request(s) and added to database`);
+      setSelectedRequests([]);
+    } catch (error) {
+      toast.error("Failed to approve requests");
+      console.error(error);
+    }
+  };
+  
+  // Handle reject single request
+  const handleRejectRequest = async (requestId: Id<"modelRequests">) => {
+    if (!confirm("Are you sure you want to reject this request?")) return;
+    
+    try {
+      await rejectRequest({ requestId });
+      toast.success("Request rejected");
+    } catch (error) {
+      toast.error("Failed to reject request");
+      console.error(error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -278,6 +328,15 @@ export default function AdminModelsPage() {
             <TabsTrigger value="brands">
               <TagIcon className="size-4 mr-2" />
               Brands
+            </TabsTrigger>
+            <TabsTrigger value="requests">
+              <InboxIcon className="size-4 mr-2" />
+              Requested Models
+              {allModelRequests?.filter(r => r.status === "pending").length ? (
+                <Badge variant="secondary" className="ml-2">
+                  {allModelRequests.filter(r => r.status === "pending").length}
+                </Badge>
+              ) : null}
             </TabsTrigger>
           </TabsList>
 
@@ -564,6 +623,217 @@ export default function AdminModelsPage() {
                 {filteredBrands?.length === 0 && (
                   <div className="text-center py-12 text-muted-foreground">
                     No brands found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* REQUESTED MODELS TAB */}
+          <TabsContent value="requests" className="space-y-6">
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Pending Requests
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-yellow-600">
+                    {allModelRequests?.filter(r => r.status === "pending").length || 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Approved
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-green-600">
+                    {allModelRequests?.filter(r => r.status === "approved").length || 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Rejected
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-red-600">
+                    {allModelRequests?.filter(r => r.status === "rejected").length || 0}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Controls */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                  <div className="flex gap-2">
+                    <Button
+                      variant={requestStatusFilter === "all" ? "default" : "outline"}
+                      onClick={() => setRequestStatusFilter("all")}
+                      size="sm"
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={requestStatusFilter === "pending" ? "default" : "outline"}
+                      onClick={() => setRequestStatusFilter("pending")}
+                      size="sm"
+                    >
+                      Pending
+                    </Button>
+                    <Button
+                      variant={requestStatusFilter === "approved" ? "default" : "outline"}
+                      onClick={() => setRequestStatusFilter("approved")}
+                      size="sm"
+                    >
+                      Approved
+                    </Button>
+                    <Button
+                      variant={requestStatusFilter === "rejected" ? "default" : "outline"}
+                      onClick={() => setRequestStatusFilter("rejected")}
+                      size="sm"
+                    >
+                      Rejected
+                    </Button>
+                  </div>
+                  <Button 
+                    onClick={handleBulkApprove} 
+                    disabled={selectedRequests.length === 0}
+                  >
+                    <CheckIcon className="size-4 mr-2" />
+                    Approve Selected ({selectedRequests.length})
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Requests Table */}
+            <Card>
+              <CardContent className="pt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">
+                        <Input
+                          type="checkbox"
+                          className="size-4"
+                          checked={selectedRequests.length === filteredRequests?.filter(r => r.status === "pending").length}
+                          onChange={(e) => {
+                            const pendingRequests = filteredRequests?.filter(r => r.status === "pending") || [];
+                            if (e.target.checked) {
+                              setSelectedRequests(pendingRequests.map((r) => r._id));
+                            } else {
+                              setSelectedRequests([]);
+                            }
+                          }}
+                        />
+                      </TableHead>
+                      <TableHead>Brand</TableHead>
+                      <TableHead>Model</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>WhatsApp</TableHead>
+                      <TableHead>Requested Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredRequests?.map((request) => (
+                      <TableRow key={request._id}>
+                        <TableCell>
+                          <Input
+                            type="checkbox"
+                            className="size-4"
+                            checked={selectedRequests.includes(request._id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedRequests([...selectedRequests, request._id]);
+                              } else {
+                                setSelectedRequests(selectedRequests.filter((id) => id !== request._id));
+                              }
+                            }}
+                            disabled={request.status !== "pending"}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{request.brandName}</TableCell>
+                        <TableCell>{request.modelName}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {getCategoryIcon(request.category as Category)}
+                            <span className="capitalize">{request.category}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <a 
+                            href={`https://wa.me/${request.whatsappPhone.replace(/[^\d]/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {request.whatsappPhone}
+                          </a>
+                        </TableCell>
+                        <TableCell>
+                          {new Date(request.requestedAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          {request.status === "pending" && (
+                            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                              Pending
+                            </Badge>
+                          )}
+                          {request.status === "approved" && (
+                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20">
+                              Approved
+                            </Badge>
+                          )}
+                          {request.status === "rejected" && (
+                            <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
+                              Rejected
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {request.status === "pending" && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleBulkApprove()}
+                                  title="Approve"
+                                >
+                                  <CheckIcon className="size-4 text-green-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRejectRequest(request._id)}
+                                  title="Reject"
+                                >
+                                  <XIcon className="size-4 text-red-600" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                {filteredRequests?.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    No model requests found.
                   </div>
                 )}
               </CardContent>

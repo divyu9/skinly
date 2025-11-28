@@ -25,9 +25,10 @@ import {
   MonitorIcon,
   MagnetIcon,
   ShieldIcon,
-  StarIcon
+  StarIcon,
+  PlusCircleIcon
 } from "lucide-react";
-import { usePaginatedQuery, useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -35,6 +36,9 @@ import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { Link, useNavigate } from "react-router-dom";
+import { Label } from "@/components/ui/label.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { toast } from "sonner";
 import {
   laptopModels,
   macMiniModels,
@@ -118,8 +122,19 @@ export default function Index() {
   const [selectedPhoneBrand, setSelectedPhoneBrand] = useState<string | null>(null);
   const [phoneModelSearch, setPhoneModelSearch] = useState("");
   
+  // Model request dialog state
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [requestBrand, setRequestBrand] = useState("");
+  const [requestModel, setRequestModel] = useState("");
+  const [requestCategory, setRequestCategory] = useState<string>("");
+  const [requestWhatsApp, setRequestWhatsApp] = useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  
   // Refs for scrolling
   const phoneBrandSelectorRef = useRef<HTMLElement>(null);
+  
+  // Mutations
+  const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
   // Function to scroll to phone brand selector
   const scrollToPhoneBrandSelector = () => {
@@ -601,6 +616,19 @@ export default function Index() {
                 </CardContent>
               </Card>
             )}
+            
+            {/* Request Model Button - Always visible */}
+            <div className="mt-6 text-center">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setRequestDialogOpen(true)}
+                className="border-2 border-primary/30 hover:border-primary"
+              >
+                <PlusCircleIcon className="size-5 mr-2" />
+                Can't find your device? Request it
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -1152,6 +1180,130 @@ export default function Index() {
           </div>
         </div>
       </footer>
+
+      {/* Request Model Dialog */}
+      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request a Device Model</DialogTitle>
+          </DialogHeader>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              
+              // Validate fields
+              if (!requestBrand.trim() || !requestModel.trim() || !requestCategory || !requestWhatsApp.trim()) {
+                toast.error("Please fill in all fields");
+                return;
+              }
+              
+              // Validate WhatsApp number format (basic validation)
+              const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+              if (!phoneRegex.test(requestWhatsApp.trim())) {
+                toast.error("Please enter a valid phone number (e.g., +911234567890)");
+                return;
+              }
+              
+              setIsSubmittingRequest(true);
+              
+              try {
+                await createModelRequest({
+                  brandName: requestBrand.trim(),
+                  modelName: requestModel.trim(),
+                  category: requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
+                  whatsappPhone: requestWhatsApp.trim(),
+                });
+                
+                toast.success("Request submitted! We'll notify you on WhatsApp when available.");
+                
+                // Reset form
+                setRequestBrand("");
+                setRequestModel("");
+                setRequestCategory("");
+                setRequestWhatsApp("");
+                setRequestDialogOpen(false);
+              } catch (error) {
+                const err = error as { data?: { message?: string } };
+                toast.error(err.data?.message || "Failed to submit request. Please try again.");
+              } finally {
+                setIsSubmittingRequest(false);
+              }
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="request-brand">Brand Name *</Label>
+              <Input
+                id="request-brand"
+                placeholder="e.g., Apple, Samsung, Xiaomi"
+                value={requestBrand}
+                onChange={(e) => setRequestBrand(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="request-model">Model Name *</Label>
+              <Input
+                id="request-model"
+                placeholder="e.g., iPhone 16 Pro, Galaxy S24"
+                value={requestModel}
+                onChange={(e) => setRequestModel(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="request-category">Device Category *</Label>
+              <Select value={requestCategory} onValueChange={setRequestCategory} required>
+                <SelectTrigger id="request-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="tablet">Tablet</SelectItem>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="console">Console</SelectItem>
+                  <SelectItem value="charger">Charger</SelectItem>
+                  <SelectItem value="drone">Drone</SelectItem>
+                  <SelectItem value="camera">Camera</SelectItem>
+                  <SelectItem value="lens">Lens</SelectItem>
+                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="request-whatsapp">WhatsApp Number *</Label>
+              <Input
+                id="request-whatsapp"
+                type="tel"
+                placeholder="+911234567890"
+                value={requestWhatsApp}
+                onChange={(e) => setRequestWhatsApp(e.target.value)}
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                We'll notify you when this model is available
+              </p>
+            </div>
+            
+            <div className="flex gap-3 justify-end pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRequestDialogOpen(false)}
+                disabled={isSubmittingRequest}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmittingRequest}>
+                {isSubmittingRequest ? "Submitting..." : "Submit Request"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

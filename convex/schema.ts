@@ -398,4 +398,31 @@ export default defineSchema({
   })
     .index("by_status", ["status"])
     .index("by_started_at", ["startedAt"]),
+
+  modelRequests: defineTable({
+    brandName: v.string(), // Brand name requested
+    modelName: v.string(), // Model name requested
+    category: v.union(
+      v.literal("phone"),
+      v.literal("tablet"),
+      v.literal("laptop"),
+      v.literal("console"),
+      v.literal("charger"),
+      v.literal("drone"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("mac-mini")
+    ),
+    whatsappPhone: v.string(), // User's WhatsApp number for notification
+    userId: v.optional(v.id("users")), // User who requested (if authenticated)
+    userEmail: v.optional(v.string()), // Email if available
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    ),
+    requestedAt: v.number(), // Timestamp when requested
+    approvedAt: v.optional(v.number()), // Timestamp when admin approved
+  })
+    .index("by_status", ["status"]),
 });
