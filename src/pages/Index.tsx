@@ -115,6 +115,9 @@ export default function Index() {
     isActive: true 
   });
   
+  // Fetch all existing brands for the request form dropdown
+  const allBrands = useQuery(api.supportedModels.getBrands, {});
+  
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -126,6 +129,8 @@ export default function Index() {
   // Model request dialog state
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [requestBrand, setRequestBrand] = useState("");
+  const [requestNewBrand, setRequestNewBrand] = useState(""); // For custom brand entry
+  const [isNewBrand, setIsNewBrand] = useState(false); // Track if "Other" is selected
   const [requestModel, setRequestModel] = useState("");
   const [requestCategory, setRequestCategory] = useState<string>("");
   const [requestWhatsApp, setRequestWhatsApp] = useState("");
@@ -1211,8 +1216,11 @@ export default function Index() {
             onSubmit={async (e) => {
               e.preventDefault();
               
+              // Determine final brand name (from dropdown or custom input)
+              const finalBrandName = isNewBrand ? requestNewBrand.trim() : requestBrand;
+              
               // Validate fields
-              if (!requestBrand.trim() || !requestModel.trim() || !requestCategory || !requestWhatsApp.trim()) {
+              if (!finalBrandName || !requestModel.trim() || !requestCategory || !requestWhatsApp.trim()) {
                 toast.error("Please fill in all fields");
                 return;
               }
@@ -1228,7 +1236,7 @@ export default function Index() {
               
               try {
                 await createModelRequest({
-                  brandName: requestBrand.trim(),
+                  brandName: finalBrandName,
                   modelName: requestModel.trim(),
                   category: requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
                   whatsappPhone: requestWhatsApp.trim(),
@@ -1238,6 +1246,8 @@ export default function Index() {
                 
                 // Reset form
                 setRequestBrand("");
+                setRequestNewBrand("");
+                setIsNewBrand(false);
                 setRequestModel("");
                 setRequestCategory("");
                 setRequestWhatsApp("");
@@ -1253,14 +1263,49 @@ export default function Index() {
           >
             <div className="space-y-2">
               <Label htmlFor="request-brand">Brand Name *</Label>
-              <Input
-                id="request-brand"
-                placeholder="e.g., Apple, Samsung, Xiaomi"
-                value={requestBrand}
-                onChange={(e) => setRequestBrand(e.target.value)}
+              <Select 
+                value={isNewBrand ? "other" : requestBrand} 
+                onValueChange={(value) => {
+                  if (value === "other") {
+                    setIsNewBrand(true);
+                    setRequestBrand("");
+                  } else {
+                    setIsNewBrand(false);
+                    setRequestBrand(value);
+                    setRequestNewBrand("");
+                  }
+                }}
                 required
-              />
+              >
+                <SelectTrigger id="request-brand">
+                  <SelectValue placeholder="Select brand" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {allBrands?.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="other" className="font-semibold border-t mt-2 pt-2">
+                    Other (New Brand)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            
+            {/* Show custom brand input when "Other" is selected */}
+            {isNewBrand && (
+              <div className="space-y-2">
+                <Label htmlFor="request-new-brand">Enter New Brand Name *</Label>
+                <Input
+                  id="request-new-brand"
+                  placeholder="e.g., Lava, Infinix, Asus"
+                  value={requestNewBrand}
+                  onChange={(e) => setRequestNewBrand(e.target.value)}
+                  required
+                />
+              </div>
+            )}
             
             <div className="space-y-2">
               <Label htmlFor="request-model">Model Name *</Label>
