@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { 
   ShieldCheckIcon, 
   SparklesIcon, 
@@ -27,12 +28,15 @@ import {
   ShieldIcon,
   StarIcon,
   PlusCircleIcon,
-  ZapIcon
+  ZapIcon,
+  AlertCircleIcon,
+  CheckCircleIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useState, useMemo, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { useDebounce } from "@/hooks/use-debounce.ts";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
@@ -135,12 +139,28 @@ export default function Index() {
   const [requestCategory, setRequestCategory] = useState<string>("");
   const [requestWhatsApp, setRequestWhatsApp] = useState("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [confirmedNotMatch, setConfirmedNotMatch] = useState(false); // Confirmation checkbox
   
   // Refs for scrolling
   const phoneBrandSelectorRef = useRef<HTMLElement>(null);
   
   // Mutations
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  
+  // Debounce model search for fuzzy matching
+  const [debouncedRequestModel] = useDebounce(requestModel, 500);
+  
+  // Find similar models query
+  const similarModels = useQuery(
+    api.modelRequests.findSimilarModels,
+    debouncedRequestModel.trim().length >= 2
+      ? {
+          brandName: !isNewBrand && requestBrand ? requestBrand : undefined,
+          modelName: debouncedRequestModel,
+          category: requestCategory ? (requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini") : undefined,
+        }
+      : "skip"
+  );
   
   // Function to scroll to phone brand selector
   const scrollToPhoneBrandSelector = () => {
@@ -1207,7 +1227,22 @@ export default function Index() {
       </footer>
 
       {/* Request Model Dialog */}
-      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+      <Dialog 
+        open={requestDialogOpen} 
+        onOpenChange={(open) => {
+          setRequestDialogOpen(open);
+          if (!open) {
+            // Reset form when dialog closes
+            setRequestBrand("");
+            setRequestNewBrand("");
+            setIsNewBrand(false);
+            setRequestModel("");
+            setRequestCategory("");
+            setRequestWhatsApp("");
+            setConfirmedNotMatch(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Request a Device Model</DialogTitle>
@@ -1222,6 +1257,12 @@ export default function Index() {
               // Validate fields
               if (!finalBrandName || !requestModel.trim() || !requestCategory || !requestWhatsApp.trim()) {
                 toast.error("Please fill in all fields");
+                return;
+              }
+              
+              // Check if similar models exist and user hasn't confirmed
+              if (similarModels && similarModels.length > 0 && !confirmedNotMatch) {
+                toast.error("Please confirm that none of the suggested models match your device");
                 return;
               }
               
@@ -1251,6 +1292,7 @@ export default function Index() {
                 setRequestModel("");
                 setRequestCategory("");
                 setRequestWhatsApp("");
+                setConfirmedNotMatch(false);
                 setRequestDialogOpen(false);
               } catch (error) {
                 const err = error as { data?: { message?: string } };
@@ -1313,9 +1355,72 @@ export default function Index() {
                 id="request-model"
                 placeholder="e.g., iPhone 16 Pro, Galaxy S24"
                 value={requestModel}
-                onChange={(e) => setRequestModel(e.target.value)}
+                onChange={(e) => {
+                  setRequestModel(e.target.value);
+                  // Reset confirmation when model changes
+                  setConfirmedNotMatch(false);
+                }}
                 required
               />
+              
+              {/* Show similar models if found */}
+              {similarModels && similarModels.length > 0 && (
+                <div className="mt-3 p-3 border-2 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 rounded-lg space-y-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircleIcon className="size-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 space-y-2">
+                      <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                        Similar models found! Please check if one of these matches your device:
+                      </p>
+                      <div className="space-y-2">
+                        {similarModels.map((model) => (
+                          <button
+                            key={model._id}
+                            type="button"
+                            onClick={() => {
+                              // Navigate to products page filtered by brand and model
+                              navigate(`/products?brand=${encodeURIComponent(model.brandName)}&model=${encodeURIComponent(model.modelName)}`);
+                              setRequestDialogOpen(false);
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded hover:border-amber-400 dark:hover:border-amber-600 transition-colors text-left group"
+                          >
+                            <div className="flex-1">
+                              <div className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                                {model.brandName} {model.modelName}
+                              </div>
+                              <div className="text-xs text-muted-foreground capitalize">
+                                {model.category}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded">
+                                Already Available
+                              </span>
+                              <ChevronRightIcon className="size-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Confirmation checkbox */}
+                      <div className="flex items-start gap-2.5 pt-2 border-t border-amber-200 dark:border-amber-800">
+                        <Checkbox
+                          id="confirm-not-match"
+                          checked={confirmedNotMatch}
+                          onCheckedChange={(checked) => setConfirmedNotMatch(checked as boolean)}
+                          className="mt-0.5"
+                        />
+                        <label
+                          htmlFor="confirm-not-match"
+                          className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer leading-tight"
+                        >
+                          None of these match my device. I want to request a new model.
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="space-y-2">

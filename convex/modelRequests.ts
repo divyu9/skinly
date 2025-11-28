@@ -28,6 +28,78 @@ export const checkModelExists = query({
 });
 
 /**
+ * Find similar models using fuzzy matching (public - no auth required)
+ * Helps users discover existing models before submitting duplicate requests
+ */
+export const findSimilarModels = query({
+  args: {
+    brandName: v.optional(v.string()),
+    modelName: v.string(),
+    category: v.optional(v.union(
+      v.literal("phone"),
+      v.literal("tablet"),
+      v.literal("laptop"),
+      v.literal("console"),
+      v.literal("charger"),
+      v.literal("drone"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("mac-mini")
+    )),
+  },
+  handler: async (ctx, args) => {
+    // Only search if model name has at least 2 characters
+    if (!args.modelName || args.modelName.trim().length < 2) {
+      return [];
+    }
+
+    const modelSearch = args.modelName.toLowerCase().trim();
+    const brandSearch = args.brandName?.toLowerCase().trim();
+    
+    // Get all active models
+    const allModels = await ctx.db
+      .query("supportedModels")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Split search terms into keywords
+    const searchKeywords = modelSearch.split(/\s+/).filter(k => k.length > 1);
+    
+    // Find models that match the search criteria
+    const matches = allModels
+      .filter((model) => {
+        const modelNameLower = model.modelName.toLowerCase();
+        const brandNameLower = model.brandName.toLowerCase();
+        
+        // Filter by category if provided
+        if (args.category && model.category !== args.category) {
+          return false;
+        }
+        
+        // Filter by brand if provided
+        if (brandSearch && brandNameLower !== brandSearch) {
+          return false;
+        }
+        
+        // Check if all keywords appear in the model name
+        const allKeywordsMatch = searchKeywords.every(keyword => 
+          modelNameLower.includes(keyword)
+        );
+        
+        return allKeywordsMatch;
+      })
+      .slice(0, 5); // Limit to 5 suggestions
+
+    return matches.map(model => ({
+      _id: model._id,
+      brandName: model.brandName,
+      modelName: model.modelName,
+      category: model.category,
+    }));
+  },
+});
+
+/**
  * Create a new model request (public - no auth required)
  */
 export const createModelRequest = mutation({
