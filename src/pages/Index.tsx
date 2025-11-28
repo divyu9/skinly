@@ -26,7 +26,8 @@ import {
   MagnetIcon,
   ShieldIcon,
   StarIcon,
-  PlusCircleIcon
+  PlusCircleIcon,
+  ZapIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -499,7 +500,10 @@ export default function Index() {
               <Card className="mt-2 max-h-[500px] overflow-y-auto border-2">
                 <CardContent className="p-4">
                   {!hasSearchResults ? (
-                    <p className="text-muted-foreground text-center py-4">No results found</p>
+                    <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-2">No results found</p>
+                      <p className="text-sm text-muted-foreground/70">Try different search terms or request your device below</p>
+                    </div>
                   ) : (
                     <div className="space-y-6">
                       {/* Device Models Section */}
@@ -623,24 +627,25 @@ export default function Index() {
                           </div>
                         </div>
                       )}
-                      
-                      {/* Request Model Button - Inside search dropdown */}
-                      <div className="mt-6 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          size="lg"
-                          onClick={() => {
-                            setRequestDialogOpen(true);
-                            setShowSearchResults(false);
-                          }}
-                          className="w-full border-2 border-primary/30 hover:border-primary"
-                        >
-                          <PlusCircleIcon className="size-5 mr-2" />
-                          Can't find your device? Request it
-                        </Button>
-                      </div>
                     </div>
                   )}
+                  
+                  {/* Request Model Button - Always visible */}
+                  <div className="mt-6 pt-4 border-t border-border">
+                    <Button
+                      onClick={() => {
+                        setRequestDialogOpen(true);
+                        setShowSearchResults(false);
+                      }}
+                      className="w-full bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                    >
+                      <ZapIcon className="size-5 mr-2" />
+                      <div className="flex flex-col items-start text-left">
+                        <span className="font-semibold">Can't find your device?</span>
+                        <span className="text-xs font-normal opacity-90">We'll add it with high priority</span>
+                      </div>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
