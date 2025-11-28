@@ -22,7 +22,7 @@ interface BrokenMockup {
   brand: string;
   model: string;
   sku: string;
-  fileId: string;
+  fileId: Id<"_storage">;
 }
 
 export default function MockupsPage() {
@@ -136,7 +136,7 @@ export default function MockupsPage() {
           brand: parts[0],
           model: parts[1],
           sku: parts[2],
-          fileId: parts[3],
+          fileId: parts[3] as Id<"_storage">,
         });
       }
       
@@ -422,7 +422,7 @@ export default function MockupsPage() {
               throw new Error(`Upload failed with status ${uploadResult.status}`);
             }
             
-            const { storageId } = await uploadResult.json();
+            const { storageId } = await uploadResult.json() as { storageId: Id<"_storage"> };
             
             // Store mockup
             const result = await storeMockupFile({
