@@ -281,19 +281,31 @@ export const storeMockupFile = internalMutation({
       throw new Error("Invalid filename format");
     }
     
-    // Check if filename contains iPhone or iPad to auto-detect Apple brand
-    const filenameLower = args.filename.toLowerCase();
-    const isAppleDevice = filenameLower.includes('iphone') || filenameLower.includes('ipad');
+    // Last part is always SKU
+    const sku = parts[parts.length - 1];
+    
+    // Model portion is everything before the SKU (joined with spaces to handle underscores or spaces)
+    const modelPortion = parts.slice(0, -1).join(' ');
+    const modelPortionLower = modelPortion.toLowerCase();
+    
+    // Check if filename contains iPhone, iPad, or Google to auto-detect brand
+    const isAppleDevice = modelPortionLower.includes('iphone') || modelPortionLower.includes('ipad');
+    const isGoogleDevice = modelPortionLower.startsWith('google');
     
     let brand: string;
     let model: string;
-    const sku = parts[parts.length - 1];
     
     if (isAppleDevice) {
       brand = 'Apple';
-      model = parts.slice(0, -1).join(' ');
+      model = modelPortion;
+    } else if (isGoogleDevice) {
+      brand = 'Google';
+      model = modelPortion.replace(/^google\s*/i, '').trim();
+      if (!model) {
+        throw new Error("Google device must have a model name");
+      }
     } else if (parts.length === 2) {
-      throw new Error("Non-Apple devices must include brand in filename");
+      throw new Error("Non-Apple/Google devices must include brand in filename");
     } else {
       brand = parts[0];
       model = parts.slice(1, -1).join(' ');

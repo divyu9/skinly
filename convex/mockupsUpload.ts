@@ -29,9 +29,13 @@ export const storeMockupFile = mutation({
     // Last part is always SKU
     const sku = parts[parts.length - 1];
     
-    // Check if filename contains iPhone or iPad to auto-detect Apple brand
-    const filenameLower = nameWithoutExt.toLowerCase();
-    const isAppleDevice = filenameLower.includes('iphone') || filenameLower.includes('ipad');
+    // Model portion is everything before the SKU (joined with spaces to handle underscores or spaces)
+    const modelPortion = parts.slice(0, -1).join(' ');
+    const modelPortionLower = modelPortion.toLowerCase();
+    
+    // Check if filename contains iPhone, iPad, or Google to auto-detect brand
+    const isAppleDevice = modelPortionLower.includes('iphone') || modelPortionLower.includes('ipad');
+    const isGoogleDevice = modelPortionLower.startsWith('google');
     
     let brand: string;
     let model: string;
@@ -39,11 +43,19 @@ export const storeMockupFile = mutation({
     if (isAppleDevice) {
       // Auto-detect Apple brand
       brand = 'Apple';
-      // Model is everything except the last part (SKU)
-      model = parts.slice(0, -1).join(' ');
+      model = modelPortion;
+    } else if (isGoogleDevice) {
+      // Auto-detect Google brand
+      brand = 'Google';
+      // Extract model after "Google" - handle both "Google Pixel" and "GooglePixel"
+      // Remove "Google" from the start (case insensitive)
+      model = modelPortion.replace(/^google\s*/i, '').trim();
+      if (!model) {
+        throw new Error(`Invalid filename format: ${args.filename}. Google device must have a model name.`);
+      }
     } else if (parts.length === 2) {
       // Format: Model_SKU.jpg (no brand specified)
-      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple devices must include brand: Brand_Model_SKU.jpg`);
+      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple/Google devices must include brand: Brand_Model_SKU.jpg`);
     } else {
       // Format: Brand_Model_SKU.jpg (3+ parts)
       brand = parts[0];

@@ -863,12 +863,14 @@ export default function MockupsPage() {
                   <li><code>Apple_iPhone15Pro_M-174.jpg</code></li>
                   <li><code>iPhone 16 Plus_M-174.jpg</code> <span className="text-amber-700">(Spaces OK!)</span></li>
                   <li><code>iPhone16_M-174.jpg</code> <span className="text-amber-700">(Auto-detects Apple)</span></li>
+                  <li><code>Google Pixel 9A_L-03.jpg</code> <span className="text-amber-700">(Auto-detects Google)</span></li>
+                  <li><code>Google_Pixel_9A_L-03.jpg</code> <span className="text-amber-700">(Underscores OK!)</span></li>
                   <li><code>Samsung_GalaxyS24_M-174.jpg</code></li>
                   <li><code>Oppo_15Pro_M-174.jpg</code></li>
                 </ul>
                 <div className="mt-2 space-y-1">
                   <p className="text-amber-800 font-medium">
-                    💡 Files with "iPhone" or "iPad" automatically assign to Apple brand
+                    💡 Files with "iPhone", "iPad", or starting with "Google" automatically detect brand
                   </p>
                   <p className="text-green-700 font-medium">
                     ✅ Spaces in model names don't matter - "iPhone 16 Plus" matches "iPhone16Plus"
