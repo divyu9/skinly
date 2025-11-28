@@ -7,19 +7,10 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { SearchIcon, XIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { phoneModels } from "@/lib/phone-models.ts";
-import {
-  laptopModels,
-  macMiniModels,
-  lensModels,
-  cameraModels,
-  tabletModels,
-  consoleModels,
-  chargerModels,
-  droneModels
-} from "@/lib/device-models.ts";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
 
 type DeviceType = "laptop" | "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
@@ -54,6 +45,20 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Map UI device types to database categories
+  const getDbCategory = (deviceType: DeviceType): "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini" => {
+    if (deviceType === "macmini") return "mac-mini";
+    return deviceType as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens";
+  };
+
+  // Fetch models from database for selected device type
+  const modelsFromDb = useQuery(
+    api.supportedModels.listAll,
+    selectedDeviceType 
+      ? { category: getDbCategory(selectedDeviceType), isActive: true }
+      : "skip"
+  );
+
   // Update state when dialog opens with initialDeviceType
   useEffect(() => {
     if (open && initialDeviceType) {
@@ -68,23 +73,25 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
     }
   }, [open, initialDeviceType]);
 
-  // Get device models based on type
+  // Group device models by brand from database
   const deviceModels = useMemo(() => {
-    if (!selectedDeviceType) return {};
+    if (!modelsFromDb) return {};
     
-    switch (selectedDeviceType) {
-      case "laptop": return laptopModels;
-      case "phone": return phoneModels;
-      case "camera": return cameraModels;
-      case "lens": return lensModels;
-      case "tablet": return tabletModels;
-      case "macmini": return macMiniModels;
-      case "console": return consoleModels;
-      case "drone": return droneModels;
-      case "charger": return chargerModels;
-      default: return {};
-    }
-  }, [selectedDeviceType]);
+    const grouped: Record<string, string[]> = {};
+    modelsFromDb.forEach(model => {
+      if (!grouped[model.brandName]) {
+        grouped[model.brandName] = [];
+      }
+      grouped[model.brandName].push(model.modelName);
+    });
+    
+    // Sort models within each brand
+    Object.keys(grouped).forEach(brand => {
+      grouped[brand].sort();
+    });
+    
+    return grouped;
+  }, [modelsFromDb]);
 
   // Get brands for selected device type
   const availableBrands = useMemo(() => {
@@ -142,11 +149,6 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
     }
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-    // Reset is handled by useEffect
-  };
-
   const getDeviceTypeLabel = (type: DeviceType): string => {
     switch (type) {
       case "laptop": return "Laptop";
@@ -165,19 +167,11 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-3xl">
-              {step === 1 && "What Needs a Makeover?"}
-              {step === 2 && `Select Your ${getDeviceTypeLabel(selectedDeviceType!)} Brand`}
-              {step === 3 && `Select Your ${selectedBrand} Model`}
-            </DialogTitle>
-            <button
-              onClick={handleClose}
-              className="rounded-full p-2 hover:bg-muted transition-colors"
-            >
-              <XIcon className="size-5" />
-            </button>
-          </div>
+          <DialogTitle className="text-3xl">
+            {step === 1 && "What Needs a Makeover?"}
+            {step === 2 && `Select Your ${getDeviceTypeLabel(selectedDeviceType!)} Brand`}
+            {step === 3 && `Select Your ${selectedBrand} Model`}
+          </DialogTitle>
           <p className="text-muted-foreground">
             {step === 1 && "Choose your device type to continue"}
             {step === 2 && "Choose your device brand to continue"}
