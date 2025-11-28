@@ -30,7 +30,8 @@ import {
   PlusCircleIcon,
   ZapIcon,
   AlertCircleIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  HelpCircleIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -663,19 +664,25 @@ export default function Index() {
                   
                   {/* Request Model Button - Always visible */}
                   <div className="mt-6 pt-4 border-t border-border">
-                    <Button
-                      onClick={() => {
-                        setRequestDialogOpen(true);
-                        setShowSearchResults(false);
-                      }}
-                      className="w-full bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
-                    >
-                      <ZapIcon className="size-5 mr-2" />
-                      <div className="flex flex-col items-start text-left">
-                        <span className="font-semibold">Can't find your device?</span>
-                        <span className="text-xs font-normal opacity-90">We'll add it with high priority</span>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <HelpCircleIcon className="size-4" />
+                        <span>Can't Find Your Device ?</span>
                       </div>
-                    </Button>
+                      <Button
+                        onClick={() => {
+                          setRequestDialogOpen(true);
+                          setShowSearchResults(false);
+                        }}
+                        className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                      >
+                        <ZapIcon className="size-4 mr-2" />
+                        Request Your Model
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        we'll add it with high priority
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
