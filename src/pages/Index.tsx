@@ -35,7 +35,6 @@ import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { phoneModels } from "@/lib/phone-models.ts";
 import {
   laptopModels,
   macMiniModels,
@@ -105,6 +104,12 @@ export default function Index() {
   // Fetch ALL supported models for search
   const allSupportedModels = useQuery(api.supportedModels.listAll, { isActive: true });
   
+  // Fetch phone models from database for brand/model selector
+  const phoneModelsFromDb = useQuery(api.supportedModels.listAll, { 
+    category: "phone", 
+    isActive: true 
+  });
+  
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -124,17 +129,39 @@ export default function Index() {
     });
   };
   
-  // Get phone brands
-  const phoneBrands = useMemo(() => Object.keys(phoneModels).sort(), []);
+  // Group phone models by brand from database
+  const phoneModelsByBrand = useMemo(() => {
+    if (!phoneModelsFromDb) return {};
+    
+    const grouped: Record<string, string[]> = {};
+    phoneModelsFromDb.forEach(model => {
+      if (!grouped[model.brandName]) {
+        grouped[model.brandName] = [];
+      }
+      grouped[model.brandName].push(model.modelName);
+    });
+    
+    // Sort models within each brand
+    Object.keys(grouped).forEach(brand => {
+      grouped[brand].sort();
+    });
+    
+    return grouped;
+  }, [phoneModelsFromDb]);
+  
+  // Get phone brands from database
+  const phoneBrands = useMemo(() => {
+    return Object.keys(phoneModelsByBrand).sort();
+  }, [phoneModelsByBrand]);
   
   // Get filtered phone models for selected brand
   const filteredPhoneModels = useMemo(() => {
     if (!selectedPhoneBrand) return [];
-    const models = phoneModels[selectedPhoneBrand] || [];
+    const models = phoneModelsByBrand[selectedPhoneBrand] || [];
     if (!phoneModelSearch) return models;
     const query = phoneModelSearch.toLowerCase();
     return models.filter(model => model.toLowerCase().includes(query));
-  }, [selectedPhoneBrand, phoneModelSearch]);
+  }, [selectedPhoneBrand, phoneModelSearch, phoneModelsByBrand]);
   
   // Handle phone brand selection
   const handlePhoneBrandSelect = (brand: string) => {
@@ -189,7 +216,7 @@ export default function Index() {
     
     // 1. Search Device Models
     const allDeviceCategories = [
-      { name: "Phones", icon: "📱", models: phoneModels },
+      { name: "Phones", icon: "📱", models: phoneModelsByBrand },
       { name: "Cameras", icon: "📷", models: cameraModels },
       { name: "Lenses", icon: "🔍", models: lensModels },
       { name: "Tablets", icon: "📱", models: tabletModels },
@@ -221,7 +248,7 @@ export default function Index() {
       });
     });
 
-    // Also search database models
+    // Also search ALL database models (for any newly added categories not in static files)
     const dbModels = allSupportedModels || [];
     dbModels.forEach(dbModel => {
       const modelLower = dbModel.modelName.toLowerCase();
@@ -279,7 +306,7 @@ export default function Index() {
       designs: designMatches,
       skus: skuMatches.slice(0, 10)
     };
-  }, [homeSearchQuery, products, allSupportedModels]);
+  }, [homeSearchQuery, products, allSupportedModels, phoneModelsByBrand]);
 
   const hasSearchResults = searchResults.devices.length > 0 || 
                           searchResults.designs.length > 0 || 

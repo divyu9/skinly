@@ -48,7 +48,6 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView, trackAddToCart } from "@/lib/analytics.ts";
 import { StockNotification } from "./_components/stock-notification.tsx";
-import { phoneModels } from "@/lib/phone-models.ts";
 
 // USP bullet points
 const skinUSPs = [
@@ -92,20 +91,46 @@ export default function ProductDetailPage() {
   const [pincode, setPincode] = useState("");
   const [pincodeChecked, setPincodeChecked] = useState(false);
   
+  // Fetch phone models from database for brand/model selector
+  const phoneModelsFromDb = useQuery(api.supportedModels.listAll, { 
+    category: "phone", 
+    isActive: true 
+  });
+  
+  // Group phone models by brand from database
+  const phoneModelsByBrand = useMemo(() => {
+    if (!phoneModelsFromDb) return {};
+    
+    const grouped: Record<string, string[]> = {};
+    phoneModelsFromDb.forEach(model => {
+      if (!grouped[model.brandName]) {
+        grouped[model.brandName] = [];
+      }
+      grouped[model.brandName].push(model.modelName);
+    });
+    
+    // Sort models within each brand
+    Object.keys(grouped).forEach(brand => {
+      grouped[brand].sort();
+    });
+    
+    return grouped;
+  }, [phoneModelsFromDb]);
+  
   // Filter models based on search
   const filteredModels = useMemo(() => {
-    if (!modelSearch.trim()) return phoneModels[selectedBrand] || [];
+    if (!modelSearch.trim()) return phoneModelsByBrand[selectedBrand] || [];
     
     const searchTerms = modelSearch
       .toLowerCase()
       .split(/\s+/)
       .filter((term) => term.length > 0);
     
-    return (phoneModels[selectedBrand] || []).filter((model) => {
+    return (phoneModelsByBrand[selectedBrand] || []).filter((model) => {
       const modelLower = model.toLowerCase();
       return searchTerms.every((term) => modelLower.includes(term));
     });
-  }, [selectedBrand, modelSearch]);
+  }, [selectedBrand, modelSearch, phoneModelsByBrand]);
   
   // Handle model selection
   const handleModelSelect = (model: string, brand: string) => {
@@ -1158,7 +1183,7 @@ export default function ProductDetailPage() {
                 <DialogDescription>Choose your phone brand to see available models</DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pr-2">
-                {Object.keys(phoneModels).sort().map((brand) => (
+                {Object.keys(phoneModelsByBrand).sort().map((brand) => (
                   <Button
                     key={brand}
                     variant="outline"
