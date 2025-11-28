@@ -48,66 +48,7 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView, trackAddToCart } from "@/lib/analytics.ts";
 import { StockNotification } from "./_components/stock-notification.tsx";
-
-// Phone models data
-const phoneModels: Record<string, string[]> = {
-  "Apple": [
-    "iPhone 17 Pro Max", "iPhone 17 Pro", "iPhone 17 Air", "iPhone 17",
-    "iPhone 16E", "iPhone 16 Pro Max", "iPhone 16 Pro",
-    "iPhone 16 Plus", "iPhone 16", "iPhone 15 Pro Max", "iPhone 15 Pro",
-    "iPhone 15 Plus", "iPhone 15", "iPhone 14 Pro Max", "iPhone 14 Pro",
-    "iPhone 14 Plus", "iPhone 14", "iPhone 13 Pro Max", "iPhone 13 Pro",
-    "iPhone 13 Mini", "iPhone 13", "iPhone 12 Pro Max", "iPhone 12 Pro",
-    "iPhone 12 Mini", "iPhone 12", "iPhone 11 Pro Max", "iPhone 11 Pro",
-    "iPhone 11", "iPhone XS Max", "iPhone XS", "iPhone XR", "iPhone X",
-    "iPhone 8 Plus", "iPhone 8", "iPhone 7 Plus", "iPhone 7",
-    "iPhone 6S Plus", "iPhone 6S", "iPhone 6 Plus", "iPhone 6",
-    "iPhone SE", "iPhone 5E", "iPhone 5S", "iPhone 5"
-  ],
-  "Samsung": [
-    "Samsung Galaxy S25 Edge", "Samsung Galaxy S25 Plus", "Samsung Galaxy S25 Ultra (5G)",
-    "Samsung Galaxy S25 (5G)", "Samsung Galaxy S24 Ultra (5G)", "Samsung Galaxy S24 Plus",
-    "Samsung Galaxy S24 (5G)", "Samsung Galaxy S24 FE (5G)", "Samsung Galaxy S23 FE (5G)",
-    "Samsung Galaxy S23 (5G)", "Samsung Galaxy S22 Ultra", "Samsung Galaxy S22 Plus",
-    "Samsung Galaxy S22", "Samsung Galaxy S21 Ultra 5G", "Samsung Galaxy S21 Plus 5G",
-    "Samsung Galaxy S21 FE 5G", "Samsung Galaxy S21 5G", "Samsung Galaxy Z Fold 5",
-    "Samsung Galaxy Z Fold 4", "Samsung Galaxy Z Flip 5", "Samsung Galaxy Z Flip 4"
-  ],
-  "OnePlus": [
-    "OnePlus 13 Pro", "OnePlus 13", "OnePlus 12", "OnePlus 11 5G", "OnePlus 10 Pro 5G",
-    "OnePlus 9 Pro", "OnePlus 9", "OnePlus 8T", "OnePlus 8 Pro", "OnePlus Nord 4",
-    "OnePlus Nord 3", "OnePlus Nord CE 4", "OnePlus Nord CE 3"
-  ],
-  "Nothing": [
-    "Nothing Phone 3A Pro", "Nothing Phone 3A", "Nothing Phone 2A",
-    "Nothing Phone 2", "Nothing Phone 1 5G"
-  ],
-  "Oppo": [
-    "Oppo Find 8X Pro (5G)", "Oppo Find 8X (5G)", "Oppo Reno 14 Pro 5G",
-    "Oppo Reno 14 5G", "Oppo Reno 13 Pro (5G)", "Oppo Reno 12 Pro (5G)",
-    "Oppo F31 Pro Plus 5G", "Oppo F29 Pro (5G)", "Oppo F27 Pro Plus (5G)"
-  ],
-  "Realme": [
-    "Realme GT 7T 5G", "Realme GT7 Pro 5G", "Realme P4 Pro 5G", "Realme P4 5G",
-    "Realme 15 Pro 5G", "Realme 14 Pro Plus (5G)", "Realme 13 Pro Plus 5G",
-    "Realme 12 Pro Plus (5G)", "Realme 11 Pro Plus"
-  ],
-  "Vivo": [
-    "Vivo X200 Pro (5G)", "Vivo X200 (5G)", "Vivo X100 Pro", "Vivo V60 5G",
-    "Vivo V50 5G", "Vivo V40 5G", "Vivo V30 Pro (5G)", "Vivo V29 Pro (5G)"
-  ],
-  "Xiaomi": [
-    "Xiaomi 15 Ultra", "Xiaomi 15 Pro", "Xiaomi 15", "Xiaomi 14 Ultra",
-    "Xiaomi 14 Pro", "Xiaomi 14", "Xiaomi 13 Pro", "Redmi Note 14 Pro Plus 5G",
-    "Redmi Note 13 Pro Plus", "Poco X7 Pro", "Poco F6"
-  ],
-  "CMF": ["CMF Phone 2 Pro", "CMF Phone 1"],
-  "Motorola": [
-    "Motorola Edge 60 Ultra", "Motorola Edge 50 Pro", "Motorola Edge 40",
-    "Moto G85", "Moto G75", "Moto G64"
-  ],
-  "Google": ["Google Pixel 9 Pro XL", "Google Pixel 9 Pro", "Google Pixel 8 Pro"]
-};
+import { phoneModels } from "@/lib/phone-models.ts";
 
 // USP bullet points
 const skinUSPs = [
