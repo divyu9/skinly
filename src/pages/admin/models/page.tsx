@@ -79,6 +79,7 @@ export default function AdminModelsPage() {
   const models = useQuery(api.supportedModels.listAll, {});
   const stats = useQuery(api.supportedModels.getStats, {});
   const brands = useQuery(api.supportedModels.getBrands, {});
+  const allBrands = useQuery(api.supportedModels.getBrands, {}); // For edit dialog dropdown
   const brandsWithCounts = useQuery(api.supportedModels.getBrandsWithCounts, {});
   const createModel = useMutation(api.supportedModels.create);
   const updateModel = useMutation(api.supportedModels.update);
@@ -91,6 +92,7 @@ export default function AdminModelsPage() {
   const allModelRequests = useQuery(api.modelRequests.getAllModelRequests, {});
   const approveRequests = useMutation(api.modelRequests.approveModelRequests);
   const rejectRequest = useMutation(api.modelRequests.rejectModelRequest);
+  const updateRequest = useMutation(api.modelRequests.updateModelRequest);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
@@ -114,6 +116,15 @@ export default function AdminModelsPage() {
   // Model requests state
   const [requestStatusFilter, setRequestStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [selectedRequests, setSelectedRequests] = useState<Id<"modelRequests">[]>([]);
+  
+  // Edit request dialog state
+  const [editRequestDialog, setEditRequestDialog] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<Id<"modelRequests"> | null>(null);
+  const [editBrand, setEditBrand] = useState("");
+  const [editNewBrand, setEditNewBrand] = useState("");
+  const [isEditNewBrand, setIsEditNewBrand] = useState(false);
+  const [editModel, setEditModel] = useState("");
+  const [editCategory, setEditCategory] = useState<Category | "">("");
 
   // Filter models
   const filteredModels = models
@@ -310,6 +321,59 @@ export default function AdminModelsPage() {
       toast.success("Request rejected");
     } catch (error) {
       toast.error("Failed to reject request");
+      console.error(error);
+    }
+  };
+  
+  // Handle edit request
+  const openEditRequestDialog = (request: { _id: Id<"modelRequests">; brandName: string; modelName: string; category: string }) => {
+    setEditingRequest(request._id);
+    
+    // Check if brand exists in allBrands
+    const brandExists = allBrands?.includes(request.brandName);
+    if (brandExists) {
+      setEditBrand(request.brandName);
+      setIsEditNewBrand(false);
+      setEditNewBrand("");
+    } else {
+      setEditBrand("");
+      setIsEditNewBrand(true);
+      setEditNewBrand(request.brandName);
+    }
+    
+    setEditModel(request.modelName);
+    setEditCategory(request.category as Category);
+    setEditRequestDialog(true);
+  };
+  
+  const handleUpdateRequest = async () => {
+    if (!editingRequest) return;
+    
+    const finalBrandName = isEditNewBrand ? editNewBrand.trim() : editBrand;
+    
+    if (!finalBrandName || !editModel.trim() || !editCategory) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    
+    try {
+      await updateRequest({
+        requestId: editingRequest,
+        brandName: finalBrandName,
+        modelName: editModel.trim(),
+        category: editCategory,
+      });
+      
+      toast.success("Request updated successfully");
+      setEditRequestDialog(false);
+      setEditingRequest(null);
+      setEditBrand("");
+      setEditNewBrand("");
+      setIsEditNewBrand(false);
+      setEditModel("");
+      setEditCategory("");
+    } catch (error) {
+      toast.error("Failed to update request");
       console.error(error);
     }
   };
@@ -809,6 +873,14 @@ export default function AdminModelsPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  onClick={() => openEditRequestDialog(request)}
+                                  title="Edit"
+                                >
+                                  <PencilIcon className="size-4 text-blue-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleBulkApprove()}
                                   title="Approve"
                                 >
@@ -1039,6 +1111,104 @@ export default function AdminModelsPage() {
               Cancel
             </Button>
             <Button onClick={handleMergeBrands}>Merge Brands</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Request Dialog */}
+      <Dialog open={editRequestDialog} onOpenChange={setEditRequestDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Model Request</DialogTitle>
+            <DialogDescription>
+              Correct any errors before approving the request
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-brand">Brand Name *</Label>
+              <Select 
+                value={isEditNewBrand ? "other" : editBrand} 
+                onValueChange={(value) => {
+                  if (value === "other") {
+                    setIsEditNewBrand(true);
+                    setEditBrand("");
+                  } else {
+                    setIsEditNewBrand(false);
+                    setEditBrand(value);
+                    setEditNewBrand("");
+                  }
+                }}
+              >
+                <SelectTrigger id="edit-brand">
+                  <SelectValue placeholder="Select brand" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {allBrands?.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="other" className="font-semibold border-t mt-2 pt-2">
+                    Other (New Brand)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {isEditNewBrand && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-new-brand">Enter New Brand Name *</Label>
+                <Input
+                  id="edit-new-brand"
+                  placeholder="e.g., Lava, Infinix, Asus"
+                  value={editNewBrand}
+                  onChange={(e) => setEditNewBrand(e.target.value)}
+                />
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-model">Model Name *</Label>
+              <Input
+                id="edit-model"
+                placeholder="e.g., iPhone 16 Pro, Galaxy S24"
+                value={editModel}
+                onChange={(e) => setEditModel(e.target.value)}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="edit-category">Device Category *</Label>
+              <Select value={editCategory} onValueChange={(val) => setEditCategory(val as Category)}>
+                <SelectTrigger id="edit-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="tablet">Tablet</SelectItem>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="console">Console</SelectItem>
+                  <SelectItem value="charger">Charger</SelectItem>
+                  <SelectItem value="drone">Drone</SelectItem>
+                  <SelectItem value="camera">Camera</SelectItem>
+                  <SelectItem value="lens">Lens</SelectItem>
+                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditRequestDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateRequest}>
+              Save Changes
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

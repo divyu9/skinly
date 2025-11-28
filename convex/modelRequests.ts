@@ -218,6 +218,65 @@ export const approveModelRequests = mutation({
 });
 
 /**
+ * Update a model request (admin only - for correcting errors before approval)
+ */
+export const updateModelRequest = mutation({
+  args: {
+    requestId: v.id("modelRequests"),
+    brandName: v.optional(v.string()),
+    modelName: v.optional(v.string()),
+    category: v.optional(
+      v.union(
+        v.literal("phone"),
+        v.literal("tablet"),
+        v.literal("laptop"),
+        v.literal("console"),
+        v.literal("charger"),
+        v.literal("drone"),
+        v.literal("camera"),
+        v.literal("lens"),
+        v.literal("mac-mini")
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Optional: Add auth check for admin users here
+
+    const request = await ctx.db.get(args.requestId);
+    
+    if (!request) {
+      throw new ConvexError({
+        code: "NOT_FOUND",
+        message: "Request not found",
+      });
+    }
+
+    if (request.status !== "pending") {
+      throw new ConvexError({
+        code: "BAD_REQUEST",
+        message: "Can only edit pending requests",
+      });
+    }
+
+    // Build update object with only provided fields
+    const updates: Record<string, string> = {};
+    if (args.brandName !== undefined) {
+      updates.brandName = args.brandName.trim();
+    }
+    if (args.modelName !== undefined) {
+      updates.modelName = args.modelName.trim();
+    }
+    if (args.category !== undefined) {
+      updates.category = args.category;
+    }
+
+    await ctx.db.patch(args.requestId, updates);
+
+    return { success: true };
+  },
+});
+
+/**
  * Reject a model request (admin only)
  */
 export const rejectModelRequest = mutation({
