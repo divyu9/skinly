@@ -39,7 +39,10 @@ export default function MockupsPage() {
   const [expandedJobs, setExpandedJobs] = useState<Set<string>>(new Set());
   const [activeJobIds, setActiveJobIds] = useState<Set<string>>(new Set());
   const [pausedJobs, setPausedJobs] = useState<Map<string, File[]>>(new Map());
+  const [interruptedJobs, setInterruptedJobs] = useState<Set<string>>(new Set());
+  const [resumeJobId, setResumeJobId] = useState<Id<"uploadJobs"> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resumeFileInputRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<unknown>(null);
   const uploadAbortRefs = useRef<Map<string, boolean>>(new Map());
   
@@ -102,6 +105,38 @@ export default function MockupsPage() {
       console.warn('Failed to release wake lock:', error);
     }
   };
+  
+  /**
+   * Detect interrupted/stuck upload jobs on page load
+   */
+  useEffect(() => {
+    if (!activeJobs) return;
+    
+    const interrupted = new Set<string>();
+    const now = Date.now();
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    
+    for (const job of activeJobs) {
+      // Check if job is "running" but not in our active state
+      // OR if lastActivityAt is more than 5 minutes ago
+      const isStale = job.lastActivityAt ? (now - job.lastActivityAt) > FIVE_MINUTES : false;
+      const isNotActive = job.status === "running" && !activeJobIds.has(job._id);
+      
+      if (isStale || isNotActive) {
+        interrupted.add(job._id);
+      }
+    }
+    
+    setInterruptedJobs(interrupted);
+    
+    // Show toast if there are interrupted jobs
+    if (interrupted.size > 0) {
+      toast.warning(`${interrupted.size} upload job(s) were interrupted`, {
+        description: "Click Resume to continue uploading the remaining files",
+        duration: 10000,
+      });
+    }
+  }, [activeJobs, activeJobIds]);
   
   const handleBulkImport = async () => {
     if (!csvData.trim()) {
@@ -292,39 +327,41 @@ export default function MockupsPage() {
     const fileArray = Array.from(files);
     const BATCH_SIZE = 50;
     
-    // Check which files already exist in the database (only for new jobs)
+    // Check which files already exist in the database (for both new AND resumed jobs)
     let filesToUpload = fileArray;
     let alreadySkipped = 0;
     
-    if (!existingJobId) {
-      toast.info("Checking for duplicate files...", { duration: 2000 });
+    toast.info("Checking for duplicate files...", { duration: 2000 });
+    
+    try {
+      const filenames = fileArray.map(f => f.name);
+      const checkResult = await convex.query(api.mockups.checkExistingMockupFilenames, {
+        filenames,
+      });
       
-      try {
-        const filenames = fileArray.map(f => f.name);
-        const checkResult = await convex.query(api.mockups.checkExistingMockupFilenames, {
-          filenames,
-        });
-        
-        // Filter to only upload missing files
-        const missingSet = new Set(checkResult.missingFilenames);
-        filesToUpload = fileArray.filter(file => missingSet.has(file.name));
-        alreadySkipped = checkResult.existing;
-        
-        if (alreadySkipped > 0) {
-          toast.success(
-            `${alreadySkipped} files already uploaded! Processing ${filesToUpload.length} remaining files.`,
-            { duration: 5000 }
-          );
-        }
-        
-        if (filesToUpload.length === 0) {
-          toast.info("All files have already been uploaded!");
-          return;
-        }
-      } catch (error) {
-        console.error("Failed to check existing mockups:", error);
-        toast.warning("Could not check for existing files. Uploading all files...");
+      // Filter to only upload missing files
+      const missingSet = new Set(checkResult.missingFilenames);
+      filesToUpload = fileArray.filter(file => missingSet.has(file.name));
+      alreadySkipped = checkResult.existing;
+      
+      if (alreadySkipped > 0) {
+        const message = existingJobId 
+          ? `Resuming: ${alreadySkipped} files already uploaded! Processing ${filesToUpload.length} remaining files.`
+          : `${alreadySkipped} files already uploaded! Processing ${filesToUpload.length} remaining files.`;
+        toast.success(message, { duration: 5000 });
       }
+      
+      if (filesToUpload.length === 0) {
+        toast.info("All files have already been uploaded!");
+        if (existingJobId) {
+          // Mark job as completed since all files are already uploaded
+          await updateJobStatus({ jobId: existingJobId, status: "completed" });
+        }
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to check existing mockups:", error);
+      toast.warning("Could not check for existing files. Uploading all files...");
     }
     
     // Create or use existing upload job
@@ -520,21 +557,23 @@ export default function MockupsPage() {
     const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
     if (!job) return;
     
-    uploadAbortRefs.current.set(jobId, false);
-    await resumeJob({ jobId });
+    // Store job ID for resume
+    setResumeJobId(jobId);
     
-    // Ask user to reselect files for resume
-    toast.info("Please reselect the files to resume upload", {
-      description: "The browser cannot retain file references after pause. Select the same files to continue.",
+    // Remove from interrupted jobs set
+    setInterruptedJobs(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(jobId);
+      return newSet;
+    });
+    
+    // Trigger file picker
+    toast.info("Select ALL original files to resume", {
+      description: "The system will automatically skip already uploaded files and continue from where it stopped.",
       duration: 8000,
     });
     
-    // Clean up paused jobs map
-    setPausedJobs(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(jobId);
-      return newMap;
-    });
+    resumeFileInputRef.current?.click();
   };
 
   /**
@@ -910,6 +949,22 @@ export default function MockupsPage() {
                 onChange={(e) => handleBulkUpload(e.target.files)}
                 disabled={activeJobIds.size >= MAX_CONCURRENT_JOBS}
               />
+              <input
+                ref={resumeFileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  if (e.target.files && resumeJobId) {
+                    await processFilesUpload(e.target.files, 0, resumeJobId);
+                    setResumeJobId(null);
+                    if (resumeFileInputRef.current) {
+                      resumeFileInputRef.current.value = '';
+                    }
+                  }
+                }}
+              />
               
               <ImageIcon className="h-12 w-12 mx-auto text-green-600 mb-3" />
               
@@ -972,14 +1027,21 @@ export default function MockupsPage() {
                   : 0;
                 const isRunning = job.status === "running";
                 const isPaused = job.status === "paused";
+                const isInterrupted = interruptedJobs.has(job._id);
                 
                 return (
-                  <div key={job._id} className="bg-white border border-blue-200 rounded p-4">
+                  <div key={job._id} className={`bg-white border rounded p-4 ${isInterrupted ? 'border-amber-400 bg-amber-50/30' : 'border-blue-200'}`}>
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold">{job.jobName}</h3>
-                          {isRunning && (
+                          {isInterrupted && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full flex items-center gap-1">
+                              <AlertCircleIcon className="h-3 w-3" />
+                              Interrupted
+                            </span>
+                          )}
+                          {isRunning && !isInterrupted && (
                             <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">
                               Running
                             </span>
@@ -994,9 +1056,25 @@ export default function MockupsPage() {
                           {job.filesChecked} / {job.totalFiles} files checked
                           {job.currentFile && <span className="ml-2">• Current: {job.currentFile}</span>}
                         </p>
+                        {isInterrupted && (
+                          <p className="text-sm text-amber-700 mt-1 font-medium">
+                            Upload was interrupted. Click Resume to continue.
+                          </p>
+                        )}
                       </div>
                       <div className="flex gap-2">
-                        {isRunning && (
+                        {isInterrupted && (
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-amber-600 hover:bg-amber-700"
+                            onClick={() => handleResume(job._id)}
+                          >
+                            <PlayIcon className="h-4 w-4 mr-1" />
+                            Resume
+                          </Button>
+                        )}
+                        {isRunning && !isInterrupted && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1005,7 +1083,7 @@ export default function MockupsPage() {
                             <PauseIcon className="h-4 w-4" />
                           </Button>
                         )}
-                        {isPaused && (
+                        {isPaused && !isInterrupted && (
                           <Button
                             size="sm"
                             variant="outline"
