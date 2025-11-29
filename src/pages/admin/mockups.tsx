@@ -551,7 +551,7 @@ export default function MockupsPage() {
   };
 
   /**
-   * Handle resume button
+   * Handle resume button (files)
    */
   const handleResume = async (jobId: Id<"uploadJobs">) => {
     const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
@@ -574,6 +574,82 @@ export default function MockupsPage() {
     });
     
     resumeFileInputRef.current?.click();
+  };
+
+  /**
+   * Handle resume button (folder)
+   */
+  const handleResumeFolder = async (jobId: Id<"uploadJobs">) => {
+    const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
+    if (!job) return;
+    
+    try {
+      // Check if the File System Access API is supported
+      if (!('showDirectoryPicker' in window)) {
+        toast.error("Folder upload not supported in this browser. Use 'Resume with Files' instead.");
+        return;
+      }
+      
+      // Check if we're in an iframe (Hercules preview)
+      if (window !== window.top) {
+        toast.error("Folder resume doesn't work in preview mode", {
+          description: "Open this page in a new tab to resume with folder, or use 'Resume with Files' instead",
+          duration: 6000,
+        });
+        return;
+      }
+      
+      // Remove from interrupted jobs set
+      setInterruptedJobs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(jobId);
+        return newSet;
+      });
+      
+      // Show directory picker
+      interface WindowWithDirectoryPicker extends Window {
+        showDirectoryPicker: () => Promise<unknown>;
+      }
+      const dirHandle = await (window as WindowWithDirectoryPicker).showDirectoryPicker();
+      
+      toast.info("Scanning folder for images...", {
+        description: "Already uploaded files will be automatically skipped",
+        duration: 5000,
+      });
+      
+      // Collect all image files recursively
+      const imageFiles = await collectImagesFromDirectory(dirHandle);
+      
+      if (imageFiles.length === 0) {
+        toast.error("No image files found in the selected folder");
+        return;
+      }
+      
+      toast.success(`Found ${imageFiles.length} images. Resuming upload...`);
+      
+      // Process the collected files with the existing job ID
+      await processFilesUpload(imageFiles, 0, jobId);
+      
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        // User cancelled the picker
+        // Re-add to interrupted jobs since they didn't complete the resume
+        setInterruptedJobs(prev => new Set(prev).add(jobId));
+        return;
+      }
+      
+      // Check for iframe/security error
+      if ((error as Error).message?.includes('Cross origin') || (error as Error).message?.includes('sub frame')) {
+        toast.error("Folder resume requires opening in a new tab", {
+          description: "Right-click the page and select 'Open in new tab', or use 'Resume with Files' instead",
+          duration: 8000,
+        });
+        return;
+      }
+      
+      console.error('Folder selection error:', error);
+      toast.error("Failed to access folder. Try 'Resume with Files' instead.");
+    }
   };
 
   /**
@@ -1058,21 +1134,31 @@ export default function MockupsPage() {
                         </p>
                         {isInterrupted && (
                           <p className="text-sm text-amber-700 mt-1 font-medium">
-                            Upload was interrupted. Click Resume to continue.
+                            Upload was interrupted. Choose how to resume:
                           </p>
                         )}
                       </div>
                       <div className="flex gap-2">
                         {isInterrupted && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="bg-amber-600 hover:bg-amber-700"
-                            onClick={() => handleResume(job._id)}
-                          >
-                            <PlayIcon className="h-4 w-4 mr-1" />
-                            Resume
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="bg-amber-600 hover:bg-amber-700"
+                              onClick={() => handleResume(job._id)}
+                            >
+                              <PlayIcon className="h-4 w-4 mr-1" />
+                              Resume with Files
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleResumeFolder(job._id)}
+                            >
+                              <FolderIcon className="h-4 w-4 mr-1" />
+                              Resume with Folder
+                            </Button>
+                          </>
                         )}
                         {isRunning && !isInterrupted && (
                           <Button
