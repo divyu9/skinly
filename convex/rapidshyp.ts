@@ -157,6 +157,8 @@ export const createShipment = action({
 
       let response: Response | null = null;
       let successfulEndpoint = "";
+      let lastErrorText = "";
+      let lastErrorStatus = 0;
 
       for (const endpoint of possibleEndpoints) {
         const fullUrl = `${baseUrl}${endpoint}`;
@@ -179,18 +181,20 @@ export const createShipment = action({
             console.log(`✓ Success with endpoint: ${endpoint}`);
             break;
           } else {
-            const errorText = await response.text();
-            console.log(`✗ Failed with ${endpoint} (${response.status}): ${errorText}`);
+            // Store error for this attempt
+            lastErrorStatus = response.status;
+            lastErrorText = await response.text();
+            console.log(`✗ Failed with ${endpoint} (${lastErrorStatus}): ${lastErrorText}`);
           }
         } catch (error) {
           console.error(`Error trying endpoint ${endpoint}:`, error);
+          lastErrorText = error instanceof Error ? error.message : String(error);
         }
       }
 
       if (!response || !response.ok) {
-        const lastError = response ? await response.text() : "No response";
         throw new ConvexError({
-          message: `RapidShyp API error: Tried all endpoints (${possibleEndpoints.join(", ")}). Last error (${response?.status}): ${lastError}`,
+          message: `RapidShyp API error: Tried all endpoints (${possibleEndpoints.join(", ")}). Last error (${lastErrorStatus}): ${lastErrorText}`,
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
