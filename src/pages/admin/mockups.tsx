@@ -366,8 +366,8 @@ export default function MockupsPage() {
     
     // Create or use existing upload job
     const jobId = existingJobId || await createJob({
-      jobName: `Upload ${filesToUpload.length} files`,
-      totalFiles: filesToUpload.length,
+      jobName: `Upload ${fileArray.length} files`,
+      totalFiles: fileArray.length,
     });
     
     // Track this job as active
@@ -377,8 +377,17 @@ export default function MockupsPage() {
     // Acquire wake lock
     await requestWakeLock();
     
-    // Update job to running
+    // Update job to running and set skipped count
     await updateJobStatus({ jobId, status: "running" });
+    
+    // Update skipped count if there are duplicates
+    if (alreadySkipped > 0) {
+      await updateJobProgress({
+        jobId,
+        filesSkipped: alreadySkipped,
+        filesChecked: alreadySkipped,
+      });
+    }
     
     const startBatch = resumeFromBatch || 0;
     let filesUploaded = 0;
@@ -414,12 +423,12 @@ export default function MockupsPage() {
           const fileIndex = startIdx + i;
           
           try {
-            // Update current file
+            // Update current file (add alreadySkipped to get true total checked count)
             await updateJobProgress({
               jobId,
               currentFile: file.name,
               currentBatch: batchNum,
-              filesChecked: fileIndex + 1,
+              filesChecked: alreadySkipped + fileIndex + 1,
             });
             
             // Validate filename
@@ -557,7 +566,7 @@ export default function MockupsPage() {
     const job = await convex.query(api.uploadJobs.getUploadJob, { jobId });
     if (!job) return;
     
-    // Store job ID for resume
+    // Store the interrupted job info for the resume job name
     setResumeJobId(jobId);
     
     // Remove from interrupted jobs set
@@ -567,9 +576,12 @@ export default function MockupsPage() {
       return newSet;
     });
     
-    // Trigger file picker
+    // Mark the interrupted job as completed (keeps the stats intact)
+    await updateJobStatus({ jobId, status: "completed" });
+    
+    // Trigger file picker - will create a NEW job for resume
     toast.info("Select ALL original files to resume", {
-      description: "The system will automatically skip already uploaded files and continue from where it stopped.",
+      description: "A new job will track files scanned, skipped, and newly uploaded.",
       duration: 8000,
     });
     
@@ -606,6 +618,9 @@ export default function MockupsPage() {
         return newSet;
       });
       
+      // Mark the interrupted job as completed (keeps the stats intact)
+      await updateJobStatus({ jobId, status: "completed" });
+      
       // Show directory picker
       interface WindowWithDirectoryPicker extends Window {
         showDirectoryPicker: () => Promise<unknown>;
@@ -613,7 +628,7 @@ export default function MockupsPage() {
       const dirHandle = await (window as WindowWithDirectoryPicker).showDirectoryPicker();
       
       toast.info("Scanning folder for images...", {
-        description: "Already uploaded files will be automatically skipped",
+        description: "A new job will track files scanned, skipped, and newly uploaded.",
         duration: 5000,
       });
       
@@ -625,10 +640,10 @@ export default function MockupsPage() {
         return;
       }
       
-      toast.success(`Found ${imageFiles.length} images. Resuming upload...`);
+      toast.success(`Found ${imageFiles.length} images. Starting resume job...`);
       
-      // Process the collected files with the existing job ID
-      await processFilesUpload(imageFiles, 0, jobId);
+      // Process the collected files - will create a NEW job (no existingJobId)
+      await processFilesUpload(imageFiles);
       
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
@@ -1033,7 +1048,8 @@ export default function MockupsPage() {
                 className="hidden"
                 onChange={async (e) => {
                   if (e.target.files && resumeJobId) {
-                    await processFilesUpload(e.target.files, 0, resumeJobId);
+                    // Create a NEW job for resume (no existingJobId passed)
+                    await processFilesUpload(e.target.files);
                     setResumeJobId(null);
                     if (resumeFileInputRef.current) {
                       resumeFileInputRef.current.value = '';
