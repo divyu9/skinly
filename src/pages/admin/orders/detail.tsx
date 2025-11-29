@@ -90,9 +90,24 @@ function OrderDetailPageInner() {
         toast.error("Failed to create shipment");
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create shipment";
-      toast.error(errorMessage);
+      console.error("RapidShyp Error:", error);
+      
+      // Extract detailed error message from ConvexError
+      let errorMessage = "Failed to create shipment";
+      let errorDetails = "";
+      
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error.data as { message?: string; code?: string };
+        errorMessage = convexError.message || errorMessage;
+        errorDetails = convexError.code || "";
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, {
+        description: errorDetails ? `Error code: ${errorDetails}` : undefined,
+        duration: 10000,
+      });
     } finally {
       setCreatingShipment(false);
     }

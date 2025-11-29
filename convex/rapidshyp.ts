@@ -58,6 +58,23 @@ export const createShipment = action({
         });
       }
 
+      console.log("Creating shipment for order:", order.orderNumber);
+
+      // Validate required fields
+      if (!order.shippingAddress?.phone) {
+        throw new ConvexError({
+          message: "Order missing phone number in shipping address",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      if (!order.items || order.items.length === 0) {
+        throw new ConvexError({
+          message: "Order has no items",
+          code: "BAD_REQUEST",
+        });
+      }
+
       // Check if shipment already created
       if (order.awbNumber) {
         throw new ConvexError({
@@ -67,6 +84,7 @@ export const createShipment = action({
       }
 
       const config = getRapidShypConfig();
+      console.log("RapidShyp API URL:", config.apiUrl);
 
       // Calculate package weight (estimate: 50g per item)
       const totalWeight = order.items.reduce(
@@ -124,6 +142,9 @@ export const createShipment = action({
         weight: totalWeight.toFixed(2),
       };
 
+      // Log payload for debugging (remove sensitive data in production)
+      console.log("RapidShyp Payload:", JSON.stringify(shipmentPayload, null, 2));
+
       // Make API request to RapidShyp
       const response: Response = await fetch(`${config.apiUrl}/v1/external/orders/create`, {
         method: "POST",
@@ -134,15 +155,19 @@ export const createShipment = action({
         body: JSON.stringify(shipmentPayload),
       });
 
+      console.log("RapidShyp Response Status:", response.status);
+
       if (!response.ok) {
         const errorData = await response.text();
+        console.error("RapidShyp API Error Response:", errorData);
         throw new ConvexError({
-          message: `RapidShyp API error: ${errorData}`,
+          message: `RapidShyp API error (${response.status}): ${errorData}`,
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
       const result: Record<string, string> = await response.json() as Record<string, string>;
+      console.log("RapidShyp Success Response:", JSON.stringify(result, null, 2));
 
       // Extract AWB number and other details from response
       // Note: Adjust these field names based on actual RapidShyp response structure
@@ -171,9 +196,21 @@ export const createShipment = action({
         message: "Shipment created successfully",
       };
     } catch (error) {
+      console.error("RapidShyp createShipment error:", error);
+      
       if (error instanceof ConvexError) {
         throw error;
       }
+      
+      // Log full error for debugging
+      if (error instanceof Error) {
+        console.error("Error details:", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+        });
+      }
+      
       throw new ConvexError({
         message:
           error instanceof Error
