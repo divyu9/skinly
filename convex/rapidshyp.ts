@@ -84,10 +84,7 @@ export const createShipment = action({
       }
 
       const config = getRapidShypConfig();
-      
-      // Use correct RapidShyp base URL format
-      const baseUrl = "https://api.rapidshyp.com/rapidshyp/apis/v1";
-      console.log("RapidShyp API Base URL:", baseUrl);
+      console.log("RapidShyp API URL:", config.apiUrl);
 
       // Calculate package weight (estimate: 50g per item)
       const totalWeight = order.items.reduce(
@@ -148,60 +145,29 @@ export const createShipment = action({
       // Log payload for debugging (remove sensitive data in production)
       console.log("RapidShyp Payload:", JSON.stringify(shipmentPayload, null, 2));
 
-      // Try different endpoint variations
-      const possibleEndpoints = [
-        "/create_order",
-        "/orders/create", 
-        "/shipments/create"
-      ];
+      // Make API request to RapidShyp using the configured URL
+      const response = await fetch(config.apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "rapidshyp-token": config.apiKey,
+        },
+        body: JSON.stringify(shipmentPayload),
+      });
 
-      let response: Response | null = null;
-      let successfulEndpoint = "";
-      let lastErrorText = "";
-      let lastErrorStatus = 0;
+      console.log("RapidShyp Response Status:", response.status);
 
-      for (const endpoint of possibleEndpoints) {
-        const fullUrl = `${baseUrl}${endpoint}`;
-        console.log(`Trying endpoint: ${fullUrl}`);
-
-        try {
-          response = await fetch(fullUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "rapidshyp-token": config.apiKey, // Correct header name for RapidShyp
-            },
-            body: JSON.stringify(shipmentPayload),
-          });
-
-          console.log(`Response status for ${endpoint}: ${response.status}`);
-
-          if (response.ok) {
-            successfulEndpoint = endpoint;
-            console.log(`✓ Success with endpoint: ${endpoint}`);
-            break;
-          } else {
-            // Store error for this attempt
-            lastErrorStatus = response.status;
-            lastErrorText = await response.text();
-            console.log(`✗ Failed with ${endpoint} (${lastErrorStatus}): ${lastErrorText}`);
-          }
-        } catch (error) {
-          console.error(`Error trying endpoint ${endpoint}:`, error);
-          lastErrorText = error instanceof Error ? error.message : String(error);
-        }
-      }
-
-      if (!response || !response.ok) {
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("RapidShyp API Error Response:", errorData);
         throw new ConvexError({
-          message: `RapidShyp API error: Tried all endpoints (${possibleEndpoints.join(", ")}). Last error (${lastErrorStatus}): ${lastErrorText}`,
+          message: `RapidShyp API error (${response.status}): ${errorData}`,
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
       const result: Record<string, string> = await response.json() as Record<string, string>;
       console.log("RapidShyp Success Response:", JSON.stringify(result, null, 2));
-      console.log(`✓ Working endpoint found: ${successfulEndpoint}`);
 
       // Extract AWB number and other details from response
       // Note: Adjust these field names based on actual RapidShyp response structure
