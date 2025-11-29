@@ -32,7 +32,13 @@ export const createShipment = action({
       const order: {
         orderNumber: string;
         _creationTime: number;
-        items: Array<{ productTitle: string; variant: string; quantity: number; price: number }>;
+        items: Array<{ 
+          productId: string;
+          productTitle: string; 
+          variant: string; 
+          quantity: number; 
+          price: number;
+        }>;
         shippingAddress: {
           fullName: string;
           addressLine1: string;
@@ -86,11 +92,72 @@ export const createShipment = action({
       const config = getRapidShypConfig();
       console.log("RapidShyp API URL:", config.apiUrl);
 
-      // Calculate package weight (estimate: 50g per item)
-      const totalWeight = order.items.reduce(
-        (sum: number, item: { quantity: number }) => sum + item.quantity * 0.05,
-        0
+      // Fetch product details for all items to get shipping dimensions
+      type OrderItem = typeof order.items[0];
+      type IdProducts = { __tableName: "products"; } & string;
+      const itemsWithProducts = await Promise.all(
+        order.items.map(async (item: OrderItem) => {
+          // productId is stored as a string in order items, cast to Id<"products">
+          const product = await ctx.runQuery(api.products.getProduct, {
+            productId: item.productId as IdProducts,
+          }) as { 
+            length?: number; 
+            breadth?: number; 
+            height?: number; 
+            weight?: number; 
+            productType?: "physical" | "digital" 
+          };
+          return { ...item, product };
+        })
       );
+
+      // Filter out digital products
+      const physicalItems = itemsWithProducts.filter(
+        (item: { product: { productType?: "physical" | "digital" } }) => 
+          item.product.productType !== "digital"
+      );
+
+      if (physicalItems.length === 0) {
+        throw new ConvexError({
+          message: "Order contains only digital products, no shipment required",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Calculate total weight (sum of each item's weight × quantity)
+      let totalWeight = 0;
+      let totalLength = 0;
+      let totalBreadth = 0;
+      let totalHeight = 0;
+      let physicalProductCount = 0;
+
+      for (const item of physicalItems) {
+        const itemWeight = item.product.weight ?? 100; // Default 100g if not set
+        const itemLength = item.product.length ?? 10; // Default 10cm if not set
+        const itemBreadth = item.product.breadth ?? 10; // Default 10cm if not set
+        const itemHeight = item.product.height ?? 2; // Default 2cm if not set
+        
+        totalWeight += itemWeight * item.quantity;
+        totalLength += itemLength;
+        totalBreadth += itemBreadth;
+        totalHeight += itemHeight;
+        physicalProductCount++;
+      }
+
+      // Calculate average dimensions
+      const avgLength = Math.ceil(totalLength / physicalProductCount);
+      const avgBreadth = Math.ceil(totalBreadth / physicalProductCount);
+      const avgHeight = Math.ceil(totalHeight / physicalProductCount);
+      const weightInKg = (totalWeight / 1000).toFixed(2); // Convert grams to kg
+
+      console.log("Calculated shipping dimensions:", {
+        totalWeight: `${totalWeight}g`,
+        weightInKg: `${weightInKg}kg`,
+        avgLength: `${avgLength}cm`,
+        avgBreadth: `${avgBreadth}cm`,
+        avgHeight: `${avgHeight}cm`,
+        physicalProductCount,
+      });
 
       // Prepare shipment payload
       // Note: This structure is based on common shipping aggregator patterns
@@ -136,10 +203,10 @@ export const createShipment = action({
         transaction_charges: "0",
         total_discount: "0",
         sub_total: order.subtotal.toString(),
-        length: "10", // Default dimensions in cm
-        breadth: "10",
-        height: "5",
-        weight: totalWeight.toFixed(2),
+        length: avgLength.toString(),
+        breadth: avgBreadth.toString(),
+        height: avgHeight.toString(),
+        weight: weightInKg,
       };
 
       // Log payload for debugging (remove sensitive data in production)

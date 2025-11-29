@@ -45,6 +45,11 @@ function EditProductPageInner() {
     status: "active" | "draft" | "archived";
     images: Array<{ url: string; alt?: string }>;
     tags: string;
+    length: string;
+    breadth: string;
+    height: string;
+    weight: string;
+    productType: "physical" | "digital";
   }>({
     title: "",
     slug: "",
@@ -54,6 +59,11 @@ function EditProductPageInner() {
     status: "active",
     images: [{ url: "", alt: "" }],
     tags: "",
+    length: "10",
+    breadth: "10",
+    height: "2",
+    weight: "100",
+    productType: "physical",
   });
 
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -71,6 +81,11 @@ function EditProductPageInner() {
         status: product.status,
         images: product.images.length > 0 ? product.images : [{ url: "", alt: "" }],
         tags: product.tags.join(", "),
+        length: (product.length ?? 10).toString(),
+        breadth: (product.breadth ?? 10).toString(),
+        height: (product.height ?? 2).toString(),
+        weight: (product.weight ?? 100).toString(),
+        productType: product.productType ?? "physical",
       });
 
       setVariants(
@@ -167,6 +182,11 @@ function EditProductPageInner() {
         status: formData.status,
         images: formData.images.filter((img) => img.url),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
+        length: parseFloat(formData.length),
+        breadth: parseFloat(formData.breadth),
+        height: parseFloat(formData.height),
+        weight: parseFloat(formData.weight),
+        productType: formData.productType,
       });
 
       // Update or create variants
@@ -421,7 +441,7 @@ function EditProductPageInner() {
         </div>
 
         {/* Sidebar */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Organization</CardTitle>
@@ -472,6 +492,98 @@ function EditProductPageInner() {
                     </SelectContent>
                   </Select>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Shipping Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="productType">Product Type</Label>
+                <Select
+                  value={formData.productType}
+                  onValueChange={(value: "physical" | "digital") =>
+                    setFormData({ ...formData, productType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="physical">Physical</SelectItem>
+                    <SelectItem value="digital">Digital</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="length">Length</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="length"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formData.length}
+                      onChange={(e) => setFormData({ ...formData, length: e.target.value })}
+                      className="text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="breadth">Breadth</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="breadth"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formData.breadth}
+                      onChange={(e) => setFormData({ ...formData, breadth: e.target.value })}
+                      className="text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="height">Height</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="height"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formData.height}
+                      onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                      className="text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="weight">Weight</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="weight"
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  />
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">grams</span>
+                </div>
               </div>
             </CardContent>
           </Card>

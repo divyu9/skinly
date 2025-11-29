@@ -295,6 +295,11 @@ export const createProduct = mutation({
       v.literal("cover"),
       v.literal("accessory")
     ),
+    length: v.optional(v.number()),
+    breadth: v.optional(v.number()),
+    height: v.optional(v.number()),
+    weight: v.optional(v.number()),
+    productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -328,6 +333,11 @@ export const createProduct = mutation({
       images: args.images,
       tags: args.tags,
       gadgetCategory: args.gadgetCategory,
+      length: args.length ?? 10,
+      breadth: args.breadth ?? 10,
+      height: args.height ?? 2,
+      weight: args.weight ?? 100,
+      productType: args.productType ?? "physical",
     });
 
     return productId;
@@ -349,6 +359,11 @@ export const updateProduct = mutation({
       alt: v.optional(v.string()),
     }))),
     tags: v.optional(v.array(v.string())),
+    length: v.optional(v.number()),
+    breadth: v.optional(v.number()),
+    height: v.optional(v.number()),
+    weight: v.optional(v.number()),
+    productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -360,6 +375,32 @@ export const updateProduct = mutation({
     }
 
     const { productId, ...updates } = args;
+
+    // Validate shipping dimensions
+    if (updates.length !== undefined && updates.length < 0) {
+      throw new ConvexError({
+        message: "Length must be a positive number",
+        code: "BAD_REQUEST",
+      });
+    }
+    if (updates.breadth !== undefined && updates.breadth < 0) {
+      throw new ConvexError({
+        message: "Breadth must be a positive number",
+        code: "BAD_REQUEST",
+      });
+    }
+    if (updates.height !== undefined && updates.height < 0) {
+      throw new ConvexError({
+        message: "Height must be a positive number",
+        code: "BAD_REQUEST",
+      });
+    }
+    if (updates.weight !== undefined && updates.weight < 0) {
+      throw new ConvexError({
+        message: "Weight must be a positive number",
+        code: "BAD_REQUEST",
+      });
+    }
 
     // If updating slug, check it's not taken
     if (updates.slug !== undefined) {

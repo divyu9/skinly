@@ -159,6 +159,12 @@ export default defineSchema({
       v.literal("embossed"),
       v.literal("transparent")
     )),
+    // Shipping dimensions and weight
+    length: v.optional(v.number()), // Length in cm
+    breadth: v.optional(v.number()), // Breadth in cm
+    height: v.optional(v.number()), // Height in cm
+    weight: v.optional(v.number()), // Weight in grams
+    productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
   })
     .index("by_slug", ["slug"])
     .index("by_collection", ["collectionId"])
