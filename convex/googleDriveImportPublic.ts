@@ -288,11 +288,13 @@ export const storeMockupFile = internalMutation({
     const modelPortion = parts.slice(0, -1).join(' ');
     const modelPortionLower = modelPortion.toLowerCase();
     
-    // Check if filename contains iPhone, iPad, Google, Nothing, or CMF to auto-detect brand
+    // Check if filename contains iPhone, iPad, Google, Nothing, CMF, OnePlus, or Samsung to auto-detect brand
     const isAppleDevice = modelPortionLower.includes('iphone') || modelPortionLower.includes('ipad');
     const isGoogleDevice = modelPortionLower.startsWith('google');
     const isNothingDevice = modelPortionLower.startsWith('nothing');
     const isCMFDevice = modelPortionLower.startsWith('cmf');
+    const isOnePlusDevice = modelPortionLower.startsWith('oneplus');
+    const isSamsungDevice = modelPortionLower.startsWith('samsung') || modelPortionLower.startsWith('galaxy');
     
     let brand: string;
     let model: string;
@@ -318,8 +320,29 @@ export const storeMockupFile = internalMutation({
       if (!model) {
         throw new Error("CMF device must have a model name");
       }
+    } else if (isOnePlusDevice) {
+      brand = 'OnePlus';
+      model = modelPortion.replace(/^oneplus\s*/i, '').trim();
+      if (!model) {
+        throw new Error("OnePlus device must have a model name");
+      }
+    } else if (isSamsungDevice) {
+      brand = 'Samsung';
+      let cleanedModel = modelPortion;
+      // Strip "Samsung" if present (case insensitive)
+      cleanedModel = cleanedModel.replace(/^samsung\s*/i, '').trim();
+      // Strip "Galaxy" if present (case insensitive)
+      cleanedModel = cleanedModel.replace(/^galaxy\s*/i, '').trim();
+      // Strip network indicators like (5G), (4G), (LTE), etc.
+      cleanedModel = cleanedModel.replace(/\s*\([0-9]?G\)/gi, '').trim();
+      cleanedModel = cleanedModel.replace(/\s*\(LTE\)/gi, '').trim();
+      
+      if (!cleanedModel) {
+        throw new Error("Samsung device must have a model name");
+      }
+      model = cleanedModel;
     } else if (parts.length === 2) {
-      throw new Error("Non-Apple/Google/Nothing/CMF devices must include brand in filename");
+      throw new Error("Non-Apple/Google/Nothing/CMF/OnePlus/Samsung devices must include brand in filename");
     } else {
       brand = parts[0];
       model = parts.slice(1, -1).join(' ');

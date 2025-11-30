@@ -33,11 +33,13 @@ export const storeMockupFile = mutation({
     const modelPortion = parts.slice(0, -1).join(' ');
     const modelPortionLower = modelPortion.toLowerCase();
     
-    // Check if filename contains iPhone, iPad, Google, Nothing, or CMF to auto-detect brand
+    // Check if filename contains iPhone, iPad, Google, Nothing, CMF, OnePlus, or Samsung to auto-detect brand
     const isAppleDevice = modelPortionLower.includes('iphone') || modelPortionLower.includes('ipad');
     const isGoogleDevice = modelPortionLower.startsWith('google');
     const isNothingDevice = modelPortionLower.startsWith('nothing');
     const isCMFDevice = modelPortionLower.startsWith('cmf');
+    const isOnePlusDevice = modelPortionLower.startsWith('oneplus');
+    const isSamsungDevice = modelPortionLower.startsWith('samsung') || modelPortionLower.startsWith('galaxy');
     
     let brand: string;
     let model: string;
@@ -73,9 +75,34 @@ export const storeMockupFile = mutation({
       if (!model) {
         throw new Error(`Invalid filename format: ${args.filename}. CMF device must have a model name.`);
       }
+    } else if (isOnePlusDevice) {
+      // Auto-detect OnePlus brand
+      brand = 'OnePlus';
+      // Extract model after "OnePlus" - handle both "OnePlus 12R" and "OnePlus12R"
+      // Remove "OnePlus" from the start (case insensitive)
+      model = modelPortion.replace(/^oneplus\s*/i, '').trim();
+      if (!model) {
+        throw new Error(`Invalid filename format: ${args.filename}. OnePlus device must have a model name.`);
+      }
+    } else if (isSamsungDevice) {
+      // Auto-detect Samsung brand
+      brand = 'Samsung';
+      let cleanedModel = modelPortion;
+      // Strip "Samsung" if present (case insensitive)
+      cleanedModel = cleanedModel.replace(/^samsung\s*/i, '').trim();
+      // Strip "Galaxy" if present (case insensitive)
+      cleanedModel = cleanedModel.replace(/^galaxy\s*/i, '').trim();
+      // Strip network indicators like (5G), (4G), (LTE), etc.
+      cleanedModel = cleanedModel.replace(/\s*\([0-9]?G\)/gi, '').trim();
+      cleanedModel = cleanedModel.replace(/\s*\(LTE\)/gi, '').trim();
+      
+      if (!cleanedModel) {
+        throw new Error(`Invalid filename format: ${args.filename}. Samsung device must have a model name.`);
+      }
+      model = cleanedModel;
     } else if (parts.length === 2) {
       // Format: Model_SKU.jpg (no brand specified)
-      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple/Google/Nothing/CMF devices must include brand: Brand_Model_SKU.jpg`);
+      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple/Google/Nothing/CMF/OnePlus/Samsung devices must include brand: Brand_Model_SKU.jpg`);
     } else {
       // Format: Brand_Model_SKU.jpg (3+ parts)
       brand = parts[0];
