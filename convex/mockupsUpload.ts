@@ -33,9 +33,11 @@ export const storeMockupFile = mutation({
     const modelPortion = parts.slice(0, -1).join(' ');
     const modelPortionLower = modelPortion.toLowerCase();
     
-    // Check if filename contains iPhone, iPad, or Google to auto-detect brand
+    // Check if filename contains iPhone, iPad, Google, Nothing, or CMF to auto-detect brand
     const isAppleDevice = modelPortionLower.includes('iphone') || modelPortionLower.includes('ipad');
     const isGoogleDevice = modelPortionLower.startsWith('google');
+    const isNothingDevice = modelPortionLower.startsWith('nothing');
+    const isCMFDevice = modelPortionLower.startsWith('cmf');
     
     let brand: string;
     let model: string;
@@ -53,9 +55,27 @@ export const storeMockupFile = mutation({
       if (!model) {
         throw new Error(`Invalid filename format: ${args.filename}. Google device must have a model name.`);
       }
+    } else if (isNothingDevice) {
+      // Auto-detect Nothing brand
+      brand = 'Nothing';
+      // Extract model after "Nothing" - handle both "Nothing Phone 1" and "NothingPhone1"
+      // Remove "Nothing" from the start (case insensitive)
+      model = modelPortion.replace(/^nothing\s*/i, '').trim();
+      if (!model) {
+        throw new Error(`Invalid filename format: ${args.filename}. Nothing device must have a model name.`);
+      }
+    } else if (isCMFDevice) {
+      // Auto-detect CMF brand
+      brand = 'CMF';
+      // Extract model after "CMF" - handle both "CMF Phone 1" and "CMFPhone1"
+      // Remove "CMF" from the start (case insensitive)
+      model = modelPortion.replace(/^cmf\s*/i, '').trim();
+      if (!model) {
+        throw new Error(`Invalid filename format: ${args.filename}. CMF device must have a model name.`);
+      }
     } else if (parts.length === 2) {
       // Format: Model_SKU.jpg (no brand specified)
-      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple/Google devices must include brand: Brand_Model_SKU.jpg`);
+      throw new Error(`Invalid filename format: ${args.filename}. Non-Apple/Google/Nothing/CMF devices must include brand: Brand_Model_SKU.jpg`);
     } else {
       // Format: Brand_Model_SKU.jpg (3+ parts)
       brand = parts[0];

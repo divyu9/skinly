@@ -288,9 +288,11 @@ export const storeMockupFile = internalMutation({
     const modelPortion = parts.slice(0, -1).join(' ');
     const modelPortionLower = modelPortion.toLowerCase();
     
-    // Check if filename contains iPhone, iPad, or Google to auto-detect brand
+    // Check if filename contains iPhone, iPad, Google, Nothing, or CMF to auto-detect brand
     const isAppleDevice = modelPortionLower.includes('iphone') || modelPortionLower.includes('ipad');
     const isGoogleDevice = modelPortionLower.startsWith('google');
+    const isNothingDevice = modelPortionLower.startsWith('nothing');
+    const isCMFDevice = modelPortionLower.startsWith('cmf');
     
     let brand: string;
     let model: string;
@@ -304,8 +306,20 @@ export const storeMockupFile = internalMutation({
       if (!model) {
         throw new Error("Google device must have a model name");
       }
+    } else if (isNothingDevice) {
+      brand = 'Nothing';
+      model = modelPortion.replace(/^nothing\s*/i, '').trim();
+      if (!model) {
+        throw new Error("Nothing device must have a model name");
+      }
+    } else if (isCMFDevice) {
+      brand = 'CMF';
+      model = modelPortion.replace(/^cmf\s*/i, '').trim();
+      if (!model) {
+        throw new Error("CMF device must have a model name");
+      }
     } else if (parts.length === 2) {
-      throw new Error("Non-Apple/Google devices must include brand in filename");
+      throw new Error("Non-Apple/Google/Nothing/CMF devices must include brand in filename");
     } else {
       brand = parts[0];
       model = parts.slice(1, -1).join(' ');
