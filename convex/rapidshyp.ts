@@ -176,19 +176,19 @@ export const createShipment = action({
           name: item.productTitle,
           sku: item.variant,
           units: item.quantity,
-          sellingPrice: item.price.toFixed(2),
+          sellingPrice: parseFloat(item.price.toFixed(2)),
           hsn: "39269099", // HSN code for vinyl skins/stickers
-          tax: "18" // GST rate 18%
+          tax: 18 // GST rate 18%
         })),
 
         // Payment details
         paymentMethod: paymentMethod,
-        totalDiscount: totalDiscount.toFixed(2),
-        subTotal: subTotal.toFixed(2),
-        orderAmount: orderAmount.toFixed(2),
+        totalDiscount: parseFloat(totalDiscount.toFixed(2)),
+        subTotal: parseFloat(subTotal.toFixed(2)),
+        orderAmount: parseFloat(orderAmount.toFixed(2)),
 
         // Package details (weight in kg, dimensions in cm)
-        weight: weightInKg,
+        weight: parseFloat(weightInKg),
         length: avgLength,
         breadth: avgBreadth,
         height: avgHeight,
