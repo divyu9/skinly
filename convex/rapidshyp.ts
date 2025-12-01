@@ -208,13 +208,16 @@ export const createShipment = action({
         // Order items - exact field names from API docs
         orderItems: order.items.map((item) => {
           const unitPrice = parseFloat(item.price.toFixed(2));
-          console.log(`Setting unitPrice for ${item.productTitle}:`, unitPrice);
+          // Calculate GST amount from tax-inclusive price (18% GST)
+          // Formula: GST amount = price × (0.18 / 1.18)
+          const taxAmount = parseFloat((item.price * (0.18 / 1.18)).toFixed(2));
+          console.log(`Setting unitPrice for ${item.productTitle}:`, unitPrice, 'Tax amount:', taxAmount);
           return {
             itemName: item.productTitle,
             sku: item.variant,
             units: item.quantity,
             unitPrice: unitPrice, // Tax-inclusive price
-            tax: 18, // GST rate 18%
+            tax: taxAmount, // GST amount in rupees (not the rate!)
             hsn: "39269099" // HSN code for vinyl skins/stickers
           };
         }),
