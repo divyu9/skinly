@@ -141,6 +141,9 @@ export const createShipment = action({
       const firstName = nameParts[0] || "";
       const lastName = nameParts.slice(1).join(" ") || "";
 
+      // Convert weight from kg to grams for package weight
+      const packageWeightInGrams = Math.round(parseFloat(weightInKg) * 1000);
+
       // Prepare shipment payload according to RapidShyp API documentation
       const shipmentPayload: Record<string, unknown> = {
         // Order details
@@ -152,54 +155,53 @@ export const createShipment = action({
         customerPhone: order.shippingAddress.phone,
         customerEmail: order.user?.email || "",
 
-        // Shipping address (same as billing)
+        // Shipping address (same as billing) - exact field names from API docs
         shippingAddress: {
           firstName: firstName,
           lastName: lastName,
-          address1: order.shippingAddress.addressLine1,
-          address2: order.shippingAddress.addressLine2 || "",
+          addressLine1: order.shippingAddress.addressLine1,
+          addressLine2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
-          pincode: order.shippingAddress.pincode,
+          pinCode: order.shippingAddress.pincode,
           phone: order.shippingAddress.phone,
           country: "India"
         },
 
-        // Billing address (same as shipping)
+        // Billing address (same as shipping) - exact field names from API docs
         billingAddress: {
           firstName: firstName,
           lastName: lastName,
-          address1: order.shippingAddress.addressLine1,
-          address2: order.shippingAddress.addressLine2 || "",
+          addressLine1: order.shippingAddress.addressLine1,
+          addressLine2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
-          pincode: order.shippingAddress.pincode,
+          pinCode: order.shippingAddress.pincode,
           phone: order.shippingAddress.phone,
           country: "India"
         },
 
-        // Order items
+        // Order items - exact field names from API docs
         orderItems: order.items.map((item) => ({
-          name: item.productTitle,
+          itemName: item.productTitle,
           sku: item.variant,
           units: item.quantity,
-          sellingPrice: parseFloat(item.price.toFixed(2)),
+          unitPrice: parseFloat(item.price.toFixed(2)),
           hsn: "39269099", // HSN code for vinyl skins/stickers
           tax: 18 // GST rate 18%
         })),
 
-        // Payment details
+        // Payment details - exact field names from API docs
         paymentMethod: paymentMethod,
         totalDiscount: parseFloat(totalDiscount.toFixed(2)),
-        subTotal: parseFloat(subTotal.toFixed(2)),
-        orderAmount: parseFloat(orderAmount.toFixed(2)),
+        shippingCharges: parseFloat(order.shippingFee.toFixed(2)),
+        totalOrderValue: parseFloat(orderAmount.toFixed(2)),
 
-        // Package details (weight in kg, dimensions in cm)
-        weight: parseFloat(weightInKg),
-        length: avgLength,
-        breadth: avgBreadth,
-        height: avgHeight,
-        packageQty: 1 // Always 1 package
+        // Package details - exact field names from API docs (dimensions in cm, weight in grams)
+        packageWeight: packageWeightInGrams,
+        packageLength: avgLength,
+        packageBreadth: avgBreadth,
+        packageHeight: avgHeight
 
         // Note: pickupLocation omitted - RapidShyp will use your default pickup location
       };
