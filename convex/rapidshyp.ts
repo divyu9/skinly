@@ -28,7 +28,7 @@ export const createShipment = action({
   args: {
     orderId: v.id("orders"),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; awbNumber?: string; shipmentId?: string; message: string }> => {
+  handler: async (ctx, args): Promise<{ success: boolean; awbNumber?: string; shipmentId?: string; trackingUrl?: string; labelUrl?: string; courierName?: string; message: string }> => {
     try {
       // Get order details
       const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
@@ -324,43 +324,64 @@ export const createShipment = action({
       }
 
       const result = await response.json() as { 
-        success?: boolean;
-        data?: {
-          awb_number?: string;
-          awb_code?: string;
-          shipment_id?: string;
-          tracking_url?: string;
-          label_url?: string;
-        };
-        awb_number?: string;
-        awb_code?: string;
-        shipment_id?: string;
-        tracking_url?: string;
+        status?: string;
+        remarks?: string;
+        orderId?: string;
+        orderCreated?: boolean;
+        shipment?: Array<{
+          shipmentId?: string;
+          tracking_link?: string;
+          awb?: string;
+          courierName?: string;
+          labelURL?: string;
+          awbGenerated?: boolean;
+          labelGenerated?: boolean;
+          pickupScheduled?: boolean;
+        }>;
         message?: string;
       };
       
       console.log("=== RapidShyp API Success ===");
       console.log("Full Response:", JSON.stringify(result, null, 2));
 
-      // Extract AWB number and shipment details from response
-      // Handle both nested (data.awb_number) and flat (awb_number) response formats
-      const awbNumber = result.data?.awb_number || result.data?.awb_code || result.awb_number || result.awb_code;
-      const shipmentId = result.data?.shipment_id || result.shipment_id;
-      const trackingUrl = result.data?.tracking_url || result.tracking_url;
+      // Extract AWB number and shipment details from RapidShyp response
+      // RapidShyp returns an array of shipments, we take the first one
+      const shipment = result.shipment?.[0];
+      
+      if (!shipment) {
+        console.error("No shipment data in response:", result);
+        throw new ConvexError({
+          message: "RapidShyp did not return shipment data. Please check the API response.",
+          code: "EXTERNAL_SERVICE_ERROR",
+        });
+      }
+
+      const awbNumber = shipment.awb;
+      const shipmentId = shipment.shipmentId;
+      const trackingUrl = shipment.tracking_link;
+      const labelUrl = shipment.labelURL;
+      const courierName = shipment.courierName;
 
       if (!awbNumber) {
-        console.error("No AWB number in response:", result);
+        console.error("No AWB number in shipment:", shipment);
         throw new ConvexError({
           message: "RapidShyp did not return an AWB number. Please check the API response.",
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
+      console.log("Extracted shipment details:");
+      console.log("  AWB:", awbNumber);
+      console.log("  Shipment ID:", shipmentId);
+      console.log("  Tracking URL:", trackingUrl);
+      console.log("  Courier:", courierName);
+      console.log("  Label URL:", labelUrl);
+
       // Update order with shipping information
       await ctx.runMutation(api.admin.orders.updateShippingInfo, {
         orderId: args.orderId,
         awbNumber,
-        trackingUrl: trackingUrl || `https://rapidshyp.com/track/${awbNumber}`,
+        trackingUrl: trackingUrl || `https://app.rapidshyp.com/t/${awbNumber}`,
         shippingStatus: "Shipment Created",
       });
 
@@ -368,6 +389,9 @@ export const createShipment = action({
         success: true,
         awbNumber,
         shipmentId,
+        trackingUrl,
+        labelUrl,
+        courierName,
         message: "Shipment created successfully",
       };
     } catch (error) {
