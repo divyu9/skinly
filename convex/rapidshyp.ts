@@ -139,19 +139,19 @@ export const createShipment = action({
       // Prepare shipment payload according to RapidShyp API documentation
       const shipmentPayload: Record<string, unknown> = {
         // Order details
-        order_number: order.orderNumber,
-        order_date: new Date(order._creationTime).toISOString().split('T')[0], // Format: YYYY-MM-DD
+        orderNumber: order.orderNumber,
+        orderDate: new Date(order._creationTime).toISOString().split('T')[0], // Format: YYYY-MM-DD
 
         // Customer information
-        customer_name: order.shippingAddress.fullName,
-        customer_phone: order.shippingAddress.phone,
-        customer_email: order.user?.email || "",
+        customerName: order.shippingAddress.fullName,
+        customerPhone: order.shippingAddress.phone,
+        customerEmail: order.user?.email || "",
 
         // Shipping address (same as billing)
-        shipping_address: {
+        shippingAddress: {
           name: order.shippingAddress.fullName,
           address: order.shippingAddress.addressLine1,
-          address_2: order.shippingAddress.addressLine2 || "",
+          address2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
           pincode: order.shippingAddress.pincode,
@@ -160,10 +160,10 @@ export const createShipment = action({
         },
 
         // Billing address (same as shipping)
-        billing_address: {
+        billingAddress: {
           name: order.shippingAddress.fullName,
           address: order.shippingAddress.addressLine1,
-          address_2: order.shippingAddress.addressLine2 || "",
+          address2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
           pincode: order.shippingAddress.pincode,
@@ -172,30 +172,30 @@ export const createShipment = action({
         },
 
         // Order items
-        order_items: order.items.map((item) => ({
+        orderItems: order.items.map((item) => ({
           name: item.productTitle,
           sku: item.variant,
           units: item.quantity,
-          selling_price: item.price.toFixed(2),
+          sellingPrice: item.price.toFixed(2),
           hsn: "39269099", // HSN code for vinyl skins/stickers
           tax: "18" // GST rate 18%
         })),
 
         // Payment details
-        payment_method: paymentMethod,
-        total_discount: totalDiscount.toFixed(2),
-        sub_total: subTotal.toFixed(2),
-        order_amount: orderAmount.toFixed(2),
+        paymentMethod: paymentMethod,
+        totalDiscount: totalDiscount.toFixed(2),
+        subTotal: subTotal.toFixed(2),
+        orderAmount: orderAmount.toFixed(2),
 
         // Package details (weight in kg, dimensions in cm)
         weight: weightInKg,
         length: avgLength,
         breadth: avgBreadth,
         height: avgHeight,
-        package_qty: 1, // Always 1 package
+        packageQty: 1, // Always 1 package
 
         // Pickup location
-        pickup_location: "SKINLY"
+        pickupLocation: "SKINLY"
       };
 
       // Log payload for debugging (remove sensitive data in production)
