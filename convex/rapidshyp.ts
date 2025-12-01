@@ -192,10 +192,9 @@ export const createShipment = action({
         length: avgLength,
         breadth: avgBreadth,
         height: avgHeight,
-        packageQty: 1, // Always 1 package
+        packageQty: 1 // Always 1 package
 
-        // Pickup location
-        pickupLocation: "SKINLY"
+        // Note: pickupLocation omitted - RapidShyp will use your default pickup location
       };
 
       // Log payload for debugging (remove sensitive data in production)
