@@ -4,11 +4,13 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { api } from "./_generated/api.js";
+import type { Id } from "./_generated/dataModel.d.ts";
 
 // RapidShyp API configuration
 function getRapidShypConfig() {
   const apiKey = process.env.RAPIDSHYP_API_KEY;
-  const apiUrl = process.env.RAPIDSHYP_API_URL || "https://api.rapidshyp.com";
+  // Use the correct RapidShyp wrapper endpoint
+  const apiUrl = process.env.RAPIDSHYP_API_URL || "https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper";
 
   if (!apiKey) {
     throw new ConvexError({
@@ -29,33 +31,9 @@ export const createShipment = action({
   handler: async (ctx, args): Promise<{ success: boolean; awbNumber?: string; shipmentId?: string; message: string }> => {
     try {
       // Get order details
-      const order: {
-        orderNumber: string;
-        _creationTime: number;
-        items: Array<{ 
-          productId: string;
-          productTitle: string; 
-          variant: string; 
-          quantity: number; 
-          price: number;
-        }>;
-        shippingAddress: {
-          fullName: string;
-          addressLine1: string;
-          addressLine2?: string;
-          city: string;
-          pincode: string;
-          state: string;
-          phone: string;
-        };
-        user?: { email?: string } | null;
-        paymentMethod: string;
-        shippingFee: number;
-        subtotal: number;
-        awbNumber?: string;
-      } = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+      const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
         orderId: args.orderId,
-      }) as typeof order;
+      });
 
       if (!order) {
         throw new ConvexError({
@@ -93,28 +71,19 @@ export const createShipment = action({
       console.log("RapidShyp API URL:", config.apiUrl);
 
       // Fetch product details for all items to get shipping dimensions
-      type OrderItem = typeof order.items[0];
-      type IdProducts = { __tableName: "products"; } & string;
       const itemsWithProducts = await Promise.all(
-        order.items.map(async (item: OrderItem) => {
+        order.items.map(async (item) => {
           // productId is stored as a string in order items, cast to Id<"products">
           const product = await ctx.runQuery(api.products.getProduct, {
-            productId: item.productId as IdProducts,
-          }) as { 
-            length?: number; 
-            breadth?: number; 
-            height?: number; 
-            weight?: number; 
-            productType?: "physical" | "digital" 
-          };
+            productId: item.productId as Id<"products">,
+          });
           return { ...item, product };
         })
       );
 
       // Filter out digital products
       const physicalItems = itemsWithProducts.filter(
-        (item: { product: { productType?: "physical" | "digital" } }) => 
-          item.product.productType !== "digital"
+        (item) => item.product?.productType !== "digital"
       );
 
       if (physicalItems.length === 0) {
@@ -132,10 +101,10 @@ export const createShipment = action({
       let physicalProductCount = 0;
 
       for (const item of physicalItems) {
-        const itemWeight = item.product.weight ?? 100; // Default 100g if not set
-        const itemLength = item.product.length ?? 10; // Default 10cm if not set
-        const itemBreadth = item.product.breadth ?? 10; // Default 10cm if not set
-        const itemHeight = item.product.height ?? 2; // Default 2cm if not set
+        const itemWeight = item.product?.weight ?? 100; // Default 100g if not set
+        const itemLength = item.product?.length ?? 10; // Default 10cm if not set
+        const itemBreadth = item.product?.breadth ?? 10; // Default 10cm if not set
+        const itemHeight = item.product?.height ?? 2; // Default 2cm if not set
         
         totalWeight += itemWeight * item.quantity;
         totalLength += itemLength;
@@ -159,54 +128,74 @@ export const createShipment = action({
         physicalProductCount,
       });
 
-      // Prepare shipment payload
-      // Note: This structure is based on common shipping aggregator patterns
-      // You'll need to adjust this based on actual RapidShyp API documentation
+      // Determine payment method (COD vs Prepaid)
+      const paymentMethod = order.paymentMethod === "phonepe" ? "Prepaid" : "COD";
+
+      // Calculate totals
+      const subTotal = order.subtotal;
+      const totalDiscount = 0; // No discounts for now
+      const orderAmount = order.total;
+
+      // Prepare shipment payload according to RapidShyp API documentation
       const shipmentPayload: Record<string, unknown> = {
-        order_id: order.orderNumber,
-        order_date: new Date(order._creationTime).toISOString(),
-        pickup_location: "default", // You may need to configure this
-        channel_id: "", // Your RapidShyp channel ID
-        billing_customer_name: order.shippingAddress.fullName,
-        billing_last_name: "",
-        billing_address: order.shippingAddress.addressLine1,
-        billing_address_2: order.shippingAddress.addressLine2 || "",
-        billing_city: order.shippingAddress.city,
-        billing_pincode: order.shippingAddress.pincode,
-        billing_state: order.shippingAddress.state,
-        billing_country: "India",
-        billing_email: order.user?.email || "",
-        billing_phone: order.shippingAddress.phone,
-        shipping_is_billing: true,
-        shipping_customer_name: "",
-        shipping_last_name: "",
-        shipping_address: "",
-        shipping_address_2: "",
-        shipping_city: "",
-        shipping_pincode: "",
-        shipping_country: "",
-        shipping_state: "",
-        shipping_email: "",
-        shipping_phone: "",
-        order_items: order.items.map((item: { productTitle: string; variant: string; quantity: number; price: number }) => ({
+        // Order details
+        order_number: order.orderNumber,
+        order_date: new Date(order._creationTime).toISOString().split('T')[0], // Format: YYYY-MM-DD
+
+        // Customer information
+        customer_name: order.shippingAddress.fullName,
+        customer_phone: order.shippingAddress.phone,
+        customer_email: order.user?.email || "",
+
+        // Shipping address (same as billing)
+        shipping_address: {
+          name: order.shippingAddress.fullName,
+          address: order.shippingAddress.addressLine1,
+          address_2: order.shippingAddress.addressLine2 || "",
+          city: order.shippingAddress.city,
+          state: order.shippingAddress.state,
+          pincode: order.shippingAddress.pincode,
+          phone: order.shippingAddress.phone,
+          country: "India"
+        },
+
+        // Billing address (same as shipping)
+        billing_address: {
+          name: order.shippingAddress.fullName,
+          address: order.shippingAddress.addressLine1,
+          address_2: order.shippingAddress.addressLine2 || "",
+          city: order.shippingAddress.city,
+          state: order.shippingAddress.state,
+          pincode: order.shippingAddress.pincode,
+          phone: order.shippingAddress.phone,
+          country: "India"
+        },
+
+        // Order items
+        order_items: order.items.map((item) => ({
           name: item.productTitle,
           sku: item.variant,
           units: item.quantity,
-          selling_price: item.price.toString(),
-          discount: "0",
-          tax: "0",
-          hsn: "", // Add if you have HSN codes
+          selling_price: item.price.toFixed(2),
+          hsn: "39269099", // HSN code for vinyl skins/stickers
+          tax: "18" // GST rate 18%
         })),
-        payment_method: order.paymentMethod === "phonepe" ? "Prepaid" : "COD",
-        shipping_charges: order.shippingFee.toString(),
-        giftwrap_charges: "0",
-        transaction_charges: "0",
-        total_discount: "0",
-        sub_total: order.subtotal.toString(),
-        length: avgLength.toString(),
-        breadth: avgBreadth.toString(),
-        height: avgHeight.toString(),
+
+        // Payment details
+        payment_method: paymentMethod,
+        total_discount: totalDiscount.toFixed(2),
+        sub_total: subTotal.toFixed(2),
+        order_amount: orderAmount.toFixed(2),
+
+        // Package details (weight in kg, dimensions in cm)
         weight: weightInKg,
+        length: avgLength,
+        breadth: avgBreadth,
+        height: avgHeight,
+        package_qty: 1, // Always 1 package
+
+        // Pickup location
+        pickup_location: "SKINLY"
       };
 
       // Log payload for debugging (remove sensitive data in production)
@@ -225,25 +214,57 @@ export const createShipment = action({
       console.log("RapidShyp Response Status:", response.status);
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error("RapidShyp API Error Response:", errorData);
+        const errorText = await response.text();
+        console.error("RapidShyp API Error Response:", errorText);
+        
+        // Try to parse error as JSON for better error messages
+        let errorMessage = `RapidShyp API error (${response.status})`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.message) {
+            errorMessage = errorJson.message;
+          } else if (errorJson.error) {
+            errorMessage = errorJson.error;
+          }
+        } catch {
+          // If not JSON, use the raw text
+          errorMessage = errorText || errorMessage;
+        }
+
         throw new ConvexError({
-          message: `RapidShyp API error (${response.status}): ${errorData}`,
+          message: errorMessage,
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
-      const result: Record<string, string> = await response.json() as Record<string, string>;
+      const result = await response.json() as { 
+        success?: boolean;
+        data?: {
+          awb_number?: string;
+          awb_code?: string;
+          shipment_id?: string;
+          tracking_url?: string;
+          label_url?: string;
+        };
+        awb_number?: string;
+        awb_code?: string;
+        shipment_id?: string;
+        tracking_url?: string;
+        message?: string;
+      };
+      
       console.log("RapidShyp Success Response:", JSON.stringify(result, null, 2));
 
-      // Extract AWB number and other details from response
-      // Note: Adjust these field names based on actual RapidShyp response structure
-      const awbNumber: string = result.awb_number || result.awb_code || result.tracking_number;
-      const shipmentId: string = result.shipment_id || result.id;
+      // Extract AWB number and shipment details from response
+      // Handle both nested (data.awb_number) and flat (awb_number) response formats
+      const awbNumber = result.data?.awb_number || result.data?.awb_code || result.awb_number || result.awb_code;
+      const shipmentId = result.data?.shipment_id || result.shipment_id;
+      const trackingUrl = result.data?.tracking_url || result.tracking_url;
 
       if (!awbNumber) {
+        console.error("No AWB number in response:", result);
         throw new ConvexError({
-          message: "Failed to generate AWB number from RapidShyp",
+          message: "RapidShyp did not return an AWB number. Please check the API response.",
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
@@ -252,7 +273,7 @@ export const createShipment = action({
       await ctx.runMutation(api.admin.orders.updateShippingInfo, {
         orderId: args.orderId,
         awbNumber,
-        trackingUrl: `https://rapidshyp.com/track/${awbNumber}`, // Adjust based on actual tracking URL format
+        trackingUrl: trackingUrl || `https://rapidshyp.com/track/${awbNumber}`,
         shippingStatus: "Shipment Created",
       });
 
