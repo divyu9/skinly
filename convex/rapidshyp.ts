@@ -207,31 +207,25 @@ export const createShipment = action({
 
         // Order items - exact field names from API docs
         orderItems: order.items.map((item) => {
-          // Convert to string with 2 decimal places for API compatibility
-          const unitPrice = item.price.toFixed(2);
           // Calculate GST amount from tax-inclusive price (18% GST)
           // Formula: GST amount = price × (0.18 / 1.18)
-          const taxAmount = (item.price * (0.18 / 1.18)).toFixed(2);
-          console.log(`Setting unitPrice for ${item.productTitle}:`, unitPrice, 'Tax amount:', taxAmount);
+          const taxAmount = parseFloat((item.price * (0.18 / 1.18)).toFixed(2));
+          console.log(`Item: ${item.productTitle}, unitPrice:`, item.price, 'Tax amount:', taxAmount);
           return {
             itemName: item.productTitle,
             sku: item.variant,
             units: item.quantity,
-            unitPrice: unitPrice, // Tax-inclusive price (as string with 2 decimals)
-            tax: taxAmount, // GST amount in rupees as string with 2 decimals
+            unitPrice: item.price, // Tax-inclusive price (as number)
+            tax: taxAmount, // GST amount in rupees (as number)
             hsn: "39269099" // HSN code for vinyl skins/stickers
           };
         }),
 
-        // Payment details - exact field names from API docs (as decimal strings)
+        // Payment details - exact field names from API docs (as numbers)
         paymentMethod: paymentMethod,
-        shippingCharges: order.shippingFee.toFixed(2),
-        totalDiscount: totalDiscount.toFixed(2),
-        totalOrderValue: (() => {
-          const total = orderAmount.toFixed(2);
-          console.log("Setting totalOrderValue:", total);
-          return total;
-        })(),
+        shippingCharges: order.shippingFee,
+        totalDiscount: totalDiscount,
+        totalOrderValue: orderAmount,
 
         // Package details - nested object as per API docs (dimensions in cm, weight in grams)
         packageDetails: {
@@ -247,11 +241,19 @@ export const createShipment = action({
       console.log("URL:", config.apiUrl);
       console.log("Payload:", JSON.stringify(shipmentPayload, null, 2));
       
-      // Specifically verify pricing fields are present
+      // Specifically verify pricing fields are present and their types
       console.log("=== Pricing Fields Check ===");
-      console.log("totalOrderValue in payload:", shipmentPayload.totalOrderValue);
-      console.log("First item unitPrice:", (shipmentPayload.orderItems as Array<{unitPrice?: number}>)[0]?.unitPrice);
-      console.log("All items have unitPrice:", (shipmentPayload.orderItems as Array<{unitPrice?: number}>).every(item => item.unitPrice !== undefined));
+      console.log("totalOrderValue:", shipmentPayload.totalOrderValue, "Type:", typeof shipmentPayload.totalOrderValue);
+      console.log("shippingCharges:", shipmentPayload.shippingCharges, "Type:", typeof shipmentPayload.shippingCharges);
+      console.log("totalDiscount:", shipmentPayload.totalDiscount, "Type:", typeof shipmentPayload.totalDiscount);
+      
+      const items = shipmentPayload.orderItems as Array<{itemName: string; unitPrice?: number; tax?: number}>;
+      console.log("Number of items:", items.length);
+      items.forEach((item, idx) => {
+        console.log(`Item ${idx}: ${item.itemName}`);
+        console.log(`  unitPrice:`, item.unitPrice, "Type:", typeof item.unitPrice);
+        console.log(`  tax:`, item.tax, "Type:", typeof item.tax);
+      });
 
       // Make API request to RapidShyp using the configured URL
       const response = await fetch(config.apiUrl, {
