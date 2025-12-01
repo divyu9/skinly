@@ -136,6 +136,30 @@ export const createShipment = action({
       const totalDiscount = 0; // No discounts for now
       const orderAmount = order.total;
 
+      // Validate pricing fields
+      console.log("=== Pricing Validation ===");
+      console.log("order.total:", order.total, "Type:", typeof order.total);
+      console.log("order.subtotal:", order.subtotal, "Type:", typeof order.subtotal);
+      console.log("order.shippingFee:", order.shippingFee, "Type:", typeof order.shippingFee);
+      
+      if (!order.total || typeof order.total !== 'number' || order.total <= 0) {
+        throw new ConvexError({
+          message: "Order total is missing or invalid",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Validate item prices
+      for (const item of order.items) {
+        console.log(`Item: ${item.productTitle}, price:`, item.price, "Type:", typeof item.price);
+        if (!item.price || typeof item.price !== 'number' || item.price <= 0) {
+          throw new ConvexError({
+            message: `Item price is missing or invalid for ${item.productTitle}`,
+            code: "BAD_REQUEST",
+          });
+        }
+      }
+
       // Split full name into firstName and lastName for RapidShyp
       const nameParts = order.shippingAddress.fullName.trim().split(/\s+/);
       const firstName = nameParts[0] || "";
@@ -182,20 +206,28 @@ export const createShipment = action({
         },
 
         // Order items - exact field names from API docs
-        orderItems: order.items.map((item) => ({
-          itemName: item.productTitle,
-          sku: item.variant,
-          units: item.quantity,
-          unitPrice: parseFloat(item.price.toFixed(2)), // Tax-inclusive price
-          hsn: "39269099", // HSN code for vinyl skins/stickers
-          tax: 18 // GST rate 18%
-        })),
+        orderItems: order.items.map((item) => {
+          const unitPrice = parseFloat(item.price.toFixed(2));
+          console.log(`Setting unitPrice for ${item.productTitle}:`, unitPrice);
+          return {
+            itemName: item.productTitle,
+            sku: item.variant,
+            units: item.quantity,
+            unitPrice: unitPrice, // Tax-inclusive price
+            hsn: "39269099", // HSN code for vinyl skins/stickers
+            tax: 18 // GST rate 18%
+          };
+        }),
 
         // Payment details - exact field names from API docs
         paymentMethod: paymentMethod,
         totalDiscount: parseFloat(totalDiscount.toFixed(2)),
         shippingCharges: parseFloat(order.shippingFee.toFixed(2)),
-        totalOrderValue: parseFloat(orderAmount.toFixed(2)),
+        totalOrderValue: (() => {
+          const total = parseFloat(orderAmount.toFixed(2));
+          console.log("Setting totalOrderValue:", total);
+          return total;
+        })(),
 
         // Package details - exact field names from API docs (dimensions in cm, weight in grams)
         packageWeight: packageWeightInGrams,
@@ -210,6 +242,12 @@ export const createShipment = action({
       console.log("=== RapidShyp API Request ===");
       console.log("URL:", config.apiUrl);
       console.log("Payload:", JSON.stringify(shipmentPayload, null, 2));
+      
+      // Specifically verify pricing fields are present
+      console.log("=== Pricing Fields Check ===");
+      console.log("totalOrderValue in payload:", shipmentPayload.totalOrderValue);
+      console.log("First item unitPrice:", (shipmentPayload.orderItems as Array<{unitPrice?: number}>)[0]?.unitPrice);
+      console.log("All items have unitPrice:", (shipmentPayload.orderItems as Array<{unitPrice?: number}>).every(item => item.unitPrice !== undefined));
 
       // Make API request to RapidShyp using the configured URL
       const response = await fetch(config.apiUrl, {
