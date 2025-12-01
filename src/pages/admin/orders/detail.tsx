@@ -446,44 +446,48 @@ function OrderDetailPageInner() {
 
         {/* Right Column: Customer & Order Details */}
         <div className="space-y-6">
-          {/* Customer Info */}
+          {/* Customer Info & Shipping Address Combined */}
           <Card>
             <CardHeader>
-              <CardTitle>Customer Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <p className="text-xs text-muted-foreground uppercase mb-1">Name</p>
-                <p className="font-medium">{order.shippingAddress.fullName}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase mb-1">Phone</p>
-                <p className="font-medium">{order.shippingAddress.phone}</p>
-              </div>
-              {order.user?.email && (
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase mb-1">Email</p>
-                  <p className="font-medium">{order.user.email}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Shipping Address */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Shipping Address</CardTitle>
+              <CardTitle>Customer & Shipping Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm">
-                {order.shippingAddress.addressLine1}
-                {order.shippingAddress.addressLine2 &&
-                  `, ${order.shippingAddress.addressLine2}`}
-              </p>
-              <p className="text-sm">
-                {order.shippingAddress.city}, {order.shippingAddress.state}
-              </p>
-              <p className="text-sm">{order.shippingAddress.pincode}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Customer Info */}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Customer</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase mb-1">Name</p>
+                    <p className="font-medium">{order.shippingAddress.fullName}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase mb-1">Phone</p>
+                    <p className="font-medium">{order.shippingAddress.phone}</p>
+                  </div>
+                  {order.user?.email && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase mb-1">Email</p>
+                      <p className="font-medium break-all">{order.user.email}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Shipping Address */}
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Shipping Address</p>
+                  <div>
+                    <p className="text-sm leading-relaxed">
+                      {order.shippingAddress.addressLine1}
+                      {order.shippingAddress.addressLine2 &&
+                        `, ${order.shippingAddress.addressLine2}`}
+                    </p>
+                    <p className="text-sm leading-relaxed">
+                      {order.shippingAddress.city}, {order.shippingAddress.state}
+                    </p>
+                    <p className="text-sm font-medium">{order.shippingAddress.pincode}</p>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
