@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
-import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon } from "lucide-react";
+import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon } from "lucide-react";
 import { AdminHeader } from "@/components/admin-header.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -501,6 +501,12 @@ function OrderDetailPageInner() {
                 <span className="text-muted-foreground">Shipping</span>
                 <span>₹{order.shippingFee.toFixed(0)}</span>
               </div>
+              {order.codFee && order.codFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">COD Fee</span>
+                  <span>₹{order.codFee.toFixed(0)}</span>
+                </div>
+              )}
               {order.totalGstAmount !== undefined && (
                 <>
                   <div className="pt-2 border-t">
@@ -549,6 +555,54 @@ function OrderDetailPageInner() {
               </div>
             </CardContent>
           </Card>
+
+          {/* COD Payment Breakdown */}
+          {order.paymentMethod === "cod" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-500/20">
+                    COD
+                  </Badge>
+                  Payment Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {order.prepaidAmount && order.prepaidAmount > 0 ? (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Prepaid Amount (PhonePe)</span>
+                        <span className="font-medium text-blue-600">₹{order.prepaidAmount.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Amount on Delivery</span>
+                        <span className="font-medium text-amber-600">₹{(order.codAmount ?? 0).toFixed(0)}</span>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Partial COD: Customer paid ₹{order.prepaidAmount.toFixed(0)} upfront. 
+                        Collect ₹{(order.codAmount ?? 0).toFixed(0)} on delivery.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Amount on Delivery</span>
+                      <span className="font-medium text-amber-600">₹{order.total.toFixed(0)}</span>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground">
+                        Full COD: Collect full payment on delivery.
+                      </p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

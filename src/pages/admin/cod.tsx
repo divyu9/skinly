@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
   Select,
   SelectContent,
@@ -16,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select.tsx";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Separator } from "@/components/ui/separator.tsx";
 import { 
   BanknoteIcon, 
@@ -78,6 +79,36 @@ export default function AdminCOD() {
   const [prepaidValue, setPrepaidValue] = useState(0);
 
   const [saving, setSaving] = useState(false);
+
+  // Search states
+  const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [collectionSearchTerm, setCollectionSearchTerm] = useState("");
+  const [variantSearchTerm, setVariantSearchTerm] = useState("");
+
+  // Filtered lists
+  const filteredProducts = useMemo(() => {
+    if (!products) return [];
+    if (!productSearchTerm) return products;
+    const term = productSearchTerm.toLowerCase();
+    return products.filter((p) => p.title.toLowerCase().includes(term));
+  }, [products, productSearchTerm]);
+
+  const filteredCollections = useMemo(() => {
+    if (!collections) return [];
+    if (!collectionSearchTerm) return collections;
+    const term = collectionSearchTerm.toLowerCase();
+    return collections.filter((c) => c.name.toLowerCase().includes(term));
+  }, [collections, collectionSearchTerm]);
+
+  const filteredVariants = useMemo(() => {
+    if (!variants) return [];
+    if (!variantSearchTerm) return variants;
+    const term = variantSearchTerm.toLowerCase();
+    return variants.filter((v) => 
+      v.sku.toLowerCase().includes(term) || 
+      v.title.toLowerCase().includes(term)
+    );
+  }, [variants, variantSearchTerm]);
 
   // Load settings into form
   useEffect(() => {
@@ -302,46 +333,69 @@ export default function AdminCOD() {
                   />
                 </div>
                 {productIdsEnabled && (
-                  <div className="ml-6 space-y-2">
-                    <p className="text-xs text-muted-foreground">Select products:</p>
-                    <Select
-                      value={selectedProductIds[0] || "none"}
-                      onValueChange={(v) => {
-                        if (v !== "none") {
-                          if (!selectedProductIds.includes(v)) {
-                            setSelectedProductIds([...selectedProductIds, v]);
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Add product..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select a product...</SelectItem>
-                        {products.map((product) => (
-                          <SelectItem key={product._id} value={product._id}>
-                            {product.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="ml-6 space-y-3">
+                    <Input
+                      type="text"
+                      placeholder="Search products..."
+                      value={productSearchTerm}
+                      onChange={(e) => setProductSearchTerm(e.target.value)}
+                      className="w-full"
+                    />
+                    {filteredProducts.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {filteredProducts.length} product(s) found
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const visibleIds = filteredProducts.map((p) => p._id);
+                              setSelectedProductIds([...new Set([...selectedProductIds, ...visibleIds])]);
+                            }}
+                          >
+                            Select All Visible
+                          </Button>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-1 border rounded-md p-2">
+                          {filteredProducts.map((product) => (
+                            <div key={product._id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                              <Checkbox
+                                checked={selectedProductIds.includes(product._id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedProductIds([...selectedProductIds, product._id]);
+                                  } else {
+                                    setSelectedProductIds(selectedProductIds.filter((id) => id !== product._id));
+                                  }
+                                }}
+                              />
+                              <span className="text-sm flex-1">{product.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {selectedProductIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedProductIds.map((id) => {
-                          const product = products.find((p) => p._id === id);
-                          return (
-                            <Badge key={id} variant="secondary" className="gap-1">
-                              {product?.title || id}
-                              <button
-                                onClick={() => setSelectedProductIds(selectedProductIds.filter((pid) => pid !== id))}
-                                className="ml-1"
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          );
-                        })}
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Selected ({selectedProductIds.length}):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedProductIds.map((id) => {
+                            const product = products.find((p) => p._id === id);
+                            return (
+                              <Badge key={id} variant="secondary" className="gap-1">
+                                {product?.title || id}
+                                <button
+                                  onClick={() => setSelectedProductIds(selectedProductIds.filter((pid) => pid !== id))}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -363,46 +417,69 @@ export default function AdminCOD() {
                   />
                 </div>
                 {collectionIdsEnabled && (
-                  <div className="ml-6 space-y-2">
-                    <p className="text-xs text-muted-foreground">Select collections:</p>
-                    <Select
-                      value={selectedCollectionIds[0] || "none"}
-                      onValueChange={(v) => {
-                        if (v !== "none") {
-                          if (!selectedCollectionIds.includes(v)) {
-                            setSelectedCollectionIds([...selectedCollectionIds, v]);
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Add collection..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select a collection...</SelectItem>
-                        {collections.map((collection) => (
-                          <SelectItem key={collection._id} value={collection._id}>
-                            {collection.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="ml-6 space-y-3">
+                    <Input
+                      type="text"
+                      placeholder="Search collections..."
+                      value={collectionSearchTerm}
+                      onChange={(e) => setCollectionSearchTerm(e.target.value)}
+                      className="w-full"
+                    />
+                    {filteredCollections.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {filteredCollections.length} collection(s) found
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const visibleIds = filteredCollections.map((c) => c._id);
+                              setSelectedCollectionIds([...new Set([...selectedCollectionIds, ...visibleIds])]);
+                            }}
+                          >
+                            Select All Visible
+                          </Button>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-1 border rounded-md p-2">
+                          {filteredCollections.map((collection) => (
+                            <div key={collection._id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                              <Checkbox
+                                checked={selectedCollectionIds.includes(collection._id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedCollectionIds([...selectedCollectionIds, collection._id]);
+                                  } else {
+                                    setSelectedCollectionIds(selectedCollectionIds.filter((id) => id !== collection._id));
+                                  }
+                                }}
+                              />
+                              <span className="text-sm flex-1">{collection.name}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {selectedCollectionIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedCollectionIds.map((id) => {
-                          const collection = collections.find((c) => c._id === id);
-                          return (
-                            <Badge key={id} variant="secondary" className="gap-1">
-                              {collection?.name || id}
-                              <button
-                                onClick={() => setSelectedCollectionIds(selectedCollectionIds.filter((cid) => cid !== id))}
-                                className="ml-1"
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          );
-                        })}
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Selected ({selectedCollectionIds.length}):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCollectionIds.map((id) => {
+                            const collection = collections.find((c) => c._id === id);
+                            return (
+                              <Badge key={id} variant="secondary" className="gap-1">
+                                {collection?.name || id}
+                                <button
+                                  onClick={() => setSelectedCollectionIds(selectedCollectionIds.filter((cid) => cid !== id))}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -424,46 +501,69 @@ export default function AdminCOD() {
                   />
                 </div>
                 {variantIdsEnabled && (
-                  <div className="ml-6 space-y-2">
-                    <p className="text-xs text-muted-foreground">Select variants:</p>
-                    <Select
-                      value={selectedVariantIds[0] || "none"}
-                      onValueChange={(v) => {
-                        if (v !== "none") {
-                          if (!selectedVariantIds.includes(v)) {
-                            setSelectedVariantIds([...selectedVariantIds, v]);
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Add variant..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Select a variant...</SelectItem>
-                        {variants.map((variant) => (
-                          <SelectItem key={variant._id} value={variant._id}>
-                            {variant.sku} - {variant.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="ml-6 space-y-3">
+                    <Input
+                      type="text"
+                      placeholder="Search by SKU or title..."
+                      value={variantSearchTerm}
+                      onChange={(e) => setVariantSearchTerm(e.target.value)}
+                      className="w-full"
+                    />
+                    {filteredVariants.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {filteredVariants.length} variant(s) found
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const visibleIds = filteredVariants.map((v) => v._id);
+                              setSelectedVariantIds([...new Set([...selectedVariantIds, ...visibleIds])]);
+                            }}
+                          >
+                            Select All Visible
+                          </Button>
+                        </div>
+                        <div className="max-h-48 overflow-y-auto space-y-1 border rounded-md p-2">
+                          {filteredVariants.map((variant) => (
+                            <div key={variant._id} className="flex items-center gap-2 p-2 hover:bg-muted rounded">
+                              <Checkbox
+                                checked={selectedVariantIds.includes(variant._id)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedVariantIds([...selectedVariantIds, variant._id]);
+                                  } else {
+                                    setSelectedVariantIds(selectedVariantIds.filter((id) => id !== variant._id));
+                                  }
+                                }}
+                              />
+                              <span className="text-sm flex-1">{variant.sku} - {variant.title}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {selectedVariantIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedVariantIds.map((id) => {
-                          const variant = variants.find((v) => v._id === id);
-                          return (
-                            <Badge key={id} variant="secondary" className="gap-1">
-                              {variant?.sku || id}
-                              <button
-                                onClick={() => setSelectedVariantIds(selectedVariantIds.filter((vid) => vid !== id))}
-                                className="ml-1"
-                              >
-                                ×
-                              </button>
-                            </Badge>
-                          );
-                        })}
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Selected ({selectedVariantIds.length}):</p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedVariantIds.map((id) => {
+                            const variant = variants.find((v) => v._id === id);
+                            return (
+                              <Badge key={id} variant="secondary" className="gap-1">
+                                {variant?.sku || id}
+                                <button
+                                  onClick={() => setSelectedVariantIds(selectedVariantIds.filter((vid) => vid !== id))}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  ×
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>

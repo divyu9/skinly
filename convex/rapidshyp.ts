@@ -128,8 +128,16 @@ export const createShipment = action({
         physicalProductCount,
       });
 
-      // Determine payment method (COD vs Prepaid)
-      const paymentMethod = order.paymentMethod === "phonepe" ? "Prepaid" : "COD";
+      // Determine payment method and COD amount
+      let paymentMethod = "Prepaid";
+      let codValue = 0;
+      
+      if (order.paymentMethod === "cod") {
+        paymentMethod = "COD";
+        // For partial COD, send the balance amount
+        // For full COD, send the full order total
+        codValue = order.codAmount ?? order.total;
+      }
 
       // Calculate totals
       const subTotal = order.subtotal;
@@ -227,6 +235,9 @@ export const createShipment = action({
         totalDiscount: totalDiscount,
         // Note: RapidShyp wants EITHER totalOrderValue OR unitPrice per item, not both
         // We're using unitPrice at item level, so we omit totalOrderValue
+        
+        // COD amount (only for COD orders)
+        ...(paymentMethod === "COD" && { codValue }),
 
         // Package details - nested object as per API docs (dimensions in cm, weight in grams)
         packageDetails: {

@@ -241,15 +241,53 @@ function OrderDetailPageInner() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <CreditCardIcon className="size-5" />
-                  Payment Method
+                  Payment Summary
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm">
-                  {order.paymentMethod === "cod"
-                    ? "Cash on Delivery (COD)"
-                    : order.paymentMethod}
-                </p>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase mb-1">Payment Method</p>
+                  <div className="flex items-center gap-2">
+                    {order.paymentMethod === "cod" ? (
+                      <>
+                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-500/20">
+                          COD
+                        </Badge>
+                        <span className="text-sm">Cash on Delivery</span>
+                      </>
+                    ) : (
+                      <span className="text-sm">{order.paymentMethod}</span>
+                    )}
+                  </div>
+                </div>
+
+                {order.paymentMethod === "cod" && (
+                  <div className="pt-2 border-t space-y-2">
+                    {order.prepaidAmount && order.prepaidAmount > 0 ? (
+                      <>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase mb-1">Prepaid (PhonePe)</p>
+                          <p className="text-sm font-semibold text-blue-600">₹{order.prepaidAmount.toFixed(0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase mb-1">Balance on Delivery</p>
+                          <p className="text-sm font-semibold text-amber-600">₹{(order.codAmount ?? 0).toFixed(0)}</p>
+                        </div>
+                        <div className="bg-blue-500/10 p-3 rounded-lg text-sm">
+                          <p className="text-blue-900 dark:text-blue-100">
+                            You paid ₹{order.prepaidAmount.toFixed(0)} upfront. Pay ₹{(order.codAmount ?? 0).toFixed(0)} when the order is delivered.
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-amber-500/10 p-3 rounded-lg text-sm">
+                        <p className="text-amber-900 dark:text-amber-100">
+                          Pay ₹{order.total.toFixed(0)} cash when your order is delivered.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -279,6 +317,12 @@ function OrderDetailPageInner() {
                       )}
                     </span>
                   </div>
+                  {order.codFee && order.codFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>COD Fee</span>
+                      <span>₹{order.codFee.toFixed(0)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

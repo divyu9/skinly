@@ -153,6 +153,22 @@ function OrdersPageInner() {
                         <p className="text-xl font-bold text-primary">
                           ₹{order.total.toFixed(0)}
                         </p>
+                        {order.paymentMethod === "cod" && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-700 border-amber-500/20">
+                              COD
+                            </Badge>
+                            {order.prepaidAmount && order.prepaidAmount > 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                Paid ₹{order.prepaidAmount.toFixed(0)}, COD ₹{(order.codAmount ?? 0).toFixed(0)}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                Pay on delivery
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <Link to={`/orders/${order._id}`}>
                         <Button variant="outline">

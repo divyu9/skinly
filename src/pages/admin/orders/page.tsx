@@ -448,12 +448,24 @@ function AdminOrdersPageInner() {
                         </Badge>
                       </td>
                       <td className="p-3">
-                        <Badge
-                          variant="outline"
-                          className={getPaymentStatusColor(order.paymentStatus)}
-                        >
-                          {order.paymentStatus || "pending"}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge
+                            variant="outline"
+                            className={getPaymentStatusColor(order.paymentStatus)}
+                          >
+                            {order.paymentStatus || "pending"}
+                          </Badge>
+                          {order.paymentMethod === "cod" && (
+                            <div className="flex items-center gap-1">
+                              <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-700 border-amber-500/20">
+                                COD
+                              </Badge>
+                              {order.codAmount && order.codAmount > 0 && (
+                                <span className="text-xs text-muted-foreground">₹{order.codAmount.toFixed(0)}</span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
