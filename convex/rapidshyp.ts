@@ -225,7 +225,8 @@ export const createShipment = action({
         paymentMethod: paymentMethod,
         shippingCharges: order.shippingFee,
         totalDiscount: totalDiscount,
-        totalOrderValue: orderAmount,
+        // Note: RapidShyp wants EITHER totalOrderValue OR unitPrice per item, not both
+        // We're using unitPrice at item level, so we omit totalOrderValue
 
         // Package details - nested object as per API docs (dimensions in cm, weight in grams)
         packageDetails: {
@@ -243,9 +244,9 @@ export const createShipment = action({
       
       // Specifically verify pricing fields are present and their types
       console.log("=== Pricing Fields Check ===");
-      console.log("totalOrderValue:", shipmentPayload.totalOrderValue, "Type:", typeof shipmentPayload.totalOrderValue);
       console.log("shippingCharges:", shipmentPayload.shippingCharges, "Type:", typeof shipmentPayload.shippingCharges);
       console.log("totalDiscount:", shipmentPayload.totalDiscount, "Type:", typeof shipmentPayload.totalDiscount);
+      console.log("Using item-level unitPrice (totalOrderValue omitted per RapidShyp requirements)");
       
       const items = shipmentPayload.orderItems as Array<{itemName: string; unitPrice?: number; tax?: number}>;
       console.log("Number of items:", items.length);
