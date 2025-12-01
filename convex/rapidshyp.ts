@@ -207,28 +207,28 @@ export const createShipment = action({
 
         // Order items - exact field names from API docs
         orderItems: order.items.map((item) => {
-          // Ensure float format (at least 1 decimal place) to match API expectations
-          const unitPrice = item.price % 1 === 0 ? parseFloat(item.price.toFixed(1)) : parseFloat(item.price.toFixed(2));
+          // Convert to string with 2 decimal places for API compatibility
+          const unitPrice = item.price.toFixed(2);
           // Calculate GST amount from tax-inclusive price (18% GST)
           // Formula: GST amount = price × (0.18 / 1.18)
-          const taxAmount = parseFloat((item.price * (0.18 / 1.18)).toFixed(2));
+          const taxAmount = (item.price * (0.18 / 1.18)).toFixed(2);
           console.log(`Setting unitPrice for ${item.productTitle}:`, unitPrice, 'Tax amount:', taxAmount);
           return {
             itemName: item.productTitle,
             sku: item.variant,
             units: item.quantity,
-            unitPrice: unitPrice, // Tax-inclusive price (as float)
-            tax: taxAmount, // GST amount in rupees (not the rate!)
+            unitPrice: unitPrice, // Tax-inclusive price (as string with 2 decimals)
+            tax: taxAmount, // GST amount in rupees as string with 2 decimals
             hsn: "39269099" // HSN code for vinyl skins/stickers
           };
         }),
 
-        // Payment details - exact field names from API docs (ensure float format)
+        // Payment details - exact field names from API docs (as decimal strings)
         paymentMethod: paymentMethod,
-        shippingCharges: order.shippingFee % 1 === 0 ? parseFloat(order.shippingFee.toFixed(1)) : parseFloat(order.shippingFee.toFixed(2)),
-        totalDiscount: totalDiscount % 1 === 0 ? parseFloat(totalDiscount.toFixed(1)) : parseFloat(totalDiscount.toFixed(2)),
+        shippingCharges: order.shippingFee.toFixed(2),
+        totalDiscount: totalDiscount.toFixed(2),
         totalOrderValue: (() => {
-          const total = orderAmount % 1 === 0 ? parseFloat(orderAmount.toFixed(1)) : parseFloat(orderAmount.toFixed(2));
+          const total = orderAmount.toFixed(2);
           console.log("Setting totalOrderValue:", total);
           return total;
         })(),
