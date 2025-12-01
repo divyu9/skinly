@@ -197,8 +197,10 @@ export const createShipment = action({
         // Note: pickupLocation omitted - RapidShyp will use your default pickup location
       };
 
-      // Log payload for debugging (remove sensitive data in production)
-      console.log("RapidShyp Payload:", JSON.stringify(shipmentPayload, null, 2));
+      // Log payload for debugging
+      console.log("=== RapidShyp API Request ===");
+      console.log("URL:", config.apiUrl);
+      console.log("Payload:", JSON.stringify(shipmentPayload, null, 2));
 
       // Make API request to RapidShyp using the configured URL
       const response = await fetch(config.apiUrl, {
@@ -210,25 +212,56 @@ export const createShipment = action({
         body: JSON.stringify(shipmentPayload),
       });
 
-      console.log("RapidShyp Response Status:", response.status);
+      console.log("=== RapidShyp API Response ===");
+      console.log("Status:", response.status, response.statusText);
+      console.log("Content-Type:", response.headers.get("content-type"));
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error("RapidShyp API Error Response:", errorText);
+        console.error("=== RapidShyp API Error ===");
+        console.error("Status:", response.status);
+        console.error("Raw Response:", errorText);
         
-        // Try to parse error as JSON for better error messages
+        // Try to parse error as JSON for detailed error information
         let errorMessage = `RapidShyp API error (${response.status})`;
+        let errorDetails: Record<string, unknown> = {};
+        
         try {
           const errorJson = JSON.parse(errorText);
+          console.error("Parsed Error JSON:", JSON.stringify(errorJson, null, 2));
+          
+          errorDetails = errorJson;
+          
+          // Extract error message from various possible fields
           if (errorJson.message) {
             errorMessage = errorJson.message;
           } else if (errorJson.error) {
-            errorMessage = errorJson.error;
+            errorMessage = typeof errorJson.error === 'string' 
+              ? errorJson.error 
+              : JSON.stringify(errorJson.error);
+          } else if (errorJson.errors) {
+            // Handle validation errors array
+            errorMessage = Array.isArray(errorJson.errors)
+              ? errorJson.errors.map((e: { field?: string; message?: string }) => 
+                  e.field ? `${e.field}: ${e.message}` : e.message || JSON.stringify(e)
+                ).join(", ")
+              : JSON.stringify(errorJson.errors);
+          } else if (errorJson.details) {
+            errorMessage = typeof errorJson.details === 'string'
+              ? errorJson.details
+              : JSON.stringify(errorJson.details);
+          } else {
+            // Show the entire error object if no standard field found
+            errorMessage = JSON.stringify(errorJson);
           }
-        } catch {
+        } catch (parseError) {
+          console.error("Could not parse error as JSON:", parseError);
           // If not JSON, use the raw text
           errorMessage = errorText || errorMessage;
         }
+
+        console.error("Final Error Message:", errorMessage);
+        console.error("Error Details:", JSON.stringify(errorDetails, null, 2));
 
         throw new ConvexError({
           message: errorMessage,
@@ -252,7 +285,8 @@ export const createShipment = action({
         message?: string;
       };
       
-      console.log("RapidShyp Success Response:", JSON.stringify(result, null, 2));
+      console.log("=== RapidShyp API Success ===");
+      console.log("Full Response:", JSON.stringify(result, null, 2));
 
       // Extract AWB number and shipment details from response
       // Handle both nested (data.awb_number) and flat (awb_number) response formats
