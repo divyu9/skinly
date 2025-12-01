@@ -12,6 +12,7 @@ import type * as abandonedCarts from "../abandonedCarts.js";
 import type * as abandonedCartsActions from "../abandonedCartsActions.js";
 import type * as admin_orders from "../admin/orders.js";
 import type * as cart from "../cart.js";
+import type * as cod from "../cod.js";
 import type * as collections from "../collections.js";
 import type * as coupons from "../coupons.js";
 import type * as ensureGadgetCategory from "../ensureGadgetCategory.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   abandonedCartsActions: typeof abandonedCartsActions;
   "admin/orders": typeof admin_orders;
   cart: typeof cart;
+  cod: typeof cod;
   collections: typeof collections;
   coupons: typeof coupons;
   ensureGadgetCategory: typeof ensureGadgetCategory;

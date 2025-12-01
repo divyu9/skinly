@@ -70,6 +70,10 @@ export default defineSchema({
     sgstAmount: v.optional(v.number()), // SGST amount
     igstAmount: v.optional(v.number()), // IGST amount
     totalGstAmount: v.optional(v.number()), // Total GST amount
+    // COD fields
+    codFee: v.optional(v.number()), // COD fee charged
+    prepaidAmount: v.optional(v.number()), // Amount paid upfront (for partial COD)
+    codAmount: v.optional(v.number()), // Amount to be collected on delivery
     // Payment fields
     paymentStatus: v.optional(v.union(
       v.literal("pending"),
@@ -433,4 +437,39 @@ export default defineSchema({
     approvedAt: v.optional(v.number()), // Timestamp when admin approved
   })
     .index("by_status", ["status"]),
+
+  codSettings: defineTable({
+    // Master toggle
+    enabled: v.boolean(),
+    // Match logic
+    matchMode: v.union(v.literal("ALL"), v.literal("ANY")),
+    // Product IDs condition
+    productIdsEnabled: v.boolean(),
+    productIds: v.array(v.id("products")),
+    // Collection IDs condition
+    collectionIdsEnabled: v.boolean(),
+    collectionIds: v.array(v.id("collections")),
+    // Variant IDs condition
+    variantIdsEnabled: v.boolean(),
+    variantIds: v.array(v.id("variants")),
+    // Min order amount condition
+    minOrderAmountEnabled: v.boolean(),
+    minOrderAmount: v.number(),
+    // Max order amount condition
+    maxOrderAmountEnabled: v.boolean(),
+    maxOrderAmount: v.number(),
+    // Min product count condition
+    minProductCountEnabled: v.boolean(),
+    minProductCount: v.number(),
+    // Max product count condition
+    maxProductCountEnabled: v.boolean(),
+    maxProductCount: v.number(),
+    // COD fee configuration
+    codFeeType: v.union(v.literal("fixed"), v.literal("percentage")),
+    codFeeValue: v.number(),
+    // Partial COD configuration
+    partialCodEnabled: v.boolean(),
+    prepaidType: v.union(v.literal("fixed"), v.literal("percentage")),
+    prepaidValue: v.number(),
+  }),
 });
