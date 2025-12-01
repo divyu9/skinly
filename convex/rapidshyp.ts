@@ -186,7 +186,7 @@ export const createShipment = action({
           itemName: item.productTitle,
           sku: item.variant,
           units: item.quantity,
-          unitPrice: parseFloat(item.price.toFixed(2)),
+          unitPrice: parseFloat(item.price.toFixed(2)), // Tax-inclusive price
           hsn: "39269099", // HSN code for vinyl skins/stickers
           tax: 18 // GST rate 18%
         })),
