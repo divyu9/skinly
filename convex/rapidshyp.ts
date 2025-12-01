@@ -156,7 +156,7 @@ export const createShipment = action({
         shippingAddress: {
           firstName: firstName,
           lastName: lastName,
-          address: order.shippingAddress.addressLine1,
+          address1: order.shippingAddress.addressLine1,
           address2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
@@ -169,7 +169,7 @@ export const createShipment = action({
         billingAddress: {
           firstName: firstName,
           lastName: lastName,
-          address: order.shippingAddress.addressLine1,
+          address1: order.shippingAddress.addressLine1,
           address2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
