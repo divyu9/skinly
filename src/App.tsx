@@ -6,6 +6,7 @@ import ProductsPage from "./pages/products/page.tsx";
 import ProductConfirmPage from "./pages/products/confirm.tsx";
 import ProductDetailPage from "./pages/products/detail/page.tsx";
 import CheckoutPage from "./pages/checkout/page.tsx";
+import CartPage from "./pages/cart/page.tsx";
 import OrdersPage from "./pages/orders/page.tsx";
 import OrderDetailPage from "./pages/orders/detail/page.tsx";
 import AdminProductsPage from "./pages/admin/products/page.tsx";
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/confirm" element={<ProductConfirmPage />} />
           <Route path="/products/detail" element={<ProductDetailPage />} />
+          <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:orderId" element={<OrderDetailPage />} />
