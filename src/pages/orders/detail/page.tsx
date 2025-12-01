@@ -174,6 +174,14 @@ function OrderDetailPageInner() {
                         <p className="text-sm font-mono font-semibold">{order.awbNumber}</p>
                       </div>
                     )}
+                    {order.courierName && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                          Courier Partner
+                        </p>
+                        <p className="text-sm font-semibold">{order.courierName}</p>
+                      </div>
+                    )}
                     {order.shippingStatus && (
                       <div>
                         <p className="text-xs font-medium text-muted-foreground uppercase mb-1">

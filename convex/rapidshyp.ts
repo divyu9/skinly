@@ -383,6 +383,8 @@ export const createShipment = action({
         awbNumber,
         trackingUrl: trackingUrl || `https://app.rapidshyp.com/t/${awbNumber}`,
         shippingStatus: "Shipment Created",
+        courierName,
+        labelUrl,
       });
 
       return {

@@ -320,6 +320,11 @@ function OrderDetailPageInner() {
                       <span className="font-medium">AWB:</span> {order.awbNumber}
                     </p>
                   )}
+                  {order.courierName && (
+                    <p className="text-sm">
+                      <span className="font-medium">Courier:</span> {order.courierName}
+                    </p>
+                  )}
                   {order.trackingUrl && (
                     <a
                       href={order.trackingUrl}
@@ -359,14 +364,28 @@ function OrderDetailPageInner() {
                   </Button>
                 ) : (
                   <>
-                    <Button
-                      onClick={() => handleGenerateLabel(order.awbNumber!)}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      <FileTextIcon className="size-4 mr-2" />
-                      Get Label
-                    </Button>
+                    {order.labelUrl ? (
+                      <a
+                        href={order.labelUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1"
+                      >
+                        <Button variant="outline" className="w-full">
+                          <FileTextIcon className="size-4 mr-2" />
+                          Download Label
+                        </Button>
+                      </a>
+                    ) : (
+                      <Button
+                        onClick={() => handleGenerateLabel(order.awbNumber!)}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        <FileTextIcon className="size-4 mr-2" />
+                        Get Label
+                      </Button>
+                    )}
                     <Dialog open={editingShipping} onOpenChange={setEditingShipping}>
                       <DialogTrigger asChild>
                         <Button

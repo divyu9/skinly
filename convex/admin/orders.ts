@@ -109,6 +109,8 @@ export const updateShippingInfo = mutation({
     awbNumber: v.optional(v.string()),
     trackingUrl: v.optional(v.string()),
     shippingStatus: v.optional(v.string()),
+    courierName: v.optional(v.string()),
+    labelUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();

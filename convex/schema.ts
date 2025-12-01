@@ -83,6 +83,8 @@ export default defineSchema({
     awbNumber: v.optional(v.string()), // Airway Bill Number from RapidShyp
     trackingUrl: v.optional(v.string()),
     shippingStatus: v.optional(v.string()),
+    courierName: v.optional(v.string()), // Courier company name (e.g., "DTDC Surface")
+    labelUrl: v.optional(v.string()), // Shipping label PDF URL
   })
     .index("by_user", ["userId"])
     .index("by_order_number", ["orderNumber"])
