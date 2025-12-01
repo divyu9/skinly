@@ -19,6 +19,7 @@ export function AdminHeader() {
     { path: "/admin/reviews", label: "Reviews" },
     { path: "/admin/abandoned-carts", label: "Abandoned Carts" },
     { path: "/admin/stock-notifications", label: "Stock Alerts" },
+    { path: "/admin/cod", label: "COD Settings" },
     { path: "/admin/models", label: "Models" },
     { path: "/admin/seed-models", label: "Seed DB" },
     { path: "/admin/oos", label: "OOS Settings" },

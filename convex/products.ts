@@ -817,6 +817,14 @@ export const bulkUpdateVariants = mutation({
   },
 });
 
+// Get all variants
+export const getAllVariants = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("variants").collect();
+  },
+});
+
 // Get all variants with their product information
 export const getAllVariantsWithProducts = query({
   args: {},
