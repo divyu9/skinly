@@ -17,6 +17,9 @@ export const createOrder = mutation({
       pincode: v.string(),
     }),
     paymentMethod: v.string(),
+    codFee: v.optional(v.number()),
+    prepaidAmount: v.optional(v.number()),
+    codAmount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -90,6 +93,10 @@ export const createOrder = mutation({
       shippingAddress: args.shippingAddress,
       paymentMethod: args.paymentMethod,
       paymentStatus: "pending",
+      // COD fields
+      codFee: args.codFee,
+      prepaidAmount: args.prepaidAmount,
+      codAmount: args.codAmount,
       // GST fields
       taxableAmount: gstCalculation.taxableAmount,
       gstRate: gstCalculation.gstRate,

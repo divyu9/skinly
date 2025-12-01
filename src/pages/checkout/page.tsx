@@ -9,13 +9,14 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { calculateGST } from "@/lib/gst";
+import { Badge } from "@/components/ui/badge.tsx";
 
 function CheckoutPageInner() {
   const navigate = useNavigate();
@@ -43,13 +44,35 @@ function CheckoutPageInner() {
   const shippingFee = subtotal > 500 ? 0 : 50;
   const total = subtotal + shippingFee;
 
+  // Check COD availability
+  const codAvailability = useQuery(
+    api.cod.isCodAvailable,
+    cartItems && cartItems.length > 0
+      ? {
+          cartItems: cartItems.map((item) => ({
+            productId: item.productId,
+            variant: item.variant,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          totalAmount: total,
+        }
+      : "skip"
+  );
+
+  // Calculate final total including COD fee if COD is selected
+  const codFee = formData.paymentMethod === "cod" && codAvailability?.available
+    ? codAvailability.codFee
+    : 0;
+  const finalTotal = total + codFee;
+
   // Calculate GST breakdown based on customer's state
   const gstBreakdown = useMemo(() => {
-    if (!formData.state || total === 0) {
+    if (!formData.state || finalTotal === 0) {
       return null;
     }
-    return calculateGST(total, formData.state);
-  }, [total, formData.state]);
+    return calculateGST(finalTotal, formData.state);
+  }, [finalTotal, formData.state]);
 
   if (cartItems === undefined) {
     return (
@@ -87,6 +110,17 @@ function CheckoutPageInner() {
     setIsSubmitting(true);
 
     try {
+      // Prepare COD fields
+      let codFeeAmount = 0;
+      let prepaidAmount = 0;
+      let codAmount = 0;
+
+      if (formData.paymentMethod === "cod" && codAvailability?.available) {
+        codFeeAmount = codAvailability.codFee;
+        prepaidAmount = codAvailability.prepaidAmount;
+        codAmount = codAvailability.codAmount;
+      }
+
       // Create order first
       const result = await createOrder({
         shippingAddress: {
@@ -99,16 +133,19 @@ function CheckoutPageInner() {
           pincode: formData.pincode,
         },
         paymentMethod: formData.paymentMethod,
+        codFee: codFeeAmount,
+        prepaidAmount,
+        codAmount,
       });
 
-      // If PhonePe payment, initiate payment flow
+      // Handle payment based on method
       if (formData.paymentMethod === "phonepe") {
         toast.loading("Redirecting to payment gateway...");
         
         const paymentResult = await initiatePayment({
           orderId: result.orderId,
           orderNumber: result.orderNumber,
-          amount: total,
+          amount: finalTotal,
           customerPhone: formData.phone,
         });
 
@@ -118,8 +155,32 @@ function CheckoutPageInner() {
         } else {
           throw new Error("Failed to initiate payment");
         }
+      } else if (formData.paymentMethod === "cod") {
+        // Check if partial COD is enabled
+        if (prepaidAmount > 0) {
+          // Partial COD: Initiate PhonePe payment for prepaid amount
+          toast.loading("Redirecting to payment gateway for prepaid amount...");
+          
+          const paymentResult = await initiatePayment({
+            orderId: result.orderId,
+            orderNumber: result.orderNumber,
+            amount: prepaidAmount,
+            customerPhone: formData.phone,
+          });
+
+          if (paymentResult.success && paymentResult.paymentUrl) {
+            // Redirect to PhonePe payment page
+            window.location.href = paymentResult.paymentUrl;
+          } else {
+            throw new Error("Failed to initiate prepaid payment");
+          }
+        } else {
+          // Full COD: Go directly to order page
+          toast.success("Order placed successfully!");
+          navigate(`/orders/${result.orderId}`);
+        }
       } else {
-        // For COD or other methods, go directly to order page
+        // For other methods, go directly to order page
         toast.success("Order placed successfully!");
         navigate(`/orders/${result.orderId}`);
       }
@@ -281,16 +342,54 @@ function CheckoutPageInner() {
                       </Label>
                     </div>
                     
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors opacity-50">
-                      <RadioGroupItem value="cod" id="cod" disabled />
-                      <Label htmlFor="cod" className="flex-1 cursor-not-allowed">
-                        <div className="font-medium">Cash on Delivery</div>
-                        <div className="text-sm text-muted-foreground">
-                          Currently not available
-                        </div>
-                      </Label>
-                    </div>
+                    {codAvailability?.available ? (
+                      <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <RadioGroupItem value="cod" id="cod" />
+                        <Label htmlFor="cod" className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Cash on Delivery</span>
+                            {codAvailability.codFee > 0 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +₹{codAvailability.codFee.toFixed(0)} fee
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {codAvailability.prepaidAmount > 0
+                              ? `Pay ₹${codAvailability.prepaidAmount.toFixed(0)} now, ₹${codAvailability.codAmount.toFixed(0)} on delivery`
+                              : "Pay cash when your order is delivered"}
+                          </div>
+                        </Label>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 p-4 border rounded-lg opacity-50">
+                        <RadioGroupItem value="cod" id="cod" disabled />
+                        <Label htmlFor="cod" className="flex-1 cursor-not-allowed">
+                          <div className="font-medium">Cash on Delivery</div>
+                          <div className="text-sm text-muted-foreground">
+                            Not available for this order
+                          </div>
+                        </Label>
+                      </div>
+                    )}
                   </RadioGroup>
+
+                  {/* COD Fee Notice */}
+                  {formData.paymentMethod === "cod" && codAvailability?.available && codAvailability.codFee > 0 && (
+                    <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                      <AlertCircleIcon className="size-4 text-amber-600 mt-0.5 shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-amber-900 dark:text-amber-100">
+                          COD fee of ₹{codAvailability.codFee.toFixed(0)} will be added to your order
+                        </p>
+                        {codAvailability.prepaidAmount > 0 && (
+                          <p className="text-amber-700 dark:text-amber-300 mt-1">
+                            You'll pay ₹{codAvailability.prepaidAmount.toFixed(0)} now via PhonePe, and ₹{codAvailability.codAmount.toFixed(0)} on delivery
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -360,6 +459,12 @@ function CheckoutPageInner() {
                       )}
                     </span>
                   </div>
+                  {codFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>COD Fee</span>
+                      <span>₹{codFee.toFixed(0)}</span>
+                    </div>
+                  )}
                   {subtotal <= 500 && (
                     <p className="text-xs text-muted-foreground">
                       Add ₹{(501 - subtotal).toFixed(0)} more for free shipping
@@ -372,9 +477,23 @@ function CheckoutPageInner() {
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Total</span>
                   <span className="text-2xl font-bold text-primary">
-                    ₹{total.toFixed(0)}
+                    ₹{finalTotal.toFixed(0)}
                   </span>
                 </div>
+
+                {/* Partial COD Breakdown */}
+                {formData.paymentMethod === "cod" && codAvailability?.available && codAvailability.prepaidAmount > 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Pay Now (PhonePe)</span>
+                      <span className="font-medium text-blue-600">₹{codAvailability.prepaidAmount.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Pay on Delivery</span>
+                      <span className="font-medium text-amber-600">₹{codAvailability.codAmount.toFixed(0)}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* GST Breakdown */}
                 {gstBreakdown && (
