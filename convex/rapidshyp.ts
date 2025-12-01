@@ -527,52 +527,56 @@ export const cancelShipment = action({
 });
 
 // Generate shipping label
-export const generateShippingLabel = action({
-  args: {
-    awbNumber: v.string(),
-  },
-  handler: async (ctx, args) => {
-    try {
-      const config = getRapidShypConfig();
-
-      // Make API request to get shipping label
-      const response = await fetch(
-        `${config.apiUrl}/v1/external/orders/label/${args.awbNumber}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${config.apiKey}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new ConvexError({
-          message: `RapidShyp label API error: ${errorData}`,
-          code: "EXTERNAL_SERVICE_ERROR",
-        });
-      }
-
-      const result = await response.json();
-
-      // Return label URL or base64 PDF
-      return {
-        success: true,
-        labelUrl: result.label_url || result.label_pdf,
-      };
-    } catch (error) {
-      if (error instanceof ConvexError) {
-        throw error;
-      }
-      throw new ConvexError({
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate shipping label",
-        code: "EXTERNAL_SERVICE_ERROR",
-      });
-    }
-  },
-});
+// NOTE: This action is deprecated and not used anymore.
+// The label URL is now automatically saved when creating a shipment.
+// RapidShyp provides the label URL in the shipment creation response.
+// 
+// export const generateShippingLabel = action({
+//   args: {
+//     awbNumber: v.string(),
+//   },
+//   handler: async (ctx, args) => {
+//     try {
+//       const config = getRapidShypConfig();
+// 
+//       // Make API request to get shipping label
+//       const response = await fetch(
+//         `${config.apiUrl}/v1/external/orders/label/${args.awbNumber}`,
+//         {
+//           method: "GET",
+//           headers: {
+//             "Content-Type": "application/json",
+//             Authorization: `Bearer ${config.apiKey}`,
+//           },
+//         }
+//       );
+// 
+//       if (!response.ok) {
+//         const errorData = await response.text();
+//         throw new ConvexError({
+//           message: `RapidShyp label API error: ${errorData}`,
+//           code: "EXTERNAL_SERVICE_ERROR",
+//         });
+//       }
+// 
+//       const result = await response.json();
+// 
+//       // Return label URL or base64 PDF
+//       return {
+//         success: true,
+//         labelUrl: result.label_url || result.label_pdf,
+//       };
+//     } catch (error) {
+//       if (error instanceof ConvexError) {
+//         throw error;
+//       }
+//       throw new ConvexError({
+//         message:
+//           error instanceof Error
+//             ? error.message
+//             : "Failed to generate shipping label",
+//         code: "EXTERNAL_SERVICE_ERROR",
+//       });
+//     }
+//   },
+// });

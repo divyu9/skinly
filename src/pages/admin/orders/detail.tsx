@@ -36,7 +36,6 @@ function OrderDetailPageInner() {
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const createShipment = useAction(api.rapidshyp.createShipment);
-  const generateLabel = useAction(api.rapidshyp.generateShippingLabel);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
 
@@ -113,20 +112,7 @@ function OrderDetailPageInner() {
     }
   };
 
-  const handleGenerateLabel = async (awbNumber: string) => {
-    try {
-      toast.loading("Generating shipping label...");
-      const result = await generateLabel({ awbNumber });
-      if (result.success && result.labelUrl) {
-        window.open(result.labelUrl, "_blank");
-        toast.success("Label generated successfully");
-      } else {
-        toast.error("Failed to generate label");
-      }
-    } catch (error) {
-      toast.error("Failed to generate label");
-    }
-  };
+
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -364,7 +350,7 @@ function OrderDetailPageInner() {
                   </Button>
                 ) : (
                   <>
-                    {order.labelUrl ? (
+                    {order.labelUrl && (
                       <a
                         href={order.labelUrl}
                         target="_blank"
@@ -376,15 +362,6 @@ function OrderDetailPageInner() {
                           Download Label
                         </Button>
                       </a>
-                    ) : (
-                      <Button
-                        onClick={() => handleGenerateLabel(order.awbNumber!)}
-                        variant="outline"
-                        className="flex-1"
-                      >
-                        <FileTextIcon className="size-4 mr-2" />
-                        Get Label
-                      </Button>
                     )}
                     <Dialog open={editingShipping} onOpenChange={setEditingShipping}>
                       <DialogTrigger asChild>
