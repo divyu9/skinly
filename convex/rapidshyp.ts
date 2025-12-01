@@ -173,13 +173,13 @@ export const createShipment = action({
         // Order details
         orderId: order.orderNumber,
         orderDate: new Date(order._creationTime).toISOString().split('T')[0], // Format: YYYY-MM-DD
+        
+        // Pickup and store details (required by API)
+        pickupAddressName: "SKINLY", // Use your created pickup location name
+        storeName: "DEFAULT", // Store name on RapidShyp
+        billingIsShipping: true, // Billing and shipping addresses are the same
 
-        // Customer information
-        customerName: order.shippingAddress.fullName,
-        customerPhone: order.shippingAddress.phone,
-        customerEmail: order.user?.email || "",
-
-        // Shipping address (same as billing) - exact field names from API docs
+        // Shipping address - exact field names from API docs
         shippingAddress: {
           firstName: firstName,
           lastName: lastName,
@@ -189,7 +189,7 @@ export const createShipment = action({
           state: order.shippingAddress.state,
           pinCode: order.shippingAddress.pincode,
           phone: order.shippingAddress.phone,
-          country: "India"
+          email: order.user?.email || ""
         },
 
         // Billing address (same as shipping) - exact field names from API docs
@@ -202,7 +202,7 @@ export const createShipment = action({
           state: order.shippingAddress.state,
           pinCode: order.shippingAddress.pincode,
           phone: order.shippingAddress.phone,
-          country: "India"
+          email: order.user?.email || ""
         },
 
         // Order items - exact field names from API docs
@@ -214,28 +214,28 @@ export const createShipment = action({
             sku: item.variant,
             units: item.quantity,
             unitPrice: unitPrice, // Tax-inclusive price
-            hsn: "39269099", // HSN code for vinyl skins/stickers
-            tax: 18 // GST rate 18%
+            tax: 18, // GST rate 18%
+            hsn: "39269099" // HSN code for vinyl skins/stickers
           };
         }),
 
         // Payment details - exact field names from API docs
         paymentMethod: paymentMethod,
-        totalDiscount: parseFloat(totalDiscount.toFixed(2)),
         shippingCharges: parseFloat(order.shippingFee.toFixed(2)),
+        totalDiscount: parseFloat(totalDiscount.toFixed(2)),
         totalOrderValue: (() => {
           const total = parseFloat(orderAmount.toFixed(2));
           console.log("Setting totalOrderValue:", total);
           return total;
         })(),
 
-        // Package details - exact field names from API docs (dimensions in cm, weight in grams)
-        packageWeight: packageWeightInGrams,
-        packageLength: avgLength,
-        packageBreadth: avgBreadth,
-        packageHeight: avgHeight
-
-        // Note: pickupLocation omitted - RapidShyp will use your default pickup location
+        // Package details - nested object as per API docs (dimensions in cm, weight in grams)
+        packageDetails: {
+          packageLength: avgLength,
+          packageBreadth: avgBreadth,
+          packageHeight: avgHeight,
+          packageWeight: packageWeightInGrams
+        }
       };
 
       // Log payload for debugging
