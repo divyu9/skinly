@@ -136,6 +136,11 @@ export const createShipment = action({
       const totalDiscount = 0; // No discounts for now
       const orderAmount = order.total;
 
+      // Split full name into firstName and lastName for RapidShyp
+      const nameParts = order.shippingAddress.fullName.trim().split(/\s+/);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts.slice(1).join(" ") || "";
+
       // Prepare shipment payload according to RapidShyp API documentation
       const shipmentPayload: Record<string, unknown> = {
         // Order details
@@ -149,7 +154,8 @@ export const createShipment = action({
 
         // Shipping address (same as billing)
         shippingAddress: {
-          name: order.shippingAddress.fullName,
+          firstName: firstName,
+          lastName: lastName,
           address: order.shippingAddress.addressLine1,
           address2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
@@ -161,7 +167,8 @@ export const createShipment = action({
 
         // Billing address (same as shipping)
         billingAddress: {
-          name: order.shippingAddress.fullName,
+          firstName: firstName,
+          lastName: lastName,
           address: order.shippingAddress.addressLine1,
           address2: order.shippingAddress.addressLine2 || "",
           city: order.shippingAddress.city,
