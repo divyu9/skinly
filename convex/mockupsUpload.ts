@@ -3,9 +3,23 @@ import { mutation } from "./_generated/server";
 
 /**
  * Normalize model name for matching (removes spaces, lowercase)
+ * For Samsung: also strips "Galaxy" and network indicators like (5G), 5G, etc.
  */
-function normalizeModelName(model: string): string {
-  return model.toLowerCase().replace(/\s+/g, '');
+function normalizeModelName(model: string, brand?: string): string {
+  let normalized = model;
+  
+  // Samsung-specific normalization
+  if (brand?.toLowerCase() === 'samsung') {
+    // Strip "Galaxy" prefix (case-insensitive)
+    normalized = normalized.replace(/^galaxy\s*/i, '').trim();
+    // Strip network indicators: (5G), (4G), (LTE), or standalone 5G, 4G, LTE
+    normalized = normalized.replace(/\s*\([0-9]?G\)/gi, '').trim();
+    normalized = normalized.replace(/\s*\(LTE\)/gi, '').trim();
+    normalized = normalized.replace(/\s+(5G|4G|LTE)$/gi, '').trim();
+  }
+  
+  // Standard normalization: lowercase and remove spaces
+  return normalized.toLowerCase().replace(/\s+/g, '');
 }
 
 /**
@@ -115,8 +129,8 @@ export const storeMockupFile = mutation({
       throw new Error(`Invalid filename format: ${args.filename}. Could not extract brand, model, and SKU.`);
     }
     
-    // Normalize model name for comparison
-    const normalizedModel = normalizeModelName(model);
+    // Normalize model name for comparison with brand-aware logic
+    const normalizedModel = normalizeModelName(model, brand);
     
     // Check if mockup already exists (space-insensitive match)
     const allMockups = await ctx.db
@@ -127,7 +141,7 @@ export const storeMockupFile = mutation({
       .collect();
     
     const existing = allMockups.find((m) => 
-      normalizeModelName(m.model) === normalizedModel && m.sku === sku
+      normalizeModelName(m.model, brand) === normalizedModel && m.sku === sku
     );
     
     if (existing) {

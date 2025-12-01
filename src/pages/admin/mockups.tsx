@@ -51,6 +51,10 @@ export default function MockupsPage() {
   const convex = useConvex();
   const mockupsCount = useQuery(api.mockups.getMockupsCount);
   const recentMockups = useQuery(api.mockups.getRecentMockups, { limit: 10 });
+  
+  // Handle query errors gracefully
+  const safeCount = mockupsCount ?? 0;
+  const safeMockups = recentMockups ?? [];
   const bulkImport = useMutation(api.mockups.bulkImportMockups);
   const clearAll = useMutation(api.mockups.clearAllMockups);
   const storeMockupFile = useMutation(api.mockupsUpload.storeMockupFile);
@@ -1300,12 +1304,17 @@ export default function MockupsPage() {
                               Failed Files ({job.failedFiles.length})
                             </p>
                             <div className="max-h-32 overflow-y-auto space-y-1">
-                              {job.failedFiles.map((file, idx) => (
+                              {job.failedFiles.slice(0, 50).map((file, idx) => (
                                 <div key={idx} className="text-xs">
                                   <span className="font-mono">{file.filename}</span>
                                   <span className="text-muted-foreground ml-2">- {file.reason}</span>
                                 </div>
                               ))}
+                              {job.failedFiles.length > 50 && (
+                                <div className="text-xs text-muted-foreground italic">
+                                  ... and {job.failedFiles.length - 50} more failed files
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -1516,7 +1525,9 @@ Samsung_GalaxyS24_M-174.jpg"
               ) : (
                 <>
                   <div className="bg-muted p-4 rounded">
-                    <div className="text-3xl font-bold">{mockupsCount.toLocaleString()}</div>
+                    <div className="text-3xl font-bold">
+                      {mockupsCount >= 1000 ? '1,000+' : mockupsCount.toLocaleString()}
+                    </div>
                     <div className="text-sm text-muted-foreground">Total mockups in database</div>
                   </div>
                   

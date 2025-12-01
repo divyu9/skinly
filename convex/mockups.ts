@@ -3,9 +3,23 @@ import { mutation, query } from "./_generated/server";
 
 /**
  * Normalize model name for matching (removes spaces, lowercase)
+ * For Samsung: also strips "Galaxy" and network indicators like (5G), 5G, etc.
  */
-function normalizeModelName(model: string): string {
-  return model.toLowerCase().replace(/\s+/g, '');
+function normalizeModelName(model: string, brand?: string): string {
+  let normalized = model;
+  
+  // Samsung-specific normalization
+  if (brand?.toLowerCase() === 'samsung') {
+    // Strip "Galaxy" prefix (case-insensitive)
+    normalized = normalized.replace(/^galaxy\s*/i, '').trim();
+    // Strip network indicators: (5G), (4G), (LTE), or standalone 5G, 4G, LTE
+    normalized = normalized.replace(/\s*\([0-9]?G\)/gi, '').trim();
+    normalized = normalized.replace(/\s*\(LTE\)/gi, '').trim();
+    normalized = normalized.replace(/\s+(5G|4G|LTE)$/gi, '').trim();
+  }
+  
+  // Standard normalization: lowercase and remove spaces
+  return normalized.toLowerCase().replace(/\s+/g, '');
 }
 
 /**
@@ -20,8 +34,8 @@ export const getMockupFileId = query({
     sku: v.string(),
   },
   handler: async (ctx, args) => {
-    // Normalize the search model name
-    const normalizedSearchModel = normalizeModelName(args.model);
+    // Normalize the search model name with brand-aware logic
+    const normalizedSearchModel = normalizeModelName(args.model, args.brand);
     
     // Get all mockups for this brand and SKU
     const mockups = await ctx.db
@@ -33,7 +47,7 @@ export const getMockupFileId = query({
     
     // Find mockup with matching normalized model name and SKU
     const mockup = mockups.find((m) => 
-      normalizeModelName(m.model) === normalizedSearchModel && m.sku === args.sku
+      normalizeModelName(m.model, args.brand) === normalizedSearchModel && m.sku === args.sku
     );
 
     if (!mockup) return null;
@@ -56,12 +70,22 @@ export const getAllMockups = query({
 
 /**
  * Get mockups count (lightweight - doesn't load all data)
+ * Returns an estimate for large tables to avoid timeout
  */
 export const getMockupsCount = query({
   args: {},
   handler: async (ctx) => {
-    const mockups = await ctx.db.query("mockups").collect();
-    return mockups.length;
+    // Take a small sample to estimate if table is large
+    const sample = await ctx.db.query("mockups").take(1000);
+    
+    // If we got less than 1000, that's the exact count
+    if (sample.length < 1000) {
+      return sample.length;
+    }
+    
+    // For large tables, return "1000+" to avoid expensive full scan
+    // This prevents timeout on huge tables
+    return 1000;
   },
 });
 
@@ -98,8 +122,8 @@ export const bulkImportMockups = mutation({
     let skipped = 0;
 
     for (const mockup of args.mockups) {
-      // Normalize model name for comparison
-      const normalizedModel = normalizeModelName(mockup.model);
+      // Normalize model name for comparison with brand-aware logic
+      const normalizedModel = normalizeModelName(mockup.model, mockup.brand);
       
       // Check if mockup already exists (space-insensitive match)
       const allMockups = await ctx.db
@@ -110,7 +134,7 @@ export const bulkImportMockups = mutation({
         .collect();
       
       const existing = allMockups.find((m) => 
-        normalizeModelName(m.model) === normalizedModel && m.sku === mockup.sku
+        normalizeModelName(m.model, mockup.brand) === normalizedModel && m.sku === mockup.sku
       );
 
       if (existing) {
