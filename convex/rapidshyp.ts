@@ -188,7 +188,7 @@ export const createShipment = action({
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
           pinCode: order.shippingAddress.pincode,
-          phone: order.shippingAddress.phone,
+          phone: order.shippingAddress.phone.replace(/^\+/, ""), // Remove leading + symbol
           email: order.user?.email || ""
         },
 
@@ -201,13 +201,14 @@ export const createShipment = action({
           city: order.shippingAddress.city,
           state: order.shippingAddress.state,
           pinCode: order.shippingAddress.pincode,
-          phone: order.shippingAddress.phone,
+          phone: order.shippingAddress.phone.replace(/^\+/, ""), // Remove leading + symbol
           email: order.user?.email || ""
         },
 
         // Order items - exact field names from API docs
         orderItems: order.items.map((item) => {
-          const unitPrice = parseFloat(item.price.toFixed(2));
+          // Ensure float format (at least 1 decimal place) to match API expectations
+          const unitPrice = item.price % 1 === 0 ? parseFloat(item.price.toFixed(1)) : parseFloat(item.price.toFixed(2));
           // Calculate GST amount from tax-inclusive price (18% GST)
           // Formula: GST amount = price × (0.18 / 1.18)
           const taxAmount = parseFloat((item.price * (0.18 / 1.18)).toFixed(2));
@@ -216,18 +217,18 @@ export const createShipment = action({
             itemName: item.productTitle,
             sku: item.variant,
             units: item.quantity,
-            unitPrice: unitPrice, // Tax-inclusive price
+            unitPrice: unitPrice, // Tax-inclusive price (as float)
             tax: taxAmount, // GST amount in rupees (not the rate!)
             hsn: "39269099" // HSN code for vinyl skins/stickers
           };
         }),
 
-        // Payment details - exact field names from API docs
+        // Payment details - exact field names from API docs (ensure float format)
         paymentMethod: paymentMethod,
-        shippingCharges: parseFloat(order.shippingFee.toFixed(2)),
-        totalDiscount: parseFloat(totalDiscount.toFixed(2)),
+        shippingCharges: order.shippingFee % 1 === 0 ? parseFloat(order.shippingFee.toFixed(1)) : parseFloat(order.shippingFee.toFixed(2)),
+        totalDiscount: totalDiscount % 1 === 0 ? parseFloat(totalDiscount.toFixed(1)) : parseFloat(totalDiscount.toFixed(2)),
         totalOrderValue: (() => {
-          const total = parseFloat(orderAmount.toFixed(2));
+          const total = orderAmount % 1 === 0 ? parseFloat(orderAmount.toFixed(1)) : parseFloat(orderAmount.toFixed(2));
           console.log("Setting totalOrderValue:", total);
           return total;
         })(),
