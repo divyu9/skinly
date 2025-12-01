@@ -139,7 +139,7 @@ export const createShipment = action({
       // Prepare shipment payload according to RapidShyp API documentation
       const shipmentPayload: Record<string, unknown> = {
         // Order details
-        orderNumber: order.orderNumber,
+        orderId: order.orderNumber,
         orderDate: new Date(order._creationTime).toISOString().split('T')[0], // Format: YYYY-MM-DD
 
         // Customer information
