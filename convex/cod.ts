@@ -33,6 +33,8 @@ export const getCodSettings = query({
         partialCodEnabled: false,
         prepaidType: "fixed" as const,
         prepaidValue: 0,
+        showCodOnPaymentPage: true,
+        allowMixedCartCod: false,
       };
     }
     
@@ -80,6 +82,8 @@ export const initializeCodSettings = mutation({
       partialCodEnabled: false,
       prepaidType: "fixed",
       prepaidValue: 0,
+      showCodOnPaymentPage: true,
+      allowMixedCartCod: false,
     });
 
     return settingsId;
@@ -110,6 +114,8 @@ export const updateCodSettings = mutation({
     partialCodEnabled: v.boolean(),
     prepaidType: v.union(v.literal("fixed"), v.literal("percentage")),
     prepaidValue: v.number(),
+    showCodOnPaymentPage: v.boolean(),
+    allowMixedCartCod: v.boolean(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -181,6 +187,9 @@ export const isCodAvailable = query({
         codFee: 0,
         prepaidAmount: 0,
         codAmount: 0,
+        reason: "COD is not enabled",
+        isMixedCart: false,
+        showOption: settings?.showCodOnPaymentPage ?? true,
       };
     }
 
@@ -200,48 +209,76 @@ export const isCodAvailable = query({
     // Get all collection products for collection checks
     const collectionProducts = await ctx.db.query("collectionProducts").collect();
 
-    // Validate conditions
-    const conditions: boolean[] = [];
+    // Helper function to check if a single item is COD-eligible
+    const isItemEligible = (item: typeof args.cartItems[0]): boolean => {
+      const itemConditions: boolean[] = [];
 
-    // Product IDs condition
-    if (settings.productIdsEnabled && settings.productIds.length > 0) {
-      const hasMatchingProduct = args.cartItems.some((item) =>
-        settings.productIds.includes(item.productId as Id<"products">)
-      );
-      conditions.push(hasMatchingProduct);
-    }
+      // Product IDs condition
+      if (settings.productIdsEnabled && settings.productIds.length > 0) {
+        itemConditions.push(settings.productIds.includes(item.productId as Id<"products">));
+      }
 
-    // Collection IDs condition
-    if (settings.collectionIdsEnabled && settings.collectionIds.length > 0) {
-      const hasMatchingCollection = args.cartItems.some((item) => {
+      // Collection IDs condition
+      if (settings.collectionIdsEnabled && settings.collectionIds.length > 0) {
         const product = productMap.get(item.productId as Id<"products">);
-        if (!product) return false;
-        
-        // Check direct collectionId
-        if (product.collectionId && settings.collectionIds.includes(product.collectionId)) {
-          return true;
+        if (product) {
+          // Check direct collectionId
+          if (product.collectionId && settings.collectionIds.includes(product.collectionId)) {
+            itemConditions.push(true);
+          } else {
+            // Check collectionProducts
+            const productCollections = collectionProducts
+              .filter((cp) => cp.productId === product._id)
+              .map((cp) => cp.collectionId);
+            
+            itemConditions.push(productCollections.some((colId) => settings.collectionIds.includes(colId)));
+          }
+        } else {
+          itemConditions.push(false);
         }
-        
-        // Check collectionProducts
-        const productCollections = collectionProducts
-          .filter((cp) => cp.productId === product._id)
-          .map((cp) => cp.collectionId);
-        
-        return productCollections.some((colId) => settings.collectionIds.includes(colId));
-      });
-      conditions.push(hasMatchingCollection);
-    }
+      }
 
-    // Variant IDs condition
-    if (settings.variantIdsEnabled && settings.variantIds.length > 0) {
-      const hasMatchingVariant = args.cartItems.some((item) => {
+      // Variant IDs condition
+      if (settings.variantIdsEnabled && settings.variantIds.length > 0) {
         const variant = allVariants.find(
           (v) => v.productId === item.productId && v.title === item.variant
         );
-        return variant && settings.variantIds.includes(variant._id);
-      });
-      conditions.push(hasMatchingVariant);
+        itemConditions.push(variant ? settings.variantIds.includes(variant._id) : false);
+      }
+
+      // If no product/collection/variant conditions are enabled, item is eligible by default
+      if (itemConditions.length === 0) {
+        return true;
+      }
+
+      // Apply match mode for item-level conditions
+      if (settings.matchMode === "ALL") {
+        return itemConditions.every((c) => c);
+      } else {
+        return itemConditions.some((c) => c);
+      }
+    };
+
+    // Check each item for eligibility
+    const itemEligibility = args.cartItems.map(isItemEligible);
+    const eligibleCount = itemEligibility.filter(Boolean).length;
+    const isMixedCart = eligibleCount > 0 && eligibleCount < args.cartItems.length;
+
+    // If mixed cart and not allowed, reject
+    if (isMixedCart && !settings.allowMixedCartCod) {
+      return {
+        available: false,
+        codFee: 0,
+        prepaidAmount: 0,
+        codAmount: 0,
+        reason: "COD not available for mixed product orders",
+        isMixedCart: true,
+        showOption: settings.showCodOnPaymentPage ?? true,
+      };
     }
+
+    // Validate order-level conditions
+    const conditions: boolean[] = [];
 
     // Min order amount condition
     if (settings.minOrderAmountEnabled) {
@@ -268,21 +305,38 @@ export const isCodAvailable = query({
 
     // Check if conditions pass based on match mode
     let conditionsPassed = false;
-    if (conditions.length === 0) {
-      // No conditions set, COD is available
+    if (conditions.length === 0 && eligibleCount === 0) {
+      // No conditions set at all, COD is available
       conditionsPassed = true;
-    } else if (settings.matchMode === "ALL") {
+    } else if (eligibleCount === 0) {
+      // Only order-level conditions, check those
       conditionsPassed = conditions.every((c) => c);
     } else {
-      conditionsPassed = conditions.some((c) => c);
+      // Have item-level conditions, check if any items are eligible
+      const hasEligibleItems = eligibleCount > 0;
+      if (conditions.length === 0) {
+        conditionsPassed = hasEligibleItems;
+      } else {
+        conditionsPassed = hasEligibleItems && conditions.every((c) => c);
+      }
     }
 
     if (!conditionsPassed) {
+      let reason = "Order does not meet COD eligibility criteria";
+      if (settings.minOrderAmountEnabled && args.totalAmount < settings.minOrderAmount) {
+        reason = `Minimum order amount ₹${settings.minOrderAmount} required for COD`;
+      } else if (settings.maxOrderAmountEnabled && args.totalAmount > settings.maxOrderAmount) {
+        reason = `Maximum order amount ₹${settings.maxOrderAmount} exceeded for COD`;
+      }
+      
       return {
         available: false,
         codFee: 0,
         prepaidAmount: 0,
         codAmount: 0,
+        reason,
+        isMixedCart,
+        showOption: settings.showCodOnPaymentPage ?? true,
       };
     }
 
@@ -307,6 +361,9 @@ export const isCodAvailable = query({
       codFee,
       prepaidAmount,
       codAmount,
+      reason: "",
+      isMixedCart,
+      showOption: true,
     };
   },
 });

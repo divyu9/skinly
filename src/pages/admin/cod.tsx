@@ -77,6 +77,10 @@ export default function AdminCOD() {
   const [partialCodEnabled, setPartialCodEnabled] = useState(false);
   const [prepaidType, setPrepaidType] = useState<"fixed" | "percentage">("fixed");
   const [prepaidValue, setPrepaidValue] = useState(0);
+  
+  // UI visibility controls
+  const [showCodOnPaymentPage, setShowCodOnPaymentPage] = useState(true);
+  const [allowMixedCartCod, setAllowMixedCartCod] = useState(false);
 
   const [saving, setSaving] = useState(false);
 
@@ -134,6 +138,8 @@ export default function AdminCOD() {
       setPartialCodEnabled(settings.partialCodEnabled);
       setPrepaidType(settings.prepaidType);
       setPrepaidValue(settings.prepaidValue);
+      setShowCodOnPaymentPage(settings.showCodOnPaymentPage ?? true);
+      setAllowMixedCartCod(settings.allowMixedCartCod ?? false);
     }
   }, [settings]);
 
@@ -162,6 +168,8 @@ export default function AdminCOD() {
         partialCodEnabled,
         prepaidType,
         prepaidValue,
+        showCodOnPaymentPage,
+        allowMixedCartCod,
       });
       toast.success("COD settings saved successfully");
     } catch (error) {
@@ -262,6 +270,54 @@ export default function AdminCOD() {
             </div>
           </CardContent>
         </Card>
+
+        {/* UI Visibility Controls */}
+        {enabled && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <SettingsIcon className="size-5" />
+                Display Settings
+              </CardTitle>
+              <CardDescription>
+                Control how COD option appears to customers on checkout
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-1 flex-1">
+                  <Label className="text-base font-medium">Show COD Option When Ineligible</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Display COD payment option on checkout even when order doesn't meet eligibility criteria (will be shown as disabled with reason)
+                  </p>
+                </div>
+                <Switch
+                  checked={showCodOnPaymentPage}
+                  onCheckedChange={setShowCodOnPaymentPage}
+                />
+              </div>
+              
+              <Separator />
+              
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-1 flex-1">
+                  <Label className="text-base font-medium">Allow COD for Mixed Carts</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Offer COD when cart contains both eligible and non-eligible products
+                  </p>
+                </div>
+                <Switch
+                  checked={allowMixedCartCod}
+                  onCheckedChange={setAllowMixedCartCod}
+                />
+              </div>
+              
+              <div className="text-xs text-muted-foreground bg-muted/30 p-3 rounded">
+                <strong>Note:</strong> When "Show COD Option When Ineligible" is OFF, the COD payment option will be completely hidden from checkout if the order doesn't meet the eligibility criteria.
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Match Logic */}
         {enabled && (

@@ -471,5 +471,8 @@ export default defineSchema({
     partialCodEnabled: v.boolean(),
     prepaidType: v.union(v.literal("fixed"), v.literal("percentage")),
     prepaidValue: v.number(),
+    // UI visibility controls
+    showCodOnPaymentPage: v.optional(v.boolean()), // Show COD option even when not eligible
+    allowMixedCartCod: v.optional(v.boolean()), // Allow COD when cart has both eligible and non-eligible items
   }),
 });

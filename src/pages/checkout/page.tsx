@@ -353,6 +353,11 @@ function CheckoutPageInner() {
                                 +₹{codAvailability.codFee.toFixed(0)} fee
                               </Badge>
                             )}
+                            {codAvailability.isMixedCart && (
+                              <Badge variant="outline" className="text-xs">
+                                Mixed Cart
+                              </Badge>
+                            )}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             {codAvailability.prepaidAmount > 0
@@ -361,17 +366,17 @@ function CheckoutPageInner() {
                           </div>
                         </Label>
                       </div>
-                    ) : (
+                    ) : codAvailability?.showOption ? (
                       <div className="flex items-center space-x-2 p-4 border rounded-lg opacity-50">
                         <RadioGroupItem value="cod" id="cod" disabled />
                         <Label htmlFor="cod" className="flex-1 cursor-not-allowed">
                           <div className="font-medium">Cash on Delivery</div>
                           <div className="text-sm text-muted-foreground">
-                            Not available for this order
+                            {codAvailability.reason || "Not available for this order"}
                           </div>
                         </Label>
                       </div>
-                    )}
+                    ) : null}
                   </RadioGroup>
 
                   {/* COD Fee Notice */}
