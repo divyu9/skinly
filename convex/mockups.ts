@@ -349,27 +349,93 @@ export const checkExistingMockupFilenames = query({
 });
 
 /**
- * Get missing mockups by checking which phone model + SKU combinations lack mockup images
- * Returns models grouped by brand with their missing SKUs
+ * Get missing mockups statistics (lightweight - only counts, no detailed results)
+ * Used for displaying summary stats without loading full dataset
  */
-export const getMissingMockups = query({
+export const getMissingMockupsStats = query({
   args: { 
     category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const category = args.category || "phone";
     
-    // Get all supported models for the category
+    // Get count of supported models
     const supportedModels = await ctx.db
       .query("supportedModels")
       .filter((q) => q.and(
         q.eq(q.field("category"), category),
         q.eq(q.field("isActive"), true)
       ))
-      .collect();
+      .take(500); // Limit to prevent timeout
     
-    // Get all products first
-    const allProducts = await ctx.db.query("products").collect();
+    // Get sample of products to estimate SKU count
+    const allProducts = await ctx.db.query("products").take(100);
+    const skinProducts = allProducts.filter(p => 
+      p.title.toLowerCase().includes("phone skin")
+    );
+    const skinProductIds = new Set(skinProducts.map(p => p._id));
+    
+    // Get sample of variants
+    const variants = await ctx.db.query("variants").take(200);
+    const sampleSKUs = new Set<string>();
+    for (const variant of variants) {
+      if (skinProductIds.has(variant.productId)) {
+        sampleSKUs.add(variant.sku);
+      }
+    }
+    
+    // Estimate based on samples
+    const estimatedSKUs = sampleSKUs.size > 0 ? sampleSKUs.size : 50;
+    const estimatedModels = supportedModels.length;
+    const estimatedTotal = estimatedModels * estimatedSKUs;
+    
+    // Get unique brands
+    const uniqueBrands = new Set(supportedModels.map(m => m.brandName)).size;
+    
+    return {
+      totalMissingCombinations: estimatedTotal,
+      modelsAffected: estimatedModels,
+      brandsAffected: uniqueBrands,
+      totalSKUs: estimatedSKUs,
+    };
+  },
+});
+
+/**
+ * Get missing mockups by checking which phone model + SKU combinations lack mockup images
+ * Returns models grouped by brand with their missing SKUs
+ * Optimized with limits and brand filtering
+ */
+export const getMissingMockups = query({
+  args: { 
+    category: v.optional(v.string()),
+    brand: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const category = args.category || "phone";
+    const limit = args.limit || 50; // Default to 50 models at a time
+    
+    // Get supported models for the category (optionally filtered by brand)
+    let modelsQuery = ctx.db
+      .query("supportedModels")
+      .filter((q) => q.and(
+        q.eq(q.field("category"), category),
+        q.eq(q.field("isActive"), true)
+      ));
+    
+    const supportedModels = await modelsQuery.take(500); // Max 500 models
+    
+    // Filter by brand if specified
+    const filteredModels = args.brand && args.brand !== "all"
+      ? supportedModels.filter(m => m.brandName === args.brand)
+      : supportedModels;
+    
+    // Take only the requested limit
+    const limitedModels = filteredModels.slice(0, limit);
+    
+    // Get all products (limit to reduce load)
+    const allProducts = await ctx.db.query("products").take(200);
     
     // Filter to only products with "Phone Skin" in the title
     const skinProducts = allProducts.filter(p => 
@@ -377,18 +443,17 @@ export const getMissingMockups = query({
     );
     const skinProductIds = new Set(skinProducts.map(p => p._id));
     
-    // Get all product variants (SKUs) for skin products only
-    const variants = await ctx.db.query("variants").collect();
+    // Get product variants (SKUs) for skin products only (limited)
+    const variants = await ctx.db.query("variants").take(500);
     const allSKUs = new Set<string>();
     for (const variant of variants) {
-      // Only include SKUs from products with "Skins" in the name
       if (skinProductIds.has(variant.productId)) {
         allSKUs.add(variant.sku);
       }
     }
     
-    // Get all existing mockups
-    const existingMockups = await ctx.db.query("mockups").collect();
+    // Get existing mockups (limited sample for performance)
+    const existingMockups = await ctx.db.query("mockups").take(2000);
     
     // Create a set of existing mockup combinations (normalized model + SKU)
     const existingCombos = new Set<string>();
@@ -397,15 +462,10 @@ export const getMissingMockups = query({
       existingCombos.add(key);
     }
     
-    // Find missing combinations
-    const missingByModel: Record<string, {
-      brand: string;
-      model: string;
-      missingSKUs: string[];
-      totalMissing: number;
-    }> = {};
+    // Find missing combinations for limited models only
+    const results = [];
     
-    for (const supportedModel of supportedModels) {
+    for (const supportedModel of limitedModels) {
       const normalizedModel = normalizeModelName(supportedModel.modelName);
       const missingSKUs: string[] = [];
       
@@ -417,30 +477,31 @@ export const getMissingMockups = query({
       }
       
       if (missingSKUs.length > 0) {
-        const modelKey = `${supportedModel.brandName}|${supportedModel.modelName}`;
-        missingByModel[modelKey] = {
+        results.push({
           brand: supportedModel.brandName,
           model: supportedModel.modelName,
           missingSKUs,
           totalMissing: missingSKUs.length,
-        };
+        });
       }
     }
     
-    // Convert to array and sort by brand then model
-    const results = Object.values(missingByModel).sort((a, b) => {
+    // Sort by brand then model
+    results.sort((a, b) => {
       if (a.brand !== b.brand) {
         return a.brand.localeCompare(b.brand);
       }
       return a.model.localeCompare(b.model);
     });
     
-    // Calculate stats
+    // Calculate stats for current page
     const totalMissingCombinations = results.reduce((sum, r) => sum + r.totalMissing, 0);
     const uniqueBrands = new Set(results.map(r => r.brand)).size;
     
     return {
       results,
+      hasMore: filteredModels.length > limit,
+      totalAvailable: filteredModels.length,
       stats: {
         totalMissingCombinations,
         modelsAffected: results.length,

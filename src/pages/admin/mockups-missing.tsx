@@ -10,7 +10,6 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminHeader } from "@/components/admin-header.tsx";
 import { 
   AlertTriangleIcon, 
-  RefreshCwIcon, 
   SearchIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -30,12 +29,20 @@ export default function MissingMockupsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrand, setSelectedBrand] = useState<string>("all");
   const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [limit, setLimit] = useState(50);
 
-  const data = useQuery(api.mockups.getMissingMockups, { category });
+  // Use separate lightweight query for stats
+  const stats = useQuery(api.mockups.getMissingMockupsStats, { category });
+  
+  // Use optimized query with brand filter and limit
+  const data = useQuery(api.mockups.getMissingMockups, { 
+    category,
+    brand: selectedBrand,
+    limit,
+  });
 
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
+  const handleLoadMore = () => {
+    setLimit(prev => prev + 50);
   };
 
   const toggleModel = (modelKey: string) => {
@@ -51,11 +58,6 @@ export default function MissingMockupsPage() {
   };
 
   const filteredResults = data?.results.filter(result => {
-    // Filter by brand
-    if (selectedBrand !== "all" && result.brand !== selectedBrand) {
-      return false;
-    }
-    
     // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -68,6 +70,7 @@ export default function MissingMockupsPage() {
     return true;
   });
 
+  // Get unique brands from stats query
   const uniqueBrands = data?.results 
     ? Array.from(new Set(data.results.map(r => r.brand))).sort()
     : [];
@@ -81,22 +84,16 @@ export default function MissingMockupsPage() {
           <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-3xl font-bold">Missing Mockups</h1>
-                  <p className="text-muted-foreground mt-1">
-                    Identify which phone models are missing mockup images for specific SKUs
-                  </p>
-                </div>
-                <Button onClick={handleRefresh} variant="outline">
-                  <RefreshCwIcon className="h-4 w-4 mr-2" />
-                  Refresh
-                </Button>
+              <div className="mb-4">
+                <h1 className="text-3xl font-bold">Missing Mockups</h1>
+                <p className="text-muted-foreground mt-1">
+                  Identify which phone models are missing mockup images for specific SKUs
+                </p>
               </div>
             </div>
 
             {/* Stats Cards */}
-            {data === undefined ? (
+            {stats === undefined ? (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                 {[1, 2, 3, 4].map(i => (
                   <Skeleton key={i} className="h-24" />
@@ -107,12 +104,12 @@ export default function MissingMockupsPage() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total Missing
+                      Estimated Missing
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {data.stats.totalMissingCombinations.toLocaleString()}
+                      {stats.totalMissingCombinations.toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Model + SKU combinations
@@ -128,7 +125,7 @@ export default function MissingMockupsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {data.stats.modelsAffected.toLocaleString()}
+                      {stats.modelsAffected.toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Phone models
@@ -144,7 +141,7 @@ export default function MissingMockupsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {data.stats.brandsAffected}
+                      {stats.brandsAffected}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Unique brands
@@ -160,7 +157,7 @@ export default function MissingMockupsPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {data.stats.totalSKUs.toLocaleString()}
+                      {stats.totalSKUs.toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Product variants
@@ -261,58 +258,69 @@ export default function MissingMockupsPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {filteredResults?.map(result => {
-                      const modelKey = `${result.brand}|${result.model}`;
-                      const isExpanded = expandedModels.has(modelKey);
-                      
-                      return (
-                        <div key={modelKey} className="border rounded-lg overflow-hidden">
-                          {/* Model Row */}
-                          <button
-                            onClick={() => toggleModel(modelKey)}
-                            className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
-                          >
-                            <div className="flex items-center gap-3">
-                              {isExpanded ? (
-                                <ChevronDownIcon className="h-5 w-5 text-muted-foreground" />
-                              ) : (
-                                <ChevronRightIcon className="h-5 w-5 text-muted-foreground" />
-                              )}
-                              <div>
-                                <div className="font-medium">
-                                  {result.brand} {result.model}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {result.totalMissing} missing SKU{result.totalMissing !== 1 ? 's' : ''}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="bg-destructive/10 text-destructive px-3 py-1 rounded-full text-sm font-medium">
-                              {result.totalMissing}
-                            </div>
-                          </button>
-
-                          {/* Expanded SKU List */}
-                          {isExpanded && (
-                            <div className="border-t bg-muted/30 p-4">
-                              <h4 className="text-sm font-medium mb-3">Missing SKUs:</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                                {result.missingSKUs.map(sku => (
-                                  <div
-                                    key={sku}
-                                    className="bg-background border rounded px-3 py-2 text-sm font-mono"
-                                  >
-                                    {sku}
+                  <>
+                    <div className="space-y-2">
+                      {filteredResults?.map(result => {
+                        const modelKey = `${result.brand}|${result.model}`;
+                        const isExpanded = expandedModels.has(modelKey);
+                        
+                        return (
+                          <div key={modelKey} className="border rounded-lg overflow-hidden">
+                            {/* Model Row */}
+                            <button
+                              onClick={() => toggleModel(modelKey)}
+                              className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                {isExpanded ? (
+                                  <ChevronDownIcon className="h-5 w-5 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRightIcon className="h-5 w-5 text-muted-foreground" />
+                                )}
+                                <div>
+                                  <div className="font-medium">
+                                    {result.brand} {result.model}
                                   </div>
-                                ))}
+                                  <div className="text-sm text-muted-foreground">
+                                    {result.totalMissing} missing SKU{result.totalMissing !== 1 ? 's' : ''}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                              <div className="bg-destructive/10 text-destructive px-3 py-1 rounded-full text-sm font-medium">
+                                {result.totalMissing}
+                              </div>
+                            </button>
+
+                            {/* Expanded SKU List */}
+                            {isExpanded && (
+                              <div className="border-t bg-muted/30 p-4">
+                                <h4 className="text-sm font-medium mb-3">Missing SKUs:</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                                  {result.missingSKUs.map(sku => (
+                                    <div
+                                      key={sku}
+                                      className="bg-background border rounded px-3 py-2 text-sm font-mono"
+                                    >
+                                      {sku}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    
+                    {/* Load More Button */}
+                    {data?.hasMore && (
+                      <div className="mt-6 text-center">
+                        <Button onClick={handleLoadMore} variant="outline">
+                          Load More Models ({data.totalAvailable - limit} remaining)
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
