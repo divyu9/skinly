@@ -31,18 +31,18 @@ export function CartButton() {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button size="sm" variant="outline" className="relative">
+        <Button size="sm" variant="outline" className="relative overflow-visible">
           <ShoppingCartIcon className="size-4 mr-2" />
           Cart
           {totalCount > 0 && (
-            <Badge className="absolute -top-2 -right-2 size-6 flex items-center justify-center p-0">
+            <Badge className="absolute -top-2 -right-2 size-6 flex items-center justify-center p-0 text-xs font-bold z-50 pointer-events-none">
               {totalCount}
             </Badge>
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col">
-        <SheetHeader>
+      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col overflow-hidden">
+        <SheetHeader className="shrink-0">
           <SheetTitle>Shopping Cart</SheetTitle>
           <SheetDescription>
             {totalCount > 0
