@@ -189,6 +189,11 @@ function CartContent() {
                         {item.phoneModel}
                       </p>
                     )}
+                    {item.coverage && (
+                      <p className="text-xs text-muted-foreground">
+                        {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
+                      </p>
+                    )}
                     {item.variant !== "Default Title" && (
                       <p className="text-xs text-muted-foreground">
                         {item.variant}
@@ -268,20 +273,22 @@ function CartContent() {
           <span className="text-lg font-bold text-primary">₹{subtotal.toFixed(0)}</span>
         </div>
 
-        <Link to="/checkout" className="block">
-          <Button className="w-full" size="default">
-            Proceed to Checkout
-          </Button>
-        </Link>
+        <div className="flex flex-col items-center gap-2">
+          <Link to="/checkout" className="w-full max-w-[85%]">
+            <Button className="w-full" size="default">
+              Proceed to Checkout
+            </Button>
+          </Link>
 
-        <Button
-          variant="outline"
-          className="w-full"
-          size="sm"
-          onClick={handleClearCart}
-        >
-          Clear Cart
-        </Button>
+          <Button
+            variant="outline"
+            className="w-full max-w-[85%]"
+            size="sm"
+            onClick={handleClearCart}
+          >
+            Clear Cart
+          </Button>
+        </div>
       </div>
     </div>
   );
