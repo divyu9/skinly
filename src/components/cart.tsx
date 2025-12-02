@@ -10,7 +10,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet.tsx";
 import { ShoppingCartIcon, MinusIcon, PlusIcon, TrashIcon } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
@@ -160,57 +159,56 @@ function CartContent() {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Cart Items */}
-      <div className="flex-1 overflow-y-auto space-y-4 py-4">
+      <div className="flex-1 overflow-y-auto py-2">
         {displayItems.map((item, idx) => {
           const itemId = "_id" in item ? (item._id as Id<"cart">) : undefined;
           const key = itemId || `${item.productId}-${item.variant}-${idx}`;
           
           return (
-            <Card key={key}>
-              <CardContent className="p-4">
-                <div className="flex gap-4">
-                  {/* Product Image */}
-                  {item.productImage && (
-                    <div className="size-20 bg-muted rounded-lg overflow-hidden shrink-0">
-                      <img
-                        src={item.productImage}
-                        alt={item.productTitle}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
+            <div key={key}>
+              <div className="flex gap-3 py-3 px-1">
+                {/* Product Image */}
+                {item.productImage && (
+                  <div className="size-16 bg-muted rounded overflow-hidden shrink-0">
+                    <img
+                      src={item.productImage}
+                      alt={item.productTitle}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
 
-                  {/* Product Details */}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-semibold text-sm line-clamp-2 mb-1">
+                {/* Product Details */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between">
+                  <div>
+                    <h4 className="font-medium text-sm line-clamp-1 mb-0.5">
                       {item.productTitle}
                     </h4>
                     {item.phoneModel && (
-                      <p className="text-xs text-muted-foreground mb-1">
-                        For: {item.phoneModel}
-                      </p>
-                    )}
-                    {item.coverage && (
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Coverage: {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
+                      <p className="text-xs text-muted-foreground">
+                        {item.phoneModel}
                       </p>
                     )}
                     {item.variant !== "Default Title" && (
-                      <p className="text-xs text-muted-foreground mb-2">
-                        Variant: {item.variant}
+                      <p className="text-xs text-muted-foreground">
+                        {item.variant}
                       </p>
                     )}
-                    <p className="text-sm font-bold text-primary">
+                  </div>
+                  
+                  {/* Price and Controls */}
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-sm font-bold text-primary">
                       ₹{item.price.toFixed(0)}
-                    </p>
-
-                    {/* Quantity Controls */}
-                    <div className="flex items-center gap-2 mt-3">
-                      <div className="flex items-center border rounded-lg">
+                    </span>
+                    
+                    <div className="flex items-center gap-2">
+                      {/* Quantity Controls */}
+                      <div className="flex items-center border rounded">
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="size-8 p-0"
+                          className="h-7 w-7 p-0"
                           onClick={() => handleUpdateQuantity(
                             item.productId,
                             item.variant,
@@ -220,11 +218,11 @@ function CartContent() {
                         >
                           <MinusIcon className="size-3" />
                         </Button>
-                        <span className="px-3 text-sm font-medium">{item.quantity}</span>
+                        <span className="px-2 text-xs font-medium min-w-[2ch] text-center">{item.quantity}</span>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="size-8 p-0"
+                          className="h-7 w-7 p-0"
                           onClick={() => handleUpdateQuantity(
                             item.productId,
                             item.variant,
@@ -235,34 +233,39 @@ function CartContent() {
                           <PlusIcon className="size-3" />
                         </Button>
                       </div>
+                      
+                      {/* Remove Button */}
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="size-8 p-0 text-destructive hover:text-destructive"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => handleRemove(
                           item.productId,
                           item.variant,
                           itemId
                         )}
                       >
-                        <TrashIcon className="size-4" />
+                        <TrashIcon className="size-3.5" />
                       </Button>
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              {/* Separator between items */}
+              {idx < displayItems.length - 1 && <Separator />}
+            </div>
           );
         })}
       </div>
 
-      <Separator className="my-4" />
+      <Separator className="my-3" />
 
       {/* Cart Summary */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
+      <div className="space-y-3 pb-2">
+        <div className="flex justify-between items-center px-1">
           <span className="font-semibold">Subtotal</span>
-          <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
+          <span className="text-xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
         </div>
 
         <Link to="/checkout" className="block">
