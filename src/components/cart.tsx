@@ -259,17 +259,17 @@ function CartContent() {
         })}
       </div>
 
-      <Separator className="my-3" />
+      <Separator className="my-2" />
 
       {/* Cart Summary */}
-      <div className="space-y-3 pb-2">
+      <div className="space-y-2 pb-1">
         <div className="flex justify-between items-center px-1">
-          <span className="font-semibold">Subtotal</span>
-          <span className="text-xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
+          <span className="font-medium text-sm">Subtotal</span>
+          <span className="text-lg font-bold text-primary">₹{subtotal.toFixed(0)}</span>
         </div>
 
         <Link to="/checkout" className="block">
-          <Button className="w-full" size="lg">
+          <Button className="w-full" size="default">
             Proceed to Checkout
           </Button>
         </Link>
