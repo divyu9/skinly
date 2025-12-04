@@ -151,6 +151,7 @@ function AdminProductsPageInner() {
   const [productNameCondition, setProductNameCondition] = useState<"starts-with" | "contains">("contains");
   const [productNameValue, setProductNameValue] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
   const [expandedProducts, setExpandedProducts] = useState<Set<Id<"products">>>(new Set());
   const [migrationReport, setMigrationReport] = useState<{
     total: number;
@@ -622,6 +623,11 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       });
     }
 
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((product) => product.status === statusFilter);
+    }
+
     // Sort by SKU numeric value
     const sorted = [...filtered].sort((a, b) => {
       const aFirstSku = a.variantSkus[0];
@@ -638,12 +644,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     });
 
     return sorted;
-  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition]);
+  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition]);
+  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter]);
 
   // Paginate filtered products
   const paginatedProducts = useMemo(() => {
@@ -688,7 +694,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         <TabsContent value="products" className="space-y-6">
           <div className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">
-              {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim()
+              {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all"
                 ? `${filteredProducts.length} of ${products.length} products`
                 : `${products.length} products`}
               {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
@@ -696,6 +702,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               {gadgetCategoryFilter !== "all" && ` • Category: ${gadgetCategoryFilter.charAt(0).toUpperCase() + gadgetCategoryFilter.slice(1).replace("-", " ")}`}
               {skuFilterValue.trim() && ` • SKU ${skuFilterCondition === "starts-with" ? "starts with" : "contains"}: "${skuFilterValue}"`}
               {productNameValue.trim() && ` • Name ${productNameCondition === "starts-with" ? "starts with" : "contains"}: "${productNameValue}"`}
+              {statusFilter !== "all" && ` • Status: ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`}
             </p>
             <div className="flex items-center gap-2">
           {selectedProducts.length > 0 && (
@@ -863,6 +870,41 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                 </div>
               </div>
 
+              {/* Status Filter */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-medium text-muted-foreground">Status:</span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "all" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("all")}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "active" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("active")}
+                  >
+                    Active
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "draft" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("draft")}
+                  >
+                    Draft
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={statusFilter === "archived" ? "default" : "outline"}
+                    onClick={() => setStatusFilter("archived")}
+                  >
+                    Archived
+                  </Button>
+                </div>
+              </div>
+
               {/* Category Filter */}
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-medium text-muted-foreground">Category:</span>
@@ -1008,7 +1050,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               )}
 
               {/* Reset Button */}
-              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim()) && (
+              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all") && (
                 <div className="flex justify-end">
                   <Button
                     size="sm"
@@ -1019,6 +1061,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       setGadgetCategoryFilter("all");
                       setSkuFilterValue("");
                       setProductNameValue("");
+                      setStatusFilter("all");
                       setShowAdvancedFilters(false);
                     }}
                     className="text-muted-foreground hover:text-foreground"
