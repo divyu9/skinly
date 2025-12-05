@@ -50,6 +50,7 @@ import type * as supportedModels from "../supportedModels.js";
 import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as uploadJobs from "../uploadJobs.js";
 import type * as users from "../users.js";
+import type * as wallet from "../wallet.js";
 import type * as whatsapp from "../whatsapp.js";
 import type * as whatsappActions from "../whatsappActions.js";
 import type * as whatsappMessaging from "../whatsappMessaging.js";
@@ -106,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   updateCollectionRules: typeof updateCollectionRules;
   uploadJobs: typeof uploadJobs;
   users: typeof users;
+  wallet: typeof wallet;
   whatsapp: typeof whatsapp;
   whatsappActions: typeof whatsappActions;
   whatsappMessaging: typeof whatsappMessaging;

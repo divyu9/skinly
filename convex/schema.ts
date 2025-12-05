@@ -6,7 +6,12 @@ export default defineSchema({
     tokenIdentifier: v.string(),
     name: v.optional(v.string()),
     email: v.optional(v.string()),
-  }).index("by_token", ["tokenIdentifier"]),
+    walletBalance: v.optional(v.number()), // Current wallet balance (default 0)
+    referralCode: v.optional(v.string()), // Unique referral code for this user
+    referredBy: v.optional(v.id("users")), // User who referred them
+  })
+    .index("by_token", ["tokenIdentifier"])
+    .index("by_referral_code", ["referralCode"]),
 
   cart: defineTable({
     userId: v.id("users"),
@@ -89,6 +94,10 @@ export default defineSchema({
     shippingStatus: v.optional(v.string()),
     courierName: v.optional(v.string()), // Courier company name (e.g., "DTDC Surface")
     labelUrl: v.optional(v.string()), // Shipping label PDF URL
+    // Wallet fields
+    walletAmountUsed: v.optional(v.number()), // Amount deducted from wallet
+    cashbackAmount: v.optional(v.number()), // Cashback earned on this order
+    cashbackCredited: v.optional(v.boolean()), // Whether cashback has been credited
   })
     .index("by_user", ["userId"])
     .index("by_order_number", ["orderNumber"])
@@ -212,6 +221,11 @@ export default defineSchema({
   coupons: defineTable({
     code: v.string(),
     description: v.string(),
+    // Coupon effect type
+    effectType: v.optional(v.union(
+      v.literal("discount"), // Traditional discount coupon
+      v.literal("wallet_credit") // Adds credit to user's wallet
+    )),
     discountType: v.union(v.literal("percentage"), v.literal("fixed")),
     discountValue: v.number(),
     minPurchase: v.optional(v.number()),
@@ -622,4 +636,73 @@ export default defineSchema({
   })
     .index("by_phone", ["phoneNumber"])
     .index("by_expires_at", ["expiresAt"]),
+
+  // Wallet Transactions (audit trail for all wallet activity)
+  walletTransactions: defineTable({
+    userId: v.id("users"), // User whose wallet changed
+    transactionType: v.union(
+      v.literal("credit"), // Money added
+      v.literal("debit") // Money deducted
+    ),
+    amount: v.number(), // Transaction amount
+    source: v.union(
+      v.literal("refund"), // Order refund/cancellation
+      v.literal("admin_credit"), // Manual credit by admin
+      v.literal("coupon_credit"), // Coupon redemption
+      v.literal("referral_reward"), // Referral reward
+      v.literal("cashback"), // Order cashback
+      v.literal("order_payment") // Used to pay for order
+    ),
+    balanceBefore: v.number(), // Balance before transaction
+    balanceAfter: v.number(), // Balance after transaction
+    description: v.string(), // Human-readable description
+    relatedOrderId: v.optional(v.id("orders")), // Related order if applicable
+    relatedCouponId: v.optional(v.id("coupons")), // Related coupon if applicable
+    adminEmail: v.optional(v.string()), // Admin who made change (for admin_credit)
+    createdAt: v.number(), // Transaction timestamp
+  })
+    .index("by_user", ["userId"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_user_and_created", ["userId", "createdAt"])
+    .index("by_source", ["source"]),
+
+  // Wallet Settings (admin-configurable)
+  walletSettings: defineTable({
+    // Maximum wallet usage per order
+    maxUsageType: v.union(
+      v.literal("percentage"), // Percentage of order total
+      v.literal("fixed"), // Fixed amount
+      v.literal("unlimited") // No limit
+    ),
+    maxUsageValue: v.number(), // Value (e.g., 50 for 50%, or 500 for ₹500)
+    // Referral reward settings
+    referralRewardAmount: v.number(), // Amount credited to referrer when referee completes first order
+    referralMinOrderValue: v.number(), // Minimum order value for referral to count
+    // General settings
+    walletEnabled: v.boolean(), // Master toggle for wallet feature
+    updatedBy: v.optional(v.string()), // Admin email who last updated
+    updatedAt: v.optional(v.number()), // Last update timestamp
+  }),
+
+  // Cashback Rules (admin-configurable cashback)
+  cashbackRules: defineTable({
+    ruleName: v.string(), // Friendly name (e.g., "10% on all orders")
+    enabled: v.boolean(), // ON/OFF toggle
+    cashbackType: v.union(
+      v.literal("percentage"), // Percentage of order value
+      v.literal("fixed") // Fixed amount
+    ),
+    cashbackValue: v.number(), // Value (e.g., 10 for 10%, or 50 for ₹50)
+    // Conditions (all must be met if enabled)
+    minOrderAmount: v.optional(v.number()), // Minimum order amount
+    maxOrderAmount: v.optional(v.number()), // Maximum order amount
+    applicableProductIds: v.optional(v.array(v.id("products"))), // Specific products
+    applicableCollectionIds: v.optional(v.array(v.id("collections"))), // Specific collections
+    maxCashbackAmount: v.optional(v.number()), // Cap on cashback amount
+    // Metadata
+    createdBy: v.string(), // Admin email
+    createdAt: v.number(), // Creation timestamp
+    updatedAt: v.optional(v.number()), // Last update timestamp
+  })
+    .index("by_enabled", ["enabled"]),
 });
