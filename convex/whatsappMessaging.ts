@@ -200,6 +200,89 @@ export const getQueueStats = query({
 });
 
 // ============================================================================
+// QUERY: Get message delivery statistics
+// ============================================================================
+
+export const getDeliveryStats = query({
+  args: {},
+  handler: async (ctx) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const pending = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+
+    const sent = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_status", (q) => q.eq("status", "sent"))
+      .collect();
+
+    const delivered = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_status", (q) => q.eq("status", "delivered"))
+      .collect();
+
+    const read = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_status", (q) => q.eq("status", "read"))
+      .collect();
+
+    const failed = await ctx.db
+      .query("whatsappMessages")
+      .withIndex("by_status", (q) => q.eq("status", "failed"))
+      .collect();
+
+    return {
+      pending: pending.length,
+      sent: sent.length,
+      delivered: delivered.length,
+      read: read.length,
+      failed: failed.length,
+      total: pending.length + sent.length + delivered.length + read.length + failed.length,
+    };
+  },
+});
+
+// ============================================================================
+// QUERY: Get recent webhook logs
+// ============================================================================
+
+export const getRecentWebhooks = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const webhooks = await ctx.db
+      .query("whatsappWebhooks")
+      .withIndex("by_processed_at")
+      .order("desc")
+      .take(args.limit ?? 50);
+
+    return webhooks.map((webhook) => ({
+      ...webhook,
+      processedAtFormatted: new Date(webhook.processedAt).toLocaleString(),
+    }));
+  },
+});
+
+// ============================================================================
 // MUTATION: Retry failed message
 // ============================================================================
 
@@ -283,5 +366,133 @@ export const triggerWorker = mutation({
     );
 
     return { success: true, message: "Worker scheduled" };
+  },
+});
+
+// ============================================================================
+// MUTATION: Log webhook for audit trail
+// ============================================================================
+
+export const logWebhook = mutation({
+  args: {
+    eventType: v.string(),
+    phoneNumber: v.optional(v.string()),
+    providerMessageId: v.optional(v.string()),
+    status: v.optional(v.string()),
+    rawPayload: v.string(),
+    processedAt: v.number(),
+    errorMessage: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const webhookId = await ctx.db.insert("whatsappWebhooks", args);
+    return webhookId;
+  },
+});
+
+// ============================================================================
+// MUTATION: Process webhook delivery status update
+// ============================================================================
+
+export const processWebhookUpdate = mutation({
+  args: {
+    providerMessageId: v.optional(v.string()), // Message ID from authkey
+    phoneNumber: v.optional(v.string()), // Recipient phone
+    status: v.string(), // Delivery status (sent/delivered/read/failed)
+    errorMessage: v.optional(v.string()), // Error details if failed
+    rawPayload: v.string(), // Raw webhook payload for logging
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    // Find message by provider message ID or phone number
+    let message = null;
+    
+    if (args.providerMessageId) {
+      message = await ctx.db
+        .query("whatsappMessages")
+        .withIndex("by_provider_message_id", (q) =>
+          q.eq("providerMessageId", args.providerMessageId)
+        )
+        .first();
+    }
+    
+    // If not found by provider ID, try phone number (find most recent pending/sent message)
+    if (!message && args.phoneNumber) {
+      const cleanedPhone = cleanPhoneNumber(args.phoneNumber);
+      const recentMessages = await ctx.db
+        .query("whatsappMessages")
+        .withIndex("by_recipient", (q) => q.eq("recipientPhone", cleanedPhone))
+        .order("desc")
+        .take(10);
+      
+      // Find first message that's not delivered/read/failed
+      message = recentMessages.find(
+        (m) => m.status === "pending" || m.status === "sent"
+      ) ?? null;
+    }
+
+    if (!message) {
+      console.log("Message not found for webhook update:", {
+        providerMessageId: args.providerMessageId,
+        phoneNumber: args.phoneNumber,
+      });
+      return { 
+        success: false, 
+        reason: "message_not_found",
+        providerMessageId: args.providerMessageId 
+      };
+    }
+
+    // Map status to our schema
+    const statusMap: Record<string, "pending" | "sent" | "delivered" | "read" | "failed"> = {
+      sent: "sent",
+      delivered: "delivered",
+      read: "read",
+      failed: "failed",
+      error: "failed",
+      undelivered: "failed",
+    };
+
+    const mappedStatus = statusMap[args.status.toLowerCase()] ?? "sent";
+
+    // Update message status
+    const updates: Record<string, unknown> = {
+      status: mappedStatus,
+    };
+
+    // Update timestamp based on status
+    if (mappedStatus === "sent" && !message.sentAt) {
+      updates.sentAt = now;
+    } else if (mappedStatus === "delivered" && !message.deliveredAt) {
+      updates.deliveredAt = now;
+    } else if (mappedStatus === "read" && !message.readAt) {
+      updates.readAt = now;
+    }
+
+    // Update provider message ID if provided and not set
+    if (args.providerMessageId && !message.providerMessageId) {
+      updates.providerMessageId = args.providerMessageId;
+    }
+
+    // Add error message if failed
+    if (mappedStatus === "failed" && args.errorMessage) {
+      updates.errorMessage = args.errorMessage;
+    }
+
+    await ctx.db.patch(message._id, updates);
+
+    console.log("Message status updated:", {
+      messageId: message._id,
+      oldStatus: message.status,
+      newStatus: mappedStatus,
+      providerMessageId: args.providerMessageId,
+    });
+
+    return {
+      success: true,
+      messageId: message._id,
+      oldStatus: message.status,
+      newStatus: mappedStatus,
+    };
   },
 });

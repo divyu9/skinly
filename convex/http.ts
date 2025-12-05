@@ -164,4 +164,96 @@ http.route({
   }),
 });
 
+// WhatsApp webhook handler for delivery status updates
+http.route({
+  path: "/whatsapp/webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await request.text();
+      const data = JSON.parse(body);
+      const now = Date.now();
+
+      console.log("WhatsApp webhook received:", data);
+
+      // Log webhook to database for audit
+      const webhookId = await ctx.runMutation(api.whatsappMessaging.logWebhook, {
+        eventType: data.event || data.type || data.status || "unknown",
+        phoneNumber: data.mobile || data.phone || data.destination,
+        providerMessageId: data.msgid || data.message_id || data.id,
+        status: data.status || data.delivery_status,
+        rawPayload: body,
+        processedAt: now,
+      });
+
+      // Extract relevant fields (adjust based on authkey.io webhook format)
+      const providerMessageId = data.msgid || data.message_id || data.id;
+      const phoneNumber = data.mobile || data.phone || data.destination;
+      const status = data.status || data.delivery_status || data.event;
+      const errorMessage = data.error || data.error_message || data.failure_reason;
+
+      if (!providerMessageId && !phoneNumber) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "Missing message ID and phone number",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      // Update message status
+      const result = await ctx.runMutation(api.whatsappMessaging.processWebhookUpdate, {
+        providerMessageId,
+        phoneNumber,
+        status: status || "unknown",
+        errorMessage,
+        rawPayload: body,
+      });
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Webhook processed",
+          webhookId,
+          result,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    } catch (error) {
+      console.error("WhatsApp webhook error:", error);
+
+      // Try to log failed webhook
+      try {
+        const body = await request.text();
+        await ctx.runMutation(api.whatsappMessaging.logWebhook, {
+          eventType: "error",
+          rawPayload: body,
+          processedAt: Date.now(),
+          errorMessage: error instanceof Error ? error.message : "Unknown error",
+        });
+      } catch (logError) {
+        console.error("Failed to log webhook error:", logError);
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: error instanceof Error ? error.message : "Webhook error",
+        }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+  }),
+});
+
 export default http;

@@ -580,4 +580,18 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_phone", ["phoneNumber"]),
+
+  // WhatsApp Provider Webhooks (for audit and debugging)
+  whatsappWebhooks: defineTable({
+    eventType: v.string(), // Event type (e.g., "delivered", "read", "failed")
+    phoneNumber: v.optional(v.string()), // Recipient phone number
+    providerMessageId: v.optional(v.string()), // Message ID from provider
+    status: v.optional(v.string()), // Delivery status
+    rawPayload: v.string(), // Raw JSON payload from webhook
+    processedAt: v.number(), // When webhook was received
+    errorMessage: v.optional(v.string()), // Error if processing failed
+  })
+    .index("by_provider_message_id", ["providerMessageId"])
+    .index("by_phone", ["phoneNumber"])
+    .index("by_processed_at", ["processedAt"]),
 });
