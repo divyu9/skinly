@@ -8,7 +8,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -481,11 +481,8 @@ function AdminOrdersPageInner() {
 
 export default function AdminOrdersPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -511,10 +508,9 @@ export default function AdminOrdersPage() {
             <Skeleton className="h-96 w-full" />
           </div>
         </AuthLoading>
-        <Authenticated>
-          <AdminOrdersPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <AdminOrdersPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

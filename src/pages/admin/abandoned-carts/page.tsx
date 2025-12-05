@@ -23,7 +23,7 @@ import { ShoppingCartIcon, MailIcon, MessageSquareIcon, TrendingUpIcon } from "l
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link } from "react-router-dom";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -267,11 +267,8 @@ function AbandonedCartsPageInner() {
 
 export default function AbandonedCartsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -294,10 +291,9 @@ export default function AbandonedCartsPage() {
             ))}
           </div>
         </AuthLoading>
-        <Authenticated>
-          <AbandonedCartsPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <AbandonedCartsPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

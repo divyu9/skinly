@@ -26,7 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { TemplateManager } from "./_components/template-manager.tsx";
 import { ProviderSettings } from "./_components/provider-settings.tsx";
 import { AdminNotifications } from "./_components/admin-notifications.tsx";
@@ -165,9 +165,9 @@ export default function WhatsAppAdminPage() {
   }
 
   return (
-    <Authenticated>
-      <AdminHeader />
-      <div className="container mx-auto max-w-6xl space-y-6 p-6">
+    <AdminLayout>
+      <Authenticated>
+        <div className="space-y-6">
         {/* Provider Settings */}
         <ProviderSettings />
 
@@ -404,7 +404,8 @@ export default function WhatsAppAdminPage() {
             })}
           </div>
         )}
-      </div>
-    </Authenticated>
+        </div>
+      </Authenticated>
+    </AdminLayout>
   );
 }

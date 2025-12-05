@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -202,22 +202,19 @@ export default function AdminCOD() {
 
   if (settings === undefined || products === undefined || collections === undefined || variants === undefined) {
     return (
-      <div className="min-h-screen bg-background">
-        <AdminHeader />
-        <div className="container mx-auto py-8 space-y-6">
+      <AdminLayout>
+        <div className="space-y-6">
           <Skeleton className="h-40 w-full" />
           <Skeleton className="h-60 w-full" />
           <Skeleton className="h-60 w-full" />
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-      
-      <div className="container mx-auto py-8 space-y-6 max-w-5xl">
+    <AdminLayout>
+      <div className="space-y-6 max-w-5xl">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -891,6 +888,6 @@ export default function AdminCOD() {
           </Button>
         </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

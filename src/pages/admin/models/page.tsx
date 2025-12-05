@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -379,10 +379,7 @@ export default function AdminModelsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8">
+    <AdminLayout>
         <Tabs defaultValue="models" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="models">
@@ -912,7 +909,6 @@ export default function AdminModelsPage() {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
 
       {/* Create/Edit Dialog */}
       <Dialog
@@ -1212,6 +1208,6 @@ export default function AdminModelsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminLayout>
   );
 }

@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Label } from "@/components/ui/label.tsx";
 
 function AdminOOSPageInner() {
@@ -97,11 +97,8 @@ function AdminOOSPageInner() {
 
 export default function AdminOOSPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -122,10 +119,9 @@ export default function AdminOOSPage() {
             <Skeleton className="h-32 w-full" />
           </div>
         </AuthLoading>
-        <Authenticated>
-          <AdminOOSPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <AdminOOSPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

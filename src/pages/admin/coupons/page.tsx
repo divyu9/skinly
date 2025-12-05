@@ -36,7 +36,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 interface CouponFormData {
   code: string;
@@ -918,11 +918,8 @@ function AdminCouponsPageInner() {
 
 export default function AdminCouponsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -945,10 +942,9 @@ export default function AdminCouponsPage() {
             ))}
           </div>
         </AuthLoading>
-        <Authenticated>
-          <AdminCouponsPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <AdminCouponsPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

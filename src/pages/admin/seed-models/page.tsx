@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { AlertCircleIcon, CheckCircleIcon, DatabaseIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -50,18 +50,15 @@ export default function SeedModelsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-      
-      <div className="container mx-auto py-8 px-4">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Seed Device Models</h1>
-          <p className="text-muted-foreground">
-            Populate the database with pre-existing device models from the codebase
-          </p>
-        </div>
+    <AdminLayout>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Seed Device Models</h1>
+        <p className="text-muted-foreground">
+          Populate the database with pre-existing device models from the codebase
+        </p>
+      </div>
 
-        <div className="grid gap-6 max-w-4xl">
+      <div className="grid gap-6 max-w-4xl">
           {/* Stats Card */}
           <Card>
             <CardHeader>
@@ -158,7 +155,6 @@ export default function SeedModelsPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

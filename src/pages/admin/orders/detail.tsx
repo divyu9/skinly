@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
 import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon } from "lucide-react";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -611,11 +611,8 @@ function OrderDetailPageInner() {
 
 export default function OrderDetailPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -640,10 +637,9 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </AuthLoading>
-        <Authenticated>
-          <OrderDetailPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <OrderDetailPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

@@ -9,7 +9,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyCont
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -1628,11 +1628,8 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
 
 export default function AdminProductsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -1655,10 +1652,9 @@ export default function AdminProductsPage() {
             ))}
           </div>
         </AuthLoading>
-        <Authenticated>
-          <AdminProductsPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <AdminProductsPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

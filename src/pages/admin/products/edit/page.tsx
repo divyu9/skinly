@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SaveIcon } from "lucide-react";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
@@ -595,11 +595,8 @@ function EditProductPageInner() {
 
 export default function EditProductPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -620,8 +617,7 @@ export default function EditProductPage() {
         </AuthLoading>
         <Authenticated>
           <EditProductPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      </Authenticated>
+    </AdminLayout>
   );
 }

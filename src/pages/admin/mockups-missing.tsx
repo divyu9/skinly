@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { 
   AlertTriangleIcon, 
   SearchIcon,
@@ -76,12 +76,9 @@ export default function MissingMockupsPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-      
-      <div className="container mx-auto py-8 px-4">
-        <Authenticated>
-          <div className="max-w-7xl mx-auto">
+    <AdminLayout>
+      <Authenticated>
+        <div className="max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
               <div className="mb-4">
@@ -324,25 +321,24 @@ export default function MissingMockupsPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
-        </Authenticated>
+        </div>
+      </Authenticated>
 
-        <Unauthenticated>
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <h2 className="text-2xl font-bold mb-4">Sign in required</h2>
-            <p className="text-muted-foreground mb-6">
-              Please sign in to access the missing mockups page
-            </p>
-            <SignInButton />
-          </div>
-        </Unauthenticated>
+      <Unauthenticated>
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <h2 className="text-2xl font-bold mb-4">Sign in required</h2>
+          <p className="text-muted-foreground mb-6">
+            Please sign in to access the missing mockups page
+          </p>
+          <SignInButton />
+        </div>
+      </Unauthenticated>
 
-        <AuthLoading>
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <Skeleton className="h-64 w-full max-w-md" />
-          </div>
-        </AuthLoading>
-      </div>
-    </div>
+      <AuthLoading>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Skeleton className="h-64 w-full max-w-md" />
+        </div>
+      </AuthLoading>
+    </AdminLayout>
   );
 }

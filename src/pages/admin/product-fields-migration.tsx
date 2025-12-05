@@ -3,7 +3,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
 import { Sparkles, CheckCircle2, AlertCircle, Loader2, PackageSearch } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -89,10 +89,8 @@ export default function ProductFieldsMigration() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-      <div className="container mx-auto p-8 max-w-6xl">
-        <div className="space-y-6">
+    <AdminLayout>
+      <div className="space-y-6">
           {/* Header */}
           <div>
             <h1 className="text-3xl font-bold mb-2">Product Fields Migration</h1>
@@ -410,7 +408,6 @@ export default function ProductFieldsMigration() {
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+    </AdminLayout>
   );
 }

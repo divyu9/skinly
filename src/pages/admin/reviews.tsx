@@ -3,7 +3,7 @@ import { api } from "@/convex/_generated/api.js";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import { StarIcon, TrashIcon, CheckCircleIcon, MessageSquareIcon } from "lucide-react";
@@ -42,14 +42,13 @@ export default function AdminReviews() {
 
   if (reviews === undefined) {
     return (
-      <div className="min-h-screen bg-background">
-        <AdminHeader />
-        <div className="container mx-auto py-8 space-y-6">
+      <AdminLayout>
+        <div className="space-y-6">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-40 w-full" />
           ))}
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
@@ -58,10 +57,8 @@ export default function AdminReviews() {
   const averageRating = reviews.length > 0 ? (totalRatings / reviews.length).toFixed(1) : "0";
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-      
-      <div className="container mx-auto py-8 space-y-6">
+    <AdminLayout>
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Customer Reviews</h1>
@@ -251,6 +248,6 @@ export default function AdminReviews() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </AdminLayout>
   );
 }

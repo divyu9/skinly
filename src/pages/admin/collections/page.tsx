@@ -8,7 +8,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyCont
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import {
@@ -848,11 +848,8 @@ function AdminCollectionsPageInner() {
 
 export default function AdminCollectionsPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        <Unauthenticated>
+    <AdminLayout>
+      <Unauthenticated>
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -874,10 +871,9 @@ export default function AdminCollectionsPage() {
             <Skeleton className="h-64 w-full" />
           </div>
         </AuthLoading>
-        <Authenticated>
-          <AdminCollectionsPageInner />
-        </Authenticated>
-      </div>
-    </div>
+      <Authenticated>
+        <AdminCollectionsPageInner />
+      </Authenticated>
+    </AdminLayout>
   );
 }

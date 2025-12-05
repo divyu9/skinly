@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/table.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { AdminHeader } from "@/components/admin-header.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import {
   MessageSquareIcon,
   FilterIcon,
@@ -116,21 +116,16 @@ export default function WhatsAppMessagesPage() {
 
   if (!messages || !queueStats || !deliveryStats) {
     return (
-      <div className="min-h-screen bg-background">
-        <AdminHeader />
-        <div className="container mx-auto px-4 py-8">
-          <Skeleton className="h-32 w-full mb-4" />
-          <Skeleton className="h-96 w-full" />
-        </div>
-      </div>
+      <AdminLayout>
+        <Skeleton className="h-32 w-full mb-4" />
+        <Skeleton className="h-96 w-full" />
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AdminHeader />
-
-      <div className="container mx-auto px-4 py-8">
+    <AdminLayout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
@@ -498,6 +493,6 @@ export default function WhatsAppMessagesPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminLayout>
   );
 }
