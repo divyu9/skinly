@@ -22,21 +22,30 @@ import {
   PackageIcon,
   SmartphoneIcon,
   ShieldCheckIcon,
+  BellIcon,
+  CheckCircle2Icon,
 } from "lucide-react";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group.tsx";
 
 function AccountPageInner() {
   const { signoutRedirect } = useAuth();
   const currentUser = useQuery(api.users.getCurrentUser);
   const recentOrders = useQuery(api.orders.getOrders, { limit: 5 }) as Doc<"orders">[] | undefined;
   const phoneVerificationStatus = useQuery(api.loginOtp.checkPhoneVerified);
+  const whatsappConsent = useQuery(api.whatsappConsent.getMyConsent);
   const generateLoginOtp = useMutation(api.loginOtp.generateLoginOtp);
   const verifyLoginOtp = useMutation(api.loginOtp.verifyLoginOtp);
+  const updateConsent = useMutation(api.whatsappConsent.updateMyConsent);
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpInput, setOtpInput] = useState("");
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
 
   const handleSendOtp = async () => {
     if (!phoneNumber.trim()) {
@@ -79,7 +88,21 @@ function AccountPageInner() {
     }
   };
 
-  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined) {
+  const handleConsentChange = async (value: string) => {
+    setIsUpdatingConsent(true);
+    try {
+      await updateConsent({
+        consentType: value as "all" | "transactional_only" | "none",
+      });
+      toast.success("WhatsApp notification preferences updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update preferences");
+    } finally {
+      setIsUpdatingConsent(false);
+    }
+  };
+
+  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined || whatsappConsent === undefined) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="space-y-6">
@@ -222,6 +245,96 @@ function AccountPageInner() {
                   </Button>
                 </div>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* WhatsApp Notification Preferences */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BellIcon className="size-5" />
+            WhatsApp Notifications
+          </CardTitle>
+          <CardDescription>
+            Manage your WhatsApp notification preferences
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!phoneVerificationStatus.verified ? (
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                Please verify your phone number first to manage WhatsApp notification preferences.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg mb-4">
+                <CheckCircle2Icon className="size-5 text-green-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                    Connected: {whatsappConsent.phoneNumber || phoneVerificationStatus.phoneNumber}
+                  </p>
+                  <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                    You will receive notifications on this WhatsApp number
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base font-semibold">Choose what notifications you want to receive:</Label>
+                
+                <RadioGroup
+                  value={whatsappConsent.consentType}
+                  onValueChange={handleConsentChange}
+                  disabled={isUpdatingConsent}
+                  className="space-y-3"
+                >
+                  <div className="flex items-start space-x-3 space-y-0 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <RadioGroupItem value="all" id="consent-all" />
+                    <div className="flex-1 space-y-1 leading-none">
+                      <Label htmlFor="consent-all" className="font-medium cursor-pointer">
+                        All Notifications
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Receive all order updates, promotional messages, and account notifications
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3 space-y-0 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <RadioGroupItem value="transactional_only" id="consent-transactional" />
+                    <div className="flex-1 space-y-1 leading-none">
+                      <Label htmlFor="consent-transactional" className="font-medium cursor-pointer">
+                        Transactional Only (Recommended)
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Only receive important order updates, OTPs, and account security notifications
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start space-x-3 space-y-0 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                    <RadioGroupItem value="none" id="consent-none" />
+                    <div className="flex-1 space-y-1 leading-none">
+                      <Label htmlFor="consent-none" className="font-medium cursor-pointer">
+                        No Notifications
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Opt out of all WhatsApp notifications (not recommended - you may miss important order updates)
+                      </p>
+                    </div>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="pt-4 border-t">
+                <p className="text-xs text-muted-foreground">
+                  You can change your preferences at any time. Transactional messages like order confirmations, 
+                  shipping updates, and OTPs are important for your account security and order tracking.
+                </p>
+              </div>
             </div>
           )}
         </CardContent>

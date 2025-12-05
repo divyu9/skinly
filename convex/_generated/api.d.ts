@@ -53,6 +53,7 @@ import type * as users from "../users.js";
 import type * as wallet from "../wallet.js";
 import type * as whatsapp from "../whatsapp.js";
 import type * as whatsappActions from "../whatsappActions.js";
+import type * as whatsappConsent from "../whatsappConsent.js";
 import type * as whatsappMessaging from "../whatsappMessaging.js";
 import type * as whatsappSeed from "../whatsappSeed.js";
 import type * as whatsappWorker from "../whatsappWorker.js";
@@ -110,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   wallet: typeof wallet;
   whatsapp: typeof whatsapp;
   whatsappActions: typeof whatsappActions;
+  whatsappConsent: typeof whatsappConsent;
   whatsappMessaging: typeof whatsappMessaging;
   whatsappSeed: typeof whatsappSeed;
   whatsappWorker: typeof whatsappWorker;
