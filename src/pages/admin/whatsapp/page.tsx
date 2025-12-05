@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
@@ -15,7 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
-import { Search, Power, PowerOff, AlertTriangle, Database, HelpCircle } from "lucide-react";
+import { Search, Power, PowerOff, AlertTriangle, Database, HelpCircle, MessageSquareIcon } from "lucide-react";
 import { Authenticated } from "convex/react";
 import {
   Dialog,
@@ -194,6 +195,12 @@ export default function WhatsAppAdminPage() {
             )}
           </div>
           <div className="flex gap-2">
+            <Button variant="default" asChild>
+              <Link to="/admin/whatsapp/messages">
+                <MessageSquareIcon className="mr-2 h-4 w-4" />
+                View Messages
+              </Link>
+            </Button>
             <TemplateManager />
             <Button onClick={handleSeedData} disabled={isSeeding} variant="outline">
               <Database className="mr-2 h-4 w-4" />

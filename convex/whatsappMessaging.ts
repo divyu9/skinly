@@ -390,6 +390,157 @@ export const logWebhook = mutation({
 });
 
 // ============================================================================
+// QUERY: Get all messages with filtering (admin)
+// ============================================================================
+
+export const getMessages = query({
+  args: {
+    usecaseKey: v.optional(v.string()),
+    status: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("sent"),
+      v.literal("delivered"),
+      v.literal("read"),
+      v.literal("failed")
+    )),
+    recipientPhone: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const limit = args.limit ?? 100;
+    let messages;
+
+    // Filter by different criteria
+    if (args.usecaseKey !== undefined) {
+      messages = await ctx.db
+        .query("whatsappMessages")
+        .withIndex("by_usecase", (q) => q.eq("usecaseKey", args.usecaseKey as string))
+        .order("desc")
+        .take(limit);
+    } else if (args.status !== undefined) {
+      messages = await ctx.db
+        .query("whatsappMessages")
+        .withIndex("by_status", (q) => q.eq("status", args.status as "pending" | "sent" | "delivered" | "read" | "failed"))
+        .order("desc")
+        .take(limit);
+    } else if (args.recipientPhone !== undefined) {
+      const cleanedPhone = cleanPhoneNumber(args.recipientPhone);
+      messages = await ctx.db
+        .query("whatsappMessages")
+        .withIndex("by_recipient", (q) => q.eq("recipientPhone", cleanedPhone))
+        .order("desc")
+        .take(limit);
+    } else {
+      // Get all messages, most recent first
+      messages = await ctx.db
+        .query("whatsappMessages")
+        .withIndex("by_created_at")
+        .order("desc")
+        .take(limit);
+    }
+
+    // Enrich with user data and format timestamps
+    const enrichedMessages = await Promise.all(
+      messages.map(async (msg) => {
+        let userName = "Unknown";
+        if (msg.recipientUserId) {
+          const user = await ctx.db.get(msg.recipientUserId);
+          userName = user?.name || user?.email || "Unknown";
+        }
+
+        return {
+          ...msg,
+          recipientName: userName,
+          createdAtFormatted: new Date(msg.createdAt).toLocaleString("en-IN", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }),
+          sentAtFormatted: msg.sentAt
+            ? new Date(msg.sentAt).toLocaleString("en-IN", {
+                dateStyle: "short",
+                timeStyle: "short",
+              })
+            : undefined,
+          deliveredAtFormatted: msg.deliveredAt
+            ? new Date(msg.deliveredAt).toLocaleString("en-IN", {
+                dateStyle: "short",
+                timeStyle: "short",
+              })
+            : undefined,
+          readAtFormatted: msg.readAt
+            ? new Date(msg.readAt).toLocaleString("en-IN", {
+                dateStyle: "short",
+                timeStyle: "short",
+              })
+            : undefined,
+        };
+      })
+    );
+
+    return enrichedMessages;
+  },
+});
+
+// ============================================================================
+// QUERY: Get single message details
+// ============================================================================
+
+export const getMessageDetails = query({
+  args: {
+    messageId: v.id("whatsappMessages"),
+  },
+  handler: async (ctx, args) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const message = await ctx.db.get(args.messageId);
+    
+    if (!message) {
+      throw new ConvexError({
+        message: "Message not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Get user details
+    let userName = "Unknown";
+    if (message.recipientUserId) {
+      const user = await ctx.db.get(message.recipientUserId);
+      userName = user?.name || user?.email || "Unknown";
+    }
+
+    // Get queue item
+    const queueItem = await ctx.db
+      .query("whatsappQueue")
+      .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
+      .unique();
+
+    return {
+      ...message,
+      recipientName: userName,
+      queueStatus: queueItem?.status,
+      queueAttempts: queueItem?.attempts,
+      queueError: queueItem?.errorMessage,
+    };
+  },
+});
+
+// ============================================================================
 // MUTATION: Process webhook delivery status update
 // ============================================================================
 
