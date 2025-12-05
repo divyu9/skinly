@@ -30,6 +30,7 @@ import { AdminLayout } from "@/components/admin-layout.tsx";
 import { TemplateManager } from "./_components/template-manager.tsx";
 import { ProviderSettings } from "./_components/provider-settings.tsx";
 import { AdminNotifications } from "./_components/admin-notifications.tsx";
+import { SetupWizard } from "./_components/setup-wizard.tsx";
 
 export default function WhatsAppAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -195,6 +196,7 @@ export default function WhatsAppAdminPage() {
             )}
           </div>
           <div className="flex gap-2">
+            <SetupWizard />
             <Button variant="default" asChild>
               <Link to="/admin/whatsapp/messages">
                 <MessageSquareIcon className="mr-2 h-4 w-4" />
