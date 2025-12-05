@@ -20,6 +20,7 @@ export function AdminHeader() {
     { path: "/admin/abandoned-carts", label: "Abandoned Carts" },
     { path: "/admin/stock-notifications", label: "Stock Alerts" },
     { path: "/admin/cod", label: "COD Settings" },
+    { path: "/admin/whatsapp", label: "WhatsApp" },
     { path: "/admin/models", label: "Models" },
     { path: "/admin/seed-models", label: "Seed DB" },
     { path: "/admin/oos", label: "OOS Settings" },

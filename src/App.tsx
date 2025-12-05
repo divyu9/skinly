@@ -28,6 +28,7 @@ import AdminSeedModelsPage from "./pages/admin/seed-models/page.tsx";
 import AdminPhoneCollectionsPage from "./pages/admin/phone-collections.tsx";
 import AdminProductFieldsMigrationPage from "./pages/admin/product-fields-migration.tsx";
 import AdminCODPage from "./pages/admin/cod.tsx";
+import AdminWhatsAppPage from "./pages/admin/whatsapp/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/admin/stock-notifications" element={<AdminStockNotificationsPage />} />
           <Route path="/admin/oos" element={<AdminOOSPage />} />
           <Route path="/admin/cod" element={<AdminCODPage />} />
+          <Route path="/admin/whatsapp" element={<AdminWhatsAppPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/admin/mockups/missing" element={<AdminMockupsMissingPage />} />
           <Route path="/admin/google-drive-import" element={<AdminGoogleDriveImportPage />} />
