@@ -48,6 +48,7 @@ import type * as supportedModels from "../supportedModels.js";
 import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as uploadJobs from "../uploadJobs.js";
 import type * as users from "../users.js";
+import type * as whatsapp from "../whatsapp.js";
 
 import type {
   ApiFromModules,
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   updateCollectionRules: typeof updateCollectionRules;
   uploadJobs: typeof uploadJobs;
   users: typeof users;
+  whatsapp: typeof whatsapp;
 }>;
 
 /**
