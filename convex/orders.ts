@@ -132,10 +132,35 @@ export const createOrder = mutation({
       });
     }
 
-    // Send order received WhatsApp notification (for prepaid/partial prepaid orders)
-    // COD orders get notification after payment confirmation
-    if (args.paymentMethod !== "cod" || args.prepaidAmount) {
-      try {
+    // Send WhatsApp notifications based on payment method
+    try {
+      if (args.paymentMethod === "cod") {
+        if (args.prepaidAmount && args.prepaidAmount > 0) {
+          // Partial COD - send partial COD notification
+          // User needs to make prepaid payment, so this notification will be sent after payment
+          // We'll handle this in the payment success handler
+        } else {
+          // Full COD - send COD confirmation notification
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "cod_confirmation",
+              recipientPhone: args.shippingAddress.phone,
+              recipientUserId: user._id,
+              variables: {
+                customer_name: args.shippingAddress.fullName || user.name || "Customer",
+                order_number: orderNumber,
+                order_total: `₹${total.toFixed(2)}`,
+                cod_amount: `₹${(args.codAmount || total).toFixed(2)}`,
+                cod_fee: `₹${(args.codFee || 0).toFixed(2)}`,
+              },
+              priority: 8,
+            }
+          );
+        }
+      } else {
+        // Prepaid orders - send order received notification
         await ctx.scheduler.runAfter(
           0,
           api.whatsappMessaging.queueMessage,
@@ -149,13 +174,13 @@ export const createOrder = mutation({
               order_total: `₹${total.toFixed(2)}`,
               order_items: cartItems.length.toString(),
             },
-            priority: 8, // High priority for order confirmations
+            priority: 8,
           }
         );
-      } catch (error) {
-        console.error("Failed to queue order received WhatsApp:", error);
-        // Don't fail order creation if WhatsApp fails
       }
+    } catch (error) {
+      console.error("Failed to queue order WhatsApp notification:", error);
+      // Don't fail order creation if WhatsApp fails
     }
 
     return { orderId, orderNumber };
@@ -353,23 +378,50 @@ export const updatePaymentStatus = mutation({
         const user = await ctx.db.get(order.userId);
         
         if (args.paymentStatus === "success") {
-          // Payment successful - send order received notification
-          await ctx.scheduler.runAfter(
-            0,
-            api.whatsappMessaging.queueMessage,
-            {
-              usecaseKey: "order_received",
-              recipientPhone: order.shippingAddress.phone,
-              recipientUserId: order.userId,
-              variables: {
-                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber,
-                order_total: `₹${order.total.toFixed(2)}`,
-                order_items: order.items.length.toString(),
-              },
-              priority: 8,
-            }
-          );
+          // Check if this is a partial COD order
+          const isPartialCod = order.paymentMethod === "cod" && 
+                              order.prepaidAmount && 
+                              order.prepaidAmount > 0;
+          
+          if (isPartialCod) {
+            // Partial COD - send partial COD notification
+            await ctx.scheduler.runAfter(
+              0,
+              api.whatsappMessaging.queueMessage,
+              {
+                usecaseKey: "partial_cod",
+                recipientPhone: order.shippingAddress.phone,
+                recipientUserId: order.userId,
+                variables: {
+                  customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                  order_number: order.orderNumber,
+                  order_total: `₹${order.total.toFixed(2)}`,
+                  prepaid_amount: `₹${(order.prepaidAmount || 0).toFixed(2)}`,
+                  cod_amount: `₹${(order.codAmount || 0).toFixed(2)}`,
+                  cod_fee: `₹${(order.codFee || 0).toFixed(2)}`,
+                },
+                priority: 8,
+              }
+            );
+          } else {
+            // Full prepaid payment - send order received notification
+            await ctx.scheduler.runAfter(
+              0,
+              api.whatsappMessaging.queueMessage,
+              {
+                usecaseKey: "order_received",
+                recipientPhone: order.shippingAddress.phone,
+                recipientUserId: order.userId,
+                variables: {
+                  customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                  order_number: order.orderNumber,
+                  order_total: `₹${order.total.toFixed(2)}`,
+                  order_items: order.items.length.toString(),
+                },
+                priority: 8,
+              }
+            );
+          }
         } else if (args.paymentStatus === "failed") {
           // Payment failed - send payment failed notification
           await ctx.scheduler.runAfter(
@@ -383,6 +435,7 @@ export const updatePaymentStatus = mutation({
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
                 order_number: order.orderNumber,
                 order_total: `₹${order.total.toFixed(2)}`,
+                payment_method: order.paymentMethod === "cod" ? "Partial COD" : "Prepaid",
               },
               priority: 8,
             }

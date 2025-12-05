@@ -196,12 +196,22 @@ const SAMPLE_TEMPLATES = [
     status: "active" as const,
   },
   {
-    templateName: "COD OTP Verification - v1",
-    providerTemplateId: "COD_OTP_V1",
+    templateName: "COD Confirmation - v1",
+    providerTemplateId: "COD_CONFIRMATION_V1",
     templateType: "transactional" as const,
     templateBody:
-      "Your COD verification OTP is {otp}. Valid for 10 minutes. Order #{order_number}",
-    variables: ["otp", "order_number"],
+      "Hi {customer_name}, your COD order #{order_number} is confirmed! Total: {order_total} (includes ₹{cod_fee} COD fee). Pay {cod_amount} on delivery.",
+    variables: ["customer_name", "order_number", "order_total", "cod_fee", "cod_amount"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
+    templateName: "Partial COD Payment - v1",
+    providerTemplateId: "PARTIAL_COD_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Hi {customer_name}, your prepayment of {prepaid_amount} for order #{order_number} is received! Pay remaining {cod_amount} (includes ₹{cod_fee} COD fee) on delivery. Total: {order_total}",
+    variables: ["customer_name", "order_number", "order_total", "prepaid_amount", "cod_amount", "cod_fee"],
     language: "en",
     status: "active" as const,
   },
@@ -252,6 +262,16 @@ const SAMPLE_TEMPLATES = [
     templateBody:
       "Thanks {customer_name}! We've received your request for {brand_name} {model_name}. We'll notify you once it's available.",
     variables: ["customer_name", "brand_name", "model_name"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
+    templateName: "Payment Failed - v1",
+    providerTemplateId: "PAYMENT_FAILED_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Hi {customer_name}, your payment for order #{order_number} failed. Please try again or contact support. Amount: {order_total}",
+    variables: ["customer_name", "order_number", "order_total", "payment_method"],
     language: "en",
     status: "active" as const,
   },
