@@ -315,6 +315,87 @@ export const getUsecaseAuditHistory = query({
 });
 
 // ============================================================================
+// PROVIDER CONFIGURATION
+// ============================================================================
+
+export const getWhatsAppProviderSettings = query({
+  args: {},
+  handler: async (ctx) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const setting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "whatsapp_provider_config"))
+      .unique();
+
+    if (!setting) {
+      return null;
+    }
+
+    // Parse the JSON value
+    return typeof setting.value === "string"
+      ? JSON.parse(setting.value)
+      : setting.value;
+  },
+});
+
+export const saveWhatsAppProviderSettings = mutation({
+  args: {
+    providerName: v.string(),
+    authKey: v.string(),
+    apiEndpoint: v.optional(v.string()),
+    senderPhone: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const config = {
+      providerName: args.providerName,
+      authKey: args.authKey,
+      apiEndpoint: args.apiEndpoint ?? "",
+      senderPhone: args.senderPhone ?? "",
+      lastUpdatedAt: Date.now(),
+      lastUpdatedBy: identity.email ?? "unknown",
+    };
+
+    // Check if setting exists
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "whatsapp_provider_config"))
+      .unique();
+
+    if (existing) {
+      // Update existing
+      await ctx.db.patch(existing._id, {
+        value: JSON.stringify(config),
+      });
+    } else {
+      // Create new
+      await ctx.db.insert("settings", {
+        key: "whatsapp_provider_config",
+        value: JSON.stringify(config),
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+// ============================================================================
 // TEMPLATE MANAGEMENT
 // ============================================================================
 

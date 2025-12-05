@@ -37,13 +37,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { toast } from "sonner";
 import { FileText, Plus, Edit, Trash2 } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
+import { VariablesMultiSelect } from "./variables-multi-select.tsx";
 
 interface TemplateFormData {
   templateName: string;
   providerTemplateId: string;
   templateType: "transactional" | "marketing";
   templateBody: string;
-  variables: string;
+  variables: string[]; // Changed to array
   language: string;
   status: "active" | "inactive";
 }
@@ -64,7 +65,7 @@ export function TemplateManager() {
     providerTemplateId: "",
     templateType: "transactional",
     templateBody: "",
-    variables: "",
+    variables: [], // Changed to array
     language: "en",
     status: "active",
   });
@@ -78,7 +79,7 @@ export function TemplateManager() {
       providerTemplateId: "",
       templateType: "transactional",
       templateBody: "",
-      variables: "",
+      variables: [], // Changed to array
       language: "en",
       status: "active",
     });
@@ -107,7 +108,7 @@ export function TemplateManager() {
       providerTemplateId: template.providerTemplateId,
       templateType: template.type,
       templateBody: template.templateBody ?? "",
-      variables: template.variables.join(", "),
+      variables: template.variables, // Already an array
       language: template.language,
       status: template.status,
     });
@@ -121,10 +122,7 @@ export function TemplateManager() {
     setIsSubmitting(true);
 
     try {
-      const variablesArray = formData.variables
-        .split(",")
-        .map((v) => v.trim())
-        .filter((v) => v.length > 0);
+      const variablesArray = formData.variables.filter((v) => v.length > 0);
 
       if (editingTemplate) {
         // Update existing template
@@ -362,14 +360,12 @@ export function TemplateManager() {
             {/* Variables */}
             <div className="space-y-2">
               <Label htmlFor="variables">Variables</Label>
-              <Input
-                id="variables"
+              <VariablesMultiSelect
                 value={formData.variables}
-                onChange={(e) => setFormData({ ...formData, variables: e.target.value })}
-                placeholder="customer_name, order_number, tracking_url"
+                onChange={(values) => setFormData({ ...formData, variables: values })}
               />
               <p className="text-xs text-muted-foreground">
-                Comma-separated list of variable names
+                Select variables to use in your template message
               </p>
             </div>
 
