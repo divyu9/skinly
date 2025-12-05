@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { api } from "./_generated/api";
 
 /**
  * Check if a model already exists in supportedModels (case-insensitive)
@@ -282,6 +283,26 @@ export const approveModelRequests = mutation({
         approvedAt: Date.now(),
       });
 
+      // Send WhatsApp notification for approval
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          api.whatsappMessaging.queueMessage,
+          {
+            usecaseKey: "model_added",
+            recipientPhone: request.whatsappPhone,
+            recipientUserId: request.userId,
+            variables: {
+              brand_name: request.brandName,
+              model_name: request.modelName,
+            },
+            priority: 6,
+          }
+        );
+      } catch (error) {
+        console.error(`Failed to queue model approved WhatsApp for ${request.whatsappPhone}:`, error);
+      }
+
       successCount++;
     }
 
@@ -370,6 +391,26 @@ export const rejectModelRequest = mutation({
     await ctx.db.patch(args.requestId, {
       status: "rejected",
     });
+
+    // Send WhatsApp notification for rejection
+    try {
+      await ctx.scheduler.runAfter(
+        0,
+        api.whatsappMessaging.queueMessage,
+        {
+          usecaseKey: "model_request_rejected",
+          recipientPhone: request.whatsappPhone,
+          recipientUserId: request.userId,
+          variables: {
+            brand_name: request.brandName,
+            model_name: request.modelName,
+          },
+          priority: 6,
+        }
+      );
+    } catch (error) {
+      console.error(`Failed to queue model rejected WhatsApp for ${request.whatsappPhone}:`, error);
+    }
 
     return { success: true };
   },

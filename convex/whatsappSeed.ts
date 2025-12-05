@@ -73,6 +73,24 @@ const DEFAULT_USECASES = [
     requireConsent: false,
   },
   {
+    usecaseKey: "model_request_rejected",
+    displayName: "Model Request Rejected",
+    isTransactional: true,
+    requireConsent: false,
+  },
+  {
+    usecaseKey: "cod_otp_verification",
+    displayName: "COD OTP Verification",
+    isTransactional: true,
+    requireConsent: false,
+  },
+  {
+    usecaseKey: "out_of_stock_alert",
+    displayName: "Out of Stock Alert",
+    isTransactional: true,
+    requireConsent: false,
+  },
+  {
     usecaseKey: "otp_login",
     displayName: "OTP Login",
     isTransactional: true,
@@ -119,6 +137,12 @@ const DEFAULT_USECASES = [
     displayName: "Birthday Offer",
     isTransactional: false,
     requireConsent: true,
+  },
+  {
+    usecaseKey: "admin_new_order",
+    displayName: "Admin New Order Alert",
+    isTransactional: true,
+    requireConsent: false,
   },
 ];
 
@@ -266,12 +290,62 @@ const SAMPLE_TEMPLATES = [
     status: "active" as const,
   },
   {
+    templateName: "Model Added - v1",
+    providerTemplateId: "MODEL_ADDED_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Great news! {brand_name} {model_name} is now available on Skinly. Shop now: https://skinly.onhercules.app/",
+    variables: ["brand_name", "model_name"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
+    templateName: "Model Request Rejected - v1",
+    providerTemplateId: "MODEL_REJECTED_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Sorry, we're unable to add {brand_name} {model_name} at this time. Contact us for more info.",
+    variables: ["brand_name", "model_name"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
+    templateName: "COD OTP - v1",
+    providerTemplateId: "COD_OTP_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Your Skinly COD verification code is {otp}. Valid for 10 minutes. Do not share this code.",
+    variables: ["otp"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
+    templateName: "Out of Stock - v1",
+    providerTemplateId: "OUT_OF_STOCK_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Sorry, {product_name} is currently out of stock. Get notified when it's back: {product_url}",
+    variables: ["product_name", "product_url"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
     templateName: "Payment Failed - v1",
     providerTemplateId: "PAYMENT_FAILED_V1",
     templateType: "transactional" as const,
     templateBody:
       "Hi {customer_name}, your payment for order #{order_number} failed. Please try again or contact support. Amount: {order_total}",
     variables: ["customer_name", "order_number", "order_total", "payment_method"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
+    templateName: "Admin New Order - v1",
+    providerTemplateId: "ADMIN_NEW_ORDER_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "🔔 NEW ORDER #{order_number}\nAmount: {order_amount}\nPayment: {payment_type}\nProducts: {products}\nCity: {city}\n{coupon_code}",
+    variables: ["order_number", "order_amount", "payment_type", "products", "city", "coupon_code"],
     language: "en",
     status: "active" as const,
   },

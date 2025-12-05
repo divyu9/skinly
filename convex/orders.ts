@@ -183,6 +183,72 @@ export const createOrder = mutation({
       // Don't fail order creation if WhatsApp fails
     }
 
+    // Send admin notification
+    try {
+      // Get admin notification settings
+      const adminSettings = await ctx.db
+        .query("settings")
+        .withIndex("by_key", (q) => q.eq("key", "whatsapp_admin_notifications"))
+        .unique();
+
+      if (adminSettings) {
+        const config = typeof adminSettings.value === "string"
+          ? JSON.parse(adminSettings.value)
+          : adminSettings.value;
+
+        if (config.enabled && config.adminPhone) {
+          // Format products list
+          const productsList = cartItems
+            .map((item) => {
+              const coverage = item.coverage === "full_body_wrap" 
+                ? "Full Body" 
+                : item.coverage === "only_back" 
+                  ? "Only Back" 
+                  : "";
+              const model = item.phoneModel || item.phoneBrand || "";
+              const details = coverage && model 
+                ? `${model} - ${coverage}` 
+                : coverage || model;
+              return `${item.productTitle}${details ? ` (${details})` : ""}`;
+            })
+            .join(", ");
+
+          // Format payment type
+          let paymentType = args.paymentMethod.toUpperCase();
+          if (args.paymentMethod === "cod") {
+            if (args.prepaidAmount && args.prepaidAmount > 0) {
+              paymentType = "Partial COD";
+            } else {
+              paymentType = "COD";
+            }
+          } else if (args.paymentMethod === "phonepe") {
+            paymentType = "PhonePe";
+          }
+
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "admin_new_order",
+              recipientPhone: config.adminPhone,
+              variables: {
+                order_number: orderNumber,
+                order_amount: `₹${total.toFixed(2)}`,
+                payment_type: paymentType,
+                products: productsList,
+                city: args.shippingAddress.city,
+                coupon_code: "", // TODO: Add coupon support
+              },
+              priority: 9, // High priority for admin notifications
+            }
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Failed to queue admin WhatsApp notification:", error);
+      // Don't fail order creation if admin WhatsApp fails
+    }
+
     return { orderId, orderNumber };
   },
 });

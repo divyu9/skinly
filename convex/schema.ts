@@ -594,4 +594,32 @@ export default defineSchema({
     .index("by_provider_message_id", ["providerMessageId"])
     .index("by_phone", ["phoneNumber"])
     .index("by_processed_at", ["processedAt"]),
+
+  // COD OTP Verification
+  codOtps: defineTable({
+    phoneNumber: v.string(), // Phone number to verify
+    otp: v.string(), // 6-digit OTP
+    orderId: v.optional(v.string()), // Temporary order ID (before creation)
+    verified: v.boolean(), // Whether OTP was successfully verified
+    attempts: v.number(), // Verification attempts made
+    expiresAt: v.number(), // Expiry timestamp (10 minutes from generation)
+    createdAt: v.number(), // When OTP was generated
+    verifiedAt: v.optional(v.number()), // When OTP was verified
+  })
+    .index("by_phone", ["phoneNumber"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  // Login OTP Verification
+  loginOtps: defineTable({
+    phoneNumber: v.string(), // Phone number for login
+    otp: v.string(), // 6-digit OTP
+    verified: v.boolean(), // Whether OTP was successfully verified
+    attempts: v.number(), // Verification attempts made
+    expiresAt: v.number(), // Expiry timestamp (10 minutes from generation)
+    createdAt: v.number(), // When OTP was generated
+    verifiedAt: v.optional(v.number()), // When OTP was verified
+    userId: v.optional(v.id("users")), // User ID if authenticated after verification
+  })
+    .index("by_phone", ["phoneNumber"])
+    .index("by_expires_at", ["expiresAt"]),
 });

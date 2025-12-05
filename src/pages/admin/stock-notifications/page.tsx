@@ -24,7 +24,7 @@ import {
 
 function AdminStockNotificationsPageInner() {
   const stats = useQuery(api.stockNotifications.getNotificationStats, {});
-  const sendNotifications = useAction(api.stockNotificationsActions.sendRestockNotifications);
+  const sendNotifications = useMutation(api.stockNotificationsActions.sendRestockNotifications);
   const [sendingFor, setSendingFor] = useState<Id<"variants"> | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [selectedVariant, setSelectedVariant] = useState<{

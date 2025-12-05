@@ -28,6 +28,7 @@ import {
 import { AdminHeader } from "@/components/admin-header.tsx";
 import { TemplateManager } from "./_components/template-manager.tsx";
 import { ProviderSettings } from "./_components/provider-settings.tsx";
+import { AdminNotifications } from "./_components/admin-notifications.tsx";
 
 export default function WhatsAppAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -168,6 +169,9 @@ export default function WhatsAppAdminPage() {
       <div className="container mx-auto max-w-6xl space-y-6 p-6">
         {/* Provider Settings */}
         <ProviderSettings />
+
+        {/* Admin Notifications */}
+        <AdminNotifications />
 
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

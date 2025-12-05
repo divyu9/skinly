@@ -569,3 +569,83 @@ export const deleteTemplate = mutation({
     return { success: true };
   },
 });
+
+// ============================================================================
+// ADMIN NOTIFICATION SETTINGS
+// ============================================================================
+
+export const getAdminNotificationSettings = query({
+  args: {},
+  handler: async (ctx) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const setting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "whatsapp_admin_notifications"))
+      .unique();
+
+    if (!setting) {
+      return {
+        enabled: false,
+        adminPhone: "",
+      };
+    }
+
+    // Parse the JSON value
+    return typeof setting.value === "string"
+      ? JSON.parse(setting.value)
+      : setting.value;
+  },
+});
+
+export const saveAdminNotificationSettings = mutation({
+  args: {
+    enabled: v.boolean(),
+    adminPhone: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const config = {
+      enabled: args.enabled,
+      adminPhone: args.adminPhone,
+      lastUpdatedAt: Date.now(),
+      lastUpdatedBy: identity.email ?? "unknown",
+    };
+
+    // Check if setting exists
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "whatsapp_admin_notifications"))
+      .unique();
+
+    if (existing) {
+      // Update existing
+      await ctx.db.patch(existing._id, {
+        value: JSON.stringify(config),
+      });
+    } else {
+      // Create new
+      await ctx.db.insert("settings", {
+        key: "whatsapp_admin_notifications",
+        value: JSON.stringify(config),
+      });
+    }
+
+    return { success: true };
+  },
+});
