@@ -253,6 +253,36 @@ export const getApprovedTemplates = query({
   },
 });
 
+// Get all templates with full data including IDs (for management)
+export const getAllTemplates = query({
+  args: {},
+  handler: async (ctx) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Get all templates (active and inactive)
+    const templates = await ctx.db.query("whApprovedTemplates").collect();
+
+    return templates.map((template) => ({
+      _id: template._id,
+      templateName: template.templateName,
+      providerTemplateId: template.providerTemplateId,
+      type: template.templateType,
+      templateBody: template.templateBody ?? null,
+      variables: template.variables ?? [],
+      language: template.language ?? "en",
+      status: template.status,
+      approvedAt: template.approvedAt ?? null,
+    }));
+  },
+});
+
 // ============================================================================
 // GET AUDIT HISTORY FOR A USE-CASE
 // ============================================================================

@@ -26,6 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog.tsx";
 import { AdminHeader } from "@/components/admin-header.tsx";
+import { TemplateManager } from "./_components/template-manager.tsx";
 
 export default function WhatsAppAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -184,10 +185,13 @@ export default function WhatsAppAdminPage() {
               </div>
             )}
           </div>
-          <Button onClick={handleSeedData} disabled={isSeeding} variant="outline">
-            <Database className="mr-2 h-4 w-4" />
-            {isSeeding ? "Seeding..." : "Seed Data"}
-          </Button>
+          <div className="flex gap-2">
+            <TemplateManager />
+            <Button onClick={handleSeedData} disabled={isSeeding} variant="outline">
+              <Database className="mr-2 h-4 w-4" />
+              {isSeeding ? "Seeding..." : "Seed Data"}
+            </Button>
+          </div>
         </div>
 
         {/* Controls */}
