@@ -1,8 +1,10 @@
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -10,20 +12,74 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import { useState } from "react";
+import { toast } from "sonner";
 import {
   UserIcon,
   MailIcon,
   ShoppingBagIcon,
   LogOutIcon,
   PackageIcon,
+  SmartphoneIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
 
 function AccountPageInner() {
   const { signoutRedirect } = useAuth();
   const currentUser = useQuery(api.users.getCurrentUser);
   const recentOrders = useQuery(api.orders.getOrders, { limit: 5 }) as Doc<"orders">[] | undefined;
+  const phoneVerificationStatus = useQuery(api.loginOtp.checkPhoneVerified);
+  const generateLoginOtp = useMutation(api.loginOtp.generateLoginOtp);
+  const verifyLoginOtp = useMutation(api.loginOtp.verifyLoginOtp);
 
-  if (currentUser === undefined || recentOrders === undefined) {
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+
+  const handleSendOtp = async () => {
+    if (!phoneNumber.trim()) {
+      toast.error("Please enter your phone number");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      await generateLoginOtp({ phoneNumber });
+      setOtpSent(true);
+      toast.success("OTP sent to your WhatsApp");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send OTP");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpInput.trim()) {
+      toast.error("Please enter the OTP");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      await verifyLoginOtp({
+        phoneNumber,
+        otp: otpInput,
+      });
+      toast.success("Phone number verified successfully!");
+      setOtpSent(false);
+      setOtpInput("");
+      setPhoneNumber("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Invalid OTP");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="space-y-6">
@@ -73,6 +129,101 @@ function AccountPageInner() {
               Sign Out
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Phone Verification */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <SmartphoneIcon className="size-5" />
+            Phone Verification
+          </CardTitle>
+          <CardDescription>
+            Verify your phone number to receive order updates via WhatsApp
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {phoneVerificationStatus.verified ? (
+            <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <ShieldCheckIcon className="size-5 text-green-600" />
+              <div>
+                <p className="font-medium text-green-900 dark:text-green-100">
+                  Phone Number Verified
+                </p>
+                <p className="text-sm text-green-700 dark:text-green-300">
+                  {phoneVerificationStatus.phoneNumber}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Verify your phone number to enable WhatsApp notifications for your orders
+              </p>
+              
+              {!otpSent ? (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="phone-verify">Phone Number</Label>
+                    <Input
+                      id="phone-verify"
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSendOtp}
+                    disabled={!phoneNumber || isSendingOtp}
+                    className="w-full"
+                  >
+                    {isSendingOtp ? "Sending OTP..." : "Send OTP to WhatsApp"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <ShieldCheckIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                    <p className="text-sm text-green-900 dark:text-green-100">
+                      OTP sent to {phoneNumber}. Check your WhatsApp.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="otp-verify">Enter OTP</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="otp-verify"
+                        type="text"
+                        maxLength={6}
+                        placeholder="Enter 6-digit OTP"
+                        value={otpInput}
+                        onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
+                      />
+                      <Button
+                        onClick={handleVerifyOtp}
+                        disabled={otpInput.length !== 6 || isVerifyingOtp}
+                      >
+                        {isVerifyingOtp ? "Verifying..." : "Verify"}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSendOtp}
+                    disabled={isSendingOtp}
+                    className="w-full"
+                  >
+                    {isSendingOtp ? "Resending..." : "Resend OTP"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

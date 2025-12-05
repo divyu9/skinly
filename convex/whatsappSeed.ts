@@ -320,6 +320,16 @@ const SAMPLE_TEMPLATES = [
     status: "active" as const,
   },
   {
+    templateName: "Login OTP - v1",
+    providerTemplateId: "LOGIN_OTP_V1",
+    templateType: "transactional" as const,
+    templateBody:
+      "Your Skinly verification code is {otp}. Valid for 10 minutes. Do not share this code with anyone.",
+    variables: ["otp"],
+    language: "en",
+    status: "active" as const,
+  },
+  {
     templateName: "Out of Stock - v1",
     providerTemplateId: "OUT_OF_STOCK_V1",
     templateType: "transactional" as const,

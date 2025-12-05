@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -23,7 +23,15 @@ function CheckoutPageInner() {
   const cartItems = useQuery(api.cart.getCart);
   const createOrder = useMutation(api.orders.createOrder);
   const initiatePayment = useAction(api.phonepe.initiatePayment);
+  const generateCodOtp = useMutation(api.codOtp.generateCodOtp);
+  const verifyCodOtp = useMutation(api.codOtp.verifyCodOtp);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -35,6 +43,28 @@ function CheckoutPageInner() {
     pincode: "",
     paymentMethod: "phonepe",
   });
+
+  // Reset OTP state when payment method changes away from COD
+  const handlePaymentMethodChange = (value: string) => {
+    setFormData({ ...formData, paymentMethod: value });
+    if (value !== "cod") {
+      setOtpSent(false);
+      setOtpVerified(false);
+      setOtpInput("");
+      setOtpExpiresAt(null);
+    }
+  };
+
+  // Reset OTP state when phone number changes
+  const handlePhoneChange = (value: string) => {
+    setFormData({ ...formData, phone: value });
+    if (otpVerified || otpSent) {
+      setOtpSent(false);
+      setOtpVerified(false);
+      setOtpInput("");
+      setOtpExpiresAt(null);
+    }
+  };
 
   // Calculate totals and GST (before early returns)
   const subtotal = cartItems ? cartItems.reduce(
@@ -105,8 +135,57 @@ function CheckoutPageInner() {
     );
   }
 
+  const handleSendOtp = async () => {
+    if (!formData.phone.trim()) {
+      toast.error("Please enter your phone number first");
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const result = await generateCodOtp({
+        phoneNumber: formData.phone,
+      });
+      setOtpSent(true);
+      setOtpExpiresAt(result.expiresAt);
+      toast.success("OTP sent to your WhatsApp");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send OTP");
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otpInput.trim()) {
+      toast.error("Please enter the OTP");
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
+      await verifyCodOtp({
+        phoneNumber: formData.phone,
+        otp: otpInput,
+      });
+      setOtpVerified(true);
+      toast.success("Phone number verified successfully!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Invalid OTP");
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check COD OTP verification
+    if (formData.paymentMethod === "cod" && !otpVerified) {
+      toast.error("Please verify your phone number with OTP before placing a COD order");
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
@@ -243,10 +322,14 @@ function CheckoutPageInner() {
                       required
                       placeholder="+91 98765 43210"
                       value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      disabled={otpVerified}
                     />
+                    {otpVerified && (
+                      <p className="text-xs text-green-600 mt-1">
+                        ✓ Verified for COD orders
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -328,9 +411,7 @@ function CheckoutPageInner() {
                 <CardContent className="space-y-3">
                   <RadioGroup
                     value={formData.paymentMethod}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, paymentMethod: value })
-                    }
+                    onValueChange={handlePaymentMethodChange}
                   >
                     <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                       <RadioGroupItem value="phonepe" id="phonepe" />
@@ -397,6 +478,91 @@ function CheckoutPageInner() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* COD Phone Verification */}
+              {formData.paymentMethod === "cod" && codAvailability?.available && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ShieldCheckIcon className="size-5" />
+                      Verify Your Phone Number
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {!otpVerified ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          For COD orders, we need to verify your phone number. An OTP will be sent to your WhatsApp.
+                        </p>
+                        
+                        {!otpSent ? (
+                          <Button
+                            type="button"
+                            onClick={handleSendOtp}
+                            disabled={!formData.phone || isSendingOtp}
+                            className="w-full"
+                          >
+                            {isSendingOtp ? "Sending OTP..." : "Send OTP to WhatsApp"}
+                          </Button>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                              <ShieldCheckIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                              <p className="text-sm text-green-900 dark:text-green-100">
+                                OTP sent to {formData.phone}. Check your WhatsApp.
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="otp">Enter OTP</Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="otp"
+                                  type="text"
+                                  maxLength={6}
+                                  placeholder="Enter 6-digit OTP"
+                                  value={otpInput}
+                                  onChange={(e) => setOtpInput(e.target.value.replace(/\D/g, ""))}
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={handleVerifyOtp}
+                                  disabled={otpInput.length !== 6 || isVerifyingOtp}
+                                >
+                                  {isVerifyingOtp ? "Verifying..." : "Verify"}
+                                </Button>
+                              </div>
+                            </div>
+                            
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleSendOtp}
+                              disabled={isSendingOtp}
+                              className="w-full"
+                            >
+                              {isSendingOtp ? "Resending..." : "Resend OTP"}
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                        <ShieldCheckIcon className="size-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-900 dark:text-green-100">
+                            Phone Number Verified
+                          </p>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            {formData.phone}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <Button
                 type="submit"
