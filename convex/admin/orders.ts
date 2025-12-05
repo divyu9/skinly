@@ -227,7 +227,7 @@ export const updateOrderStatus = mutation({
             }
           );
         } else if (args.status === "delivered") {
-          // Order delivered
+          // Order delivered - send delivery confirmation
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
@@ -241,6 +241,40 @@ export const updateOrderStatus = mutation({
                 order_total: `₹${order.total.toFixed(2)}`,
               },
               priority: 7,
+            }
+          );
+
+          // Send review request after 2 hours (7200000 ms)
+          await ctx.scheduler.runAfter(
+            7200000,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "review_request",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber,
+                product_name: order.items[0]?.productTitle || "your order",
+              },
+              priority: 5,
+            }
+          );
+
+          // Send review reminder after 7 days (604800000 ms)
+          await ctx.scheduler.runAfter(
+            604800000,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "review_reminder",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                product_name: order.items[0]?.productTitle || "your product",
+                order_number: order.orderNumber,
+              },
+              priority: 3, // Lower priority for reminders
             }
           );
         } else if (args.status === "cancelled") {
