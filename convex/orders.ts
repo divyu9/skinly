@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { calculateGST } from "./gst";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 // Create a new order
 export const createOrder = mutation({
@@ -130,6 +130,32 @@ export const createOrder = mutation({
       await ctx.db.patch(cart._id, {
         status: "recovered",
       });
+    }
+
+    // Send order received WhatsApp notification (for prepaid/partial prepaid orders)
+    // COD orders get notification after payment confirmation
+    if (args.paymentMethod !== "cod" || args.prepaidAmount) {
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          api.whatsappMessaging.queueMessage,
+          {
+            usecaseKey: "order_received",
+            recipientPhone: args.shippingAddress.phone,
+            recipientUserId: user._id,
+            variables: {
+              customer_name: args.shippingAddress.fullName || user.name || "Customer",
+              order_number: orderNumber,
+              order_total: `₹${total.toFixed(2)}`,
+              order_items: cartItems.length.toString(),
+            },
+            priority: 8, // High priority for order confirmations
+          }
+        );
+      } catch (error) {
+        console.error("Failed to queue order received WhatsApp:", error);
+        // Don't fail order creation if WhatsApp fails
+      }
     }
 
     return { orderId, orderNumber };
@@ -312,10 +338,61 @@ export const updatePaymentStatus = mutation({
       }
     }
 
+    const oldPaymentStatus = order.paymentStatus;
+    const newStatus = args.paymentStatus === "success" ? "confirmed" : order.status;
+
     await ctx.db.patch(order._id, {
       paymentStatus: args.paymentStatus,
-      status: args.paymentStatus === "success" ? "confirmed" : order.status,
+      status: newStatus,
     });
+
+    // Send WhatsApp notifications based on payment status change
+    if (oldPaymentStatus !== args.paymentStatus) {
+      try {
+        // Get user info for notification
+        const user = await ctx.db.get(order.userId);
+        
+        if (args.paymentStatus === "success") {
+          // Payment successful - send order received notification
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_received",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber,
+                order_total: `₹${order.total.toFixed(2)}`,
+                order_items: order.items.length.toString(),
+              },
+              priority: 8,
+            }
+          );
+        } else if (args.paymentStatus === "failed") {
+          // Payment failed - send payment failed notification
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "payment_failed",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber,
+                order_total: `₹${order.total.toFixed(2)}`,
+              },
+              priority: 8,
+            }
+          );
+        }
+      } catch (error) {
+        console.error("Failed to queue payment status WhatsApp:", error);
+        // Don't fail payment update if WhatsApp fails
+      }
+    }
 
     return { orderId: order._id };
   },

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import { ConvexError } from "convex/values";
+import { api } from "../_generated/api.js";
 
 // Get all orders for admin (not restricted to current user)
 export const getAllOrders = query({
@@ -123,7 +124,44 @@ export const updateShippingInfo = mutation({
 
     const { orderId, ...updates } = args;
 
+    // Get order before update to check if AWB is new
+    const order = await ctx.db.get(orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const isNewAWB = args.awbNumber && !order.awbNumber;
+
     await ctx.db.patch(orderId, updates);
+
+    // Send order dispatched notification if AWB is added for first time
+    if (isNewAWB && args.awbNumber) {
+      try {
+        const user = await ctx.db.get(order.userId);
+        await ctx.scheduler.runAfter(
+          0,
+          api.whatsappMessaging.queueMessage,
+          {
+            usecaseKey: "order_dispatched",
+            recipientPhone: order.shippingAddress.phone,
+            recipientUserId: order.userId,
+            variables: {
+              customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+              order_number: order.orderNumber,
+              awb_number: args.awbNumber,
+              courier_name: args.courierName || "courier partner",
+              tracking_url: args.trackingUrl || "",
+            },
+            priority: 8,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to queue order dispatched WhatsApp:", error);
+      }
+    }
 
     return { success: true };
   },
@@ -151,7 +189,82 @@ export const updateOrderStatus = mutation({
       });
     }
 
+    // Get order before update to check for status change
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const oldStatus = order.status;
+
     await ctx.db.patch(args.orderId, { status: args.status });
+
+    // Send WhatsApp notifications based on status change
+    if (oldStatus !== args.status) {
+      try {
+        const user = await ctx.db.get(order.userId);
+
+        if (args.status === "shipped" && order.awbNumber) {
+          // Order shipped
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_dispatched",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber,
+                awb_number: order.awbNumber,
+                courier_name: order.courierName || "courier partner",
+                tracking_url: order.trackingUrl || "",
+              },
+              priority: 8,
+            }
+          );
+        } else if (args.status === "delivered") {
+          // Order delivered
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_delivered",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber,
+                order_total: `₹${order.total.toFixed(2)}`,
+              },
+              priority: 7,
+            }
+          );
+        } else if (args.status === "cancelled") {
+          // Order cancelled
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_cancelled",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber,
+                order_total: `₹${order.total.toFixed(2)}`,
+              },
+              priority: 8,
+            }
+          );
+        }
+      } catch (error) {
+        console.error("Failed to queue order status WhatsApp:", error);
+      }
+    }
 
     return { success: true };
   },
