@@ -283,3 +283,178 @@ export const getUsecaseAuditHistory = query({
     return audits;
   },
 });
+
+// ============================================================================
+// TEMPLATE MANAGEMENT
+// ============================================================================
+
+// Create a new template
+export const createTemplate = mutation({
+  args: {
+    templateName: v.string(),
+    providerTemplateId: v.string(),
+    templateType: v.union(v.literal("transactional"), v.literal("marketing")),
+    templateBody: v.optional(v.string()),
+    variables: v.optional(v.array(v.string())),
+    language: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Check if provider template ID already exists
+    const existing = await ctx.db
+      .query("whApprovedTemplates")
+      .withIndex("by_provider_id", (q) =>
+        q.eq("providerTemplateId", args.providerTemplateId)
+      )
+      .unique();
+
+    if (existing) {
+      throw new ConvexError({
+        message: `Template with provider ID '${args.providerTemplateId}' already exists`,
+        code: "CONFLICT",
+      });
+    }
+
+    // Create the template
+    const templateId = await ctx.db.insert("whApprovedTemplates", {
+      templateName: args.templateName,
+      providerTemplateId: args.providerTemplateId,
+      templateType: args.templateType,
+      templateBody: args.templateBody,
+      variables: args.variables,
+      language: args.language ?? "en",
+      status: "active",
+      approvedAt: Date.now(),
+    });
+
+    return { id: templateId, success: true };
+  },
+});
+
+// Update an existing template
+export const updateTemplate = mutation({
+  args: {
+    templateId: v.id("whApprovedTemplates"),
+    templateName: v.optional(v.string()),
+    providerTemplateId: v.optional(v.string()),
+    templateType: v.optional(
+      v.union(v.literal("transactional"), v.literal("marketing"))
+    ),
+    templateBody: v.optional(v.string()),
+    variables: v.optional(v.array(v.string())),
+    language: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
+  },
+  handler: async (ctx, args) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Get the template
+    const template = await ctx.db.get(args.templateId);
+    if (!template) {
+      throw new ConvexError({
+        message: "Template not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // If provider template ID is being changed, check for duplicates
+    if (
+      args.providerTemplateId !== undefined &&
+      args.providerTemplateId !== template.providerTemplateId
+    ) {
+      const existing = await ctx.db
+        .query("whApprovedTemplates")
+        .withIndex("by_provider_id", (q) =>
+          q.eq("providerTemplateId", args.providerTemplateId!)
+        )
+        .unique();
+
+      if (existing && existing._id !== args.templateId) {
+        throw new ConvexError({
+          message: `Template with provider ID '${args.providerTemplateId}' already exists`,
+          code: "CONFLICT",
+        });
+      }
+    }
+
+    // Update the template
+    const updates: Partial<Doc<"whApprovedTemplates">> = {};
+
+    if (args.templateName !== undefined) updates.templateName = args.templateName;
+    if (args.providerTemplateId !== undefined)
+      updates.providerTemplateId = args.providerTemplateId;
+    if (args.templateType !== undefined) updates.templateType = args.templateType;
+    if (args.templateBody !== undefined) updates.templateBody = args.templateBody;
+    if (args.variables !== undefined) updates.variables = args.variables;
+    if (args.language !== undefined) updates.language = args.language;
+    if (args.status !== undefined) updates.status = args.status;
+
+    await ctx.db.patch(args.templateId, updates);
+
+    return { success: true };
+  },
+});
+
+// Delete a template
+export const deleteTemplate = mutation({
+  args: {
+    templateId: v.id("whApprovedTemplates"),
+  },
+  handler: async (ctx, args) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Get the template
+    const template = await ctx.db.get(args.templateId);
+    if (!template) {
+      throw new ConvexError({
+        message: "Template not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Check if template is in use by any use-case
+    const usecasesUsingTemplate = await ctx.db
+      .query("whUsecaseTemplates")
+      .filter((q) =>
+        q.eq(q.field("providerTemplateId"), template.providerTemplateId)
+      )
+      .collect();
+
+    if (usecasesUsingTemplate.length > 0) {
+      const usecaseNames = usecasesUsingTemplate
+        .map((uc) => uc.displayName)
+        .join(", ");
+      throw new ConvexError({
+        message: `Cannot delete template. It is currently assigned to: ${usecaseNames}`,
+        code: "CONFLICT",
+      });
+    }
+
+    // Delete the template
+    await ctx.db.delete(args.templateId);
+
+    return { success: true };
+  },
+});
