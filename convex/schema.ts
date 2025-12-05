@@ -475,4 +475,43 @@ export default defineSchema({
     showCodOnPaymentPage: v.optional(v.boolean()), // Show COD option even when not eligible
     allowMixedCartCod: v.optional(v.boolean()), // Allow COD when cart has both eligible and non-eligible items
   }),
+
+  // WhatsApp Use-case Templates
+  whUsecaseTemplates: defineTable({
+    usecaseKey: v.string(), // Unique key (e.g., "order_received", "cod_confirmation")
+    displayName: v.string(), // Friendly name for UI (e.g., "Order Received")
+    enabled: v.boolean(), // ON/OFF toggle
+    templateName: v.optional(v.string()), // Selected template name (e.g., "Order Received - v3")
+    providerTemplateId: v.optional(v.string()), // Provider/HSM ID (e.g., "AUTHKEY_HSM_123")
+    isTransactional: v.boolean(), // Transactional vs marketing
+    requireConsent: v.boolean(), // Whether user consent is required
+    lastUpdatedBy: v.optional(v.string()), // Admin email who made the change
+    lastUpdatedAt: v.optional(v.number()), // Timestamp of last update
+  }).index("by_usecase_key", ["usecaseKey"]),
+
+  // WhatsApp Use-case Audit Trail
+  whUsecaseAudit: defineTable({
+    usecaseKey: v.string(), // Which use-case was changed
+    fieldChanged: v.string(), // "enabled" or "template_name"
+    oldValue: v.optional(v.string()), // Previous value
+    newValue: v.optional(v.string()), // New value
+    changedBy: v.string(), // Admin email
+    changedAt: v.number(), // Timestamp
+  })
+    .index("by_usecase_key", ["usecaseKey"])
+    .index("by_changed_at", ["changedAt"]),
+
+  // WhatsApp Approved Templates
+  whApprovedTemplates: defineTable({
+    templateName: v.string(), // Template name (e.g., "Order Received - v3")
+    providerTemplateId: v.string(), // Provider/HSM ID (e.g., "AUTHKEY_HSM_123")
+    templateType: v.union(v.literal("transactional"), v.literal("marketing")), // Type
+    templateBody: v.optional(v.string()), // Template text with placeholders
+    variables: v.optional(v.array(v.string())), // List of variables in template
+    language: v.optional(v.string()), // Language code (e.g., "en")
+    status: v.union(v.literal("active"), v.literal("inactive")), // Status
+    approvedAt: v.optional(v.number()), // When approved/synced from AUTHKEY
+  })
+    .index("by_provider_id", ["providerTemplateId"])
+    .index("by_status", ["status"]),
 });
