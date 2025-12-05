@@ -514,4 +514,70 @@ export default defineSchema({
   })
     .index("by_provider_id", ["providerTemplateId"])
     .index("by_status", ["status"]),
+
+  // WhatsApp Messages Log
+  whatsappMessages: defineTable({
+    usecaseKey: v.string(), // Which use-case triggered this (e.g., "order_received")
+    recipientPhone: v.string(), // Phone number (cleaned)
+    recipientUserId: v.optional(v.id("users")), // User ID if available
+    providerTemplateId: v.string(), // Template ID used
+    templateName: v.string(), // Template name for reference
+    variables: v.optional(v.object({})), // Variables sent (as JSON object)
+    status: v.union(
+      v.literal("pending"), // Queued for sending
+      v.literal("sent"), // Sent to provider
+      v.literal("delivered"), // Delivered to recipient
+      v.literal("read"), // Read by recipient
+      v.literal("failed") // Failed to send
+    ),
+    providerMessageId: v.optional(v.string()), // Message ID from provider
+    errorMessage: v.optional(v.string()), // Error details if failed
+    retryCount: v.number(), // Number of retry attempts
+    sentAt: v.optional(v.number()), // When sent successfully
+    deliveredAt: v.optional(v.number()), // When delivered
+    readAt: v.optional(v.number()), // When read
+    createdAt: v.number(), // When queued
+  })
+    .index("by_usecase", ["usecaseKey"])
+    .index("by_recipient", ["recipientPhone"])
+    .index("by_status", ["status"])
+    .index("by_user", ["recipientUserId"])
+    .index("by_provider_message_id", ["providerMessageId"])
+    .index("by_created_at", ["createdAt"]),
+
+  // WhatsApp Message Queue (for worker processing)
+  whatsappQueue: defineTable({
+    messageId: v.id("whatsappMessages"), // Reference to message
+    priority: v.number(), // Higher = more urgent (1-10)
+    scheduledFor: v.number(), // When to send (for retry delays)
+    attempts: v.number(), // Number of processing attempts
+    status: v.union(
+      v.literal("pending"), // Waiting to be processed
+      v.literal("processing"), // Currently being processed
+      v.literal("completed"), // Successfully sent
+      v.literal("failed") // Permanently failed (max retries)
+    ),
+    lastAttemptAt: v.optional(v.number()), // Last processing attempt
+    nextRetryAt: v.optional(v.number()), // Next retry time
+    errorMessage: v.optional(v.string()), // Latest error
+  })
+    .index("by_status", ["status"])
+    .index("by_scheduled", ["scheduledFor"])
+    .index("by_message", ["messageId"])
+    .index("by_status_and_scheduled", ["status", "scheduledFor"]),
+
+  // WhatsApp Customer Consent
+  whatsappConsent: defineTable({
+    userId: v.optional(v.id("users")), // User ID if authenticated
+    phoneNumber: v.string(), // Phone number
+    consentType: v.union(
+      v.literal("all"), // All messages
+      v.literal("transactional_only"), // Only transactional
+      v.literal("none") // Opted out
+    ),
+    consentedAt: v.number(), // When consent was given/updated
+    ipAddress: v.optional(v.string()), // IP address for audit
+  })
+    .index("by_user", ["userId"])
+    .index("by_phone", ["phoneNumber"]),
 });

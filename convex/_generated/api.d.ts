@@ -50,7 +50,10 @@ import type * as uploadJobs from "../uploadJobs.js";
 import type * as users from "../users.js";
 import type * as whatsapp from "../whatsapp.js";
 import type * as whatsappActions from "../whatsappActions.js";
+import type * as whatsappMessaging from "../whatsappMessaging.js";
 import type * as whatsappSeed from "../whatsappSeed.js";
+import type * as whatsappWorker from "../whatsappWorker.js";
+import type * as whatsappWorkerInternal from "../whatsappWorkerInternal.js";
 
 import type {
   ApiFromModules,
@@ -101,7 +104,10 @@ declare const fullApi: ApiFromModules<{
   users: typeof users;
   whatsapp: typeof whatsapp;
   whatsappActions: typeof whatsappActions;
+  whatsappMessaging: typeof whatsappMessaging;
   whatsappSeed: typeof whatsappSeed;
+  whatsappWorker: typeof whatsappWorker;
+  whatsappWorkerInternal: typeof whatsappWorkerInternal;
 }>;
 
 /**
