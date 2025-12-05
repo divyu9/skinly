@@ -47,6 +47,11 @@ export default function WhatsAppAdminPage() {
       uc.usecaseKey.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Calculate stats
+  const enabledCount = usecases?.filter((uc) => uc.enabled).length ?? 0;
+  const totalCount = usecases?.length ?? 0;
+  const hasTemplateIssues = usecases?.some((uc) => uc.enabled && !uc.templateName) ?? false;
+
   // Handle toggle change
   const handleToggleChange = async (usecaseKey: string, enabled: boolean) => {
     setUpdatingKeys((prev) => new Set(prev).add(usecaseKey));
@@ -161,11 +166,23 @@ export default function WhatsAppAdminPage() {
       <div className="container mx-auto max-w-6xl space-y-6 p-6">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div className="flex-1">
             <h1 className="text-3xl font-bold">WhatsApp Use-case Toggles</h1>
             <p className="text-muted-foreground">
               Manage WhatsApp notification use-cases and templates
             </p>
+            {usecases && (
+              <div className="mt-2 flex items-center gap-4 text-sm">
+                <span className="text-muted-foreground">
+                  {enabledCount} of {totalCount} enabled
+                </span>
+                {hasTemplateIssues && (
+                  <Badge variant="destructive" className="text-xs">
+                    Missing Templates
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
           <Button onClick={handleSeedData} disabled={isSeeding} variant="outline">
             <Database className="mr-2 h-4 w-4" />
@@ -314,16 +331,21 @@ export default function WhatsAppAdminPage() {
                               key={template.providerTemplateId}
                               value={`${template.templateName}|${template.providerTemplateId}`}
                             >
-                              <div className="flex items-center gap-2">
-                                <span>{template.templateName}</span>
-                                <Badge
-                                  variant={
-                                    template.type === "transactional" ? "secondary" : "outline"
-                                  }
-                                  className="text-xs"
-                                >
-                                  {template.type}
-                                </Badge>
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span>{template.templateName}</span>
+                                  <Badge
+                                    variant={
+                                      template.type === "transactional" ? "secondary" : "outline"
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {template.type}
+                                  </Badge>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {template.providerTemplateId}
+                                </span>
                               </div>
                             </SelectItem>
                           ))}
