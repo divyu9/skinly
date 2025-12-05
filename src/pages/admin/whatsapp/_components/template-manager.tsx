@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -35,7 +35,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
-import { FileText, Plus, Edit, Trash2 } from "lucide-react";
+import { FileText, Plus, Edit, Trash2, Send, CheckCircle2 } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import { VariablesMultiSelect } from "./variables-multi-select.tsx";
 
@@ -54,11 +54,17 @@ export function TemplateManager() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Id<"whApprovedTemplates"> | null>(null);
   const [deleteTemplateId, setDeleteTemplateId] = useState<Id<"whApprovedTemplates"> | null>(null);
+  
+  // Test template state
+  const [testTemplateId, setTestTemplateId] = useState<Id<"whApprovedTemplates"> | null>(null);
+  const [testPhoneNumber, setTestPhoneNumber] = useState("");
+  const [isTesting, setIsTesting] = useState(false);
 
   const templates = useQuery(api.whatsapp.getAllTemplates);
   const createTemplate = useMutation(api.whatsapp.createTemplate);
   const updateTemplate = useMutation(api.whatsapp.updateTemplate);
   const deleteTemplate = useMutation(api.whatsapp.deleteTemplate);
+  const testTemplate = useAction(api.whatsappActions.testTemplate);
 
   const [formData, setFormData] = useState<TemplateFormData>({
     templateName: "",
@@ -172,6 +178,41 @@ export function TemplateManager() {
     }
   };
 
+  // Handle test template
+  const handleTestTemplate = async () => {
+    if (!testTemplateId || !testPhoneNumber) {
+      toast.error("Please enter a phone number");
+      return;
+    }
+
+    setIsTesting(true);
+    try {
+      const result = await testTemplate({
+        templateId: testTemplateId,
+        testPhoneNumber: testPhoneNumber,
+      });
+      
+      toast.success(
+        <div>
+          <p className="font-semibold">Test message sent!</p>
+          <p className="text-sm mt-1">Check your WhatsApp for the message</p>
+        </div>
+      );
+      
+      setTestTemplateId(null);
+      setTestPhoneNumber("");
+    } catch (error) {
+      toast.error(
+        <div>
+          <p className="font-semibold">Test failed</p>
+          <p className="text-sm mt-1">{error instanceof Error ? error.message : "Unknown error"}</p>
+        </div>
+      );
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const templateCount = templates?.length ?? 0;
 
   return (
@@ -241,7 +282,16 @@ export function TemplateManager() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => setTestTemplateId(template._id)}
+                            title="Test template"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleEdit(template)}
+                            title="Edit template"
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
@@ -249,6 +299,7 @@ export function TemplateManager() {
                             variant="ghost"
                             size="icon"
                             onClick={() => setDeleteTemplateId(template._id)}
+                            title="Delete template"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -421,6 +472,85 @@ export function TemplateManager() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Test Template Dialog */}
+      <Dialog open={!!testTemplateId} onOpenChange={(open) => !open && setTestTemplateId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Test Template</DialogTitle>
+            <DialogDescription>
+              Send a test message to verify your template works correctly
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Template info */}
+            {testTemplateId && templates && (
+              <div className="rounded-lg border bg-muted/50 p-3">
+                <p className="text-sm font-medium">
+                  {templates.find((t) => t._id === testTemplateId)?.templateName}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Provider ID: {templates.find((t) => t._id === testTemplateId)?.providerTemplateId}
+                </p>
+                {templates.find((t) => t._id === testTemplateId)?.variables && templates.find((t) => t._id === testTemplateId)!.variables.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {templates.find((t) => t._id === testTemplateId)!.variables.map((variable) => (
+                      <Badge key={variable} variant="outline" className="text-xs">
+                        {`{${variable}}`}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Phone number input */}
+            <div className="space-y-2">
+              <Label htmlFor="testPhone">WhatsApp Phone Number</Label>
+              <Input
+                id="testPhone"
+                type="tel"
+                placeholder="+91 9876543210"
+                value={testPhoneNumber}
+                onChange={(e) => setTestPhoneNumber(e.target.value)}
+                disabled={isTesting}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter your WhatsApp number with country code
+              </p>
+            </div>
+
+            {/* Info message */}
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-900 dark:bg-blue-950">
+              <p className="text-blue-900 dark:text-blue-200">
+                <strong>Note:</strong> Test variables will be filled with sample values automatically.
+                You'll receive the test message on WhatsApp.
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setTestTemplateId(null);
+                  setTestPhoneNumber("");
+                }}
+                disabled={isTesting}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleTestTemplate}
+                disabled={isTesting || !testPhoneNumber}
+              >
+                {isTesting ? "Sending..." : "Send Test Message"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

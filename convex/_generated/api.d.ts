@@ -49,6 +49,7 @@ import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as uploadJobs from "../uploadJobs.js";
 import type * as users from "../users.js";
 import type * as whatsapp from "../whatsapp.js";
+import type * as whatsappActions from "../whatsappActions.js";
 import type * as whatsappSeed from "../whatsappSeed.js";
 
 import type {
@@ -99,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   uploadJobs: typeof uploadJobs;
   users: typeof users;
   whatsapp: typeof whatsapp;
+  whatsappActions: typeof whatsappActions;
   whatsappSeed: typeof whatsappSeed;
 }>;
 
