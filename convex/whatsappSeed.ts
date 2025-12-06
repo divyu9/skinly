@@ -314,7 +314,7 @@ const SAMPLE_TEMPLATES = [
     providerTemplateId: "COD_OTP_V1",
     templateType: "authentication" as const,
     templateBody:
-      "Your Skinly COD verification code is {otp}. Valid for 10 minutes. Do not share this code.",
+      "Your Skinly COD verification code is {{1}}. Valid for 10 minutes. Do not share this code.",
     variables: ["otp"],
     language: "en",
     status: "active" as const,
@@ -324,7 +324,7 @@ const SAMPLE_TEMPLATES = [
     providerTemplateId: "LOGIN_OTP_V1",
     templateType: "authentication" as const,
     templateBody:
-      "Your Skinly verification code is {otp}. Valid for 10 minutes. Do not share this code with anyone.",
+      "Your Skinly verification code is {{1}}. Valid for 10 minutes. Do not share this code with anyone.",
     variables: ["otp"],
     language: "en",
     status: "active" as const,
