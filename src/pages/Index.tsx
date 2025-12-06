@@ -1213,7 +1213,7 @@ export default function Index() {
                 </li>
                 <li>
                   <Link to="/orders" className="text-muted-foreground hover:text-primary transition-colors">
-                    Returns
+                    Returns & Refund Policy
                   </Link>
                 </li>
               </ul>

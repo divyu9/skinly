@@ -28,6 +28,26 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
 
   const menuItems = [
     {
+      label: "Home",
+      icon: LayoutGridIcon,
+      href: "/",
+    },
+    {
+      label: "Shop",
+      icon: PackageIcon,
+      href: "/products",
+    },
+    {
+      label: "Devices",
+      icon: ListIcon,
+      href: "/devices",
+    },
+    {
+      label: "My Orders",
+      icon: ShoppingBagIcon,
+      href: "/orders",
+    },
+    {
       label: "Gadget Selector",
       icon: LayoutGridIcon,
       onClick: () => {
@@ -42,21 +62,6 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
         setOpen(false);
         onPhoneSelectorClick?.();
       },
-    },
-    {
-      label: "All Products",
-      icon: PackageIcon,
-      href: "/products",
-    },
-    {
-      label: "Devices",
-      icon: ListIcon,
-      href: "/devices",
-    },
-    {
-      label: "My Orders",
-      icon: ShoppingBagIcon,
-      href: "/orders",
     },
     {
       label: "My Account",
