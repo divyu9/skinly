@@ -1,4 +1,6 @@
 import { AdminSidebar } from "./admin-sidebar.tsx";
+import { useSidebar } from "./admin-sidebar-context.tsx";
+import { cn } from "@/lib/utils.ts";
 import type { ReactNode } from "react";
 
 interface AdminLayoutProps {
@@ -6,10 +8,15 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children }: AdminLayoutProps) {
+  const { collapsed } = useSidebar();
+
   return (
     <div className="flex min-h-screen">
       <AdminSidebar />
-      <main className="flex-1 ml-64 transition-all duration-300">
+      <main className={cn(
+        "flex-1 transition-all duration-300",
+        collapsed ? "ml-16" : "ml-64"
+      )}>
         <div className="container mx-auto p-6">
           {children}
         </div>

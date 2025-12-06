@@ -21,11 +21,11 @@ import {
   ChevronRight,
   Home,
 } from "lucide-react";
-import { useState } from "react";
+import { useSidebar } from "./admin-sidebar-context.tsx";
 
 export function AdminSidebar() {
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useSidebar();
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
