@@ -120,8 +120,20 @@ export default function Index() {
     isActive: true 
   });
   
-  // Fetch all unique brand names (optimized query)
-  const allBrands = useQuery(api.supportedModels.getBrandsList);
+  // Extract brands from already-loaded data (workaround for query issues)
+  const allBrands = useMemo(() => {
+    // Try allSupportedModels first (has all categories)
+    if (allSupportedModels && allSupportedModels.length > 0) {
+      const brandSet = new Set(allSupportedModels.map(m => m.brandName));
+      return Array.from(brandSet).sort();
+    }
+    // Fallback to phone brands if allSupportedModels isn't ready
+    if (phoneModelsFromDb && phoneModelsFromDb.length > 0) {
+      const brandSet = new Set(phoneModelsFromDb.map(m => m.brandName));
+      return Array.from(brandSet).sort();
+    }
+    return undefined;
+  }, [allSupportedModels, phoneModelsFromDb]);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
