@@ -121,7 +121,7 @@ export default function Index() {
   });
   
   // Fetch all existing brands for the request form dropdown
-  const allBrands = useQuery(api.supportedModels.getBrands, {});
+  const allBrands = useQuery(api.supportedModels.getBrands);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
