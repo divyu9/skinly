@@ -16,7 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
-import { Search, Power, PowerOff, AlertTriangle, Database, HelpCircle, MessageSquareIcon } from "lucide-react";
+import { Search, Power, PowerOff, AlertTriangle, Database, HelpCircle, MessageSquareIcon, RefreshCw } from "lucide-react";
 import { Authenticated } from "convex/react";
 import {
   Dialog,
@@ -36,6 +36,7 @@ import { VariableMapper } from "./_components/variable-mapper.tsx";
 export default function WhatsAppAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSeeding, setIsSeeding] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [updatingKeys, setUpdatingKeys] = useState<Set<string>>(new Set());
 
   const usecases = useQuery(api.whatsapp.getAllUsecases);
@@ -45,6 +46,7 @@ export default function WhatsAppAdminPage() {
   const seedUsecases = useMutation(api.whatsappSeed.seedUsecases);
   const seedTemplates = useMutation(api.whatsappSeed.seedTemplates);
   const checkSeeded = useMutation(api.whatsappSeed.checkSeeded);
+  const syncTemplateLinks = useMutation(api.whatsapp.syncTemplateLinks);
 
   // Filter use-cases by search query
   const filteredUsecases = usecases?.filter(
@@ -158,6 +160,19 @@ export default function WhatsAppAdminPage() {
     }
   };
 
+  // Handle sync template links
+  const handleSyncTemplateLinks = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncTemplateLinks({});
+      toast.success(result.message);
+    } catch (error) {
+      toast.error(`Failed to sync: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   if (usecases === undefined || templates === undefined) {
     return (
       <div className="container mx-auto max-w-6xl space-y-6 p-6">
@@ -215,6 +230,10 @@ export default function WhatsAppAdminPage() {
             <Button onClick={handleSeedData} disabled={isSeeding} variant="outline">
               <Database className="mr-2 h-4 w-4" />
               {isSeeding ? "Seeding..." : "Seed Data"}
+            </Button>
+            <Button onClick={handleSyncTemplateLinks} disabled={isSyncing} variant="outline">
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {isSyncing ? "Syncing..." : "Sync Links"}
             </Button>
           </div>
         </div>
@@ -384,12 +403,10 @@ export default function WhatsAppAdminPage() {
                             ))}
                           </SelectContent>
                         </Select>
-                        {usecase.templateName && (
-                          <VariableMapper
-                            usecaseKey={usecase.usecaseKey}
-                            usecaseName={usecase.displayName}
-                          />
-                        )}
+                        <VariableMapper
+                          usecaseKey={usecase.usecaseKey}
+                          usecaseName={usecase.displayName}
+                        />
                       </div>
                     </div>
 

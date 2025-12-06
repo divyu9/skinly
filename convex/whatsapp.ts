@@ -662,6 +662,12 @@ export const getUsecaseWithTemplate = query({
     let template = null;
     if (usecase.templateId) {
       template = await ctx.db.get(usecase.templateId);
+    } else if (usecase.providerTemplateId) {
+      // Fallback: look up by providerTemplateId if templateId is missing
+      template = await ctx.db
+        .query("whApprovedTemplates")
+        .withIndex("by_provider_id", (q) => q.eq("providerTemplateId", usecase.providerTemplateId!))
+        .first();
     }
 
     return {
@@ -680,6 +686,72 @@ export const getUsecaseWithTemplate = query({
         templateBody: template.templateBody,
         variables: template.variables,
       } : null,
+    };
+  },
+});
+
+// ============================================================================
+// SYNC TEMPLATE IDS (Fix for existing data)
+// ============================================================================
+
+export const syncTemplateLinks = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    let fixed = 0;
+    let skipped = 0;
+    let notFound = 0;
+
+    // Get all use cases
+    const usecases = await ctx.db.query("whUsecaseTemplates").collect();
+
+    for (const usecase of usecases) {
+      // Skip if templateId is already set
+      if (usecase.templateId) {
+        skipped++;
+        continue;
+      }
+
+      // Skip if no providerTemplateId
+      if (!usecase.providerTemplateId) {
+        skipped++;
+        continue;
+      }
+
+      // Look up template by providerTemplateId
+      const template = await ctx.db
+        .query("whApprovedTemplates")
+        .withIndex("by_provider_id", (q) => q.eq("providerTemplateId", usecase.providerTemplateId!))
+        .first();
+
+      if (template) {
+        // Update the use case with the template ID
+        await ctx.db.patch(usecase._id, {
+          templateId: template._id,
+          lastUpdatedBy: identity.email ?? "system",
+          lastUpdatedAt: Date.now(),
+        });
+        fixed++;
+      } else {
+        notFound++;
+      }
+    }
+
+    return {
+      success: true,
+      fixed,
+      skipped,
+      notFound,
+      total: usecases.length,
+      message: `Synced ${fixed} template links, skipped ${skipped}, ${notFound} templates not found`,
     };
   },
 });

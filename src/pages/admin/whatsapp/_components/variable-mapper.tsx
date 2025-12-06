@@ -163,18 +163,35 @@ export function VariableMapper({ usecaseKey, usecaseName }: VariableMapperProps)
             <Skeleton className="h-20 w-full" />
           </div>
         ) : !usecaseData.template ? (
-          <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-              <div>
-                <p className="font-medium text-orange-900 dark:text-orange-200">
-                  No Template Selected
-                </p>
-                <p className="text-sm text-orange-700 dark:text-orange-300">
-                  Please select a template for this use case first before configuring variables.
-                </p>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                <div className="flex-1">
+                  <p className="font-medium text-orange-900 dark:text-orange-200">
+                    No Template Selected
+                  </p>
+                  <p className="text-sm text-orange-700 dark:text-orange-300">
+                    Please select a template from the dropdown on the main page before configuring variables.
+                  </p>
+                </div>
               </div>
             </div>
+            {usecaseData.usecase.providerTemplateId && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <div className="flex-1">
+                    <p className="font-medium text-blue-900 dark:text-blue-200">
+                      Template Link Issue
+                    </p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      This use case has a template ID ({usecaseData.usecase.providerTemplateId}) but the template couldn't be loaded. Try clicking the "Sync Links" button on the main page to fix this.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
