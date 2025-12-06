@@ -26,12 +26,32 @@ export const testTemplate = action({
 
     // Get the template
     const template = await ctx.runQuery(api.whatsapp.getAllTemplates, {});
+    console.log("Found templates:", template.length);
+    
     const templateData = template.find((t: { _id: string }) => t._id === args.templateId);
+    console.log("Template data:", templateData);
 
     if (!templateData) {
       throw new ConvexError({
         message: "Template not found",
         code: "NOT_FOUND",
+      });
+    }
+
+    // Verify required fields exist
+    if (!templateData.providerTemplateId || typeof templateData.providerTemplateId !== 'string') {
+      console.error("Invalid providerTemplateId:", templateData.providerTemplateId);
+      throw new ConvexError({
+        message: "Template is missing provider template ID",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    if (!templateData.templateName || typeof templateData.templateName !== 'string') {
+      console.error("Invalid templateName:", templateData.templateName);
+      throw new ConvexError({
+        message: "Template is missing template name",
+        code: "BAD_REQUEST",
       });
     }
 
@@ -50,7 +70,7 @@ export const testTemplate = action({
 
     // Build test variable values
     const testVariables: Record<string, string> = {};
-    if (templateData.variables && templateData.variables.length > 0) {
+    if (templateData.variables && Array.isArray(templateData.variables) && templateData.variables.length > 0) {
       templateData.variables.forEach((varName: string, index: number) => {
         // Provide sensible test values for common variable names
         if (varName.toLowerCase().includes("name")) {
@@ -70,6 +90,13 @@ export const testTemplate = action({
         }
       });
     }
+
+    console.log("Queueing test message with:", {
+      recipientPhone: args.testPhoneNumber,
+      providerTemplateId: templateData.providerTemplateId,
+      templateName: templateData.templateName,
+      variableCount: Object.keys(testVariables).length,
+    });
 
     // Queue the test message through the proper system
     const result: {
