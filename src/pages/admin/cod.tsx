@@ -39,20 +39,11 @@ import {
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 export default function AdminCOD() {
-  const settings = useQuery(api.cod.getCodSettings, {});
-  const updateSettings = useMutation(api.cod.updateCodSettings);
-  const initializeSettings = useMutation(api.cod.initializeCodSettings);
-  const updateDisplaySettings = useMutation(api.codDisplayRules.updateDisplaySettings);
-  
-  const products = useQuery(api.products.getAllProducts, {});
-  const collections = useQuery(api.collections.getAllCollections, {});
-  const variants = useQuery(api.products.getAllVariants, {});
-
-  // Form state
+  // Form state - declare before queries that depend on them
   const [enabled, setEnabled] = useState(false);
   const [matchMode, setMatchMode] = useState<"ALL" | "ANY">("ALL");
   
-  // Conditions
+  // Conditions - declare before queries that depend on them
   const [productIdsEnabled, setProductIdsEnabled] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   
@@ -61,6 +52,27 @@ export default function AdminCOD() {
   
   const [variantIdsEnabled, setVariantIdsEnabled] = useState(false);
   const [selectedVariantIds, setSelectedVariantIds] = useState<string[]>([]);
+
+  const settings = useQuery(api.cod.getCodSettings, {});
+  const updateSettings = useMutation(api.cod.updateCodSettings);
+  const initializeSettings = useMutation(api.cod.initializeCodSettings);
+  const updateDisplaySettings = useMutation(api.codDisplayRules.updateDisplaySettings);
+  
+  // Only load products when product filter is enabled (lazy loading)
+  const products = useQuery(
+    api.products.getAllProductsBasic, 
+    productIdsEnabled ? {} : "skip"
+  );
+  // Only load collections when collection filter is enabled (lazy loading)
+  const collections = useQuery(
+    api.collections.getAllCollections, 
+    collectionIdsEnabled ? {} : "skip"
+  );
+  // Only load variants when variant filter is enabled (lazy loading)
+  const variants = useQuery(
+    api.products.getAllVariants, 
+    variantIdsEnabled ? {} : "skip"
+  );
   
   const [minOrderAmountEnabled, setMinOrderAmountEnabled] = useState(false);
   const [minOrderAmount, setMinOrderAmount] = useState(0);
@@ -102,23 +114,23 @@ export default function AdminCOD() {
   const [collectionSearchTerm, setCollectionSearchTerm] = useState("");
   const [variantSearchTerm, setVariantSearchTerm] = useState("");
 
-  // Filtered lists
+  // Filtered lists - handle undefined during lazy loading
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
+    if (!products || products === undefined) return [];
     if (!productSearchTerm) return products;
     const term = productSearchTerm.toLowerCase();
     return products.filter((p) => p.title.toLowerCase().includes(term));
   }, [products, productSearchTerm]);
 
   const filteredCollections = useMemo(() => {
-    if (!collections) return [];
+    if (!collections || collections === undefined) return [];
     if (!collectionSearchTerm) return collections;
     const term = collectionSearchTerm.toLowerCase();
     return collections.filter((c) => c.name.toLowerCase().includes(term));
   }, [collections, collectionSearchTerm]);
 
   const filteredVariants = useMemo(() => {
-    if (!variants) return [];
+    if (!variants || variants === undefined) return [];
     if (!variantSearchTerm) return variants;
     const term = variantSearchTerm.toLowerCase();
     return variants.filter((v) => 
@@ -219,7 +231,8 @@ export default function AdminCOD() {
     maxProductCountEnabled,
   ].filter(Boolean).length;
 
-  if (settings === undefined || products === undefined || collections === undefined || variants === undefined) {
+  // Only block rendering on settings - products/collections/variants load lazily
+  if (settings === undefined) {
     return (
       <AdminLayout>
         <div className="space-y-6">
@@ -406,14 +419,18 @@ export default function AdminCOD() {
                 </div>
                 {productIdsEnabled && (
                   <div className="ml-6 space-y-3">
-                    <Input
-                      type="text"
-                      placeholder="Search products..."
-                      value={productSearchTerm}
-                      onChange={(e) => setProductSearchTerm(e.target.value)}
-                      className="w-full"
-                    />
-                    {filteredProducts.length > 0 && (
+                    {products === undefined ? (
+                      <Skeleton className="h-32 w-full" />
+                    ) : (
+                      <>
+                        <Input
+                          type="text"
+                          placeholder="Search products..."
+                          value={productSearchTerm}
+                          onChange={(e) => setProductSearchTerm(e.target.value)}
+                          className="w-full"
+                        />
+                        {filteredProducts.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">
@@ -449,26 +466,28 @@ export default function AdminCOD() {
                         </div>
                       </div>
                     )}
-                    {selectedProductIds.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Selected ({selectedProductIds.length}):</p>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedProductIds.map((id) => {
-                            const product = products.find((p) => p._id === id);
-                            return (
-                              <Badge key={id} variant="secondary" className="gap-1">
-                                {product?.title || id}
-                                <button
-                                  onClick={() => setSelectedProductIds(selectedProductIds.filter((pid) => pid !== id))}
-                                  className="ml-1 hover:text-destructive"
-                                >
-                                  ×
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
+                        {selectedProductIds.length > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2">Selected ({selectedProductIds.length}):</p>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedProductIds.map((id) => {
+                                const product = products?.find((p) => p._id === id);
+                                return (
+                                  <Badge key={id} variant="secondary" className="gap-1">
+                                    {product?.title || id}
+                                    <button
+                                      onClick={() => setSelectedProductIds(selectedProductIds.filter((pid) => pid !== id))}
+                                      className="ml-1 hover:text-destructive"
+                                    >
+                                      ×
+                                    </button>
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -490,14 +509,18 @@ export default function AdminCOD() {
                 </div>
                 {collectionIdsEnabled && (
                   <div className="ml-6 space-y-3">
-                    <Input
-                      type="text"
-                      placeholder="Search collections..."
-                      value={collectionSearchTerm}
-                      onChange={(e) => setCollectionSearchTerm(e.target.value)}
-                      className="w-full"
-                    />
-                    {filteredCollections.length > 0 && (
+                    {collections === undefined ? (
+                      <Skeleton className="h-32 w-full" />
+                    ) : (
+                      <>
+                        <Input
+                          type="text"
+                          placeholder="Search collections..."
+                          value={collectionSearchTerm}
+                          onChange={(e) => setCollectionSearchTerm(e.target.value)}
+                          className="w-full"
+                        />
+                        {filteredCollections.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">
@@ -533,26 +556,28 @@ export default function AdminCOD() {
                         </div>
                       </div>
                     )}
-                    {selectedCollectionIds.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Selected ({selectedCollectionIds.length}):</p>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedCollectionIds.map((id) => {
-                            const collection = collections.find((c) => c._id === id);
-                            return (
-                              <Badge key={id} variant="secondary" className="gap-1">
-                                {collection?.name || id}
-                                <button
-                                  onClick={() => setSelectedCollectionIds(selectedCollectionIds.filter((cid) => cid !== id))}
-                                  className="ml-1 hover:text-destructive"
-                                >
-                                  ×
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
+                        {selectedCollectionIds.length > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2">Selected ({selectedCollectionIds.length}):</p>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedCollectionIds.map((id) => {
+                                const collection = collections?.find((c) => c._id === id);
+                                return (
+                                  <Badge key={id} variant="secondary" className="gap-1">
+                                    {collection?.name || id}
+                                    <button
+                                      onClick={() => setSelectedCollectionIds(selectedCollectionIds.filter((cid) => cid !== id))}
+                                      className="ml-1 hover:text-destructive"
+                                    >
+                                      ×
+                                    </button>
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -574,14 +599,18 @@ export default function AdminCOD() {
                 </div>
                 {variantIdsEnabled && (
                   <div className="ml-6 space-y-3">
-                    <Input
-                      type="text"
-                      placeholder="Search by SKU or title..."
-                      value={variantSearchTerm}
-                      onChange={(e) => setVariantSearchTerm(e.target.value)}
-                      className="w-full"
-                    />
-                    {filteredVariants.length > 0 && (
+                    {variants === undefined ? (
+                      <Skeleton className="h-32 w-full" />
+                    ) : (
+                      <>
+                        <Input
+                          type="text"
+                          placeholder="Search by SKU or title..."
+                          value={variantSearchTerm}
+                          onChange={(e) => setVariantSearchTerm(e.target.value)}
+                          className="w-full"
+                        />
+                        {filteredVariants.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">
@@ -617,26 +646,28 @@ export default function AdminCOD() {
                         </div>
                       </div>
                     )}
-                    {selectedVariantIds.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Selected ({selectedVariantIds.length}):</p>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedVariantIds.map((id) => {
-                            const variant = variants.find((v) => v._id === id);
-                            return (
-                              <Badge key={id} variant="secondary" className="gap-1">
-                                {variant?.sku || id}
-                                <button
-                                  onClick={() => setSelectedVariantIds(selectedVariantIds.filter((vid) => vid !== id))}
-                                  className="ml-1 hover:text-destructive"
-                                >
-                                  ×
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      </div>
+                        {selectedVariantIds.length > 0 && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-2">Selected ({selectedVariantIds.length}):</p>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedVariantIds.map((id) => {
+                                const variant = variants?.find((v) => v._id === id);
+                                return (
+                                  <Badge key={id} variant="secondary" className="gap-1">
+                                    {variant?.sku || id}
+                                    <button
+                                      onClick={() => setSelectedVariantIds(selectedVariantIds.filter((vid) => vid !== id))}
+                                      className="ml-1 hover:text-destructive"
+                                    >
+                                      ×
+                                    </button>
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
