@@ -511,6 +511,7 @@ export default defineSchema({
   whUsecaseTemplates: defineTable({
     usecaseKey: v.string(), // Unique key (e.g., "order_received", "cod_confirmation")
     displayName: v.string(), // Friendly name for UI (e.g., "Order Received")
+    description: v.optional(v.string()), // Description of when this usecase triggers
     enabled: v.boolean(), // ON/OFF toggle
     templateName: v.optional(v.string()), // Selected template name (e.g., "Order Received - v3")
     providerTemplateId: v.optional(v.string()), // Provider/HSM ID (e.g., "AUTHKEY_HSM_123")

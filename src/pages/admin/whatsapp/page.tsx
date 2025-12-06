@@ -49,7 +49,8 @@ export default function WhatsAppAdminPage() {
   const filteredUsecases = usecases?.filter(
     (uc) =>
       uc.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      uc.usecaseKey.toLowerCase().includes(searchQuery.toLowerCase())
+      uc.usecaseKey.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (uc.description && uc.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Calculate stats
@@ -314,7 +315,10 @@ export default function WhatsAppAdminPage() {
                             <Badge variant="outline">Marketing</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{usecase.usecaseKey}</p>
+                        {usecase.description && (
+                          <p className="text-sm text-muted-foreground">{usecase.description}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground/60">{usecase.usecaseKey}</p>
                       </div>
                       <Switch
                         checked={usecase.enabled}

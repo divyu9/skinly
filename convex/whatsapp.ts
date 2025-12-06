@@ -27,6 +27,7 @@ export const getAllUsecases = query({
     return usecases.map((usecase) => ({
       usecaseKey: usecase.usecaseKey,
       displayName: usecase.displayName,
+      description: usecase.description ?? null,
       enabled: usecase.enabled,
       templateName: usecase.templateName ?? null,
       providerTemplateId: usecase.providerTemplateId ?? null,
