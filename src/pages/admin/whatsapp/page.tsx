@@ -31,6 +31,7 @@ import { TemplateManager } from "./_components/template-manager.tsx";
 import { ProviderSettings } from "./_components/provider-settings.tsx";
 import { AdminNotifications } from "./_components/admin-notifications.tsx";
 import { SetupWizard } from "./_components/setup-wizard.tsx";
+import { VariableMapper } from "./_components/variable-mapper.tsx";
 
 export default function WhatsAppAdminPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -341,47 +342,55 @@ export default function WhatsAppAdminPage() {
                     {/* Template Selector */}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Approved Template</label>
-                      <Select
-                        value={
-                          usecase.templateName && usecase.providerTemplateId
-                            ? `${usecase.templateName}|${usecase.providerTemplateId}`
-                            : "none"
-                        }
-                        onValueChange={(value) =>
-                          handleTemplateChange(usecase.usecaseKey, value)
-                        }
-                        disabled={isUpdating}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">None (No template assigned)</SelectItem>
-                          {templates.map((template) => (
-                            <SelectItem
-                              key={template.providerTemplateId}
-                              value={`${template.templateName}|${template.providerTemplateId}`}
-                            >
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-2">
-                                  <span>{template.templateName}</span>
-                                  <Badge
-                                    variant={
-                                      template.type === "transactional" ? "secondary" : "outline"
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {template.type}
-                                  </Badge>
+                      <div className="flex gap-2">
+                        <Select
+                          value={
+                            usecase.templateName && usecase.providerTemplateId
+                              ? `${usecase.templateName}|${usecase.providerTemplateId}`
+                              : "none"
+                          }
+                          onValueChange={(value) =>
+                            handleTemplateChange(usecase.usecaseKey, value)
+                          }
+                          disabled={isUpdating}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select a template" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None (No template assigned)</SelectItem>
+                            {templates.map((template) => (
+                              <SelectItem
+                                key={template.providerTemplateId}
+                                value={`${template.templateName}|${template.providerTemplateId}`}
+                              >
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span>{template.templateName}</span>
+                                    <Badge
+                                      variant={
+                                        template.type === "transactional" ? "secondary" : "outline"
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {template.type}
+                                    </Badge>
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {template.providerTemplateId}
+                                  </span>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {template.providerTemplateId}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {usecase.templateName && (
+                          <VariableMapper
+                            usecaseKey={usecase.usecaseKey}
+                            usecaseName={usecase.displayName}
+                          />
+                        )}
+                      </div>
                     </div>
 
                     {/* Warnings */}

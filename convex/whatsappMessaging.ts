@@ -118,6 +118,27 @@ export const queueMessage = mutation({
     // Clean phone number
     const cleanedPhone = cleanPhoneNumber(args.recipientPhone);
 
+    // Apply variable mappings if configured
+    let finalVariables = args.variables || {};
+    if (usecase.variableMapping && usecase.variableMapping.length > 0) {
+      finalVariables = {};
+      for (const mapping of usecase.variableMapping) {
+        const values = mapping.sourceFields
+          .map((field) => args.variables?.[field])
+          .filter((val) => val !== undefined);
+        
+        if (values.length > 0) {
+          finalVariables[mapping.templateVariable] = values.join(mapping.separator || " ");
+        }
+      }
+      
+      console.log("Applied variable mapping:", {
+        usecaseKey: args.usecaseKey,
+        inputVariables: args.variables,
+        mappedVariables: finalVariables,
+      });
+    }
+
     // Check consent
     const consent = await ctx.db
       .query("whatsappConsent")
@@ -148,7 +169,7 @@ export const queueMessage = mutation({
       recipientUserId: args.recipientUserId,
       providerTemplateId: usecase.providerTemplateId,
       templateName: usecase.templateName,
-      variables: args.variables,
+      variables: finalVariables,
       status: "pending",
       retryCount: 0,
       createdAt: now,
