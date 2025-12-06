@@ -61,6 +61,7 @@ import type * as whatsapp from "../whatsapp.js";
 import type * as whatsappActions from "../whatsappActions.js";
 import type * as whatsappAutoFix from "../whatsappAutoFix.js";
 import type * as whatsappConsent from "../whatsappConsent.js";
+import type * as whatsappDebugLogs from "../whatsappDebugLogs.js";
 import type * as whatsappHealthCheck from "../whatsappHealthCheck.js";
 import type * as whatsappMessaging from "../whatsappMessaging.js";
 import type * as whatsappSeed from "../whatsappSeed.js";
@@ -127,6 +128,7 @@ declare const fullApi: ApiFromModules<{
   whatsappActions: typeof whatsappActions;
   whatsappAutoFix: typeof whatsappAutoFix;
   whatsappConsent: typeof whatsappConsent;
+  whatsappDebugLogs: typeof whatsappDebugLogs;
   whatsappHealthCheck: typeof whatsappHealthCheck;
   whatsappMessaging: typeof whatsappMessaging;
   whatsappSeed: typeof whatsappSeed;

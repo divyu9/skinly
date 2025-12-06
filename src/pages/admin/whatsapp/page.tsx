@@ -198,6 +198,12 @@ export default function WhatsAppAdminPage() {
           </div>
           <div className="flex gap-2">
             <SetupWizard />
+            <Button variant="outline" asChild>
+              <Link to="/admin/whatsapp/health">
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Health Check
+              </Link>
+            </Button>
             <Button variant="default" asChild>
               <Link to="/admin/whatsapp/messages">
                 <MessageSquareIcon className="mr-2 h-4 w-4" />

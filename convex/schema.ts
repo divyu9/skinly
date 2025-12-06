@@ -627,6 +627,34 @@ export default defineSchema({
     .index("by_phone", ["phoneNumber"])
     .index("by_processed_at", ["processedAt"]),
 
+  // WhatsApp Debug Logs (detailed API call logs for debugging)
+  whatsappDebugLogs: defineTable({
+    messageId: v.id("whatsappMessages"), // Related message
+    usecaseKey: v.string(), // Use case that triggered this
+    recipientPhone: v.string(), // Phone number (for filtering)
+    templateId: v.string(), // Provider template ID used
+    // Request details
+    requestUrl: v.string(), // Full URL (with authkey masked)
+    requestParams: v.string(), // JSON string of all params sent
+    requestVariables: v.optional(v.string()), // JSON string of variables
+    // Response details
+    responseStatus: v.number(), // HTTP status code
+    responseBody: v.string(), // Full response body
+    responseHeaders: v.optional(v.string()), // Response headers
+    // Parsed error information
+    success: v.boolean(), // Whether the API call succeeded
+    errorType: v.optional(v.string()), // Parsed error type (invalid_authkey, template_not_found, etc.)
+    errorMessage: v.optional(v.string()), // Human-readable error message
+    suggestedFix: v.optional(v.string()), // Suggested fix for the error
+    // Metadata
+    createdAt: v.number(), // When this log was created
+  })
+    .index("by_message", ["messageId"])
+    .index("by_usecase", ["usecaseKey"])
+    .index("by_success", ["success"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_error_type", ["errorType"]),
+
   // COD OTP Verification
   codOtps: defineTable({
     phoneNumber: v.string(), // Phone number to verify

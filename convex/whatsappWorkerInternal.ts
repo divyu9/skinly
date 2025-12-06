@@ -197,3 +197,44 @@ export const scheduleWorker = internalMutation({
     // Note: This would schedule the worker, but we're triggering it on queue instead
   },
 });
+
+// ============================================================================
+// INTERNAL MUTATION: Create debug log entry
+// ============================================================================
+
+export const createDebugLog = internalMutation({
+  args: {
+    messageId: v.id("whatsappMessages"),
+    usecaseKey: v.string(),
+    recipientPhone: v.string(),
+    templateId: v.string(),
+    requestUrl: v.string(),
+    requestParams: v.string(),
+    requestVariables: v.string(),
+    responseStatus: v.number(),
+    responseBody: v.string(),
+    success: v.boolean(),
+    errorType: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    suggestedFix: v.optional(v.string()),
+    createdAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("whatsappDebugLogs", {
+      messageId: args.messageId,
+      usecaseKey: args.usecaseKey,
+      recipientPhone: args.recipientPhone,
+      templateId: args.templateId,
+      requestUrl: args.requestUrl,
+      requestParams: args.requestParams,
+      requestVariables: args.requestVariables,
+      responseStatus: args.responseStatus,
+      responseBody: args.responseBody,
+      success: args.success,
+      errorType: args.errorType,
+      errorMessage: args.errorMessage,
+      suggestedFix: args.suggestedFix,
+      createdAt: args.createdAt,
+    });
+  },
+});
