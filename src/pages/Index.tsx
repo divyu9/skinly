@@ -123,6 +123,11 @@ export default function Index() {
   // Fetch all existing brands for the request form dropdown
   const allBrands = useQuery(api.supportedModels.getBrands);
   
+  // Debug logging
+  console.log("allBrands value:", allBrands);
+  console.log("allBrands type:", typeof allBrands);
+  console.log("allBrands is undefined?", allBrands === undefined);
+  
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
