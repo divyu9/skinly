@@ -31,7 +31,7 @@ export const processMessage = action({
       recipientPhone: v.string(),
       providerTemplateId: v.string(),
       templateName: v.string(),
-      variables: v.optional(v.object({})),
+      variables: v.optional(v.record(v.string(), v.string())),
       retryCount: v.number(),
     }),
   },

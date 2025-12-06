@@ -553,7 +553,7 @@ export default defineSchema({
     recipientUserId: v.optional(v.id("users")), // User ID if available
     providerTemplateId: v.string(), // Template ID used
     templateName: v.string(), // Template name for reference
-    variables: v.optional(v.object({})), // Variables sent (as JSON object)
+    variables: v.optional(v.record(v.string(), v.string())), // Variables sent (as JSON object)
     status: v.union(
       v.literal("pending"), // Queued for sending
       v.literal("sent"), // Sent to provider
