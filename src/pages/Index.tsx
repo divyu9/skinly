@@ -96,6 +96,14 @@ const brandLogos: Record<string, string> = {
   "HMD": "https://cdn.hercules.app/file_IoeAItMLvooxgFhpKthzUhZD",
 };
 
+// Hardcoded brand list as fallback (matches database brands)
+const ALL_BRANDS = [
+  "Acer", "Apple", "Asus", "CMF", "Canon", "DJI", "Dell", "Google",
+  "HMD", "HP", "Honor", "Infinix", "Lava", "Lenovo", "Motorola",
+  "Nikon", "Nothing", "One Plus", "Oppo", "PlayStation", "Poco",
+  "Realme", "Samsung", "Sony", "Tecno", "Vivo", "Xbox", "Xiaomi", "iQOO"
+];
+
 export default function Index() {
   const navigate = useNavigate();
   
@@ -120,8 +128,9 @@ export default function Index() {
     isActive: true 
   });
   
-  // Fetch all brands for Request Model dropdown
-  const allBrands = useQuery(api.supportedModels.getBrands);
+  // Fetch all brands for Request Model dropdown (with hardcoded fallback)
+  const brandsFromDb = useQuery(api.supportedModels.getBrands);
+  const allBrands = brandsFromDb && brandsFromDb.length > 0 ? brandsFromDb : ALL_BRANDS;
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
