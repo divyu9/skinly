@@ -150,7 +150,7 @@ export const createOrder = mutation({
       userId: user._id,
       orderNumber,
       customerEmail: args.customerEmail,
-      status: "pending",
+      status: "processing",
       items: cartItems.map((item) => ({
         productId: item.productId,
         productTitle: item.productTitle,
@@ -366,10 +366,10 @@ export const createOrder = mutation({
       // Don't fail order creation if admin WhatsApp fails
     }
 
-    // If order is fully paid by wallet, confirm it and deduct inventory immediately
+    // If order is fully paid by wallet, keep it in processing and deduct inventory immediately
     if (walletAmountUsed >= originalTotal) {
       await ctx.db.patch(orderId, {
-        status: "confirmed",
+        status: "processing",
       });
 
       // Deduct roll inventory
@@ -517,12 +517,14 @@ export const updateOrderStatus = mutation({
   args: {
     orderId: v.id("orders"),
     status: v.union(
-      v.literal("pending"),
-      v.literal("confirmed"),
       v.literal("processing"),
       v.literal("shipped"),
       v.literal("delivered"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
+      v.literal("rto"),
+      // Legacy statuses - temporarily allowed during migration
+      v.literal("pending"),
+      v.literal("confirmed")
     ),
   },
   handler: async (ctx, args) => {
@@ -613,7 +615,7 @@ export const updatePaymentStatus = mutation({
     }
 
     const oldPaymentStatus = order.paymentStatus;
-    const newStatus = args.paymentStatus === "success" ? "confirmed" : order.status;
+    const newStatus = args.paymentStatus === "success" ? "processing" : order.status;
 
     await ctx.db.patch(order._id, {
       paymentStatus: args.paymentStatus,

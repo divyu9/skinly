@@ -172,12 +172,14 @@ export const updateOrderStatus = mutation({
   args: {
     orderId: v.id("orders"),
     status: v.union(
-      v.literal("pending"),
-      v.literal("confirmed"),
       v.literal("processing"),
       v.literal("shipped"),
       v.literal("delivered"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
+      v.literal("rto"),
+      // Legacy statuses - temporarily allowed during migration
+      v.literal("pending"),
+      v.literal("confirmed")
     ),
   },
   handler: async (ctx, args) => {
@@ -345,12 +347,11 @@ export const getOrderStats = query({
 
     const stats = {
       total: allOrders.length,
-      pending: allOrders.filter((o) => o.status === "pending").length,
-      confirmed: allOrders.filter((o) => o.status === "confirmed").length,
       processing: allOrders.filter((o) => o.status === "processing").length,
       shipped: allOrders.filter((o) => o.status === "shipped").length,
       delivered: allOrders.filter((o) => o.status === "delivered").length,
       cancelled: allOrders.filter((o) => o.status === "cancelled").length,
+      rto: allOrders.filter((o) => o.status === "rto").length,
       totalRevenue: allOrders
         .filter((o) => o.paymentStatus === "success")
         .reduce((sum, o) => sum + o.total, 0),

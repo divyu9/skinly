@@ -131,6 +131,11 @@ http.route({
           statusLower.includes("complete")
         ) {
           newOrderStatus = "delivered";
+        } else if (
+          statusLower.includes("rto") ||
+          statusLower.includes("return")
+        ) {
+          newOrderStatus = "rto";
         }
 
         if (newOrderStatus !== order.status) {

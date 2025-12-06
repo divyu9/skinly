@@ -33,12 +33,14 @@ export default defineSchema({
     orderNumber: v.string(),
     customerEmail: v.optional(v.string()), // Customer's email for notifications
     status: v.union(
-      v.literal("pending"),
-      v.literal("confirmed"),
       v.literal("processing"),
       v.literal("shipped"),
       v.literal("delivered"),
-      v.literal("cancelled")
+      v.literal("cancelled"),
+      v.literal("rto"),
+      // Legacy statuses - to be removed after migration
+      v.literal("pending"),
+      v.literal("confirmed")
     ),
     items: v.array(
       v.object({
@@ -99,10 +101,37 @@ export default defineSchema({
     walletAmountUsed: v.optional(v.number()), // Amount deducted from wallet
     cashbackAmount: v.optional(v.number()), // Cashback earned on this order
     cashbackCredited: v.optional(v.boolean()), // Whether cashback has been credited
+    // Manual tracking fields (for non-RapidShyp orders)
+    manualTrackingNumber: v.optional(v.string()), // Manual tracking number
+    manualCourierCompany: v.optional(v.string()), // Manual courier company name
+    // Inventory restocking audit trail
+    restockingHistory: v.optional(v.array(v.object({
+      restockedAt: v.number(), // Timestamp
+      restockedBy: v.string(), // Admin email
+      items: v.array(v.object({
+        productId: v.string(),
+        variantId: v.optional(v.string()),
+        sku: v.string(),
+        quantity: v.number(),
+      })),
+    }))),
+    // RTO action history
+    rtoActions: v.optional(v.array(v.object({
+      actionType: v.union(
+        v.literal("restocked"), // Inventory restocked
+        v.literal("resent"), // Package resent
+        v.literal("resolved") // Marked as resolved
+      ),
+      actionAt: v.number(), // Timestamp
+      actionBy: v.string(), // Admin email
+      notes: v.optional(v.string()), // Optional notes
+      newOrderNumber: v.optional(v.string()), // New order number if resent (with -C suffix)
+    }))),
   })
     .index("by_user", ["userId"])
     .index("by_order_number", ["orderNumber"])
-    .index("by_merchant_transaction", ["phonepeMerchantTransactionId"]),
+    .index("by_merchant_transaction", ["phonepeMerchantTransactionId"])
+    .index("by_status", ["status"]),
 
   collections: defineTable({
     name: v.string(),

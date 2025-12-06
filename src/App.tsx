@@ -35,6 +35,7 @@ import AdminWhatsAppHealthPage from "./pages/admin/whatsapp-health.tsx";
 import AdminWhatsAppDebugLogsPage from "./pages/admin/whatsapp-debug-logs.tsx";
 import AdminWalletPage from "./pages/admin/wallet/page.tsx";
 import AdminEmailsPage from "./pages/admin/emails/page.tsx";
+import AdminMigrationPage from "./pages/admin/migration.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -85,6 +86,7 @@ export default function App() {
           <Route path="/admin/gst-migration" element={<AdminPageWrapper><GstMigrationPage /></AdminPageWrapper>} />
           <Route path="/admin/tax-export" element={<AdminPageWrapper><TaxExportPage /></AdminPageWrapper>} />
           <Route path="/admin/fix-collections" element={<AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper>} />
+          <Route path="/admin/migration" element={<AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper>} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

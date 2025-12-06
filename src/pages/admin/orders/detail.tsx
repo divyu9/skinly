@@ -40,7 +40,7 @@ function OrderDetailPageInner() {
   const [creatingShipment, setCreatingShipment] = useState(false);
 
   const handleStatusChange = async (
-    status: "pending" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled"
+    status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
   ) => {
     if (!orderId) return;
     try {
@@ -116,10 +116,6 @@ function OrderDetailPageInner() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-      case "confirmed":
-        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "processing":
         return "bg-purple-500/10 text-purple-600 border-purple-500/20";
       case "shipped":
@@ -128,6 +124,13 @@ function OrderDetailPageInner() {
         return "bg-green-500/10 text-green-600 border-green-500/20";
       case "cancelled":
         return "bg-red-500/10 text-red-600 border-red-500/20";
+      case "rto":
+        return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+      // Legacy statuses (during migration)
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      case "confirmed":
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       default:
         return "";
     }
@@ -210,18 +213,17 @@ function OrderDetailPageInner() {
         <div className="flex flex-wrap gap-2">
           <Select
             value={order.status}
-            onValueChange={(value: typeof order.status) => handleStatusChange(value)}
+            onValueChange={(value) => handleStatusChange(value as "processing" | "shipped" | "delivered" | "cancelled" | "rto")}
           >
             <SelectTrigger className={`w-40 ${getStatusColor(order.status)}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="confirmed">Confirmed</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="cancelled">Cancelled/Refunded</SelectItem>
+              <SelectItem value="rto">RTO</SelectItem>
             </SelectContent>
           </Select>
 

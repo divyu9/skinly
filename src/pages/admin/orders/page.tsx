@@ -39,10 +39,6 @@ function AdminOrdersPageInner() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "pending":
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-      case "confirmed":
-        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       case "processing":
         return "bg-purple-500/10 text-purple-600 border-purple-500/20";
       case "shipped":
@@ -51,6 +47,13 @@ function AdminOrdersPageInner() {
         return "bg-green-500/10 text-green-600 border-green-500/20";
       case "cancelled":
         return "bg-red-500/10 text-red-600 border-red-500/20";
+      case "rto":
+        return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+      // Legacy statuses (during migration)
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      case "confirmed":
+        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
       default:
         return "";
     }
@@ -216,7 +219,7 @@ function AdminOrdersPageInner() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.total}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.pending} pending
+              {stats.processing} processing
             </p>
           </CardContent>
         </Card>
