@@ -190,6 +190,27 @@ export const createModelRequest = mutation({
       requestedAt: Date.now(),
     });
 
+    // Queue WhatsApp confirmation (model_requested)
+    try {
+      await ctx.scheduler.runAfter(
+        0,
+        api.whatsappMessaging.queueMessage,
+        {
+          usecaseKey: "model_requested",
+          recipientPhone: args.whatsappPhone.trim(),
+          recipientUserId: userId,
+          variables: {
+            customer_name: identity?.name?.trim() || "Customer",
+            brand_name: args.brandName.trim(),
+            model_name: args.modelName.trim(),
+          },
+          priority: 7,
+        }
+      );
+    } catch (error) {
+      console.error(`Failed to queue model request WhatsApp for ${args.whatsappPhone}:`, error);
+    }
+
     return { requestId };
   },
 });
