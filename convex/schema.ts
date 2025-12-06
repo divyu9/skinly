@@ -489,6 +489,22 @@ export default defineSchema({
     // UI visibility controls
     showCodOnPaymentPage: v.optional(v.boolean()), // Show COD option even when not eligible
     allowMixedCartCod: v.optional(v.boolean()), // Allow COD when cart has both eligible and non-eligible items
+    // Display rules configuration
+    hideWhenIneligible: v.optional(v.boolean()), // Hide COD completely when ineligible or disabled (default: false)
+    displayRules: v.optional(v.array(v.object({
+      ruleType: v.union(
+        v.literal("cart_min_value"), // Hide if cart value < value
+        v.literal("cart_max_value"), // Hide if cart value > value
+        v.literal("product_count_min"), // Hide if product count < value
+        v.literal("product_count_max"), // Hide if product count > value
+        v.literal("contains_category"), // Hide if cart contains specific gadget category
+        v.literal("excludes_category"), // Show only if cart contains specific gadget category
+        v.literal("user_verified"), // Show only for verified users (has completed an order)
+        v.literal("first_time_buyer") // Show only for first-time buyers (no previous orders)
+      ),
+      value: v.union(v.string(), v.number()), // Value to compare (category name for category rules, number for others)
+      enabled: v.boolean(), // Whether this rule is active
+    }))),
   }),
 
   // WhatsApp Use-case Templates

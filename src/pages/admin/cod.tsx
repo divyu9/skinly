@@ -31,6 +31,10 @@ import {
   HashIcon,
   CheckCircleIcon,
   XCircleIcon,
+  EyeIcon,
+  EyeOffIcon,
+  PlusIcon,
+  TrashIcon,
 } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
@@ -38,6 +42,7 @@ export default function AdminCOD() {
   const settings = useQuery(api.cod.getCodSettings, {});
   const updateSettings = useMutation(api.cod.updateCodSettings);
   const initializeSettings = useMutation(api.cod.initializeCodSettings);
+  const updateDisplaySettings = useMutation(api.codDisplayRules.updateDisplaySettings);
   
   const products = useQuery(api.products.getAllProducts, {});
   const collections = useQuery(api.collections.getAllCollections, {});
@@ -81,6 +86,14 @@ export default function AdminCOD() {
   // UI visibility controls
   const [showCodOnPaymentPage, setShowCodOnPaymentPage] = useState(true);
   const [allowMixedCartCod, setAllowMixedCartCod] = useState(false);
+
+  // Display rules
+  const [hideWhenIneligible, setHideWhenIneligible] = useState(false);
+  const [displayRules, setDisplayRules] = useState<Array<{
+    ruleType: "cart_min_value" | "cart_max_value" | "product_count_min" | "product_count_max" | "contains_category" | "excludes_category" | "user_verified" | "first_time_buyer";
+    value: string | number;
+    enabled: boolean;
+  }>>([]);
 
   const [saving, setSaving] = useState(false);
 
@@ -140,6 +153,12 @@ export default function AdminCOD() {
       setPrepaidValue(settings.prepaidValue);
       setShowCodOnPaymentPage(settings.showCodOnPaymentPage ?? true);
       setAllowMixedCartCod(settings.allowMixedCartCod ?? false);
+      if ("hideWhenIneligible" in settings) {
+        setHideWhenIneligible(settings.hideWhenIneligible ?? false);
+      }
+      if ("displayRules" in settings) {
+        setDisplayRules(settings.displayRules || []);
+      }
     }
   }, [settings]);
 
@@ -877,6 +896,185 @@ export default function AdminCOD() {
             </CardContent>
           </Card>
         )}
+
+        {/* COD Visibility Rules */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <EyeIcon className="h-5 w-5" />
+                  COD Visibility Rules
+                </CardTitle>
+                <CardDescription>
+                  Control when COD option is shown to customers on checkout page
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Hide When Ineligible Toggle */}
+            <div className="flex items-center justify-between p-4 border rounded-lg">
+              <div>
+                <Label className="text-base font-medium">Hide COD When Ineligible</Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Completely hide COD payment option when disabled or cart doesn't meet eligibility criteria
+                </p>
+              </div>
+              <Switch
+                checked={hideWhenIneligible}
+                onCheckedChange={setHideWhenIneligible}
+              />
+            </div>
+
+            <Separator />
+
+            {/* Display Rules */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-base font-medium">Advanced Display Rules</Label>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Add custom conditions to hide COD. If ANY rule fails, COD will be hidden.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setDisplayRules([
+                      ...displayRules,
+                      { ruleType: "cart_min_value", value: 500, enabled: true },
+                    ]);
+                  }}
+                >
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Add Rule
+                </Button>
+              </div>
+
+              {displayRules.length === 0 ? (
+                <div className="text-center p-8 border border-dashed rounded-lg">
+                  <EyeOffIcon className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No display rules configured. Add rules to control when COD is visible.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {displayRules.map((rule, index) => (
+                    <div key={index} className="flex items-center gap-3 p-4 border rounded-lg">
+                      <Switch
+                        checked={rule.enabled}
+                        onCheckedChange={(checked) => {
+                          const newRules = [...displayRules];
+                          newRules[index] = { ...newRules[index], enabled: checked };
+                          setDisplayRules(newRules);
+                        }}
+                      />
+                      <div className="flex-1 grid grid-cols-2 gap-3">
+                        <Select
+                          value={rule.ruleType}
+                          onValueChange={(value) => {
+                            const newRules = [...displayRules];
+                            newRules[index] = {
+                              ...newRules[index],
+                              ruleType: value as typeof rule.ruleType,
+                              value: value.includes("category") ? "phone" : 500,
+                            };
+                            setDisplayRules(newRules);
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cart_min_value">Hide if cart value &lt;</SelectItem>
+                            <SelectItem value="cart_max_value">Hide if cart value &gt;</SelectItem>
+                            <SelectItem value="product_count_min">Hide if product count &lt;</SelectItem>
+                            <SelectItem value="product_count_max">Hide if product count &gt;</SelectItem>
+                            <SelectItem value="contains_category">Hide if contains category</SelectItem>
+                            <SelectItem value="excludes_category">Show only for category</SelectItem>
+                            <SelectItem value="user_verified">Show only for verified users</SelectItem>
+                            <SelectItem value="first_time_buyer">Show only for first-time buyers</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {rule.ruleType.includes("category") ? (
+                          <Select
+                            value={String(rule.value)}
+                            onValueChange={(value) => {
+                              const newRules = [...displayRules];
+                              newRules[index] = { ...newRules[index], value };
+                              setDisplayRules(newRules);
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="phone">Phone</SelectItem>
+                              <SelectItem value="laptop">Laptop</SelectItem>
+                              <SelectItem value="tablet">Tablet</SelectItem>
+                              <SelectItem value="camera">Camera</SelectItem>
+                              <SelectItem value="console">Console</SelectItem>
+                              <SelectItem value="accessory">Accessory</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : rule.ruleType === "user_verified" || rule.ruleType === "first_time_buyer" ? (
+                          <div className="flex items-center text-sm text-muted-foreground italic px-3">
+                            No value needed
+                          </div>
+                        ) : (
+                          <Input
+                            type="number"
+                            min="0"
+                            value={rule.value}
+                            onChange={(e) => {
+                              const newRules = [...displayRules];
+                              newRules[index] = { ...newRules[index], value: Number(e.target.value) };
+                              setDisplayRules(newRules);
+                            }}
+                            placeholder="Enter value"
+                          />
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setDisplayRules(displayRules.filter((_, i) => i !== index));
+                        }}
+                      >
+                        <TrashIcon className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Save Display Rules */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await updateDisplaySettings({
+                      hideWhenIneligible,
+                      displayRules,
+                    });
+                    toast.success("Visibility rules saved successfully");
+                  } catch (error) {
+                    toast.error("Failed to save visibility rules");
+                  }
+                }}
+              >
+                Save Visibility Rules
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Save Button */}
         <div className="flex items-center justify-end gap-4">
