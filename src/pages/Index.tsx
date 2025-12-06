@@ -1279,10 +1279,9 @@ export default function Index() {
                 return;
               }
               
-              // Validate WhatsApp number format (basic validation)
-              const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-              if (!phoneRegex.test(requestWhatsApp.trim())) {
-                toast.error("Please enter a valid phone number (e.g., +911234567890)");
+              // Validate WhatsApp number format (must be exactly 10 digits)
+              if (requestWhatsApp.trim().length !== 10 || !/^\d{10}$/.test(requestWhatsApp.trim())) {
+                toast.error("Please enter a valid 10-digit phone number");
                 return;
               }
               
@@ -1293,7 +1292,7 @@ export default function Index() {
                   brandName: finalBrandName,
                   modelName: requestModel.trim(),
                   category: requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
-                  whatsappPhone: requestWhatsApp.trim(),
+                  whatsappPhone: `+91${requestWhatsApp.trim()}`,
                 });
                 
                 toast.success("Request submitted! We'll notify you on WhatsApp when available.");
@@ -1318,34 +1317,46 @@ export default function Index() {
           >
             <div className="space-y-2">
               <Label htmlFor="request-brand">Brand Name *</Label>
-              <Select 
-                value={isNewBrand ? "other" : requestBrand} 
-                onValueChange={(value) => {
-                  if (value === "other") {
-                    setIsNewBrand(true);
-                    setRequestBrand("");
-                  } else {
-                    setIsNewBrand(false);
-                    setRequestBrand(value);
-                    setRequestNewBrand("");
-                  }
-                }}
-                required
-              >
-                <SelectTrigger id="request-brand">
-                  <SelectValue placeholder="Select brand" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  {allBrands?.map((brand) => (
-                    <SelectItem key={brand} value={brand}>
-                      {brand}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="other" className="font-semibold border-t mt-2 pt-2">
-                    Other (New Brand)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              {allBrands === undefined ? (
+                <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted">
+                  <div className="text-sm text-muted-foreground">Loading brands...</div>
+                </div>
+              ) : (
+                <Select 
+                  value={isNewBrand ? "other" : requestBrand} 
+                  onValueChange={(value) => {
+                    if (value === "other") {
+                      setIsNewBrand(true);
+                      setRequestBrand("");
+                    } else {
+                      setIsNewBrand(false);
+                      setRequestBrand(value);
+                      setRequestNewBrand("");
+                    }
+                  }}
+                  required
+                >
+                  <SelectTrigger id="request-brand">
+                    <SelectValue placeholder="Select brand" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {allBrands.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">No brands available</div>
+                    ) : (
+                      <>
+                        {allBrands.map((brand) => (
+                          <SelectItem key={brand} value={brand}>
+                            {brand}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="other" className="font-semibold border-t mt-2 pt-2">
+                          Other (New Brand)
+                        </SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             
             {/* Show custom brand input when "Other" is selected */}
@@ -1458,14 +1469,26 @@ export default function Index() {
             
             <div className="space-y-2">
               <Label htmlFor="request-whatsapp">WhatsApp Number *</Label>
-              <Input
-                id="request-whatsapp"
-                type="tel"
-                placeholder="+911234567890"
-                value={requestWhatsApp}
-                onChange={(e) => setRequestWhatsApp(e.target.value)}
-                required
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 items-center rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium">
+                  +91
+                </div>
+                <Input
+                  id="request-whatsapp"
+                  type="tel"
+                  placeholder="9876543210"
+                  value={requestWhatsApp}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "");
+                    if (value.length <= 10) {
+                      setRequestWhatsApp(value);
+                    }
+                  }}
+                  maxLength={10}
+                  className="flex-1"
+                  required
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
                 We'll notify you when this model is available
               </p>
