@@ -487,16 +487,34 @@ export const getShipmentTracking = action({
 // Cancel shipment
 export const cancelShipment = action({
   args: {
-    awbNumber: v.string(),
     orderId: v.id("orders"),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; message: string; orderNumber?: string }> => {
     try {
+      // Get order details
+      const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+        orderId: args.orderId,
+      });
+
+      if (!order) {
+        throw new ConvexError({
+          message: "Order not found",
+          code: "NOT_FOUND",
+        });
+      }
+
+      if (!order.awbNumber) {
+        throw new ConvexError({
+          message: "Order has no shipment to cancel",
+          code: "BAD_REQUEST",
+        });
+      }
+
       const config = getRapidShypConfig();
 
       // Make API request to cancel shipment
       const response = await fetch(
-        `${config.apiUrl}/v1/external/orders/cancel/${args.awbNumber}`,
+        `${config.apiUrl}/v1/external/orders/cancel/${order.awbNumber}`,
         {
           method: "POST",
           headers: {
@@ -514,15 +532,26 @@ export const cancelShipment = action({
         });
       }
 
-      // Update order status
+      // Clear all shipping data and reset status to Processing
       await ctx.runMutation(api.admin.orders.updateShippingInfo, {
         orderId: args.orderId,
-        shippingStatus: "Shipment Cancelled",
+        awbNumber: "",
+        trackingUrl: "",
+        courierName: "",
+        labelUrl: "",
+        shippingStatus: "",
+      });
+
+      // Change order status back to Processing
+      await ctx.runMutation(api.admin.orders.updateOrderStatus, {
+        orderId: args.orderId,
+        status: "processing",
       });
 
       return {
         success: true,
         message: "Shipment cancelled successfully",
+        orderNumber: order.orderNumber,
       };
     } catch (error) {
       if (error instanceof ConvexError) {
@@ -534,6 +563,62 @@ export const cancelShipment = action({
         code: "EXTERNAL_SERVICE_ERROR",
       });
     }
+  },
+});
+
+// Bulk cancel shipments for multiple orders
+export const bulkCancelShipments = action({
+  args: {
+    orderIds: v.array(v.id("orders")),
+  },
+  handler: async (ctx, args) => {
+    const successful: Array<{ orderNumber: string; orderId: string }> = [];
+    const failed: Array<{ orderNumber: string; orderId: string; error: string }> = [];
+
+    // Process each order
+    for (const orderId of args.orderIds) {
+      try {
+        const result = await ctx.runAction(api.rapidshyp.cancelShipment, {
+          orderId,
+        });
+
+        if (result.success) {
+          successful.push({
+            orderNumber: result.orderNumber || orderId,
+            orderId,
+          });
+        }
+      } catch (error) {
+        // Get order details for error reporting
+        try {
+          const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+            orderId,
+          });
+          failed.push({
+            orderNumber: order?.orderNumber || orderId,
+            orderId,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to cancel shipment",
+          });
+        } catch {
+          failed.push({
+            orderNumber: orderId,
+            orderId,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to cancel shipment",
+          });
+        }
+      }
+    }
+
+    return {
+      successful,
+      failed,
+    };
   },
 });
 
