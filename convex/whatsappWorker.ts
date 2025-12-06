@@ -81,13 +81,13 @@ export const processMessage = action({
       // Extract 10-digit mobile number for AuthKey API
       const mobileNumber = extractMobileNumber(args.message.recipientPhone);
 
-      // Convert named variables to AuthKey numbered format (v1, v2, v3, etc.)
+      // Convert named variables to AuthKey numbered format (1, 2, 3, etc.)
       const numberedVariables: Record<string, string> = {};
       if (args.message.variables && templateVariables.length > 0) {
         templateVariables.forEach((varName: string, index: number) => {
           const value = args.message.variables?.[varName];
           if (value !== undefined) {
-            numberedVariables[`v${index + 1}`] = value;
+            numberedVariables[`${index + 1}`] = value;
           }
         });
       }
@@ -106,7 +106,7 @@ export const processMessage = action({
         mobile: mobileNumber, // Send only 10-digit number
         country_code: "91", // Default to India
         wid: args.message.providerTemplateId,
-        ...numberedVariables, // Use numbered format (v1, v2, v3)
+        ...numberedVariables, // Use numbered format (1, 2, 3)
       });
 
       const url = `${baseUrl}?${params.toString()}`;
