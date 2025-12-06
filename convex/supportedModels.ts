@@ -55,29 +55,19 @@ export const getLatest = query({
 export const getBrands = query({
   args: {},
   handler: async (ctx, args) => {
-    try {
-      const models = await ctx.db.query("supportedModels").collect();
-      console.log("Models fetched:", models.length);
-      const brandSet = new Set(models.map((m) => m.brandName));
-      console.log("Brand set size:", brandSet.size);
-      const brands = Array.from(brandSet).sort();
-      console.log("Brands array:", brands);
-      console.log("getBrands returning:", brands.length, "brands");
-      return brands;
-    } catch (error) {
-      console.error("Error in getBrands:", error);
-      throw error;
-    }
+    const models = await ctx.db.query("supportedModels").collect();
+    const brandSet = new Set(models.map((m) => m.brandName));
+    return Array.from(brandSet).sort();
   },
 });
 
-// Alternative brand fetcher for debugging
+// Alternative brand fetcher
 export const getAllBrandNames = query({
   args: {},
   handler: async (ctx, args) => {
-    // Return hardcoded array for testing
-    console.log("getAllBrandNames called - returning hardcoded test");
-    return ["Apple", "Samsung", "OnePlus"];
+    const models = await ctx.db.query("supportedModels").collect();
+    const brandSet = new Set(models.map((m) => m.brandName));
+    return Array.from(brandSet).sort();
   },
 });
 

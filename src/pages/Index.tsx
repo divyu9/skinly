@@ -120,15 +120,12 @@ export default function Index() {
     isActive: true 
   });
   
-  // Fetch all existing brands for the request form dropdown
-  const allBrands = useQuery(api.supportedModels.getAllBrandNames);
-  
-  // Debug logging
-  console.log("allBrands value:", allBrands);
-  console.log("allBrands type:", typeof allBrands);
-  console.log("allBrands is undefined?", allBrands === undefined);
-  console.log("allBrands is array?", Array.isArray(allBrands));
-  console.log("allBrands length:", allBrands?.length);
+  // Extract all brands from supported models
+  const allBrands = useMemo(() => {
+    if (!allSupportedModels) return undefined;
+    const brandSet = new Set(allSupportedModels.map(m => m.brandName));
+    return Array.from(brandSet).sort();
+  }, [allSupportedModels]);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
