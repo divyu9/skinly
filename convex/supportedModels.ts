@@ -54,10 +54,20 @@ export const getLatest = query({
 // Get unique brands
 export const getBrands = query({
   args: {},
-  handler: async (ctx) => {
-    const models = await ctx.db.query("supportedModels").collect();
-    const brandSet = new Set(models.map((m) => m.brandName));
-    return Array.from(brandSet).sort();
+  handler: async (ctx, args) => {
+    try {
+      const models = await ctx.db.query("supportedModels").collect();
+      console.log("Models fetched:", models.length);
+      const brandSet = new Set(models.map((m) => m.brandName));
+      console.log("Brand set size:", brandSet.size);
+      const brands = Array.from(brandSet).sort();
+      console.log("Brands array:", brands);
+      console.log("getBrands returning:", brands.length, "brands");
+      return brands;
+    } catch (error) {
+      console.error("Error in getBrands:", error);
+      throw error;
+    }
   },
 });
 

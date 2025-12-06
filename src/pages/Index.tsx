@@ -127,6 +127,7 @@ export default function Index() {
   console.log("allBrands value:", allBrands);
   console.log("allBrands type:", typeof allBrands);
   console.log("allBrands is undefined?", allBrands === undefined);
+  console.log("allBrands length:", allBrands?.length);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
