@@ -120,20 +120,8 @@ export default function Index() {
     isActive: true 
   });
   
-  // Extract brands from already-loaded data (workaround for query issues)
-  const allBrands = useMemo(() => {
-    // Try allSupportedModels first (has all categories)
-    if (allSupportedModels && allSupportedModels.length > 0) {
-      const brandSet = new Set(allSupportedModels.map(m => m.brandName));
-      return Array.from(brandSet).sort();
-    }
-    // Fallback to phone brands if allSupportedModels isn't ready
-    if (phoneModelsFromDb && phoneModelsFromDb.length > 0) {
-      const brandSet = new Set(phoneModelsFromDb.map(m => m.brandName));
-      return Array.from(brandSet).sort();
-    }
-    return undefined;
-  }, [allSupportedModels, phoneModelsFromDb]);
+  // Fetch all brands for Request Model dropdown
+  const allBrands = useQuery(api.supportedModels.getBrands);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -1329,46 +1317,42 @@ export default function Index() {
           >
             <div className="space-y-2">
               <Label htmlFor="request-brand">Brand Name *</Label>
-              {allBrands === undefined ? (
-                <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-muted">
-                  <div className="text-sm text-muted-foreground">Loading brands...</div>
-                </div>
-              ) : (
-                <Select 
-                  value={isNewBrand ? "other" : requestBrand} 
-                  onValueChange={(value) => {
-                    if (value === "other") {
-                      setIsNewBrand(true);
-                      setRequestBrand("");
-                    } else {
-                      setIsNewBrand(false);
-                      setRequestBrand(value);
-                      setRequestNewBrand("");
-                    }
-                  }}
-                  required
-                >
-                  <SelectTrigger id="request-brand">
-                    <SelectValue placeholder="Select brand" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {allBrands.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">No brands available</div>
-                    ) : (
-                      <>
-                        {allBrands.map((brand) => (
-                          <SelectItem key={brand} value={brand}>
-                            {brand}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="other" className="font-semibold border-t mt-2 pt-2">
-                          Other (New Brand)
+              <Select 
+                value={isNewBrand ? "other" : requestBrand} 
+                onValueChange={(value) => {
+                  if (value === "other") {
+                    setIsNewBrand(true);
+                    setRequestBrand("");
+                  } else {
+                    setIsNewBrand(false);
+                    setRequestBrand(value);
+                    setRequestNewBrand("");
+                  }
+                }}
+                required
+              >
+                <SelectTrigger id="request-brand">
+                  <SelectValue placeholder="Select brand" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {allBrands && allBrands.length > 0 ? (
+                    <>
+                      {allBrands.map((brand) => (
+                        <SelectItem key={brand} value={brand}>
+                          {brand}
                         </SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
+                      ))}
+                      <SelectItem value="other" className="font-semibold border-t mt-2 pt-2">
+                        Other (New Brand)
+                      </SelectItem>
+                    </>
+                  ) : (
+                    <SelectItem value="other" className="font-semibold">
+                      Other (New Brand)
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             
             {/* Show custom brand input when "Other" is selected */}
