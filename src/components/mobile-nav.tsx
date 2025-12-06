@@ -75,6 +75,9 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
         <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
           Shop
         </Link>
+        <Link to="/devices" className="text-sm font-medium hover:text-primary transition-colors">
+          Devices
+        </Link>
         <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
           My Orders
         </Link>
