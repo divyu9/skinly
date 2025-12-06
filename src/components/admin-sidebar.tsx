@@ -46,6 +46,8 @@ export function AdminSidebar() {
     { path: "/admin/wallet", label: "Wallet", icon: Wallet },
     { path: "/admin/emails", label: "Email Templates", icon: Mail },
     { path: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+    { path: "/admin/whatsapp/messages", label: "WA Messages", icon: MessageCircle },
+    { path: "/admin/whatsapp/health", label: "WA Health", icon: MessageCircle },
     { path: "/admin/models", label: "Models", icon: Database },
     { path: "/admin/seed-models", label: "Seed DB", icon: Settings },
     { path: "/admin/oos", label: "OOS Settings", icon: Settings },
