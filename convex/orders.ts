@@ -521,10 +521,7 @@ export const updateOrderStatus = mutation({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto"),
-      // Legacy statuses - temporarily allowed during migration
-      v.literal("pending"),
-      v.literal("confirmed")
+      v.literal("rto")
     ),
   },
   handler: async (ctx, args) => {

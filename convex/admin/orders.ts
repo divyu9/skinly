@@ -135,7 +135,13 @@ export const updateShippingInfo = mutation({
 
     const isNewAWB = args.awbNumber && !order.awbNumber;
 
-    await ctx.db.patch(orderId, updates);
+    // Auto-update status to "shipped" when AWB is added (RapidShyp flow)
+    const updateData = {
+      ...updates,
+      ...(isNewAWB && { status: "shipped" as const }),
+    };
+
+    await ctx.db.patch(orderId, updateData);
 
     // Send order dispatched notification if AWB is added for first time
     if (isNewAWB && args.awbNumber) {
@@ -176,10 +182,7 @@ export const updateOrderStatus = mutation({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto"),
-      // Legacy statuses - temporarily allowed during migration
-      v.literal("pending"),
-      v.literal("confirmed")
+      v.literal("rto")
     ),
   },
   handler: async (ctx, args) => {

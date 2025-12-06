@@ -37,10 +37,7 @@ export default defineSchema({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto"),
-      // Legacy statuses - to be removed after migration
-      v.literal("pending"),
-      v.literal("confirmed")
+      v.literal("rto")
     ),
     items: v.array(
       v.object({
