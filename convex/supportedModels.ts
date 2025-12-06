@@ -71,6 +71,16 @@ export const getBrands = query({
   },
 });
 
+// Alternative brand fetcher for debugging
+export const getAllBrandNames = query({
+  args: {},
+  handler: async (ctx, args) => {
+    // Return hardcoded array for testing
+    console.log("getAllBrandNames called - returning hardcoded test");
+    return ["Apple", "Samsung", "OnePlus"];
+  },
+});
+
 // Get models by brand (for devices page)
 export const getByBrand = query({
   args: { brandName: v.string() },

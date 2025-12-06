@@ -121,12 +121,13 @@ export default function Index() {
   });
   
   // Fetch all existing brands for the request form dropdown
-  const allBrands = useQuery(api.supportedModels.getBrands);
+  const allBrands = useQuery(api.supportedModels.getAllBrandNames);
   
   // Debug logging
   console.log("allBrands value:", allBrands);
   console.log("allBrands type:", typeof allBrands);
   console.log("allBrands is undefined?", allBrands === undefined);
+  console.log("allBrands is array?", Array.isArray(allBrands));
   console.log("allBrands length:", allBrands?.length);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
