@@ -69,14 +69,11 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
     <>
       {/* Desktop Navigation */}
       <div className="hidden md:flex items-center gap-6">
-        <a href="#products" className="text-sm font-medium hover:text-primary transition-colors">
-          Categories
-        </a>
-        <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
-          All Products
+        <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
+          Home
         </Link>
-        <Link to="/devices" className="text-sm font-medium hover:text-primary transition-colors">
-          Devices
+        <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
+          Shop
         </Link>
         <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
           My Orders
