@@ -181,7 +181,7 @@ export function SetupWizard() {
         templateId: firstTemplate._id,
         testPhoneNumber: testPhone.trim(),
       });
-      toast.success("Test message sent! Check your phone.");
+      toast.success("Test message queued! Check /admin/whatsapp/messages to track delivery.");
       setCurrentStep(5);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send test message");

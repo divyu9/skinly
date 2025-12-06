@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { api } from "./_generated/api.js";
@@ -13,6 +13,67 @@ function cleanPhoneNumber(phone: string): string {
 }
 
 
+
+// ============================================================================
+// INTERNAL MUTATION: Queue a test message (bypasses consent and usecase checks)
+// ============================================================================
+
+export const queueTestMessage = internalMutation({
+  args: {
+    recipientPhone: v.string(),
+    providerTemplateId: v.string(),
+    templateName: v.string(),
+    variables: v.optional(v.record(v.string(), v.string())),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    
+    // Clean phone number
+    const cleanedPhone = cleanPhoneNumber(args.recipientPhone);
+
+    // Create message record with a special "test_message" usecase
+    const messageId = await ctx.db.insert("whatsappMessages", {
+      usecaseKey: "test_message",
+      recipientPhone: cleanedPhone,
+      recipientUserId: undefined,
+      providerTemplateId: args.providerTemplateId,
+      templateName: args.templateName,
+      variables: args.variables,
+      status: "pending",
+      retryCount: 0,
+      createdAt: now,
+    });
+
+    // Add to queue with high priority
+    const queueId = await ctx.db.insert("whatsappQueue", {
+      messageId,
+      priority: 10, // Highest priority for test messages
+      scheduledFor: now, // Send immediately
+      attempts: 0,
+      status: "pending",
+    });
+
+    console.log(`Test message queued:`, {
+      messageId,
+      queueId,
+      recipientPhone: cleanedPhone,
+      templateName: args.templateName,
+    });
+
+    // Schedule worker to process the queue immediately
+    await ctx.scheduler.runAfter(
+      500, // Process after 500ms
+      api.whatsappWorker.processQueue,
+      { batchSize: 1 }
+    );
+
+    return {
+      queued: true,
+      messageId,
+      queueId,
+    };
+  },
+});
 
 // ============================================================================
 // MUTATION: Queue a WhatsApp message
