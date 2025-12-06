@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { calculateGST } from "@/lib/gst";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 
 function CheckoutPageInner() {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ function CheckoutPageInner() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
+  const [useWallet, setUseWallet] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -74,6 +76,13 @@ function CheckoutPageInner() {
   const shippingFee = subtotal > 500 ? 0 : 50;
   const total = subtotal + shippingFee;
 
+  // Get wallet balance and max usage
+  const walletData = useQuery(api.wallet.getWalletBalance);
+  const walletMaxUsage = useQuery(
+    api.wallet.calculateMaxWalletUsage,
+    { orderTotal: total }
+  );
+
   // Check COD availability
   const codAvailability = useQuery(
     api.cod.isCodAvailable,
@@ -90,11 +99,17 @@ function CheckoutPageInner() {
       : "skip"
   );
 
+  // Calculate wallet amount to use
+  const walletBalance = walletData?.balance || 0;
+  const maxWalletUsage = walletMaxUsage?.maxUsage || 0;
+  const walletAmount = useWallet ? Math.min(maxWalletUsage, total) : 0;
+
   // Calculate final total including COD fee if COD is selected
   const codFee = formData.paymentMethod === "cod" && codAvailability?.available
     ? codAvailability.codFee
     : 0;
-  const finalTotal = total + codFee;
+  const subtotalAfterWallet = total - walletAmount;
+  const finalTotal = subtotalAfterWallet + codFee;
 
   // Calculate GST breakdown based on customer's state
   const gstBreakdown = useMemo(() => {
@@ -215,16 +230,24 @@ function CheckoutPageInner() {
         codFee: codFeeAmount,
         prepaidAmount,
         codAmount,
+        walletAmount: useWallet ? walletAmount : undefined,
       });
 
       // Handle payment based on method
-      if (formData.paymentMethod === "phonepe") {
+      // Check if order was fully paid by wallet
+      const remainingAmount = result.remainingAmount || 0;
+      
+      if (remainingAmount === 0) {
+        // Order fully paid by wallet
+        toast.success("Order placed successfully! Paid with wallet.");
+        navigate(`/orders/${result.orderId}`);
+      } else if (formData.paymentMethod === "phonepe") {
         toast.loading("Redirecting to payment gateway...");
         
         const paymentResult = await initiatePayment({
           orderId: result.orderId,
           orderNumber: result.orderNumber,
-          amount: finalTotal,
+          amount: remainingAmount,
           customerPhone: formData.phone,
         });
 
@@ -399,6 +422,62 @@ function CheckoutPageInner() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Wallet Payment */}
+              {walletBalance > 0 && walletMaxUsage?.canUseWallet && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <WalletIcon className="size-5" />
+                      Wallet Balance
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Available Balance</p>
+                        <p className="text-2xl font-bold text-primary">₹{walletBalance.toFixed(2)}</p>
+                      </div>
+                      {maxWalletUsage > 0 && maxWalletUsage < walletBalance && (
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">Max Usage</p>
+                          <p className="text-lg font-semibold">₹{maxWalletUsage.toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="useWallet" 
+                        checked={useWallet}
+                        onCheckedChange={(checked) => setUseWallet(checked === true)}
+                      />
+                      <Label
+                        htmlFor="useWallet"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        Use wallet balance for this order
+                      </Label>
+                    </div>
+
+                    {useWallet && walletAmount > 0 && (
+                      <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                        <WalletIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium text-green-900 dark:text-green-100">
+                            ₹{walletAmount.toFixed(2)} will be deducted from your wallet
+                          </p>
+                          {walletAmount >= total && (
+                            <p className="text-green-700 dark:text-green-300 mt-1">
+                              Your order will be fully paid with wallet balance!
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Payment Method */}
               <Card>
@@ -636,6 +715,15 @@ function CheckoutPageInner() {
                       <span>₹{codFee.toFixed(0)}</span>
                     </div>
                   )}
+                  {walletAmount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-green-600 flex items-center gap-1">
+                        <WalletIcon className="size-3" />
+                        Wallet Deduction
+                      </span>
+                      <span className="text-green-600 font-medium">-₹{walletAmount.toFixed(0)}</span>
+                    </div>
+                  )}
                   {subtotal <= 500 && (
                     <p className="text-xs text-muted-foreground">
                       Add ₹{(501 - subtotal).toFixed(0)} more for free shipping
@@ -646,11 +734,22 @@ function CheckoutPageInner() {
                 <Separator />
 
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold">Total</span>
+                  <span className="font-semibold">
+                    {walletAmount > 0 ? "Amount to Pay" : "Total"}
+                  </span>
                   <span className="text-2xl font-bold text-primary">
                     ₹{finalTotal.toFixed(0)}
                   </span>
                 </div>
+                
+                {walletAmount > 0 && walletAmount >= total && (
+                  <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <WalletIcon className="size-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                      Fully paid with wallet!
+                    </p>
+                  </div>
+                )}
 
                 {/* Partial COD Breakdown */}
                 {formData.paymentMethod === "cod" && codAvailability?.available && codAvailability.prepaidAmount > 0 && (

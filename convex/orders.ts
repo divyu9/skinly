@@ -20,6 +20,7 @@ export const createOrder = mutation({
     codFee: v.optional(v.number()),
     prepaidAmount: v.optional(v.number()),
     codAmount: v.optional(v.number()),
+    walletAmount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -63,13 +64,85 @@ export const createOrder = mutation({
       0
     );
     const shippingFee = subtotal > 500 ? 0 : 50; // Free shipping over ₹500
-    const total = subtotal + shippingFee;
+    let total = subtotal + shippingFee;
+
+    // Handle wallet payment
+    let walletAmountUsed = 0;
+    if (args.walletAmount && args.walletAmount > 0) {
+      // Validate wallet amount
+      const walletBalance = user.walletBalance || 0;
+      
+      if (args.walletAmount > walletBalance) {
+        throw new ConvexError({
+          message: `Insufficient wallet balance. Available: ₹${walletBalance}`,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Get wallet settings to validate max usage
+      const walletSettings = await ctx.db.query("walletSettings").first();
+      
+      if (walletSettings && !walletSettings.walletEnabled) {
+        throw new ConvexError({
+          message: "Wallet payments are currently disabled",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Calculate max allowed wallet usage
+      let maxAllowedUsage = walletBalance;
+      
+      if (walletSettings && walletSettings.maxUsageType !== "unlimited") {
+        if (walletSettings.maxUsageType === "percentage") {
+          maxAllowedUsage = Math.min(
+            walletBalance,
+            (total * walletSettings.maxUsageValue) / 100
+          );
+        } else if (walletSettings.maxUsageType === "fixed") {
+          maxAllowedUsage = Math.min(walletBalance, walletSettings.maxUsageValue);
+        }
+      }
+
+      if (args.walletAmount > maxAllowedUsage) {
+        throw new ConvexError({
+          message: `Maximum wallet usage exceeded. Max allowed: ₹${maxAllowedUsage.toFixed(2)}`,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Don't allow wallet to pay more than order total
+      walletAmountUsed = Math.min(args.walletAmount, total);
+
+      // Deduct from wallet
+      const newWalletBalance = walletBalance - walletAmountUsed;
+      await ctx.db.patch(user._id, {
+        walletBalance: newWalletBalance,
+      });
+
+      // Record wallet transaction
+      await ctx.db.insert("walletTransactions", {
+        userId: user._id,
+        transactionType: "debit",
+        amount: walletAmountUsed,
+        source: "order_payment",
+        balanceBefore: walletBalance,
+        balanceAfter: newWalletBalance,
+        description: `Payment for order`,
+        createdAt: Date.now(),
+      });
+
+      // Reduce total by wallet amount
+      total = total - walletAmountUsed;
+    }
 
     // Calculate GST breakdown (tax-inclusive pricing)
-    const gstCalculation = calculateGST(total, args.shippingAddress.state);
+    const gstCalculation = calculateGST(total + walletAmountUsed, args.shippingAddress.state);
 
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+
+    // Store original total for notifications (before wallet deduction)
+    const originalTotal = subtotal + shippingFee;
 
     // Create order
     const orderId = await ctx.db.insert("orders", {
@@ -89,10 +162,12 @@ export const createOrder = mutation({
       })),
       subtotal,
       shippingFee,
-      total,
+      total: originalTotal, // Store original total (for display)
       shippingAddress: args.shippingAddress,
       paymentMethod: args.paymentMethod,
-      paymentStatus: "pending",
+      paymentStatus: walletAmountUsed >= originalTotal ? "success" : "pending", // If fully paid by wallet, mark as success
+      // Wallet fields
+      walletAmountUsed,
       // COD fields
       codFee: args.codFee,
       prepaidAmount: args.prepaidAmount,
@@ -108,6 +183,22 @@ export const createOrder = mutation({
       igstAmount: gstCalculation.igstAmount,
       totalGstAmount: gstCalculation.totalGstAmount,
     });
+
+    // Update wallet transaction with order ID
+    if (walletAmountUsed > 0) {
+      const walletTransaction = await ctx.db
+        .query("walletTransactions")
+        .withIndex("by_user_and_created", (q) => q.eq("userId", user._id))
+        .order("desc")
+        .first();
+      
+      if (walletTransaction) {
+        await ctx.db.patch(walletTransaction._id, {
+          relatedOrderId: orderId,
+          description: `Payment for order ${orderNumber}`,
+        });
+      }
+    }
 
     // Clear cart
     for (const item of cartItems) {
@@ -249,7 +340,57 @@ export const createOrder = mutation({
       // Don't fail order creation if admin WhatsApp fails
     }
 
-    return { orderId, orderNumber };
+    // If order is fully paid by wallet, confirm it and deduct inventory immediately
+    if (walletAmountUsed >= originalTotal) {
+      await ctx.db.patch(orderId, {
+        status: "confirmed",
+      });
+
+      // Deduct roll inventory
+      const allVariants = await ctx.db.query("variants").collect();
+      const items = cartItems
+        .map((item) => {
+          const variant = allVariants.find(
+            (v) => v.productId === item.productId && v.title === item.variant
+          );
+          if (!variant) return null;
+          return {
+            variantId: variant._id,
+            quantity: item.quantity,
+          };
+        })
+        .filter((item) => item !== null);
+
+      if (items.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.rollsManagement.deductRollInventory, {
+          items,
+        });
+      }
+
+      // Send order received notification
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          api.whatsappMessaging.queueMessage,
+          {
+            usecaseKey: "order_received",
+            recipientPhone: args.shippingAddress.phone,
+            recipientUserId: user._id,
+            variables: {
+              customer_name: args.shippingAddress.fullName || user.name || "Customer",
+              order_number: orderNumber,
+              order_total: `₹${originalTotal.toFixed(2)}`,
+              order_items: cartItems.length.toString(),
+            },
+            priority: 8,
+          }
+        );
+      } catch (error) {
+        console.error("Failed to queue WhatsApp notification:", error);
+      }
+    }
+
+    return { orderId, orderNumber, remainingAmount: total };
   },
 });
 
