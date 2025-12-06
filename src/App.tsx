@@ -1,6 +1,6 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { DefaultProviders } from "./components/providers/default.tsx";
-import { SidebarProvider } from "./components/admin-sidebar-context.tsx";
+import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import ProductsPage from "./pages/products/page.tsx";
@@ -54,37 +54,31 @@ export default function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-          <Route path="/admin/*" element={
-            <SidebarProvider>
-              <Routes>
-                <Route path="products" element={<AdminProductsPage />} />
-                <Route path="products/new" element={<NewProductPage />} />
-                <Route path="products/:productId" element={<EditProductPage />} />
-                <Route path="collections" element={<AdminCollectionsPage />} />
-                <Route path="orders" element={<AdminOrdersPage />} />
-                <Route path="orders/:orderId" element={<AdminOrderDetailPage />} />
-                <Route path="coupons" element={<AdminCouponsPage />} />
-                <Route path="reviews" element={<AdminReviewsPage />} />
-                <Route path="abandoned-carts" element={<AdminAbandonedCartsPage />} />
-                <Route path="stock-notifications" element={<AdminStockNotificationsPage />} />
-                <Route path="oos" element={<AdminOOSPage />} />
-                <Route path="cod" element={<AdminCODPage />} />
-                <Route path="whatsapp" element={<AdminWhatsAppPage />} />
-                <Route path="whatsapp/messages" element={<AdminWhatsAppMessagesPage />} />
-                <Route path="wallet" element={<AdminWalletPage />} />
-                <Route path="mockups" element={<AdminMockupsPage />} />
-                <Route path="mockups/missing" element={<AdminMockupsMissingPage />} />
-                <Route path="google-drive-import" element={<AdminGoogleDriveImportPage />} />
-                <Route path="models" element={<AdminModelsPage />} />
-                <Route path="seed-models" element={<AdminSeedModelsPage />} />
-                <Route path="phone-collections" element={<AdminPhoneCollectionsPage />} />
-                <Route path="product-fields-migration" element={<AdminProductFieldsMigrationPage />} />
-                <Route path="gst-migration" element={<GstMigrationPage />} />
-                <Route path="tax-export" element={<TaxExportPage />} />
-                <Route path="fix-collections" element={<FixCollectionsPage />} />
-              </Routes>
-            </SidebarProvider>
-          } />
+          <Route path="/admin/products" element={<AdminPageWrapper><AdminProductsPage /></AdminPageWrapper>} />
+          <Route path="/admin/products/new" element={<AdminPageWrapper><NewProductPage /></AdminPageWrapper>} />
+          <Route path="/admin/products/:productId" element={<AdminPageWrapper><EditProductPage /></AdminPageWrapper>} />
+          <Route path="/admin/collections" element={<AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper>} />
+          <Route path="/admin/orders" element={<AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper>} />
+          <Route path="/admin/orders/:orderId" element={<AdminPageWrapper><AdminOrderDetailPage /></AdminPageWrapper>} />
+          <Route path="/admin/coupons" element={<AdminPageWrapper><AdminCouponsPage /></AdminPageWrapper>} />
+          <Route path="/admin/reviews" element={<AdminPageWrapper><AdminReviewsPage /></AdminPageWrapper>} />
+          <Route path="/admin/abandoned-carts" element={<AdminPageWrapper><AdminAbandonedCartsPage /></AdminPageWrapper>} />
+          <Route path="/admin/stock-notifications" element={<AdminPageWrapper><AdminStockNotificationsPage /></AdminPageWrapper>} />
+          <Route path="/admin/oos" element={<AdminPageWrapper><AdminOOSPage /></AdminPageWrapper>} />
+          <Route path="/admin/cod" element={<AdminPageWrapper><AdminCODPage /></AdminPageWrapper>} />
+          <Route path="/admin/whatsapp" element={<AdminPageWrapper><AdminWhatsAppPage /></AdminPageWrapper>} />
+          <Route path="/admin/whatsapp/messages" element={<AdminPageWrapper><AdminWhatsAppMessagesPage /></AdminPageWrapper>} />
+          <Route path="/admin/wallet" element={<AdminPageWrapper><AdminWalletPage /></AdminPageWrapper>} />
+          <Route path="/admin/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />
+          <Route path="/admin/mockups/missing" element={<AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper>} />
+          <Route path="/admin/google-drive-import" element={<AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper>} />
+          <Route path="/admin/models" element={<AdminPageWrapper><AdminModelsPage /></AdminPageWrapper>} />
+          <Route path="/admin/seed-models" element={<AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper>} />
+          <Route path="/admin/phone-collections" element={<AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper>} />
+          <Route path="/admin/product-fields-migration" element={<AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper>} />
+          <Route path="/admin/gst-migration" element={<AdminPageWrapper><GstMigrationPage /></AdminPageWrapper>} />
+          <Route path="/admin/tax-export" element={<AdminPageWrapper><TaxExportPage /></AdminPageWrapper>} />
+          <Route path="/admin/fix-collections" element={<AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper>} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
