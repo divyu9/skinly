@@ -264,8 +264,7 @@ export const createOrder = mutation({
             variables: {
               customer_name: args.shippingAddress.fullName || user.name || "Customer",
               order_number: orderNumber,
-              order_total: `₹${total.toFixed(2)}`,
-              order_items: cartItems.length.toString(),
+              product_name: cartItems.map(item => item.productTitle).join(", "),
             },
             priority: 8,
           }
@@ -381,8 +380,7 @@ export const createOrder = mutation({
             variables: {
               customer_name: args.shippingAddress.fullName || user.name || "Customer",
               order_number: orderNumber,
-              order_total: `₹${originalTotal.toFixed(2)}`,
-              order_items: cartItems.length.toString(),
+              product_name: cartItems.map(item => item.productTitle).join(", "),
             },
             priority: 8,
           }
@@ -641,8 +639,7 @@ export const updatePaymentStatus = mutation({
                 variables: {
                   customer_name: order.shippingAddress.fullName || user?.name || "Customer",
                   order_number: order.orderNumber,
-                  order_total: `₹${order.total.toFixed(2)}`,
-                  order_items: order.items.length.toString(),
+                  product_name: order.items.map(item => item.productTitle).join(", "),
                 },
                 priority: 8,
               }
