@@ -31,6 +31,7 @@ export default defineSchema({
   orders: defineTable({
     userId: v.id("users"),
     orderNumber: v.string(),
+    customerEmail: v.optional(v.string()), // Customer's email for notifications
     status: v.union(
       v.literal("pending"),
       v.literal("confirmed"),

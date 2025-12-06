@@ -16,6 +16,7 @@ export const createOrder = mutation({
       state: v.string(),
       pincode: v.string(),
     }),
+    customerEmail: v.optional(v.string()),
     paymentMethod: v.string(),
     codFee: v.optional(v.number()),
     prepaidAmount: v.optional(v.number()),
@@ -148,6 +149,7 @@ export const createOrder = mutation({
     const orderId = await ctx.db.insert("orders", {
       userId: user._id,
       orderNumber,
+      customerEmail: args.customerEmail,
       status: "pending",
       items: cartItems.map((item) => ({
         productId: item.productId,
@@ -387,6 +389,23 @@ export const createOrder = mutation({
         );
       } catch (error) {
         console.error("Failed to queue WhatsApp notification:", error);
+      }
+    }
+
+    // Send email notification (order confirmed)
+    if (args.customerEmail) {
+      try {
+        await ctx.scheduler.runAfter(
+          2000,
+          api.emailActions.sendEmailNotification,
+          {
+            orderId,
+            emailType: "order_confirmed",
+          }
+        );
+      } catch (error) {
+        console.error("Failed to schedule email notification:", error);
+        // Don't fail order creation if email fails
       }
     }
 
