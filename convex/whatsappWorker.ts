@@ -19,6 +19,28 @@ function cleanPhoneNumber(phone: string): string {
 }
 
 // ============================================================================
+// HELPER: Extract 10-digit mobile number for AuthKey
+// ============================================================================
+
+function extractMobileNumber(phone: string): string {
+  // Remove all non-digit characters
+  const digitsOnly = phone.replace(/\D/g, "");
+  
+  // If starts with 91 and has 12 digits, remove the country code
+  if (digitsOnly.startsWith("91") && digitsOnly.length === 12) {
+    return digitsOnly.substring(2); // Return last 10 digits
+  }
+  
+  // If already 10 digits, return as is
+  if (digitsOnly.length === 10) {
+    return digitsOnly;
+  }
+  
+  // Otherwise return the digits (fallback)
+  return digitsOnly;
+}
+
+// ============================================================================
 // ACTION: Process a single message
 // ============================================================================
 
@@ -47,15 +69,18 @@ export const processMessage = action({
         throw new Error("WhatsApp provider not configured");
       }
 
-      // Clean phone number
+      // Clean phone number for storage
       const cleanedPhone = cleanPhoneNumber(args.message.recipientPhone);
+      
+      // Extract 10-digit mobile number for AuthKey API
+      const mobileNumber = extractMobileNumber(args.message.recipientPhone);
 
       // Prepare API request
       const baseUrl = providerSettings.apiEndpoint || "https://console.authkey.io/restapi/request.php";
       
       const params = new URLSearchParams({
         authkey: providerSettings.authKey,
-        mobile: cleanedPhone,
+        mobile: mobileNumber, // Send only 10-digit number
         country_code: "91", // Default to India
         wid: args.message.providerTemplateId,
         ...(args.message.variables ?? {}), // Spread variables as query params
