@@ -1,11 +1,11 @@
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon } from "lucide-react";
+import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -15,9 +15,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { PDFDocument } from "pdf-lib";
 
 function AdminOrdersPageInner() {
   const navigate = useNavigate();
@@ -25,6 +34,21 @@ function AdminOrdersPageInner() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
+  
+  // Bulk operations state
+  const [showBulkShipDialog, setShowBulkShipDialog] = useState(false);
+  const [showBulkLabelsDialog, setShowBulkLabelsDialog] = useState(false);
+  const [isProcessingBulk, setIsProcessingBulk] = useState(false);
+  const [bulkResults, setBulkResults] = useState<{
+    type: "ship" | "labels";
+    successful: number;
+    failed: number;
+    details: Array<{ orderNumber: string; error?: string; awb?: string }>;
+  } | null>(null);
+  
+  // Actions
+  const bulkCreateShipments = useAction(api.rapidshyp.bulkCreateShipments);
+  const bulkFetchLabels = useAction(api.rapidshyp.bulkFetchLabels);
 
   const stats = useQuery(api.admin.orders.getOrderStats);
   const allOrders = useQuery(api.admin.orders.getAllOrders, {
@@ -93,6 +117,138 @@ function AdminOrdersPageInner() {
       setSelectedOrders(new Set(displayOrders.map((o) => o._id)));
     } else {
       setSelectedOrders(new Set());
+    }
+  };
+
+  // Get valid orders for bulk ship (processing status, no AWB)
+  const getValidShipOrders = () => {
+    if (!displayOrders) return [];
+    return displayOrders.filter((o) => 
+      selectedOrders.has(o._id) && 
+      o.status === "processing" && 
+      !o.awbNumber
+    );
+  };
+
+  // Get valid orders for bulk labels (shipped status, has labelUrl)
+  const getValidLabelOrders = () => {
+    if (!displayOrders) return [];
+    return displayOrders.filter((o) => 
+      selectedOrders.has(o._id) && 
+      o.status === "shipped" && 
+      o.labelUrl
+    );
+  };
+
+  const handleBulkShip = async () => {
+    const validOrders = getValidShipOrders();
+    if (validOrders.length === 0) return;
+
+    setIsProcessingBulk(true);
+    setShowBulkShipDialog(false);
+
+    try {
+      const results = await bulkCreateShipments({
+        orderIds: validOrders.map((o) => o._id),
+      });
+
+      setBulkResults({
+        type: "ship",
+        successful: results.successful.length,
+        failed: results.failed.length,
+        details: [
+          ...results.successful.map((r) => ({
+            orderNumber: r.orderNumber,
+            awb: r.awbNumber,
+          })),
+          ...results.failed.map((r) => ({
+            orderNumber: r.orderNumber,
+            error: r.error,
+          })),
+        ],
+      });
+
+      if (results.successful.length > 0) {
+        toast.success(`${results.successful.length} shipments created successfully`);
+      }
+      if (results.failed.length > 0) {
+        toast.error(`${results.failed.length} shipments failed`);
+      }
+
+      // Clear selection
+      setSelectedOrders(new Set());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create shipments");
+    } finally {
+      setIsProcessingBulk(false);
+    }
+  };
+
+  const handleBulkFetchLabels = async () => {
+    const validOrders = getValidLabelOrders();
+    if (validOrders.length === 0) return;
+
+    setIsProcessingBulk(true);
+    setShowBulkLabelsDialog(false);
+
+    try {
+      const results = await bulkFetchLabels({
+        orderIds: validOrders.map((o) => o._id),
+      });
+
+      if (results.labels.length === 0) {
+        toast.error("No labels found");
+        setIsProcessingBulk(false);
+        return;
+      }
+
+      // Fetch and merge PDFs
+      const mergedPdf = await PDFDocument.create();
+
+      for (const label of results.labels) {
+        try {
+          const response = await fetch(label.labelUrl);
+          const pdfBytes = await response.arrayBuffer();
+          const pdf = await PDFDocument.load(pdfBytes);
+          const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+          pages.forEach((page) => mergedPdf.addPage(page));
+        } catch (error) {
+          console.error(`Failed to fetch label for ${label.orderNumber}:`, error);
+        }
+      }
+
+      // Download merged PDF
+      const mergedPdfBytes = await mergedPdf.save();
+      const blob = new Blob([new Uint8Array(mergedPdfBytes)], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `shipping-labels-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Downloaded ${results.labels.length} labels`);
+
+      if (results.errors.length > 0) {
+        setBulkResults({
+          type: "labels",
+          successful: results.labels.length,
+          failed: results.errors.length,
+          details: results.errors.map((e) => ({
+            orderNumber: e.orderNumber,
+            error: e.error,
+          })),
+        });
+      }
+
+      // Clear selection
+      setSelectedOrders(new Set());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to fetch labels");
+    } finally {
+      setIsProcessingBulk(false);
     }
   };
 
@@ -354,22 +510,57 @@ function AdminOrdersPageInner() {
         </CardContent>
       </Card>
 
-      {/* Pack List Button */}
+      {/* Bulk Operation Buttons */}
       {displayOrders && displayOrders.length > 0 && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
             {selectedOrders.size > 0
               ? `${selectedOrders.size} order${selectedOrders.size > 1 ? "s" : ""} selected`
-              : "Select orders to create pack list"}
+              : "Select orders for bulk operations"}
           </div>
-          <Button
-            onClick={generatePackList}
-            disabled={selectedOrders.size === 0}
-            variant="default"
-          >
-            <ListChecksIcon className="size-4 mr-2" />
-            Generate Pack List ({selectedOrders.size})
-          </Button>
+          <div className="flex gap-2">
+            {/* Bulk Ship - Processing tab only */}
+            {statusFilter === "processing" && (
+              <Button
+                onClick={() => setShowBulkShipDialog(true)}
+                disabled={isProcessingBulk || getValidShipOrders().length === 0}
+                variant="default"
+              >
+                {isProcessingBulk ? (
+                  <LoaderIcon className="size-4 mr-2 animate-spin" />
+                ) : (
+                  <PackageCheckIcon className="size-4 mr-2" />
+                )}
+                Bulk Ship via RapidShyp ({getValidShipOrders().length})
+              </Button>
+            )}
+            
+            {/* Bulk Fetch Labels - Shipped tab only */}
+            {statusFilter === "shipped" && (
+              <Button
+                onClick={() => setShowBulkLabelsDialog(true)}
+                disabled={isProcessingBulk || getValidLabelOrders().length === 0}
+                variant="default"
+              >
+                {isProcessingBulk ? (
+                  <LoaderIcon className="size-4 mr-2 animate-spin" />
+                ) : (
+                  <FileDownIcon className="size-4 mr-2" />
+                )}
+                Bulk Fetch Labels ({getValidLabelOrders().length})
+              </Button>
+            )}
+            
+            {/* Pack List - All tabs */}
+            <Button
+              onClick={generatePackList}
+              disabled={selectedOrders.size === 0}
+              variant="outline"
+            >
+              <ListChecksIcon className="size-4 mr-2" />
+              Generate Pack List ({selectedOrders.size})
+            </Button>
+          </div>
         </div>
       )}
 
@@ -497,6 +688,112 @@ function AdminOrdersPageInner() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Bulk Ship Confirmation Dialog */}
+      <Dialog open={showBulkShipDialog} onOpenChange={setShowBulkShipDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Create Shipments</DialogTitle>
+            <DialogDescription>
+              Create RapidShyp shipments for {getValidShipOrders().length} selected orders?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-2">Orders to ship:</p>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {getValidShipOrders().map((order) => (
+                <div key={order._id} className="text-sm font-mono">
+                  {order.orderNumber} - {order.shippingAddress.fullName}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkShipDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkShip}>
+              Create Shipments
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Fetch Labels Confirmation Dialog */}
+      <Dialog open={showBulkLabelsDialog} onOpenChange={setShowBulkLabelsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Fetch Labels</DialogTitle>
+            <DialogDescription>
+              Download combined PDF with labels for {getValidLabelOrders().length} selected orders?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-2">Orders to fetch labels for:</p>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {getValidLabelOrders().map((order) => (
+                <div key={order._id} className="text-sm font-mono">
+                  {order.orderNumber} - AWB: {order.awbNumber}
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkLabelsDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkFetchLabels}>
+              Fetch Labels
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Results Dialog */}
+      {bulkResults && (
+        <Dialog open={!!bulkResults} onOpenChange={() => setBulkResults(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {bulkResults.type === "ship" ? "Shipment Results" : "Label Fetch Results"}
+              </DialogTitle>
+              <DialogDescription>
+                {bulkResults.successful} successful, {bulkResults.failed} failed
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 max-h-96 overflow-y-auto">
+              {bulkResults.details.map((detail, idx) => (
+                <div
+                  key={idx}
+                  className={`p-3 mb-2 rounded border ${
+                    detail.error ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="font-mono text-sm font-medium">{detail.orderNumber}</span>
+                      {detail.awb && (
+                        <span className="ml-2 text-xs text-muted-foreground">AWB: {detail.awb}</span>
+                      )}
+                    </div>
+                    {detail.error ? (
+                      <Badge variant="destructive">Failed</Badge>
+                    ) : (
+                      <Badge variant="default" className="bg-green-600">Success</Badge>
+                    )}
+                  </div>
+                  {detail.error && (
+                    <p className="text-xs text-red-600 mt-1">{detail.error}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setBulkResults(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

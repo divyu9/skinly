@@ -537,57 +537,148 @@ export const cancelShipment = action({
   },
 });
 
-// Generate shipping label
-// NOTE: This action is deprecated and not used anymore.
-// The label URL is now automatically saved when creating a shipment.
-// RapidShyp provides the label URL in the shipment creation response.
-// 
-// export const generateShippingLabel = action({
-//   args: {
-//     awbNumber: v.string(),
-//   },
-//   handler: async (ctx, args) => {
-//     try {
-//       const config = getRapidShypConfig();
-// 
-//       // Make API request to get shipping label
-//       const response = await fetch(
-//         `${config.apiUrl}/v1/external/orders/label/${args.awbNumber}`,
-//         {
-//           method: "GET",
-//           headers: {
-//             "Content-Type": "application/json",
-//             Authorization: `Bearer ${config.apiKey}`,
-//           },
-//         }
-//       );
-// 
-//       if (!response.ok) {
-//         const errorData = await response.text();
-//         throw new ConvexError({
-//           message: `RapidShyp label API error: ${errorData}`,
-//           code: "EXTERNAL_SERVICE_ERROR",
-//         });
-//       }
-// 
-//       const result = await response.json();
-// 
-//       // Return label URL or base64 PDF
-//       return {
-//         success: true,
-//         labelUrl: result.label_url || result.label_pdf,
-//       };
-//     } catch (error) {
-//       if (error instanceof ConvexError) {
-//         throw error;
-//       }
-//       throw new ConvexError({
-//         message:
-//           error instanceof Error
-//             ? error.message
-//             : "Failed to generate shipping label",
-//         code: "EXTERNAL_SERVICE_ERROR",
-//       });
-//     }
-//   },
-// });
+// Bulk create shipments for multiple orders
+export const bulkCreateShipments = action({
+  args: {
+    orderIds: v.array(v.id("orders")),
+  },
+  handler: async (ctx, args) => {
+    const results: {
+      successful: Array<{ orderId: Id<"orders">; orderNumber: string; awbNumber: string }>;
+      failed: Array<{ orderId: Id<"orders">; orderNumber: string; error: string }>;
+    } = {
+      successful: [],
+      failed: [],
+    };
+
+    // Process each order sequentially
+    for (const orderId of args.orderIds) {
+      try {
+        // Get order details first to check if it's valid for shipping
+        const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+          orderId,
+        });
+
+        // Validate order is in processing status and doesn't have AWB
+        if (order.status !== "processing") {
+          results.failed.push({
+            orderId,
+            orderNumber: order.orderNumber,
+            error: `Order status is ${order.status}, must be processing`,
+          });
+          continue;
+        }
+
+        if (order.awbNumber) {
+          results.failed.push({
+            orderId,
+            orderNumber: order.orderNumber,
+            error: "Shipment already created",
+          });
+          continue;
+        }
+
+        // Create shipment
+        const result = await ctx.runAction(api.rapidshyp.createShipment, {
+          orderId,
+        });
+
+        if (result.success && result.awbNumber) {
+          results.successful.push({
+            orderId,
+            orderNumber: order.orderNumber,
+            awbNumber: result.awbNumber,
+          });
+        } else {
+          results.failed.push({
+            orderId,
+            orderNumber: order.orderNumber,
+            error: result.message || "Unknown error",
+          });
+        }
+      } catch (error) {
+        // Get order number for error reporting
+        let orderNumber = "Unknown";
+        try {
+          const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+            orderId,
+          });
+          orderNumber = order.orderNumber;
+        } catch {
+          // Ignore error getting order number
+        }
+
+        results.failed.push({
+          orderId,
+          orderNumber,
+          error: error instanceof Error ? error.message : "Failed to create shipment",
+        });
+      }
+    }
+
+    return results;
+  },
+});
+
+// Bulk fetch label URLs for multiple orders
+export const bulkFetchLabels = action({
+  args: {
+    orderIds: v.array(v.id("orders")),
+  },
+  handler: async (ctx, args) => {
+    const labels: Array<{
+      orderId: Id<"orders">;
+      orderNumber: string;
+      labelUrl: string;
+    }> = [];
+    const errors: Array<{
+      orderId: Id<"orders">;
+      orderNumber: string;
+      error: string;
+    }> = [];
+
+    // Process each order
+    for (const orderId of args.orderIds) {
+      try {
+        const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+          orderId,
+        });
+
+        // Validate order has label URL
+        if (!order.labelUrl) {
+          errors.push({
+            orderId,
+            orderNumber: order.orderNumber,
+            error: "No label URL found",
+          });
+          continue;
+        }
+
+        labels.push({
+          orderId,
+          orderNumber: order.orderNumber,
+          labelUrl: order.labelUrl,
+        });
+      } catch (error) {
+        // Get order number for error reporting
+        let orderNumber = "Unknown";
+        try {
+          const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
+            orderId,
+          });
+          orderNumber = order.orderNumber;
+        } catch {
+          // Ignore error getting order number
+        }
+
+        errors.push({
+          orderId,
+          orderNumber,
+          error: error instanceof Error ? error.message : "Failed to fetch label",
+        });
+      }
+    }
+
+    return { labels, errors };
+  },
+});
