@@ -233,24 +233,49 @@ export const createOrder = mutation({
           // User needs to make prepaid payment, so this notification will be sent after payment
           // We'll handle this in the payment success handler
         } else {
-          // Full COD - send COD confirmation notification
-          await ctx.scheduler.runAfter(
-            0,
-            api.whatsappMessaging.queueMessage,
-            {
-              usecaseKey: "cod_confirmation",
-              recipientPhone: args.shippingAddress.phone,
-              recipientUserId: user._id,
-              variables: {
-                customer_name: args.shippingAddress.fullName || user.name || "Customer",
-                order_number: orderNumber,
-                order_total: `₹${total.toFixed(2)}`,
-                cod_amount: `₹${(args.codAmount || total).toFixed(2)}`,
-                cod_fee: `₹${(args.codFee || 0).toFixed(2)}`,
-              },
-              priority: 8,
-            }
-          );
+          // Full COD - check if cod_confirmation is enabled
+          const codUsecase = await ctx.db
+            .query("whUsecaseTemplates")
+            .withIndex("by_usecase_key", (q) => q.eq("usecaseKey", "cod_confirmation"))
+            .first();
+
+          if (codUsecase?.enabled && codUsecase.providerTemplateId) {
+            // Send COD confirmation if enabled
+            await ctx.scheduler.runAfter(
+              0,
+              api.whatsappMessaging.queueMessage,
+              {
+                usecaseKey: "cod_confirmation",
+                recipientPhone: args.shippingAddress.phone,
+                recipientUserId: user._id,
+                variables: {
+                  customer_name: args.shippingAddress.fullName || user.name || "Customer",
+                  order_number: orderNumber,
+                  order_total: `₹${total.toFixed(2)}`,
+                  cod_amount: `₹${(args.codAmount || total).toFixed(2)}`,
+                  cod_fee: `₹${(args.codFee || 0).toFixed(2)}`,
+                },
+                priority: 8,
+              }
+            );
+          } else {
+            // Fallback to order_received
+            await ctx.scheduler.runAfter(
+              0,
+              api.whatsappMessaging.queueMessage,
+              {
+                usecaseKey: "order_received",
+                recipientPhone: args.shippingAddress.phone,
+                recipientUserId: user._id,
+                variables: {
+                  customer_name: args.shippingAddress.fullName || user.name || "Customer",
+                  order_number: orderNumber,
+                  product_name: cartItems.map(item => item.productTitle).join(", "),
+                },
+                priority: 8,
+              }
+            );
+          }
         }
       } else {
         // Prepaid orders - send order received notification
@@ -608,25 +633,50 @@ export const updatePaymentStatus = mutation({
                               order.prepaidAmount > 0;
           
           if (isPartialCod) {
-            // Partial COD - send partial COD notification
-            await ctx.scheduler.runAfter(
-              0,
-              api.whatsappMessaging.queueMessage,
-              {
-                usecaseKey: "partial_cod",
-                recipientPhone: order.shippingAddress.phone,
-                recipientUserId: order.userId,
-                variables: {
-                  customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                  order_number: order.orderNumber,
-                  order_total: `₹${order.total.toFixed(2)}`,
-                  prepaid_amount: `₹${(order.prepaidAmount || 0).toFixed(2)}`,
-                  cod_amount: `₹${(order.codAmount || 0).toFixed(2)}`,
-                  cod_fee: `₹${(order.codFee || 0).toFixed(2)}`,
-                },
-                priority: 8,
-              }
-            );
+            // Partial COD - check if partial_cod usecase is enabled
+            const partialCodUsecase = await ctx.db
+              .query("whUsecaseTemplates")
+              .withIndex("by_usecase_key", (q) => q.eq("usecaseKey", "partial_cod"))
+              .first();
+
+            if (partialCodUsecase?.enabled && partialCodUsecase.providerTemplateId) {
+              // Send partial COD notification if enabled
+              await ctx.scheduler.runAfter(
+                0,
+                api.whatsappMessaging.queueMessage,
+                {
+                  usecaseKey: "partial_cod",
+                  recipientPhone: order.shippingAddress.phone,
+                  recipientUserId: order.userId,
+                  variables: {
+                    customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                    order_number: order.orderNumber,
+                    order_total: `₹${order.total.toFixed(2)}`,
+                    prepaid_amount: `₹${(order.prepaidAmount || 0).toFixed(2)}`,
+                    cod_amount: `₹${(order.codAmount || 0).toFixed(2)}`,
+                    cod_fee: `₹${(order.codFee || 0).toFixed(2)}`,
+                  },
+                  priority: 8,
+                }
+              );
+            } else {
+              // Fallback to order_received
+              await ctx.scheduler.runAfter(
+                0,
+                api.whatsappMessaging.queueMessage,
+                {
+                  usecaseKey: "order_received",
+                  recipientPhone: order.shippingAddress.phone,
+                  recipientUserId: order.userId,
+                  variables: {
+                    customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                    order_number: order.orderNumber,
+                    product_name: order.items.map(item => item.productTitle).join(", "),
+                  },
+                  priority: 8,
+                }
+              );
+            }
           } else {
             // Full prepaid payment - send order received notification
             await ctx.scheduler.runAfter(
