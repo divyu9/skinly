@@ -202,43 +202,38 @@ function AdminOrdersPageInner() {
         return;
       }
 
-      console.log(`Fetching ${results.labels.length} labels for ST4 format`);
+      console.log(`Loading ${results.labels.length} labels for ST4 format`);
 
-      // Fetch all label PDFs
+      // Load all label PDFs from base64 data (fetched by backend)
       const labelPdfs: Array<{ orderNumber: string; pdf: PDFDocument }> = [];
-      const fetchErrors: Array<{ orderNumber: string; error: string }> = [];
+      const loadErrors: Array<{ orderNumber: string; error: string }> = [];
 
       for (const label of results.labels) {
         try {
-          console.log(`Fetching label for ${label.orderNumber} from ${label.labelUrl}`);
+          console.log(`Loading label for ${label.orderNumber}`);
           
-          const response = await fetch(label.labelUrl, {
-            method: 'GET',
-            redirect: 'follow',
-          });
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // Convert base64 to bytes
+          const base64Data = label.pdfBase64;
+          const binaryString = atob(base64Data);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
           }
 
-          const contentType = response.headers.get('content-type');
-          console.log(`Content-Type for ${label.orderNumber}:`, contentType);
+          console.log(`Decoded ${bytes.byteLength} bytes for ${label.orderNumber}`);
 
-          const pdfBytes = await response.arrayBuffer();
-          console.log(`Fetched ${pdfBytes.byteLength} bytes for ${label.orderNumber}`);
-
-          if (pdfBytes.byteLength === 0) {
-            throw new Error('Empty PDF file');
+          if (bytes.byteLength === 0) {
+            throw new Error('Empty PDF data');
           }
 
-          const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+          const pdf = await PDFDocument.load(bytes, { ignoreEncryption: true });
           console.log(`Loaded PDF for ${label.orderNumber}, pages: ${pdf.getPageCount()}`);
           
           labelPdfs.push({ orderNumber: label.orderNumber, pdf });
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`Failed to fetch/load label for ${label.orderNumber}:`, errorMsg);
-          fetchErrors.push({
+          console.error(`Failed to load label for ${label.orderNumber}:`, errorMsg);
+          loadErrors.push({
             orderNumber: label.orderNumber,
             error: errorMsg,
           });
@@ -246,13 +241,13 @@ function AdminOrdersPageInner() {
       }
 
       if (labelPdfs.length === 0) {
-        toast.error("Failed to fetch any labels");
-        if (fetchErrors.length > 0) {
+        toast.error("Failed to load any labels");
+        if (loadErrors.length > 0) {
           setBulkResults({
             type: "labels",
             successful: 0,
-            failed: fetchErrors.length,
-            details: fetchErrors.map((e) => ({
+            failed: loadErrors.length,
+            details: loadErrors.map((e) => ({
               orderNumber: e.orderNumber,
               error: e.error,
             })),
@@ -324,7 +319,7 @@ function AdminOrdersPageInner() {
             console.log(`Placed label ${orderNumber} at position ${j + 1}/4 on page ${Math.floor(i / 4) + 1}`);
           } catch (error) {
             console.error(`Failed to embed label ${orderNumber}:`, error);
-            fetchErrors.push({
+            loadErrors.push({
               orderNumber,
               error: error instanceof Error ? error.message : 'Failed to embed in ST4 layout',
             });
@@ -347,13 +342,13 @@ function AdminOrdersPageInner() {
       const totalPages = Math.ceil(labelPdfs.length / 4);
       toast.success(`Downloaded ${labelPdfs.length} labels in ST4 format (${totalPages} A4 pages)`);
 
-      if (fetchErrors.length > 0 || results.errors.length > 0) {
+      if (loadErrors.length > 0 || results.errors.length > 0) {
         setBulkResults({
           type: "labels",
           successful: labelPdfs.length,
-          failed: fetchErrors.length + results.errors.length,
+          failed: loadErrors.length + results.errors.length,
           details: [
-            ...fetchErrors.map((e) => ({
+            ...loadErrors.map((e) => ({
               orderNumber: e.orderNumber,
               error: e.error,
             })),

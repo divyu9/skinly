@@ -620,7 +620,7 @@ export const bulkCreateShipments = action({
   },
 });
 
-// Bulk fetch label URLs for multiple orders
+// Bulk fetch label PDFs for multiple orders (fetches actual PDF bytes to bypass CORS)
 export const bulkFetchLabels = action({
   args: {
     orderIds: v.array(v.id("orders")),
@@ -629,7 +629,7 @@ export const bulkFetchLabels = action({
     const labels: Array<{
       orderId: Id<"orders">;
       orderNumber: string;
-      labelUrl: string;
+      pdfBase64: string;
     }> = [];
     const errors: Array<{
       orderId: Id<"orders">;
@@ -654,10 +654,34 @@ export const bulkFetchLabels = action({
           continue;
         }
 
+        console.log(`Fetching label for ${order.orderNumber} from ${order.labelUrl}`);
+
+        // Fetch the PDF from RapidShyp (backend has no CORS restrictions)
+        const response = await fetch(order.labelUrl, {
+          method: 'GET',
+          redirect: 'follow',
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Get PDF bytes
+        const pdfBuffer = await response.arrayBuffer();
+        
+        if (pdfBuffer.byteLength === 0) {
+          throw new Error('Empty PDF file');
+        }
+
+        console.log(`Fetched ${pdfBuffer.byteLength} bytes for ${order.orderNumber}`);
+
+        // Convert to base64 for transport to frontend
+        const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+
         labels.push({
           orderId,
           orderNumber: order.orderNumber,
-          labelUrl: order.labelUrl,
+          pdfBase64,
         });
       } catch (error) {
         // Get order number for error reporting
@@ -671,10 +695,13 @@ export const bulkFetchLabels = action({
           // Ignore error getting order number
         }
 
+        const errorMsg = error instanceof Error ? error.message : "Failed to fetch label";
+        console.error(`Failed to fetch label for ${orderNumber}:`, errorMsg);
+
         errors.push({
           orderId,
           orderNumber,
-          error: error instanceof Error ? error.message : "Failed to fetch label",
+          error: errorMsg,
         });
       }
     }
