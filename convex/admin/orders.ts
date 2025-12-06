@@ -405,3 +405,149 @@ export const getOrderDetails = query({
     };
   },
 });
+
+// Get variant inventory for order items
+export const getOrderVariantInventory = query({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Get inventory for each SKU
+    const inventoryData = await Promise.all(
+      order.items.map(async (item) => {
+        const variant = await ctx.db
+          .query("variants")
+          .withIndex("by_sku", (q) => q.eq("sku", item.variant))
+          .first();
+
+        return {
+          sku: item.variant,
+          productTitle: item.productTitle,
+          quantity: item.quantity,
+          currentInventory: variant?.inventoryQuantity || 0,
+          variantTitle: variant?.title || item.variant,
+        };
+      })
+    );
+
+    return inventoryData;
+  },
+});
+
+// Restock inventory for cancelled orders
+export const restockInventory = mutation({
+  args: {
+    orderId: v.id("orders"),
+    itemsToRestock: v.array(v.object({
+      variant: v.string(), // SKU
+      quantity: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Only allow restocking for cancelled or RTO orders
+    if (order.status !== "cancelled" && order.status !== "rto") {
+      throw new ConvexError({
+        message: "Can only restock inventory for cancelled or RTO orders",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const results: Array<{ sku: string; success: boolean; error?: string; oldQty?: number; newQty?: number }> = [];
+
+    // Process each item to restock
+    for (const item of args.itemsToRestock) {
+      try {
+        // Find the variant by SKU
+        const variant = await ctx.db
+          .query("variants")
+          .withIndex("by_sku", (q) => q.eq("sku", item.variant))
+          .first();
+
+        if (!variant) {
+          results.push({
+            sku: item.variant,
+            success: false,
+            error: "Variant not found",
+          });
+          continue;
+        }
+
+        const oldQty = variant.inventoryQuantity;
+        const newQty = oldQty + item.quantity;
+
+        // Update inventory
+        await ctx.db.patch(variant._id, {
+          inventoryQuantity: newQty,
+        });
+
+        results.push({
+          sku: item.variant,
+          success: true,
+          oldQty,
+          newQty,
+        });
+      } catch (error) {
+        results.push({
+          sku: item.variant,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    }
+
+    // Add to restocking history
+    const restockingEntry = {
+      restockedAt: Date.now(),
+      restockedBy: identity.email || identity.tokenIdentifier,
+      items: args.itemsToRestock.map((item) => {
+        const orderItem = order.items.find((i) => i.variant === item.variant);
+        return {
+          productId: orderItem?.productId || "unknown",
+          variantId: undefined,
+          sku: item.variant,
+          quantity: item.quantity,
+        };
+      }),
+    };
+
+    const existingHistory = order.restockingHistory || [];
+    await ctx.db.patch(args.orderId, {
+      restockingHistory: [...existingHistory, restockingEntry],
+    });
+
+    return {
+      success: results.every((r) => r.success),
+      results,
+    };
+  },
+});

@@ -4,17 +4,18 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
-import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon } from "lucide-react";
+import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog.tsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -32,12 +33,22 @@ function OrderDetailPageInner() {
     api.admin.orders.getOrderDetails,
     orderId ? { orderId: orderId as Id<"orders"> } : "skip"
   );
+  const inventoryData = useQuery(
+    api.admin.orders.getOrderVariantInventory,
+    orderId && order && (order.status === "cancelled" || order.status === "rto")
+      ? { orderId: orderId as Id<"orders"> }
+      : "skip"
+  );
   const updateOrderStatus = useMutation(api.admin.orders.updateOrderStatus);
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const createShipment = useAction(api.rapidshyp.createShipment);
+  const restockInventory = useMutation(api.admin.orders.restockInventory);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
+  const [showRestockDialog, setShowRestockDialog] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isRestocking, setIsRestocking] = useState(false);
 
   const handleStatusChange = async (
     status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
@@ -110,6 +121,67 @@ function OrderDetailPageInner() {
     } finally {
       setCreatingShipment(false);
     }
+  };
+
+  const handleSelectAllItems = (checked: boolean) => {
+    if (checked && order) {
+      setSelectedItems(new Set(order.items.map((item) => item.variant)));
+    } else {
+      setSelectedItems(new Set());
+    }
+  };
+
+  const handleSelectItem = (sku: string, checked: boolean) => {
+    const newSelected = new Set(selectedItems);
+    if (checked) {
+      newSelected.add(sku);
+    } else {
+      newSelected.delete(sku);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleRestock = async () => {
+    if (!orderId || !order) return;
+    setIsRestocking(true);
+    try {
+      const itemsToRestock = order.items
+        .filter((item) => selectedItems.has(item.variant))
+        .map((item) => ({
+          variant: item.variant,
+          quantity: item.quantity,
+        }));
+
+      const result = await restockInventory({
+        orderId: orderId as Id<"orders">,
+        itemsToRestock,
+      });
+
+      if (result.success) {
+        toast.success(`Successfully restocked ${itemsToRestock.length} item(s)`);
+        setShowRestockDialog(false);
+        setSelectedItems(new Set());
+      } else {
+        const failedItems = result.results.filter((r) => !r.success);
+        toast.error(`Failed to restock ${failedItems.length} item(s)`, {
+          description: failedItems.map((r) => `${r.sku}: ${r.error}`).join(", "),
+        });
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to restock inventory");
+    } finally {
+      setIsRestocking(false);
+    }
+  };
+
+  const formatRestockDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
 
@@ -435,6 +507,82 @@ function OrderDetailPageInner() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Inventory Restocking - Only show for cancelled/RTO orders */}
+          {(order.status === "cancelled" || order.status === "rto") && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PackageXIcon className="size-5" />
+                  Inventory Restocking
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.restockingHistory && order.restockingHistory.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckIcon className="size-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900">
+                        Inventory has been restocked
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">
+                        Restocking History
+                      </p>
+                      {order.restockingHistory.map((entry, idx) => (
+                        <div key={idx} className="p-3 bg-muted/50 rounded-lg text-sm">
+                          <p className="font-medium">
+                            {formatRestockDate(entry.restockedAt)}
+                          </p>
+                          <p className="text-muted-foreground text-xs">
+                            By: {entry.restockedBy}
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            {entry.items.map((item, itemIdx) => (
+                              <p key={itemIdx} className="text-xs">
+                                • {item.sku} × {item.quantity}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedItems(new Set(order.items.map((i) => i.variant)));
+                        setShowRestockDialog(true);
+                      }}
+                    >
+                      <RotateCcwIcon className="size-4 mr-2" />
+                      Restock Again
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <PackageXIcon className="size-4 text-amber-600" />
+                      <span className="text-sm text-amber-900">
+                        Inventory has not been restocked yet
+                      </span>
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedItems(new Set(order.items.map((i) => i.variant)));
+                        setShowRestockDialog(true);
+                      }}
+                    >
+                      <RotateCcwIcon className="size-4 mr-2" />
+                      Restock Inventory
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Customer & Order Details */}
@@ -602,6 +750,100 @@ function OrderDetailPageInner() {
           )}
         </div>
       </div>
+
+      {/* Restock Inventory Dialog */}
+      <Dialog open={showRestockDialog} onOpenChange={setShowRestockDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Restock Inventory</DialogTitle>
+            <DialogDescription>
+              Select which items to restock from this {order.status} order
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {inventoryData === undefined ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : inventoryData && inventoryData.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 pb-3 border-b">
+                  <Checkbox
+                    checked={selectedItems.size === order.items.length && selectedItems.size > 0}
+                    onCheckedChange={handleSelectAllItems}
+                  />
+                  <span className="text-sm font-medium">Select All Items</span>
+                </div>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {inventoryData.map((item) => (
+                    <div
+                      key={item.sku}
+                      className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <Checkbox
+                        checked={selectedItems.has(item.sku)}
+                        onCheckedChange={(checked) =>
+                          handleSelectItem(item.sku, checked as boolean)
+                        }
+                      />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-medium text-sm">{item.productTitle}</p>
+                        <p className="text-xs text-muted-foreground">
+                          SKU: {item.sku} • Variant: {item.variantTitle}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs">
+                          <span className="text-muted-foreground">
+                            Order Qty: <span className="font-medium text-foreground">{item.quantity}</span>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Current Inventory: <span className="font-medium text-foreground">{item.currentInventory}</span>
+                          </span>
+                          <span className="text-green-600">
+                            → After Restock: <span className="font-semibold">{item.currentInventory + item.quantity}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No inventory data available
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRestockDialog(false);
+                setSelectedItems(new Set());
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRestock}
+              disabled={selectedItems.size === 0 || isRestocking}
+            >
+              {isRestocking ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Restocking...
+                </>
+              ) : (
+                <>
+                  <RotateCcwIcon className="size-4 mr-2" />
+                  Restock {selectedItems.size} Item{selectedItems.size !== 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
