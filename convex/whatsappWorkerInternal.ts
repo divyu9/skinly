@@ -164,6 +164,28 @@ export const getProviderSettings = internalQuery({
 });
 
 // ============================================================================
+// INTERNAL QUERY: Get template variables order
+// ============================================================================
+
+export const getTemplateVariables = internalQuery({
+  args: {
+    providerTemplateId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const template = await ctx.db
+      .query("whApprovedTemplates")
+      .withIndex("by_provider_id", (q) => q.eq("providerTemplateId", args.providerTemplateId))
+      .first();
+
+    if (!template || !template.variables) {
+      return [];
+    }
+
+    return template.variables;
+  },
+});
+
+// ============================================================================
 // INTERNAL MUTATION: Schedule worker to run again
 // ============================================================================
 

@@ -69,11 +69,34 @@ export const processMessage = action({
         throw new Error("WhatsApp provider not configured");
       }
 
+      // Get template variables order for AuthKey numbered format
+      const templateVariables = await ctx.runQuery(
+        internal.whatsappWorkerInternal.getTemplateVariables,
+        { providerTemplateId: args.message.providerTemplateId }
+      );
+
       // Clean phone number for storage
       const cleanedPhone = cleanPhoneNumber(args.message.recipientPhone);
       
       // Extract 10-digit mobile number for AuthKey API
       const mobileNumber = extractMobileNumber(args.message.recipientPhone);
+
+      // Convert named variables to AuthKey numbered format (v1, v2, v3, etc.)
+      const numberedVariables: Record<string, string> = {};
+      if (args.message.variables && templateVariables.length > 0) {
+        templateVariables.forEach((varName: string, index: number) => {
+          const value = args.message.variables?.[varName];
+          if (value !== undefined) {
+            numberedVariables[`v${index + 1}`] = value;
+          }
+        });
+      }
+
+      console.log("Variable conversion:", {
+        templateVariables,
+        inputVariables: args.message.variables,
+        numberedVariables,
+      });
 
       // Prepare API request
       const baseUrl = providerSettings.apiEndpoint || "https://console.authkey.io/restapi/request.php";
@@ -83,7 +106,7 @@ export const processMessage = action({
         mobile: mobileNumber, // Send only 10-digit number
         country_code: "91", // Default to India
         wid: args.message.providerTemplateId,
-        ...(args.message.variables ?? {}), // Spread variables as query params
+        ...numberedVariables, // Use numbered format (v1, v2, v3)
       });
 
       const url = `${baseUrl}?${params.toString()}`;
