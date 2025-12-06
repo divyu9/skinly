@@ -14,6 +14,7 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -275,10 +276,52 @@ function AdminOrdersPageInner() {
         </Card>
       </div>
 
+      {/* Status Tabs */}
+      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+        <TabsList className="w-full justify-start overflow-x-auto">
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            All Orders
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+              {stats.total}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="processing" className="flex items-center gap-2">
+            Processing
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/20">
+              {stats.processing}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="shipped" className="flex items-center gap-2">
+            Shipped
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
+              {stats.shipped}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="delivered" className="flex items-center gap-2">
+            Delivered
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-green-500/10 text-green-600 border-green-500/20">
+              {stats.delivered}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="cancelled" className="flex items-center gap-2">
+            Cancelled
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
+              {stats.cancelled}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="rto" className="flex items-center gap-2">
+            RTO
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
+              {stats.rto}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Filters and Search */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
               <Label htmlFor="search">Search Orders</Label>
               <div className="relative">
@@ -291,24 +334,6 @@ function AdminOrdersPageInner() {
                   className="pl-9"
                 />
               </div>
-            </div>
-
-            <div>
-              <Label>Order Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="shipped">Shipped</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div>
