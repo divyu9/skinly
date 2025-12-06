@@ -60,7 +60,9 @@ function CheckoutPageInner() {
 
   // Reset OTP state when phone number changes
   const handlePhoneChange = (value: string) => {
-    setFormData({ ...formData, phone: value });
+    // Only allow digits, max 10
+    const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
+    setFormData({ ...formData, phone: digitsOnly });
     if (otpVerified || otpSent) {
       setOtpSent(false);
       setOtpVerified(false);
@@ -68,6 +70,14 @@ function CheckoutPageInner() {
       setOtpExpiresAt(null);
     }
   };
+
+  // Get full phone number with country code for backend
+  const getFullPhoneNumber = () => {
+    return formData.phone ? `+91${formData.phone}` : "";
+  };
+
+  // Validate phone number
+  const isPhoneValid = formData.phone.length === 10;
 
   // Calculate totals and GST (before early returns)
   const subtotal = cartItems ? cartItems.reduce(
@@ -156,11 +166,15 @@ function CheckoutPageInner() {
       toast.error("Please enter your phone number first");
       return;
     }
+    if (!isPhoneValid) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
 
     setIsSendingOtp(true);
     try {
       const result = await generateCodOtp({
-        phoneNumber: formData.phone,
+        phoneNumber: getFullPhoneNumber(),
       });
       setOtpSent(true);
       setOtpExpiresAt(result.expiresAt);
@@ -181,7 +195,7 @@ function CheckoutPageInner() {
     setIsVerifyingOtp(true);
     try {
       await verifyCodOtp({
-        phoneNumber: formData.phone,
+        phoneNumber: getFullPhoneNumber(),
         otp: otpInput,
       });
       setOtpVerified(true);
@@ -195,6 +209,12 @@ function CheckoutPageInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate phone number
+    if (!isPhoneValid) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
     
     // Check COD OTP verification
     if (formData.paymentMethod === "cod" && !otpVerified) {
@@ -220,7 +240,7 @@ function CheckoutPageInner() {
       const result = await createOrder({
         shippingAddress: {
           fullName: formData.fullName,
-          phone: formData.phone,
+          phone: getFullPhoneNumber(),
           addressLine1: formData.addressLine1,
           addressLine2: formData.addressLine2,
           city: formData.city,
@@ -249,7 +269,7 @@ function CheckoutPageInner() {
           orderId: result.orderId,
           orderNumber: result.orderNumber,
           amount: remainingAmount,
-          customerPhone: formData.phone,
+          customerPhone: getFullPhoneNumber(),
         });
 
         if (paymentResult.success && paymentResult.paymentUrl) {
@@ -268,7 +288,7 @@ function CheckoutPageInner() {
             orderId: result.orderId,
             orderNumber: result.orderNumber,
             amount: prepaidAmount,
-            customerPhone: formData.phone,
+            customerPhone: getFullPhoneNumber(),
           });
 
           if (paymentResult.success && paymentResult.paymentUrl) {
@@ -354,15 +374,28 @@ function CheckoutPageInner() {
 
                   <div>
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      required
-                      placeholder="+91 98765 43210"
-                      value={formData.phone}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      disabled={otpVerified}
-                    />
+                    <div className="flex items-stretch gap-0">
+                      <div className="flex items-center justify-center px-3 bg-muted border border-r-0 rounded-l-md text-sm font-medium">
+                        +91
+                      </div>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        required
+                        placeholder="9876543210"
+                        value={formData.phone}
+                        onChange={(e) => handlePhoneChange(e.target.value)}
+                        disabled={otpVerified}
+                        className="rounded-l-none"
+                        maxLength={10}
+                        pattern="[0-9]{10}"
+                      />
+                    </div>
+                    {formData.phone && !isPhoneValid && (
+                      <p className="text-xs text-red-600 mt-1">
+                        Please enter a valid 10-digit mobile number
+                      </p>
+                    )}
                     {otpVerified && (
                       <p className="text-xs text-green-600 mt-1">
                         ✓ Verified for COD orders
@@ -593,7 +626,7 @@ function CheckoutPageInner() {
                           <Button
                             type="button"
                             onClick={handleSendOtp}
-                            disabled={!formData.phone || isSendingOtp}
+                            disabled={!formData.phone || !isPhoneValid || isSendingOtp}
                             className="w-full"
                           >
                             {isSendingOtp ? "Sending OTP..." : "Send OTP to WhatsApp"}
@@ -603,7 +636,7 @@ function CheckoutPageInner() {
                             <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                               <ShieldCheckIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
                               <p className="text-sm text-green-900 dark:text-green-100">
-                                OTP sent to {formData.phone}. Check your WhatsApp.
+                                OTP sent to {getFullPhoneNumber()}. Check your WhatsApp.
                               </p>
                             </div>
                             
@@ -649,7 +682,7 @@ function CheckoutPageInner() {
                             Phone Number Verified
                           </p>
                           <p className="text-sm text-green-700 dark:text-green-300">
-                            {formData.phone}
+                            {getFullPhoneNumber()}
                           </p>
                         </div>
                       </div>
