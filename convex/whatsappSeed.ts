@@ -312,7 +312,7 @@ const SAMPLE_TEMPLATES = [
   {
     templateName: "COD OTP - v1",
     providerTemplateId: "COD_OTP_V1",
-    templateType: "transactional" as const,
+    templateType: "authentication" as const,
     templateBody:
       "Your Skinly COD verification code is {otp}. Valid for 10 minutes. Do not share this code.",
     variables: ["otp"],
@@ -322,7 +322,7 @@ const SAMPLE_TEMPLATES = [
   {
     templateName: "Login OTP - v1",
     providerTemplateId: "LOGIN_OTP_V1",
-    templateType: "transactional" as const,
+    templateType: "authentication" as const,
     templateBody:
       "Your Skinly verification code is {otp}. Valid for 10 minutes. Do not share this code with anyone.",
     variables: ["otp"],

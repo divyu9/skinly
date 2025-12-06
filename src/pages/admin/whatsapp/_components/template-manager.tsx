@@ -42,7 +42,7 @@ import { VariablesMultiSelect } from "./variables-multi-select.tsx";
 interface TemplateFormData {
   templateName: string;
   providerTemplateId: string;
-  templateType: "transactional" | "marketing";
+  templateType: "transactional" | "marketing" | "authentication";
   templateBody: string;
   variables: string[]; // Changed to array
   language: string;
@@ -103,7 +103,7 @@ export function TemplateManager() {
     _id: Id<"whApprovedTemplates">;
     templateName: string;
     providerTemplateId: string;
-    type: "transactional" | "marketing";
+    type: "transactional" | "marketing" | "authentication";
     templateBody: string | null;
     variables: string[];
     language: string;
@@ -267,7 +267,7 @@ export function TemplateManager() {
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             <CardTitle className="text-base">{template.templateName}</CardTitle>
-                            <Badge variant={template.type === "transactional" ? "secondary" : "outline"}>
+                            <Badge variant={template.type === "transactional" ? "secondary" : template.type === "authentication" ? "default" : "outline"}>
                               {template.type}
                             </Badge>
                           </div>
@@ -379,7 +379,7 @@ export function TemplateManager() {
               </Label>
               <Select
                 value={formData.templateType}
-                onValueChange={(value: "transactional" | "marketing") =>
+                onValueChange={(value: "transactional" | "marketing" | "authentication") =>
                   setFormData({ ...formData, templateType: value })
                 }
               >
@@ -389,6 +389,7 @@ export function TemplateManager() {
                 <SelectContent>
                   <SelectItem value="transactional">Transactional</SelectItem>
                   <SelectItem value="marketing">Marketing</SelectItem>
+                  <SelectItem value="authentication">Authentication</SelectItem>
                 </SelectContent>
               </Select>
             </div>

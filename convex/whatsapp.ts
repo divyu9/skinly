@@ -404,7 +404,7 @@ export const createTemplate = mutation({
   args: {
     templateName: v.string(),
     providerTemplateId: v.string(),
-    templateType: v.union(v.literal("transactional"), v.literal("marketing")),
+    templateType: v.union(v.literal("transactional"), v.literal("marketing"), v.literal("authentication")),
     templateBody: v.optional(v.string()),
     variables: v.optional(v.array(v.string())),
     language: v.optional(v.string()),
@@ -457,7 +457,7 @@ export const updateTemplate = mutation({
     templateName: v.optional(v.string()),
     providerTemplateId: v.optional(v.string()),
     templateType: v.optional(
-      v.union(v.literal("transactional"), v.literal("marketing"))
+      v.union(v.literal("transactional"), v.literal("marketing"), v.literal("authentication"))
     ),
     templateBody: v.optional(v.string()),
     variables: v.optional(v.array(v.string())),

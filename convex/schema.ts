@@ -536,7 +536,7 @@ export default defineSchema({
   whApprovedTemplates: defineTable({
     templateName: v.string(), // Template name (e.g., "Order Received - v3")
     providerTemplateId: v.string(), // Provider/HSM ID (e.g., "AUTHKEY_HSM_123")
-    templateType: v.union(v.literal("transactional"), v.literal("marketing")), // Type
+    templateType: v.union(v.literal("transactional"), v.literal("marketing"), v.literal("authentication")), // Type
     templateBody: v.optional(v.string()), // Template text with placeholders
     variables: v.optional(v.array(v.string())), // List of variables in template
     language: v.optional(v.string()), // Language code (e.g., "en")
