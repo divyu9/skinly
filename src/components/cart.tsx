@@ -18,14 +18,22 @@ import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export function CartButton() {
-  const { user } = useAuth();
-  const cartCount = useQuery(api.cart.getCartCount);
-  const { getGuestCartCount } = useGuestCart();
+  const { user, isLoading: authLoading } = useAuth();
+  const cartCount = useQuery(api.cart.getCartCount, user ? {} : "skip");
+  const { getGuestCartCount, guestCart } = useGuestCart();
+  const [displayCount, setDisplayCount] = useState(0);
 
-  const totalCount = user ? (cartCount || 0) : getGuestCartCount();
+  // Update display count whenever cart data changes
+  useEffect(() => {
+    if (user && cartCount !== undefined) {
+      setDisplayCount(cartCount);
+    } else if (!user && !authLoading) {
+      setDisplayCount(getGuestCartCount());
+    }
+  }, [user, cartCount, guestCart, authLoading, getGuestCartCount]);
 
   return (
     <Sheet>
@@ -33,9 +41,9 @@ export function CartButton() {
         <Button size="sm" variant="outline" className="relative overflow-visible">
           <ShoppingCartIcon className="size-4 mr-2" />
           Cart
-          {totalCount > 0 && (
+          {displayCount > 0 && (
             <Badge className="absolute -top-2 -right-2 size-6 flex items-center justify-center p-0 text-xs font-bold z-50 pointer-events-none">
-              {totalCount}
+              {displayCount}
             </Badge>
           )}
         </Button>
@@ -44,8 +52,8 @@ export function CartButton() {
         <SheetHeader className="shrink-0">
           <SheetTitle>Shopping Cart</SheetTitle>
           <SheetDescription>
-            {totalCount > 0
-              ? `${totalCount} ${totalCount === 1 ? "item" : "items"} in your cart`
+            {displayCount > 0
+              ? `${displayCount} ${displayCount === 1 ? "item" : "items"} in your cart`
               : "Your cart is empty"}
           </SheetDescription>
         </SheetHeader>
@@ -56,12 +64,13 @@ export function CartButton() {
 }
 
 function CartContent() {
-  const { user } = useAuth();
-  const cartItems = useQuery(api.cart.getCart);
+  const { user, isLoading: authLoading } = useAuth();
+  const cartItems = useQuery(api.cart.getCart, user ? {} : "skip");
   const updateQuantity = useMutation(api.cart.updateQuantity);
   const removeFromCart = useMutation(api.cart.removeFromCart);
   const clearCart = useMutation(api.cart.clearCart);
   const syncGuestCart = useMutation(api.cart.syncGuestCart);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const {
     guestCart,
@@ -72,21 +81,28 @@ function CartContent() {
 
   // Sync guest cart when user signs in
   useEffect(() => {
-    if (user && guestCart.length > 0) {
+    if (user && guestCart.length > 0 && !isSyncing) {
+      setIsSyncing(true);
       syncGuestCart({ guestCartItems: guestCart })
         .then(() => {
           clearGuestCart();
           toast.success("Cart synced!");
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error("Cart sync error:", error);
           toast.error("Failed to sync cart");
+        })
+        .finally(() => {
+          setIsSyncing(false);
         });
     }
-  }, [user, guestCart, syncGuestCart, clearGuestCart]);
+  }, [user, guestCart.length, syncGuestCart, clearGuestCart, isSyncing]);
 
+  // Determine loading state
+  const isLoading = authLoading || (user && cartItems === undefined) || isSyncing;
+  
   // Use guest cart if not authenticated, otherwise use database cart
-  const displayItems = user ? cartItems : guestCart;
-  const isLoading = user ? cartItems === undefined : false;
+  const displayItems = user ? (cartItems || []) : guestCart;
 
   if (isLoading) {
     return (

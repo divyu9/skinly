@@ -11,13 +11,22 @@ import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
-import { useEffect } from "react";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { CartButton } from "@/components/cart.tsx";
 
 export default function CartPage() {
   const navigate = useNavigate();
+  const { user, isLoading: authLoading } = useAuth();
+  const [showContent, setShowContent] = useState(false);
+
+  // Delay showing content slightly to ensure auth is determined
+  useEffect(() => {
+    if (!authLoading) {
+      const timer = setTimeout(() => setShowContent(true), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [authLoading]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -44,21 +53,17 @@ export default function CartPage() {
 
       {/* Cart Content */}
       <div className="container mx-auto px-4 py-8">
-        <AuthLoading>
+        {(authLoading || !showContent) ? (
           <div className="max-w-4xl mx-auto space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-32 w-full" />
             ))}
           </div>
-        </AuthLoading>
-        
-        <Authenticated>
+        ) : user ? (
           <AuthenticatedCartContent />
-        </Authenticated>
-        
-        <Unauthenticated>
+        ) : (
           <GuestCartContent />
-        </Unauthenticated>
+        )}
       </div>
     </div>
   );
@@ -72,22 +77,31 @@ function AuthenticatedCartContent() {
   const clearCart = useMutation(api.cart.clearCart);
   const syncGuestCart = useMutation(api.cart.syncGuestCart);
   const { guestCart, clearGuestCart } = useGuestCart();
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   // Sync guest cart when user signs in
   useEffect(() => {
-    if (guestCart.length > 0) {
+    if (guestCart.length > 0 && !isSyncing) {
+      setIsSyncing(true);
       syncGuestCart({ guestCartItems: guestCart })
         .then(() => {
           clearGuestCart();
           toast.success("Cart synced!");
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error("Cart sync error:", error);
           toast.error("Failed to sync cart");
+          setHasError(true);
+        })
+        .finally(() => {
+          setIsSyncing(false);
         });
     }
-  }, [guestCart, syncGuestCart, clearGuestCart]);
+  }, [guestCart.length, syncGuestCart, clearGuestCart, isSyncing]);
 
-  if (cartItems === undefined) {
+  // Show loading state
+  if (cartItems === undefined || isSyncing) {
     return (
       <div className="max-w-4xl mx-auto space-y-4">
         {Array.from({ length: 3 }).map((_, i) => (
@@ -97,6 +111,29 @@ function AuthenticatedCartContent() {
     );
   }
 
+  // Handle errors gracefully
+  if (hasError) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <ShoppingCartIcon />
+            </EmptyMedia>
+            <EmptyTitle>Unable to load cart</EmptyTitle>
+            <EmptyDescription>
+              There was an error loading your cart. Please try refreshing the page.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+          </EmptyContent>
+        </Empty>
+      </div>
+    );
+  }
+
+  // Show empty state
   if (!cartItems || cartItems.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -126,6 +163,7 @@ function AuthenticatedCartContent() {
     try {
       await updateQuantity({ cartId, quantity: newQuantity });
     } catch (error) {
+      console.error("Update quantity error:", error);
       toast.error("Failed to update quantity");
     }
   };
@@ -135,6 +173,7 @@ function AuthenticatedCartContent() {
       await removeFromCart({ cartId });
       toast.success("Item removed from cart");
     } catch (error) {
+      console.error("Remove item error:", error);
       toast.error("Failed to remove item");
     }
   };
@@ -144,6 +183,7 @@ function AuthenticatedCartContent() {
       await clearCart({});
       toast.success("Cart cleared");
     } catch (error) {
+      console.error("Clear cart error:", error);
       toast.error("Failed to clear cart");
     }
   };
