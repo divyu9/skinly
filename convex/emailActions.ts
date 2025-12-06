@@ -13,6 +13,61 @@ import {
 } from "./emailTemplates";
 
 /**
+ * Replace template variables with actual values
+ */
+function replaceTemplateVariables(
+  template: string,
+  order: Doc<"orders">,
+  emailData: {
+    orderNumber: string;
+    customerName: string;
+    items: Doc<"orders">["items"];
+    subtotal: number;
+    shippingFee: number;
+    total: number;
+    shippingAddress: Doc<"orders">["shippingAddress"];
+    trackingUrl?: string;
+    awbNumber?: string;
+  }
+): string {
+  const variables: Record<string, string> = {
+    customer_name: emailData.customerName,
+    order_id: order._id,
+    order_number: emailData.orderNumber,
+    order_date: new Date(order._creationTime).toLocaleDateString("en-IN"),
+    order_total: `₹${emailData.total.toFixed(2)}`,
+    items_list: emailData.items
+      .map(
+        (item) =>
+          `${item.productTitle} (${item.variant}) - Qty: ${item.quantity} - ₹${item.price.toFixed(2)}`
+      )
+      .join("<br>"),
+    shipping_address: `${emailData.shippingAddress.fullName}<br>${emailData.shippingAddress.addressLine1}<br>${emailData.shippingAddress.addressLine2 || ""}<br>${emailData.shippingAddress.city}, ${emailData.shippingAddress.state} ${emailData.shippingAddress.pincode}`,
+    payment_method: order.paymentMethod,
+    tracking_link: emailData.trackingUrl || "Not available yet",
+    tracking_number: emailData.awbNumber || "Not assigned yet",
+    courier_name: order.courierName || "Not assigned yet",
+    estimated_delivery: "3-5 business days",
+    delivery_date: new Date().toLocaleDateString("en-IN"),
+    review_link: `https://skinly.com/orders/${order._id}`,
+    cancellation_reason: "As per your request",
+    refund_amount: `₹${emailData.total.toFixed(2)}`,
+    refund_method: order.paymentMethod === "COD" ? "Wallet credit" : "Original payment method",
+    payment_amount: `₹${emailData.total.toFixed(2)}`,
+    failure_reason: "Payment gateway error",
+    retry_link: `https://skinly.com/orders/${order._id}/payment`,
+  };
+
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`{{${key}}}`, "g");
+    result = result.replace(regex, value);
+  }
+
+  return result;
+}
+
+/**
  * Send email notification using Resend API
  */
 export const sendEmailNotification = action({
@@ -57,24 +112,39 @@ export const sendEmailNotification = action({
         awbNumber: order.awbNumber,
       };
 
+      // Check for custom active template first
+      const customTemplate = await ctx.runQuery(internal.emailActionsInternal.getActiveTemplate, {
+        templateType: args.emailType,
+      });
+
       // Generate email based on type
       let emailContent: { subject: string; html: string };
-      switch (args.emailType) {
-        case "order_confirmed":
-          emailContent = generateOrderConfirmedEmail(emailData);
-          break;
-        case "payment_failed":
-          emailContent = generatePaymentFailedEmail(emailData);
-          break;
-        case "order_dispatched":
-          emailContent = generateOrderDispatchedEmail(emailData);
-          break;
-        case "order_delivered":
-          emailContent = generateOrderDeliveredEmail(emailData);
-          break;
-        case "order_cancelled":
-          emailContent = generateOrderCancelledEmail(emailData);
-          break;
+      
+      if (customTemplate) {
+        // Use custom template and replace variables
+        emailContent = {
+          subject: replaceTemplateVariables(customTemplate.subject, order, emailData),
+          html: replaceTemplateVariables(customTemplate.htmlContent, order, emailData),
+        };
+      } else {
+        // Fall back to default hardcoded templates
+        switch (args.emailType) {
+          case "order_confirmed":
+            emailContent = generateOrderConfirmedEmail(emailData);
+            break;
+          case "payment_failed":
+            emailContent = generatePaymentFailedEmail(emailData);
+            break;
+          case "order_dispatched":
+            emailContent = generateOrderDispatchedEmail(emailData);
+            break;
+          case "order_delivered":
+            emailContent = generateOrderDeliveredEmail(emailData);
+            break;
+          case "order_cancelled":
+            emailContent = generateOrderCancelledEmail(emailData);
+            break;
+        }
       }
 
       // Send email via Resend

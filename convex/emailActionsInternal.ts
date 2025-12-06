@@ -13,6 +13,42 @@ export const getOrderForEmail = internalQuery({
 });
 
 /**
+ * Internal query to get active email template
+ */
+export const getActiveTemplate = internalQuery({
+  args: {
+    templateType: v.union(
+      v.literal("order_confirmed"),
+      v.literal("order_dispatched"),
+      v.literal("order_delivered"),
+      v.literal("order_cancelled"),
+      v.literal("payment_failed")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const template = await ctx.db
+      .query("emailTemplates")
+      .withIndex("by_type_and_active", (q) =>
+        q.eq("templateType", args.templateType).eq("isActive", true)
+      )
+      .first();
+
+    return template;
+  },
+});
+
+/**
+ * Internal query to get email template by ID
+ */
+export const getTemplateById = internalQuery({
+  args: { templateId: v.id("emailTemplates") },
+  handler: async (ctx, args) => {
+    const template = await ctx.db.get(args.templateId);
+    return template;
+  },
+});
+
+/**
  * Internal mutation to log successful email send
  */
 export const logEmailSent = internalMutation({

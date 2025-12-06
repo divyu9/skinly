@@ -706,4 +706,27 @@ export default defineSchema({
     updatedAt: v.optional(v.number()), // Last update timestamp
   })
     .index("by_enabled", ["enabled"]),
+
+  // Email Templates (admin-managed custom HTML templates)
+  emailTemplates: defineTable({
+    templateType: v.union(
+      v.literal("order_confirmed"),
+      v.literal("order_dispatched"),
+      v.literal("order_delivered"),
+      v.literal("order_cancelled"),
+      v.literal("payment_failed")
+    ),
+    templateName: v.string(), // Display name for UI
+    subject: v.string(), // Email subject line
+    htmlContent: v.string(), // Full HTML template with variable placeholders
+    isActive: v.boolean(), // Whether this template is currently active
+    variables: v.array(v.string()), // List of available variables (e.g., ["customer_name", "order_id"])
+    createdBy: v.string(), // Admin email who created
+    createdAt: v.number(), // Creation timestamp
+    updatedAt: v.optional(v.number()), // Last update timestamp
+    lastActivatedAt: v.optional(v.number()), // When it was last activated
+  })
+    .index("by_type", ["templateType"])
+    .index("by_type_and_active", ["templateType", "isActive"])
+    .index("by_active", ["isActive"]),
 });
