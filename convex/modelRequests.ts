@@ -200,9 +200,8 @@ export const createModelRequest = mutation({
           recipientPhone: args.whatsappPhone.trim(),
           recipientUserId: userId,
           variables: {
-            customer_name: identity?.name?.trim() || "Customer",
-            brand_name: args.brandName.trim(),
-            model_name: args.modelName.trim(),
+            // Send combined brand + model name for single-variable template
+            model_name: `${args.brandName.trim()} ${args.modelName.trim()}`,
           },
           priority: 7,
         }

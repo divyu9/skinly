@@ -31,6 +31,8 @@ export const getAllUsecases = query({
       enabled: usecase.enabled,
       templateName: usecase.templateName ?? null,
       providerTemplateId: usecase.providerTemplateId ?? null,
+      templateId: usecase.templateId ?? null,
+      variableMapping: usecase.variableMapping ?? null,
       isTransactional: usecase.isTransactional,
       requireConsent: usecase.requireConsent,
       lastUpdatedBy: usecase.lastUpdatedBy ?? null,
@@ -124,6 +126,16 @@ export const updateUsecase = mutation({
 
     if (args.providerTemplateId !== undefined) {
       updates.providerTemplateId = args.providerTemplateId;
+      
+      // Also link the template ID for variable mapping
+      const template = await ctx.db
+        .query("whApprovedTemplates")
+        .withIndex("by_provider_id", (q) => q.eq("providerTemplateId", args.providerTemplateId!))
+        .first();
+      
+      if (template) {
+        updates.templateId = template._id;
+      }
     }
 
     await ctx.db.patch(usecase._id, updates);
@@ -568,6 +580,107 @@ export const deleteTemplate = mutation({
     await ctx.db.delete(args.templateId);
 
     return { success: true };
+  },
+});
+
+// ============================================================================
+// VARIABLE MAPPING CONFIGURATION
+// ============================================================================
+
+export const updateVariableMapping = mutation({
+  args: {
+    usecaseKey: v.string(),
+    variableMapping: v.array(v.object({
+      templateVariable: v.string(),
+      sourceFields: v.array(v.string()),
+      separator: v.optional(v.string()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // Check admin authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Find the use-case
+    const usecase = await ctx.db
+      .query("whUsecaseTemplates")
+      .withIndex("by_usecase_key", (q) => q.eq("usecaseKey", args.usecaseKey))
+      .unique();
+
+    if (!usecase) {
+      throw new ConvexError({
+        message: `Use-case '${args.usecaseKey}' not found`,
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Update variable mapping
+    await ctx.db.patch(usecase._id, {
+      variableMapping: args.variableMapping,
+      lastUpdatedBy: identity.email ?? "unknown",
+      lastUpdatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Get use case with template details for variable mapping UI
+export const getUsecaseWithTemplate = query({
+  args: {
+    usecaseKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Get use case
+    const usecase = await ctx.db
+      .query("whUsecaseTemplates")
+      .withIndex("by_usecase_key", (q) => q.eq("usecaseKey", args.usecaseKey))
+      .unique();
+
+    if (!usecase) {
+      throw new ConvexError({
+        message: `Use-case '${args.usecaseKey}' not found`,
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Get linked template if available
+    let template = null;
+    if (usecase.templateId) {
+      template = await ctx.db.get(usecase.templateId);
+    }
+
+    return {
+      usecase: {
+        usecaseKey: usecase.usecaseKey,
+        displayName: usecase.displayName,
+        description: usecase.description,
+        enabled: usecase.enabled,
+        templateName: usecase.templateName,
+        providerTemplateId: usecase.providerTemplateId,
+        variableMapping: usecase.variableMapping,
+      },
+      template: template ? {
+        templateName: template.templateName,
+        providerTemplateId: template.providerTemplateId,
+        templateBody: template.templateBody,
+        variables: template.variables,
+      } : null,
+    };
   },
 });
 

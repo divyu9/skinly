@@ -515,6 +515,13 @@ export default defineSchema({
     enabled: v.boolean(), // ON/OFF toggle
     templateName: v.optional(v.string()), // Selected template name (e.g., "Order Received - v3")
     providerTemplateId: v.optional(v.string()), // Provider/HSM ID (e.g., "AUTHKEY_HSM_123")
+    templateId: v.optional(v.id("whApprovedTemplates")), // Link to approved template (for variable mapping)
+    // Variable mapping configuration
+    variableMapping: v.optional(v.array(v.object({
+      templateVariable: v.string(), // Template variable name (e.g., "customer_name", "1", "2")
+      sourceFields: v.array(v.string()), // Source fields to combine (e.g., ["brand_name", "model_name"])
+      separator: v.optional(v.string()), // Separator for multiple fields (default: " ")
+    }))),
     isTransactional: v.boolean(), // Transactional vs marketing
     requireConsent: v.boolean(), // Whether user consent is required
     lastUpdatedBy: v.optional(v.string()), // Admin email who made the change
