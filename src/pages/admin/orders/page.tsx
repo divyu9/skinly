@@ -202,18 +202,133 @@ function AdminOrdersPageInner() {
         return;
       }
 
-      // Fetch and merge PDFs
-      const mergedPdf = await PDFDocument.create();
+      console.log(`Fetching ${results.labels.length} labels for ST4 format`);
+
+      // Fetch all label PDFs
+      const labelPdfs: Array<{ orderNumber: string; pdf: PDFDocument }> = [];
+      const fetchErrors: Array<{ orderNumber: string; error: string }> = [];
 
       for (const label of results.labels) {
         try {
-          const response = await fetch(label.labelUrl);
+          console.log(`Fetching label for ${label.orderNumber} from ${label.labelUrl}`);
+          
+          const response = await fetch(label.labelUrl, {
+            method: 'GET',
+            redirect: 'follow',
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const contentType = response.headers.get('content-type');
+          console.log(`Content-Type for ${label.orderNumber}:`, contentType);
+
           const pdfBytes = await response.arrayBuffer();
-          const pdf = await PDFDocument.load(pdfBytes);
-          const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-          pages.forEach((page) => mergedPdf.addPage(page));
+          console.log(`Fetched ${pdfBytes.byteLength} bytes for ${label.orderNumber}`);
+
+          if (pdfBytes.byteLength === 0) {
+            throw new Error('Empty PDF file');
+          }
+
+          const pdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+          console.log(`Loaded PDF for ${label.orderNumber}, pages: ${pdf.getPageCount()}`);
+          
+          labelPdfs.push({ orderNumber: label.orderNumber, pdf });
         } catch (error) {
-          console.error(`Failed to fetch label for ${label.orderNumber}:`, error);
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`Failed to fetch/load label for ${label.orderNumber}:`, errorMsg);
+          fetchErrors.push({
+            orderNumber: label.orderNumber,
+            error: errorMsg,
+          });
+        }
+      }
+
+      if (labelPdfs.length === 0) {
+        toast.error("Failed to fetch any labels");
+        if (fetchErrors.length > 0) {
+          setBulkResults({
+            type: "labels",
+            successful: 0,
+            failed: fetchErrors.length,
+            details: fetchErrors.map((e) => ({
+              orderNumber: e.orderNumber,
+              error: e.error,
+            })),
+          });
+        }
+        setIsProcessingBulk(false);
+        return;
+      }
+
+      console.log(`Successfully loaded ${labelPdfs.length} labels, creating ST4 layout`);
+
+      // Create merged PDF with ST4 layout (2×2 grid on A4 pages)
+      const mergedPdf = await PDFDocument.create();
+      
+      // A4 dimensions in points (72 points = 1 inch)
+      const A4_WIDTH = 595.28;  // 210mm
+      const A4_HEIGHT = 841.89; // 297mm
+      
+      // Each label occupies 1/4 of A4 page
+      const LABEL_WIDTH = A4_WIDTH / 2;
+      const LABEL_HEIGHT = A4_HEIGHT / 2;
+
+      // Process labels in batches of 4 (one A4 page per batch)
+      for (let i = 0; i < labelPdfs.length; i += 4) {
+        const batch = labelPdfs.slice(i, i + 4);
+        
+        // Create new A4 page
+        const a4Page = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+        
+        // Position labels in 2×2 grid
+        const positions = [
+          { x: 0, y: LABEL_HEIGHT },           // Top-left
+          { x: LABEL_WIDTH, y: LABEL_HEIGHT }, // Top-right
+          { x: 0, y: 0 },                      // Bottom-left
+          { x: LABEL_WIDTH, y: 0 },            // Bottom-right
+        ];
+
+        for (let j = 0; j < batch.length; j++) {
+          const { orderNumber, pdf } = batch[j];
+          const position = positions[j];
+          
+          try {
+            // Get first page from the label PDF
+            const [labelPage] = await mergedPdf.embedPages([pdf.getPages()[0]]);
+            
+            // Get original dimensions
+            const { width: origWidth, height: origHeight } = labelPage;
+            
+            // Calculate scale to fit in cell while maintaining aspect ratio
+            const scaleX = LABEL_WIDTH / origWidth;
+            const scaleY = LABEL_HEIGHT / origHeight;
+            const scale = Math.min(scaleX, scaleY);
+            
+            const scaledWidth = origWidth * scale;
+            const scaledHeight = origHeight * scale;
+            
+            // Center label in its cell
+            const xOffset = (LABEL_WIDTH - scaledWidth) / 2;
+            const yOffset = (LABEL_HEIGHT - scaledHeight) / 2;
+            
+            // Draw the label on the A4 page
+            a4Page.drawPage(labelPage, {
+              x: position.x + xOffset,
+              y: position.y + yOffset,
+              width: scaledWidth,
+              height: scaledHeight,
+            });
+            
+            console.log(`Placed label ${orderNumber} at position ${j + 1}/4 on page ${Math.floor(i / 4) + 1}`);
+          } catch (error) {
+            console.error(`Failed to embed label ${orderNumber}:`, error);
+            fetchErrors.push({
+              orderNumber,
+              error: error instanceof Error ? error.message : 'Failed to embed in ST4 layout',
+            });
+          }
         }
       }
 
@@ -223,29 +338,37 @@ function AdminOrdersPageInner() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `shipping-labels-${new Date().toISOString().slice(0, 10)}.pdf`;
+      link.download = `shipping-labels-st4-${new Date().toISOString().slice(0, 10)}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success(`Downloaded ${results.labels.length} labels`);
+      const totalPages = Math.ceil(labelPdfs.length / 4);
+      toast.success(`Downloaded ${labelPdfs.length} labels in ST4 format (${totalPages} A4 pages)`);
 
-      if (results.errors.length > 0) {
+      if (fetchErrors.length > 0 || results.errors.length > 0) {
         setBulkResults({
           type: "labels",
-          successful: results.labels.length,
-          failed: results.errors.length,
-          details: results.errors.map((e) => ({
-            orderNumber: e.orderNumber,
-            error: e.error,
-          })),
+          successful: labelPdfs.length,
+          failed: fetchErrors.length + results.errors.length,
+          details: [
+            ...fetchErrors.map((e) => ({
+              orderNumber: e.orderNumber,
+              error: e.error,
+            })),
+            ...results.errors.map((e) => ({
+              orderNumber: e.orderNumber,
+              error: e.error,
+            })),
+          ],
         });
       }
 
       // Clear selection
       setSelectedOrders(new Set());
     } catch (error) {
+      console.error('Bulk fetch labels error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to fetch labels");
     } finally {
       setIsProcessingBulk(false);
