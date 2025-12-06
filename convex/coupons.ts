@@ -399,6 +399,7 @@ export const createCoupon = mutation({
   args: {
     code: v.string(),
     description: v.string(),
+    effectType: v.optional(v.union(v.literal("discount"), v.literal("wallet_credit"))),
     discountType: v.union(v.literal("percentage"), v.literal("fixed")),
     discountValue: v.number(),
     minPurchase: v.optional(v.number()),
@@ -524,6 +525,7 @@ export const updateCoupon = mutation({
     couponId: v.id("coupons"),
     code: v.optional(v.string()),
     description: v.optional(v.string()),
+    effectType: v.optional(v.union(v.literal("discount"), v.literal("wallet_credit"))),
     discountType: v.optional(v.union(v.literal("percentage"), v.literal("fixed"))),
     discountValue: v.optional(v.number()),
     minPurchase: v.optional(v.union(v.number(), v.null())),
@@ -597,6 +599,163 @@ export const deleteCoupon = mutation({
     }
 
     await ctx.db.delete(args.couponId);
+  },
+});
+
+// Redeem wallet credit coupon
+export const redeemWalletCreditCoupon = mutation({
+  args: {
+    code: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Find coupon
+    const coupon = await ctx.db
+      .query("coupons")
+      .withIndex("by_code", (q) => q.eq("code", args.code.toUpperCase()))
+      .first();
+
+    if (!coupon) {
+      throw new ConvexError({
+        message: "Invalid coupon code",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Validate it's a wallet credit coupon
+    if (coupon.effectType !== "wallet_credit") {
+      throw new ConvexError({
+        message: "This coupon is not a wallet credit coupon. Use it at checkout instead.",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const now = Date.now();
+
+    // Check if coupon is active
+    if (!coupon.isActive) {
+      throw new ConvexError({
+        message: "This coupon is not active",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Check date range
+    if (now < coupon.startDate || now > coupon.endDate) {
+      throw new ConvexError({
+        message: "This coupon has expired or is not yet active",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Check usage limit
+    if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+      throw new ConvexError({
+        message: "This coupon has reached its usage limit",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Check customer email restrictions
+    if (coupon.allowedCustomerEmails && coupon.allowedCustomerEmails.length > 0) {
+      const emailLower = (user.email || "").toLowerCase();
+      const allowed = coupon.allowedCustomerEmails.some((email) => email.toLowerCase() === emailLower);
+      if (!allowed) {
+        throw new ConvexError({
+          message: "This coupon is not available for your account",
+          code: "BAD_REQUEST",
+        });
+      }
+    }
+
+    // Check if user has already used this coupon
+    const existingUsage = await ctx.db
+      .query("couponUsage")
+      .withIndex("by_coupon_and_user", (q) => 
+        q.eq("couponId", coupon._id).eq("userId", user._id)
+      )
+      .first();
+
+    if (existingUsage) {
+      throw new ConvexError({
+        message: "You have already redeemed this coupon",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Calculate credit amount
+    let creditAmount = 0;
+    if (coupon.discountType === "fixed") {
+      creditAmount = coupon.discountValue;
+    } else {
+      throw new ConvexError({
+        message: "Percentage-based wallet credit coupons are not supported",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Add credit to wallet
+    const currentBalance = user.walletBalance || 0;
+    const newBalance = currentBalance + creditAmount;
+
+    await ctx.db.patch(user._id, {
+      walletBalance: newBalance,
+    });
+
+    // Create wallet transaction
+    await ctx.db.insert("walletTransactions", {
+      userId: user._id,
+      transactionType: "credit",
+      amount: creditAmount,
+      source: "coupon_credit",
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      description: `Coupon: ${coupon.code} - ${coupon.description}`,
+      relatedCouponId: coupon._id,
+      createdAt: now,
+    });
+
+    // Increment usage count
+    await ctx.db.patch(coupon._id, {
+      usageCount: coupon.usageCount + 1,
+    });
+
+    // Track usage (no orderId for wallet credit coupons)
+    await ctx.db.insert("couponUsage", {
+      couponId: coupon._id,
+      userId: user._id,
+      userEmail: (user.email || "").toLowerCase(),
+      discountAmount: creditAmount,
+      usedAt: now,
+    });
+
+    return {
+      success: true,
+      creditAmount,
+      newBalance,
+      couponCode: coupon.code,
+    };
   },
 });
 

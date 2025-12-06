@@ -251,7 +251,7 @@ export default defineSchema({
     couponId: v.id("coupons"),
     userId: v.id("users"),
     userEmail: v.string(),
-    orderId: v.id("orders"),
+    orderId: v.optional(v.id("orders")), // Optional because wallet credit coupons don't have orders
     discountAmount: v.number(),
     usedAt: v.number(),
   })

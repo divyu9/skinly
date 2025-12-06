@@ -41,6 +41,7 @@ import { AdminLayout } from "@/components/admin-layout.tsx";
 interface CouponFormData {
   code: string;
   description: string;
+  effectType: "discount" | "wallet_credit";
   discountType: "percentage" | "fixed";
   discountValue: string;
   minPurchase: string;
@@ -93,6 +94,7 @@ function AdminCouponsPageInner() {
   const [formData, setFormData] = useState<CouponFormData>({
     code: "",
     description: "",
+    effectType: "discount",
     discountType: "percentage",
     discountValue: "",
     minPurchase: "",
@@ -116,6 +118,7 @@ function AdminCouponsPageInner() {
     setFormData({
       code: coupon.code,
       description: coupon.description,
+      effectType: coupon.effectType || "discount",
       discountType: coupon.discountType,
       discountValue: String(coupon.discountValue),
       minPurchase: coupon.minPurchase ? String(coupon.minPurchase) : "",
@@ -153,6 +156,7 @@ function AdminCouponsPageInner() {
       const data = {
         code: formData.code.toUpperCase(),
         description: formData.description,
+        effectType: formData.effectType,
         discountType: formData.discountType,
         discountValue: parseFloat(formData.discountValue),
         minPurchase: formData.minPurchase ? parseFloat(formData.minPurchase) : undefined,
@@ -191,6 +195,7 @@ function AdminCouponsPageInner() {
       setFormData({
         code: "",
         description: "",
+        effectType: "discount",
         discountType: "percentage",
         discountValue: "",
         minPurchase: "",
@@ -298,6 +303,11 @@ function AdminCouponsPageInner() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-2xl font-mono">{coupon.code}</CardTitle>
+                        {coupon.effectType === "wallet_credit" && (
+                          <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">
+                            Wallet Credit
+                          </Badge>
+                        )}
                         {isActive && (
                           <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
                             Active
@@ -452,6 +462,27 @@ function AdminCouponsPageInner() {
                 {/* Basic Info */}
                 <div className="space-y-4">
                   <h3 className="font-semibold">Basic Information</h3>
+                  <div>
+                    <Label htmlFor="effectType">Effect Type *</Label>
+                    <Select
+                      value={formData.effectType}
+                      onValueChange={(value: "discount" | "wallet_credit") =>
+                        setFormData({ ...formData, effectType: value, discountType: value === "wallet_credit" ? "fixed" : formData.discountType })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="discount">Discount (Applied at Checkout)</SelectItem>
+                        <SelectItem value="wallet_credit">Wallet Credit (Redeemed in Account)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formData.effectType === "discount" ? "Customers apply this at checkout for an order discount" : "Customers redeem this in their account for wallet credit"}
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="code">Coupon Code *</Label>
@@ -472,6 +503,7 @@ function AdminCouponsPageInner() {
                         onValueChange={(value: "percentage" | "fixed") =>
                           setFormData({ ...formData, discountType: value })
                         }
+                        disabled={formData.effectType === "wallet_credit"}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -481,6 +513,11 @@ function AdminCouponsPageInner() {
                           <SelectItem value="fixed">Fixed Amount (₹)</SelectItem>
                         </SelectContent>
                       </Select>
+                      {formData.effectType === "wallet_credit" && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Wallet credit coupons must be fixed amount
+                        </p>
+                      )}
                     </div>
                   </div>
 

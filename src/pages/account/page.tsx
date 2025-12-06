@@ -24,6 +24,8 @@ import {
   ShieldCheckIcon,
   BellIcon,
   CheckCircle2Icon,
+  WalletIcon,
+  TicketIcon,
 } from "lucide-react";
 import {
   RadioGroup,
@@ -36,9 +38,11 @@ function AccountPageInner() {
   const recentOrders = useQuery(api.orders.getOrders, { limit: 5 }) as Doc<"orders">[] | undefined;
   const phoneVerificationStatus = useQuery(api.loginOtp.checkPhoneVerified);
   const whatsappConsent = useQuery(api.whatsappConsent.getMyConsent);
+  const walletBalance = useQuery(api.wallet.getWalletBalance);
   const generateLoginOtp = useMutation(api.loginOtp.generateLoginOtp);
   const verifyLoginOtp = useMutation(api.loginOtp.verifyLoginOtp);
   const updateConsent = useMutation(api.whatsappConsent.updateMyConsent);
+  const redeemCoupon = useMutation(api.coupons.redeemWalletCreditCoupon);
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpInput, setOtpInput] = useState("");
@@ -46,6 +50,8 @@ function AccountPageInner() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
+  const [couponCode, setCouponCode] = useState("");
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   const handleSendOtp = async () => {
     if (!phoneNumber.trim()) {
@@ -102,7 +108,29 @@ function AccountPageInner() {
     }
   };
 
-  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined || whatsappConsent === undefined) {
+  const handleRedeemCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+
+    setIsRedeeming(true);
+    try {
+      const result = await redeemCoupon({ code: couponCode });
+      toast.success(`₹${result.creditAmount.toFixed(2)} added to your wallet!`);
+      setCouponCode("");
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to redeem coupon");
+      }
+    } finally {
+      setIsRedeeming(false);
+    }
+  };
+
+  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined || whatsappConsent === undefined || walletBalance === undefined) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="space-y-6">
@@ -151,6 +179,64 @@ function AccountPageInner() {
               <LogOutIcon className="size-4 mr-2" />
               Sign Out
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Wallet Balance & Coupon Redemption */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <WalletIcon className="size-5" />
+            Wallet Balance
+          </CardTitle>
+          <CardDescription>
+            Your available balance and redeem coupons
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Current Balance */}
+          <div className="p-4 bg-muted/50 rounded-lg">
+            <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
+            <p className="text-3xl font-bold text-primary">₹{(walletBalance.balance || 0).toFixed(2)}</p>
+          </div>
+
+          {/* Coupon Redemption */}
+          <div className="space-y-3 pt-4 border-t">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <TicketIcon className="size-4" />
+              Redeem Coupon for Wallet Credit
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter coupon code"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleRedeemCoupon();
+                  }
+                }}
+              />
+              <Button
+                onClick={handleRedeemCoupon}
+                disabled={!couponCode || isRedeeming}
+              >
+                {isRedeeming ? "Redeeming..." : "Redeem"}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter a wallet credit coupon code to add funds to your wallet
+            </p>
+          </div>
+
+          {/* View Transactions */}
+          <div className="pt-4 border-t">
+            <Link to="/account/wallet">
+              <Button variant="outline" className="w-full">
+                View Transaction History
+              </Button>
+            </Link>
           </div>
         </CardContent>
       </Card>
