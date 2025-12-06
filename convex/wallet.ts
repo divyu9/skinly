@@ -368,3 +368,248 @@ export const calculateMaxWalletUsage = query({
     };
   },
 });
+
+// =============================================================================
+// ADMIN FUNCTIONS
+// =============================================================================
+
+/**
+ * Get all users with wallet balances (admin)
+ */
+export const getAllUsersWithWallets = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const limit = args.limit || 100;
+    const users = await ctx.db.query("users").take(limit);
+
+    // Get transaction counts for each user
+    const usersWithStats = await Promise.all(
+      users.map(async (user) => {
+        const transactions = await ctx.db
+          .query("walletTransactions")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+
+        return {
+          _id: user._id,
+          name: user.name || "Unknown",
+          email: user.email || "No email",
+          walletBalance: user.walletBalance || 0,
+          transactionCount: transactions.length,
+          referralCode: user.referralCode,
+          referredBy: user.referredBy,
+        };
+      })
+    );
+
+    // Sort by wallet balance descending
+    return usersWithStats.sort((a, b) => b.walletBalance - a.walletBalance);
+  },
+});
+
+/**
+ * Get user wallet details (admin)
+ */
+export const getUserWalletDetails = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Get all transactions
+    const transactions = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_user_and_created", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(50);
+
+    // Calculate stats
+    let lifetimeEarned = 0;
+    let lifetimeSpent = 0;
+
+    const allTransactions = await ctx.db
+      .query("walletTransactions")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const txn of allTransactions) {
+      if (txn.transactionType === "credit") {
+        lifetimeEarned += txn.amount;
+      } else if (txn.transactionType === "debit") {
+        lifetimeSpent += txn.amount;
+      }
+    }
+
+    return {
+      user: {
+        _id: user._id,
+        name: user.name || "Unknown",
+        email: user.email || "No email",
+        walletBalance: user.walletBalance || 0,
+        referralCode: user.referralCode,
+        referredBy: user.referredBy,
+      },
+      stats: {
+        lifetimeEarned,
+        lifetimeSpent,
+        transactionCount: allTransactions.length,
+      },
+      recentTransactions: transactions,
+    };
+  },
+});
+
+/**
+ * Admin credit wallet (public mutation wrapper)
+ */
+export const adminCreditWallet = mutation({
+  args: {
+    userId: v.id("users"),
+    amount: v.number(),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    if (args.amount <= 0) {
+      throw new ConvexError({
+        message: "Amount must be greater than 0",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const currentBalance = user.walletBalance || 0;
+    const newBalance = currentBalance + args.amount;
+
+    // Update user's wallet balance
+    await ctx.db.patch(args.userId, {
+      walletBalance: newBalance,
+    });
+
+    // Create transaction record
+    await ctx.db.insert("walletTransactions", {
+      userId: args.userId,
+      transactionType: "credit",
+      amount: args.amount,
+      source: "admin_credit",
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      description: args.description,
+      adminEmail: identity.email,
+      createdAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      newBalance,
+    };
+  },
+});
+
+/**
+ * Admin debit wallet (public mutation wrapper)
+ */
+export const adminDebitWallet = mutation({
+  args: {
+    userId: v.id("users"),
+    amount: v.number(),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    if (args.amount <= 0) {
+      throw new ConvexError({
+        message: "Amount must be greater than 0",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const currentBalance = user.walletBalance || 0;
+
+    if (currentBalance < args.amount) {
+      throw new ConvexError({
+        message: `Insufficient wallet balance. Current balance: ₹${currentBalance}`,
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const newBalance = currentBalance - args.amount;
+
+    // Update user's wallet balance
+    await ctx.db.patch(args.userId, {
+      walletBalance: newBalance,
+    });
+
+    // Create transaction record
+    await ctx.db.insert("walletTransactions", {
+      userId: args.userId,
+      transactionType: "debit",
+      amount: args.amount,
+      source: "order_payment",
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      description: args.description,
+      adminEmail: identity.email,
+      createdAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      newBalance,
+    };
+  },
+});

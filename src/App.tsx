@@ -30,6 +30,7 @@ import AdminProductFieldsMigrationPage from "./pages/admin/product-fields-migrat
 import AdminCODPage from "./pages/admin/cod.tsx";
 import AdminWhatsAppPage from "./pages/admin/whatsapp/page.tsx";
 import AdminWhatsAppMessagesPage from "./pages/admin/whatsapp/messages.tsx";
+import AdminWalletPage from "./pages/admin/wallet/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -66,6 +67,7 @@ export default function App() {
           <Route path="/admin/cod" element={<AdminCODPage />} />
           <Route path="/admin/whatsapp" element={<AdminWhatsAppPage />} />
           <Route path="/admin/whatsapp/messages" element={<AdminWhatsAppMessagesPage />} />
+          <Route path="/admin/wallet" element={<AdminWalletPage />} />
           <Route path="/admin/mockups" element={<AdminMockupsPage />} />
           <Route path="/admin/mockups/missing" element={<AdminMockupsMissingPage />} />
           <Route path="/admin/google-drive-import" element={<AdminGoogleDriveImportPage />} />
