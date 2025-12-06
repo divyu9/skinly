@@ -61,10 +61,10 @@ export const getBrands = query({
   },
 });
 
-// Alternative brand fetcher
-export const getAllBrandNames = query({
+// Get unique brand names (optimized - returns only brands, not full models)
+export const getBrandsList = query({
   args: {},
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const models = await ctx.db.query("supportedModels").collect();
     const brandSet = new Set(models.map((m) => m.brandName));
     return Array.from(brandSet).sort();

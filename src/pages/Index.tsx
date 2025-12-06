@@ -120,12 +120,8 @@ export default function Index() {
     isActive: true 
   });
   
-  // Extract all brands from supported models
-  const allBrands = useMemo(() => {
-    if (!allSupportedModels) return undefined;
-    const brandSet = new Set(allSupportedModels.map(m => m.brandName));
-    return Array.from(brandSet).sort();
-  }, [allSupportedModels]);
+  // Fetch all unique brand names (optimized query)
+  const allBrands = useQuery(api.supportedModels.getBrandsList);
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
