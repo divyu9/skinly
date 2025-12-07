@@ -1169,7 +1169,8 @@ export default function Index() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-4xl mx-auto mb-8">
+          {/* Desktop: 3 columns | Mobile: Shop & Support side-by-side, Company below */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 max-w-4xl mx-auto mb-8">
             {/* Shop */}
             <div>
               <h3 className="font-bold text-lg mb-4">Shop</h3>
@@ -1219,8 +1220,8 @@ export default function Index() {
               </ul>
             </div>
 
-            {/* Company */}
-            <div>
+            {/* Company - Spans full width on mobile */}
+            <div className="col-span-2 md:col-span-1">
               <h3 className="font-bold text-lg mb-4">Company</h3>
               <ul className="space-y-2">
                 <li>

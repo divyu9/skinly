@@ -16,11 +16,21 @@ import {
   PlaneIcon,
   CameraIcon,
   PackageIcon,
+  ZapIcon,
+  HelpCircleIcon,
+  AlertCircleIcon,
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
-import { useQuery } from "convex/react";
+import { MobileNav } from "@/components/mobile-nav.tsx";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { useDebounce } from "@/hooks/use-debounce.ts";
+import { toast } from "sonner";
 
 const CATEGORY_CONFIG = {
   phone: { label: "Phones", icon: SmartphoneIcon, emoji: "📱" },
@@ -34,12 +44,53 @@ const CATEGORY_CONFIG = {
   "mac-mini": { label: "Mac Mini", icon: PackageIcon, emoji: "💻" },
 } as const;
 
+// Hardcoded brand list as fallback (matches database brands)
+const ALL_BRANDS = [
+  "Acer", "Apple", "Asus", "CMF", "Canon", "DJI", "Dell", "Google",
+  "HMD", "HP", "Honor", "Infinix", "Lava", "Lenovo", "Motorola",
+  "Nikon", "Nothing", "One Plus", "Oppo", "PlayStation", "Poco",
+  "Realme", "Samsung", "Sony", "Tecno", "Vivo", "Xbox", "Xiaomi", "iQOO"
+];
+
 export default function DevicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
   
+  // Model request dialog state
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [requestBrand, setRequestBrand] = useState("");
+  const [requestNewBrand, setRequestNewBrand] = useState(""); // For custom brand entry
+  const [isNewBrand, setIsNewBrand] = useState(false); // Track if "Other" is selected
+  const [requestModel, setRequestModel] = useState("");
+  const [requestCategory, setRequestCategory] = useState<string>("");
+  const [requestWhatsApp, setRequestWhatsApp] = useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [confirmedNotMatch, setConfirmedNotMatch] = useState(false); // Confirmation checkbox
+  
   // Fetch all active supported models from database
   const allModels = useQuery(api.supportedModels.listAll, { isActive: true });
+  
+  // Fetch all brands for Request Model dropdown (with hardcoded fallback)
+  const brandsFromDb = useQuery(api.supportedModels.getBrands);
+  const allBrands = brandsFromDb && brandsFromDb.length > 0 ? brandsFromDb : ALL_BRANDS;
+  
+  // Mutations
+  const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  
+  // Debounce model search for fuzzy matching
+  const [debouncedRequestModel] = useDebounce(requestModel, 500);
+  
+  // Find similar models query
+  const similarModels = useQuery(
+    api.modelRequests.findSimilarModels,
+    debouncedRequestModel.trim().length >= 2
+      ? {
+          brandName: !isNewBrand && requestBrand ? requestBrand : undefined,
+          modelName: debouncedRequestModel,
+          category: requestCategory ? (requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini") : undefined,
+        }
+      : "skip"
+  );
 
   // Group models by brand
   const brandedModels = useMemo(() => {
@@ -111,6 +162,68 @@ export default function DevicesPage() {
     setExpandedBrands(new Set());
   };
 
+  // Handle model request submission
+  const handleSubmitRequest = async () => {
+    // Validation
+    if (!requestBrand && !requestNewBrand) {
+      toast.error("Please select or enter a brand name");
+      return;
+    }
+    if (!requestModel.trim()) {
+      toast.error("Please enter a model name");
+      return;
+    }
+    if (!requestCategory) {
+      toast.error("Please select a device category");
+      return;
+    }
+    if (!requestWhatsApp.trim()) {
+      toast.error("Please enter your WhatsApp number");
+      return;
+    }
+    
+    // Validate WhatsApp number format (10 digits)
+    const cleanedPhone = requestWhatsApp.replace(/\D/g, "");
+    if (cleanedPhone.length !== 10) {
+      toast.error("Please enter a valid 10-digit phone number");
+      return;
+    }
+    
+    // If similar models exist and user hasn't confirmed, show warning
+    if (similarModels && similarModels.length > 0 && !confirmedNotMatch) {
+      toast.error("Please confirm that your model doesn't match any of the similar models listed");
+      return;
+    }
+
+    setIsSubmittingRequest(true);
+    try {
+      const finalBrand = isNewBrand ? requestNewBrand : requestBrand;
+      await createModelRequest({
+        brandName: finalBrand,
+        modelName: requestModel.trim(),
+        category: requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
+        whatsappPhone: "+91" + cleanedPhone,
+      });
+      
+      toast.success("Request submitted! We'll notify you on WhatsApp when it's added.");
+      
+      // Reset form
+      setRequestDialogOpen(false);
+      setRequestBrand("");
+      setRequestNewBrand("");
+      setIsNewBrand(false);
+      setRequestModel("");
+      setRequestCategory("");
+      setRequestWhatsApp("");
+      setConfirmedNotMatch(false);
+    } catch (error) {
+      toast.error("Failed to submit request. Please try again.");
+      console.error(error);
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -120,21 +233,10 @@ export default function DevicesPage() {
             <img
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
               alt="Skinly"
-              className="h-16"
+              className="h-12 md:h-16"
             />
           </Link>
-          <div className="flex items-center gap-6">
-            <Link to="/#products" className="text-sm font-medium hover:text-primary transition-colors">
-              Categories
-            </Link>
-            <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
-              All Products
-            </Link>
-            <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
-              My Orders
-            </Link>
-            <CartButton />
-          </div>
+          <MobileNav />
         </div>
       </nav>
 
@@ -171,6 +273,24 @@ export default function DevicesPage() {
                 {filteredBrands.reduce((acc, item) => acc + item.matchCount, 0)} matching model(s)
               </div>
             )}
+            
+            {/* Request Model Button */}
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                <HelpCircleIcon className="size-4" />
+                <span>Can't Find Your Device?</span>
+              </div>
+              <Button
+                onClick={() => setRequestDialogOpen(true)}
+                className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+              >
+                <ZapIcon className="size-4 mr-2" />
+                Request Your Model
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                we'll add it with high priority
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -353,6 +473,182 @@ export default function DevicesPage() {
           </p>
         </div>
       </section>
+
+      {/* Request Model Dialog */}
+      <Dialog 
+        open={requestDialogOpen} 
+        onOpenChange={(open) => {
+          setRequestDialogOpen(open);
+          if (!open) {
+            // Reset form when dialog closes
+            setRequestBrand("");
+            setRequestNewBrand("");
+            setIsNewBrand(false);
+            setRequestModel("");
+            setRequestCategory("");
+            setRequestWhatsApp("");
+            setConfirmedNotMatch(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Request a Device Model</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Brand Selection */}
+            <div className="space-y-2">
+              <Label>Brand *</Label>
+              <Select 
+                value={isNewBrand ? "other_new_brand" : requestBrand} 
+                onValueChange={(value) => {
+                  if (value === "other_new_brand") {
+                    setIsNewBrand(true);
+                    setRequestBrand("");
+                  } else {
+                    setIsNewBrand(false);
+                    setRequestBrand(value);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {allBrands.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="other_new_brand">Other (New Brand)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Custom Brand Input */}
+            {isNewBrand && (
+              <div className="space-y-2">
+                <Label>Enter New Brand Name *</Label>
+                <Input
+                  type="text"
+                  placeholder="Enter brand name"
+                  value={requestNewBrand}
+                  onChange={(e) => setRequestNewBrand(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Model Name */}
+            <div className="space-y-2">
+              <Label>Model Name *</Label>
+              <Input
+                type="text"
+                placeholder="e.g., iPhone 15 Pro Max"
+                value={requestModel}
+                onChange={(e) => setRequestModel(e.target.value)}
+              />
+            </div>
+
+            {/* Similar Models Warning */}
+            {similarModels && similarModels.length > 0 && (
+              <div className="p-4 border-2 border-yellow-500/50 bg-yellow-500/5 rounded-lg space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircleIcon className="size-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                      Similar models found in our database:
+                    </p>
+                    <ul className="space-y-1 mb-3">
+                      {similarModels.slice(0, 5).map((model, idx) => (
+                        <li key={idx} className="text-sm text-yellow-800 dark:text-yellow-200">
+                          • {model.brandName} {model.modelName}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-500/10 rounded">
+                      <Checkbox
+                        id="confirm-not-match"
+                        checked={confirmedNotMatch}
+                        onCheckedChange={(checked) => setConfirmedNotMatch(checked === true)}
+                      />
+                      <label
+                        htmlFor="confirm-not-match"
+                        className="text-sm font-medium leading-tight cursor-pointer"
+                      >
+                        I confirm my device model is different from the models listed above
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Category Selection */}
+            <div className="space-y-2">
+              <Label>Device Category *</Label>
+              <Select value={requestCategory} onValueChange={setRequestCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="tablet">Tablet</SelectItem>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="console">Gaming Console</SelectItem>
+                  <SelectItem value="charger">Charger</SelectItem>
+                  <SelectItem value="drone">Drone</SelectItem>
+                  <SelectItem value="camera">Camera</SelectItem>
+                  <SelectItem value="lens">Camera Lens</SelectItem>
+                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* WhatsApp Number */}
+            <div className="space-y-2">
+              <Label>WhatsApp Number *</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground px-3 py-2 bg-muted rounded-md">
+                  +91
+                </span>
+                <Input
+                  type="tel"
+                  placeholder="9876543210"
+                  value={requestWhatsApp}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setRequestWhatsApp(value);
+                  }}
+                  className="flex-1"
+                  maxLength={10}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                We'll notify you on WhatsApp when your device is added
+              </p>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleSubmitRequest}
+                disabled={isSubmittingRequest}
+                className="flex-1"
+              >
+                {isSubmittingRequest ? "Submitting..." : "Submit Request"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setRequestDialogOpen(false)}
+                disabled={isSubmittingRequest}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

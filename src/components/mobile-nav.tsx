@@ -106,7 +106,13 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-[70vw] sm:w-[350px]">
           <SheetHeader>
-            <SheetTitle className="text-left">Menu</SheetTitle>
+            <div className="flex items-center gap-3">
+              <img 
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                alt="Skinly" 
+                className="h-10"
+              />
+            </div>
           </SheetHeader>
           <div className="mt-8 flex flex-col gap-1">
             {menuItems.map((item) => (
