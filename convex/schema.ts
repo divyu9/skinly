@@ -100,6 +100,12 @@ export default defineSchema({
     walletAmountUsed: v.optional(v.number()), // Amount deducted from wallet
     cashbackAmount: v.optional(v.number()), // Cashback earned on this order
     cashbackCredited: v.optional(v.boolean()), // Whether cashback has been credited
+    // Refund tracking fields
+    refundedToWallet: v.optional(v.boolean()), // Whether order was refunded to wallet
+    refundAmount: v.optional(v.number()), // Amount refunded to wallet
+    refundedAt: v.optional(v.number()), // Timestamp of refund
+    refundedBy: v.optional(v.string()), // Admin who processed the refund
+    refundReason: v.optional(v.string()), // Reason for refund
     // Manual tracking fields (for non-RapidShyp orders)
     manualTrackingNumber: v.optional(v.string()), // Manual tracking number
     manualCourierCompany: v.optional(v.string()), // Manual courier company name

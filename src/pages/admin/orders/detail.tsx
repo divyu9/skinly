@@ -45,13 +45,20 @@ function OrderDetailPageInner() {
   const createShipment = useAction(api.rapidshyp.createShipment);
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
+  const refundToWallet = useMutation(api.admin.orders.refundToWallet);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
   const [cancellingShipment, setCancellingShipment] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRestockDialog, setShowRestockDialog] = useState(false);
+  const [showRefundDialog, setShowRefundDialog] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isRestocking, setIsRestocking] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [refundForm, setRefundForm] = useState({
+    amount: "",
+    reason: "",
+  });
 
   const handleStatusChange = async (
     status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
@@ -220,6 +227,50 @@ function OrderDetailPageInner() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const handleRefund = async () => {
+    if (!orderId || !order) return;
+    
+    const amount = parseFloat(refundForm.amount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid refund amount");
+      return;
+    }
+
+    if (amount > order.total) {
+      toast.error(`Refund amount cannot exceed order total (₹${order.total})`);
+      return;
+    }
+
+    setIsRefunding(true);
+    try {
+      const result = await refundToWallet({
+        orderId: orderId as Id<"orders">,
+        refundAmount: amount,
+        refundReason: refundForm.reason || undefined,
+      });
+
+      if (result.success) {
+        toast.success(`Successfully refunded ₹${amount} to customer's wallet`);
+        setShowRefundDialog(false);
+        setRefundForm({ amount: "", reason: "" });
+      }
+    } catch (error) {
+      console.error("Refund Error:", error);
+      
+      let errorMessage = "Failed to process refund";
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error.data as { message?: string };
+        errorMessage = convexError.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsRefunding(false);
+    }
   };
 
 
@@ -671,6 +722,73 @@ function OrderDetailPageInner() {
               </CardContent>
             </Card>
           )}
+
+          {/* Refund to Wallet - Only show for cancelled/RTO orders */}
+          {(order.status === "cancelled" || order.status === "rto") && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BanknoteIcon className="size-5" />
+                  Refund to Wallet
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.refundedToWallet ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckIcon className="size-4 text-green-600" />
+                      <span className="text-sm font-medium text-green-900">
+                        Refunded to customer's wallet
+                      </span>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Refund Amount:</span>
+                        <span className="font-semibold">₹{order.refundAmount?.toFixed(0)}</span>
+                      </div>
+                      {order.refundedAt && (
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Date: </span>
+                          <span>{formatRestockDate(order.refundedAt)}</span>
+                        </div>
+                      )}
+                      {order.refundedBy && (
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">By: </span>
+                          <span>{order.refundedBy}</span>
+                        </div>
+                      )}
+                      {order.refundReason && (
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Reason: </span>
+                          <span>{order.refundReason}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <BanknoteIcon className="size-4 text-blue-600" />
+                      <span className="text-sm text-blue-900">
+                        No refund processed yet
+                      </span>
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        setRefundForm({ amount: order.total.toString(), reason: "" });
+                        setShowRefundDialog(true);
+                      }}
+                    >
+                      <BanknoteIcon className="size-4 mr-2" />
+                      Process Refund
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Customer & Order Details */}
@@ -838,6 +956,78 @@ function OrderDetailPageInner() {
           )}
         </div>
       </div>
+
+      {/* Refund to Wallet Dialog */}
+      <Dialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refund to Wallet</DialogTitle>
+            <DialogDescription>
+              Process a refund and credit the amount to customer's wallet
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="refund-amount">Refund Amount (₹)</Label>
+              <Input
+                id="refund-amount"
+                type="number"
+                min="0"
+                max={order.total}
+                step="0.01"
+                placeholder="Enter refund amount"
+                value={refundForm.amount}
+                onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Maximum: ₹{order.total.toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="refund-reason">Reason (Optional)</Label>
+              <Input
+                id="refund-reason"
+                placeholder="Enter reason for refund"
+                value={refundForm.reason}
+                onChange={(e) => setRefundForm({ ...refundForm, reason: e.target.value })}
+              />
+            </div>
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900">
+                <strong>Note:</strong> The refund amount will be credited to the customer's Skinly Wallet and can be used on their next purchase.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRefundDialog(false);
+                setRefundForm({ amount: "", reason: "" });
+              }}
+              disabled={isRefunding}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRefund}
+              disabled={isRefunding || !refundForm.amount || parseFloat(refundForm.amount) <= 0}
+            >
+              {isRefunding ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <BanknoteIcon className="size-4 mr-2" />
+                  Confirm Refund
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Restock Inventory Dialog */}
       <Dialog open={showRestockDialog} onOpenChange={setShowRestockDialog}>

@@ -619,3 +619,105 @@ export const restockInventory = mutation({
     };
   },
 });
+
+// Refund order to wallet
+export const refundToWallet = mutation({
+  args: {
+    orderId: v.id("orders"),
+    refundAmount: v.number(),
+    refundReason: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Only allow refunds for cancelled or RTO orders
+    if (order.status !== "cancelled" && order.status !== "rto") {
+      throw new ConvexError({
+        message: "Can only refund cancelled or RTO orders",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Validate refund amount
+    if (args.refundAmount <= 0) {
+      throw new ConvexError({
+        message: "Refund amount must be greater than 0",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    if (args.refundAmount > order.total) {
+      throw new ConvexError({
+        message: `Refund amount cannot exceed order total (₹${order.total})`,
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Check if already refunded
+    if (order.refundedToWallet) {
+      throw new ConvexError({
+        message: "This order has already been refunded to wallet",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const user = await ctx.db.get(order.userId);
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Credit wallet
+    const currentBalance = user.walletBalance || 0;
+    const newBalance = currentBalance + args.refundAmount;
+
+    await ctx.db.patch(order.userId, {
+      walletBalance: newBalance,
+    });
+
+    // Create wallet transaction
+    await ctx.db.insert("walletTransactions", {
+      userId: order.userId,
+      transactionType: "credit",
+      amount: args.refundAmount,
+      source: "refund",
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+      description: args.refundReason || `Refund for order #${order.orderNumber}`,
+      relatedOrderId: order._id,
+      adminEmail: identity.email,
+      createdAt: Date.now(),
+    });
+
+    // Update order with refund info
+    await ctx.db.patch(args.orderId, {
+      refundedToWallet: true,
+      refundAmount: args.refundAmount,
+      refundedAt: Date.now(),
+      refundedBy: identity.email || identity.tokenIdentifier,
+      refundReason: args.refundReason,
+    });
+
+    return {
+      success: true,
+      refundAmount: args.refundAmount,
+      newWalletBalance: newBalance,
+    };
+  },
+});
