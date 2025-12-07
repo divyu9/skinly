@@ -1055,8 +1055,12 @@ export default function Index() {
             <Card className="overflow-hidden hover:shadow-xl transition-all border-2 bg-gradient-to-br from-cyan-50 to-purple-100">
               <CardContent className="p-8 text-center">
                 <div className="mb-6 flex justify-center">
-                  <div className="size-32 bg-pink-200 rounded-full flex items-center justify-center">
-                    <MagnetIcon className="size-16 text-pink-600" />
+                  <div className="size-32 bg-pink-200 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="https://cdn.hercules.app/file_u4dxxTfSBjH58WllZq7n6zke" 
+                      alt="Magneto X"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
                 <div className="absolute top-4 right-4 bg-cyan-500 text-white text-xs font-bold px-3 py-1 rounded-full">
@@ -1074,8 +1078,12 @@ export default function Index() {
             <Card className="overflow-hidden hover:shadow-xl transition-all border-2 bg-gradient-to-br from-purple-50 to-pink-100">
               <CardContent className="p-8 text-center">
                 <div className="mb-6 flex justify-center">
-                  <div className="size-32 bg-purple-300 rounded-full flex items-center justify-center">
-                    <SmartphoneIcon className="size-16 text-purple-700" />
+                  <div className="size-32 bg-purple-300 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="https://cdn.hercules.app/file_nCDu0r9nHIwQtbnZ38ljdmce" 
+                      alt="MagSafe Covers"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
                 <div className="absolute top-4 right-4 bg-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
@@ -1093,8 +1101,12 @@ export default function Index() {
             <Card className="overflow-hidden hover:shadow-xl transition-all border-2 bg-gradient-to-br from-pink-50 to-orange-100">
               <CardContent className="p-8 text-center">
                 <div className="mb-6 flex justify-center">
-                  <div className="size-32 bg-orange-200 rounded-full flex items-center justify-center">
-                    <StarIcon className="size-16 text-orange-600" />
+                  <div className="size-32 bg-orange-200 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="https://cdn.hercules.app/file_qDIKn5jfcAtNssBnvtyywWhK" 
+                      alt="AutoApply Guard"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
                 <div className="absolute top-4 right-4 bg-pink-500 text-white text-xs font-bold px-3 py-1 rounded-full">
