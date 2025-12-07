@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api.js";
+import { api, internal } from "./_generated/api.js";
+import { ConvexError } from "convex/values";
 
 const http = httpRouter();
 
@@ -73,15 +74,40 @@ http.route({
       const body = await request.text();
       const data = JSON.parse(body);
 
-      // Extract tracking information
-      // Note: Adjust field names based on actual RapidShyp webhook payload
-      const awbNumber = data.awb_number || data.tracking_number;
-      const status = data.status || data.shipment_status;
-      const trackingUpdate = data.tracking_update || data.scan_details;
+      console.log("=== RapidShyp Webhook Received ===");
+      console.log("Raw payload:", body);
 
+      // Extract tracking information
+      // RapidShyp sends various field names depending on the webhook type
+      const awbNumber = 
+        data.awb_number || 
+        data.awb || 
+        data.tracking_number || 
+        data.trackingNumber ||
+        data.waybill;
+
+      const status = 
+        data.status || 
+        data.shipment_status || 
+        data.current_status ||
+        data.shipmentStatus;
+
+      const trackingUpdate = 
+        data.tracking_update || 
+        data.scan_details || 
+        data.statusDescription ||
+        data.scan_detail;
+
+      console.log("Parsed fields:", { awbNumber, status, trackingUpdate });
+
+      // Validate required fields
       if (!awbNumber) {
+        console.error("Missing AWB number in webhook");
         return new Response(
-          JSON.stringify({ success: false, message: "Invalid webhook data" }),
+          JSON.stringify({ 
+            success: false, 
+            message: "Missing AWB number in webhook data" 
+          }),
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
@@ -89,79 +115,44 @@ http.route({
         );
       }
 
-      // Find order by AWB number
-      const orders = await ctx.runQuery(api.admin.orders.getAllOrders, {});
-      const order = orders.find((o: { awbNumber?: string }) => o.awbNumber === awbNumber);
-
-      if (!order) {
-        return new Response(
-          JSON.stringify({ success: false, message: "Order not found" }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      // Update shipping status
-      await ctx.runMutation(api.admin.orders.updateShippingInfo, {
-        orderId: order._id,
-        shippingStatus: status || trackingUpdate,
+      // Process webhook update using internal mutation
+      const result = await ctx.runMutation(internal.rapidshypWebhook.processWebhookUpdate, {
+        awbNumber,
+        status,
+        trackingUpdate,
+        rawPayload: body,
       });
 
-      // Auto-update order status based on shipping status
-      if (status) {
-        const statusLower = status.toLowerCase();
-        let newOrderStatus = order.status;
-
-        if (statusLower.includes("picked") || statusLower.includes("pickup")) {
-          newOrderStatus = "processing";
-        } else if (
-          statusLower.includes("in transit") ||
-          statusLower.includes("shipped")
-        ) {
-          newOrderStatus = "shipped";
-        } else if (
-          statusLower.includes("out for delivery") ||
-          statusLower.includes("delivery")
-        ) {
-          newOrderStatus = "shipped";
-        } else if (
-          statusLower.includes("delivered") ||
-          statusLower.includes("complete")
-        ) {
-          newOrderStatus = "delivered";
-        } else if (
-          statusLower.includes("rto") ||
-          statusLower.includes("return")
-        ) {
-          newOrderStatus = "rto";
-        }
-
-        if (newOrderStatus !== order.status) {
-          await ctx.runMutation(api.admin.orders.updateOrderStatus, {
-            orderId: order._id,
-            status: newOrderStatus,
-          });
-        }
-      }
+      console.log("Webhook processed successfully:", result);
 
       return new Response(
-        JSON.stringify({ success: true, message: "Webhook processed" }),
+        JSON.stringify({ 
+          success: true, 
+          message: "Webhook processed successfully",
+          orderNumber: result.orderNumber,
+        }),
         {
           status: 200,
           headers: { "Content-Type": "application/json" },
         }
       );
     } catch (error) {
-      console.error("RapidShyp webhook error:", error);
+      console.error("=== RapidShyp Webhook Error ===");
+      console.error("Error:", error);
+      
+      // Return 200 to RapidShyp to prevent retries for known errors
+      const statusCode = 
+        error instanceof ConvexError && error.data.code === "NOT_FOUND"
+          ? 200 // Don't retry for order not found
+          : 500; // Retry for other errors
+
       return new Response(
         JSON.stringify({
           success: false,
-          message: error instanceof Error ? error.message : "Webhook error",
+          message: error instanceof Error ? error.message : "Webhook processing error",
         }),
         {
-          status: 500,
+          status: statusCode,
           headers: { "Content-Type": "application/json" },
         }
       );
