@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, ChevronRightIcon, CalendarIcon } from "lucide-react";
+import { PackageIcon, ChevronRightIcon, CalendarIcon, WalletIcon, CoinsIcon, RefreshCcwIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -317,6 +317,45 @@ function OrdersPageInner() {
                         </p>
                       )}
                     </div>
+
+                    {/* Wallet & Cashback Information */}
+                    {(order.walletAmountUsed || (order.cashbackCredited && order.cashbackAmount) || order.refundedToWallet) && (
+                      <div className="flex flex-wrap gap-2 pb-4 border-b">
+                        {order.walletAmountUsed && order.walletAmountUsed > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                            <WalletIcon className="size-4 text-blue-600" />
+                            <div className="flex flex-col">
+                              <span className="text-xs text-muted-foreground">Wallet Used</span>
+                              <span className="text-sm font-semibold text-blue-600">
+                                ₹{order.walletAmountUsed.toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {order.cashbackCredited && order.cashbackAmount && order.cashbackAmount > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                            <CoinsIcon className="size-4 text-green-600" />
+                            <div className="flex flex-col">
+                              <span className="text-xs text-muted-foreground">Cashback Earned</span>
+                              <span className="text-sm font-semibold text-green-600">
+                                ₹{order.cashbackAmount.toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        {order.refundedToWallet && order.refundAmount && order.refundAmount > 0 && (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                            <RefreshCcwIcon className="size-4 text-purple-600" />
+                            <div className="flex flex-col">
+                              <span className="text-xs text-muted-foreground">Refunded to Wallet</span>
+                              <span className="text-sm font-semibold text-purple-600">
+                                ₹{order.refundAmount.toFixed(0)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Order Total and View Button */}
                     <div className="flex items-center justify-between pt-4 border-t">
