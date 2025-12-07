@@ -252,4 +252,65 @@ http.route({
   }),
 });
 
+// Sitemap XML endpoint
+http.route({
+  path: "/sitemap.xml",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    try {
+      // Get sitemap URLs from query
+      const urls = await ctx.runQuery(api.sitemap.getSitemapUrls, {});
+
+      // Generate XML
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+      xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+
+      urls.forEach((entry) => {
+        xml += "  <url>\n";
+        xml += `    <loc>${entry.url}</loc>\n`;
+        xml += `    <lastmod>${entry.lastmod}</lastmod>\n`;
+        xml += `    <changefreq>${entry.changefreq}</changefreq>\n`;
+        xml += `    <priority>${entry.priority}</priority>\n`;
+        xml += "  </url>\n";
+      });
+
+      xml += "</urlset>";
+
+      return new Response(xml, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml",
+          "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        },
+      });
+    } catch (error) {
+      console.error("Sitemap generation error:", error);
+      return new Response("Error generating sitemap", {
+        status: 500,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+  }),
+});
+
+// Robots.txt endpoint
+http.route({
+  path: "/robots.txt",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const robotsTxt = `User-agent: *
+Allow: /
+
+Sitemap: https://skinly.onhercules.app/sitemap.xml`;
+
+    return new Response(robotsTxt, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain",
+        "Cache-Control": "public, max-age=86400", // Cache for 24 hours
+      },
+    });
+  }),
+});
+
 export default http;

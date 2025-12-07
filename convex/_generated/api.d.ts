@@ -60,6 +60,7 @@ import type * as runMigration from "../runMigration.js";
 import type * as seedModels from "../seedModels.js";
 import type * as settings from "../settings.js";
 import type * as shopify from "../shopify.js";
+import type * as sitemap from "../sitemap.js";
 import type * as stockNotifications from "../stockNotifications.js";
 import type * as stockNotificationsActions from "../stockNotificationsActions.js";
 import type * as supportedModels from "../supportedModels.js";
@@ -137,6 +138,7 @@ declare const fullApi: ApiFromModules<{
   seedModels: typeof seedModels;
   settings: typeof settings;
   shopify: typeof shopify;
+  sitemap: typeof sitemap;
   stockNotifications: typeof stockNotifications;
   stockNotificationsActions: typeof stockNotificationsActions;
   supportedModels: typeof supportedModels;
