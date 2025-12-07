@@ -34,6 +34,7 @@ import AdminWhatsAppMessagesPage from "./pages/admin/whatsapp/messages.tsx";
 import AdminWhatsAppHealthPage from "./pages/admin/whatsapp-health.tsx";
 import AdminWhatsAppDebugLogsPage from "./pages/admin/whatsapp-debug-logs.tsx";
 import AdminWalletPage from "./pages/admin/wallet/page.tsx";
+import AdminCashbackPage from "./pages/admin/cashback/page.tsx";
 import AdminEmailsPage from "./pages/admin/emails/page.tsx";
 import AdminBugsPage from "./pages/admin/bugs/page.tsx";
 import AdminMigrationPage from "./pages/admin/migration.tsx";
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/admin/whatsapp/health" element={<AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper>} />
           <Route path="/admin/whatsapp/debug-logs" element={<AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper>} />
           <Route path="/admin/wallet" element={<AdminPageWrapper><AdminWalletPage /></AdminPageWrapper>} />
+          <Route path="/admin/cashback" element={<AdminPageWrapper><AdminCashbackPage /></AdminPageWrapper>} />
           <Route path="/admin/emails" element={<AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper>} />
           <Route path="/admin/bugs" element={<AdminPageWrapper><AdminBugsPage /></AdminPageWrapper>} />
           <Route path="/admin/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />

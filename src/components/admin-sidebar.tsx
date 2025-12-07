@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Home,
   Bug,
+  Coins,
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 
@@ -45,6 +46,7 @@ export function AdminSidebar() {
     { path: "/admin/stock-notifications", label: "Stock Alerts", icon: Bell },
     { path: "/admin/cod", label: "COD Settings", icon: CreditCard },
     { path: "/admin/wallet", label: "Wallet", icon: Wallet },
+    { path: "/admin/cashback", label: "Cashback", icon: Coins },
     { path: "/admin/emails", label: "Email Templates", icon: Mail },
     { path: "/admin/bugs", label: "Bug Reports", icon: Bug },
     { path: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
