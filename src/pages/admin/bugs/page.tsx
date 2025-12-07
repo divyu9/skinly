@@ -41,14 +41,13 @@ interface BugReportWithAttachments {
 
 function BugReportsContent() {
   const { user } = useAuth();
+  const currentUser = useQuery(api.users.getCurrentUser);
   const stats = useQuery(api.admin.bugReports.getBugStats);
   const allReports = useQuery(api.admin.bugReports.getBugReports, {});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBug, setSelectedBug] = useState<BugReportWithAttachments | null>(null);
 
   // Check if user is admin
-  const currentUser = useQuery(api.users.getCurrentUser);
-  
   if (currentUser === undefined) {
     return (
       <div className="space-y-4">
@@ -60,17 +59,38 @@ function BugReportsContent() {
 
   if (!currentUser?.isAdmin) {
     return (
-      <ErrorState>
-        <ErrorStateHeader>
-          <ErrorStateMedia variant="icon">
-            <AlertTriangleIcon />
-          </ErrorStateMedia>
-          <ErrorStateTitle>Access Denied</ErrorStateTitle>
-          <ErrorStateDescription>
-            You do not have permission to access this page. Only administrators can view bug reports.
-          </ErrorStateDescription>
-        </ErrorStateHeader>
-      </ErrorState>
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangleIcon className="h-5 w-5 text-orange-500" />
+              <CardTitle>Admin Access Required</CardTitle>
+            </div>
+            <CardDescription>
+              You need admin privileges to view bug reports.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-muted p-4 rounded-md space-y-3">
+              <p className="text-sm font-medium">To set yourself as an admin:</p>
+              <ol className="text-sm space-y-2 list-decimal list-inside">
+                <li>Go to the <strong>Database</strong> tab in the left sidebar</li>
+                <li>Click on the <strong>users</strong> table</li>
+                <li>Find your user row (look for your email: <code className="bg-background px-1 py-0.5 rounded">{currentUser?.email || "your-email"}</code>)</li>
+                <li>Double-click the row to edit it</li>
+                <li>Add a new field: <code className="bg-background px-1 py-0.5 rounded">isAdmin</code> and set it to <code className="bg-background px-1 py-0.5 rounded">true</code> (boolean)</li>
+                <li>Save the changes</li>
+                <li>Refresh this page</li>
+              </ol>
+            </div>
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+              <div className="text-sm text-blue-900 dark:text-blue-100">
+                <strong>Note:</strong> Once you have admin access, you can manage other admins through the Database tab.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
