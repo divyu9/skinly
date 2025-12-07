@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { api } from "./_generated/api.js";
 
 // Get all collections
 export const getAllCollections = query({
@@ -8,6 +9,31 @@ export const getAllCollections = query({
   handler: async (ctx) => {
     const collections = await ctx.db.query("collections").collect();
     return collections;
+  },
+});
+
+// Get all collections with product counts
+export const getAllCollectionsWithCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const collections = await ctx.db.query("collections").collect();
+    
+    // Get product counts for each collection
+    const collectionsWithCounts = await Promise.all(
+      collections.map(async (collection) => {
+        const productLinks = await ctx.db
+          .query("collectionProducts")
+          .withIndex("by_collection", (q) => q.eq("collectionId", collection._id))
+          .collect();
+        
+        return {
+          ...collection,
+          productCount: productLinks.length,
+        };
+      })
+    );
+    
+    return collectionsWithCounts;
   },
 });
 
@@ -112,6 +138,13 @@ export const createCollection = mutation({
       rules: args.rules,
     });
 
+    // Auto-sync products if this is an auto collection
+    if (args.isAuto && args.rules && args.rules.length > 0) {
+      await ctx.runMutation(api.collections.syncAutoCollectionProducts, {
+        collectionId,
+      });
+    }
+
     return collectionId;
   },
 });
@@ -166,6 +199,14 @@ export const updateCollection = mutation({
     }
 
     await ctx.db.patch(collectionId, updates);
+
+    // Re-sync products if this is an auto collection
+    const collection = await ctx.db.get(collectionId);
+    if (collection && collection.isAuto && collection.rules && collection.rules.length > 0) {
+      await ctx.runMutation(api.collections.syncAutoCollectionProducts, {
+        collectionId,
+      });
+    }
   },
 });
 
@@ -288,6 +329,120 @@ export const getCollectionProductsPaginated = query({
       hasMore: offset + limit < collectionProductLinks.length,
       total: collectionProductLinks.length
     };
+  },
+});
+
+// Sync products for an auto-collection (populate collectionProducts table)
+export const syncAutoCollectionProducts = mutation({
+  args: { collectionId: v.id("collections") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection) {
+      throw new ConvexError({
+        message: "Collection not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Only sync auto collections
+    if (!collection.isAuto || !collection.rules || collection.rules.length === 0) {
+      return { synced: 0, message: "Not an auto collection or no rules defined" };
+    }
+
+    // Filter out rules with empty values
+    const validRules = collection.rules.filter((rule) => rule.value.trim() !== "");
+    if (validRules.length === 0) {
+      return { synced: 0, message: "No valid rules" };
+    }
+
+    // Get all products and variants
+    const allProducts = await ctx.db.query("products").collect();
+    const allVariants = await ctx.db.query("variants").collect();
+
+    // Group variants by product
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+
+    // Filter products based on rules (same logic as preview)
+    const matchLogic = collection.matchLogic || "all";
+    const matchingProducts = allProducts.filter((product) => {
+      const variants = variantsByProduct.get(product._id) || [];
+      
+      const ruleMatches = (rule: {
+        field: "productName" | "sku";
+        condition: "contains" | "startsWith" | "notContains";
+        value: string;
+      }) => {
+        const value = rule.value.toLowerCase();
+        
+        if (rule.field === "productName") {
+          const productName = product.title.toLowerCase();
+          
+          if (rule.condition === "contains") {
+            return productName.includes(value);
+          } else if (rule.condition === "startsWith") {
+            return productName.startsWith(value);
+          } else if (rule.condition === "notContains") {
+            return !productName.includes(value);
+          }
+        } else if (rule.field === "sku") {
+          return variants.some((variant) => {
+            const sku = variant.sku.toLowerCase();
+            
+            if (rule.condition === "contains") {
+              return sku.includes(value);
+            } else if (rule.condition === "startsWith") {
+              return sku.startsWith(value);
+            } else if (rule.condition === "notContains") {
+              return !sku.includes(value);
+            }
+            return false;
+          });
+        }
+        
+        return false;
+      };
+      
+      if (matchLogic === "any") {
+        return validRules.some(ruleMatches);
+      } else {
+        return validRules.every(ruleMatches);
+      }
+    });
+
+    // Delete existing collectionProducts entries for this collection
+    const existingLinks = await ctx.db
+      .query("collectionProducts")
+      .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId))
+      .collect();
+    
+    for (const link of existingLinks) {
+      await ctx.db.delete(link._id);
+    }
+
+    // Insert new collectionProducts entries
+    for (const product of matchingProducts) {
+      await ctx.db.insert("collectionProducts", {
+        collectionId: args.collectionId,
+        productId: product._id,
+      });
+    }
+
+    return { synced: matchingProducts.length };
   },
 });
 
