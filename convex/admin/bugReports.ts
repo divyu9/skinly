@@ -86,6 +86,7 @@ export const getBugReports = query({
         (b) =>
           b.bugId.toLowerCase().includes(searchLower) ||
           b.userEmail.toLowerCase().includes(searchLower) ||
+          b.userPhone.includes(searchLower) ||
           b.bugDetails.toLowerCase().includes(searchLower)
       );
     }
@@ -93,7 +94,22 @@ export const getBugReports = query({
     // Sort by creation time (newest first)
     bugs.sort((a, b) => b._creationTime - a._creationTime);
 
-    return bugs;
+    // Get attachments for each bug
+    const bugsWithAttachments = await Promise.all(
+      bugs.map(async (bug) => {
+        const attachments = await ctx.db
+          .query("bugAttachments")
+          .withIndex("by_bug_report", (q) => q.eq("bugReportId", bug._id))
+          .collect();
+
+        return {
+          ...bug,
+          attachments,
+        };
+      })
+    );
+
+    return bugsWithAttachments;
   },
 });
 

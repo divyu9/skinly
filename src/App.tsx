@@ -35,6 +35,7 @@ import AdminWhatsAppHealthPage from "./pages/admin/whatsapp-health.tsx";
 import AdminWhatsAppDebugLogsPage from "./pages/admin/whatsapp-debug-logs.tsx";
 import AdminWalletPage from "./pages/admin/wallet/page.tsx";
 import AdminEmailsPage from "./pages/admin/emails/page.tsx";
+import AdminBugsPage from "./pages/admin/bugs/page.tsx";
 import AdminMigrationPage from "./pages/admin/migration.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
@@ -80,6 +81,7 @@ export default function App() {
           <Route path="/admin/whatsapp/debug-logs" element={<AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper>} />
           <Route path="/admin/wallet" element={<AdminPageWrapper><AdminWalletPage /></AdminPageWrapper>} />
           <Route path="/admin/emails" element={<AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper>} />
+          <Route path="/admin/bugs" element={<AdminPageWrapper><AdminBugsPage /></AdminPageWrapper>} />
           <Route path="/admin/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />
           <Route path="/admin/mockups/missing" element={<AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper>} />
           <Route path="/admin/google-drive-import" element={<AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper>} />

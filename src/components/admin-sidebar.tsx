@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Home,
+  Bug,
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 
@@ -45,6 +46,7 @@ export function AdminSidebar() {
     { path: "/admin/cod", label: "COD Settings", icon: CreditCard },
     { path: "/admin/wallet", label: "Wallet", icon: Wallet },
     { path: "/admin/emails", label: "Email Templates", icon: Mail },
+    { path: "/admin/bugs", label: "Bug Reports", icon: Bug },
     { path: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
     { path: "/admin/whatsapp/messages", label: "WA Messages", icon: MessageCircle },
     { path: "/admin/whatsapp/health", label: "WA Health", icon: MessageCircle },
