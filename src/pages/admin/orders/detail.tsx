@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
-import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon } from "lucide-react";
+import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -43,9 +43,12 @@ function OrderDetailPageInner() {
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const createShipment = useAction(api.rapidshyp.createShipment);
+  const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
+  const [cancellingShipment, setCancellingShipment] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRestockDialog, setShowRestockDialog] = useState(false);
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isRestocking, setIsRestocking] = useState(false);
@@ -120,6 +123,41 @@ function OrderDetailPageInner() {
       });
     } finally {
       setCreatingShipment(false);
+    }
+  };
+
+  const handleCancelShipment = async () => {
+    if (!orderId) return;
+    setCancellingShipment(true);
+    try {
+      const result = await cancelShipment({ orderId: orderId as Id<"orders"> });
+      if (result.success) {
+        toast.success("Shipment cancelled successfully");
+        setShowCancelDialog(false);
+      } else {
+        toast.error("Failed to cancel shipment");
+      }
+    } catch (error) {
+      console.error("Cancel Shipment Error:", error);
+      
+      // Extract detailed error message from ConvexError
+      let errorMessage = "Failed to cancel shipment";
+      let errorDetails = "";
+      
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error.data as { message?: string; code?: string };
+        errorMessage = convexError.message || errorMessage;
+        errorDetails = convexError.code || "";
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage, {
+        description: errorDetails ? `Error code: ${errorDetails}` : undefined,
+        duration: 10000,
+      });
+    } finally {
+      setCancellingShipment(false);
     }
   };
 
@@ -500,6 +538,56 @@ function OrderDetailPageInner() {
                             Save Shipping Info
                           </Button>
                         </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          className="flex-1"
+                          disabled={cancellingShipment}
+                        >
+                          <XCircleIcon className="size-4 mr-2" />
+                          Cancel Shipment
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Cancel Shipment</DialogTitle>
+                          <DialogDescription>
+                            Are you sure you want to cancel this shipment?
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                            <p className="text-sm text-amber-900">
+                              <strong>Warning:</strong> This will cancel the shipment with RapidShyp and reset the order status to Processing. All shipping information (AWB, tracking URL, label) will be removed.
+                            </p>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowCancelDialog(false)}
+                            disabled={cancellingShipment}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            onClick={handleCancelShipment}
+                            disabled={cancellingShipment}
+                          >
+                            {cancellingShipment ? (
+                              <>
+                                <Spinner className="size-4 mr-2" />
+                                Cancelling...
+                              </>
+                            ) : (
+                              "Confirm Cancel"
+                            )}
+                          </Button>
+                        </DialogFooter>
                       </DialogContent>
                     </Dialog>
                   </>
