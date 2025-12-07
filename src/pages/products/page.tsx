@@ -162,6 +162,7 @@ export default function ProductsPage() {
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
   const [gadgetFilter, setGadgetFilter] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   
   // Get collection if collection parameter is present
   const collection = useQuery(
@@ -296,6 +297,29 @@ export default function ProductsPage() {
       filtered = filtered.filter(p => p.gadgetCategory === gadgetFilter);
     }
     
+    // Filter by product category (Cases, Camera Rings, etc.)
+    if (categoryFilter) {
+      const categoryLower = categoryFilter.toLowerCase();
+      filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        const tags = p.tags.toLowerCase();
+        
+        if (categoryFilter === 'cover-and-case') {
+          return title.includes('cover') || title.includes('case') || tags.includes('cover') || tags.includes('case');
+        }
+        if (categoryFilter === 'camera-rings') {
+          return title.includes('camera ring') || title.includes('camera protector') || tags.includes('camera ring') || tags.includes('camera protector');
+        }
+        if (categoryFilter === 'magneto-x') {
+          return title.includes('magneto') || tags.includes('magneto');
+        }
+        if (categoryFilter === 'autoapply-glasses') {
+          return title.includes('autoapply') || title.includes('tempered glass') || title.includes('screen protector') || tags.includes('autoapply') || tags.includes('tempered glass');
+        }
+        return false;
+      });
+    }
+    
     // Filter by device (when not coming from phone selector)
     if (deviceFilter && !brandFilter) {
       filtered = filtered.filter(p => {
@@ -340,7 +364,7 @@ export default function ProductsPage() {
     }
     
     return filtered;
-  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter, gadgetFilter]);
+  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter, gadgetFilter, categoryFilter]);
   
   // Apply sorting and stock filtering
   const sortedAndFilteredProducts = useMemo(() => {
@@ -662,7 +686,7 @@ export default function ProductsPage() {
 
           {/* Gadget Category Tabs - Only show when not filtered by brand/model */}
           {!brandFilter && !modelFilter && (
-            <div className="mb-6">
+            <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
                   onClick={() => setGadgetFilter(null)}
@@ -740,6 +764,64 @@ export default function ProductsPage() {
                 >
                   <Gamepad2 className="size-4" />
                   Consoles
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Product Category Tabs - Second row for popular product types */}
+          {!brandFilter && !modelFilter && (
+            <div className="mb-6">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                <button
+                  onClick={() => setCategoryFilter(null)}
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    !categoryFilter
+                      ? 'bg-primary text-primary-foreground shadow-md'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  All Products
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('cover-and-case')}
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    categoryFilter === 'cover-and-case'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Cases And Covers
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('camera-rings')}
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    categoryFilter === 'camera-rings'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-md'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Camera Rings
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('magneto-x')}
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    categoryFilter === 'magneto-x'
+                      ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-md'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Magneto X
+                </button>
+                <button
+                  onClick={() => setCategoryFilter('autoapply-glasses')}
+                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    categoryFilter === 'autoapply-glasses'
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-md'
+                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  AutoApply HQ Glasses
                 </button>
               </div>
             </div>
@@ -890,11 +972,12 @@ export default function ProductsPage() {
                 </SelectContent>
               </Select>
 
-              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter) && (
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter || categoryFilter) && (
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
                   setGadgetFilter(null);
+                  setCategoryFilter(null);
                   window.location.href = '/products';
                 }} className="h-8 sm:h-10 text-xs sm:text-sm">
                   Clear All
