@@ -303,11 +303,11 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
                       className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
                     >
                       {brandLogos[brand] ? (
-                        <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
+                        <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden">
                           <img 
                             src={brandLogos[brand]} 
                             alt={brand}
-                            className="max-w-full max-h-full object-contain"
+                            className="w-full h-full object-cover"
                           />
                         </div>
                       ) : (
