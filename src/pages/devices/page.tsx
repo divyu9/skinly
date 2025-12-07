@@ -1,9 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import {
   SearchIcon,
   ChevronDownIcon,
@@ -55,6 +56,9 @@ const ALL_BRANDS = [
 export default function DevicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedBrands, setExpandedBrands] = useState<Set<string>>(new Set());
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   // Model request dialog state
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
@@ -172,6 +176,24 @@ export default function DevicesPage() {
       .filter((item) => item.matchCount > 0 || item.brand.toLowerCase().includes(searchLower));
   }, [searchQuery, brandedModels]);
 
+  // Flattened search results for dropdown (limit to 15)
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim() || !allModels) return [];
+    
+    const searchLower = searchQuery.toLowerCase();
+    const results = allModels
+      .filter((model) =>
+        model.modelName.toLowerCase().includes(searchLower) ||
+        model.brandName.toLowerCase().includes(searchLower) ||
+        CATEGORY_CONFIG[model.category as keyof typeof CATEGORY_CONFIG]?.label
+          .toLowerCase()
+          .includes(searchLower)
+      )
+      .slice(0, 15);
+    
+    return results;
+  }, [searchQuery, allModels]);
+
   const toggleBrand = (brand: string) => {
     const newExpanded = new Set(expandedBrands);
     if (newExpanded.has(brand)) {
@@ -188,6 +210,85 @@ export default function DevicesPage() {
 
   const collapseAll = () => {
     setExpandedBrands(new Set());
+  };
+
+  // Handle clicking a model from dropdown
+  const handleModelClick = (brandName: string, modelId: string) => {
+    // Close dropdown
+    setDropdownOpen(false);
+    setSearchQuery("");
+    
+    // Expand the brand if not already expanded
+    setExpandedBrands((prev) => new Set([...prev, brandName]));
+    
+    // Scroll to brand after a brief delay to allow expansion
+    setTimeout(() => {
+      const brandElement = document.getElementById(`brand-${brandName}`);
+      if (brandElement) {
+        const offset = 100; // Account for fixed header
+        const elementPosition = brandElement.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+        
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+        
+        // Highlight the specific model after scrolling to brand
+        setTimeout(() => {
+          const modelElement = document.getElementById(`model-${modelId}`);
+          if (modelElement) {
+            modelElement.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            
+            // Add temporary highlight
+            modelElement.classList.add("ring-2", "ring-primary", "ring-offset-2");
+            setTimeout(() => {
+              modelElement.classList.remove("ring-2", "ring-primary", "ring-offset-2");
+            }, 2000);
+          }
+        }, 300);
+      }
+    }, 100);
+  };
+
+  // Open dropdown when search query changes
+  useEffect(() => {
+    if (searchQuery.trim().length > 0) {
+      setDropdownOpen(true);
+      setSelectedIndex(-1);
+    } else {
+      setDropdownOpen(false);
+    }
+  }, [searchQuery]);
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!dropdownOpen || searchResults.length === 0) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setSelectedIndex((prev) => 
+          prev < searchResults.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (selectedIndex >= 0 && selectedIndex < searchResults.length) {
+          const model = searchResults[selectedIndex];
+          handleModelClick(model.brandName, model._id);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        setDropdownOpen(false);
+        setSelectedIndex(-1);
+        break;
+    }
   };
 
   // Handle model request submission
@@ -283,18 +384,76 @@ export default function DevicesPage() {
             </p>
           </div>
 
-          {/* Search Bar */}
+          {/* Search Bar with Dropdown */}
           <div className="max-w-2xl mx-auto">
-            <div className="relative">
-              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search by brand or model (e.g., iPhone 15 Pro, Galaxy S24...)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-14 text-base border-2 focus:border-primary"
-              />
-            </div>
+            <Popover open={dropdownOpen} onOpenChange={setDropdownOpen}>
+              <PopoverTrigger asChild>
+                <div className="relative">
+                  <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground pointer-events-none z-10" />
+                  <Input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Search by brand or model (e.g., iPhone 15 Pro, Galaxy S24...)"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="pl-12 h-14 text-base border-2 focus:border-primary"
+                    onFocus={() => searchQuery.trim() && setDropdownOpen(true)}
+                  />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0 max-h-[400px] overflow-y-auto"
+                align="start"
+                onOpenAutoFocus={(e) => e.preventDefault()}
+              >
+                {searchResults.length > 0 ? (
+                  <div className="py-2">
+                    {searchResults.map((model, index) => {
+                      const categoryConfig = CATEGORY_CONFIG[model.category as keyof typeof CATEGORY_CONFIG];
+                      const Icon = categoryConfig?.icon || PackageIcon;
+                      
+                      return (
+                        <button
+                          key={model._id}
+                          onClick={() => handleModelClick(model.brandName, model._id)}
+                          className={`w-full px-4 py-3 flex items-center gap-3 hover:bg-muted/50 transition-colors ${
+                            selectedIndex === index ? "bg-muted" : ""
+                          }`}
+                        >
+                          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <Icon className="size-4 text-primary" />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="font-medium truncate">{model.modelName}</div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2">
+                              <span>{model.brandName}</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {categoryConfig?.label}
+                              </Badge>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                    {allModels && filteredBrands.reduce((acc, item) => acc + item.matchCount, 0) > 15 && (
+                      <div className="px-4 py-2 text-xs text-muted-foreground text-center border-t">
+                        Showing top 15 results. Scroll down to see all {filteredBrands.reduce((acc, item) => acc + item.matchCount, 0)} matches.
+                      </div>
+                    )}
+                  </div>
+                ) : searchQuery.trim() && allModels ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    No models found matching "{searchQuery}"
+                  </div>
+                ) : searchQuery.trim() ? (
+                  <div className="p-8 flex flex-col items-center gap-2">
+                    <div className="size-6 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+                    <p className="text-sm text-muted-foreground">Searching...</p>
+                  </div>
+                ) : null}
+              </PopoverContent>
+            </Popover>
             {searchQuery && (
               <div className="mt-3 text-sm text-muted-foreground text-center">
                 Found {filteredBrands.length} brand(s) with{" "}
@@ -362,7 +521,7 @@ export default function DevicesPage() {
                 const categoryConfig = CATEGORY_CONFIG[primaryCategory];
 
                 return (
-                  <Card key={brand} className="overflow-hidden border-2 hover:border-primary/50 transition-colors">
+                  <Card key={brand} id={`brand-${brand}`} className="overflow-hidden border-2 hover:border-primary/50 transition-colors scroll-mt-24">
                     <button
                       onClick={() => toggleBrand(brand)}
                       className="w-full p-6 flex items-center justify-between hover:bg-muted/50 transition-colors"
@@ -420,8 +579,9 @@ export default function DevicesPage() {
                                     {categoryModels.map((model) => (
                                       <Link
                                         key={model._id}
+                                        id={`model-${model._id}`}
                                         to={`/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model.modelName)}&showFinish=true`}
-                                        className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all group"
+                                        className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all group scroll-mt-24"
                                       >
                                         <div className="flex items-center justify-between">
                                           <span className="text-sm font-medium group-hover:text-primary transition-colors">
