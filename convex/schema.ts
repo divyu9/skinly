@@ -9,9 +9,11 @@ export default defineSchema({
     walletBalance: v.optional(v.number()), // Current wallet balance (default 0)
     referralCode: v.optional(v.string()), // Unique referral code for this user
     referredBy: v.optional(v.id("users")), // User who referred them
+    isAdmin: v.optional(v.boolean()), // Admin role for bug dashboard access
   })
     .index("by_token", ["tokenIdentifier"])
-    .index("by_referral_code", ["referralCode"]),
+    .index("by_referral_code", ["referralCode"])
+    .index("by_is_admin", ["isAdmin"]),
 
   cart: defineTable({
     userId: v.id("users"),
@@ -807,4 +809,35 @@ export default defineSchema({
     .index("by_type", ["templateType"])
     .index("by_type_and_active", ["templateType", "isActive"])
     .index("by_active", ["isActive"]),
+
+  // Bug Reports (user-submitted bugs)
+  bugReports: defineTable({
+    bugId: v.string(), // Human-readable ID (e.g., "BUG-001")
+    userEmail: v.string(), // Reporter's email
+    userPhone: v.string(), // Reporter's phone number
+    bugDetails: v.string(), // Bug description (min 20 chars)
+    status: v.union(
+      v.literal("pending"), // New bug, not addressed
+      v.literal("resolved"), // Bug fixed
+      v.literal("deleted") // Soft deleted
+    ),
+    userId: v.optional(v.id("users")), // User ID if authenticated
+    attachmentCount: v.number(), // Number of attached files
+    ipAddress: v.optional(v.string()), // IP address for audit trail
+    updatedAt: v.optional(v.number()), // Last update timestamp
+  })
+    .index("by_status", ["status"])
+    .index("by_bug_id", ["bugId"])
+    .index("by_user", ["userId"])
+    .index("by_email", ["userEmail"]),
+
+  // Bug Attachments (files uploaded with bug reports)
+  bugAttachments: defineTable({
+    bugReportId: v.id("bugReports"), // Link to bug report
+    fileId: v.id("_storage"), // Convex storage ID
+    fileName: v.string(), // Original file name
+    fileSize: v.number(), // File size in bytes
+    fileType: v.string(), // MIME type (e.g., "image/jpeg", "video/mp4")
+  })
+    .index("by_bug_report", ["bugReportId"]),
 });
