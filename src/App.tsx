@@ -44,6 +44,7 @@ import TaxExportPage from "./pages/admin/tax-export.tsx";
 import FixCollectionsPage from "./pages/admin/fix-collections.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
 import AccountPage from "./pages/account/page.tsx";
+import WalletPage from "./pages/account/wallet/page.tsx";
 import ReturnsPolicy from "./pages/policies/returns.tsx";
 import ShippingPolicy from "./pages/policies/shipping.tsx";
 import TermsOfService from "./pages/policies/terms.tsx";
@@ -57,6 +58,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/account/wallet" element={<WalletPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/confirm" element={<ProductConfirmPage />} />
           <Route path="/products/detail" element={<ProductDetailPage />} />
