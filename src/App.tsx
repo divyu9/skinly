@@ -38,6 +38,7 @@ import AdminCashbackPage from "./pages/admin/cashback/page.tsx";
 import AdminEmailsPage from "./pages/admin/emails/page.tsx";
 import AdminBugsPage from "./pages/admin/bugs/page.tsx";
 import AdminMigrationPage from "./pages/admin/migration.tsx";
+import AdminSitemapGeneratorPage from "./pages/admin/sitemap-generator.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -97,6 +98,7 @@ export default function App() {
           <Route path="/admin/tax-export" element={<AdminPageWrapper><TaxExportPage /></AdminPageWrapper>} />
           <Route path="/admin/fix-collections" element={<AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper>} />
           <Route path="/admin/migration" element={<AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper>} />
+          <Route path="/admin/sitemap" element={<AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper>} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
