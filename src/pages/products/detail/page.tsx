@@ -28,7 +28,8 @@ import {
   CopyIcon,
   MessageCircleIcon,
   CheckCircleIcon,
-  ClockIcon
+  ClockIcon,
+  AlertCircleIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -44,6 +45,9 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView, trackAddToCart } from "@/lib/analytics.ts";
@@ -90,6 +94,17 @@ export default function ProductDetailPage() {
   // Pincode state
   const [pincode, setPincode] = useState("");
   const [pincodeChecked, setPincodeChecked] = useState(false);
+  
+  // Model request dialog state
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [requestBrand, setRequestBrand] = useState("");
+  const [requestNewBrand, setRequestNewBrand] = useState("");
+  const [isNewBrand, setIsNewBrand] = useState(false);
+  const [requestModel, setRequestModel] = useState("");
+  const [requestCategory, setRequestCategory] = useState<string>("phone");
+  const [requestWhatsApp, setRequestWhatsApp] = useState("");
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  const [confirmedNotMatch, setConfirmedNotMatch] = useState(false);
   
   // Fetch phone models from database for brand/model selector
   const phoneModelsFromDb = useQuery(api.supportedModels.listAll, { 
@@ -161,6 +176,26 @@ export default function ProductDetailPage() {
     api.reviews.getReviewStats,
     productData ? { productId: productData._id } : "skip"
   );
+  
+  // Model request mutations and queries
+  const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  const similarModels = useQuery(
+    api.modelRequests.findSimilarModels,
+    requestModel.trim().length >= 2
+      ? {
+          brandName: !isNewBrand && requestBrand ? requestBrand : undefined,
+          modelName: requestModel,
+          category: requestCategory ? (requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini") : undefined,
+        }
+      : "skip"
+  );
+  
+  // Get all brands for the request dialog
+  const allBrands = useMemo(() => {
+    if (!phoneModelsFromDb) return [];
+    const brands = new Set(phoneModelsFromDb.map(m => m.brandName));
+    return Array.from(brands).sort();
+  }, [phoneModelsFromDb]);
   
   // Query mockup file URL from database
   const mockupFileUrl = useQuery(
@@ -474,6 +509,67 @@ export default function ProductDetailPage() {
       }
     } finally {
       setUploadingReview(false);
+    }
+  };
+  
+  const handleSubmitRequest = async () => {
+    // Validate form
+    const finalBrand = isNewBrand ? requestNewBrand : requestBrand;
+    if (!finalBrand.trim()) {
+      toast.error("Please select or enter a brand");
+      return;
+    }
+    if (!requestModel.trim()) {
+      toast.error("Please enter a model name");
+      return;
+    }
+    if (!requestCategory) {
+      toast.error("Please select a device category");
+      return;
+    }
+    if (!requestWhatsApp.trim()) {
+      toast.error("Please enter your WhatsApp number");
+      return;
+    }
+    
+    // Validate WhatsApp number format (10 digits)
+    const cleanedPhone = requestWhatsApp.replace(/\D/g, "");
+    if (cleanedPhone.length !== 10) {
+      toast.error("Please enter a valid 10-digit phone number");
+      return;
+    }
+    
+    // If similar models exist and user hasn't confirmed, show warning
+    if (similarModels && similarModels.length > 0 && !confirmedNotMatch) {
+      toast.error("Please confirm that your model doesn't match any of the similar models listed");
+      return;
+    }
+
+    setIsSubmittingRequest(true);
+    try {
+      await createModelRequest({
+        brandName: finalBrand,
+        modelName: requestModel.trim(),
+        category: requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
+        whatsappPhone: "+91" + cleanedPhone,
+      });
+      
+      toast.success("Request submitted! We'll notify you on WhatsApp when it's added.");
+      
+      // Reset form
+      setRequestDialogOpen(false);
+      setRequestBrand("");
+      setRequestNewBrand("");
+      setIsNewBrand(false);
+      setRequestModel("");
+      setRequestCategory("phone");
+      setRequestWhatsApp("");
+      setConfirmedNotMatch(false);
+    } catch (error) {
+      toast.error("Failed to submit request. Please try again.");
+      console.error(error);
+    } finally {
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -1224,14 +1320,15 @@ export default function ProductDetailPage() {
                 ) : (
                   <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
                     <p className="text-muted-foreground">No models found matching "{modelSearch}"</p>
-                    <a
-                      href={`https://wa.me/919761011121?text=${encodeURIComponent("I Want to request a model on Skinly")}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setModelDialogOpen(false);
+                        setRequestDialogOpen(true);
+                      }}
                     >
                       Request Your Model
-                    </a>
+                    </Button>
                   </div>
                 )}
               </div>
@@ -1467,6 +1564,185 @@ export default function ProductDetailPage() {
             >
               Continue Shopping
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Request Model Dialog */}
+      <Dialog 
+        open={requestDialogOpen} 
+        onOpenChange={(open) => {
+          setRequestDialogOpen(open);
+          if (!open) {
+            // Reset form when dialog closes
+            setRequestBrand("");
+            setRequestNewBrand("");
+            setIsNewBrand(false);
+            setRequestModel("");
+            setRequestCategory("phone");
+            setRequestWhatsApp("");
+            setConfirmedNotMatch(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Request a Device Model</DialogTitle>
+            <DialogDescription>
+              Can't find your device? Let us know and we'll add it to our database.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Brand Selection */}
+            <div className="space-y-2">
+              <Label>Brand *</Label>
+              <Select 
+                value={isNewBrand ? "other_new_brand" : requestBrand} 
+                onValueChange={(value) => {
+                  if (value === "other_new_brand") {
+                    setIsNewBrand(true);
+                    setRequestBrand("");
+                  } else {
+                    setIsNewBrand(false);
+                    setRequestBrand(value);
+                  }
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a brand" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {allBrands.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="other_new_brand">Other (New Brand)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Custom Brand Input */}
+            {isNewBrand && (
+              <div className="space-y-2">
+                <Label>Enter New Brand Name *</Label>
+                <Input
+                  type="text"
+                  placeholder="Enter brand name"
+                  value={requestNewBrand}
+                  onChange={(e) => setRequestNewBrand(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Model Name */}
+            <div className="space-y-2">
+              <Label>Model Name *</Label>
+              <Input
+                type="text"
+                placeholder="e.g., iPhone 15 Pro Max"
+                value={requestModel}
+                onChange={(e) => setRequestModel(e.target.value)}
+              />
+            </div>
+
+            {/* Similar Models Warning */}
+            {similarModels && similarModels.length > 0 && (
+              <div className="p-4 border-2 border-yellow-500/50 bg-yellow-500/5 rounded-lg space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircleIcon className="size-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                      Similar models found in our database:
+                    </p>
+                    <ul className="space-y-1 mb-3">
+                      {similarModels.slice(0, 5).map((model, idx) => (
+                        <li key={idx} className="text-sm text-yellow-800 dark:text-yellow-200">
+                          • {model.brandName} {model.modelName}
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="flex items-start gap-2 mt-3 p-3 bg-yellow-500/10 rounded">
+                      <Checkbox
+                        id="confirm-not-match"
+                        checked={confirmedNotMatch}
+                        onCheckedChange={(checked) => setConfirmedNotMatch(checked === true)}
+                      />
+                      <label
+                        htmlFor="confirm-not-match"
+                        className="text-sm font-medium leading-tight cursor-pointer"
+                      >
+                        I confirm my device model is different from the models listed above
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Category Selection */}
+            <div className="space-y-2">
+              <Label>Device Category *</Label>
+              <Select value={requestCategory} onValueChange={setRequestCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="tablet">Tablet</SelectItem>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="console">Gaming Console</SelectItem>
+                  <SelectItem value="charger">Charger</SelectItem>
+                  <SelectItem value="drone">Drone</SelectItem>
+                  <SelectItem value="camera">Camera</SelectItem>
+                  <SelectItem value="lens">Camera Lens</SelectItem>
+                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* WhatsApp Number */}
+            <div className="space-y-2">
+              <Label>WhatsApp Number *</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground px-3 py-2 bg-muted rounded-md">
+                  +91
+                </span>
+                <Input
+                  type="tel"
+                  placeholder="9876543210"
+                  value={requestWhatsApp}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setRequestWhatsApp(value);
+                  }}
+                  className="flex-1"
+                  maxLength={10}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                We'll notify you on WhatsApp when your device is added
+              </p>
+            </div>
+
+            {/* Submit Button */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={handleSubmitRequest}
+                disabled={isSubmittingRequest}
+                className="flex-1"
+              >
+                {isSubmittingRequest ? "Submitting..." : "Submit Request"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setRequestDialogOpen(false)}
+                disabled={isSubmittingRequest}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
