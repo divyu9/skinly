@@ -533,7 +533,89 @@ export const updateOrderStatus = mutation({
       });
     }
 
+    // Get the order to check its current state
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Update order status
     await ctx.db.patch(args.orderId, { status: args.status });
+
+    // If status is now "delivered" and cashback hasn't been credited yet, process cashback
+    if (args.status === "delivered" && !order.cashbackCredited) {
+      // Get all variants to map order items to variant IDs
+      const allVariants = await ctx.db.query("variants").collect();
+      const allProducts = await ctx.db.query("products").collect();
+
+      // Build items array for cashback calculation
+      const itemsForCashback = order.items
+        .map((item) => {
+          // Find the product
+          const product = allProducts.find((p) => p._id === item.productId);
+          if (!product) return null;
+
+          // Find the variant by matching productId and variant title
+          const variant = allVariants.find(
+            (v) => v.productId === item.productId && v.title === item.variant
+          );
+          if (!variant) return null;
+
+          // Calculate final unit price (item price is already after discounts from order creation)
+          const finalPrice = item.price;
+
+          return {
+            productId: product._id,
+            variantId: variant._id,
+            finalPrice,
+            quantity: item.quantity,
+          };
+        })
+        .filter((item) => item !== null);
+
+      if (itemsForCashback.length > 0) {
+        // Calculate total cashback for the order
+        const cashbackResult = await ctx.runQuery(api.cashbackHelpers.calculateCartCashback, {
+          items: itemsForCashback,
+        });
+
+        if (cashbackResult.totalCashback > 0) {
+          // Get the user
+          const user = await ctx.db.get(order.userId);
+          if (user) {
+            const currentBalance = user.walletBalance || 0;
+            const newBalance = currentBalance + cashbackResult.totalCashback;
+
+            // Update user's wallet balance
+            await ctx.db.patch(order.userId, {
+              walletBalance: newBalance,
+            });
+
+            // Create wallet transaction record
+            await ctx.db.insert("walletTransactions", {
+              userId: order.userId,
+              transactionType: "credit",
+              amount: cashbackResult.totalCashback,
+              source: "cashback",
+              balanceBefore: currentBalance,
+              balanceAfter: newBalance,
+              description: `Cashback from order #${order.orderNumber}`,
+              relatedOrderId: order._id,
+              createdAt: Date.now(),
+            });
+
+            // Mark order as cashback credited
+            await ctx.db.patch(args.orderId, {
+              cashbackAmount: cashbackResult.totalCashback,
+              cashbackCredited: true,
+            });
+          }
+        }
+      }
+    }
   },
 });
 
