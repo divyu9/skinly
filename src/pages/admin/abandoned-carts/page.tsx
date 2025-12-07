@@ -97,7 +97,7 @@ function AbandonedCartsPageInner() {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline">
-            <Link to="/admin">Back to Admin</Link>
+            <Link to="/backend-skinly/products">Back to Admin</Link>
           </Button>
           <Button onClick={handleProcessAll} disabled={processing}>
             {processing ? "Processing..." : "Send All Reminders"}

@@ -137,7 +137,7 @@ export default function SitemapGenerator() {
                     <Button
                       variant="link"
                       className="h-auto p-0 text-muted-foreground underline"
-                      onClick={() => window.open("/admin/mockups", "_blank")}
+                      onClick={() => window.open("/backend-skinly/mockups", "_blank")}
                     >
                       Files & Media tab
                       <ExternalLink className="h-3 w-3 ml-1" />

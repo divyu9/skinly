@@ -503,7 +503,7 @@ function AdminOrdersPageInner() {
             Manage all customer orders and track payments
           </p>
         </div>
-        <Link to="/admin/tax-export">
+        <Link to="/backend-skinly/tax-export">
           <Button variant="outline">
             <FileTextIcon className="size-4 mr-2" />
             Export for Tax Filing
@@ -847,7 +847,7 @@ function AdminOrdersPageInner() {
                         if ((e.target as HTMLElement).closest('button[role="checkbox"]')) {
                           return;
                         }
-                        navigate(`/admin/orders/${order._id}`);
+                        navigate(`/backend-skinly/orders/${order._id}`);
                       }}
                     >
                       <td className="p-3" onClick={(e) => e.stopPropagation()}>

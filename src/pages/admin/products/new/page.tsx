@@ -135,7 +135,7 @@ function NewProductPageInner() {
       }
 
       toast.success("Product created successfully");
-      navigate("/admin/products");
+      navigate("/backend-skinly/products");
     } catch (error) {
       toast.error("Failed to create product");
     } finally {
@@ -151,7 +151,7 @@ function NewProductPageInner() {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/admin/products">
+          <Link to="/backend-skinly/products">
             <Button type="button" variant="ghost" size="sm">
               <ChevronLeftIcon className="size-4 mr-2" />
               Back
@@ -376,7 +376,7 @@ function NewProductPageInner() {
                 {collections.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No collections yet.{" "}
-                    <Link to="/admin/collections" className="text-primary underline">
+                    <Link to="/backend-skinly/collections" className="text-primary underline">
                       Create one
                     </Link>
                   </p>

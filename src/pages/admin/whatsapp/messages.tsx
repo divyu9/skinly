@@ -139,7 +139,7 @@ export default function WhatsAppMessagesPage() {
                 Trigger Worker
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link to="/admin/whatsapp">Back to Settings</Link>
+                <Link to="/backend-skinly/whatsapp">Back to Settings</Link>
               </Button>
             </div>
           </div>

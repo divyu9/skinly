@@ -453,7 +453,7 @@ function OrderDetailPageInner() {
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
-          <Link to="/admin/orders">
+          <Link to="/backend-skinly/orders">
             <Button>Back to Orders</Button>
           </Link>
         </EmptyContent>
@@ -465,7 +465,7 @@ function OrderDetailPageInner() {
     <div className="space-y-6">
       {/* Back Button */}
       <div>
-        <Link to="/admin/orders">
+        <Link to="/backend-skinly/orders">
           <Button variant="outline" size="sm">
             <ArrowLeftIcon className="size-4 mr-2" />
             Back to Orders

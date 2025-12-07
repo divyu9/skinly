@@ -776,7 +776,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               View Last Report
             </Button>
           )}
-          <Link to="/admin/products/new">
+          <Link to="/backend-skinly/products/new">
             <Button>
               <PlusIcon className="size-4 mr-2" />
               Add Product
@@ -1085,7 +1085,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
             <EmptyDescription>Create your first product to start selling</EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Link to="/admin/products/new">
+            <Link to="/backend-skinly/products/new">
               <Button>
                 <PlusIcon className="size-4 mr-2" />
                 Create Product

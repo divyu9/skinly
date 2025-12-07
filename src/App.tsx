@@ -67,38 +67,38 @@ export default function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-          <Route path="/admin/products" element={<AdminPageWrapper><AdminProductsPage /></AdminPageWrapper>} />
-          <Route path="/admin/products/new" element={<AdminPageWrapper><NewProductPage /></AdminPageWrapper>} />
-          <Route path="/admin/products/:productId" element={<AdminPageWrapper><EditProductPage /></AdminPageWrapper>} />
-          <Route path="/admin/collections" element={<AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper>} />
-          <Route path="/admin/orders" element={<AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper>} />
-          <Route path="/admin/orders/:orderId" element={<AdminPageWrapper><AdminOrderDetailPage /></AdminPageWrapper>} />
-          <Route path="/admin/coupons" element={<AdminPageWrapper><AdminCouponsPage /></AdminPageWrapper>} />
-          <Route path="/admin/reviews" element={<AdminPageWrapper><AdminReviewsPage /></AdminPageWrapper>} />
-          <Route path="/admin/abandoned-carts" element={<AdminPageWrapper><AdminAbandonedCartsPage /></AdminPageWrapper>} />
-          <Route path="/admin/stock-notifications" element={<AdminPageWrapper><AdminStockNotificationsPage /></AdminPageWrapper>} />
-          <Route path="/admin/oos" element={<AdminPageWrapper><AdminOOSPage /></AdminPageWrapper>} />
-          <Route path="/admin/cod" element={<AdminPageWrapper><AdminCODPage /></AdminPageWrapper>} />
-          <Route path="/admin/whatsapp" element={<AdminPageWrapper><AdminWhatsAppPage /></AdminPageWrapper>} />
-          <Route path="/admin/whatsapp/messages" element={<AdminPageWrapper><AdminWhatsAppMessagesPage /></AdminPageWrapper>} />
-          <Route path="/admin/whatsapp/health" element={<AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper>} />
-          <Route path="/admin/whatsapp/debug-logs" element={<AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper>} />
-          <Route path="/admin/wallet" element={<AdminPageWrapper><AdminWalletPage /></AdminPageWrapper>} />
-          <Route path="/admin/cashback" element={<AdminPageWrapper><AdminCashbackPage /></AdminPageWrapper>} />
-          <Route path="/admin/emails" element={<AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper>} />
-          <Route path="/admin/bugs" element={<AdminPageWrapper><AdminBugsPage /></AdminPageWrapper>} />
-          <Route path="/admin/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />
-          <Route path="/admin/mockups/missing" element={<AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper>} />
-          <Route path="/admin/google-drive-import" element={<AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper>} />
-          <Route path="/admin/models" element={<AdminPageWrapper><AdminModelsPage /></AdminPageWrapper>} />
-          <Route path="/admin/seed-models" element={<AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper>} />
-          <Route path="/admin/phone-collections" element={<AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper>} />
-          <Route path="/admin/product-fields-migration" element={<AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper>} />
-          <Route path="/admin/gst-migration" element={<AdminPageWrapper><GstMigrationPage /></AdminPageWrapper>} />
-          <Route path="/admin/tax-export" element={<AdminPageWrapper><TaxExportPage /></AdminPageWrapper>} />
-          <Route path="/admin/fix-collections" element={<AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper>} />
-          <Route path="/admin/migration" element={<AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper>} />
-          <Route path="/admin/sitemap" element={<AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/products" element={<AdminPageWrapper><AdminProductsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/products/new" element={<AdminPageWrapper><NewProductPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/products/:productId" element={<AdminPageWrapper><EditProductPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/collections" element={<AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/orders" element={<AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/orders/:orderId" element={<AdminPageWrapper><AdminOrderDetailPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/coupons" element={<AdminPageWrapper><AdminCouponsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/reviews" element={<AdminPageWrapper><AdminReviewsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/abandoned-carts" element={<AdminPageWrapper><AdminAbandonedCartsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/stock-notifications" element={<AdminPageWrapper><AdminStockNotificationsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/oos" element={<AdminPageWrapper><AdminOOSPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/cod" element={<AdminPageWrapper><AdminCODPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/whatsapp" element={<AdminPageWrapper><AdminWhatsAppPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/whatsapp/messages" element={<AdminPageWrapper><AdminWhatsAppMessagesPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/whatsapp/health" element={<AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/whatsapp/debug-logs" element={<AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/wallet" element={<AdminPageWrapper><AdminWalletPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/cashback" element={<AdminPageWrapper><AdminCashbackPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/emails" element={<AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/bugs" element={<AdminPageWrapper><AdminBugsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/mockups/missing" element={<AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/google-drive-import" element={<AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/models" element={<AdminPageWrapper><AdminModelsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/seed-models" element={<AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/phone-collections" element={<AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/product-fields-migration" element={<AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/gst-migration" element={<AdminPageWrapper><GstMigrationPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/tax-export" element={<AdminPageWrapper><TaxExportPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/fix-collections" element={<AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/migration" element={<AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/sitemap" element={<AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper>} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />

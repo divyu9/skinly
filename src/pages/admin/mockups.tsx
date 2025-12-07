@@ -923,14 +923,14 @@ export default function MockupsPage() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
-                onClick={() => window.location.href = '/admin/google-drive-import'}
+                onClick={() => window.location.href = '/backend-skinly/google-drive-import'}
               >
                 <FolderIcon className="h-4 w-4 mr-2" />
                 Google Drive Import
               </Button>
               <Button
                 variant="outline"
-                onClick={() => window.location.href = '/admin/mockups/missing'}
+                onClick={() => window.location.href = '/backend-skinly/mockups/missing'}
               >
                 <AlertCircleIcon className="h-4 w-4 mr-2" />
                 Check Missing Mockups
@@ -955,7 +955,7 @@ export default function MockupsPage() {
                     size="sm" 
                     variant="secondary"
                     className="border-orange-300"
-                    onClick={() => window.open('/admin/mockups', '_blank')}
+                    onClick={() => window.open('/backend-skinly/mockups', '_blank')}
                   >
                     Open in New Tab
                   </Button>
