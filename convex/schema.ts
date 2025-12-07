@@ -812,27 +812,28 @@ export default defineSchema({
     updatedAt: v.optional(v.number()), // Last update timestamp
   }),
 
-  // Cashback Rules (admin-configurable cashback)
+  // Cashback Rules (Skinly Coins rewards system - variant/product/collection level)
   cashbackRules: defineTable({
-    ruleName: v.string(), // Friendly name (e.g., "10% on all orders")
-    enabled: v.boolean(), // ON/OFF toggle
-    cashbackType: v.union(
-      v.literal("percentage"), // Percentage of order value
-      v.literal("fixed") // Fixed amount
+    targetType: v.union(
+      v.literal("variant"), // Specific variant
+      v.literal("product"), // All variants of a product
+      v.literal("collection") // All products in a collection
     ),
-    cashbackValue: v.number(), // Value (e.g., 10 for 10%, or 50 for ₹50)
-    // Conditions (all must be met if enabled)
-    minOrderAmount: v.optional(v.number()), // Minimum order amount
-    maxOrderAmount: v.optional(v.number()), // Maximum order amount
-    applicableProductIds: v.optional(v.array(v.id("products"))), // Specific products
-    applicableCollectionIds: v.optional(v.array(v.id("collections"))), // Specific collections
-    maxCashbackAmount: v.optional(v.number()), // Cap on cashback amount
-    // Metadata
-    createdBy: v.string(), // Admin email
-    createdAt: v.number(), // Creation timestamp
+    targetId: v.string(), // ID of variant, product, or collection
+    cashbackType: v.union(
+      v.literal("fixed"), // Fixed amount (e.g., ₹50)
+      v.literal("percentage") // Percentage of final price (e.g., 5%)
+    ),
+    cashbackValue: v.number(), // Value (e.g., 50 for ₹50, or 5 for 5%)
+    isActive: v.boolean(), // Whether this rule is currently active
+    createdAt: v.number(), // When rule was created
     updatedAt: v.optional(v.number()), // Last update timestamp
+    createdBy: v.optional(v.string()), // Admin email who created
+    updatedBy: v.optional(v.string()), // Admin email who last updated
   })
-    .index("by_enabled", ["enabled"]),
+    .index("by_target", ["targetType", "targetId"])
+    .index("by_target_and_active", ["targetType", "targetId", "isActive"])
+    .index("by_active", ["isActive"]),
 
   // Email Templates (admin-managed custom HTML templates)
   emailTemplates: defineTable({

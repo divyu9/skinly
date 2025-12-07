@@ -16,6 +16,7 @@ import type * as admin_orders from "../admin/orders.js";
 import type * as admin_setAdmin from "../admin/setAdmin.js";
 import type * as bugReports from "../bugReports.js";
 import type * as cart from "../cart.js";
+import type * as cashback from "../cashback.js";
 import type * as cod from "../cod.js";
 import type * as codDisplayRules from "../codDisplayRules.js";
 import type * as codOtp from "../codOtp.js";
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   "admin/setAdmin": typeof admin_setAdmin;
   bugReports: typeof bugReports;
   cart: typeof cart;
+  cashback: typeof cashback;
   cod: typeof cod;
   codDisplayRules: typeof codDisplayRules;
   codOtp: typeof codOtp;
