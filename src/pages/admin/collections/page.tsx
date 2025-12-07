@@ -3,7 +3,7 @@ import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Link } from "react-router-dom";
-import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon, SearchIcon, ImageIcon } from "lucide-react";
+import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon, SearchIcon, ImageIcon, RefreshCwIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -42,15 +42,17 @@ type CollectionRule = {
 };
 
 function AdminCollectionsPageInner() {
-  const collections = useQuery(api.collections.getAllCollections, {});
+  const collections = useQuery(api.collections.getAllCollectionsWithCounts, {});
   const createCollection = useMutation(api.collections.createCollection);
   const updateCollection = useMutation(api.collections.updateCollection);
   const deleteCollection = useMutation(api.collections.deleteCollection);
+  const syncAutoCollection = useMutation(api.collections.syncAutoCollectionProducts);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<Id<"collections"> | null>(null);
   const [isAutoCollection, setIsAutoCollection] = useState(false);
   const [matchLogic, setMatchLogic] = useState<"all" | "any">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [syncingCollectionId, setSyncingCollectionId] = useState<Id<"collections"> | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -220,6 +222,18 @@ function AdminCollectionsPageInner() {
     }
   };
 
+  const handleSync = async (collectionId: Id<"collections">) => {
+    setSyncingCollectionId(collectionId);
+    try {
+      const result = await syncAutoCollection({ collectionId });
+      toast.success(`Synced ${result.synced} product${result.synced !== 1 ? "s" : ""}`);
+    } catch (error) {
+      toast.error("Failed to sync collection");
+    } finally {
+      setSyncingCollectionId(null);
+    }
+  };
+
   const addRule = () => {
     setRules([...rules, { field: "productName", condition: "contains", value: "" }]);
   };
@@ -251,16 +265,7 @@ function AdminCollectionsPageInner() {
     }
   };
 
-  // Component for fetching product count for a collection
-  function CollectionProductCount({ collectionId }: { collectionId: Id<"collections"> }) {
-    const products = useQuery(api.collections.getCollectionProducts, { collectionId });
-    
-    if (products === undefined) {
-      return <span className="text-muted-foreground">Loading...</span>;
-    }
-    
-    return <span className="font-medium">{products.length}</span>;
-  }
+
 
   if (collections === undefined) {
     return (
@@ -591,9 +596,14 @@ function AdminCollectionsPageInner() {
                   </TableCell>
                   <TableCell>
                     {collection.isAuto ? (
-                      <CollectionProductCount collectionId={collection._id} />
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{collection.productCount}</span>
+                        <span className="text-muted-foreground text-sm">
+                          product{collection.productCount !== 1 ? "s" : ""}
+                        </span>
+                      </div>
                     ) : (
-                      <span className="text-muted-foreground">-</span>
+                      <span className="text-muted-foreground">Manual</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -629,14 +639,25 @@ function AdminCollectionsPageInner() {
                   <TableCell className="text-right">
                     <div className="flex items-center gap-2 justify-end">
                       {collection.isAuto && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setPreviewCollectionId(collection._id)}
-                        >
-                          <PackageIcon className="size-4 mr-1" />
-                          Preview
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSync(collection._id)}
+                            disabled={syncingCollectionId === collection._id}
+                          >
+                            <RefreshCwIcon className={`size-4 mr-1 ${syncingCollectionId === collection._id ? 'animate-spin' : ''}`} />
+                            {syncingCollectionId === collection._id ? 'Syncing...' : 'Sync'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setPreviewCollectionId(collection._id)}
+                          >
+                            <PackageIcon className="size-4 mr-1" />
+                            Preview
+                          </Button>
+                        </>
                       )}
                       <Button
                         size="sm"
