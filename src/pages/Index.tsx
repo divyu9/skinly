@@ -1257,6 +1257,11 @@ export default function Index() {
                     Shipping Policy
                   </Link>
                 </li>
+                <li>
+                  <Link to="/devices" className="text-muted-foreground hover:text-primary transition-colors">
+                    Request Your Model
+                  </Link>
+                </li>
               </ul>
             </div>
 

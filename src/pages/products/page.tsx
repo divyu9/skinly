@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
@@ -120,7 +120,7 @@ export default function ProductsPage() {
   const urlSearchQuery = urlParams.get('search') || '';
   const collectionParam = urlParams.get('collection') || '';
   
-  // Use paginated query - load 30 products at a time
+  // Use paginated query - load 100 products at a time
   // When coming from phone selector (brand + model), only load phone products
   const { results: productsData, status, loadMore } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
@@ -128,7 +128,7 @@ export default function ProductsPage() {
       status: "active",
       ...(brandFilter && modelFilter ? { gadgetCategory: "phone" } : {})
     },
-    { initialNumItems: 30 }
+    { initialNumItems: 100 }
   );
   
   // Intersection observer for infinite scroll
@@ -136,7 +136,7 @@ export default function ProductsPage() {
   
   const handleLoadMore = useCallback(() => {
     if (status === "CanLoadMore") {
-      loadMore(30);
+      loadMore(100);
     }
   }, [status, loadMore]);
   
@@ -161,6 +161,7 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(null);
   
   // Get collection if collection parameter is present
   const collection = useQuery(
@@ -290,6 +291,11 @@ export default function ProductsPage() {
       filtered = filtered.filter(p => p.gadgetCategory === "phone");
     }
     
+    // Filter by gadget category (new tab-based filter)
+    if (gadgetFilter && !brandFilter) {
+      filtered = filtered.filter(p => p.gadgetCategory === gadgetFilter);
+    }
+    
     // Filter by device (when not coming from phone selector)
     if (deviceFilter && !brandFilter) {
       filtered = filtered.filter(p => {
@@ -334,7 +340,7 @@ export default function ProductsPage() {
     }
     
     return filtered;
-  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter]);
+  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter, gadgetFilter]);
   
   // Apply sorting and stock filtering
   const sortedAndFilteredProducts = useMemo(() => {
@@ -630,12 +636,12 @@ export default function ProductsPage() {
                collectionParam && collection ? collection.name :
                deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
-               'All Products'}
+               'Shop'}
             </h1>
             <p className="text-xs sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance hidden sm:block">
               {searchQuery 
                 ? `${sortedAndFilteredProducts.length} ${sortedAndFilteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
-                : `${sortedAndFilteredProducts.length} quirky ${sortedAndFilteredProducts.length === 1 ? "skin" : "skins"} ready to make your tech pop`
+                : `More than 500 Designs To Choose From Across Gadgets`
               }
             </p>
             
@@ -653,6 +659,91 @@ export default function ProductsPage() {
               </div>
             </div>
           </div>
+
+          {/* Gadget Category Tabs - Only show when not filtered by brand/model */}
+          {!brandFilter && !modelFilter && (
+            <div className="mb-6">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                <button
+                  onClick={() => setGadgetFilter(null)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    !gadgetFilter
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Package2 className="size-4" />
+                  All Gadgets
+                </button>
+                <button
+                  onClick={() => setGadgetFilter('phone')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'phone'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Smartphone className="size-4" />
+                  Phones
+                </button>
+                <button
+                  onClick={() => setGadgetFilter('laptop')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'laptop'
+                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Laptop className="size-4" />
+                  Laptops
+                </button>
+                <button
+                  onClick={() => setGadgetFilter('tablet')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'tablet'
+                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Tablet className="size-4" />
+                  Tablets
+                </button>
+                <button
+                  onClick={() => setGadgetFilter('camera')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'camera'
+                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Camera className="size-4" />
+                  Cameras
+                </button>
+                <button
+                  onClick={() => setGadgetFilter('charger')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'charger'
+                      ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Zap className="size-4" />
+                  Chargers
+                </button>
+                <button
+                  onClick={() => setGadgetFilter('console')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'console'
+                      ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Gamepad2 className="size-4" />
+                  Consoles
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Finish Tabs - Only show if brand and model are selected */}
           {brandFilter && modelFilter && (
@@ -799,10 +890,11 @@ export default function ProductsPage() {
                 </SelectContent>
               </Select>
 
-              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter) && (
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
+                  setGadgetFilter(null);
                   window.location.href = '/products';
                 }} className="h-8 sm:h-10 text-xs sm:text-sm">
                   Clear All
