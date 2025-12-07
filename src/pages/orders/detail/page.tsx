@@ -156,7 +156,7 @@ function OrderDetailPageInner() {
             </Card>
 
             {/* Tracking Information */}
-            {(order.awbNumber || order.trackingUrl) && (
+            {(order.awbNumber || order.trackingUrl || order.manualTrackingNumber) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -165,43 +165,73 @@ function OrderDetailPageInner() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {order.awbNumber && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                          Tracking Number
-                        </p>
-                        <p className="text-sm font-mono font-semibold">{order.awbNumber}</p>
+                  <div className="space-y-4">
+                    {/* RapidShyp Tracking */}
+                    {(order.awbNumber || order.trackingUrl) && (
+                      <div className="space-y-3">
+                        {order.awbNumber && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Tracking Number
+                            </p>
+                            <p className="text-sm font-mono font-semibold">{order.awbNumber}</p>
+                          </div>
+                        )}
+                        {order.courierName && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Courier Partner
+                            </p>
+                            <p className="text-sm font-semibold">{order.courierName}</p>
+                          </div>
+                        )}
+                        {order.shippingStatus && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Status
+                            </p>
+                            <p className="text-sm">{order.shippingStatus}</p>
+                          </div>
+                        )}
+                        {order.trackingUrl && (
+                          <a
+                            href={order.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <Button className="w-full" size="sm">
+                              <TruckIcon className="size-4 mr-2" />
+                              Track Your Shipment
+                            </Button>
+                          </a>
+                        )}
                       </div>
                     )}
-                    {order.courierName && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                          Courier Partner
-                        </p>
-                        <p className="text-sm font-semibold">{order.courierName}</p>
+
+                    {/* Manual Tracking */}
+                    {order.manualTrackingNumber && (
+                      <div className={`space-y-3 ${order.awbNumber ? "pt-4 border-t" : ""}`}>
+                        {order.awbNumber && (
+                          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+                            Additional Tracking
+                          </p>
+                        )}
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                            Tracking Number
+                          </p>
+                          <p className="text-sm font-mono font-semibold">{order.manualTrackingNumber}</p>
+                        </div>
+                        {order.manualCourierCompany && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Courier Company
+                            </p>
+                            <p className="text-sm font-semibold">{order.manualCourierCompany}</p>
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {order.shippingStatus && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
-                          Status
-                        </p>
-                        <p className="text-sm">{order.shippingStatus}</p>
-                      </div>
-                    )}
-                    {order.trackingUrl && (
-                      <a
-                        href={order.trackingUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block"
-                      >
-                        <Button className="w-full" size="sm">
-                          <TruckIcon className="size-4 mr-2" />
-                          Track Your Shipment
-                        </Button>
-                      </a>
                     )}
                   </div>
                 </CardContent>

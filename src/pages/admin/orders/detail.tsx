@@ -46,6 +46,7 @@ function OrderDetailPageInner() {
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
   const refundToWallet = useMutation(api.admin.orders.refundToWallet);
+  const saveManualTracking = useMutation(api.admin.manualTracking.saveManualTracking);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
   const [cancellingShipment, setCancellingShipment] = useState(false);
@@ -59,6 +60,12 @@ function OrderDetailPageInner() {
     amount: "",
     reason: "",
   });
+  const [showManualTrackingDialog, setShowManualTrackingDialog] = useState(false);
+  const [manualTrackingForm, setManualTrackingForm] = useState({
+    trackingNumber: "",
+    courierCompany: "",
+  });
+  const [isSavingManualTracking, setIsSavingManualTracking] = useState(false);
 
   const handleStatusChange = async (
     status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
@@ -273,7 +280,51 @@ function OrderDetailPageInner() {
     }
   };
 
+  const handleSaveManualTracking = async () => {
+    if (!orderId) return;
+    
+    if (!manualTrackingForm.trackingNumber.trim()) {
+      toast.error("Tracking number is required");
+      return;
+    }
 
+    if (!manualTrackingForm.courierCompany.trim()) {
+      toast.error("Courier company is required");
+      return;
+    }
+
+    setIsSavingManualTracking(true);
+    try {
+      const result = await saveManualTracking({
+        orderId: orderId as Id<"orders">,
+        trackingNumber: manualTrackingForm.trackingNumber,
+        courierCompany: manualTrackingForm.courierCompany,
+      });
+
+      if (result.success) {
+        const statusMsg = result.statusUpdated 
+          ? " Order status updated to shipped."
+          : "";
+        toast.success(`Manual tracking saved successfully!${statusMsg}`);
+        setShowManualTrackingDialog(false);
+        setManualTrackingForm({ trackingNumber: "", courierCompany: "" });
+      }
+    } catch (error) {
+      console.error("Manual Tracking Error:", error);
+      
+      let errorMessage = "Failed to save manual tracking";
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error.data as { message?: string };
+        errorMessage = convexError.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
+    } finally {
+      setIsSavingManualTracking(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -487,6 +538,26 @@ function OrderDetailPageInner() {
                 </div>
               )}
 
+              {/* Manual Tracking Details */}
+              {(order.manualTrackingNumber || order.manualCourierCompany) && (
+                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="font-medium text-xs text-blue-700 dark:text-blue-300 uppercase mb-1 flex items-center gap-2">
+                    <TruckIcon className="size-3" />
+                    Manual Tracking (Non-RapidShyp)
+                  </p>
+                  {order.manualTrackingNumber && (
+                    <p className="text-sm">
+                      <span className="font-medium">Tracking Number:</span> {order.manualTrackingNumber}
+                    </p>
+                  )}
+                  {order.manualCourierCompany && (
+                    <p className="text-sm">
+                      <span className="font-medium">Courier:</span> {order.manualCourierCompany}
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
                 {!order.awbNumber ? (
                   <Button
@@ -643,6 +714,88 @@ function OrderDetailPageInner() {
                     </Dialog>
                   </>
                 )}
+
+                {/* Manual Tracking Button */}
+                <Dialog open={showManualTrackingDialog} onOpenChange={setShowManualTrackingDialog}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant={order.manualTrackingNumber ? "outline" : "default"}
+                      className="flex-1"
+                      onClick={() => {
+                        setManualTrackingForm({
+                          trackingNumber: order.manualTrackingNumber || "",
+                          courierCompany: order.manualCourierCompany || "",
+                        });
+                      }}
+                    >
+                      <TruckIcon className="size-4 mr-2" />
+                      {order.manualTrackingNumber ? "Edit Manual Tracking" : "Add Manual Tracking"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {order.manualTrackingNumber ? "Edit" : "Add"} Manual Tracking
+                      </DialogTitle>
+                      <DialogDescription>
+                        Add tracking details for orders shipped through non-RapidShyp couriers. 
+                        {order.status === "processing" && " Order status will be updated to shipped."}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label htmlFor="manual-tracking">Tracking Number *</Label>
+                        <Input
+                          id="manual-tracking"
+                          placeholder="Enter tracking number"
+                          value={manualTrackingForm.trackingNumber}
+                          onChange={(e) =>
+                            setManualTrackingForm({
+                              ...manualTrackingForm,
+                              trackingNumber: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="manual-courier">Courier Company *</Label>
+                        <Input
+                          id="manual-courier"
+                          placeholder="e.g., Blue Dart, DTDC, India Post"
+                          value={manualTrackingForm.courierCompany}
+                          onChange={(e) =>
+                            setManualTrackingForm({
+                              ...manualTrackingForm,
+                              courierCompany: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowManualTrackingDialog(false)}
+                        disabled={isSavingManualTracking}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleSaveManualTracking}
+                        disabled={isSavingManualTracking}
+                      >
+                        {isSavingManualTracking ? (
+                          <>
+                            <Spinner className="size-4 mr-2" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Manual Tracking"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardContent>
           </Card>

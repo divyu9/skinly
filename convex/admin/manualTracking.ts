@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import { ConvexError } from "convex/values";
 
-// Save manual tracking details and auto-update status to "shipped"
+// Save or update manual tracking details and auto-update status to "shipped" if applicable
 export const saveManualTracking = mutation({
   args: {
     orderId: v.id("orders"),
@@ -18,6 +18,21 @@ export const saveManualTracking = mutation({
       });
     }
 
+    // Validate required fields
+    if (!args.trackingNumber.trim()) {
+      throw new ConvexError({
+        message: "Tracking number is required",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    if (!args.courierCompany.trim()) {
+      throw new ConvexError({
+        message: "Courier company is required",
+        code: "BAD_REQUEST",
+      });
+    }
+
     // Get order before update
     const order = await ctx.db.get(args.orderId);
     if (!order) {
@@ -27,13 +42,27 @@ export const saveManualTracking = mutation({
       });
     }
 
-    // Update order with manual tracking details and auto-update status to "shipped"
-    await ctx.db.patch(args.orderId, {
-      manualTrackingNumber: args.trackingNumber,
-      manualCourierCompany: args.courierCompany,
-      status: "shipped",
-    });
+    // Update order with manual tracking details
+    const updates: {
+      manualTrackingNumber: string;
+      manualCourierCompany: string;
+      status?: "shipped";
+    } = {
+      manualTrackingNumber: args.trackingNumber.trim(),
+      manualCourierCompany: args.courierCompany.trim(),
+    };
 
-    return { success: true };
+    // Only auto-update to "shipped" if order is in "processing" status
+    // Don't change status if already delivered, cancelled, rto, or shipped
+    if (order.status === "processing") {
+      updates.status = "shipped";
+    }
+
+    await ctx.db.patch(args.orderId, updates);
+
+    return { 
+      success: true,
+      statusUpdated: order.status === "processing",
+    };
   },
 });
