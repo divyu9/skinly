@@ -20,22 +20,29 @@ interface DeviceSelectorDialogProps {
   initialDeviceType?: DeviceType;
 }
 
-// Brand logo mapping
+// Brand logo mapping - updated with new brand logos
 const brandLogos: Record<string, string> = {
-  "Apple": "https://cdn.hercules.app/file_54FjDV0bMGUJ9N5uWOHBlwYx",
-  "Samsung": "https://cdn.hercules.app/file_8eVkxycD51p7VEELLLP3bxSy",
-  "OnePlus": "https://cdn.hercules.app/file_FbXR6g2WQASC01Y3octztLhA",
-  "Nothing": "https://cdn.hercules.app/file_fL533mZxpk2ay0q8AXPMvuRY",
-  "CMF": "https://cdn.hercules.app/file_7h7knJlwFVqgbBOHAJjHTI0w",
-  "Oppo": "https://cdn.hercules.app/file_MCp4r3Jyw8KP6WtCI1D2DuRD",
-  "Realme": "https://cdn.hercules.app/file_JNqnBiKQWZzvQKqF4gd1mzRR",
-  "Vivo": "https://cdn.hercules.app/file_hvtV8uEVRQisJNhlD61R9kdR",
-  "iQOO": "https://cdn.hercules.app/file_xcVXF74gr4T2yPKx6ORu7NBz",
-  "Xiaomi": "https://cdn.hercules.app/file_0lIeCdPQqf7QAo7N6nysd5X5",
-  "Lava": "https://cdn.hercules.app/file_s9hzIBK6UB038BycBaNvFk6K",
-  "Infinix": "https://cdn.hercules.app/file_Pjj5THd5TS0SHK2RAhDceiD4",
-  "Asus": "https://cdn.hercules.app/file_3gojHhsqgDme3d6XcYPI927X",
+  "Apple": "https://cdn.hercules.app/file_yXvLJ6BJz77frUtjkKNvsta5",
+  "Asus": "https://cdn.hercules.app/file_0LL7DgU98xrDCPL00t5KFGTT",
+  "CMF": "https://cdn.hercules.app/file_4c1OKYG0fSACOsMluL75owT2",
+  "Canon": "https://cdn.hercules.app/file_off0gfWoUMcir0QQZCzi7GIU",
   "HMD": "https://cdn.hercules.app/file_IoeAItMLvooxgFhpKthzUhZD",
+  "Honor": "https://cdn.hercules.app/file_we74pfzTJnEtTUdJhYuW5ThV",
+  "Infinix": "https://cdn.hercules.app/file_Pjj5THd5TS0SHK2RAhDceiD4",
+  "Lava": "https://cdn.hercules.app/file_7hHzwp413xD518fxJ5x0baw6",
+  "Motorola": "https://cdn.hercules.app/file_mrd4R2pm62O76PqkzhyqHbeh",
+  "Nikon": "https://cdn.hercules.app/file_ylLjoFqbjC30tGQqjNW6HyTr",
+  "Nothing": "https://cdn.hercules.app/file_n1uEhYdL5ZtXcIo6CRLXRG9L",
+  "One Plus": "https://cdn.hercules.app/file_CFmZ3JACXeL3XhcE9uOqiEGB",
+  "Oppo": "https://cdn.hercules.app/file_MCp4r3Jyw8KP6WtCI1D2DuRD",
+  "PlayStation": "https://cdn.hercules.app/file_G2wSLrMTBTW2Kcy9GtGCv5KW",
+  "Poco": "https://cdn.hercules.app/file_DMUZvqLtfG3xqHV8GA1rnCJD",
+  "Realme": "https://cdn.hercules.app/file_NrBIl0OOhvh0eLyAhLKluYU9",
+  "Samsung": "https://cdn.hercules.app/file_8eVkxycD51p7VEELLLP3bxSy",
+  "Vivo": "https://cdn.hercules.app/file_hvtV8uEVRQisJNhlD61R9kdR",
+  "Xbox": "https://cdn.hercules.app/file_RMC3F2D6573iOGnDKKenuTH7",
+  "Xiaomi": "https://cdn.hercules.app/file_0lIeCdPQqf7QAo7N6nysd5X5",
+  "iQOO": "https://cdn.hercules.app/file_xcVXF74gr4T2yPKx6ORu7NBz",
 };
 
 export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: DeviceSelectorDialogProps) {
