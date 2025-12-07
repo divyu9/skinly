@@ -26,6 +26,12 @@ import {
   CheckCircle2Icon,
   WalletIcon,
   TicketIcon,
+  TrendingUpIcon,
+  TrendingDownIcon,
+  CoinsIcon,
+  ArrowUpRightIcon,
+  ArrowDownLeftIcon,
+  HistoryIcon,
 } from "lucide-react";
 import {
   RadioGroup,
@@ -39,6 +45,8 @@ function AccountPageInner() {
   const phoneVerificationStatus = useQuery(api.loginOtp.checkPhoneVerified);
   const whatsappConsent = useQuery(api.whatsappConsent.getMyConsent);
   const walletBalance = useQuery(api.wallet.getWalletBalance);
+  const walletStats = useQuery(api.wallet.getWalletStats);
+  const recentTransactions = useQuery(api.wallet.getWalletTransactions, { limit: 5 });
   const generateLoginOtp = useMutation(api.loginOtp.generateLoginOtp);
   const verifyLoginOtp = useMutation(api.loginOtp.verifyLoginOtp);
   const updateConsent = useMutation(api.whatsappConsent.updateMyConsent);
@@ -130,7 +138,7 @@ function AccountPageInner() {
     }
   };
 
-  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined || whatsappConsent === undefined || walletBalance === undefined) {
+  if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined || whatsappConsent === undefined || walletBalance === undefined || walletStats === undefined || recentTransactions === undefined) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="space-y-6">
@@ -183,23 +191,107 @@ function AccountPageInner() {
         </CardContent>
       </Card>
 
-      {/* Wallet Balance & Coupon Redemption */}
+      {/* Wallet Balance & Stats */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <WalletIcon className="size-5" />
-            Wallet Balance
+            Skinly Wallet
           </CardTitle>
           <CardDescription>
-            Your available balance and redeem coupons
+            Manage your wallet balance, earn cashback, and redeem coupons
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Current Balance */}
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <p className="text-sm text-muted-foreground mb-1">Available Balance</p>
-            <p className="text-3xl font-bold text-primary">₹{(walletBalance.balance || 0).toFixed(2)}</p>
+        <CardContent className="space-y-6">
+          {/* Current Balance - Prominent Display */}
+          <div className="relative overflow-hidden p-6 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 text-white">
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <CoinsIcon className="size-5" />
+                <p className="text-sm font-medium opacity-90">Available Balance</p>
+              </div>
+              <p className="text-4xl font-bold tracking-tight">
+                ₹{(walletBalance.balance || 0).toFixed(0)}
+              </p>
+              <p className="text-xs opacity-75 mt-2">
+                Use your wallet balance to pay for orders and earn cashback on purchases
+              </p>
+            </div>
+            <div className="absolute right-0 top-0 size-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute left-0 bottom-0 size-24 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2" />
           </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingUpIcon className="size-4 text-green-600" />
+                <p className="text-xs text-muted-foreground">Lifetime Earned</p>
+              </div>
+              <p className="text-2xl font-bold text-green-600">
+                ₹{(walletStats.lifetimeEarned || 0).toFixed(0)}
+              </p>
+            </div>
+            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <TrendingDownIcon className="size-4 text-orange-600" />
+                <p className="text-xs text-muted-foreground">Lifetime Spent</p>
+              </div>
+              <p className="text-2xl font-bold text-orange-600">
+                ₹{(walletStats.lifetimeSpent || 0).toFixed(0)}
+              </p>
+            </div>
+          </div>
+
+          {/* Recent Transactions */}
+          {recentTransactions && recentTransactions.length > 0 && (
+            <div className="space-y-3 pt-4 border-t">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <HistoryIcon className="size-4" />
+                  <p className="text-sm font-medium">Recent Activity</p>
+                </div>
+                <Link to="/account/wallet">
+                  <Button variant="ghost" size="sm">
+                    View All
+                  </Button>
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {recentTransactions.slice(0, 3).map((txn) => (
+                  <div key={txn._id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`size-8 rounded-full flex items-center justify-center ${
+                        txn.transactionType === "credit"
+                          ? "bg-green-500/10"
+                          : "bg-red-500/10"
+                      }`}>
+                        {txn.transactionType === "credit" ? (
+                          <ArrowDownLeftIcon className="size-4 text-green-600" />
+                        ) : (
+                          <ArrowUpRightIcon className="size-4 text-red-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium line-clamp-1">{txn.description}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(txn.createdAt).toLocaleDateString('en-IN', { 
+                            day: 'numeric', 
+                            month: 'short'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <p className={`text-sm font-semibold ${
+                      txn.transactionType === "credit" ? "text-green-600" : "text-red-600"
+                    }`}>
+                      {txn.transactionType === "credit" ? "+" : "-"}₹{txn.amount.toFixed(0)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Coupon Redemption */}
           <div className="space-y-3 pt-4 border-t">
@@ -230,11 +322,12 @@ function AccountPageInner() {
             </p>
           </div>
 
-          {/* View Transactions */}
+          {/* View Full History */}
           <div className="pt-4 border-t">
             <Link to="/account/wallet">
               <Button variant="outline" className="w-full">
-                View Transaction History
+                <HistoryIcon className="size-4 mr-2" />
+                View Complete Transaction History
               </Button>
             </Link>
           </div>
