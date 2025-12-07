@@ -269,13 +269,67 @@ function BugReportsContent() {
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedBug(bug)}
-                  >
-                    View Details
-                  </Button>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedBug(bug)}
+                      className="gap-1"
+                    >
+                      <EyeIcon className="h-4 w-4" />
+                      View
+                    </Button>
+                    {bug.status === "pending" && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openConfirmDialog("resolve", bug._id)}
+                          className="gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+                        >
+                          <CheckCircleIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openConfirmDialog("delete", bug._id)}
+                          className="gap-1 text-destructive hover:bg-destructive/10"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {bug.status === "resolved" && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openConfirmDialog("restore", bug._id)}
+                          className="gap-1"
+                        >
+                          <RotateCcwIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => openConfirmDialog("delete", bug._id)}
+                          className="gap-1 text-destructive hover:bg-destructive/10"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+                    {bug.status === "deleted" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openConfirmDialog("restore", bug._id)}
+                        className="gap-1"
+                      >
+                        <RotateCcwIcon className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -288,7 +342,17 @@ function BugReportsContent() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total</CardTitle>
+            <BugIcon className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.total}</div>
+            <p className="text-xs text-muted-foreground">All reports</p>
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending</CardTitle>
@@ -302,7 +366,7 @@ function BugReportsContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Resolved</CardTitle>
-            <BugIcon className="h-4 w-4 text-green-500" />
+            <CheckCircleIcon className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.resolved}</div>
@@ -312,11 +376,11 @@ function BugReportsContent() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Deleted</CardTitle>
-            <BugIcon className="h-4 w-4 text-muted-foreground" />
+            <TrashIcon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.deleted}</div>
-            <p className="text-xs text-muted-foreground">Soft-deleted reports</p>
+            <p className="text-xs text-muted-foreground">Soft-deleted</p>
           </CardContent>
         </Card>
       </div>
@@ -338,7 +402,7 @@ function BugReportsContent() {
       </Card>
 
       {/* Tabs */}
-      <Tabs defaultValue="pending" className="space-y-4">
+      <Tabs value={currentTab} onValueChange={(v) => setCurrentTab(v as "pending" | "resolved" | "deleted")} className="space-y-4">
         <TabsList>
           <TabsTrigger value="pending">
             Pending
@@ -379,76 +443,101 @@ function BugReportsContent() {
         </TabsContent>
       </Tabs>
 
-      {/* Bug Details Dialog - Will be implemented in next milestone */}
+      {/* Bug Details Dialog */}
       {selectedBug && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedBug(null)}
+        >
+          <Card 
+            className="max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Bug Report Details</CardTitle>
-                  <CardDescription className="mt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CardTitle>Bug Report</CardTitle>
                     <Badge variant="outline">{selectedBug.bugId}</Badge>
+                    <Badge
+                      variant={
+                        selectedBug.status === "pending"
+                          ? "default"
+                          : selectedBug.status === "resolved"
+                            ? "secondary"
+                            : "outline"
+                      }
+                    >
+                      {selectedBug.status.charAt(0).toUpperCase() + selectedBug.status.slice(1)}
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    Submitted {formatDistanceToNow(selectedBug._creationTime, { addSuffix: true })}
                   </CardDescription>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setSelectedBug(null)}>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setSelectedBug(null)}
+                  className="gap-2"
+                >
+                  <XIcon className="h-4 w-4" />
                   Close
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Contact Information</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <MailIcon className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedBug.userEmail}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
+                    Email
+                  </h4>
+                  <p className="text-sm">{selectedBug.userEmail}</p>
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
                     <PhoneIcon className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedBug.userPhone}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    <span>
-                      Submitted {formatDistanceToNow(selectedBug._creationTime, { addSuffix: true })}
-                    </span>
-                  </div>
+                    Phone
+                  </h4>
+                  <p className="text-sm">{selectedBug.userPhone}</p>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-sm font-medium mb-2">Bug Details</h4>
-                <div className="bg-muted p-3 rounded-md text-sm whitespace-pre-wrap">
+                <h4 className="text-sm font-medium mb-3">Bug Description</h4>
+                <div className="bg-muted p-4 rounded-md text-sm whitespace-pre-wrap border">
                   {selectedBug.bugDetails}
                 </div>
               </div>
 
               {selectedBug.attachments.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium mb-2">Attachments</h4>
-                  <div className="space-y-2">
+                  <h4 className="text-sm font-medium mb-3">
+                    Attachments ({selectedBug.attachments.length})
+                  </h4>
+                  <div className="grid gap-2 sm:grid-cols-2">
                     {selectedBug.attachments.map((attachment) => (
                       <div
                         key={attachment._id}
-                        className="flex items-center justify-between p-2 border rounded-md"
+                        className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           {getFileIcon(attachment.fileType)}
-                          <div>
-                            <div className="text-sm font-medium">{attachment.fileName}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{attachment.fileName}</div>
                             <div className="text-xs text-muted-foreground">
                               {formatFileSize(attachment.fileSize)}
                             </div>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild className="ml-2">
                           <a
                             href={`${import.meta.env.VITE_CONVEX_URL}/api/storage/${attachment.fileId}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            View
+                            <EyeIcon className="h-4 w-4" />
                           </a>
                         </Button>
                       </div>
@@ -456,21 +545,6 @@ function BugReportsContent() {
                   </div>
                 </div>
               )}
-
-              <div>
-                <h4 className="text-sm font-medium mb-2">Status</h4>
-                <Badge
-                  variant={
-                    selectedBug.status === "pending"
-                      ? "default"
-                      : selectedBug.status === "resolved"
-                        ? "secondary"
-                        : "outline"
-                  }
-                >
-                  {selectedBug.status.charAt(0).toUpperCase() + selectedBug.status.slice(1)}
-                </Badge>
-              </div>
 
               {/* Status Management Actions */}
               <div className="pt-4 border-t space-y-3">
