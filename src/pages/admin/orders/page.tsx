@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon } from "lucide-react";
+import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon, CalendarIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -23,10 +23,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
+import { Calendar } from "@/components/ui/calendar.tsx";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { PDFDocument } from "pdf-lib";
+
+type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
 function AdminOrdersPageInner() {
   const navigate = useNavigate();
@@ -34,6 +38,11 @@ function AdminOrdersPageInner() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
+  
+  // Date filter state
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
   
   // Bulk operations state
   const [showBulkShipDialog, setShowBulkShipDialog] = useState(false);
@@ -60,7 +69,34 @@ function AdminOrdersPageInner() {
     searchTerm.length >= 3 ? { searchTerm } : "skip"
   );
 
-  const displayOrders = searchTerm.length >= 3 ? searchResults : allOrders;
+  const baseOrders = searchTerm.length >= 3 ? searchResults : allOrders;
+  
+  // Apply date filter to orders
+  const displayOrders = useMemo(() => {
+    if (!baseOrders) return undefined;
+    if (dateFilter === "all") return baseOrders;
+    
+    let filtered = [...baseOrders];
+    const now = Date.now();
+    
+    if (dateFilter === "custom") {
+      if (customStartDate) {
+        const startTime = customStartDate.getTime();
+        filtered = filtered.filter(order => order._creationTime >= startTime);
+      }
+      if (customEndDate) {
+        const endDate = new Date(customEndDate);
+        endDate.setHours(23, 59, 59, 999);
+        filtered = filtered.filter(order => order._creationTime <= endDate.getTime());
+      }
+    } else {
+      const days = parseInt(dateFilter);
+      const startTime = now - (days * 24 * 60 * 60 * 1000);
+      filtered = filtered.filter(order => order._creationTime >= startTime);
+    }
+    
+    return filtered;
+  }, [baseOrders, dateFilter, customStartDate, customEndDate]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -595,7 +631,7 @@ function AdminOrdersPageInner() {
       {/* Filters and Search */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div className="md:col-span-2">
               <Label htmlFor="search">Search Orders</Label>
               <div className="relative">
@@ -624,6 +660,81 @@ function AdminOrdersPageInner() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex flex-wrap items-center gap-3 pt-4 border-t">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="size-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Order Date:</span>
+            </div>
+            <Select value={dateFilter} onValueChange={(value) => setDateFilter(value as DateFilter)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="7">Last 7 Days</SelectItem>
+                <SelectItem value="15">Last 15 Days</SelectItem>
+                <SelectItem value="30">Last 30 Days</SelectItem>
+                <SelectItem value="60">Last 60 Days</SelectItem>
+                <SelectItem value="90">Last 90 Days</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {dateFilter === "custom" && (
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {customStartDate ? formatDate(customStartDate.getTime()) : "Start Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-sm text-muted-foreground">to</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      {customEndDate ? formatDate(customEndDate.getTime()) : "End Date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+            
+            {(dateFilter !== "all" || statusFilter !== "all" || paymentFilter !== "all" || searchTerm.length >= 3) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setDateFilter("all");
+                  setStatusFilter("all");
+                  setPaymentFilter("all");
+                  setSearchTerm("");
+                  setCustomStartDate(undefined);
+                  setCustomEndDate(undefined);
+                }}
+              >
+                Clear All Filters
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
