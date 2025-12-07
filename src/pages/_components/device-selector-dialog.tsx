@@ -51,11 +51,14 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
     return deviceType as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens";
   };
 
-  // Fetch models from database for selected device type
-  const modelsFromDb = useQuery(
-    api.supportedModels.listAll,
-    selectedDeviceType 
-      ? { category: getDbCategory(selectedDeviceType), isActive: true }
+  // Fetch metadata from cache (super fast!)
+  const metadata = useQuery(api.supportedModels.getMetadata);
+  
+  // Lazy-load models for selected brand + category (only when brand is selected)
+  const brandModels = useQuery(
+    api.supportedModels.getBrandModels,
+    selectedBrand && selectedDeviceType
+      ? { brand: selectedBrand, category: getDbCategory(selectedDeviceType) }
       : "skip"
   );
 
@@ -73,41 +76,26 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
     }
   }, [open, initialDeviceType]);
 
-  // Group device models by brand from database
-  const deviceModels = useMemo(() => {
-    if (!modelsFromDb) return {};
-    
-    const grouped: Record<string, string[]> = {};
-    modelsFromDb.forEach(model => {
-      if (!grouped[model.brandName]) {
-        grouped[model.brandName] = [];
-      }
-      grouped[model.brandName].push(model.modelName);
-    });
-    
-    // Sort models within each brand
-    Object.keys(grouped).forEach(brand => {
-      grouped[brand].sort();
-    });
-    
-    return grouped;
-  }, [modelsFromDb]);
-
-  // Get brands for selected device type
+  // Get brands for selected device type from cache
   const availableBrands = useMemo(() => {
-    return Object.keys(deviceModels).sort();
-  }, [deviceModels]);
+    if (!metadata || !selectedDeviceType) return [];
+    
+    const categoryKey = selectedDeviceType === "macmini" ? "macMini" : selectedDeviceType;
+    const categoryData = metadata.byCategory[categoryKey as keyof typeof metadata.byCategory];
+    
+    return categoryData?.brands || [];
+  }, [metadata, selectedDeviceType]);
 
   // Get models for selected brand with search filter
   const availableModels = useMemo(() => {
-    if (!selectedBrand) return [];
-    const models = deviceModels[selectedBrand] || [];
+    if (!brandModels) return [];
+    const models = brandModels.map(m => m.modelName);
     
     if (!searchQuery) return models;
     
     const query = searchQuery.toLowerCase();
     return models.filter(model => model.toLowerCase().includes(query));
-  }, [selectedBrand, deviceModels, searchQuery]);
+  }, [brandModels, searchQuery]);
 
   const handleDeviceTypeSelect = (type: DeviceType) => {
     setSelectedDeviceType(type);
@@ -172,11 +160,18 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
             {step === 2 && `Select Your ${getDeviceTypeLabel(selectedDeviceType!)} Brand`}
             {step === 3 && `Select Your ${selectedBrand} Model`}
           </DialogTitle>
-          <p className="text-muted-foreground">
-            {step === 1 && "Choose your device type to continue"}
-            {step === 2 && "Choose your device brand to continue"}
-            {step === 3 && "Choose your phone model to see compatible skins"}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-muted-foreground">
+              {step === 1 && "Choose your device type to continue"}
+              {step === 2 && "Choose your device brand to continue"}
+              {step === 3 && "Choose your phone model to see compatible skins"}
+            </p>
+            {step !== 1 && (
+              <Button variant="ghost" size="sm" onClick={handleBack}>
+                ← Back
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="py-6">
@@ -278,10 +273,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
           {/* Step 2: Brand Selection */}
           {step === 2 && (
             <div>
-              <Button variant="ghost" onClick={handleBack} className="mb-4">
-                ← Back
-              </Button>
-              {modelsFromDb === undefined ? (
+              {metadata === undefined ? (
                 // Loading state
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
                   <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
@@ -327,10 +319,6 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
           {/* Step 3: Model Selection */}
           {step === 3 && (
             <div>
-              <Button variant="ghost" onClick={handleBack} className="mb-4">
-                ← Back
-              </Button>
-              
               {/* Search Input */}
               <div className="relative mb-6">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
@@ -345,7 +333,13 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
 
               {/* Model List */}
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {availableModels.length === 0 ? (
+                {brandModels === undefined ? (
+                  // Loading state
+                  <div className="flex flex-col items-center justify-center py-12 gap-3">
+                    <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                    <p className="text-sm text-muted-foreground">Loading models...</p>
+                  </div>
+                ) : availableModels.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">
                     No models found
                   </p>

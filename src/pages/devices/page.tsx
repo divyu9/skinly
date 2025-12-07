@@ -70,7 +70,7 @@ export default function DevicesPage() {
   // Fetch metadata from cache (super fast!)
   const metadata = useQuery(api.supportedModels.getMetadata);
   
-  // Fetch all active supported models from database (only load when needed for display)
+  // Fetch all models in background (lazy load after cache shows)
   const allModels = useQuery(api.supportedModels.listAll, { isActive: true });
   
   // Get all brands from cache
@@ -94,8 +94,33 @@ export default function DevicesPage() {
       : "skip"
   );
 
-  // Group models by brand
+  // Group models by brand (use cache for instant display, then real data when loaded)
   const brandedModels = useMemo(() => {
+    // If metadata exists, create brand structure from cache
+    if (metadata && !allModels) {
+      // Show brands from cache while models are loading
+      return allBrands.map(brand => {
+        // Calculate total count and categories from metadata
+        let totalCount = 0;
+        const categories: string[] = [];
+        
+        Object.entries(metadata.byCategory).forEach(([categoryKey, categoryData]) => {
+          if (categoryData.brands.includes(brand)) {
+            categories.push(categoryKey);
+          }
+        });
+        
+        return {
+          brand,
+          models: [], // Empty initially
+          categories,
+          matchCount: totalCount,
+          isLoading: true, // Mark as loading
+        };
+      }).sort((a, b) => a.brand.localeCompare(b.brand));
+    }
+    
+    // When models are loaded, use actual data
     if (!allModels) return [];
     
     const grouped = new Map<string, { models: typeof allModels; categories: Set<string> }>();
@@ -114,11 +139,12 @@ export default function DevicesPage() {
       models: data.models,
       categories: Array.from(data.categories),
       matchCount: data.models.length,
+      isLoading: false,
     })).sort((a, b) => a.brand.localeCompare(b.brand));
-  }, [allModels]);
+  }, [allModels, metadata, allBrands]);
 
-  // Calculate total models
-  const totalModels = allModels?.length || 0;
+  // Calculate total models (from cache or real data)
+  const totalModels = allModels?.length || metadata?.totalModels || 0;
 
   // Filter and search logic
   const filteredBrands = useMemo(() => {
@@ -318,8 +344,8 @@ export default function DevicesPage() {
             </div>
           </div>
 
-          {/* Loading State */}
-          {!allModels && (
+          {/* Loading State - only show if no metadata yet */}
+          {!metadata && (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Skeleton key={i} className="h-24 w-full" />
@@ -327,10 +353,10 @@ export default function DevicesPage() {
             </div>
           )}
 
-          {/* Brands List */}
-          {allModels && (
+          {/* Brands List - show immediately when metadata loads */}
+          {metadata && (
             <div className="space-y-3">
-              {filteredBrands.map(({ brand, models, categories, matchCount }) => {
+              {filteredBrands.map(({ brand, models, categories, matchCount, isLoading }) => {
                 const isExpanded = expandedBrands.has(brand);
                 const primaryCategory = categories[0] as keyof typeof CATEGORY_CONFIG;
                 const categoryConfig = CATEGORY_CONFIG[primaryCategory];
@@ -367,44 +393,52 @@ export default function DevicesPage() {
 
                     {isExpanded && (
                       <CardContent className="pt-0 pb-6 px-6">
-                        <div className="border-t pt-4 space-y-4">
-                          {/* Group by category */}
-                          {categories.map((category) => {
-                            const categoryModels = models.filter((m) => m.category === category);
-                            const catConfig = CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
-                            
-                            return (
-                              <div key={category} className="space-y-2">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <span className="text-sm font-semibold text-primary">
-                                    {catConfig?.emoji} {catConfig?.label}
-                                  </span>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {categoryModels.length}
-                                  </Badge>
+                        {isLoading ? (
+                          // Loading state while models are being fetched
+                          <div className="border-t pt-4 flex flex-col items-center justify-center py-8 gap-3">
+                            <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                            <p className="text-sm text-muted-foreground">Loading models...</p>
+                          </div>
+                        ) : (
+                          <div className="border-t pt-4 space-y-4">
+                            {/* Group by category */}
+                            {categories.map((category) => {
+                              const categoryModels = models.filter((m) => m.category === category);
+                              const catConfig = CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG];
+                              
+                              return (
+                                <div key={category} className="space-y-2">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-sm font-semibold text-primary">
+                                      {catConfig?.emoji} {catConfig?.label}
+                                    </span>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {categoryModels.length}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {categoryModels.map((model) => (
+                                      <Link
+                                        key={model._id}
+                                        to={`/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model.modelName)}&showFinish=true`}
+                                        className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all group"
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                                            {model.modelName}
+                                          </span>
+                                          <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
+                                            →
+                                          </span>
+                                        </div>
+                                      </Link>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                                  {categoryModels.map((model) => (
-                                    <Link
-                                      key={model._id}
-                                      to={`/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model.modelName)}&showFinish=true`}
-                                      className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all group"
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-sm font-medium group-hover:text-primary transition-colors">
-                                          {model.modelName}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                                          →
-                                        </span>
-                                      </div>
-                                    </Link>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </CardContent>
                     )}
                   </Card>

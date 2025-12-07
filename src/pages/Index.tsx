@@ -846,7 +846,13 @@ export default function Index() {
 
                 {/* Model List */}
                 <div className="space-y-2">
-                  {filteredPhoneModels.length === 0 ? (
+                  {brandModels === undefined ? (
+                    // Loading state
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                      <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                      <p className="text-sm text-muted-foreground">Loading your models...</p>
+                    </div>
+                  ) : filteredPhoneModels.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">No models found</p>
                   ) : (
                     filteredPhoneModels.map((model, idx) => (
