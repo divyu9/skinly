@@ -42,6 +42,10 @@ import TaxExportPage from "./pages/admin/tax-export.tsx";
 import FixCollectionsPage from "./pages/admin/fix-collections.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
 import AccountPage from "./pages/account/page.tsx";
+import ReturnsPolicy from "./pages/policies/returns.tsx";
+import ShippingPolicy from "./pages/policies/shipping.tsx";
+import TermsOfService from "./pages/policies/terms.tsx";
+import PrivacyPolicy from "./pages/policies/privacy.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 export default function App() {
@@ -90,6 +94,10 @@ export default function App() {
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/policies/returns" element={<ReturnsPolicy />} />
+          <Route path="/policies/shipping" element={<ShippingPolicy />} />
+          <Route path="/policies/terms" element={<TermsOfService />} />
+          <Route path="/policies/privacy" element={<PrivacyPolicy />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
