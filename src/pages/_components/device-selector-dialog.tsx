@@ -44,7 +44,7 @@ const brandLogos: Record<string, string> = {
   "PlayStation": "https://cdn.hercules.app/file_G2wSLrMTBTW2Kcy9GtGCv5KW",
   "Poco": "https://cdn.hercules.app/file_DMUZvqLtfG3xqHV8GA1rnCJD",
   "Realme": "https://cdn.hercules.app/file_NrBIl0OOhvh0eLyAhLKluYU9",
-  "Samsung": "https://cdn.hercules.app/file_8eVkxycD51p7VEELLLP3bxSy",
+  "Samsung": "https://cdn.hercules.app/file_wtgTFk2vMW6YlMu15GbUnFvJ",
   "Sony": "https://cdn.hercules.app/file_8mYsjEHmr72IQRnEON8FEfD2",
   "Tecno": "https://cdn.hercules.app/file_d4D7g77UjY356BBldBKW7HNo",
   "Vivo": "https://cdn.hercules.app/file_o3IQVV2jjv2h9nbO09Wf08D6",
