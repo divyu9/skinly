@@ -1,5 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { useAuth } from "@/hooks/use-auth.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import {
@@ -9,6 +12,16 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet.tsx";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
+import { toast } from "sonner";
+import {
   MenuIcon,
   SmartphoneIcon,
   PackageIcon,
@@ -16,6 +29,14 @@ import {
   UserIcon,
   ListIcon,
   LayoutGridIcon,
+  PencilIcon,
+  MailIcon,
+  PhoneIcon,
+  WalletIcon,
+  TrophyIcon,
+  LogOutIcon,
+  CheckIcon,
+  XIcon,
 } from "lucide-react";
 
 interface MobileNavProps {
@@ -25,6 +46,43 @@ interface MobileNavProps {
 
 export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: MobileNavProps) {
   const [open, setOpen] = useState(false);
+  const [accountPanelOpen, setAccountPanelOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  
+  const { user, signoutRedirect } = useAuth();
+  const profileData = useQuery(api.users.getProfileData, user ? {} : "skip");
+  const updateProfile = useMutation(api.users.updateProfile);
+
+  const handleEditName = () => {
+    setNewName(profileData?.name || "");
+    setEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!newName.trim()) {
+      toast.error("Name cannot be empty");
+      return;
+    }
+    
+    try {
+      await updateProfile({ name: newName.trim() });
+      toast.success("Name updated successfully");
+      setEditingName(false);
+    } catch (error) {
+      toast.error("Failed to update name");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingName(false);
+    setNewName("");
+  };
+
+  const handleLogout = async () => {
+    setAccountPanelOpen(false);
+    await signoutRedirect();
+  };
 
   const menuItems = [
     {
@@ -83,9 +141,33 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
         <Link to="/devices" className="text-sm font-medium hover:text-primary transition-colors">
           Devices
         </Link>
-        <Link to="/orders" className="text-sm font-medium hover:text-primary transition-colors">
-          My Orders
-        </Link>
+        
+        {/* My Account Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-sm font-medium hover:text-primary">
+              <UserIcon className="size-4 mr-2" />
+              My Account
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => setAccountPanelOpen(true)}>
+              <UserIcon className="size-4 mr-2" />
+              View Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to="/orders" className="cursor-pointer">
+                <ShoppingBagIcon className="size-4 mr-2" />
+                My Orders
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
+              <LogOutIcon className="size-4 mr-2" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        
         <CartButton />
       </div>
 
@@ -136,6 +218,131 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
                 )}
               </Button>
             ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* My Account Panel (Right Side) */}
+      <Sheet open={accountPanelOpen} onOpenChange={setAccountPanelOpen}>
+        <SheetContent side="right" className="w-[90vw] sm:w-[400px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>My Account</SheetTitle>
+          </SheetHeader>
+          
+          <div className="mt-6 space-y-4">
+            {/* Name Section */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground mb-1">Name</p>
+                    {editingName ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                          placeholder="Enter your name"
+                          className="h-9"
+                        />
+                        <Button size="icon" variant="ghost" onClick={handleSaveName} className="size-8">
+                          <CheckIcon className="size-4 text-green-600" />
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={handleCancelEdit} className="size-8">
+                          <XIcon className="size-4 text-red-600" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-semibold">
+                          Hi, {profileData?.name || "Guest"}
+                        </p>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={handleEditName}
+                          className="size-7"
+                        >
+                          <PencilIcon className="size-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contact Information */}
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <MailIcon className="size-4" />
+                    <p className="text-xs">Email</p>
+                  </div>
+                  <p className="text-sm font-medium pl-6">
+                    {profileData?.email || "Not provided"}
+                  </p>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <PhoneIcon className="size-4" />
+                    <p className="text-xs">Phone</p>
+                  </div>
+                  <p className="text-sm font-medium pl-6">
+                    {profileData?.phone || "Not provided"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* My Orders Button */}
+            <Button asChild className="w-full" variant="outline" size="lg">
+              <Link to="/orders" onClick={() => setAccountPanelOpen(false)}>
+                <ShoppingBagIcon className="size-4 mr-2" />
+                My Orders
+              </Link>
+            </Button>
+
+            {/* Wallet Information */}
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div>
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <WalletIcon className="size-4" />
+                    <p className="text-xs">Wallet Balance</p>
+                  </div>
+                  <p className="text-2xl font-bold text-primary pl-6">
+                    ₹{profileData?.walletBalance?.toFixed(2) || "0.00"}
+                  </p>
+                </div>
+                
+                <Separator />
+                
+                <div>
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <TrophyIcon className="size-4" />
+                    <p className="text-xs">Cashback Earned</p>
+                  </div>
+                  <p className="text-2xl font-bold text-green-600 pl-6">
+                    ₹{profileData?.totalCashbackEarned?.toFixed(2) || "0.00"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Logout Button */}
+            <Button
+              variant="destructive"
+              className="w-full"
+              size="lg"
+              onClick={handleLogout}
+            >
+              <LogOutIcon className="size-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </SheetContent>
       </Sheet>
