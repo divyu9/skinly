@@ -22,7 +22,7 @@ interface DeviceSelectorDialogProps {
 
 // Brand logo mapping - updated with new brand logos
 const brandLogos: Record<string, string> = {
-  "Apple": "https://cdn.hercules.app/file_yXvLJ6BJz77frUtjkKNvsta5",
+  "Apple": "https://cdn.hercules.app/file_qcbK94JAlKCQO3s4ECR3BDw8",
   "Asus": "https://cdn.hercules.app/file_0LL7DgU98xrDCPL00t5KFGTT",
   "CMF": "https://cdn.hercules.app/file_4c1OKYG0fSACOsMluL75owT2",
   "Canon": "https://cdn.hercules.app/file_off0gfWoUMcir0QQZCzi7GIU",
