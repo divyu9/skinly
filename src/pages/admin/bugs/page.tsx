@@ -1,11 +1,11 @@
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Authenticated } from "convex/react";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import { ErrorState, ErrorStateHeader, ErrorStateMedia, ErrorStateTitle, ErrorStateDescription } from "@/components/ui/error-state.tsx";
-import { BugIcon, AlertTriangleIcon, FileTextIcon, ImageIcon, VideoIcon, PhoneIcon, MailIcon, CalendarIcon } from "lucide-react";
+import { BugIcon, AlertTriangleIcon, FileTextIcon, ImageIcon, VideoIcon, PhoneIcon, MailIcon, CalendarIcon, CheckCircleIcon, TrashIcon, RotateCcwIcon, SearchIcon, XIcon, EyeIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
@@ -15,6 +15,16 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import { formatDistanceToNow } from "date-fns";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import { ConvexError } from "convex/values";
 
 interface BugReportWithAttachments {
   _id: Id<"bugReports">;
@@ -46,6 +56,67 @@ function BugReportsContent() {
   const allReports = useQuery(api.admin.bugReports.getBugReports, {});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBug, setSelectedBug] = useState<BugReportWithAttachments | null>(null);
+  const [currentTab, setCurrentTab] = useState<"pending" | "resolved" | "deleted">("pending");
+  
+  // Status management
+  const updateStatus = useMutation(api.admin.bugReports.updateBugStatus);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    action: "resolve" | "delete" | "restore" | null;
+    bugId: Id<"bugReports"> | null;
+  }>({
+    open: false,
+    action: null,
+    bugId: null,
+  });
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Handle status update
+  const handleStatusUpdate = async (status: "pending" | "resolved" | "deleted") => {
+    if (!confirmDialog.bugId) return;
+
+    setIsUpdating(true);
+    try {
+      await updateStatus({
+        bugReportId: confirmDialog.bugId,
+        status,
+      });
+
+      const actionText = status === "resolved" ? "resolved" : status === "deleted" ? "deleted" : "restored";
+      toast.success(`Bug report ${actionText} successfully`);
+      
+      // Close dialog and refresh
+      setConfirmDialog({ open: false, action: null, bugId: null });
+      
+      // Close detail modal if it's the same bug
+      if (selectedBug?._id === confirmDialog.bugId) {
+        setSelectedBug(null);
+      }
+    } catch (error) {
+      if (error instanceof ConvexError) {
+        const { message } = error.data as { code: string; message: string };
+        toast.error(message);
+      } else {
+        toast.error("Failed to update bug status");
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const openConfirmDialog = (action: "resolve" | "delete" | "restore", bugId: Id<"bugReports">) => {
+    setConfirmDialog({ open: true, action, bugId });
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm("");
+  };
+
+  // Get filtered count for current tab
+  const getFilteredCount = () => {
+    return filteredReports(currentTab).length;
+  };
 
   // Check if user is admin
   if (currentUser === undefined) {
@@ -401,16 +472,113 @@ function BugReportsContent() {
                 </Badge>
               </div>
 
-              {/* Status actions will be added in next milestone */}
-              <div className="pt-4 border-t">
-                <p className="text-sm text-muted-foreground">
-                  Status management actions will be available soon.
-                </p>
+              {/* Status Management Actions */}
+              <div className="pt-4 border-t space-y-3">
+                <h4 className="text-sm font-medium">Actions</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedBug.status === "pending" && (
+                    <>
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => openConfirmDialog("resolve", selectedBug._id)}
+                        className="gap-2"
+                      >
+                        <CheckCircleIcon className="h-4 w-4" />
+                        Mark as Resolved
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openConfirmDialog("delete", selectedBug._id)}
+                        className="gap-2"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                  {selectedBug.status === "resolved" && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openConfirmDialog("restore", selectedBug._id)}
+                        className="gap-2"
+                      >
+                        <RotateCcwIcon className="h-4 w-4" />
+                        Restore to Pending
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => openConfirmDialog("delete", selectedBug._id)}
+                        className="gap-2"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </>
+                  )}
+                  {selectedBug.status === "deleted" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openConfirmDialog("restore", selectedBug._id)}
+                      className="gap-2"
+                    >
+                      <RotateCcwIcon className="h-4 w-4" />
+                      Restore to Pending
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => !isUpdating && setConfirmDialog({ ...confirmDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmDialog.action === "resolve" && "Mark Bug as Resolved"}
+              {confirmDialog.action === "delete" && "Delete Bug Report"}
+              {confirmDialog.action === "restore" && "Restore Bug Report"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDialog.action === "resolve" && "This will mark the bug report as resolved. You can restore it later if needed."}
+              {confirmDialog.action === "delete" && "This will soft-delete the bug report. You can restore it later from the Deleted tab."}
+              {confirmDialog.action === "restore" && "This will restore the bug report to pending status."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog({ open: false, action: null, bugId: null })}
+              disabled={isUpdating}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={confirmDialog.action === "delete" ? "destructive" : "default"}
+              onClick={() => {
+                if (confirmDialog.action === "resolve") {
+                  handleStatusUpdate("resolved");
+                } else if (confirmDialog.action === "delete") {
+                  handleStatusUpdate("deleted");
+                } else if (confirmDialog.action === "restore") {
+                  handleStatusUpdate("pending");
+                }
+              }}
+              disabled={isUpdating}
+            >
+              {isUpdating ? "Processing..." : "Confirm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
