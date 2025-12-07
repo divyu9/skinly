@@ -1068,8 +1068,12 @@ export default function Index() {
                 </div>
                 <h3 className="text-2xl font-bold mb-3">Magneto X</h3>
                 <p className="text-muted-foreground mb-6">Revolutionary magnetic accessories and mounts for all your devices</p>
-                <Button className="w-full" variant="outline" asChild>
-                  <Link to="/products">Explore →</Link>
+                <Button 
+                  className="w-full" 
+                  variant="outline"
+                  onClick={() => toast.info("Magneto X product page coming soon!")}
+                >
+                  Explore →
                 </Button>
               </CardContent>
             </Card>
@@ -1092,7 +1096,7 @@ export default function Index() {
                 <h3 className="text-2xl font-bold mb-3">MagSafe Covers</h3>
                 <p className="text-muted-foreground mb-6">Premium black covers for iPhone & Samsung. Seamless magnetic experience</p>
                 <Button className="w-full" variant="outline" asChild>
-                  <Link to="/products">Explore →</Link>
+                  <Link to="/products?collection=cover-and-case">Explore →</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -1115,7 +1119,7 @@ export default function Index() {
                 <h3 className="text-2xl font-bold mb-3">AutoApply Guard</h3>
                 <p className="text-muted-foreground mb-6">Super HQ armoured tempered glass with auto-apply technology</p>
                 <Button className="w-full" variant="outline" asChild>
-                  <Link to="/products">Explore →</Link>
+                  <Link to="/products?collection=tempered-glasses">Explore →</Link>
                 </Button>
               </CardContent>
             </Card>
