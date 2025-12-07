@@ -13,6 +13,7 @@ import type * as abandonedCartsActions from "../abandonedCartsActions.js";
 import type * as admin_bugReports from "../admin/bugReports.js";
 import type * as admin_manualTracking from "../admin/manualTracking.js";
 import type * as admin_orders from "../admin/orders.js";
+import type * as admin_setAdmin from "../admin/setAdmin.js";
 import type * as bugReports from "../bugReports.js";
 import type * as cart from "../cart.js";
 import type * as cod from "../cod.js";
@@ -85,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   "admin/bugReports": typeof admin_bugReports;
   "admin/manualTracking": typeof admin_manualTracking;
   "admin/orders": typeof admin_orders;
+  "admin/setAdmin": typeof admin_setAdmin;
   bugReports: typeof bugReports;
   cart: typeof cart;
   cod: typeof cod;
