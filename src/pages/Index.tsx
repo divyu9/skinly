@@ -124,9 +124,14 @@ export default function Index() {
   // Fetch metadata from cache (super fast!)
   const metadata = useQuery(api.supportedModels.getMetadata);
   
-  // Get brands from cache
+  // Get brands from cache with fallbacks for instant display on cold start
   const allBrands = metadata?.brands || ALL_BRANDS;
-  const phoneBrands = metadata?.byCategory.phone.brands || [];
+  const phoneBrands = metadata?.byCategory.phone.brands || [
+    // Fallback phone brands for instant cold start display
+    "Apple", "Samsung", "OnePlus", "Nothing", "CMF", "Oppo", "Realme", 
+    "Vivo", "iQOO", "Xiaomi", "Google", "Motorola", "Poco", "Honor",
+    "Asus", "Infinix", "Lava", "Tecno", "HMD"
+  ];
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -502,7 +507,13 @@ export default function Index() {
             {showSearchResults && homeSearchQuery.trim().length > 0 && (
               <Card className="mt-2 max-h-[500px] overflow-y-auto border-2">
                 <CardContent className="p-4">
-                  {!hasSearchResults ? (
+                  {debouncedSearchQuery.trim().length >= 2 && deviceSearchResults === undefined ? (
+                    // Loading state while searching
+                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                      <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                      <p className="text-sm text-muted-foreground">Searching models...</p>
+                    </div>
+                  ) : !hasSearchResults ? (
                     <div className="text-center py-8">
                       <p className="text-muted-foreground mb-2">No results found</p>
                       <p className="text-sm text-muted-foreground/70">Try different search terms or request your device below</p>
