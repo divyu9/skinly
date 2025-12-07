@@ -432,54 +432,67 @@ export default function Index() {
       </nav>
 
       {/* Latest Models Marquee */}
-      {latestModels && latestModels.length > 0 && (
-        <div className="w-full bg-primary/5 border-y border-primary/10 mt-24 overflow-hidden">
-          {/* Mobile: Stacked Horizontal Marquee */}
-          <div className="md:hidden">
-            <div className="text-center py-2 bg-primary text-primary-foreground text-xs font-bold">
-              ✨ Now supporting:
-            </div>
-            <div className="py-3 overflow-hidden">
-              <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap">
-                {(() => {
-                  const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
-                  return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
-                    const emoji = emojis[idx % emojis.length];
-                    return (
-                      <span key={idx} className="text-base text-foreground font-semibold">
-                        {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
-                      </span>
-                    );
-                  });
-                })()}
+      <div className="w-full bg-primary/5 border-y border-primary/10 mt-24 overflow-hidden">
+        {latestModels === undefined ? (
+          // Loading state
+          <div className="py-4 flex items-center justify-center gap-2">
+            <div className="size-4 rounded-full bg-primary/40 animate-pulse" />
+            <span className="text-sm text-muted-foreground">Loading latest models...</span>
+          </div>
+        ) : latestModels.length === 0 ? (
+          // Empty state
+          <div className="py-4 text-center text-sm text-muted-foreground">
+            No models available
+          </div>
+        ) : (
+          <>
+            {/* Mobile: Stacked Horizontal Marquee */}
+            <div className="md:hidden">
+              <div className="text-center py-2 bg-primary text-primary-foreground text-xs font-bold">
+                ✨ Now supporting:
+              </div>
+              <div className="py-3 overflow-hidden">
+                <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap">
+                  {(() => {
+                    const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
+                    return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
+                      const emoji = emojis[idx % emojis.length];
+                      return (
+                        <span key={idx} className="text-base text-foreground font-semibold">
+                          {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
+                        </span>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Desktop: Horizontal Marquee */}
-          <div className="hidden md:flex items-center gap-4 py-3">
-            <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
-              <span>✨</span>
-              <span className="whitespace-nowrap">Now supporting:</span>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <div className="animate-marquee flex gap-3 whitespace-nowrap">
-                {(() => {
-                  const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
-                  return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
-                    const emoji = emojis[idx % emojis.length];
-                    return (
-                      <span key={idx} className="text-sm text-foreground/80 font-medium">
-                        {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
-                      </span>
-                    );
-                  });
-                })()}
+            {/* Desktop: Horizontal Marquee */}
+            <div className="hidden md:flex items-center gap-4 py-3">
+              <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
+                <span>✨</span>
+                <span className="whitespace-nowrap">Now supporting:</span>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <div className="animate-marquee flex gap-3 whitespace-nowrap">
+                  {(() => {
+                    const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
+                    return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
+                      const emoji = emojis[idx % emojis.length];
+                      return (
+                        <span key={idx} className="text-sm text-foreground/80 font-medium">
+                          {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
+                        </span>
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-4 bg-gradient-to-br from-cyan-50 via-purple-50 to-pink-50">
@@ -822,30 +835,47 @@ export default function Index() {
           </div>
 
           {/* Brand Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
-            {phoneBrands.map(brand => (
-              <button
-                key={brand}
-                onClick={() => handlePhoneBrandSelect(brand)}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
-              >
-                {brandLogos[brand] ? (
-                  <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
-                    <img 
-                      src={brandLogos[brand]} 
-                      alt={brand}
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  </div>
-                ) : (
-                  <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
-                    {brand[0]}
-                  </div>
-                )}
-                <span className="font-semibold text-center">{brand}</span>
-              </button>
-            ))}
-          </div>
+          {phoneModelsFromDb === undefined ? (
+            // Loading state
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          ) : phoneBrands.length === 0 ? (
+            // Empty state
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">No phone brands available</p>
+              <Button variant="outline" asChild>
+                <Link to="/devices">View All Devices</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
+              {phoneBrands.map(brand => (
+                <button
+                  key={brand}
+                  onClick={() => handlePhoneBrandSelect(brand)}
+                  className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
+                >
+                  {brandLogos[brand] ? (
+                    <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
+                      <img 
+                        src={brandLogos[brand]} 
+                        alt={brand}
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
+                      {brand[0]}
+                    </div>
+                  )}
+                  <span className="font-semibold text-center">{brand}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Phone Model Selection Dialog */}
           {selectedPhoneBrand && (
@@ -914,26 +944,32 @@ export default function Index() {
                     <h3 className="text-2xl font-bold mb-2">Matte Skins</h3>
                     <p className="text-muted-foreground text-sm mb-4">Smooth, premium, fingerprint-proof</p>
                   </div>
-                  <div className="space-y-3 mb-4">
-                    {matteProducts.slice(0, 3).map(product => (
-                      <Link key={product._id} to={`/products/${product.slug}`}>
-                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          {product.images[0] && (
-                            <img 
-                              src={product.images[0].url} 
-                              alt={product.title}
-                              className="size-20 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              From ₹{Math.min(...product.variants.map(v => v.price))}
-                            </p>
+                  <div className="space-y-3 mb-4 min-h-[260px]">
+                    {matteProducts.length === 0 ? (
+                      <div className="flex items-center justify-center h-[260px] text-center">
+                        <p className="text-sm text-muted-foreground">No matte products available yet</p>
+                      </div>
+                    ) : (
+                      matteProducts.slice(0, 3).map(product => (
+                        <Link key={product._id} to={`/products/${product.slug}`}>
+                          <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                            {product.images[0] && (
+                              <img 
+                                src={product.images[0].url} 
+                                alt={product.title}
+                                className="size-20 object-cover rounded"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                              <p className="text-xs text-muted-foreground">
+                                From ₹{Math.min(...product.variants.map(v => v.price))}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      ))
+                    )}
                   </div>
                   <Button variant="outline" className="w-full" asChild>
                     <Link to="/products?filter=matte">View All Matte</Link>
@@ -948,26 +984,32 @@ export default function Index() {
                     <h3 className="text-2xl font-bold mb-2">3D Embossed</h3>
                     <p className="text-muted-foreground text-sm mb-4">Textured designs you can feel</p>
                   </div>
-                  <div className="space-y-3 mb-4">
-                    {embossedProducts.slice(0, 3).map(product => (
-                      <Link key={product._id} to={`/products/${product.slug}`}>
-                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          {product.images[0] && (
-                            <img 
-                              src={product.images[0].url} 
-                              alt={product.title}
-                              className="size-20 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              From ₹{Math.min(...product.variants.map(v => v.price))}
-                            </p>
+                  <div className="space-y-3 mb-4 min-h-[260px]">
+                    {embossedProducts.length === 0 ? (
+                      <div className="flex items-center justify-center h-[260px] text-center">
+                        <p className="text-sm text-muted-foreground">No embossed products available yet</p>
+                      </div>
+                    ) : (
+                      embossedProducts.slice(0, 3).map(product => (
+                        <Link key={product._id} to={`/products/${product.slug}`}>
+                          <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                            {product.images[0] && (
+                              <img 
+                                src={product.images[0].url} 
+                                alt={product.title}
+                                className="size-20 object-cover rounded"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                              <p className="text-xs text-muted-foreground">
+                                From ₹{Math.min(...product.variants.map(v => v.price))}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      ))
+                    )}
                   </div>
                   <Button variant="outline" className="w-full" asChild>
                     <Link to="/products?filter=embossed">View All Embossed</Link>
@@ -982,26 +1024,32 @@ export default function Index() {
                     <h3 className="text-2xl font-bold mb-2">Transparent (Tranzy)</h3>
                     <p className="text-muted-foreground text-sm mb-4">Show off your phone's original color</p>
                   </div>
-                  <div className="space-y-3 mb-4">
-                    {transparentProducts.slice(0, 3).map(product => (
-                      <Link key={product._id} to={`/products/${product.slug}`}>
-                        <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
-                          {product.images[0] && (
-                            <img 
-                              src={product.images[0].url} 
-                              alt={product.title}
-                              className="size-20 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              From ₹{Math.min(...product.variants.map(v => v.price))}
-                            </p>
+                  <div className="space-y-3 mb-4 min-h-[260px]">
+                    {transparentProducts.length === 0 ? (
+                      <div className="flex items-center justify-center h-[260px] text-center">
+                        <p className="text-sm text-muted-foreground">No transparent products available yet</p>
+                      </div>
+                    ) : (
+                      transparentProducts.slice(0, 3).map(product => (
+                        <Link key={product._id} to={`/products/${product.slug}`}>
+                          <div className="flex gap-3 p-2 hover:bg-muted rounded-lg transition-colors">
+                            {product.images[0] && (
+                              <img 
+                                src={product.images[0].url} 
+                                alt={product.title}
+                                className="size-20 object-cover rounded"
+                              />
+                            )}
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-sm mb-1 line-clamp-2">{product.title}</h4>
+                              <p className="text-xs text-muted-foreground">
+                                From ₹{Math.min(...product.variants.map(v => v.price))}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      </Link>
-                    ))}
+                        </Link>
+                      ))
+                    )}
                   </div>
                   <Button variant="outline" className="w-full" asChild>
                     <Link to="/products?filter=transparent">View All Transparent</Link>

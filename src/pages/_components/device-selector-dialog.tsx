@@ -281,30 +281,46 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
               <Button variant="ghost" onClick={handleBack} className="mb-4">
                 ← Back
               </Button>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {availableBrands.map(brand => (
-                  <button
-                    key={brand}
-                    onClick={() => handleBrandSelect(brand)}
-                    className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-                  >
-                    {brandLogos[brand] ? (
-                      <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
-                        <img 
-                          src={brandLogos[brand]} 
-                          alt={brand}
-                          className="max-w-full max-h-full object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
-                        {brand[0]}
-                      </div>
-                    )}
-                    <span className="font-semibold text-center">{brand}</span>
-                  </button>
-                ))}
-              </div>
+              {modelsFromDb === undefined ? (
+                // Loading state
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">Loading brands...</p>
+                </div>
+              ) : availableBrands.length === 0 ? (
+                // Empty state
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground mb-4">No brands available for this device type</p>
+                  <Button variant="outline" onClick={handleBack}>
+                    Choose Another Device
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {availableBrands.map(brand => (
+                    <button
+                      key={brand}
+                      onClick={() => handleBrandSelect(brand)}
+                      className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+                    >
+                      {brandLogos[brand] ? (
+                        <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden p-2">
+                          <img 
+                            src={brandLogos[brand]} 
+                            alt={brand}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        </div>
+                      ) : (
+                        <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
+                          {brand[0]}
+                        </div>
+                      )}
+                      <span className="font-semibold text-center">{brand}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
