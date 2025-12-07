@@ -42,6 +42,7 @@ import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
 import type * as mockups from "../mockups.js";
 import type * as mockupsUpload from "../mockupsUpload.js";
+import type * as modelCache from "../modelCache.js";
 import type * as modelRequests from "../modelRequests.js";
 import type * as orders from "../orders.js";
 import type * as phoneCollections from "../phoneCollections.js";
@@ -115,6 +116,7 @@ declare const fullApi: ApiFromModules<{
   migrationInternal: typeof migrationInternal;
   mockups: typeof mockups;
   mockupsUpload: typeof mockupsUpload;
+  modelCache: typeof modelCache;
   modelRequests: typeof modelRequests;
   orders: typeof orders;
   phoneCollections: typeof phoneCollections;

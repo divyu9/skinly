@@ -67,12 +67,14 @@ export default function DevicesPage() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [confirmedNotMatch, setConfirmedNotMatch] = useState(false); // Confirmation checkbox
   
-  // Fetch all active supported models from database
+  // Fetch metadata from cache (super fast!)
+  const metadata = useQuery(api.supportedModels.getMetadata);
+  
+  // Fetch all active supported models from database (only load when needed for display)
   const allModels = useQuery(api.supportedModels.listAll, { isActive: true });
   
-  // Fetch all brands for Request Model dropdown (with hardcoded fallback)
-  const brandsFromDb = useQuery(api.supportedModels.getBrands);
-  const allBrands = brandsFromDb && brandsFromDb.length > 0 ? brandsFromDb : ALL_BRANDS;
+  // Get all brands from cache
+  const allBrands = metadata?.brands || ALL_BRANDS;
   
   // Mutations
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);

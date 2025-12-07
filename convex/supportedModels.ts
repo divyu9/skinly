@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 // Get all supported models with filters
 export const listAll = query({
@@ -108,6 +109,10 @@ export const create = mutation({
       category: args.category,
       isActive: args.isActive,
     });
+    
+    // Trigger cache rebuild
+    await ctx.scheduler.runAfter(0, internal.modelCache.rebuildCache);
+    
     return modelId;
   },
 });
@@ -142,6 +147,9 @@ export const remove = mutation({
   args: { id: v.id("supportedModels") },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
+    
+    // Trigger cache rebuild
+    await ctx.scheduler.runAfter(0, internal.modelCache.rebuildCache);
   },
 });
 
@@ -171,6 +179,10 @@ export const bulkCreate = mutation({
       const id = await ctx.db.insert("supportedModels", model);
       ids.push(id);
     }
+    
+    // Trigger cache rebuild after bulk insert
+    await ctx.scheduler.runAfter(0, internal.modelCache.rebuildCache);
+    
     return ids;
   },
 });
@@ -301,5 +313,144 @@ export const deleteBrand = mutation({
     }
 
     return { success: true };
+  },
+});
+
+// ===== OPTIMIZED CACHED QUERIES =====
+
+// Get metadata from cache (super fast - no model scanning)
+export const getMetadata = query({
+  args: {},
+  handler: async (ctx) => {
+    const cache = await ctx.db
+      .query("modelMetadata")
+      .withIndex("by_key", (q) => q.eq("key", "current"))
+      .first();
+
+    // Return cache or empty fallback
+    if (!cache) {
+      return {
+        brands: [],
+        totalModels: 0,
+        byCategory: {
+          phone: { brands: [], count: 0 },
+          laptop: { brands: [], count: 0 },
+          tablet: { brands: [], count: 0 },
+          camera: { brands: [], count: 0 },
+          lens: { brands: [], count: 0 },
+          drone: { brands: [], count: 0 },
+          charger: { brands: [], count: 0 },
+          console: { brands: [], count: 0 },
+          macMini: { brands: [], count: 0 },
+        },
+        lastUpdated: 0,
+      };
+    }
+
+    return cache;
+  },
+});
+
+// Get models for a specific brand and category (lazy loading)
+export const getBrandModels = query({
+  args: {
+    brand: v.string(),
+    category: v.union(
+      v.literal("phone"),
+      v.literal("tablet"),
+      v.literal("laptop"),
+      v.literal("console"),
+      v.literal("charger"),
+      v.literal("drone"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("mac-mini")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const models = await ctx.db
+      .query("supportedModels")
+      .withIndex("by_brand", (q) => q.eq("brandName", args.brand))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("category"), args.category),
+          q.eq(q.field("isActive"), true)
+        )
+      )
+      .collect();
+
+    return models.map((m) => ({
+      _id: m._id,
+      brandName: m.brandName,
+      modelName: m.modelName,
+      category: m.category,
+    }));
+  },
+});
+
+// Search models with server-side filtering (on-demand)
+export const searchModels = query({
+  args: {
+    query: v.string(),
+    category: v.optional(v.union(
+      v.literal("phone"),
+      v.literal("tablet"),
+      v.literal("laptop"),
+      v.literal("console"),
+      v.literal("charger"),
+      v.literal("drone"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("mac-mini")
+    )),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const searchQuery = args.query.toLowerCase().trim();
+    if (searchQuery.length < 2) {
+      return [];
+    }
+
+    // Fetch models (with optional category filter)
+    let allModels;
+    
+    if (args.category !== undefined) {
+      const category = args.category;
+      allModels = await ctx.db
+        .query("supportedModels")
+        .withIndex("by_category", (q) => q.eq("category", category))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+    } else {
+      allModels = await ctx.db
+        .query("supportedModels")
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+    }
+
+    // Filter by search query (brand or model name)
+    const filtered = allModels.filter((model) => {
+      const brandMatch = model.brandName.toLowerCase().includes(searchQuery);
+      const modelMatch = model.modelName.toLowerCase().includes(searchQuery);
+      return brandMatch || modelMatch;
+    });
+
+    // Sort by relevance (brand exact match first, then model match)
+    const sorted = filtered.sort((a, b) => {
+      const aBrandExact = a.brandName.toLowerCase() === searchQuery;
+      const bBrandExact = b.brandName.toLowerCase() === searchQuery;
+      if (aBrandExact && !bBrandExact) return -1;
+      if (!aBrandExact && bBrandExact) return 1;
+      return a.modelName.localeCompare(b.modelName);
+    });
+
+    // Apply limit
+    const limit = args.limit || 50;
+    return sorted.slice(0, limit).map((m) => ({
+      _id: m._id,
+      brandName: m.brandName,
+      modelName: m.modelName,
+      category: m.category,
+    }));
   },
 });

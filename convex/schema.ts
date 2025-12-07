@@ -372,6 +372,53 @@ export default defineSchema({
     .index("by_brand", ["brandName"])
     .index("by_category", ["category"]),
 
+  // Cached model metadata (for fast queries - updated when models change)
+  modelMetadata: defineTable({
+    key: v.string(), // Always "current" - single row table
+    brands: v.array(v.string()), // All unique brand names sorted
+    totalModels: v.number(), // Total count of active models
+    // Per-category metadata
+    byCategory: v.object({
+      phone: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      laptop: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      tablet: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      camera: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      lens: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      drone: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      charger: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      console: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+      macMini: v.object({
+        brands: v.array(v.string()),
+        count: v.number(),
+      }),
+    }),
+    lastUpdated: v.number(), // Timestamp of last cache update
+  }).index("by_key", ["key"]),
+
   gadgetConsumption: defineTable({
     categoryName: v.string(), // e.g., "Phone", "Laptop Top", "Mac Mini"
     lengthCm: v.number(), // Length in cm

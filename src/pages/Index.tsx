@@ -121,22 +121,17 @@ export default function Index() {
   // Fetch latest supported models for marquee
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
   
-  // Fetch ALL supported models for search
-  const allSupportedModels = useQuery(api.supportedModels.listAll, { isActive: true });
+  // Fetch metadata from cache (super fast!)
+  const metadata = useQuery(api.supportedModels.getMetadata);
   
-  // Fetch phone models from database for brand/model selector
-  const phoneModelsFromDb = useQuery(api.supportedModels.listAll, { 
-    category: "phone", 
-    isActive: true 
-  });
-  
-  // Fetch all brands for Request Model dropdown (with hardcoded fallback)
-  const brandsFromDb = useQuery(api.supportedModels.getBrands);
-  const allBrands = brandsFromDb && brandsFromDb.length > 0 ? brandsFromDb : ALL_BRANDS;
+  // Get brands from cache
+  const allBrands = metadata?.brands || ALL_BRANDS;
+  const phoneBrands = metadata?.byCategory.phone.brands || [];
   
   const [homeSearchQuery, setHomeSearchQuery] = useState("");
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [debouncedSearchQuery] = useDebounce(homeSearchQuery, 300);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDeviceType, setDialogDeviceType] = useState<DeviceType | undefined>(undefined);
   const [selectedPhoneBrand, setSelectedPhoneBrand] = useState<string | null>(null);
@@ -183,39 +178,20 @@ export default function Index() {
     });
   };
   
-  // Group phone models by brand from database
-  const phoneModelsByBrand = useMemo(() => {
-    if (!phoneModelsFromDb) return {};
-    
-    const grouped: Record<string, string[]> = {};
-    phoneModelsFromDb.forEach(model => {
-      if (!grouped[model.brandName]) {
-        grouped[model.brandName] = [];
-      }
-      grouped[model.brandName].push(model.modelName);
-    });
-    
-    // Sort models within each brand
-    Object.keys(grouped).forEach(brand => {
-      grouped[brand].sort();
-    });
-    
-    return grouped;
-  }, [phoneModelsFromDb]);
-  
-  // Get phone brands from database
-  const phoneBrands = useMemo(() => {
-    return Object.keys(phoneModelsByBrand).sort();
-  }, [phoneModelsByBrand]);
+  // Lazy load phone models when user selects a brand
+  const brandModels = useQuery(
+    api.supportedModels.getBrandModels,
+    selectedPhoneBrand ? { brand: selectedPhoneBrand, category: "phone" } : "skip"
+  );
   
   // Get filtered phone models for selected brand
   const filteredPhoneModels = useMemo(() => {
-    if (!selectedPhoneBrand) return [];
-    const models = phoneModelsByBrand[selectedPhoneBrand] || [];
+    if (!brandModels) return [];
+    const models = brandModels.map(m => m.modelName);
     if (!phoneModelSearch) return models;
     const query = phoneModelSearch.toLowerCase();
     return models.filter(model => model.toLowerCase().includes(query));
-  }, [selectedPhoneBrand, phoneModelSearch, phoneModelsByBrand]);
+  }, [brandModels, phoneModelSearch]);
   
   // Handle phone brand selection
   const handlePhoneBrandSelect = (brand: string) => {
@@ -261,6 +237,14 @@ export default function Index() {
     setDialogOpen(true);
   };
 
+  // Server-side device search with debounce
+  const deviceSearchResults = useQuery(
+    api.supportedModels.searchModels,
+    debouncedSearchQuery.trim().length >= 2 
+      ? { query: debouncedSearchQuery, limit: 15 }
+      : "skip"
+  );
+
   // Helper function to normalize text for search (removes spaces and special chars)
   const normalizeForSearch = (text: string): string => {
     return text.toLowerCase().replace(/[\s\-_]/g, '');
@@ -274,72 +258,34 @@ export default function Index() {
     const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
     const normalizedSearchTerms = searchTerms.map(normalizeForSearch);
     
-    // 1. Search Device Models
-    const allDeviceCategories = [
-      { name: "Phones", icon: "📱", models: phoneModelsByBrand },
-      { name: "Cameras", icon: "📷", models: cameraModels },
-      { name: "Lenses", icon: "🔍", models: lensModels },
-      { name: "Tablets", icon: "📱", models: tabletModels },
-      { name: "Mac Mini", icon: "💻", models: macMiniModels },
-      { name: "Gaming Consoles", icon: "🎮", models: consoleModels },
-      { name: "Drones", icon: "🚁", models: droneModels },
-      { name: "Chargers", icon: "🔌", models: chargerModels },
-    ];
+    // 1. Device Models from server-side search
+    const deviceMatches = (deviceSearchResults || []).map(model => {
+      const categoryName = 
+        model.category === "phone" ? "Phones" :
+        model.category === "camera" ? "Cameras" :
+        model.category === "lens" ? "Lenses" :
+        model.category === "tablet" ? "Tablets" :
+        model.category === "mac-mini" ? "Mac Mini" :
+        model.category === "console" ? "Gaming Consoles" :
+        model.category === "drone" ? "Drones" :
+        model.category === "charger" ? "Chargers" : "Other";
+      
+      const icon = 
+        model.category === "phone" ? "📱" :
+        model.category === "camera" ? "📷" :
+        model.category === "lens" ? "🔍" :
+        model.category === "tablet" ? "📱" :
+        model.category === "mac-mini" ? "💻" :
+        model.category === "console" ? "🎮" :
+        model.category === "drone" ? "🚁" :
+        model.category === "charger" ? "🔌" : "📱";
 
-    const deviceMatches: Array<{ category: string; brand: string; model: string; icon: string }> = [];
-    
-    allDeviceCategories.forEach(category => {
-      Object.entries(category.models).forEach(([brand, models]) => {
-        models.forEach(model => {
-          const normalizedModel = normalizeForSearch(model);
-          const normalizedBrand = normalizeForSearch(brand);
-          const matchesAll = normalizedSearchTerms.every(term => 
-            normalizedModel.includes(term) || normalizedBrand.includes(term)
-          );
-          if (matchesAll) {
-            deviceMatches.push({
-              category: category.name,
-              brand,
-              model,
-              icon: category.icon
-            });
-          }
-        });
-      });
-    });
-
-    // Also search ALL database models (for any newly added categories not in static files)
-    const dbModels = allSupportedModels || [];
-    dbModels.forEach(dbModel => {
-      const normalizedModel = normalizeForSearch(dbModel.modelName);
-      const normalizedBrand = normalizeForSearch(dbModel.brandName);
-      const matchesAll = normalizedSearchTerms.every(term => 
-        normalizedModel.includes(term) || normalizedBrand.includes(term)
-      );
-      if (matchesAll) {
-        const categoryName = 
-          dbModel.category === "phone" ? "Phones" :
-          dbModel.category === "camera" ? "Cameras" :
-          dbModel.category === "lens" ? "Lenses" :
-          dbModel.category === "tablet" ? "Tablets" :
-          dbModel.category === "mac-mini" ? "Mac Mini" :
-          dbModel.category === "console" ? "Gaming Consoles" :
-          dbModel.category === "drone" ? "Drones" :
-          dbModel.category === "charger" ? "Chargers" : "Other";
-        
-        // Avoid duplicates
-        const exists = deviceMatches.some(d => 
-          d.brand === dbModel.brandName && d.model === dbModel.modelName
-        );
-        if (!exists) {
-          deviceMatches.push({
-            category: categoryName,
-            brand: dbModel.brandName,
-            model: dbModel.modelName,
-            icon: "📱"
-          });
-        }
-      }
+      return {
+        category: categoryName,
+        brand: model.brandName,
+        model: model.modelName,
+        icon
+      };
     });
 
     // 2. Search Product Designs (titles) - ALL terms must match
@@ -362,11 +308,11 @@ export default function Index() {
     });
 
     return {
-      devices: deviceMatches.slice(0, 15),
+      devices: deviceMatches,
       designs: designMatches,
       skus: skuMatches.slice(0, 10)
     };
-  }, [homeSearchQuery, products, allSupportedModels, phoneModelsByBrand]);
+  }, [homeSearchQuery, products, deviceSearchResults]);
 
   const hasSearchResults = searchResults.devices.length > 0 || 
                           searchResults.designs.length > 0 || 
@@ -835,7 +781,7 @@ export default function Index() {
           </div>
 
           {/* Brand Grid */}
-          {phoneModelsFromDb === undefined ? (
+          {metadata === undefined ? (
             // Loading state
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
               {Array.from({ length: 12 }).map((_, i) => (
