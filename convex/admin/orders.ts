@@ -721,3 +721,69 @@ export const refundToWallet = mutation({
     };
   },
 });
+
+// Record RTO action
+export const recordRtoAction = mutation({
+  args: {
+    orderId: v.id("orders"),
+    actionType: v.union(
+      v.literal("restocked"),
+      v.literal("resent"),
+      v.literal("resolved")
+    ),
+    notes: v.optional(v.string()),
+    newOrderNumber: v.optional(v.string()), // For "resent" action
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Only allow RTO actions for RTO orders
+    if (order.status !== "rto") {
+      throw new ConvexError({
+        message: "Can only record RTO actions for RTO orders",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Validate resent action requires new order number
+    if (args.actionType === "resent" && !args.newOrderNumber) {
+      throw new ConvexError({
+        message: "New order number is required for 'resent' action",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Create RTO action entry
+    const rtoAction = {
+      actionType: args.actionType,
+      actionAt: Date.now(),
+      actionBy: identity.email || identity.tokenIdentifier,
+      notes: args.notes,
+      newOrderNumber: args.newOrderNumber,
+    };
+
+    const existingActions = order.rtoActions || [];
+    await ctx.db.patch(args.orderId, {
+      rtoActions: [...existingActions, rtoAction],
+    });
+
+    return {
+      success: true,
+      actionType: args.actionType,
+    };
+  },
+});

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
-import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon } from "lucide-react";
+import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon, AlertCircleIcon, PackageOpenIcon, RefreshCwIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ function OrderDetailPageInner() {
   const restockInventory = useMutation(api.admin.orders.restockInventory);
   const refundToWallet = useMutation(api.admin.orders.refundToWallet);
   const saveManualTracking = useMutation(api.admin.manualTracking.saveManualTracking);
+  const recordRtoAction = useMutation(api.admin.orders.recordRtoAction);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
   const [cancellingShipment, setCancellingShipment] = useState(false);
@@ -66,6 +68,17 @@ function OrderDetailPageInner() {
     courierCompany: "",
   });
   const [isSavingManualTracking, setIsSavingManualTracking] = useState(false);
+  const [showRtoActionDialog, setShowRtoActionDialog] = useState(false);
+  const [rtoActionForm, setRtoActionForm] = useState<{
+    actionType: "restocked" | "resent" | "resolved";
+    notes: string;
+    newOrderNumber: string;
+  }>({
+    actionType: "resolved",
+    notes: "",
+    newOrderNumber: "",
+  });
+  const [isRecordingRtoAction, setIsRecordingRtoAction] = useState(false);
 
   const handleStatusChange = async (
     status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
@@ -323,6 +336,55 @@ function OrderDetailPageInner() {
       toast.error(errorMessage);
     } finally {
       setIsSavingManualTracking(false);
+    }
+  };
+
+  const handleRecordRtoAction = async () => {
+    if (!orderId) return;
+
+    // Validate required fields
+    if (rtoActionForm.actionType === "resent" && !rtoActionForm.newOrderNumber.trim()) {
+      toast.error("New order number is required for 'Resent' action");
+      return;
+    }
+
+    setIsRecordingRtoAction(true);
+    try {
+      const result = await recordRtoAction({
+        orderId: orderId as Id<"orders">,
+        actionType: rtoActionForm.actionType,
+        notes: rtoActionForm.notes || undefined,
+        newOrderNumber: rtoActionForm.newOrderNumber || undefined,
+      });
+
+      if (result.success) {
+        const actionLabels = {
+          restocked: "Inventory Restocked",
+          resent: "Package Resent",
+          resolved: "Marked as Resolved",
+        };
+        toast.success(`RTO action recorded: ${actionLabels[result.actionType]}`);
+        setShowRtoActionDialog(false);
+        setRtoActionForm({
+          actionType: "resolved",
+          notes: "",
+          newOrderNumber: "",
+        });
+      }
+    } catch (error) {
+      console.error("Record RTO Action Error:", error);
+
+      let errorMessage = "Failed to record RTO action";
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error.data as { message?: string };
+        errorMessage = convexError.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+    } finally {
+      setIsRecordingRtoAction(false);
     }
   };
 
@@ -942,6 +1004,96 @@ function OrderDetailPageInner() {
               </CardContent>
             </Card>
           )}
+
+          {/* RTO Management - Only show for RTO orders */}
+          {order.status === "rto" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircleIcon className="size-5" />
+                  RTO Management
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* RTO Action History */}
+                {order.rtoActions && order.rtoActions.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <PackageOpenIcon className="size-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">
+                        {order.rtoActions.length} RTO {order.rtoActions.length === 1 ? "action" : "actions"} recorded
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase">
+                        Action History
+                      </p>
+                      {order.rtoActions.map((action, idx) => {
+                        const actionLabels = {
+                          restocked: { label: "Inventory Restocked", color: "text-green-600", icon: RotateCcwIcon },
+                          resent: { label: "Package Resent", color: "text-indigo-600", icon: RefreshCwIcon },
+                          resolved: { label: "Marked as Resolved", color: "text-purple-600", icon: CheckIcon },
+                        };
+                        const actionInfo = actionLabels[action.actionType];
+                        const ActionIcon = actionInfo.icon;
+
+                        return (
+                          <div key={idx} className="p-3 bg-muted/50 rounded-lg text-sm space-y-2">
+                            <div className="flex items-center gap-2">
+                              <ActionIcon className={`size-4 ${actionInfo.color}`} />
+                              <span className="font-medium">{actionInfo.label}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {formatRestockDate(action.actionAt)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              By: {action.actionBy}
+                            </p>
+                            {action.notes && (
+                              <p className="text-xs">
+                                <span className="text-muted-foreground">Notes: </span>
+                                <span>{action.notes}</span>
+                              </p>
+                            )}
+                            {action.newOrderNumber && (
+                              <p className="text-xs">
+                                <span className="text-muted-foreground">New Order: </span>
+                                <span className="font-mono font-medium">{action.newOrderNumber}</span>
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => setShowRtoActionDialog(true)}
+                    >
+                      <AlertCircleIcon className="size-4 mr-2" />
+                      Record Another Action
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                      <AlertCircleIcon className="size-4 text-orange-600" />
+                      <span className="text-sm text-orange-900">
+                        No RTO actions recorded yet
+                      </span>
+                    </div>
+                    <Button
+                      className="w-full"
+                      onClick={() => setShowRtoActionDialog(true)}
+                    >
+                      <AlertCircleIcon className="size-4 mr-2" />
+                      Record RTO Action
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Customer & Order Details */}
@@ -1269,6 +1421,108 @@ function OrderDetailPageInner() {
                 <>
                   <RotateCcwIcon className="size-4 mr-2" />
                   Restock {selectedItems.size} Item{selectedItems.size !== 1 ? "s" : ""}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* RTO Action Dialog */}
+      <Dialog open={showRtoActionDialog} onOpenChange={setShowRtoActionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record RTO Action</DialogTitle>
+            <DialogDescription>
+              Record what action was taken for this RTO (Return to Origin) order
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="rto-action-type">Action Type *</Label>
+              <Select
+                value={rtoActionForm.actionType}
+                onValueChange={(value: "restocked" | "resent" | "resolved") =>
+                  setRtoActionForm({ ...rtoActionForm, actionType: value })
+                }
+              >
+                <SelectTrigger id="rto-action-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="restocked">Inventory Restocked</SelectItem>
+                  <SelectItem value="resent">Package Resent</SelectItem>
+                  <SelectItem value="resolved">Marked as Resolved</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {rtoActionForm.actionType === "restocked" && "Record that inventory was restocked"}
+                {rtoActionForm.actionType === "resent" && "Record that the package was resent to the customer"}
+                {rtoActionForm.actionType === "resolved" && "Mark this RTO as resolved without further action"}
+              </p>
+            </div>
+
+            {rtoActionForm.actionType === "resent" && (
+              <div>
+                <Label htmlFor="new-order-number">New Order Number *</Label>
+                <Input
+                  id="new-order-number"
+                  placeholder="e.g., ORD-1234567890-C"
+                  value={rtoActionForm.newOrderNumber}
+                  onChange={(e) =>
+                    setRtoActionForm({ ...rtoActionForm, newOrderNumber: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter the new order number (typically with -C suffix)
+                </p>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="rto-notes">Notes (Optional)</Label>
+              <Textarea
+                id="rto-notes"
+                placeholder="Add any additional notes about this action..."
+                value={rtoActionForm.notes}
+                onChange={(e) =>
+                  setRtoActionForm({ ...rtoActionForm, notes: e.target.value })
+                }
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowRtoActionDialog(false);
+                setRtoActionForm({
+                  actionType: "resolved",
+                  notes: "",
+                  newOrderNumber: "",
+                });
+              }}
+              disabled={isRecordingRtoAction}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRecordRtoAction}
+              disabled={
+                isRecordingRtoAction ||
+                (rtoActionForm.actionType === "resent" && !rtoActionForm.newOrderNumber.trim())
+              }
+            >
+              {isRecordingRtoAction ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <AlertCircleIcon className="size-4 mr-2" />
+                  Record Action
                 </>
               )}
             </Button>
