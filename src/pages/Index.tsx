@@ -31,7 +31,8 @@ import {
   ZapIcon,
   AlertCircleIcon,
   CheckCircleIcon,
-  HelpCircleIcon
+  HelpCircleIcon,
+  BugIcon
 } from "lucide-react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -41,6 +42,7 @@ import { useDebounce } from "@/hooks/use-debounce.ts";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
+import { BugReportModal } from "@/components/bug-report-modal.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -142,6 +144,7 @@ export default function Index() {
   
   // Model request dialog state
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [bugReportOpen, setBugReportOpen] = useState(false);
   const [requestBrand, setRequestBrand] = useState("");
   const [requestNewBrand, setRequestNewBrand] = useState(""); // For custom brand entry
   const [isNewBrand, setIsNewBrand] = useState(false); // Track if "Other" is selected
@@ -1264,11 +1267,25 @@ export default function Index() {
             </div>
           </div>
 
-          <div className="text-center text-sm text-muted-foreground border-t pt-8">
-            © {new Date().getFullYear()} Mad House Media. All rights reserved.
+          <div className="flex flex-col items-center gap-4 border-t pt-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBugReportOpen(true)}
+              className="text-muted-foreground hover:text-primary"
+            >
+              <BugIcon className="size-4 mr-2" />
+              Report a Bug
+            </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              © {new Date().getFullYear()} Mad House Media. All rights reserved.
+            </div>
           </div>
         </div>
       </footer>
+
+      {/* Bug Report Modal */}
+      <BugReportModal open={bugReportOpen} onOpenChange={setBugReportOpen} />
 
       {/* Request Model Dialog */}
       <Dialog 
