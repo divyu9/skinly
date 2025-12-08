@@ -245,10 +245,7 @@ export const getProductBySlug = query({
       .first();
       
     if (!product) {
-      throw new ConvexError({
-        message: "Product not found",
-        code: "NOT_FOUND",
-      });
+      return null;
     }
 
     const variants = await ctx.db
