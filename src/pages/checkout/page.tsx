@@ -236,14 +236,27 @@ function CheckoutPageInner() {
       // User cancelled payment
       setIsRedirectingToPayment(false);
       setIsSubmitting(false);
+      // Clear sessionStorage
+      sessionStorage.removeItem('skinly_merchant_txn_id');
+      sessionStorage.removeItem('skinly_order_id');
       toast.error("Payment cancelled");
       return;
     }
     
     if (response === 'CONCLUDED') {
       // Payment completed (could be success or failure)
-      // Check database for order status
-      if (!currentMerchantTxnId || !currentOrderId) {
+      // Try to get transaction details from state first, then fallback to sessionStorage
+      let merchantTxnId = currentMerchantTxnId;
+      let orderId = currentOrderId;
+      
+      if (!merchantTxnId || !orderId) {
+        console.log("State variables missing, trying sessionStorage...");
+        merchantTxnId = sessionStorage.getItem('skinly_merchant_txn_id');
+        orderId = sessionStorage.getItem('skinly_order_id') as Id<"orders"> | null;
+        console.log("SessionStorage values:", { merchantTxnId, orderId });
+      }
+      
+      if (!merchantTxnId || !orderId) {
         console.error("Missing transaction ID or order ID");
         toast.error("Unable to verify payment");
         setIsRedirectingToPayment(false);
@@ -254,19 +267,25 @@ function CheckoutPageInner() {
       try {
         console.log("Checking payment status from database...");
         const order = await convex.query(api.orders.getOrderByMerchantTransaction, {
-          merchantTransactionId: currentMerchantTxnId,
+          merchantTransactionId: merchantTxnId,
         });
         
         if (order) {
           console.log("Order found, payment status:", order.paymentStatus);
           
           if (order.paymentStatus === "success") {
+            // Clear sessionStorage on success
+            sessionStorage.removeItem('skinly_merchant_txn_id');
+            sessionStorage.removeItem('skinly_order_id');
             toast.success("Payment successful!");
             // Small delay for better UX
             setTimeout(() => {
               navigate(`/orders/${order._id}`);
             }, 500);
           } else if (order.paymentStatus === "failed") {
+            // Clear sessionStorage on failure
+            sessionStorage.removeItem('skinly_merchant_txn_id');
+            sessionStorage.removeItem('skinly_order_id');
             toast.error("Payment failed. Please try again.");
             setIsRedirectingToPayment(false);
             setIsSubmitting(false);
@@ -365,9 +384,15 @@ function CheckoutPageInner() {
         });
 
         if (paymentResult.success && paymentResult.paymentUrl) {
-          // Store transaction details for callback
+          // Store transaction details for callback in state and sessionStorage
           setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
           setCurrentOrderId(result.orderId);
+          sessionStorage.setItem('skinly_merchant_txn_id', paymentResult.merchantTransactionId);
+          sessionStorage.setItem('skinly_order_id', result.orderId);
+          console.log("Stored transaction details:", { 
+            merchantTxnId: paymentResult.merchantTransactionId, 
+            orderId: result.orderId 
+          });
           
           // Check if PhonePe SDK is loaded
           if (!window.PhonePeCheckout) {
@@ -402,9 +427,15 @@ function CheckoutPageInner() {
           });
 
           if (paymentResult.success && paymentResult.paymentUrl) {
-            // Store transaction details for callback
+            // Store transaction details for callback in state and sessionStorage
             setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
             setCurrentOrderId(result.orderId);
+            sessionStorage.setItem('skinly_merchant_txn_id', paymentResult.merchantTransactionId);
+            sessionStorage.setItem('skinly_order_id', result.orderId);
+            console.log("Stored transaction details (partial COD):", { 
+              merchantTxnId: paymentResult.merchantTransactionId, 
+              orderId: result.orderId 
+            });
             
             // Check if PhonePe SDK is loaded
             if (!window.PhonePeCheckout) {
