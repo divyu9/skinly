@@ -141,32 +141,7 @@ function CheckoutPageInner() {
     );
   }
 
-  // Show loading state while redirecting to payment (CHECK THIS FIRST!)
-  if (isRedirectingToPayment) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <div className="flex justify-center">
-                <Spinner className="size-12" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">
-                  Taking you to the payment page...
-                </h3>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Please wait while we redirect you to PhonePe
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (cartItems.length === 0) {
+  if (cartItems.length === 0 && !isRedirectingToPayment) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Empty>
@@ -765,9 +740,21 @@ function CheckoutPageInner() {
                 type="submit"
                 size="lg"
                 className="w-full"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isRedirectingToPayment}
               >
-                {isSubmitting ? "Placing Order..." : "Place Order"}
+                {isRedirectingToPayment ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner className="size-4" />
+                    Redirecting to payment...
+                  </span>
+                ) : isSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <Spinner className="size-4" />
+                    Processing...
+                  </span>
+                ) : (
+                  "Place Order"
+                )}
               </Button>
             </form>
           </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { useAction, useQuery } from "convex/react";
+import { useAction, useQuery, useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -11,6 +11,7 @@ import { trackPurchase } from "@/lib/analytics.ts";
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const convex = useConvex();
   const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
   const [status, setStatus] = useState<"loading" | "success" | "failed" | "error">("loading");
   const [merchantTransactionId, setMerchantTransactionId] = useState<string | null>(null);
@@ -97,7 +98,36 @@ export default function PaymentCallback() {
       }
     } catch (error) {
       console.error("Payment verification error:", error);
-      setStatus("error");
+      // Fallback: Check order status directly from our database
+      console.log("Attempting to verify payment via database fallback...");
+      try {
+        const order = await convex.query(api.orders.getOrderByMerchantTransaction, {
+          merchantTransactionId: txnId,
+        });
+        
+        if (order) {
+          console.log("Database fallback - Order found:", order.paymentStatus);
+          // Check order's payment status from database
+          if (order.paymentStatus === "success") {
+            console.log("Database fallback: Payment successful!");
+            setStatus("success");
+            setMerchantTransactionId(txnId);
+          } else if (order.paymentStatus === "failed") {
+            console.log("Database fallback: Payment failed");
+            setStatus("failed");
+          } else {
+            // Still pending, retry
+            console.log("Database fallback: Payment still pending, retrying...");
+            setTimeout(() => verifyPayment(txnId), 2000);
+          }
+        } else {
+          console.error("Database fallback: Order not found");
+          setStatus("error");
+        }
+      } catch (fallbackError) {
+        console.error("Database fallback also failed:", fallbackError);
+        setStatus("error");
+      }
     }
   };
 
