@@ -12,15 +12,49 @@ http.route({
   handler: httpAction(async (ctx, request) => {
     try {
       const body = await request.text();
-      const data = JSON.parse(body);
+      
+      console.log("=== PhonePe Webhook Received ===");
+      console.log("Raw body:", body);
+      
+      // PhonePe sends the webhook as URL-encoded form data or JSON
+      // Try to parse as JSON first
+      let webhookData;
+      try {
+        webhookData = JSON.parse(body);
+      } catch {
+        // If not JSON, might be form-encoded
+        const params = new URLSearchParams(body);
+        webhookData = Object.fromEntries(params.entries());
+      }
+      
+      console.log("Parsed webhook data:", webhookData);
 
-      // Extract merchant transaction ID and payment status
-      const merchantTransactionId = data.response?.transactionId;
-      const state = data.response?.state;
+      // PhonePe webhook might send data in different formats:
+      // Format 1: { response: { ... } }
+      // Format 2: { merchantTransactionId: ..., transactionId: ..., state: ... }
+      // Format 3: Direct fields at root level
+      
+      const merchantTransactionId = 
+        webhookData.merchantTransactionId ||
+        webhookData.response?.merchantTransactionId ||
+        webhookData.response?.transactionId;
+        
+      const state = 
+        webhookData.state ||
+        webhookData.response?.state ||
+        webhookData.status;
+        
+      const responseCode =
+        webhookData.code ||
+        webhookData.response?.code ||
+        webhookData.response?.responseCode;
 
-      if (!merchantTransactionId || !state) {
+      console.log("Extracted fields:", { merchantTransactionId, state, responseCode });
+
+      if (!merchantTransactionId) {
+        console.error("Missing merchantTransactionId in webhook");
         return new Response(
-          JSON.stringify({ success: false, message: "Invalid webhook data" }),
+          JSON.stringify({ success: false, message: "Missing merchant transaction ID" }),
           {
             status: 400,
             headers: { "Content-Type": "application/json" },
@@ -28,19 +62,31 @@ http.route({
         );
       }
 
-      // Map PhonePe state to our payment status
+      // Map PhonePe state/code to our payment status
       const paymentStatus =
-        state === "COMPLETED" || state === "SUCCESS"
+        state === "COMPLETED" || 
+        state === "SUCCESS" || 
+        responseCode === "PAYMENT_SUCCESS"
           ? "success"
-          : state === "FAILED"
+          : state === "FAILED" ||
+            responseCode === "PAYMENT_ERROR" ||
+            responseCode === "PAYMENT_DECLINED" ||
+            responseCode === "PAYMENT_CANCELLED"
             ? "failed"
             : "pending";
 
+      console.log("Mapped payment status:", paymentStatus);
+
       // Update order payment status
-      await ctx.runMutation(api.orders.updatePaymentStatus, {
-        merchantTransactionId,
-        paymentStatus,
-      });
+      if (paymentStatus === "success" || paymentStatus === "failed") {
+        await ctx.runMutation(api.orders.updatePaymentStatus, {
+          merchantTransactionId,
+          paymentStatus,
+        });
+        console.log("Order payment status updated successfully");
+      } else {
+        console.log("Skipping update for pending status");
+      }
 
       return new Response(
         JSON.stringify({ success: true, message: "Webhook processed" }),
@@ -50,7 +96,8 @@ http.route({
         }
       );
     } catch (error) {
-      console.error("PhonePe webhook error:", error);
+      console.error("=== PhonePe Webhook Error ===");
+      console.error("Error:", error);
       return new Response(
         JSON.stringify({
           success: false,

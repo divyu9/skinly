@@ -277,16 +277,28 @@ export const checkPaymentStatus = action({
         };
       } = await response.json();
 
-      console.log("PhonePe Status Response:", {
+      console.log("PhonePe Status Response (Full):", {
         status: response.status,
         success: responseData.success,
         code: responseData.code,
+        message: responseData.message,
+        data: responseData.data,
       });
 
       if (!response.ok || !responseData.success) {
+        const errorMessage = responseData.message 
+          ? `${responseData.code}: ${responseData.message}`
+          : responseData.code || "Status check failed";
+        
+        console.error("PhonePe Status Check Failed:", {
+          error: errorMessage,
+          merchantTransactionId: args.merchantTransactionId,
+          endpoint,
+          responseStatus: response.status
+        });
+        
         throw new ConvexError({
-          message:
-            responseData.message || responseData.code || "Status check failed",
+          message: errorMessage,
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
