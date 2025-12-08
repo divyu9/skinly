@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
@@ -35,6 +36,7 @@ function CheckoutPageInner() {
   const [otpInput, setOtpInput] = useState("");
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [useWallet, setUseWallet] = useState(false);
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -162,6 +164,31 @@ function CheckoutPageInner() {
     );
   }
 
+  // Show loading state while redirecting to payment
+  if (isRedirectingToPayment) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="flex justify-center">
+                <Spinner className="size-12" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg">
+                  Taking you to the payment page...
+                </h3>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Please wait while we redirect you to PhonePe
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const handleSendOtp = async () => {
     if (!formData.phone.trim()) {
       toast.error("Please enter your phone number first");
@@ -272,7 +299,8 @@ function CheckoutPageInner() {
         toast.success("Test order placed successfully! (No real payment processed)");
         navigate(`/orders/${result.orderId}`);
       } else if (formData.paymentMethod === "phonepe") {
-        toast.loading("Redirecting to payment gateway...");
+        // Show loading state immediately
+        setIsRedirectingToPayment(true);
         
         const paymentResult = await initiatePayment({
           orderId: result.orderId,
@@ -285,13 +313,15 @@ function CheckoutPageInner() {
           // Redirect to PhonePe payment page
           window.location.href = paymentResult.paymentUrl;
         } else {
+          setIsRedirectingToPayment(false);
           throw new Error("Failed to initiate payment");
         }
       } else if (formData.paymentMethod === "cod") {
         // Check if partial COD is enabled
         if (prepaidAmount > 0) {
           // Partial COD: Initiate PhonePe payment for prepaid amount
-          toast.loading("Redirecting to payment gateway for prepaid amount...");
+          // Show loading state immediately
+          setIsRedirectingToPayment(true);
           
           const paymentResult = await initiatePayment({
             orderId: result.orderId,
@@ -304,6 +334,7 @@ function CheckoutPageInner() {
             // Redirect to PhonePe payment page
             window.location.href = paymentResult.paymentUrl;
           } else {
+            setIsRedirectingToPayment(false);
             throw new Error("Failed to initiate prepaid payment");
           }
         } else {
@@ -319,6 +350,7 @@ function CheckoutPageInner() {
     } catch (error) {
       toast.error("Failed to place order. Please try again.");
       setIsSubmitting(false);
+      setIsRedirectingToPayment(false);
     }
   };
 

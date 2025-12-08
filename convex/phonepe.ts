@@ -111,7 +111,7 @@ export const initiatePayment = action({
         merchantUserId: order.userId || "GUEST_USER",
         amount: amountInPaise,
         redirectUrl: `${siteUrl}/payment/callback`,
-        redirectMode: "POST",
+        redirectMode: "REDIRECT",
         callbackUrl: `${siteUrl}/payment/callback`,
         mobileNumber: args.customerPhone,
         paymentInstrument: {
