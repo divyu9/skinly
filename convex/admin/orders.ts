@@ -43,7 +43,7 @@ export const getAllOrders = query({
     // Fetch user info for each order
     const ordersWithUsers = await Promise.all(
       filteredOrders.map(async (order) => {
-        const user = await ctx.db.get(order.userId);
+        const user = order.userId ? await ctx.db.get(order.userId) : null;
         return {
           ...order,
           user: user
@@ -86,7 +86,7 @@ export const searchOrders = query({
     // Fetch user info for each order
     const ordersWithUsers = await Promise.all(
       filteredOrders.map(async (order) => {
-        const user = await ctx.db.get(order.userId);
+        const user = order.userId ? await ctx.db.get(order.userId) : null;
         return {
           ...order,
           user: user
@@ -146,7 +146,7 @@ export const updateShippingInfo = mutation({
     // Send order dispatched notification if AWB is added for first time
     if (isNewAWB && args.awbNumber) {
       try {
-        const user = await ctx.db.get(order.userId);
+        const user = order.userId ? await ctx.db.get(order.userId) : null;
         await ctx.scheduler.runAfter(
           0,
           api.whatsappMessaging.queueMessage,
@@ -210,7 +210,7 @@ export const updateOrderStatus = mutation({
     // Send WhatsApp notifications based on status change
     if (oldStatus !== args.status) {
       try {
-        const user = await ctx.db.get(order.userId);
+        const user = order.userId ? await ctx.db.get(order.userId) : null;
 
         if (args.status === "shipped" && order.awbNumber) {
           // Order shipped
@@ -269,7 +269,7 @@ export const updateOrderStatus = mutation({
                 items: itemsForCashback,
               });
 
-              if (cashbackResult.totalCashback > 0) {
+              if (cashbackResult.totalCashback > 0 && order.userId) {
                 const currentBalance = user?.walletBalance || 0;
                 const newBalance = currentBalance + cashbackResult.totalCashback;
 
@@ -460,7 +460,7 @@ export const getOrderDetails = query({
       });
     }
 
-    const user = await ctx.db.get(order.userId);
+    const user = order.userId ? await ctx.db.get(order.userId) : null;
 
     return {
       ...order,
@@ -675,8 +675,8 @@ export const refundToWallet = mutation({
       });
     }
 
-    const user = await ctx.db.get(order.userId);
-    if (!user) {
+    const user = order.userId ? await ctx.db.get(order.userId) : null;
+    if (!user || !order.userId) {
       throw new ConvexError({
         message: "User not found",
         code: "NOT_FOUND",

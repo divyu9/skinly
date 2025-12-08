@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, AlertTriangleIcon, FlaskConicalIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -476,14 +476,6 @@ function CheckoutPageInner() {
         // Order fully paid by wallet
         toast.success("Order placed successfully! Paid with wallet.");
         navigate(`/orders/${result.orderId}`);
-      } else if (formData.paymentMethod === "testing_prepaid") {
-        // Testing prepaid gateway - mark as paid and go directly to order page
-        await updatePaymentStatus({
-          merchantTransactionId: `TEST-${result.orderNumber}`,
-          paymentStatus: "success",
-        });
-        toast.success("Test order placed successfully! (No real payment processed)");
-        navigate(`/orders/${result.orderId}`);
       } else if (formData.paymentMethod === "phonepe") {
         // Show loading state immediately
         setIsRedirectingToPayment(true);
@@ -603,19 +595,6 @@ function CheckoutPageInner() {
       </header>
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Development Warning */}
-        <div className="mb-6 flex items-start gap-3 p-4 bg-amber-500/10 border-2 border-amber-500 rounded-lg">
-          <AlertTriangleIcon className="size-6 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <p className="font-bold text-amber-900 dark:text-amber-100 text-lg">
-              WARNING - WEBSITE UNDER DEVELOPMENT
-            </p>
-            <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-              This website is currently under development. All orders placed are treated as dummy orders for testing purposes only. No real transactions will be processed.
-            </p>
-          </div>
-        </div>
-
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2">
@@ -833,22 +812,6 @@ function CheckoutPageInner() {
                         </div>
                       </Label>
                     </div>
-
-                    <div className="flex items-center space-x-2 p-4 border-2 border-amber-500 rounded-lg hover:bg-amber-500/5 transition-colors bg-amber-500/5">
-                      <RadioGroupItem value="testing_prepaid" id="testing_prepaid" />
-                      <Label htmlFor="testing_prepaid" className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <FlaskConicalIcon className="size-4 text-amber-600" />
-                          <span className="font-medium">Testing Prepaid Gateway</span>
-                          <Badge variant="destructive" className="text-xs">
-                            FOR TESTING ONLY
-                          </Badge>
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Instantly confirms order without real payment processing
-                        </div>
-                      </Label>
-                    </div>
                     
                     {codAvailability?.available ? (
                       <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
@@ -871,16 +834,6 @@ function CheckoutPageInner() {
                             {codAvailability.prepaidAmount > 0
                               ? `Pay ₹${codAvailability.prepaidAmount.toFixed(0)} now, ₹${codAvailability.codAmount.toFixed(0)} on delivery`
                               : "Pay cash when your order is delivered"}
-                          </div>
-                        </Label>
-                      </div>
-                    ) : codAvailability?.showOption ? (
-                      <div className="flex items-center space-x-2 p-4 border rounded-lg opacity-50">
-                        <RadioGroupItem value="cod" id="cod" disabled />
-                        <Label htmlFor="cod" className="flex-1 cursor-not-allowed">
-                          <div className="font-medium">Cash on Delivery</div>
-                          <div className="text-sm text-muted-foreground">
-                            {codAvailability.reason || "Not available for this order"}
                           </div>
                         </Label>
                       </div>

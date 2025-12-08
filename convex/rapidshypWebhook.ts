@@ -110,7 +110,7 @@ export const processWebhookUpdate = internalMutation({
         await ctx.db.patch(order._id, { status: newOrderStatus });
 
         // Handle delivered status - credit cashback if not already done
-        if (newOrderStatus === "delivered" && !order.cashbackCredited && order.cashbackAmount) {
+        if (newOrderStatus === "delivered" && !order.cashbackCredited && order.cashbackAmount && order.userId) {
           const user = await ctx.db.get(order.userId);
           if (user) {
             const currentBalance = user.walletBalance || 0;

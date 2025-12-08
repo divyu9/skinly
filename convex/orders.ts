@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { calculateGST } from "./gst";
 import { internal, api } from "./_generated/api";
-import type { Id } from "./_generated/dataModel.d.ts";
+import type { Id, Doc } from "./_generated/dataModel.d.ts";
 
 // Create a new order (supports both authenticated and guest checkout)
 export const createOrder = mutation({
@@ -31,7 +31,7 @@ export const createOrder = mutation({
     const isGuest = !identity;
     
     let user: { _id: Id<"users">; name?: string; walletBalance?: number } | null = null;
-    let cartItems = [];
+    let cartItems: Doc<"cart">[] = [];
 
     if (isGuest) {
       // Guest checkout - require email and sessionId
@@ -71,12 +71,10 @@ export const createOrder = mutation({
       }
 
       // Get authenticated cart items
-      if (user) {
-        cartItems = await ctx.db
-          .query("cart")
-          .withIndex("by_user", (q) => q.eq("userId", user._id))
-          .collect();
-      }
+      cartItems = await ctx.db
+        .query("cart")
+        .withIndex("by_user", (q) => q.eq("userId", user!._id))
+        .collect();
     }
 
     if (cartItems.length === 0) {
@@ -155,13 +153,13 @@ export const createOrder = mutation({
 
       // Deduct from wallet
       const newWalletBalance = walletBalance - walletAmountUsed;
-      await ctx.db.patch(user._id, {
+      await ctx.db.patch(user!._id, {
         walletBalance: newWalletBalance,
       });
 
       // Record wallet transaction
       await ctx.db.insert("walletTransactions", {
-        userId: user._id,
+        userId: user!._id,
         transactionType: "debit",
         amount: walletAmountUsed,
         source: "order_payment",
@@ -237,7 +235,7 @@ export const createOrder = mutation({
     if (!isGuest && walletAmountUsed > 0 && user) {
       const walletTransaction = await ctx.db
         .query("walletTransactions")
-        .withIndex("by_user_and_created", (q) => q.eq("userId", user._id))
+        .withIndex("by_user_and_created", (q) => q.eq("userId", user!._id))
         .order("desc")
         .first();
       
@@ -258,7 +256,7 @@ export const createOrder = mutation({
     if (!isGuest && user) {
       const abandonedCarts = await ctx.db
         .query("abandonedCarts")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .withIndex("by_user", (q) => q.eq("userId", user!._id))
         .filter((q) =>
           q.or(
             q.eq(q.field("status"), "pending"),
@@ -636,8 +634,8 @@ export const updateOrderStatus = mutation({
           items: itemsForCashback,
         });
 
-        if (cashbackResult.totalCashback > 0) {
-          // Get the user
+        if (cashbackResult.totalCashback > 0 && order.userId) {
+          // Get the user (only for authenticated orders)
           const user = await ctx.db.get(order.userId);
           if (user) {
             const currentBalance = user.walletBalance || 0;
@@ -768,7 +766,7 @@ export const updatePaymentStatus = mutation({
     if (args.paymentStatus === "failed" && oldPaymentStatus !== "failed") {
       const walletAmountToRefund = order.walletAmountUsed || 0;
       
-      if (walletAmountToRefund > 0) {
+      if (walletAmountToRefund > 0 && order.userId) {
         const user = await ctx.db.get(order.userId);
         if (user) {
           const currentBalance = user.walletBalance || 0;
@@ -798,8 +796,8 @@ export const updatePaymentStatus = mutation({
     // Send WhatsApp notifications based on payment status change
     if (oldPaymentStatus !== args.paymentStatus) {
       try {
-        // Get user info for notification
-        const user = await ctx.db.get(order.userId);
+        // Get user info for notification (only for authenticated users)
+        const user = order.userId ? await ctx.db.get(order.userId) : null;
         
         if (args.paymentStatus === "success") {
           // Check if this is a partial COD order
