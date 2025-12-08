@@ -291,3 +291,50 @@ export const syncGuestCart = mutation({
     }
   },
 });
+
+// Sync guest cart items to database cart (for checkout)
+export const syncGuestCartToDb = mutation({
+  args: {
+    sessionId: v.string(),
+    guestCartItems: v.array(
+      v.object({
+        productId: v.string(),
+        productTitle: v.string(),
+        productImage: v.optional(v.string()),
+        variant: v.string(),
+        price: v.number(),
+        quantity: v.number(),
+        phoneModel: v.optional(v.string()),
+        phoneBrand: v.optional(v.string()),
+        coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    // Clear existing guest cart for this session
+    const existingItems = await ctx.db
+      .query("cart")
+      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+      .collect();
+    
+    for (const item of existingItems) {
+      await ctx.db.delete(item._id);
+    }
+
+    // Add guest cart items to database
+    for (const item of args.guestCartItems) {
+      await ctx.db.insert("cart", {
+        sessionId: args.sessionId,
+        productId: item.productId,
+        productTitle: item.productTitle,
+        productImage: item.productImage,
+        variant: item.variant,
+        price: item.price,
+        quantity: item.quantity,
+        phoneModel: item.phoneModel,
+        phoneBrand: item.phoneBrand,
+        coverage: item.coverage,
+      });
+    }
+  },
+});

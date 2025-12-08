@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
@@ -19,6 +19,8 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { useGuestCart } from "@/hooks/use-guest-cart.ts";
+import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 // PhonePe TypeScript declarations
@@ -35,10 +37,31 @@ declare global {
   }
 }
 
+// Generate or retrieve guest session ID
+function getGuestSessionId() {
+  const storageKey = "skinly_guest_session_id";
+  let sessionId = sessionStorage.getItem(storageKey);
+  
+  if (!sessionId) {
+    sessionId = `guest-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    sessionStorage.setItem(storageKey, sessionId);
+  }
+  
+  return sessionId;
+}
+
 function CheckoutPageInner() {
   const navigate = useNavigate();
   const convex = useConvex();
-  const cartItems = useQuery(api.cart.getCart);
+  const { user, isLoading: authLoading } = useAuth();
+  const isAuthenticated = !!user;
+  
+  // For authenticated users, use database cart
+  // For guests, use localStorage cart
+  const dbCartItems = useQuery(api.cart.getCart, isAuthenticated ? {} : "skip");
+  const { guestCart, clearGuestCart } = useGuestCart();
+  const syncGuestCartToDb = useMutation(api.cart.syncGuestCartToDb);
+  
   const createOrder = useMutation(api.orders.createOrder);
   const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
   const initiatePayment = useAction(api.phonepe.initiatePayment);
@@ -59,6 +82,7 @@ function CheckoutPageInner() {
   const [retryCount, setRetryCount] = useState(0);
   const [showPaymentVerificationFailed, setShowPaymentVerificationFailed] = useState(false);
   const maxRetries = 5; // 5 retries = ~10 seconds total
+  const [guestSessionId] = useState(() => getGuestSessionId());
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -71,6 +95,9 @@ function CheckoutPageInner() {
     pincode: "",
     paymentMethod: "phonepe",
   });
+
+  // Determine which cart to use
+  const cartItems = isAuthenticated ? dbCartItems : guestCart;
 
   // Reset OTP state when payment method changes away from COD
   const handlePaymentMethodChange = (value: string) => {
@@ -105,7 +132,7 @@ function CheckoutPageInner() {
   const isPhoneValid = formData.phone.length === 10;
 
   // Calculate totals and GST (before early returns)
-  const subtotal = cartItems ? cartItems.reduce(
+  const subtotal = (cartItems && cartItems.length > 0) ? cartItems.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0
   ) : 0;
@@ -117,11 +144,11 @@ function CheckoutPageInner() {
     : 0;
   const total = subtotal + shippingFee;
 
-  // Get wallet balance and max usage
-  const walletData = useQuery(api.wallet.getWalletBalance);
+  // Get wallet balance and max usage (only for authenticated users)
+  const walletData = useQuery(api.wallet.getWalletBalance, isAuthenticated ? {} : "skip");
   const walletMaxUsage = useQuery(
     api.wallet.calculateMaxWalletUsage,
-    { orderTotal: total }
+    isAuthenticated ? { orderTotal: total } : "skip"
   );
 
   // Check COD availability
@@ -160,7 +187,8 @@ function CheckoutPageInner() {
     return calculateGST(finalTotal, formData.state);
   }, [finalTotal, formData.state]);
 
-  if (cartItems === undefined) {
+  // Loading state
+  if (authLoading || (isAuthenticated && dbCartItems === undefined)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
@@ -237,7 +265,7 @@ function CheckoutPageInner() {
     );
   }
 
-  if (cartItems.length === 0 && !isRedirectingToPayment) {
+  if ((!cartItems || cartItems.length === 0) && !isRedirectingToPayment) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Empty>
@@ -367,7 +395,14 @@ function CheckoutPageInner() {
             setIsSubmitting(false);
             toast.success("Payment successful!");
             setTimeout(() => {
-              navigate(`/orders/${orderId}`);
+              // For guests with tracking token, use tracking page
+              const urlParams = new URLSearchParams(window.location.search);
+              const trackingToken = urlParams.get('trackingToken');
+              if (!isAuthenticated && trackingToken) {
+                navigate(`/orders/track?token=${trackingToken}`);
+              } else {
+                navigate(`/orders/${orderId}`);
+              }
             }, 300);
             return;
           } else if (phonepeStatus.paymentStatus === "failed") {
@@ -422,6 +457,12 @@ function CheckoutPageInner() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate email for guest users
+    if (!isAuthenticated && !formData.email) {
+      toast.error("Email is required for guest checkout");
+      return;
+    }
+    
     // Validate phone number
     if (!isPhoneValid) {
       toast.error("Please enter a valid 10-digit mobile number");
@@ -439,6 +480,13 @@ function CheckoutPageInner() {
     setShowPaymentVerificationFailed(false); // Reset failed state
 
     try {
+      // For guest users, sync cart to database first
+      if (!isAuthenticated && guestCart.length > 0) {
+        await syncGuestCartToDb({
+          sessionId: guestSessionId,
+          guestCartItems: guestCart,
+        });
+      }
       // Prepare COD fields
       let codFeeAmount = 0;
       let prepaidAmount = 0;
@@ -461,12 +509,20 @@ function CheckoutPageInner() {
           state: formData.state,
           pincode: formData.pincode,
         },
+        customerEmail: formData.email || undefined,
         paymentMethod: formData.paymentMethod,
         codFee: codFeeAmount,
         prepaidAmount,
         codAmount,
-        walletAmount: useWallet ? walletAmount : undefined,
+        walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
+        sessionId: !isAuthenticated ? guestSessionId : undefined,
+        guestEmail: !isAuthenticated ? formData.email : undefined,
       });
+
+      // Clear guest cart if successful
+      if (!isAuthenticated) {
+        clearGuestCart();
+      }
 
       // Handle payment based on method
       // Check if order was fully paid by wallet
@@ -474,8 +530,14 @@ function CheckoutPageInner() {
       
       if (remainingAmount === 0) {
         // Order fully paid by wallet
-        toast.success("Order placed successfully! Paid with wallet.");
-        navigate(`/orders/${result.orderId}`);
+        toast.success("Order placed successfully!");
+        
+        // For guests, navigate with tracking token
+        if (!isAuthenticated && result.trackingToken) {
+          navigate(`/orders/track?token=${result.trackingToken}`);
+        } else {
+          navigate(`/orders/${result.orderId}`);
+        }
       } else if (formData.paymentMethod === "phonepe") {
         // Show loading state immediately
         setIsRedirectingToPayment(true);
@@ -562,7 +624,13 @@ function CheckoutPageInner() {
         } else {
           // Full COD: Go directly to order page
           toast.success("Order placed successfully!");
-          navigate(`/orders/${result.orderId}`);
+          
+          // For guests, navigate with tracking token
+          if (!isAuthenticated && result.trackingToken) {
+            navigate(`/orders/track?token=${result.trackingToken}`);
+          } else {
+            navigate(`/orders/${result.orderId}`);
+          }
         }
       } else {
         // For other methods, go directly to order page
@@ -622,17 +690,24 @@ function CheckoutPageInner() {
                   </div>
 
                   <div>
-                    <Label htmlFor="email">Email Address</Label>
+                    <Label htmlFor="email">
+                      Email Address {!isAuthenticated && <span className="text-red-600">*</span>}
+                    </Label>
                     <Input
                       id="email"
                       type="email"
-                      required
+                      required={!isAuthenticated}
                       placeholder="john@example.com"
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
                     />
+                    {!isAuthenticated && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        We'll send your order confirmation and tracking link to this email
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -734,8 +809,30 @@ function CheckoutPageInner() {
                 </CardContent>
               </Card>
 
+              {/* Guest Checkout Notice */}
+              {!isAuthenticated && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                      <AlertCircleIcon className="size-5 text-blue-600 mt-0.5 shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-blue-900 dark:text-blue-100">
+                          Guest Checkout
+                        </p>
+                        <p className="text-blue-700 dark:text-blue-300 mt-1">
+                          You're checking out as a guest. We'll send your order confirmation to your email.
+                        </p>
+                        <p className="text-blue-700 dark:text-blue-300 mt-1">
+                          Want to track your orders easily? <Link to="/" className="underline font-medium">Sign in</Link> or create an account.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Wallet Payment */}
-              {walletBalance > 0 && walletMaxUsage?.canUseWallet && (
+              {isAuthenticated && walletBalance > 0 && walletMaxUsage?.canUseWallet && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -979,8 +1076,8 @@ function CheckoutPageInner() {
               <CardContent className="space-y-4">
                 {/* Items */}
                 <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {cartItems.map((item) => (
-                    <div key={item._id} className="flex gap-3">
+                  {cartItems && cartItems.map((item, index) => (
+                    <div key={('_id' in item ? String(item._id) : `${item.productId}-${item.variant}-${index}`)} className="flex gap-3">
                       {item.productImage && (
                         <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
                           <img
@@ -1127,34 +1224,5 @@ function CheckoutPageInner() {
 }
 
 export default function CheckoutPage() {
-  return (
-    <>
-      <Unauthenticated>
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <PackageIcon />
-              </EmptyMedia>
-              <EmptyTitle>Please sign in to checkout</EmptyTitle>
-              <EmptyDescription>
-                You need to be logged in to proceed with checkout
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <SignInButton />
-            </EmptyContent>
-          </Empty>
-        </div>
-      </Unauthenticated>
-      <AuthLoading>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <Skeleton className="h-96 w-full max-w-4xl" />
-        </div>
-      </AuthLoading>
-      <Authenticated>
-        <CheckoutPageInner />
-      </Authenticated>
-    </>
-  );
+  return <CheckoutPageInner />;
 }
