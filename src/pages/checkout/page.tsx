@@ -457,15 +457,47 @@ function CheckoutPageInner() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate email for guest users
-    if (!isAuthenticated && !formData.email) {
-      toast.error("Email is required for guest checkout");
+    // Validate all required fields
+    if (!formData.fullName.trim()) {
+      toast.error("Please enter your full name");
+      return;
+    }
+    
+    // Validate email for all users
+    if (!formData.email.trim()) {
+      toast.error("Email is required");
       return;
     }
     
     // Validate phone number
     if (!isPhoneValid) {
       toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
+    
+    // Validate address fields
+    if (!formData.addressLine1.trim()) {
+      toast.error("Please enter address line 1");
+      return;
+    }
+    
+    if (!formData.addressLine2.trim()) {
+      toast.error("Please enter address line 2");
+      return;
+    }
+    
+    if (!formData.city.trim()) {
+      toast.error("Please enter your city");
+      return;
+    }
+    
+    if (!formData.state.trim()) {
+      toast.error("Please enter your state");
+      return;
+    }
+    
+    if (!formData.pincode.trim()) {
+      toast.error("Please enter your pincode");
       return;
     }
     
@@ -690,24 +722,20 @@ function CheckoutPageInner() {
                   </div>
 
                   <div>
-                    <Label htmlFor="email">
-                      Email Address {!isAuthenticated && <span className="text-red-600">*</span>}
-                    </Label>
+                    <Label htmlFor="email">Email Address</Label>
                     <Input
                       id="email"
                       type="email"
-                      required={!isAuthenticated}
+                      required
                       placeholder="john@example.com"
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
                     />
-                    {!isAuthenticated && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        We'll send your order confirmation and tracking link to this email
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      We'll send your order confirmation and tracking link to this email
+                    </p>
                   </div>
 
                   <div>
@@ -748,22 +776,31 @@ function CheckoutPageInner() {
                       required
                       placeholder="House/Flat No., Building Name"
                       value={formData.addressLine1}
+                      maxLength={99}
                       onChange={(e) =>
                         setFormData({ ...formData, addressLine1: e.target.value })
                       }
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formData.addressLine1.length}/99 characters
+                    </p>
                   </div>
 
                   <div>
                     <Label htmlFor="addressLine2">Address Line 2</Label>
                     <Input
                       id="addressLine2"
+                      required
                       placeholder="Street, Area, Locality"
                       value={formData.addressLine2}
+                      maxLength={99}
                       onChange={(e) =>
                         setFormData({ ...formData, addressLine2: e.target.value })
                       }
                     />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formData.addressLine2.length}/99 characters
+                    </p>
                   </div>
 
                   <div className="grid sm:grid-cols-3 gap-4">

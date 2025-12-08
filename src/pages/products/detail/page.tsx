@@ -695,12 +695,32 @@ export default function ProductDetailPage() {
           </nav>
 
           <div className="pt-24 pb-20 px-4">
-            <div className="container mx-auto max-w-2xl text-center">
-              <PackageIcon className="size-16 text-muted-foreground mx-auto mb-4" />
-              <h1 className="text-3xl font-bold mb-4">Product Not Found</h1>
-              <Button asChild>
-                <Link to="/products">Browse All Products</Link>
-              </Button>
+            <div className="container mx-auto max-w-2xl text-center space-y-6">
+              <div className="flex justify-center">
+                <div className="size-20 rounded-full bg-muted flex items-center justify-center">
+                  <AlertTriangleIcon className="size-10 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold">Product Not Found</h1>
+                <p className="text-muted-foreground text-lg">
+                  Sorry, the product you're looking for doesn't exist or may have been removed.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+                <Button asChild size="lg">
+                  <Link to="/products">
+                    <PackageIcon className="size-4 mr-2" />
+                    Browse All Products
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg">
+                  <Link to="/">
+                    <ArrowLeftIcon className="size-4 mr-2" />
+                    Back to Home
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </div>
