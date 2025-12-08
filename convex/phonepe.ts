@@ -110,13 +110,14 @@ export const initiatePayment = action({
       // Convert amount to paise (minimum 100 paise = ₹1)
       const amountInPaise = Math.max(Math.round(args.amount * 100), 100);
 
+      // Get site URL from environment variable
+      const siteUrl = process.env.SITE_URL || "https://skinly.onhercules.app";
+      
       // Build payment request
       const payRequest = PhonePe.StandardCheckoutPayRequest.builder()
         .merchantOrderId(merchantTransactionId)
         .amount(amountInPaise)
-        .redirectUrl(
-          `${process.env.VITE_SITE_URL || "https://skinly.onhercules.app"}/payment/callback`
-        )
+        .redirectUrl(`${siteUrl}/payment/callback`)
         .mobileNumber(args.customerPhone.replace(/\D/g, ""))
         .build();
 
