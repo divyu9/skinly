@@ -6,40 +6,34 @@ import { ConvexError } from "convex/values";
 import { api } from "./_generated/api.js";
 
 // PhonePe SDK types (based on official docs)
+interface StandardCheckoutPayResponse {
+  state: string;
+  redirect_url: string;
+  order_id: string;
+  expire_at: string;
+}
+
 interface StandardCheckoutClient {
-  pay(request: unknown): Promise<{
-    success: boolean;
-    data?: {
-      instrumentResponse: {
-        redirectInfo: {
-          url: string;
-        };
-      };
-      merchantTransactionId: string;
-      transactionId: string;
-    };
-    message?: string;
-  }>;
-  getOrderStatus(merchantTransactionId: string): Promise<{
-    success: boolean;
-    data?: {
-      state: string;
-      transactionId: string;
-      responseCode: string;
-    };
-    message?: string;
+  pay(request: unknown): Promise<StandardCheckoutPayResponse>;
+  getOrderStatus(merchantOrderId: string): Promise<{
+    state: string;
+    order_id: string;
+    amount: number;
+    // ... other fields
   }>;
 }
 
 interface PhonePeSDK {
-  StandardCheckoutClient: new (
-    merchantId: string,
-    saltKey: string,
-    saltIndex: number,
-    environment: string
-  ) => StandardCheckoutClient;
+  StandardCheckoutClient: {
+    getInstance(
+      merchantId: string,
+      saltKey: string,
+      saltIndex: number,
+      environment: string
+    ): StandardCheckoutClient;
+  };
   StandardCheckoutPayRequest: {
-    builder(): PayRequestBuilder;
+    build_request(): PayRequestBuilder;
   };
 }
 
@@ -47,8 +41,7 @@ interface PayRequestBuilder {
   merchantOrderId(id: string): PayRequestBuilder;
   amount(amount: number): PayRequestBuilder;
   redirectUrl(url: string): PayRequestBuilder;
-  callbackUrl(url: string): PayRequestBuilder;
-  mobileNumber(number: string): PayRequestBuilder;
+  metaInfo(info: Record<string, string>): PayRequestBuilder;
   build(): unknown;
 }
 
@@ -70,7 +63,7 @@ function getPhonePeClient(): StandardCheckoutClient {
   // Dynamic import to avoid loading in V8 runtime
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const PhonePe = require("pg-sdk-node") as PhonePeSDK;
-  return new PhonePe.StandardCheckoutClient(
+  return PhonePe.StandardCheckoutClient.getInstance(
     merchantId,
     saltKey,
     parseInt(saltIndex),
@@ -113,32 +106,32 @@ export const initiatePayment = action({
       // Get site URL from environment variable
       const siteUrl = process.env.SITE_URL || "https://skinly.onhercules.app";
       
-      // Build payment request
-      const payRequest = PhonePe.StandardCheckoutPayRequest.builder()
+      // Build payment request (using build_request as per official docs)
+      const payRequest = PhonePe.StandardCheckoutPayRequest.build_request()
         .merchantOrderId(merchantTransactionId)
         .amount(amountInPaise)
         .redirectUrl(`${siteUrl}/payment/callback`)
-        .mobileNumber(args.customerPhone.replace(/\D/g, ""))
         .build();
 
       // Initiate payment
       const response = await client.pay(payRequest);
 
-      if (!response.success || !response.data) {
+      // Response structure: { state, redirect_url, order_id, expire_at }
+      if (!response || !response.redirect_url) {
         throw new ConvexError({
-          message: response.message || "Failed to initiate payment",
+          message: "Failed to initiate payment - no redirect URL received",
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
-      const paymentUrl = response.data.instrumentResponse.redirectInfo.url;
-      const transactionId = response.data.transactionId;
+      const paymentUrl = response.redirect_url;
+      const orderId = response.order_id;
 
       // Update order with payment details
       await ctx.runMutation(api.orders.updatePaymentDetails, {
         orderId: args.orderId,
         phonepeMerchantTransactionId: merchantTransactionId,
-        phonepeTransactionId: transactionId,
+        phonepeTransactionId: orderId,
         phonepePaymentUrl: paymentUrl,
       });
 
@@ -146,7 +139,7 @@ export const initiatePayment = action({
         success: true,
         paymentUrl,
         merchantTransactionId,
-        transactionId,
+        transactionId: orderId,
       };
     } catch (error) {
       if (error instanceof ConvexError) {
@@ -173,14 +166,14 @@ export const checkPaymentStatus = action({
       const client = getPhonePeClient();
       const response = await client.getOrderStatus(args.merchantTransactionId);
 
-      if (!response.success || !response.data) {
+      if (!response || !response.state) {
         throw new ConvexError({
-          message: response.message || "Failed to check payment status",
+          message: "Failed to check payment status",
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
-      const { state, transactionId, responseCode } = response.data;
+      const { state, order_id } = response;
 
       // Map PhonePe states to our payment status
       const paymentStatus =
@@ -194,8 +187,8 @@ export const checkPaymentStatus = action({
         success: true,
         paymentStatus,
         state,
-        transactionId,
-        responseCode,
+        transactionId: order_id,
+        responseCode: state,
       };
     } catch (error) {
       if (error instanceof ConvexError) {
