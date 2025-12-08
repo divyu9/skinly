@@ -4,9 +4,10 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { api } from "./_generated/api.js";
+import crypto from "crypto";
 
-// Initialize PhonePe client
-function getPhonePeClient() {
+// PhonePe API Configuration
+function getPhonePeConfig() {
   const merchantId = process.env.PHONEPE_MERCHANT_ID;
   const saltKey = process.env.PHONEPE_SALT_KEY;
   const saltIndex = process.env.PHONEPE_SALT_INDEX;
@@ -20,22 +21,35 @@ function getPhonePeClient() {
     });
   }
 
-  // Dynamic import to avoid loading in V8 runtime
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { StandardCheckoutClient, Env } = require("pg-sdk-node");
-  
-  // Use Env enum for environment
-  const env = environment === "PRODUCTION" ? Env.PRODUCTION : Env.SANDBOX;
-  
-  return StandardCheckoutClient.getInstance(
+  const baseUrl =
+    environment === "PRODUCTION"
+      ? "https://api.phonepe.com/apis/hermes"
+      : "https://api-preprod.phonepe.com/apis/pg-sandbox";
+
+  return {
     merchantId,
     saltKey,
-    parseInt(saltIndex),
-    env
-  );
+    saltIndex: parseInt(saltIndex),
+    baseUrl,
+  };
 }
 
-// Initiate payment with PhonePe
+// Generate X-VERIFY header
+function generateXVerifyHeader(
+  base64Payload: string,
+  endpoint: string,
+  saltKey: string,
+  saltIndex: number
+): string {
+  const stringToHash = base64Payload + endpoint + saltKey;
+  const sha256Hash = crypto
+    .createHash("sha256")
+    .update(stringToHash)
+    .digest("hex");
+  return `${sha256Hash}###${saltIndex}`;
+}
+
+// Initiate payment with PhonePe REST API
 export const initiatePayment = action({
   args: {
     orderId: v.id("orders"),
@@ -57,9 +71,7 @@ export const initiatePayment = action({
         });
       }
 
-      const client = getPhonePeClient();
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { StandardCheckoutPayRequest, MetaInfo } = require("pg-sdk-node");
+      const config = getPhonePeConfig();
 
       // Generate merchant transaction ID
       const merchantTransactionId = `TXN-${args.orderNumber}-${Date.now()}`;
@@ -69,40 +81,87 @@ export const initiatePayment = action({
 
       // Get site URL from environment variable
       const siteUrl = process.env.SITE_URL || "https://skinly.onhercules.app";
-      
-      // Build MetaInfo (optional but recommended)
-      const metaInfo = MetaInfo.builder()
-        .udf1(args.orderNumber)
-        .udf2(args.orderId)
-        .build();
-      
-      // Build payment request (using builder() as per official docs)
-      const payRequest = StandardCheckoutPayRequest.builder()
-        .merchantOrderId(merchantTransactionId)
-        .amount(amountInPaise)
-        .redirectUrl(`${siteUrl}/payment/callback`)
-        .metaInfo(metaInfo)
-        .build();
 
-      // Initiate payment
-      const response = await client.pay(payRequest);
+      // Build the payment request payload
+      const payload = {
+        merchantId: config.merchantId,
+        merchantTransactionId: merchantTransactionId,
+        merchantUserId: args.customerPhone.replace("+", ""),
+        amount: amountInPaise,
+        redirectUrl: `${siteUrl}/payment/callback`,
+        redirectMode: "POST",
+        callbackUrl: `${siteUrl}/payment/callback`,
+        mobileNumber: args.customerPhone.replace("+", ""),
+        paymentInstrument: {
+          type: "PAY_PAGE",
+        },
+      };
 
-      // Response structure: { state, redirectUrl, orderId, expireAt }
-      if (!response || !response.redirectUrl) {
+      // Base64 encode the payload
+      const base64Payload = Buffer.from(JSON.stringify(payload)).toString(
+        "base64"
+      );
+
+      // Generate X-VERIFY header
+      const endpoint = "/pg/v1/pay";
+      const xVerify = generateXVerifyHeader(
+        base64Payload,
+        endpoint,
+        config.saltKey,
+        config.saltIndex
+      );
+
+      console.log("PhonePe Payment Request:", {
+        merchantId: config.merchantId,
+        merchantTransactionId,
+        amount: amountInPaise,
+        endpoint: `${config.baseUrl}${endpoint}`,
+      });
+
+      // Make the API request
+      const response = await fetch(`${config.baseUrl}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-VERIFY": xVerify,
+          accept: "application/json",
+        },
+        body: JSON.stringify({
+          request: base64Payload,
+        }),
+      });
+
+      const responseData = await response.json();
+
+      console.log("PhonePe API Response:", {
+        status: response.status,
+        success: responseData.success,
+        code: responseData.code,
+        message: responseData.message,
+      });
+
+      if (!response.ok || !responseData.success) {
         throw new ConvexError({
-          message: "Failed to initiate payment - no redirect URL received",
+          message: responseData.message || "Failed to initiate payment",
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
-      const paymentUrl = response.redirectUrl;
-      const orderId = response.orderId;
+      const data = responseData.data;
+      const paymentUrl = data.instrumentResponse?.redirectInfo?.url;
+
+      if (!paymentUrl) {
+        throw new ConvexError({
+          message: "No payment URL received from PhonePe",
+          code: "EXTERNAL_SERVICE_ERROR",
+        });
+      }
 
       // Update order with payment details
       await ctx.runMutation(api.orders.updatePaymentDetails, {
         orderId: args.orderId,
         phonepeMerchantTransactionId: merchantTransactionId,
-        phonepeTransactionId: orderId,
+        phonepeTransactionId: merchantTransactionId,
         phonepePaymentUrl: paymentUrl,
       });
 
@@ -110,7 +169,7 @@ export const initiatePayment = action({
         success: true,
         paymentUrl,
         merchantTransactionId,
-        transactionId: orderId,
+        transactionId: merchantTransactionId,
       };
     } catch (error) {
       if (error instanceof ConvexError) {
@@ -127,24 +186,47 @@ export const initiatePayment = action({
   },
 });
 
-// Check payment status
+// Check payment status using REST API
 export const checkPaymentStatus = action({
   args: {
     merchantTransactionId: v.string(),
   },
   handler: async (ctx, args) => {
     try {
-      const client = getPhonePeClient();
-      const response = await client.getOrderStatus(args.merchantTransactionId);
+      const config = getPhonePeConfig();
 
-      if (!response || !response.state) {
+      // Build the status check endpoint
+      const endpoint = `/pg/v1/status/${config.merchantId}/${args.merchantTransactionId}`;
+
+      // Generate X-VERIFY header (for status check, no payload)
+      const xVerify = generateXVerifyHeader(
+        "",
+        endpoint,
+        config.saltKey,
+        config.saltIndex
+      );
+
+      // Make the API request
+      const response = await fetch(`${config.baseUrl}${endpoint}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "X-VERIFY": xVerify,
+          accept: "application/json",
+        },
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok || !responseData.success) {
         throw new ConvexError({
-          message: "Failed to check payment status",
+          message: responseData.message || "Failed to check payment status",
           code: "EXTERNAL_SERVICE_ERROR",
         });
       }
 
-      const { state, orderId } = response;
+      const data = responseData.data;
+      const state = data.state;
 
       // Map PhonePe states to our payment status
       const paymentStatus =
@@ -158,8 +240,8 @@ export const checkPaymentStatus = action({
         success: true,
         paymentStatus,
         state,
-        transactionId: orderId,
-        responseCode: state,
+        transactionId: args.merchantTransactionId,
+        responseCode: data.responseCode || state,
       };
     } catch (error) {
       if (error instanceof ConvexError) {
