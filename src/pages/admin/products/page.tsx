@@ -1353,7 +1353,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                             >
                               <ImagesIcon className="size-3" />
                             </Button>
-                            <Link to={`/admin/products/${product._id}`}>
+                            <Link to={`/backend-skinly/products/${product._id}`}>
                               <Button size="sm" variant="outline">
                                 <EditIcon className="size-3" />
                               </Button>

@@ -59,6 +59,7 @@ import type * as rollsManagement from "../rollsManagement.js";
 import type * as runMigration from "../runMigration.js";
 import type * as seedModels from "../seedModels.js";
 import type * as settings from "../settings.js";
+import type * as shipping from "../shipping.js";
 import type * as shopify from "../shopify.js";
 import type * as sitemap from "../sitemap.js";
 import type * as stockNotifications from "../stockNotifications.js";
@@ -137,6 +138,7 @@ declare const fullApi: ApiFromModules<{
   runMigration: typeof runMigration;
   seedModels: typeof seedModels;
   settings: typeof settings;
+  shipping: typeof shipping;
   shopify: typeof shopify;
   sitemap: typeof sitemap;
   stockNotifications: typeof stockNotifications;

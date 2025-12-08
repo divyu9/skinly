@@ -64,7 +64,19 @@ export const createOrder = mutation({
       (sum, item) => sum + item.price * item.quantity,
       0
     );
-    const shippingFee = subtotal > 500 ? 0 : 50; // Free shipping over ₹500
+    // Get shipping settings from database
+    const freeThresholdSetting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "shipping_free_threshold"))
+      .first();
+    const flatFeeSetting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "shipping_flat_fee"))
+      .first();
+    
+    const freeShippingThreshold = (freeThresholdSetting?.value as number) ?? 500;
+    const flatShippingFee = (flatFeeSetting?.value as number) ?? 50;
+    const shippingFee = subtotal >= freeShippingThreshold ? 0 : flatShippingFee;
     let total = subtotal + shippingFee;
 
     // Handle wallet payment

@@ -105,7 +105,12 @@ function CheckoutPageInner() {
     (sum, item) => sum + item.price * item.quantity,
     0
   ) : 0;
-  const shippingFee = subtotal > 500 ? 0 : 50;
+  
+  // Get shipping settings from backend
+  const shippingSettings = useQuery(api.shipping.getShippingSettings);
+  const shippingFee = shippingSettings 
+    ? (subtotal >= shippingSettings.freeShippingThreshold ? 0 : shippingSettings.flatShippingFee)
+    : 0;
   const total = subtotal + shippingFee;
 
   // Get wallet balance and max usage
@@ -972,9 +977,9 @@ function CheckoutPageInner() {
                       <span className="text-green-600 font-medium">-₹{walletAmount.toFixed(0)}</span>
                     </div>
                   )}
-                  {subtotal <= 500 && (
+                  {shippingSettings && subtotal < shippingSettings.freeShippingThreshold && (
                     <p className="text-xs text-muted-foreground">
-                      Add ₹{(501 - subtotal).toFixed(0)} more for free shipping
+                      Add ₹{(shippingSettings.freeShippingThreshold - subtotal + 1).toFixed(0)} more for free shipping
                     </p>
                   )}
                 </div>
