@@ -309,16 +309,26 @@ export const checkPaymentStatus = action({
 
       const data = responseData.data;
       const code = data?.responseCode || responseData.code || "UNKNOWN";
+      const state = data?.state || "UNKNOWN";
 
-      // Map PhonePe response codes to payment status
+      // Map PhonePe response codes and state to payment status
+      // Check both responseCode and state fields for better compatibility
       const paymentStatus =
-        code === "PAYMENT_SUCCESS"
+        code === "PAYMENT_SUCCESS" || code === "SUCCESS" || state === "COMPLETED"
           ? "success"
           : code === "PAYMENT_ERROR" ||
               code === "PAYMENT_DECLINED" ||
-              code === "PAYMENT_CANCELLED"
+              code === "PAYMENT_CANCELLED" ||
+              state === "FAILED" ||
+              state === "CANCELLED"
             ? "failed"
             : "pending";
+
+      console.log("Payment status mapping:", {
+        code,
+        state,
+        mappedStatus: paymentStatus,
+      });
 
       // Update order payment status in database (for success or failed, not pending)
       if (paymentStatus === "success" || paymentStatus === "failed") {
