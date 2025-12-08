@@ -359,6 +359,7 @@ export default function ProductDetailPage() {
   const [selectedVariant, setSelectedVariant] = useState<number>(0);
   const [selectedCoverage, setSelectedCoverage] = useState<"only_back" | "full_body_wrap">("only_back");
   const [isAdding, setIsAdding] = useState(false);
+  const [isBuyingNow, setIsBuyingNow] = useState(false);
   
   const isLoading = productData === undefined;
   const product = productData;
@@ -443,6 +444,77 @@ export default function ProductDetailPage() {
       }
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const handleBuyNow = async () => {
+    if (!product) return;
+    // Only require phoneModel for phone skins
+    if (isPhoneSkin && !phoneModel) {
+      toast.error("Please select your phone model first");
+      return;
+    }
+    
+    setIsBuyingNow(true);
+    
+    try {
+      const cartItem = {
+        productId: product._id,
+        productTitle: product.title,
+        productImage: displayImages[0]?.url || product.images[0]?.url,
+        variant: product.variants[selectedVariant].title,
+        price: product.variants[selectedVariant].price,
+        quantity: 1,
+        phoneModel: phoneModel || undefined,
+        phoneBrand: phoneBrand || undefined,
+        coverage: isPhoneSkin ? selectedCoverage : undefined,
+      };
+      
+      if (user) {
+        await addToCart(cartItem);
+      } else {
+        addToGuestCart(cartItem);
+      }
+      
+      // Track add to cart event
+      trackAddToCart(
+        product._id,
+        `${product.title} - ${product.variants[selectedVariant].title}`,
+        product.variants[selectedVariant].price,
+        1
+      );
+      
+      // Navigate to checkout immediately
+      navigate("/checkout");
+    } catch (error) {
+      if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
+        addToGuestCart({
+          productId: product._id,
+          productTitle: product.title,
+          productImage: displayImages[0]?.url || product.images[0]?.url,
+          variant: product.variants[selectedVariant].title,
+          price: product.variants[selectedVariant].price,
+          quantity: 1,
+          phoneModel: phoneModel || undefined,
+          phoneBrand: phoneBrand || undefined,
+          coverage: isPhoneSkin ? selectedCoverage : undefined,
+        });
+        
+        // Track add to cart event
+        trackAddToCart(
+          product._id,
+          `${product.title} - ${product.variants[selectedVariant].title}`,
+          product.variants[selectedVariant].price,
+          1
+        );
+        
+        // Navigate to checkout immediately
+        navigate("/checkout");
+      } else {
+        toast.error("Failed to add to cart");
+      }
+    } finally {
+      setIsBuyingNow(false);
     }
   };
 
@@ -913,30 +985,42 @@ export default function ProductDetailPage() {
                 </div>
               )}
               
-              {/* Add to Cart or Out of Stock Notification */}
+              {/* Add to Cart and Buy Now buttons */}
               {productData.variants[selectedVariant].inventoryQuantity > 0 ? (
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={() => {
-                    // Only require phone model for phone skins
-                    if (isPhoneSkin && !phoneModel) {
-                      toast.error("Please select your phone model first");
-                      return;
-                    }
-                    
-                    // Show cross-sell dialog if products available, otherwise add directly
-                    if (crossSellProducts && crossSellProducts.length > 0) {
-                      setCrossSellDialogOpen(true);
-                    } else {
-                      handleAddToCart();
-                    }
-                  }}
-                  disabled={isAdding || (isPhoneSkin && !phoneModel)}
-                >
-                  <ShoppingCartIcon className="size-5 mr-2" />
-                  {isAdding ? "Adding..." : "Add to Cart"}
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    className="flex-1"
+                    size="lg"
+                    variant="outline"
+                    onClick={() => {
+                      // Only require phone model for phone skins
+                      if (isPhoneSkin && !phoneModel) {
+                        toast.error("Please select your phone model first");
+                        return;
+                      }
+                      
+                      // Show cross-sell dialog if products available, otherwise add directly
+                      if (crossSellProducts && crossSellProducts.length > 0) {
+                        setCrossSellDialogOpen(true);
+                      } else {
+                        handleAddToCart();
+                      }
+                    }}
+                    disabled={isAdding || isBuyingNow || (isPhoneSkin && !phoneModel)}
+                  >
+                    <ShoppingCartIcon className="size-5 mr-2" />
+                    {isAdding ? "Adding..." : "Add to Cart"}
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    size="lg"
+                    onClick={handleBuyNow}
+                    disabled={isAdding || isBuyingNow || (isPhoneSkin && !phoneModel)}
+                  >
+                    <ZapIcon className="size-5 mr-2" />
+                    {isBuyingNow ? "Processing..." : "Buy Now"}
+                  </Button>
+                </div>
               ) : (
                 <StockNotification
                   variantId={productData.variants[selectedVariant]._id}
