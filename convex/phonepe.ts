@@ -117,9 +117,6 @@ export const initiatePayment = action({
         .redirectUrl(
           `${process.env.VITE_SITE_URL || "https://skinly.onhercules.app"}/payment/callback`
         )
-        .callbackUrl(
-          `${process.env.VITE_SITE_URL || "https://skinly.onhercules.app"}/api/phonepe/webhook`
-        )
         .mobileNumber(args.customerPhone.replace(/\D/g, ""))
         .build();
 
