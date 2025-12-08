@@ -4,19 +4,17 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
 import { api } from "./_generated/api.js";
-import crypto from "crypto";
 
 // PhonePe API Configuration
 function getPhonePeConfig() {
   const merchantId = process.env.PHONEPE_MERCHANT_ID;
   const saltKey = process.env.PHONEPE_SALT_KEY;
-  const saltIndex = process.env.PHONEPE_SALT_INDEX;
   const environment = process.env.PHONEPE_ENVIRONMENT || "SANDBOX";
 
-  if (!merchantId || !saltKey || !saltIndex) {
+  if (!merchantId || !saltKey) {
     throw new ConvexError({
       message:
-        "PhonePe credentials not configured. Please add PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY, and PHONEPE_SALT_INDEX in Secrets tab.",
+        "PhonePe credentials not configured. Please add PHONEPE_MERCHANT_ID and PHONEPE_SALT_KEY in Secrets tab.",
       code: "BAD_REQUEST",
     });
   }
@@ -29,27 +27,43 @@ function getPhonePeConfig() {
   return {
     merchantId,
     saltKey,
-    saltIndex: parseInt(saltIndex),
     baseUrl,
   };
 }
 
-// Generate X-VERIFY header
-function generateXVerifyHeader(
-  base64Payload: string,
-  endpoint: string,
+// Generate OAuth access token for Standard Checkout v2
+async function getAccessToken(
+  merchantId: string,
   saltKey: string,
-  saltIndex: number
-): string {
-  const stringToHash = base64Payload + endpoint + saltKey;
-  const sha256Hash = crypto
-    .createHash("sha256")
-    .update(stringToHash)
-    .digest("hex");
-  return `${sha256Hash}###${saltIndex}`;
+  baseUrl: string
+): Promise<string> {
+  const tokenEndpoint = `${baseUrl}/v1/oauth/token`;
+
+  const response = await fetch(tokenEndpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      clientId: merchantId,
+      clientSecret: saltKey,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.accessToken) {
+    console.error("Token generation failed:", data);
+    throw new ConvexError({
+      message: data.message || "Failed to generate access token",
+      code: "EXTERNAL_SERVICE_ERROR",
+    });
+  }
+
+  return data.accessToken;
 }
 
-// Initiate payment with PhonePe REST API
+// Initiate payment with PhonePe Standard Checkout v2
 export const initiatePayment = action({
   args: {
     orderId: v.id("orders"),
@@ -73,10 +87,16 @@ export const initiatePayment = action({
 
       const config = getPhonePeConfig();
 
-      // Generate merchant transaction ID (max 38 chars)
-      // Format: orderNumber + last 6 digits of timestamp
-      const timestamp = Date.now().toString().slice(-6);
-      const merchantTransactionId = `${args.orderNumber}-${timestamp}`;
+      // Step 1: Get OAuth access token
+      console.log("Getting PhonePe access token...");
+      const accessToken = await getAccessToken(
+        config.merchantId,
+        config.saltKey,
+        config.baseUrl
+      );
+
+      // Generate merchant order ID (max 63 chars for Standard Checkout)
+      const merchantOrderId = args.orderNumber;
 
       // Convert amount to paise (minimum 100 paise = ₹1)
       const amountInPaise = Math.max(Math.round(args.amount * 100), 100);
@@ -84,53 +104,36 @@ export const initiatePayment = action({
       // Get site URL from environment variable
       const siteUrl = process.env.SITE_URL || "https://skinly.onhercules.app";
 
-      // Build the payment request payload
+      // Step 2: Build the Standard Checkout v2 payment request
       const payload = {
-        merchantId: config.merchantId,
-        merchantTransactionId: merchantTransactionId,
-        merchantUserId: args.customerPhone.replace("+", ""),
+        merchantOrderId: merchantOrderId,
         amount: amountInPaise,
-        redirectUrl: `${siteUrl}/payment/callback`,
-        redirectMode: "POST",
-        callbackUrl: `${siteUrl}/payment/callback`,
-        mobileNumber: args.customerPhone.replace("+", ""),
-        paymentInstrument: {
-          type: "PAY_PAGE",
+        expireAfter: 1200, // 20 minutes expiry
+        paymentFlow: {
+          type: "PG_CHECKOUT",
+          merchantUrls: {
+            redirectUrl: `${siteUrl}/payment/callback`,
+          },
         },
       };
 
-      // Base64 encode the payload
-      const base64Payload = Buffer.from(JSON.stringify(payload)).toString(
-        "base64"
-      );
-
-      // Generate X-VERIFY header
       const endpoint = "/checkout/v2/pay";
-      const xVerify = generateXVerifyHeader(
-        base64Payload,
-        endpoint,
-        config.saltKey,
-        config.saltIndex
-      );
 
       console.log("PhonePe Payment Request:", {
-        merchantId: config.merchantId,
-        merchantTransactionId,
+        merchantOrderId,
         amount: amountInPaise,
         endpoint: `${config.baseUrl}${endpoint}`,
       });
 
-      // Make the API request
+      // Make the API request with Bearer token
       const response = await fetch(`${config.baseUrl}${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-VERIFY": xVerify,
+          Authorization: `Bearer ${accessToken}`,
           accept: "application/json",
         },
-        body: JSON.stringify({
-          request: base64Payload,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const responseData = await response.json();
@@ -138,7 +141,6 @@ export const initiatePayment = action({
       console.log("PhonePe API Response:", {
         status: response.status,
         success: responseData.success,
-        code: responseData.code,
         message: responseData.message,
       });
 
@@ -150,7 +152,7 @@ export const initiatePayment = action({
       }
 
       const data = responseData.data;
-      const paymentUrl = data.instrumentResponse?.redirectInfo?.url;
+      const paymentUrl = data.redirectUrl;
 
       if (!paymentUrl) {
         throw new ConvexError({
@@ -162,16 +164,16 @@ export const initiatePayment = action({
       // Update order with payment details
       await ctx.runMutation(api.orders.updatePaymentDetails, {
         orderId: args.orderId,
-        phonepeMerchantTransactionId: merchantTransactionId,
-        phonepeTransactionId: merchantTransactionId,
+        phonepeMerchantTransactionId: merchantOrderId,
+        phonepeTransactionId: merchantOrderId,
         phonepePaymentUrl: paymentUrl,
       });
 
       return {
         success: true,
         paymentUrl,
-        merchantTransactionId,
-        transactionId: merchantTransactionId,
+        merchantTransactionId: merchantOrderId,
+        transactionId: merchantOrderId,
       };
     } catch (error) {
       if (error instanceof ConvexError) {
@@ -188,7 +190,7 @@ export const initiatePayment = action({
   },
 });
 
-// Check payment status using REST API
+// Check payment status using Standard Checkout v2
 export const checkPaymentStatus = action({
   args: {
     merchantTransactionId: v.string(),
@@ -197,23 +199,22 @@ export const checkPaymentStatus = action({
     try {
       const config = getPhonePeConfig();
 
-      // Build the status check endpoint
-      const endpoint = `/checkout/v2/order/${config.merchantId}/${args.merchantTransactionId}/status`;
-
-      // Generate X-VERIFY header (for status check, no payload)
-      const xVerify = generateXVerifyHeader(
-        "",
-        endpoint,
+      // Get OAuth access token
+      const accessToken = await getAccessToken(
+        config.merchantId,
         config.saltKey,
-        config.saltIndex
+        config.baseUrl
       );
 
-      // Make the API request
+      // Build the status check endpoint
+      const endpoint = `/checkout/v2/order/${args.merchantTransactionId}/status`;
+
+      // Make the API request with Bearer token
       const response = await fetch(`${config.baseUrl}${endpoint}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "X-VERIFY": xVerify,
+          Authorization: `Bearer ${accessToken}`,
           accept: "application/json",
         },
       });
