@@ -177,6 +177,32 @@ export default function AdminCOD() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      console.log("Saving COD settings with data:", {
+        enabled,
+        matchMode,
+        productIdsEnabled,
+        productIds: selectedProductIds,
+        collectionIdsEnabled,
+        collectionIds: selectedCollectionIds,
+        variantIdsEnabled,
+        variantIds: selectedVariantIds,
+        minOrderAmountEnabled,
+        minOrderAmount,
+        maxOrderAmountEnabled,
+        maxOrderAmount,
+        minProductCountEnabled,
+        minProductCount,
+        maxProductCountEnabled,
+        maxProductCount,
+        codFeeType,
+        codFeeValue,
+        partialCodEnabled,
+        prepaidType,
+        prepaidValue,
+        showCodOnPaymentPage,
+        allowMixedCartCod,
+      });
+      
       await updateSettings({
         enabled,
         matchMode,
@@ -204,8 +230,9 @@ export default function AdminCOD() {
       });
       toast.success("COD settings saved successfully");
     } catch (error) {
-      toast.error("Failed to save COD settings");
-      console.error(error);
+      console.error("Error saving COD settings:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      toast.error(`Failed to save COD settings: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
