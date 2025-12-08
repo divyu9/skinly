@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation, useAction, useConvex } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -19,9 +19,25 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
+// PhonePe TypeScript declarations
+declare global {
+  interface Window {
+    PhonePeCheckout?: {
+      transact: (config: {
+        tokenUrl: string;
+        callback: (response: 'USER_CANCEL' | 'CONCLUDED') => void;
+        type: 'IFRAME';
+      }) => void;
+      closePage: () => void;
+    };
+  }
+}
 
 function CheckoutPageInner() {
   const navigate = useNavigate();
+  const convex = useConvex();
   const cartItems = useQuery(api.cart.getCart);
   const createOrder = useMutation(api.orders.createOrder);
   const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
@@ -37,6 +53,8 @@ function CheckoutPageInner() {
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
+  const [currentMerchantTxnId, setCurrentMerchantTxnId] = useState<string | null>(null);
+  const [currentOrderId, setCurrentOrderId] = useState<Id<"orders"> | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -210,6 +228,68 @@ function CheckoutPageInner() {
     }
   };
 
+  // PhonePe iframe callback handler
+  const handlePhonePeCallback = async (response: 'USER_CANCEL' | 'CONCLUDED') => {
+    console.log("PhonePe callback received:", response);
+    
+    if (response === 'USER_CANCEL') {
+      // User cancelled payment
+      setIsRedirectingToPayment(false);
+      setIsSubmitting(false);
+      toast.error("Payment cancelled");
+      return;
+    }
+    
+    if (response === 'CONCLUDED') {
+      // Payment completed (could be success or failure)
+      // Check database for order status
+      if (!currentMerchantTxnId || !currentOrderId) {
+        console.error("Missing transaction ID or order ID");
+        toast.error("Unable to verify payment");
+        setIsRedirectingToPayment(false);
+        setIsSubmitting(false);
+        return;
+      }
+      
+      try {
+        console.log("Checking payment status from database...");
+        const order = await convex.query(api.orders.getOrderByMerchantTransaction, {
+          merchantTransactionId: currentMerchantTxnId,
+        });
+        
+        if (order) {
+          console.log("Order found, payment status:", order.paymentStatus);
+          
+          if (order.paymentStatus === "success") {
+            toast.success("Payment successful!");
+            // Small delay for better UX
+            setTimeout(() => {
+              navigate(`/orders/${order._id}`);
+            }, 500);
+          } else if (order.paymentStatus === "failed") {
+            toast.error("Payment failed. Please try again.");
+            setIsRedirectingToPayment(false);
+            setIsSubmitting(false);
+          } else {
+            // Still pending, retry after delay
+            console.log("Payment still pending, retrying...");
+            setTimeout(() => handlePhonePeCallback('CONCLUDED'), 2000);
+          }
+        } else {
+          console.error("Order not found in database");
+          toast.error("Unable to verify payment");
+          setIsRedirectingToPayment(false);
+          setIsSubmitting(false);
+        }
+      } catch (error) {
+        console.error("Error checking payment status:", error);
+        toast.error("Unable to verify payment. Please check your orders page.");
+        setIsRedirectingToPayment(false);
+        setIsSubmitting(false);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -285,8 +365,24 @@ function CheckoutPageInner() {
         });
 
         if (paymentResult.success && paymentResult.paymentUrl) {
-          // Redirect to PhonePe payment page
-          window.location.href = paymentResult.paymentUrl;
+          // Store transaction details for callback
+          setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
+          setCurrentOrderId(result.orderId);
+          
+          // Check if PhonePe SDK is loaded
+          if (!window.PhonePeCheckout) {
+            console.error("PhonePe SDK not loaded");
+            toast.error("Payment service not available. Please refresh and try again.");
+            setIsRedirectingToPayment(false);
+            return;
+          }
+          
+          // Open PhonePe payment in iframe
+          window.PhonePeCheckout.transact({
+            tokenUrl: paymentResult.paymentUrl,
+            callback: handlePhonePeCallback,
+            type: "IFRAME"
+          });
         } else {
           setIsRedirectingToPayment(false);
           throw new Error("Failed to initiate payment");
@@ -306,8 +402,24 @@ function CheckoutPageInner() {
           });
 
           if (paymentResult.success && paymentResult.paymentUrl) {
-            // Redirect to PhonePe payment page
-            window.location.href = paymentResult.paymentUrl;
+            // Store transaction details for callback
+            setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
+            setCurrentOrderId(result.orderId);
+            
+            // Check if PhonePe SDK is loaded
+            if (!window.PhonePeCheckout) {
+              console.error("PhonePe SDK not loaded");
+              toast.error("Payment service not available. Please refresh and try again.");
+              setIsRedirectingToPayment(false);
+              return;
+            }
+            
+            // Open PhonePe payment in iframe
+            window.PhonePeCheckout.transact({
+              tokenUrl: paymentResult.paymentUrl,
+              callback: handlePhonePeCallback,
+              type: "IFRAME"
+            });
           } else {
             setIsRedirectingToPayment(false);
             throw new Error("Failed to initiate prepaid payment");
@@ -745,12 +857,12 @@ function CheckoutPageInner() {
                 {isRedirectingToPayment ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="size-4" />
-                    Redirecting to payment...
+                    Processing payment...
                   </span>
                 ) : isSubmitting ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="size-4" />
-                    Processing...
+                    Creating order...
                   </span>
                 ) : (
                   "Place Order"
