@@ -910,7 +910,7 @@ function CheckoutPageInner() {
                       </Label>
                     </div>
                     
-                    {codAvailability?.available ? (
+                    {codAvailability?.available && codAvailability?.showOption ? (
                       <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                         <RadioGroupItem value="cod" id="cod" />
                         <Label htmlFor="cod" className="flex-1 cursor-pointer">
