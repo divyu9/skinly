@@ -21,24 +21,17 @@ function getPhonePeConfig() {
     });
   }
 
-  // v1 base URL for payment initiation
+  // v1 base URL for all PhonePe API calls
   const v1BaseUrl =
     environment === "PRODUCTION"
       ? "https://api.phonepe.com/apis/hermes"
       : "https://api-preprod.phonepe.com/apis/pg-sandbox";
-
-  // v2 base URL for status checks
-  const v2BaseUrl =
-    environment === "PRODUCTION"
-      ? "https://api.phonepe.com"
-      : "https://api-preprod.phonepe.com";
 
   return {
     merchantId,
     saltKey,
     saltIndex,
     v1BaseUrl,
-    v2BaseUrl,
   };
 }
 
@@ -230,23 +223,7 @@ export const initiatePayment = action({
   },
 });
 
-// Generate OAuth Bearer token for v2 API
-async function getOAuthToken(
-  merchantId: string,
-  saltKey: string,
-  saltIndex: string,
-  baseUrl: string
-): Promise<string> {
-  // Generate token request
-  const timestamp = Date.now();
-  const payload = `${merchantId}${timestamp}${saltKey}`;
-  const hash = crypto.createHash("sha256").update(payload).digest("hex");
-  const token = `${hash}###${saltIndex}`;
-  
-  return token;
-}
-
-// Check payment status using Standard Checkout v2
+// Check payment status using Standard Checkout v1
 export const checkPaymentStatus = action({
   args: {
     merchantTransactionId: v.string(),
@@ -264,29 +241,29 @@ export const checkPaymentStatus = action({
     try {
       const config = getPhonePeConfig();
 
-      // Get OAuth token
-      const authToken = await getOAuthToken(
-        config.merchantId,
-        config.saltKey,
-        config.saltIndex,
-        config.v2BaseUrl
-      );
+      // Build the v1 status check endpoint
+      const endpoint = `/pg/v1/status/${config.merchantId}/${args.merchantTransactionId}`;
+      const fullUrl = `${config.v1BaseUrl}${endpoint}`;
 
-      // Build the v2 status check endpoint
-      const endpoint = `/apis/pg/checkout/v2/order/${args.merchantTransactionId}/status`;
-      const fullUrl = `${config.v2BaseUrl}${endpoint}`;
+      // Generate X-VERIFY header for status check (no payload for GET requests)
+      const stringToHash = endpoint + config.saltKey;
+      const sha256Hash = crypto
+        .createHash("sha256")
+        .update(stringToHash)
+        .digest("hex");
+      const xVerify = `${sha256Hash}###${config.saltIndex}`;
 
-      console.log("Checking payment status (v2):", {
+      console.log("Checking payment status (v1):", {
         merchantTransactionId: args.merchantTransactionId,
         endpoint: fullUrl,
       });
 
-      // Make the API request with v2 authentication
+      // Make the API request with v1 signature authentication
       const response: Response = await fetch(fullUrl, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `O-Bearer ${authToken}`,
+          "X-VERIFY": xVerify,
           "X-MERCHANT-ID": config.merchantId,
           "accept": "application/json",
         },
@@ -304,7 +281,7 @@ export const checkPaymentStatus = action({
         };
       } = await response.json();
 
-      console.log("PhonePe v2 Status Response (Full):", {
+      console.log("PhonePe v1 Status Response:", {
         status: response.status,
         success: responseData.success,
         code: responseData.code,
@@ -317,7 +294,7 @@ export const checkPaymentStatus = action({
           ? `${responseData.code}: ${responseData.message}`
           : responseData.code || "Status check failed";
         
-        console.error("PhonePe v2 Status Check Failed:", {
+        console.error("PhonePe v1 Status Check Failed:", {
           error: errorMessage,
           merchantTransactionId: args.merchantTransactionId,
           endpoint,
