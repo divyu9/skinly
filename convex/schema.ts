@@ -16,7 +16,8 @@ export default defineSchema({
     .index("by_is_admin", ["isAdmin"]),
 
   cart: defineTable({
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")), // Optional for guest carts
+    sessionId: v.optional(v.string()), // Session ID for guest carts
     productId: v.string(),
     productTitle: v.string(),
     productImage: v.optional(v.string()),
@@ -28,10 +29,14 @@ export default defineSchema({
     coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
   })
     .index("by_user", ["userId"])
+    .index("by_session", ["sessionId"])
     .index("by_user_and_product", ["userId", "productId", "variant"]),
 
   orders: defineTable({
-    userId: v.id("users"),
+    userId: v.optional(v.id("users")), // Optional for guest orders
+    isGuest: v.optional(v.boolean()), // Whether this is a guest order
+    guestEmail: v.optional(v.string()), // Guest email for guest orders
+    trackingToken: v.optional(v.string()), // Secure token for guest order tracking
     orderNumber: v.string(),
     customerEmail: v.optional(v.string()), // Customer's email for notifications
     status: v.union(
@@ -136,7 +141,9 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_order_number", ["orderNumber"])
     .index("by_merchant_transaction", ["phonepeMerchantTransactionId"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_guest_email", ["guestEmail"])
+    .index("by_tracking_token", ["trackingToken"]),
 
   collections: defineTable({
     name: v.string(),

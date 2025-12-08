@@ -3,8 +3,9 @@ import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { calculateGST } from "./gst";
 import { internal, api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel.d.ts";
 
-// Create a new order
+// Create a new order (supports both authenticated and guest checkout)
 export const createOrder = mutation({
   args: {
     shippingAddress: v.object({
@@ -22,35 +23,61 @@ export const createOrder = mutation({
     prepaidAmount: v.optional(v.number()),
     codAmount: v.optional(v.number()),
     walletAmount: v.optional(v.number()),
+    sessionId: v.optional(v.string()), // For guest checkout
+    guestEmail: v.optional(v.string()), // Required for guest checkout
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new ConvexError({
-        message: "User not logged in",
-        code: "UNAUTHENTICATED",
-      });
+    const isGuest = !identity;
+    
+    let user: { _id: Id<"users">; name?: string; walletBalance?: number } | null = null;
+    let cartItems = [];
+
+    if (isGuest) {
+      // Guest checkout - require email and sessionId
+      if (!args.guestEmail) {
+        throw new ConvexError({
+          message: "Email is required for guest checkout",
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      if (!args.sessionId) {
+        throw new ConvexError({
+          message: "Session ID is required for guest checkout",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Get guest cart items by sessionId
+      cartItems = await ctx.db
+        .query("cart")
+        .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+        .collect();
+    } else {
+      // Authenticated checkout
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier)
+        )
+        .unique();
+
+      if (!user) {
+        throw new ConvexError({
+          message: "User not found",
+          code: "NOT_FOUND",
+        });
+      }
+
+      // Get authenticated cart items
+      if (user) {
+        cartItems = await ctx.db
+          .query("cart")
+          .withIndex("by_user", (q) => q.eq("userId", user._id))
+          .collect();
+      }
     }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-
-    if (!user) {
-      throw new ConvexError({
-        message: "User not found",
-        code: "NOT_FOUND",
-      });
-    }
-
-    // Get cart items
-    const cartItems = await ctx.db
-      .query("cart")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .collect();
 
     if (cartItems.length === 0) {
       throw new ConvexError({
@@ -79,9 +106,9 @@ export const createOrder = mutation({
     const shippingFee = subtotal >= freeShippingThreshold ? 0 : flatShippingFee;
     let total = subtotal + shippingFee;
 
-    // Handle wallet payment
+    // Handle wallet payment (only for authenticated users)
     let walletAmountUsed = 0;
-    if (args.walletAmount && args.walletAmount > 0) {
+    if (!isGuest && args.walletAmount && args.walletAmount > 0 && user) {
       // Validate wallet amount
       const walletBalance = user.walletBalance || 0;
       
@@ -154,14 +181,22 @@ export const createOrder = mutation({
     // Generate order number
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
+    // Generate tracking token for guest orders (secure random string)
+    const trackingToken = isGuest 
+      ? `TRK-${Date.now()}-${Math.random().toString(36).substr(2, 20)}-${Math.random().toString(36).substr(2, 20)}`
+      : undefined;
+
     // Store original total for notifications (before wallet deduction)
     const originalTotal = subtotal + shippingFee;
 
     // Create order
     const orderId = await ctx.db.insert("orders", {
-      userId: user._id,
+      userId: user?._id,
+      isGuest,
+      guestEmail: isGuest ? args.guestEmail : undefined,
+      trackingToken,
       orderNumber,
-      customerEmail: args.customerEmail,
+      customerEmail: args.customerEmail || args.guestEmail,
       status: "processing",
       items: cartItems.map((item) => ({
         productId: item.productId,
@@ -198,8 +233,8 @@ export const createOrder = mutation({
       totalGstAmount: gstCalculation.totalGstAmount,
     });
 
-    // Update wallet transaction with order ID
-    if (walletAmountUsed > 0) {
+    // Update wallet transaction with order ID (authenticated users only)
+    if (!isGuest && walletAmountUsed > 0 && user) {
       const walletTransaction = await ctx.db
         .query("walletTransactions")
         .withIndex("by_user_and_created", (q) => q.eq("userId", user._id))
@@ -219,22 +254,24 @@ export const createOrder = mutation({
       await ctx.db.delete(item._id);
     }
 
-    // Mark any abandoned carts as recovered
-    const abandonedCarts = await ctx.db
-      .query("abandonedCarts")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) =>
-        q.or(
-          q.eq(q.field("status"), "pending"),
-          q.eq(q.field("status"), "reminded")
+    // Mark any abandoned carts as recovered (authenticated users only)
+    if (!isGuest && user) {
+      const abandonedCarts = await ctx.db
+        .query("abandonedCarts")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "pending"),
+            q.eq(q.field("status"), "reminded")
+          )
         )
-      )
-      .collect();
+        .collect();
 
-    for (const cart of abandonedCarts) {
-      await ctx.db.patch(cart._id, {
-        status: "recovered",
-      });
+      for (const cart of abandonedCarts) {
+        await ctx.db.patch(cart._id, {
+          status: "recovered",
+        });
+      }
     }
 
     // Send WhatsApp notifications based on payment method
@@ -259,9 +296,9 @@ export const createOrder = mutation({
               {
                 usecaseKey: "cod_confirmation",
                 recipientPhone: args.shippingAddress.phone,
-                recipientUserId: user._id,
+                recipientUserId: user?._id,
                 variables: {
-                  customer_name: args.shippingAddress.fullName || user.name || "Customer",
+                  customer_name: args.shippingAddress.fullName || user?.name || "Customer",
                   order_number: orderNumber,
                   order_total: `₹${total.toFixed(2)}`,
                   cod_amount: `₹${(args.codAmount || total).toFixed(2)}`,
@@ -278,9 +315,9 @@ export const createOrder = mutation({
               {
                 usecaseKey: "order_received",
                 recipientPhone: args.shippingAddress.phone,
-                recipientUserId: user._id,
+                recipientUserId: user?._id,
                 variables: {
-                  customer_name: args.shippingAddress.fullName || user.name || "Customer",
+                  customer_name: args.shippingAddress.fullName || user?.name || "Customer",
                   order_number: orderNumber,
                   product_name: cartItems.map(item => item.productTitle).join(", "),
                 },
@@ -297,9 +334,9 @@ export const createOrder = mutation({
           {
             usecaseKey: "order_received",
             recipientPhone: args.shippingAddress.phone,
-            recipientUserId: user._id,
+            recipientUserId: user?._id,
             variables: {
-              customer_name: args.shippingAddress.fullName || user.name || "Customer",
+              customer_name: args.shippingAddress.fullName || user?.name || "Customer",
               order_number: orderNumber,
               product_name: cartItems.map(item => item.productTitle).join(", "),
             },
@@ -413,9 +450,9 @@ export const createOrder = mutation({
           {
             usecaseKey: "order_received",
             recipientPhone: args.shippingAddress.phone,
-            recipientUserId: user._id,
+            recipientUserId: user?._id,
             variables: {
-              customer_name: args.shippingAddress.fullName || user.name || "Customer",
+              customer_name: args.shippingAddress.fullName || user?.name || "Customer",
               order_number: orderNumber,
               product_name: cartItems.map(item => item.productTitle).join(", "),
             },
@@ -444,7 +481,12 @@ export const createOrder = mutation({
       }
     }
 
-    return { orderId, orderNumber, remainingAmount: total };
+    return { 
+      orderId, 
+      orderNumber, 
+      remainingAmount: total,
+      trackingToken: isGuest ? trackingToken : undefined,
+    };
   },
 });
 
@@ -871,6 +913,26 @@ export const getOrderByMerchantTransaction = query({
     if (!order) {
       throw new ConvexError({
         message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    return order;
+  },
+});
+
+// Get order by tracking token (for guest order tracking)
+export const getOrderByTrackingToken = query({
+  args: { trackingToken: v.string() },
+  handler: async (ctx, args) => {
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_tracking_token", (q) => q.eq("trackingToken", args.trackingToken))
+      .unique();
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found. Please check your tracking link.",
         code: "NOT_FOUND",
       });
     }
