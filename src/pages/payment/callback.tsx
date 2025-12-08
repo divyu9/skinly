@@ -21,7 +21,7 @@ export default function PaymentCallback() {
     status === "success" && merchantTransactionId ? { merchantTransactionId } : "skip"
   );
   
-  // Track purchase when order is loaded
+  // Track purchase and auto-redirect when order is loaded
   const [hasTracked, setHasTracked] = useState(false);
   useEffect(() => {
     if (order && status === "success" && !hasTracked) {
@@ -37,19 +37,30 @@ export default function PaymentCallback() {
         }))
       );
       setHasTracked(true);
+      
+      // Auto-redirect to order page after a brief delay
+      setTimeout(() => {
+        navigate(`/orders/${order._id}`);
+      }, 1500);
     }
-  }, [order, status, hasTracked]);
+  }, [order, status, hasTracked, navigate]);
 
   // Get merchant transaction ID from URL params
   useEffect(() => {
-    const txnId = searchParams.get("merchantTransactionId") || 
+    // PhonePe sends merchantOrderId in the redirect URL
+    const txnId = searchParams.get("merchantOrderId") ||
+                  searchParams.get("merchantTransactionId") || 
                   searchParams.get("transactionId") ||
                   searchParams.get("id");
+    
+    console.log("Callback URL params:", Object.fromEntries(searchParams.entries()));
+    console.log("Extracted transaction ID:", txnId);
     
     if (txnId) {
       setMerchantTransactionId(txnId);
       verifyPayment(txnId);
     } else {
+      console.error("No transaction ID found in URL params");
       setStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,23 +68,31 @@ export default function PaymentCallback() {
 
   const verifyPayment = async (txnId: string) => {
     try {
+      console.log("Verifying payment for transaction:", txnId);
+      
       // Check payment status with PhonePe
       const result = await checkPaymentStatus({
         merchantTransactionId: txnId,
       });
 
+      console.log("Payment status result:", result);
+
       if (result.success) {
         if (result.paymentStatus === "success") {
+          console.log("Payment successful!");
           setStatus("success");
           // Store the transaction ID to fetch order later
           setMerchantTransactionId(txnId);
         } else if (result.paymentStatus === "failed") {
+          console.log("Payment failed");
           setStatus("failed");
         } else {
           // Still pending
+          console.log("Payment pending, retrying in 2 seconds...");
           setTimeout(() => verifyPayment(txnId), 2000);
         }
       } else {
+        console.error("Payment verification returned unsuccessful result");
         setStatus("error");
       }
     } catch (error) {
@@ -109,7 +128,9 @@ export default function PaymentCallback() {
                   Payment Successful!
                 </h3>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Your order has been confirmed and is being processed
+                  {order 
+                    ? "Redirecting to your order details..." 
+                    : "Your order has been confirmed and is being processed"}
                 </p>
               </div>
               {order && (

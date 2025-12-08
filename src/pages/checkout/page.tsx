@@ -141,30 +141,7 @@ function CheckoutPageInner() {
     );
   }
 
-  if (cartItems.length === 0) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <PackageIcon />
-            </EmptyMedia>
-            <EmptyTitle>Your cart is empty</EmptyTitle>
-            <EmptyDescription>
-              Add some items to your cart before checking out
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Link to="/products">
-              <Button>Browse Products</Button>
-            </Link>
-          </EmptyContent>
-        </Empty>
-      </div>
-    );
-  }
-
-  // Show loading state while redirecting to payment
+  // Show loading state while redirecting to payment (CHECK THIS FIRST!)
   if (isRedirectingToPayment) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -185,6 +162,29 @@ function CheckoutPageInner() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  if (cartItems.length === 0) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageIcon />
+            </EmptyMedia>
+            <EmptyTitle>Your cart is empty</EmptyTitle>
+            <EmptyDescription>
+              Add some items to your cart before checking out
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Link to="/products">
+              <Button>Browse Products</Button>
+            </Link>
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }
