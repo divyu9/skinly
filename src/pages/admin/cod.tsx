@@ -37,8 +37,10 @@ import {
   TrashIcon,
 } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { SignInButton } from "@/components/ui/signin.tsx";
 
-export default function AdminCOD() {
+function AdminCODInner() {
   // Form state - declare before queries that depend on them
   const [enabled, setEnabled] = useState(false);
   const [matchMode, setMatchMode] = useState<"ALL" | "ANY">("ALL");
@@ -1145,5 +1147,39 @@ export default function AdminCOD() {
         </div>
       </div>
     </AdminLayout>
+  );
+}
+
+export default function AdminCOD() {
+  return (
+    <>
+      <AuthLoading>
+        <AdminLayout>
+          <div className="space-y-6">
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-60 w-full" />
+            <Skeleton className="h-60 w-full" />
+          </div>
+        </AdminLayout>
+      </AuthLoading>
+      <Unauthenticated>
+        <AdminLayout>
+          <Card className="max-w-md mx-auto mt-8">
+            <CardHeader>
+              <CardTitle>Authentication Required</CardTitle>
+              <CardDescription>
+                Please sign in to access the COD settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SignInButton />
+            </CardContent>
+          </Card>
+        </AdminLayout>
+      </Unauthenticated>
+      <Authenticated>
+        <AdminCODInner />
+      </Authenticated>
+    </>
   );
 }
