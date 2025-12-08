@@ -304,6 +304,14 @@ export const checkPaymentStatus = action({
             ? "failed"
             : "pending";
 
+      // Update order payment status in database (for success or failed, not pending)
+      if (paymentStatus === "success" || paymentStatus === "failed") {
+        await ctx.runMutation(api.orders.updatePaymentStatus, {
+          merchantTransactionId: args.merchantTransactionId,
+          paymentStatus,
+        });
+      }
+
       return {
         success: true,
         paymentStatus,

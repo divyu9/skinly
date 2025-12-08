@@ -694,12 +694,52 @@ export const updatePaymentStatus = mutation({
     }
 
     const oldPaymentStatus = order.paymentStatus;
-    const newStatus = args.paymentStatus === "success" ? "processing" : order.status;
+    // Set order status based on payment outcome:
+    // - success → processing
+    // - failed → cancelled
+    // - pending → keep current status
+    const newStatus = 
+      args.paymentStatus === "success" 
+        ? "processing" 
+        : args.paymentStatus === "failed"
+          ? "cancelled"
+          : order.status;
 
     await ctx.db.patch(order._id, {
       paymentStatus: args.paymentStatus,
       status: newStatus,
     });
+
+    // If payment failed and user had used wallet, refund the wallet amount
+    if (args.paymentStatus === "failed" && oldPaymentStatus !== "failed") {
+      const walletAmountToRefund = order.walletAmountUsed || 0;
+      
+      if (walletAmountToRefund > 0) {
+        const user = await ctx.db.get(order.userId);
+        if (user) {
+          const currentBalance = user.walletBalance || 0;
+          const newBalance = currentBalance + walletAmountToRefund;
+
+          // Refund to wallet
+          await ctx.db.patch(order.userId, {
+            walletBalance: newBalance,
+          });
+
+          // Record wallet transaction
+          await ctx.db.insert("walletTransactions", {
+            userId: order.userId,
+            transactionType: "credit",
+            amount: walletAmountToRefund,
+            source: "refund",
+            balanceBefore: currentBalance,
+            balanceAfter: newBalance,
+            description: `Refund for failed payment on order ${order.orderNumber}`,
+            relatedOrderId: order._id,
+            createdAt: Date.now(),
+          });
+        }
+      }
+    }
 
     // Send WhatsApp notifications based on payment status change
     if (oldPaymentStatus !== args.paymentStatus) {
