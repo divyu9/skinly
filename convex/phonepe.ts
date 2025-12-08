@@ -23,7 +23,7 @@ function getPhonePeConfig() {
 
   const baseUrl =
     environment === "PRODUCTION"
-      ? "https://api.phonepe.com/apis/hermes"
+      ? "https://api.phonepe.com/apis/pg"
       : "https://api-preprod.phonepe.com/apis/pg-sandbox";
 
   return {
@@ -73,8 +73,10 @@ export const initiatePayment = action({
 
       const config = getPhonePeConfig();
 
-      // Generate merchant transaction ID
-      const merchantTransactionId = `TXN-${args.orderNumber}-${Date.now()}`;
+      // Generate merchant transaction ID (max 38 chars)
+      // Format: orderNumber + last 6 digits of timestamp
+      const timestamp = Date.now().toString().slice(-6);
+      const merchantTransactionId = `${args.orderNumber}-${timestamp}`;
 
       // Convert amount to paise (minimum 100 paise = ₹1)
       const amountInPaise = Math.max(Math.round(args.amount * 100), 100);
@@ -103,7 +105,7 @@ export const initiatePayment = action({
       );
 
       // Generate X-VERIFY header
-      const endpoint = "/pg/v1/pay";
+      const endpoint = "/checkout/v2/pay";
       const xVerify = generateXVerifyHeader(
         base64Payload,
         endpoint,
@@ -196,7 +198,7 @@ export const checkPaymentStatus = action({
       const config = getPhonePeConfig();
 
       // Build the status check endpoint
-      const endpoint = `/pg/v1/status/${config.merchantId}/${args.merchantTransactionId}`;
+      const endpoint = `/checkout/v2/order/${config.merchantId}/${args.merchantTransactionId}/status`;
 
       // Generate X-VERIFY header (for status check, no payload)
       const xVerify = generateXVerifyHeader(
