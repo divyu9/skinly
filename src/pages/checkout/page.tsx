@@ -42,6 +42,7 @@ function CheckoutPageInner() {
   const createOrder = useMutation(api.orders.createOrder);
   const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
   const initiatePayment = useAction(api.phonepe.initiatePayment);
+  const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
   const generateCodOtp = useMutation(api.codOtp.generateCodOtp);
   const verifyCodOtp = useMutation(api.codOtp.verifyCodOtp);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,6 +56,9 @@ function CheckoutPageInner() {
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
   const [currentMerchantTxnId, setCurrentMerchantTxnId] = useState<string | null>(null);
   const [currentOrderId, setCurrentOrderId] = useState<Id<"orders"> | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showPaymentVerificationFailed, setShowPaymentVerificationFailed] = useState(false);
+  const maxRetries = 5; // 5 retries = ~10 seconds total
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -164,6 +168,60 @@ function CheckoutPageInner() {
     );
   }
 
+  // Show payment verification failed UI
+  if (showPaymentVerificationFailed && currentOrderId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircleIcon className="size-6 text-amber-600" />
+              Payment Verification Delayed
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Your payment is processing but we're unable to verify it immediately. 
+              This is normal and your payment should be confirmed within a few minutes.
+            </p>
+            <div className="flex items-start gap-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <AlertCircleIcon className="size-4 text-blue-600 mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-medium text-blue-900 dark:text-blue-100">
+                  What you can do:
+                </p>
+                <ul className="list-disc list-inside text-blue-700 dark:text-blue-300 mt-1 space-y-1">
+                  <li>View your order details to check payment status</li>
+                  <li>Refresh the order page in a few minutes</li>
+                  <li>Contact support if payment status doesn't update</li>
+                </ul>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  setShowPaymentVerificationFailed(false);
+                  setRetryCount(0);
+                  handlePhonePeCallback('CONCLUDED');
+                }}
+              >
+                Retry Verification
+              </Button>
+              <Button
+                className="flex-1"
+                variant="outline"
+                onClick={() => navigate(`/orders/${currentOrderId}`)}
+              >
+                View My Order
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (cartItems.length === 0 && !isRedirectingToPayment) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -241,6 +299,7 @@ function CheckoutPageInner() {
       // User cancelled payment
       setIsRedirectingToPayment(false);
       setIsSubmitting(false);
+      setRetryCount(0);
       // Clear sessionStorage
       sessionStorage.removeItem('skinly_merchant_txn_id');
       sessionStorage.removeItem('skinly_order_id');
@@ -266,10 +325,47 @@ function CheckoutPageInner() {
         toast.error("Unable to verify payment");
         setIsRedirectingToPayment(false);
         setIsSubmitting(false);
+        setRetryCount(0);
         return;
       }
       
       try {
+        // First, force-check payment status with PhonePe API
+        console.log("Force-checking payment status with PhonePe API...");
+        try {
+          const phonepeStatus = await checkPaymentStatus({
+            merchantTransactionId: merchantTxnId,
+          });
+          console.log("PhonePe API status:", phonepeStatus);
+          
+          // If payment was successful or failed, the mutation already updated the DB
+          if (phonepeStatus.paymentStatus === "success") {
+            // Clear sessionStorage on success
+            sessionStorage.removeItem('skinly_merchant_txn_id');
+            sessionStorage.removeItem('skinly_order_id');
+            setRetryCount(0);
+            toast.success("Payment successful!");
+            setTimeout(() => {
+              navigate(`/orders/${orderId}`);
+            }, 500);
+            return;
+          } else if (phonepeStatus.paymentStatus === "failed") {
+            // Clear sessionStorage on failure
+            sessionStorage.removeItem('skinly_merchant_txn_id');
+            sessionStorage.removeItem('skinly_order_id');
+            setRetryCount(0);
+            toast.error("Payment failed. Please try again.");
+            setIsRedirectingToPayment(false);
+            setIsSubmitting(false);
+            return;
+          }
+          // If still pending, continue to database check below
+        } catch (phonepeError) {
+          console.error("PhonePe API check failed:", phonepeError);
+          // Continue to database check
+        }
+        
+        // Then check database
         console.log("Checking payment status from database...");
         const order = await convex.query(api.orders.getOrderByMerchantTransaction, {
           merchantTransactionId: merchantTxnId,
@@ -282,8 +378,8 @@ function CheckoutPageInner() {
             // Clear sessionStorage on success
             sessionStorage.removeItem('skinly_merchant_txn_id');
             sessionStorage.removeItem('skinly_order_id');
+            setRetryCount(0);
             toast.success("Payment successful!");
-            // Small delay for better UX
             setTimeout(() => {
               navigate(`/orders/${order._id}`);
             }, 500);
@@ -291,25 +387,40 @@ function CheckoutPageInner() {
             // Clear sessionStorage on failure
             sessionStorage.removeItem('skinly_merchant_txn_id');
             sessionStorage.removeItem('skinly_order_id');
+            setRetryCount(0);
             toast.error("Payment failed. Please try again.");
             setIsRedirectingToPayment(false);
             setIsSubmitting(false);
           } else {
-            // Still pending, retry after delay
-            console.log("Payment still pending, retrying...");
-            setTimeout(() => handlePhonePeCallback('CONCLUDED'), 2000);
+            // Still pending - check retry count
+            const currentRetry = retryCount + 1;
+            setRetryCount(currentRetry);
+            
+            if (currentRetry >= maxRetries) {
+              // Max retries reached - show fallback UI
+              console.log("Max retries reached. Showing fallback UI.");
+              setShowPaymentVerificationFailed(true);
+              setIsRedirectingToPayment(false);
+              setIsSubmitting(false);
+            } else {
+              // Retry after delay
+              console.log(`Payment still pending, retrying (${currentRetry}/${maxRetries})...`);
+              setTimeout(() => handlePhonePeCallback('CONCLUDED'), 2000);
+            }
           }
         } else {
           console.error("Order not found in database");
           toast.error("Unable to verify payment");
           setIsRedirectingToPayment(false);
           setIsSubmitting(false);
+          setRetryCount(0);
         }
       } catch (error) {
         console.error("Error checking payment status:", error);
         toast.error("Unable to verify payment. Please check your orders page.");
         setIsRedirectingToPayment(false);
         setIsSubmitting(false);
+        setRetryCount(0);
       }
     }
   };
@@ -330,6 +441,8 @@ function CheckoutPageInner() {
     }
     
     setIsSubmitting(true);
+    setRetryCount(0); // Reset retry count for new payment
+    setShowPaymentVerificationFailed(false); // Reset failed state
 
     try {
       // Prepare COD fields
@@ -893,7 +1006,10 @@ function CheckoutPageInner() {
                 {isRedirectingToPayment ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="size-4" />
-                    Processing payment...
+                    {retryCount > 0 
+                      ? `Verifying payment... (${retryCount}/${maxRetries})`
+                      : "Processing payment..."
+                    }
                   </span>
                 ) : isSubmitting ? (
                   <span className="flex items-center gap-2">
