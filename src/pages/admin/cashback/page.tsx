@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { useState, useMemo } from "react";
+import { useDebounce } from "@/hooks/use-debounce.ts";
 import {
   Table,
   TableBody,
@@ -36,9 +37,18 @@ import {
   SearchIcon, 
   CoinsIcon,
   FilterIcon,
-  XIcon
+  XIcon,
+  CheckIcon
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch.tsx";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import {
   AlertDialog,
@@ -54,12 +64,23 @@ import {
 type TargetType = "variant" | "product" | "collection";
 type CashbackType = "fixed" | "percentage";
 
+interface SelectedTarget {
+  type: TargetType;
+  id: string;
+  displayName: string;
+}
+
 function AdminCashbackPageInner() {
   const rules = useQuery(api.cashback.getAllCashbackRules, {});
   const createRule = useMutation(api.cashback.createCashbackRule);
   const updateRule = useMutation(api.cashback.updateCashbackRule);
   const deleteRule = useMutation(api.cashback.deleteCashbackRule);
   const toggleRule = useMutation(api.cashback.toggleCashbackRule);
+  
+  // Fetch data for search
+  const allProducts = useQuery(api.products.getAllProductsBasic, { status: "active" });
+  const allVariants = useQuery(api.products.getAllVariantsWithProducts, {});
+  const allCollections = useQuery(api.collections.getAllCollections, {});
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<Id<"cashbackRules"> | null>(null);
@@ -68,6 +89,11 @@ function AdminCashbackPageInner() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [ruleToDelete, setRuleToDelete] = useState<Id<"cashbackRules"> | null>(null);
 
+  // For create dialog
+  const [targetSearchQuery, setTargetSearchQuery] = useState("");
+  const [debouncedTargetSearch] = useDebounce(targetSearchQuery, 300);
+  const [selectedTargets, setSelectedTargets] = useState<SelectedTarget[]>([]);
+
   const [formData, setFormData] = useState({
     targetType: "product" as TargetType,
     targetId: "",
@@ -75,6 +101,68 @@ function AdminCashbackPageInner() {
     cashbackValue: 0,
     isActive: true,
   });
+
+  // Filter searchable items based on target type and search query
+  const searchResults = useMemo(() => {
+    if (!debouncedTargetSearch.trim()) return [];
+    
+    const query = debouncedTargetSearch.toLowerCase();
+    const results: SelectedTarget[] = [];
+
+    if (formData.targetType === "product" && allProducts) {
+      const matchingProducts = allProducts
+        .filter((p) => 
+          p.title.toLowerCase().includes(query) || 
+          p.slug.toLowerCase().includes(query)
+        )
+        .slice(0, 20);
+      
+      matchingProducts.forEach((p) => {
+        results.push({
+          type: "product",
+          id: p._id,
+          displayName: p.title,
+        });
+      });
+    }
+
+    if (formData.targetType === "variant" && allVariants) {
+      const matchingVariants = allVariants
+        .filter((v) => 
+          v.sku.toLowerCase().includes(query) ||
+          v.title.toLowerCase().includes(query) ||
+          v.productTitle.toLowerCase().includes(query)
+        )
+        .slice(0, 20);
+      
+      matchingVariants.forEach((v) => {
+        results.push({
+          type: "variant",
+          id: v._id,
+          displayName: `${v.productTitle} - ${v.title} (${v.sku})`,
+        });
+      });
+    }
+
+    if (formData.targetType === "collection" && allCollections) {
+      const matchingCollections = allCollections
+        .filter((c) => 
+          c.name.toLowerCase().includes(query) || 
+          c.slug.toLowerCase().includes(query)
+        )
+        .slice(0, 20);
+      
+      matchingCollections.forEach((c) => {
+        results.push({
+          type: "collection",
+          id: c._id,
+          displayName: c.name,
+        });
+      });
+    }
+
+    return results;
+  }, [formData.targetType, debouncedTargetSearch, allProducts, allVariants, allCollections]);
 
   // Filter and search rules
   const filteredRules = useMemo(() => {
@@ -100,6 +188,8 @@ function AdminCashbackPageInner() {
 
   const openCreateDialog = () => {
     setEditingRuleId(null);
+    setSelectedTargets([]);
+    setTargetSearchQuery("");
     setFormData({
       targetType: "product",
       targetId: "",
@@ -119,6 +209,8 @@ function AdminCashbackPageInner() {
     isActive: boolean;
   }) => {
     setEditingRuleId(rule._id);
+    setSelectedTargets([]);
+    setTargetSearchQuery("");
     setFormData({
       targetType: rule.targetType,
       targetId: rule.targetId,
@@ -129,13 +221,21 @@ function AdminCashbackPageInner() {
     setIsDialogOpen(true);
   };
 
+  const addSelectedTarget = (target: SelectedTarget) => {
+    // Check if already selected
+    if (selectedTargets.some((t) => t.id === target.id && t.type === target.type)) {
+      return;
+    }
+    setSelectedTargets([...selectedTargets, target]);
+    setTargetSearchQuery(""); // Clear search after selection
+  };
+
+  const removeSelectedTarget = (targetId: string) => {
+    setSelectedTargets(selectedTargets.filter((t) => t.id !== targetId));
+  };
+
   const handleSubmit = async () => {
     try {
-      if (!formData.targetId.trim()) {
-        toast.error("Please enter a target ID");
-        return;
-      }
-
       if (formData.cashbackValue <= 0) {
         toast.error("Cashback value must be greater than 0");
         return;
@@ -147,6 +247,12 @@ function AdminCashbackPageInner() {
       }
 
       if (editingRuleId) {
+        // Edit mode - single rule update
+        if (!formData.targetId.trim()) {
+          toast.error("Please enter a target ID");
+          return;
+        }
+        
         await updateRule({
           ruleId: editingRuleId,
           cashbackType: formData.cashbackType,
@@ -155,14 +261,37 @@ function AdminCashbackPageInner() {
         });
         toast.success("Cashback rule updated successfully");
       } else {
-        await createRule({
-          targetType: formData.targetType,
-          targetId: formData.targetId,
-          cashbackType: formData.cashbackType,
-          cashbackValue: formData.cashbackValue,
-          isActive: formData.isActive,
-        });
-        toast.success("Cashback rule created successfully");
+        // Create mode - can create multiple rules
+        if (selectedTargets.length === 0) {
+          toast.error("Please select at least one product, variant, or collection");
+          return;
+        }
+
+        // Create a rule for each selected target
+        let successCount = 0;
+        for (const target of selectedTargets) {
+          try {
+            await createRule({
+              targetType: target.type,
+              targetId: target.id,
+              cashbackType: formData.cashbackType,
+              cashbackValue: formData.cashbackValue,
+              isActive: formData.isActive,
+            });
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to create rule for ${target.displayName}:`, error);
+          }
+        }
+
+        if (successCount === selectedTargets.length) {
+          toast.success(`${successCount} cashback rule(s) created successfully`);
+        } else if (successCount > 0) {
+          toast.success(`${successCount} of ${selectedTargets.length} rules created`);
+        } else {
+          toast.error("Failed to create cashback rules");
+          return;
+        }
       }
 
       setIsDialogOpen(false);
@@ -377,15 +506,15 @@ function AdminCashbackPageInner() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingRuleId ? "Edit Cashback Rule" : "Create Cashback Rule"}
+              {editingRuleId ? "Edit Cashback Rule" : "Create Cashback Rules"}
             </DialogTitle>
             <DialogDescription>
               {editingRuleId
                 ? "Update the cashback rule details"
-                : "Configure a new cashback rule for products, variants, or collections"}
+                : "Search and select items to apply cashback rules"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -395,35 +524,92 @@ function AdminCashbackPageInner() {
                   <Label htmlFor="targetType">Target Type</Label>
                   <Select
                     value={formData.targetType}
-                    onValueChange={(value: TargetType) =>
-                      setFormData({ ...formData, targetType: value })
-                    }
+                    onValueChange={(value: TargetType) => {
+                      setFormData({ ...formData, targetType: value });
+                      setSelectedTargets([]);
+                      setTargetSearchQuery("");
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="variant">Variant</SelectItem>
                       <SelectItem value="product">Product</SelectItem>
+                      <SelectItem value="variant">Variant</SelectItem>
                       <SelectItem value="collection">Collection</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                
                 <div className="space-y-2">
-                  <Label htmlFor="targetId">Target ID</Label>
-                  <Input
-                    id="targetId"
-                    placeholder="Enter product ID, variant ID, or collection slug"
-                    value={formData.targetId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, targetId: e.target.value })
-                    }
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    For collections, use the collection slug (e.g., "tempered-glasses")
-                  </p>
+                  <Label>Search & Select {formatTargetType(formData.targetType)}s</Label>
+                  <Command className="border rounded-md">
+                    <CommandInput 
+                      placeholder={`Search ${formData.targetType}s...`} 
+                      value={targetSearchQuery}
+                      onValueChange={setTargetSearchQuery}
+                    />
+                    <CommandList>
+                      {targetSearchQuery.trim() && searchResults.length === 0 && (
+                        <CommandEmpty>No results found.</CommandEmpty>
+                      )}
+                      {searchResults.length > 0 && (
+                        <CommandGroup>
+                          {searchResults.map((result) => (
+                            <CommandItem
+                              key={result.id}
+                              onSelect={() => addSelectedTarget(result)}
+                              className="cursor-pointer"
+                            >
+                              <CheckIcon
+                                className={`mr-2 h-4 w-4 ${
+                                  selectedTargets.some((t) => t.id === result.id)
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                }`}
+                              />
+                              {result.displayName}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
                 </div>
+
+                {/* Selected Targets */}
+                {selectedTargets.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Selected Items ({selectedTargets.length})</Label>
+                    <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/20">
+                      {selectedTargets.map((target) => (
+                        <Badge key={target.id} variant="secondary" className="gap-1 pr-1">
+                          <span className="truncate max-w-[200px]">{target.displayName}</span>
+                          <button
+                            onClick={() => removeSelectedTarget(target.id)}
+                            className="ml-1 rounded-full hover:bg-muted p-0.5"
+                          >
+                            <XIcon className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
+            )}
+            {editingRuleId && (
+              <div className="space-y-2">
+                <Label>Target</Label>
+                <Input
+                  value={formData.targetId}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Target ID cannot be changed when editing
+                </p>
+              </div>
             )}
             <div className="space-y-2">
               <Label htmlFor="cashbackType">Cashback Type</Label>

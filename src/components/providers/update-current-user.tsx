@@ -4,12 +4,15 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useAuth } from "@/hooks/use-auth";
 import { Spinner } from "../ui/spinner";
 
+const GUEST_CART_KEY = "skinly_guest_cart";
+
 // This will automatically run and store the user
 function useUpdateCurrentUserEffect() {
   const { isAuthenticated } = useConvexAuth();
   const { user } = useAuth();
   const sub = user?.profile.sub;
   const updateCurrentUser = useMutation(api.users.updateCurrentUser);
+  const syncGuestCart = useMutation(api.cart.syncGuestCart);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [userCreated, setUserCreated] = useState(false);
 
@@ -22,13 +25,29 @@ function useUpdateCurrentUserEffect() {
       setIsCreatingUser(true);
       try {
         await updateCurrentUser();
+        
+        // Sync guest cart if exists
+        const guestCartData = localStorage.getItem(GUEST_CART_KEY);
+        if (guestCartData) {
+          try {
+            const guestCart = JSON.parse(guestCartData);
+            if (Array.isArray(guestCart) && guestCart.length > 0) {
+              await syncGuestCart({ guestCartItems: guestCart });
+              // Clear guest cart after successful sync
+              localStorage.removeItem(GUEST_CART_KEY);
+            }
+          } catch (err) {
+            console.error("Failed to sync guest cart:", err);
+          }
+        }
+        
         setUserCreated(true);
       } finally {
         setIsCreatingUser(false);
       }
     }
     createUser();
-  }, [isAuthenticated, updateCurrentUser, sub]);
+  }, [isAuthenticated, updateCurrentUser, syncGuestCart, sub]);
 
   return { isCreatingUser, userCreated };
 }
