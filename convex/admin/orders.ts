@@ -8,6 +8,7 @@ export const getAllOrders = query({
   args: {
     status: v.optional(v.string()),
     paymentStatus: v.optional(v.string()),
+    showDeleted: v.optional(v.boolean()), // Whether to show deleted orders
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -25,8 +26,12 @@ export const getAllOrders = query({
 
     const allOrders = await ordersQuery.collect();
 
+    // Filter out deleted orders by default (unless showDeleted is true)
+    let filteredOrders = args.showDeleted 
+      ? allOrders.filter((order) => order.isDeleted === true)
+      : allOrders.filter((order) => !order.isDeleted);
+
     // Filter by status if provided
-    let filteredOrders = allOrders;
     if (args.status && args.status !== "all") {
       filteredOrders = filteredOrders.filter(
         (order) => order.status === args.status
@@ -74,11 +79,15 @@ export const searchOrders = query({
 
     const allOrders = await ctx.db.query("orders").order("desc").collect();
 
+    // Filter out deleted orders
+    const nonDeletedOrders = allOrders.filter((order) => !order.isDeleted);
+
     const searchLower = args.searchTerm.toLowerCase();
 
-    const filteredOrders = allOrders.filter(
+    const filteredOrders = nonDeletedOrders.filter(
       (order) =>
-        order.orderNumber.toLowerCase().includes(searchLower) ||
+        (order.orderNumber && order.orderNumber.toLowerCase().includes(searchLower)) ||
+        (order.failedOrderNumber && order.failedOrderNumber.toLowerCase().includes(searchLower)) ||
         order.shippingAddress.fullName.toLowerCase().includes(searchLower) ||
         order.shippingAddress.phone.includes(args.searchTerm)
     );
@@ -156,7 +165,7 @@ export const updateShippingInfo = mutation({
             recipientUserId: order.userId,
             variables: {
               customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-              order_number: order.orderNumber,
+              order_number: order.orderNumber || order.failedOrderNumber || "Pending",
               awb_number: args.awbNumber,
               courier_name: args.courierName || "courier partner",
               tracking_url: args.trackingUrl || "",
@@ -223,7 +232,7 @@ export const updateOrderStatus = mutation({
               recipientUserId: order.userId,
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber,
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                 awb_number: order.awbNumber,
                 courier_name: order.courierName || "courier partner",
                 tracking_url: order.trackingUrl || "",
@@ -310,7 +319,7 @@ export const updateOrderStatus = mutation({
               recipientUserId: order.userId,
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber,
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                 order_total: `₹${order.total.toFixed(2)}`,
               },
               priority: 7,
@@ -327,7 +336,7 @@ export const updateOrderStatus = mutation({
               recipientUserId: order.userId,
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber,
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                 product_name: order.items[0]?.productTitle || "your order",
               },
               priority: 5,
@@ -345,7 +354,7 @@ export const updateOrderStatus = mutation({
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
                 product_name: order.items[0]?.productTitle || "your product",
-                order_number: order.orderNumber,
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
               },
               priority: 3, // Lower priority for reminders
             }
@@ -361,7 +370,7 @@ export const updateOrderStatus = mutation({
               recipientUserId: order.userId,
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber,
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                 order_total: `₹${order.total.toFixed(2)}`,
               },
               priority: 8,
@@ -415,23 +424,29 @@ export const getOrderStats = query({
     }
 
     const allOrders = await ctx.db.query("orders").collect();
+    
+    // Filter out deleted orders for stats
+    const activeOrders = allOrders.filter((o) => !o.isDeleted);
+    const deletedOrders = allOrders.filter((o) => o.isDeleted);
 
     const stats = {
-      total: allOrders.length,
-      processing: allOrders.filter((o) => o.status === "processing").length,
-      shipped: allOrders.filter((o) => o.status === "shipped").length,
-      delivered: allOrders.filter((o) => o.status === "delivered").length,
-      cancelled: allOrders.filter((o) => o.status === "cancelled").length,
-      rto: allOrders.filter((o) => o.status === "rto").length,
-      totalRevenue: allOrders
+      total: activeOrders.length,
+      processing: activeOrders.filter((o) => o.status === "processing" && o.paymentStatus === "success").length,
+      shipped: activeOrders.filter((o) => o.status === "shipped").length,
+      delivered: activeOrders.filter((o) => o.status === "delivered").length,
+      cancelled: activeOrders.filter((o) => o.status === "cancelled").length,
+      rto: activeOrders.filter((o) => o.status === "rto").length,
+      failed: activeOrders.filter((o) => o.paymentStatus === "failed").length,
+      deleted: deletedOrders.length,
+      totalRevenue: activeOrders
         .filter((o) => o.paymentStatus === "success")
         .reduce((sum, o) => sum + o.total, 0),
-      pendingPayments: allOrders.filter(
+      pendingPayments: activeOrders.filter(
         (o) => o.paymentStatus === "pending" || !o.paymentStatus
       ).length,
-      successfulPayments: allOrders.filter((o) => o.paymentStatus === "success")
+      successfulPayments: activeOrders.filter((o) => o.paymentStatus === "success")
         .length,
-      failedPayments: allOrders.filter((o) => o.paymentStatus === "failed")
+      failedPayments: activeOrders.filter((o) => o.paymentStatus === "failed")
         .length,
     };
 
@@ -785,5 +800,71 @@ export const recordRtoAction = mutation({
       success: true,
       actionType: args.actionType,
     };
+  },
+});
+
+// Soft delete orders (bulk)
+export const softDeleteOrders = mutation({
+  args: {
+    orderIds: v.array(v.id("orders")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier))
+      .unique();
+
+    if (!user) {
+      throw new ConvexError({
+        message: "User not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Soft delete all orders
+    for (const orderId of args.orderIds) {
+      await ctx.db.patch(orderId, {
+        isDeleted: true,
+        deletedAt: Date.now(),
+        deletedBy: user._id,
+      });
+    }
+
+    return { success: true, deletedCount: args.orderIds.length };
+  },
+});
+
+// Restore deleted orders (bulk)
+export const restoreOrders = mutation({
+  args: {
+    orderIds: v.array(v.id("orders")),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Restore all orders
+    for (const orderId of args.orderIds) {
+      await ctx.db.patch(orderId, {
+        isDeleted: false,
+        deletedAt: undefined,
+        deletedBy: undefined,
+      });
+    }
+
+    return { success: true, restoredCount: args.orderIds.length };
   },
 });

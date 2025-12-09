@@ -181,16 +181,25 @@ export const createOrder = mutation({
     // Calculate GST breakdown (tax-inclusive pricing)
     const gstCalculation = calculateGST(total + walletAmountUsed, args.shippingAddress.state);
 
-    // Generate order number
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    // Store original total for notifications (before wallet and coupon deductions)
+    const originalTotal = subtotal + shippingFee - couponDiscount;
+
+    // Determine if we should generate order number now
+    // Generate immediately for: COD orders, wallet-fully-paid orders
+    // Don't generate for: online payment orders (will be assigned when payment succeeds)
+    const shouldGenerateOrderNumber = 
+      (args.paymentMethod === "cod") || 
+      (walletAmountUsed >= originalTotal);
+    
+    let orderNumber: string | undefined;
+    if (shouldGenerateOrderNumber) {
+      orderNumber = await ctx.runMutation(internal.orderNumberHelpers.generateOrderNumber);
+    }
 
     // Generate tracking token for guest orders (secure random string)
     const trackingToken = isGuest 
       ? `TRK-${Date.now()}-${Math.random().toString(36).substr(2, 20)}-${Math.random().toString(36).substr(2, 20)}`
       : undefined;
-
-    // Store original total for notifications (before wallet and coupon deductions)
-    const originalTotal = subtotal + shippingFee - couponDiscount;
 
     // Create order
     const orderId = await ctx.db.insert("orders", {
@@ -316,7 +325,7 @@ export const createOrder = mutation({
                 recipientUserId: user?._id,
                 variables: {
                   customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-                  order_number: orderNumber,
+                  order_number: orderNumber || "Pending",
                   order_total: `₹${total.toFixed(2)}`,
                   cod_amount: `₹${(args.codAmount || total).toFixed(2)}`,
                   cod_fee: `₹${(args.codFee || 0).toFixed(2)}`,
@@ -335,7 +344,7 @@ export const createOrder = mutation({
                 recipientUserId: user?._id,
                 variables: {
                   customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-                  order_number: orderNumber,
+                  order_number: orderNumber || "Pending",
                   product_name: cartItems.map(item => item.productTitle).join(", "),
                 },
                 priority: 8,
@@ -354,7 +363,7 @@ export const createOrder = mutation({
             recipientUserId: user?._id,
             variables: {
               customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-              order_number: orderNumber,
+              order_number: orderNumber || "Pending",
               product_name: cartItems.map(item => item.productTitle).join(", "),
             },
             priority: 8,
@@ -415,7 +424,7 @@ export const createOrder = mutation({
               usecaseKey: "admin_new_order",
               recipientPhone: config.adminPhone,
               variables: {
-                order_number: orderNumber,
+                order_number: orderNumber || "Pending",
                 order_amount: `₹${total.toFixed(2)}`,
                 payment_type: paymentType,
                 products: productsList,
@@ -470,7 +479,7 @@ export const createOrder = mutation({
             recipientUserId: user?._id,
             variables: {
               customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-              order_number: orderNumber,
+              order_number: orderNumber || "Pending",
               product_name: cartItems.map(item => item.productTitle).join(", "),
             },
             priority: 8,
@@ -765,6 +774,19 @@ export const updatePaymentStatus = mutation({
     }
 
     const oldPaymentStatus = order.paymentStatus;
+    
+    // Handle order numbering based on payment status
+    let orderNumberUpdate: string | undefined = order.orderNumber;
+    let failedOrderNumberUpdate: string | undefined = order.failedOrderNumber;
+    
+    if (args.paymentStatus === "success" && !order.orderNumber) {
+      // Payment succeeded and no order number yet - generate one
+      orderNumberUpdate = await ctx.runMutation(internal.orderNumberHelpers.generateOrderNumber);
+    } else if (args.paymentStatus === "failed" && oldPaymentStatus !== "failed" && !order.failedOrderNumber) {
+      // Payment failed for the first time - generate failed order number
+      failedOrderNumberUpdate = await ctx.runMutation(internal.orderNumberHelpers.generateFailedOrderNumber);
+    }
+    
     // Set order status based on payment outcome:
     // - success → processing
     // - failed → cancelled
@@ -779,6 +801,8 @@ export const updatePaymentStatus = mutation({
     await ctx.db.patch(order._id, {
       paymentStatus: args.paymentStatus,
       status: newStatus,
+      orderNumber: orderNumberUpdate,
+      failedOrderNumber: failedOrderNumberUpdate,
     });
 
     // If payment failed and user had used wallet, refund the wallet amount
@@ -842,7 +866,7 @@ export const updatePaymentStatus = mutation({
                   recipientUserId: order.userId,
                   variables: {
                     customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                    order_number: order.orderNumber,
+                    order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                     order_total: `₹${order.total.toFixed(2)}`,
                     prepaid_amount: `₹${(order.prepaidAmount || 0).toFixed(2)}`,
                     cod_amount: `₹${(order.codAmount || 0).toFixed(2)}`,
@@ -862,7 +886,7 @@ export const updatePaymentStatus = mutation({
                   recipientUserId: order.userId,
                   variables: {
                     customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                    order_number: order.orderNumber,
+                    order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                     product_name: order.items.map(item => item.productTitle).join(", "),
                   },
                   priority: 8,
@@ -880,7 +904,7 @@ export const updatePaymentStatus = mutation({
                 recipientUserId: order.userId,
                 variables: {
                   customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                  order_number: order.orderNumber,
+                  order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                   product_name: order.items.map(item => item.productTitle).join(", "),
                 },
                 priority: 8,
@@ -955,5 +979,42 @@ export const getOrderByTrackingToken = query({
     }
 
     return order;
+  },
+});
+
+// Retry payment for failed order
+export const retryPayment = mutation({
+  args: {
+    orderId: v.id("orders"),
+  },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    if (order.paymentStatus !== "failed") {
+      throw new ConvexError({
+        message: "Can only retry payment for failed orders",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Reset payment status to pending to allow retry
+    await ctx.db.patch(order._id, {
+      paymentStatus: "pending",
+      status: "processing",
+    });
+
+    // Return order data needed for payment initiation
+    return {
+      orderId: order._id,
+      total: order.total,
+      walletAmountUsed: order.walletAmountUsed || 0,
+    };
   },
 });

@@ -37,7 +37,8 @@ export default defineSchema({
     isGuest: v.optional(v.boolean()), // Whether this is a guest order
     guestEmail: v.optional(v.string()), // Guest email for guest orders
     trackingToken: v.optional(v.string()), // Secure token for guest order tracking
-    orderNumber: v.string(),
+    orderNumber: v.optional(v.string()), // Sequential order number (e.g., #4001), assigned when payment succeeds
+    failedOrderNumber: v.optional(v.string()), // Failed order number (e.g., F26-001), for failed payments
     customerEmail: v.optional(v.string()), // Customer's email for notifications
     status: v.union(
       v.literal("processing"),
@@ -140,13 +141,19 @@ export default defineSchema({
       notes: v.optional(v.string()), // Optional notes
       newOrderNumber: v.optional(v.string()), // New order number if resent (with -C suffix)
     }))),
+    // Soft delete fields
+    isDeleted: v.optional(v.boolean()), // Whether order is soft deleted
+    deletedAt: v.optional(v.number()), // Timestamp of deletion
+    deletedBy: v.optional(v.id("users")), // Admin who deleted the order
   })
     .index("by_user", ["userId"])
     .index("by_order_number", ["orderNumber"])
     .index("by_merchant_transaction", ["phonepeMerchantTransactionId"])
     .index("by_status", ["status"])
     .index("by_guest_email", ["guestEmail"])
-    .index("by_tracking_token", ["trackingToken"]),
+    .index("by_tracking_token", ["trackingToken"])
+    .index("by_payment_status", ["paymentStatus"])
+    .index("by_is_deleted", ["isDeleted"]),
 
   collections: defineTable({
     name: v.string(),

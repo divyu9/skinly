@@ -1,4 +1,4 @@
-import { useQuery, useAction } from "convex/react";
+import { useQuery, useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -34,7 +34,7 @@ type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
 function AdminOrdersPageInner() {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("processing");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
@@ -58,11 +58,14 @@ function AdminOrdersPageInner() {
   // Actions
   const bulkCreateShipments = useAction(api.rapidshyp.bulkCreateShipments);
   const bulkFetchLabels = useAction(api.rapidshyp.bulkFetchLabels);
+  const softDeleteOrders = useMutation(api.admin.orders.softDeleteOrders);
+  const restoreOrders = useMutation(api.admin.orders.restoreOrders);
 
   const stats = useQuery(api.admin.orders.getOrderStats);
   const allOrders = useQuery(api.admin.orders.getAllOrders, {
-    status: statusFilter,
-    paymentStatus: paymentFilter,
+    status: statusFilter === "failed" || statusFilter === "deleted" || statusFilter === "all" ? undefined : statusFilter,
+    paymentStatus: statusFilter === "failed" ? "failed" : (paymentFilter !== "all" ? paymentFilter : undefined),
+    showDeleted: statusFilter === "deleted",
   });
   const searchResults = useQuery(
     api.admin.orders.searchOrders,
@@ -406,6 +409,34 @@ function AdminOrdersPageInner() {
     }
   };
 
+  const handleSoftDelete = async () => {
+    if (selectedOrders.size === 0) return;
+    
+    try {
+      const result = await softDeleteOrders({
+        orderIds: Array.from(selectedOrders),
+      });
+      toast.success(`${result.deletedCount} order(s) deleted successfully`);
+      setSelectedOrders(new Set());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete orders");
+    }
+  };
+
+  const handleRestore = async () => {
+    if (selectedOrders.size === 0) return;
+    
+    try {
+      const result = await restoreOrders({
+        orderIds: Array.from(selectedOrders),
+      });
+      toast.success(`${result.restoredCount} order(s) restored successfully`);
+      setSelectedOrders(new Set());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to restore orders");
+    }
+  };
+
   const generatePackList = () => {
     if (!displayOrders || selectedOrders.size === 0) {
       toast.error("Please select orders to generate pack list");
@@ -589,12 +620,6 @@ function AdminOrdersPageInner() {
       {/* Status Tabs */}
       <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            All Orders
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-              {stats.total}
-            </Badge>
-          </TabsTrigger>
           <TabsTrigger value="processing" className="flex items-center gap-2">
             Processing
             <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/20">
@@ -623,6 +648,24 @@ function AdminOrdersPageInner() {
             RTO
             <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
               {stats.rto}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="failed" className="flex items-center gap-2">
+            Failed Orders
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
+              {stats.failed}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="deleted" className="flex items-center gap-2">
+            Deleted Orders
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-gray-500/10 text-gray-600 border-gray-500/20">
+              {stats.deleted}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            All Orders
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+              {stats.total}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -780,6 +823,28 @@ function AdminOrdersPageInner() {
               </Button>
             )}
             
+            {/* Soft Delete - All tabs except deleted */}
+            {statusFilter !== "deleted" && (
+              <Button
+                onClick={() => handleSoftDelete()}
+                disabled={selectedOrders.size === 0}
+                variant="destructive"
+              >
+                Delete Selected ({selectedOrders.size})
+              </Button>
+            )}
+            
+            {/* Restore - Deleted tab only */}
+            {statusFilter === "deleted" && (
+              <Button
+                onClick={() => handleRestore()}
+                disabled={selectedOrders.size === 0}
+                variant="default"
+              >
+                Restore Selected ({selectedOrders.size})
+              </Button>
+            )}
+            
             {/* Pack List - All tabs */}
             <Button
               onClick={generatePackList}
@@ -860,7 +925,7 @@ function AdminOrdersPageInner() {
                       </td>
                       <td className="p-3">
                         <span className="font-mono text-sm font-medium">
-                          {order.orderNumber}
+                          {order.orderNumber || order.failedOrderNumber || "Pending"}
                         </span>
                       </td>
                       <td className="p-3">

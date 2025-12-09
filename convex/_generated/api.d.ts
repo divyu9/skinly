@@ -46,6 +46,7 @@ import type * as mockups from "../mockups.js";
 import type * as mockupsUpload from "../mockupsUpload.js";
 import type * as modelCache from "../modelCache.js";
 import type * as modelRequests from "../modelRequests.js";
+import type * as orderNumberHelpers from "../orderNumberHelpers.js";
 import type * as orders from "../orders.js";
 import type * as phoneCollections from "../phoneCollections.js";
 import type * as phoneCollectionsHelpers from "../phoneCollectionsHelpers.js";
@@ -125,6 +126,7 @@ declare const fullApi: ApiFromModules<{
   mockupsUpload: typeof mockupsUpload;
   modelCache: typeof modelCache;
   modelRequests: typeof modelRequests;
+  orderNumberHelpers: typeof orderNumberHelpers;
   orders: typeof orders;
   phoneCollections: typeof phoneCollections;
   phoneCollectionsHelpers: typeof phoneCollectionsHelpers;
