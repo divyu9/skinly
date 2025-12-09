@@ -218,8 +218,8 @@ function CheckoutPageInner() {
         cartTotal: total,
         userEmail: formData.email || undefined,
         cartItems: cartItems?.map((item) => ({
-          variantId: item.variantId,
-          productId: item.productId,
+          variantId: ('variantId' in item ? item.variantId : item.variant) as Id<"variants">,
+          productId: item.productId as Id<"products">,
           productTitle: item.productTitle,
           price: item.price,
           quantity: item.quantity,

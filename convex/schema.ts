@@ -105,6 +105,9 @@ export default defineSchema({
     walletAmountUsed: v.optional(v.number()), // Amount deducted from wallet
     cashbackAmount: v.optional(v.number()), // Cashback earned on this order
     cashbackCredited: v.optional(v.boolean()), // Whether cashback has been credited
+    // Coupon fields
+    couponId: v.optional(v.id("coupons")), // Coupon used for this order
+    couponDiscount: v.optional(v.number()), // Discount amount from coupon
     // Refund tracking fields
     refundedToWallet: v.optional(v.boolean()), // Whether order was refunded to wallet
     refundAmount: v.optional(v.number()), // Amount refunded to wallet

@@ -32,7 +32,7 @@ export const createOrder = mutation({
     const identity = await ctx.auth.getUserIdentity();
     const isGuest = !identity;
     
-    let user: { _id: Id<"users">; name?: string; walletBalance?: number } | null = null;
+    let user: { _id: Id<"users">; name?: string; email?: string; walletBalance?: number } | null = null;
     let cartItems: Doc<"cart">[] = [];
 
     if (isGuest) {

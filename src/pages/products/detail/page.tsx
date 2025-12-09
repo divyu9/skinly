@@ -1424,14 +1424,14 @@ export default function ProductDetailPage() {
                 ) : (
                   <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
                     <p className="text-muted-foreground">No models found matching "{modelSearch}"</p>
+                    <p className="text-sm text-muted-foreground">Can't find your model?</p>
                     <Button
                       variant="outline"
-                      onClick={() => {
-                        setModelDialogOpen(false);
-                        setRequestDialogOpen(true);
-                      }}
+                      asChild
                     >
-                      Request Your Model
+                      <Link to="/backend-skinly/model-requests">
+                        Request Your Model →
+                      </Link>
                     </Button>
                   </div>
                 )}

@@ -443,8 +443,20 @@ export default function DevicesPage() {
                     )}
                   </div>
                 ) : searchQuery.trim() && allModels ? (
-                  <div className="p-8 text-center text-sm text-muted-foreground">
-                    No models found matching "{searchQuery}"
+                  <div className="p-8 text-center space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      No models found matching "{searchQuery}"
+                    </p>
+                    <p className="text-xs text-muted-foreground">Can't find your model?</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                    >
+                      <Link to="/backend-skinly/model-requests">
+                        Request Your Model →
+                      </Link>
+                    </Button>
                   </div>
                 ) : searchQuery.trim() ? (
                   <div className="p-8 flex flex-col items-center gap-2">
@@ -468,11 +480,13 @@ export default function DevicesPage() {
                 <span>Can't Find Your Device?</span>
               </div>
               <Button
-                onClick={() => setRequestDialogOpen(true)}
+                asChild
                 className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
               >
-                <ZapIcon className="size-4 mr-2" />
-                Request Your Model
+                <Link to="/backend-skinly/model-requests">
+                  <ZapIcon className="size-4 mr-2" />
+                  Request Your Model
+                </Link>
               </Button>
               <p className="text-xs text-muted-foreground">
                 we'll add it with high priority
