@@ -139,7 +139,7 @@ function TaxExportPageInner() {
           .join(", ");
 
         return [
-          order.orderNumber,
+          order.orderNumber || order.failedOrderNumber || "Pending",
           new Date(order._creationTime).toLocaleString("en-IN"),
           order.shippingAddress.fullName,
           order.shippingAddress.phone,

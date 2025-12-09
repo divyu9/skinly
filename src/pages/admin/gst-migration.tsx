@@ -100,12 +100,12 @@ export default function GstMigrationPage() {
               <div className="space-y-2">
                 <h3 className="font-medium">Orders without GST data:</h3>
                 <div className="max-h-48 overflow-y-auto space-y-1 text-sm">
-                  {ordersWithoutGst.map((order: { _id: string; orderNumber: string; total: number; state: string }) => (
+                  {ordersWithoutGst.map((order: { _id: string; orderNumber: string | undefined; total: number; state: string }) => (
                     <div
                       key={order._id}
                       className="flex justify-between p-2 bg-muted/50 rounded"
                     >
-                      <span>{order.orderNumber}</span>
+                      <span>{order.orderNumber || order._id}</span>
                       <span className="text-muted-foreground">
                         ₹{order.total.toFixed(0)} ({order.state})
                       </span>

@@ -453,14 +453,15 @@ function AdminOrdersPageInner() {
     selectedOrdersList.forEach((order) => {
       order.items.forEach((item) => {
         const sku = item.variant; // Using variant as SKU
+        const orderRef = order.orderNumber || order.failedOrderNumber || order._id;
         if (skuMap[sku]) {
           skuMap[sku].quantity += item.quantity;
-          skuMap[sku].orders.push(order.orderNumber);
+          skuMap[sku].orders.push(orderRef);
         } else {
           skuMap[sku] = {
             sku,
             quantity: item.quantity,
-            orders: [order.orderNumber],
+            orders: [orderRef],
           };
         }
       });

@@ -54,7 +54,7 @@ function generateXVerify(
 export const initiatePayment = action({
   args: {
     orderId: v.id("orders"),
-    orderNumber: v.string(),
+    orderNumber: v.optional(v.string()),
     amount: v.number(), // in rupees
     customerPhone: v.string(),
   },
@@ -85,7 +85,9 @@ export const initiatePayment = action({
       // Generate merchant transaction ID (max 38 chars)
       const timestamp = Date.now();
       const last6 = timestamp.toString().slice(-6);
-      const merchantTransactionId = `${args.orderNumber}-${last6}`;
+      // Use orderNumber if available, otherwise use orderId
+      const orderRef = args.orderNumber || args.orderId.slice(-8);
+      const merchantTransactionId = `${orderRef}-${last6}`;
 
       // Convert amount to paise (minimum 100 paise = ₹1)
       const amountInPaise = Math.max(Math.round(args.amount * 100), 100);
