@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon, SparklesIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon, SparklesIcon, CheckCircleIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -96,6 +96,10 @@ function CheckoutPageInner() {
     eligibleItemsCount: number;
   } | null>(null);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -233,8 +237,11 @@ function CheckoutPageInner() {
 
   // Handle coupon apply
   const handleApplyCoupon = async () => {
+    // Clear previous message
+    setCouponMessage(null);
+    
     if (!couponCode.trim()) {
-      toast.error("Please enter a coupon code");
+      setCouponMessage({ type: 'error', text: 'Please enter a coupon code' });
       return;
     }
 
@@ -242,7 +249,7 @@ function CheckoutPageInner() {
     try {
       // Validate cart items have proper IDs before querying
       if (!cartItems || cartItems.length === 0) {
-        toast.error("Your cart is empty");
+        setCouponMessage({ type: 'error', text: 'Your cart is empty' });
         setIsApplyingCoupon(false);
         return;
       }
@@ -255,7 +262,7 @@ function CheckoutPageInner() {
       });
 
       if (validCartItems.length === 0) {
-        toast.error("Unable to apply coupon to items in your cart");
+        setCouponMessage({ type: 'error', text: 'Unable to apply coupon to items in your cart' });
         setIsApplyingCoupon(false);
         return;
       }
@@ -274,7 +281,9 @@ function CheckoutPageInner() {
       });
       
       setAppliedCoupon(result);
-      toast.success(`Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}`);
+      setCouponMessage({ type: 'success', text: `Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}` });
+      // Clear success message after showing briefly
+      setTimeout(() => setCouponMessage(null), 2000);
     } catch (error) {
       // Extract user-friendly error message from ConvexError
       let errorMessage = "Unable to apply coupon";
@@ -291,7 +300,7 @@ function CheckoutPageInner() {
       
       // Log full error for debugging but show clean message to user
       console.error("Coupon validation error:", error);
-      toast.error(errorMessage);
+      setCouponMessage({ type: 'error', text: errorMessage });
     } finally {
       setIsApplyingCoupon(false);
     }
@@ -301,7 +310,16 @@ function CheckoutPageInner() {
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponCode("");
-    toast.success("Coupon removed");
+    setCouponMessage(null);
+  };
+
+  // Handle coupon code change
+  const handleCouponCodeChange = (value: string) => {
+    setCouponCode(value.toUpperCase());
+    // Clear message when user starts typing
+    if (couponMessage) {
+      setCouponMessage(null);
+    }
   };
 
   // Loading state
@@ -869,22 +887,46 @@ function CheckoutPageInner() {
                     </div>
                     
                     {!appliedCoupon ? (
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Enter coupon code"
-                          value={couponCode}
-                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                          disabled={isApplyingCoupon}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleApplyCoupon}
-                          disabled={!couponCode.trim() || isApplyingCoupon}
-                        >
-                          {isApplyingCoupon ? "Applying..." : "Apply"}
-                        </Button>
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter coupon code"
+                            value={couponCode}
+                            onChange={(e) => handleCouponCodeChange(e.target.value)}
+                            disabled={isApplyingCoupon}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleApplyCoupon}
+                            disabled={!couponCode.trim() || isApplyingCoupon}
+                          >
+                            {isApplyingCoupon ? "Applying..." : "Apply"}
+                          </Button>
+                        </div>
+                        
+                        {/* Inline feedback message */}
+                        {couponMessage && (
+                          <div className={`flex items-start gap-2 p-2 rounded-lg text-sm ${
+                            couponMessage.type === 'success' 
+                              ? 'bg-green-500/10 border border-green-500/20' 
+                              : 'bg-red-500/10 border border-red-500/20'
+                          }`}>
+                            {couponMessage.type === 'success' ? (
+                              <CheckCircleIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                            ) : (
+                              <AlertCircleIcon className="size-4 text-red-600 mt-0.5 shrink-0" />
+                            )}
+                            <p className={`text-xs ${
+                              couponMessage.type === 'success' 
+                                ? 'text-green-700 dark:text-green-300' 
+                                : 'text-red-700 dark:text-red-300'
+                            }`}>
+                              {couponMessage.text}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
@@ -1529,22 +1571,46 @@ function CheckoutPageInner() {
                   </div>
                   
                   {!appliedCoupon ? (
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter coupon code"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        disabled={isApplyingCoupon}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleApplyCoupon}
-                        disabled={!couponCode.trim() || isApplyingCoupon}
-                      >
-                        {isApplyingCoupon ? "Applying..." : "Apply"}
-                      </Button>
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter coupon code"
+                          value={couponCode}
+                          onChange={(e) => handleCouponCodeChange(e.target.value)}
+                          disabled={isApplyingCoupon}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleApplyCoupon}
+                          disabled={!couponCode.trim() || isApplyingCoupon}
+                        >
+                          {isApplyingCoupon ? "Applying..." : "Apply"}
+                        </Button>
+                      </div>
+                      
+                      {/* Inline feedback message */}
+                      {couponMessage && (
+                        <div className={`flex items-start gap-2 p-2 rounded-lg text-sm ${
+                          couponMessage.type === 'success' 
+                            ? 'bg-green-500/10 border border-green-500/20' 
+                            : 'bg-red-500/10 border border-red-500/20'
+                        }`}>
+                          {couponMessage.type === 'success' ? (
+                            <CheckCircleIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                          ) : (
+                            <AlertCircleIcon className="size-4 text-red-600 mt-0.5 shrink-0" />
+                          )}
+                          <p className={`text-xs ${
+                            couponMessage.type === 'success' 
+                              ? 'text-green-700 dark:text-green-300' 
+                              : 'text-red-700 dark:text-red-300'
+                          }`}>
+                            {couponMessage.text}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
