@@ -23,6 +23,8 @@ export const createOrder = mutation({
     prepaidAmount: v.optional(v.number()),
     codAmount: v.optional(v.number()),
     walletAmount: v.optional(v.number()),
+    couponId: v.optional(v.id("coupons")),
+    couponDiscount: v.optional(v.number()),
     sessionId: v.optional(v.string()), // For guest checkout
     guestEmail: v.optional(v.string()), // Required for guest checkout
   },
@@ -102,7 +104,10 @@ export const createOrder = mutation({
     const freeShippingThreshold = (freeThresholdSetting?.value as number) ?? 500;
     const flatShippingFee = (flatFeeSetting?.value as number) ?? 50;
     const shippingFee = subtotal >= freeShippingThreshold ? 0 : flatShippingFee;
-    let total = subtotal + shippingFee;
+    
+    // Apply coupon discount
+    const couponDiscount = args.couponDiscount || 0;
+    let total = Math.max(0, subtotal + shippingFee - couponDiscount);
 
     // Handle wallet payment (only for authenticated users)
     let walletAmountUsed = 0;
@@ -184,8 +189,8 @@ export const createOrder = mutation({
       ? `TRK-${Date.now()}-${Math.random().toString(36).substr(2, 20)}-${Math.random().toString(36).substr(2, 20)}`
       : undefined;
 
-    // Store original total for notifications (before wallet deduction)
-    const originalTotal = subtotal + shippingFee;
+    // Store original total for notifications (before wallet and coupon deductions)
+    const originalTotal = subtotal + shippingFee - couponDiscount;
 
     // Create order
     const orderId = await ctx.db.insert("orders", {
@@ -215,6 +220,9 @@ export const createOrder = mutation({
       paymentStatus: walletAmountUsed >= originalTotal ? "success" : "pending", // If fully paid by wallet, mark as success
       // Wallet fields
       walletAmountUsed,
+      // Coupon fields
+      couponId: args.couponId,
+      couponDiscount,
       // COD fields
       codFee: args.codFee,
       prepaidAmount: args.prepaidAmount,
@@ -250,6 +258,17 @@ export const createOrder = mutation({
     // Clear cart
     for (const item of cartItems) {
       await ctx.db.delete(item._id);
+    }
+
+    // Track coupon usage (only for authenticated users, guests can't use coupons yet)
+    if (!isGuest && user && args.couponId && couponDiscount > 0) {
+      await ctx.runMutation(api.coupons.incrementCouponUsage, {
+        couponId: args.couponId,
+        userId: user._id,
+        userEmail: user.email || args.customerEmail || "",
+        orderId,
+        discountAmount: couponDiscount,
+      });
     }
 
     // Mark any abandoned carts as recovered (authenticated users only)

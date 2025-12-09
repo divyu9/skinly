@@ -606,6 +606,8 @@ function CheckoutPageInner() {
         prepaidAmount,
         codAmount,
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
+        couponId: appliedCoupon?.coupon._id,
+        couponDiscount: appliedCoupon?.discountAmount,
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,
       });
@@ -1285,10 +1287,13 @@ function CheckoutPageInner() {
                       )}
                     </span>
                   </div>
-                  {codFee > 0 && (
+                  {couponDiscount > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span>COD Fee</span>
-                      <span>₹{codFee.toFixed(0)}</span>
+                      <span className="text-green-600 flex items-center gap-1">
+                        <TagIcon className="size-3" />
+                        Coupon Discount
+                      </span>
+                      <span className="text-green-600 font-medium">-₹{couponDiscount.toFixed(0)}</span>
                     </div>
                   )}
                   {walletAmount > 0 && (
@@ -1298,6 +1303,12 @@ function CheckoutPageInner() {
                         Wallet Deduction
                       </span>
                       <span className="text-green-600 font-medium">-₹{walletAmount.toFixed(0)}</span>
+                    </div>
+                  )}
+                  {codFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>COD Fee</span>
+                      <span>₹{codFee.toFixed(0)}</span>
                     </div>
                   )}
                   {shippingSettings && subtotal < shippingSettings.freeShippingThreshold && (
