@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon, SparklesIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -179,6 +179,23 @@ function CheckoutPageInner() {
         }
       : "skip"
   );
+
+  // Calculate cashback for cart items
+  const cashbackData = useQuery(
+    api.cashbackHelpers.calculateCartCashback,
+    cartItems && cartItems.length > 0
+      ? {
+          items: cartItems.map((item) => ({
+            productId: item.productId as Id<"products">,
+            variantId: ('variantId' in item ? item.variantId : item.variant) as Id<"variants">,
+            finalPrice: item.price,
+            quantity: item.quantity,
+          })),
+        }
+      : "skip"
+  );
+
+  const totalCashback = cashbackData?.totalCashback || 0;
 
   // Calculate coupon discount
   const couponDiscount = appliedCoupon?.discountAmount || 0;
@@ -760,6 +777,244 @@ function CheckoutPageInner() {
           {/* Checkout Form */}
           <div className="lg:col-span-2">
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Order Summary - Mobile Only */}
+              <Card className="lg:hidden">
+                <CardHeader>
+                  <CardTitle>Order Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Items */}
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {cartItems && cartItems.map((item, index) => (
+                      <div key={('_id' in item ? String(item._id) : `${item.productId}-${item.variant}-${index}`)} className="flex gap-3">
+                        {item.productImage && (
+                          <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
+                            <img
+                              src={item.productImage}
+                              alt={item.productTitle}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium line-clamp-2">
+                            {item.productTitle}
+                          </p>
+                          {item.phoneModel && (
+                            <p className="text-xs text-muted-foreground">
+                              {item.phoneModel}
+                            </p>
+                          )}
+                          <p className="text-sm font-semibold text-primary">
+                            ₹{item.price.toFixed(0)} × {item.quantity}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Separator />
+
+                  {/* Coupon Code Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <TagIcon className="size-4" />
+                      <span>Have a Coupon?</span>
+                    </div>
+                    
+                    {!appliedCoupon ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter coupon code"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          disabled={isApplyingCoupon}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleApplyCoupon}
+                          disabled={!couponCode.trim() || isApplyingCoupon}
+                        >
+                          {isApplyingCoupon ? "Applying..." : "Apply"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                        <TagIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                              {appliedCoupon.coupon.code}
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveCoupon}
+                              className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
+                            >
+                              <XIcon className="size-4" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                            {appliedCoupon.coupon.description}
+                          </p>
+                          <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                            You're saving ₹{appliedCoupon.discountAmount.toFixed(0)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Pricing */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal</span>
+                      <span>₹{subtotal.toFixed(0)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Shipping</span>
+                      <span>
+                        {shippingFee === 0 ? (
+                          <span className="text-green-600 font-medium">FREE</span>
+                        ) : (
+                          `₹${shippingFee.toFixed(0)}`
+                        )}
+                      </span>
+                    </div>
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-green-600 flex items-center gap-1">
+                          <TagIcon className="size-3" />
+                          Coupon Discount
+                        </span>
+                        <span className="text-green-600 font-medium">-₹{couponDiscount.toFixed(0)}</span>
+                      </div>
+                    )}
+                    {walletAmount > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-green-600 flex items-center gap-1">
+                          <WalletIcon className="size-3" />
+                          Wallet Deduction
+                        </span>
+                        <span className="text-green-600 font-medium">-₹{walletAmount.toFixed(0)}</span>
+                      </div>
+                    )}
+                    {codFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>COD Fee</span>
+                        <span>₹{codFee.toFixed(0)}</span>
+                      </div>
+                    )}
+                    {shippingSettings && subtotal < shippingSettings.freeShippingThreshold && (
+                      <p className="text-xs text-muted-foreground">
+                        Add ₹{(shippingSettings.freeShippingThreshold - subtotal + 1).toFixed(0)} more for free shipping
+                      </p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">
+                      {walletAmount > 0 ? "Amount to Pay" : "Total"}
+                    </span>
+                    <span className="text-2xl font-bold text-primary">
+                      ₹{finalTotal.toFixed(0)}
+                    </span>
+                  </div>
+
+                  {/* Cashback Display */}
+                  {totalCashback > 0 && (
+                    <>
+                      <div className="flex items-start gap-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                        <SparklesIcon className="size-4 text-purple-600 mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                            You'll earn ₹{totalCashback.toFixed(0)} cashback
+                          </p>
+                          <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                            Credited to your wallet after delivery
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex justify-between items-center pt-2 border-t-2 border-purple-500/20">
+                        <span className="text-sm font-medium text-muted-foreground">Effective Cost</span>
+                        <span className="text-xl font-bold text-purple-600">
+                          ₹{(finalTotal - totalCashback).toFixed(0)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  
+                  {walletAmount > 0 && walletAmount >= total && (
+                    <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                      <WalletIcon className="size-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                        Fully paid with wallet!
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Partial COD Breakdown */}
+                  {formData.paymentMethod === "cod" && codAvailability?.available && codAvailability.prepaidAmount > 0 && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Pay Now (PhonePe)</span>
+                        <span className="font-medium text-blue-600">₹{codAvailability.prepaidAmount.toFixed(0)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Pay on Delivery</span>
+                        <span className="font-medium text-amber-600">₹{codAvailability.codAmount.toFixed(0)}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* GST Breakdown */}
+                  {gstBreakdown && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          GST Breakdown (Tax Included)
+                        </p>
+                        <div className="flex justify-between text-xs">
+                          <span>Taxable Amount</span>
+                          <span>₹{gstBreakdown.taxableAmount.toFixed(2)}</span>
+                        </div>
+                        {gstBreakdown.isUttarPradesh ? (
+                          <>
+                            <div className="flex justify-between text-xs">
+                              <span>CGST (9%)</span>
+                              <span>₹{gstBreakdown.cgstAmount?.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span>SGST (9%)</span>
+                              <span>₹{gstBreakdown.sgstAmount?.toFixed(2)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex justify-between text-xs">
+                            <span>IGST (18%)</span>
+                            <span>₹{gstBreakdown.igstAmount?.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-xs font-medium pt-1 border-t">
+                          <span>Total GST</span>
+                          <span>₹{gstBreakdown.totalGstAmount.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Shipping Information */}
               <Card>
                 <CardHeader>
@@ -1328,6 +1583,30 @@ function CheckoutPageInner() {
                     ₹{finalTotal.toFixed(0)}
                   </span>
                 </div>
+
+                {/* Cashback Display */}
+                {totalCashback > 0 && (
+                  <>
+                    <div className="flex items-start gap-2 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                      <SparklesIcon className="size-4 text-purple-600 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                          You'll earn ₹{totalCashback.toFixed(0)} cashback
+                        </p>
+                        <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
+                          Credited to your wallet after delivery
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center pt-2 border-t-2 border-purple-500/20">
+                      <span className="text-sm font-medium text-muted-foreground">Effective Cost</span>
+                      <span className="text-xl font-bold text-purple-600">
+                        ₹{(finalTotal - totalCashback).toFixed(0)}
+                      </span>
+                    </div>
+                  </>
+                )}
                 
                 {walletAmount > 0 && walletAmount >= total && (
                   <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
