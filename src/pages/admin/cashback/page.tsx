@@ -70,6 +70,16 @@ interface SelectedTarget {
   displayName: string;
 }
 
+// Helper function for smart search: normalize text by removing spaces and converting to lowercase
+const normalizeText = (text: string): string => {
+  return text.toLowerCase().replace(/\s+/g, '');
+};
+
+// Check if normalized text contains normalized query
+const smartMatch = (text: string, query: string): boolean => {
+  return normalizeText(text).includes(normalizeText(query));
+};
+
 function AdminCashbackPageInner() {
   const rules = useQuery(api.cashback.getAllCashbackRules, {});
   const createRule = useMutation(api.cashback.createCashbackRule);
@@ -106,14 +116,14 @@ function AdminCashbackPageInner() {
   const searchResults = useMemo(() => {
     if (!debouncedTargetSearch.trim()) return [];
     
-    const query = debouncedTargetSearch.toLowerCase();
+    const query = debouncedTargetSearch;
     const results: SelectedTarget[] = [];
 
     if (formData.targetType === "product" && allProducts) {
       const matchingProducts = allProducts
         .filter((p) => 
-          p.title.toLowerCase().includes(query) || 
-          p.slug.toLowerCase().includes(query)
+          smartMatch(p.title, query) || 
+          smartMatch(p.slug, query)
         )
         .slice(0, 20);
       
@@ -129,9 +139,9 @@ function AdminCashbackPageInner() {
     if (formData.targetType === "variant" && allVariants) {
       const matchingVariants = allVariants
         .filter((v) => 
-          v.sku.toLowerCase().includes(query) ||
-          v.title.toLowerCase().includes(query) ||
-          v.productTitle.toLowerCase().includes(query)
+          smartMatch(v.sku, query) ||
+          smartMatch(v.title, query) ||
+          smartMatch(v.productTitle, query)
         )
         .slice(0, 20);
       
@@ -147,8 +157,8 @@ function AdminCashbackPageInner() {
     if (formData.targetType === "collection" && allCollections) {
       const matchingCollections = allCollections
         .filter((c) => 
-          c.name.toLowerCase().includes(query) || 
-          c.slug.toLowerCase().includes(query)
+          smartMatch(c.name, query) || 
+          smartMatch(c.slug, query)
         )
         .slice(0, 20);
       
