@@ -553,17 +553,18 @@ function AdminCashbackPageInner() {
                 
                 <div className="space-y-2">
                   <Label>Search & Select {formatTargetType(formData.targetType)}s</Label>
-                  <Command className="border rounded-md">
+                  <Command className="border rounded-md" shouldFilter={false}>
                     <CommandInput 
                       placeholder={`Search ${formData.targetType}s...`} 
                       value={targetSearchQuery}
                       onValueChange={setTargetSearchQuery}
                     />
-                    <CommandList className="max-h-[200px] overflow-y-auto">
-                      {targetSearchQuery.trim() && searchResults.length === 0 && (
+                    <CommandList className="max-h-[200px] overflow-y-auto min-h-[50px]">
+                      {targetSearchQuery.trim() === "" ? (
+                        <CommandEmpty>Start typing to search...</CommandEmpty>
+                      ) : searchResults.length === 0 ? (
                         <CommandEmpty>No results found.</CommandEmpty>
-                      )}
-                      {searchResults.length > 0 && (
+                      ) : (
                         <CommandGroup>
                           {searchResults.map((result) => (
                             <CommandItem
