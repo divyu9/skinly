@@ -506,7 +506,7 @@ function OrderDetailPageInner() {
                     <span>Subtotal</span>
                     <span>₹{order.subtotal.toFixed(0)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between items-center text-sm">
                     <span className="flex items-center gap-1">
                       <TruckIcon className="size-3" />
                       Shipping

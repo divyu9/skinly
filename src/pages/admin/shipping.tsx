@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { toast } from "sonner";
 import { TruckIcon, Loader2Icon, SaveIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -15,12 +16,16 @@ export default function AdminShippingPage() {
   
   const [freeThreshold, setFreeThreshold] = useState<string>("");
   const [flatFee, setFlatFee] = useState<string>("");
+  const [includesTax, setIncludesTax] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
   // Initialize form when settings load
-  if (shippingSettings && freeThreshold === "" && flatFee === "") {
+  if (shippingSettings && !isInitialized) {
     setFreeThreshold(shippingSettings.freeShippingThreshold.toString());
     setFlatFee(shippingSettings.flatShippingFee.toString());
+    setIncludesTax(shippingSettings.shippingIncludesTax);
+    setIsInitialized(true);
   }
   
   const handleSave = async () => {
@@ -42,6 +47,7 @@ export default function AdminShippingPage() {
       await updateShippingSettings({
         freeShippingThreshold: threshold,
         flatShippingFee: fee,
+        shippingIncludesTax: includesTax,
       });
       toast.success("Shipping settings updated successfully!");
     } catch (error) {
@@ -123,6 +129,27 @@ export default function AdminShippingPage() {
             <p className="text-sm text-muted-foreground">
               This fee applies to orders below the free shipping threshold
             </p>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                id="includesTax"
+                checked={includesTax}
+                onCheckedChange={(checked) => setIncludesTax(checked as boolean)}
+              />
+              <div className="space-y-1">
+                <Label 
+                  htmlFor="includesTax" 
+                  className="font-medium cursor-pointer"
+                >
+                  Shipping fees include GST/taxes
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Enable this if your shipping fees already include GST. This will be reflected in reports and tax calculations.
+                </p>
+              </div>
+            </div>
           </div>
           
           <div className="pt-4 border-t">

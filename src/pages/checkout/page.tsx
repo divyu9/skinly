@@ -984,7 +984,7 @@ function CheckoutPageInner() {
                       <span>Subtotal</span>
                       <span>₹{subtotal.toFixed(0)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between items-center text-sm">
                       <span>Shipping</span>
                       <span>
                         {shippingFee === 0 ? (

@@ -786,10 +786,11 @@ export const updatePaymentStatus = mutation({
       // Payment failed for the first time - generate failed order number
       failedOrderNumberUpdate = await ctx.runMutation(internal.orderNumberHelpers.generateFailedOrderNumber);
     }
+    // If payment fails on retry (oldPaymentStatus was already "failed"), keep existing numbers
     
     // Set order status based on payment outcome:
     // - success → processing
-    // - failed → cancelled
+    // - failed → cancelled (including retries - keep it in cancelled)
     // - pending → keep current status
     const newStatus = 
       args.paymentStatus === "success" 
@@ -1080,9 +1081,9 @@ export const retryPayment = mutation({
     }
 
     // Reset payment status to pending to allow retry
+    // Keep order in cancelled status - don't move to processing
     await ctx.db.patch(order._id, {
       paymentStatus: "pending",
-      status: "processing",
     });
 
     // Calculate remaining amount after wallet deduction

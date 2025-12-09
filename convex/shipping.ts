@@ -14,10 +14,16 @@ export const getShippingSettings = query({
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "shipping_flat_fee"))
       .first();
+    
+    const includesTax = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "shipping_includes_tax"))
+      .first();
 
     return {
       freeShippingThreshold: (freeThreshold?.value as number) ?? 500,
       flatShippingFee: (flatFee?.value as number) ?? 50,
+      shippingIncludesTax: (includesTax?.value as boolean) ?? false,
     };
   },
 });
@@ -27,6 +33,7 @@ export const updateShippingSettings = mutation({
   args: {
     freeShippingThreshold: v.number(),
     flatShippingFee: v.number(),
+    shippingIncludesTax: v.boolean(),
   },
   handler: async (ctx, args) => {
     // Update or create free shipping threshold
@@ -56,6 +63,21 @@ export const updateShippingSettings = mutation({
       await ctx.db.insert("settings", {
         key: "shipping_flat_fee",
         value: args.flatShippingFee,
+      });
+    }
+
+    // Update or create shipping includes tax
+    const existingIncludesTax = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "shipping_includes_tax"))
+      .first();
+
+    if (existingIncludesTax) {
+      await ctx.db.patch(existingIncludesTax._id, { value: args.shippingIncludesTax });
+    } else {
+      await ctx.db.insert("settings", {
+        key: "shipping_includes_tax",
+        value: args.shippingIncludesTax,
       });
     }
   },
