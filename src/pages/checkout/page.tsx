@@ -474,7 +474,26 @@ function CheckoutPageInner() {
     console.log("PhonePe callback received:", response);
     
     if (response === 'USER_CANCEL') {
-      // User cancelled payment
+      // User cancelled payment - update order status to failed
+      let merchantTxnId = currentMerchantTxnId;
+      
+      if (!merchantTxnId) {
+        merchantTxnId = sessionStorage.getItem('skinly_merchant_txn_id');
+      }
+      
+      // Update order status to failed if we have transaction ID
+      if (merchantTxnId) {
+        try {
+          await updatePaymentStatus({
+            merchantTransactionId: merchantTxnId,
+            paymentStatus: "failed",
+          });
+          console.log("Order marked as cancelled due to user cancellation");
+        } catch (error) {
+          console.error("Failed to update order status on cancellation:", error);
+        }
+      }
+      
       setIsRedirectingToPayment(false);
       setIsSubmitting(false);
       setRetryCount(0);
