@@ -559,7 +559,7 @@ function AdminCashbackPageInner() {
                       value={targetSearchQuery}
                       onValueChange={setTargetSearchQuery}
                     />
-                    <CommandList>
+                    <CommandList className="max-h-[200px] overflow-y-auto">
                       {targetSearchQuery.trim() && searchResults.length === 0 && (
                         <CommandEmpty>No results found.</CommandEmpty>
                       )}
