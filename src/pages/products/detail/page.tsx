@@ -1429,7 +1429,7 @@ export default function ProductDetailPage() {
                       variant="outline"
                       asChild
                     >
-                      <Link to="/backend-skinly/model-requests">
+                      <Link to="/backend-skinly/models">
                         Request Your Model →
                       </Link>
                     </Button>

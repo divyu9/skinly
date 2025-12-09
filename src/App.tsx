@@ -40,7 +40,6 @@ import AdminBugsPage from "./pages/admin/bugs/page.tsx";
 import AdminMigrationPage from "./pages/admin/migration.tsx";
 import AdminSitemapGeneratorPage from "./pages/admin/sitemap-generator.tsx";
 import AdminShippingPage from "./pages/admin/shipping.tsx";
-import AdminModelRequestsPage from "./pages/admin/model-requests.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -82,7 +81,6 @@ export default function App() {
           <Route path="/backend-skinly/oos" element={<AdminPageWrapper><AdminOOSPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/cod" element={<AdminPageWrapper><AdminCODPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/shipping" element={<AdminPageWrapper><AdminShippingPage /></AdminPageWrapper>} />
-          <Route path="/backend-skinly/model-requests" element={<AdminPageWrapper><AdminModelRequestsPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/whatsapp" element={<AdminPageWrapper><AdminWhatsAppPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/whatsapp/messages" element={<AdminPageWrapper><AdminWhatsAppMessagesPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/whatsapp/health" element={<AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper>} />

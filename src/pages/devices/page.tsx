@@ -453,7 +453,7 @@ export default function DevicesPage() {
                       size="sm"
                       asChild
                     >
-                      <Link to="/backend-skinly/model-requests">
+                      <Link to="/backend-skinly/models">
                         Request Your Model →
                       </Link>
                     </Button>
@@ -483,7 +483,7 @@ export default function DevicesPage() {
                 asChild
                 className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
               >
-                <Link to="/backend-skinly/model-requests">
+                <Link to="/backend-skinly/models">
                   <ZapIcon className="size-4 mr-2" />
                   Request Your Model
                 </Link>
