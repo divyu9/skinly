@@ -240,12 +240,32 @@ function CheckoutPageInner() {
 
     setIsApplyingCoupon(true);
     try {
+      // Validate cart items have proper IDs before querying
+      if (!cartItems || cartItems.length === 0) {
+        toast.error("Your cart is empty");
+        setIsApplyingCoupon(false);
+        return;
+      }
+
+      // Filter cart items to only include those with valid Convex IDs
+      const validCartItems = cartItems.filter(item => {
+        const hasValidProductId = item.productId && typeof item.productId === 'string' && item.productId.startsWith('j');
+        const hasValidVariant = item.variant && typeof item.variant === 'string' && item.variant.startsWith('j');
+        return hasValidProductId && hasValidVariant;
+      });
+
+      if (validCartItems.length === 0) {
+        toast.error("Unable to apply coupon to items in your cart");
+        setIsApplyingCoupon(false);
+        return;
+      }
+
       const result = await convex.query(api.coupons.validateCoupon, {
         code: couponCode.trim(),
         cartTotal: total,
         userEmail: formData.email || undefined,
-        cartItems: cartItems?.map((item) => ({
-          variantId: ('variantId' in item ? item.variantId : item.variant) as Id<"variants">,
+        cartItems: validCartItems.map((item) => ({
+          variantId: item.variant as Id<"variants">,
           productId: item.productId as Id<"products">,
           productTitle: item.productTitle,
           price: item.price,
@@ -256,11 +276,22 @@ function CheckoutPageInner() {
       setAppliedCoupon(result);
       toast.success(`Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}`);
     } catch (error) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error("Invalid coupon code");
+      // Extract user-friendly error message from ConvexError
+      let errorMessage = "Unable to apply coupon";
+      
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error as { data?: { message?: string } };
+        if (convexError.data?.message) {
+          errorMessage = convexError.data.message;
+        }
+      } else if (error instanceof Error && error.message && !error.message.includes('CONVEX')) {
+        // Use error message only if it doesn't contain technical Convex details
+        errorMessage = error.message;
       }
+      
+      // Log full error for debugging but show clean message to user
+      console.error("Coupon validation error:", error);
+      toast.error(errorMessage);
     } finally {
       setIsApplyingCoupon(false);
     }
