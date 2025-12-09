@@ -815,6 +815,11 @@ function CheckoutPageInner() {
                               {item.phoneModel}
                             </p>
                           )}
+                          {item.coverage && (
+                            <p className="text-xs text-muted-foreground">
+                              Coverage: {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
+                            </p>
+                          )}
                           <p className="text-sm font-semibold text-primary">
                             ₹{item.price.toFixed(0)} × {item.quantity}
                           </p>
@@ -1441,8 +1446,8 @@ function CheckoutPageInner() {
             </form>
           </div>
 
-          {/* Order Summary */}
-          <div className="lg:col-span-1">
+          {/* Order Summary - Desktop Only */}
+          <div className="hidden lg:block lg:col-span-1">
             <Card className="sticky top-24">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
@@ -1468,6 +1473,11 @@ function CheckoutPageInner() {
                         {item.phoneModel && (
                           <p className="text-xs text-muted-foreground">
                             {item.phoneModel}
+                          </p>
+                        )}
+                        {item.coverage && (
+                          <p className="text-xs text-muted-foreground">
+                            Coverage: {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
                           </p>
                         )}
                         <p className="text-sm font-semibold text-primary">
