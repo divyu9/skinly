@@ -11,75 +11,85 @@ export const calculateItemCashback = query({
     finalPrice: v.number(), // Final price after all discounts/coupons
   },
   handler: async (ctx, args) => {
-    // Get all active cashback rules
-    const allActiveRules = await ctx.db
-      .query("cashbackRules")
-      .withIndex("by_active", (q) => q.eq("isActive", true))
-      .collect();
+    try {
+      // Get all active cashback rules
+      const allActiveRules = await ctx.db
+        .query("cashbackRules")
+        .withIndex("by_active", (q) => q.eq("isActive", true))
+        .collect();
 
-    // Get variant-level rules
-    const variantRules = allActiveRules.filter(
-      (rule) => rule.targetType === "variant" && rule.targetId === args.variantId
-    );
+      // Get variant-level rules
+      const variantRules = allActiveRules.filter(
+        (rule) => rule.targetType === "variant" && rule.targetId === args.variantId
+      );
 
-    // Get product-level rules
-    const productRules = allActiveRules.filter(
-      (rule) => rule.targetType === "product" && rule.targetId === args.productId
-    );
+      // Get product-level rules
+      const productRules = allActiveRules.filter(
+        (rule) => rule.targetType === "product" && rule.targetId === args.productId
+      );
 
-    // Get collection-level rules
-    // First, find which collections this product belongs to
-    const collectionProducts = await ctx.db
-      .query("collectionProducts")
-      .filter((q) => q.eq(q.field("productId"), args.productId))
-      .collect();
+      // Get collection-level rules
+      // First, find which collections this product belongs to
+      const collectionProducts = await ctx.db
+        .query("collectionProducts")
+        .filter((q) => q.eq(q.field("productId"), args.productId))
+        .collect();
 
-    const collectionIds = collectionProducts.map((cp) => cp.collectionId);
-    
-    const collectionRules = allActiveRules.filter(
-      (rule) => 
-        rule.targetType === "collection" && 
-        collectionIds.includes(rule.targetId as Id<"collections">)
-    );
+      const collectionIds = collectionProducts.map((cp) => cp.collectionId);
+      
+      const collectionRules = allActiveRules.filter(
+        (rule) => 
+          rule.targetType === "collection" && 
+          collectionIds.includes(rule.targetId as Id<"collections">)
+      );
 
-    // Combine all applicable rules
-    const applicableRules = [...variantRules, ...productRules, ...collectionRules];
+      // Combine all applicable rules
+      const applicableRules = [...variantRules, ...productRules, ...collectionRules];
 
-    if (applicableRules.length === 0) {
+      if (applicableRules.length === 0) {
+        return {
+          hasCashback: false,
+          cashbackAmount: 0,
+          cashbackRule: null,
+        };
+      }
+
+      // Calculate cashback for each rule
+      const calculatedRules = applicableRules.map((rule) => {
+        let amount = 0;
+        
+        if (rule.cashbackType === "fixed") {
+          amount = rule.cashbackValue;
+        } else if (rule.cashbackType === "percentage") {
+          // Calculate percentage of final price
+          amount = (args.finalPrice * rule.cashbackValue) / 100;
+        }
+
+        return {
+          rule,
+          amount: Math.round(amount), // Round to nearest rupee
+        };
+      });
+
+      // Find the highest cashback amount (as per priority logic)
+      const bestCashback = calculatedRules.reduce((best, current) => {
+        return current.amount > best.amount ? current : best;
+      });
+
+      return {
+        hasCashback: true,
+        cashbackAmount: bestCashback.amount,
+        cashbackRule: bestCashback.rule,
+      };
+    } catch (error) {
+      // Return no cashback if there's any error
+      console.error("Error calculating item cashback:", error);
       return {
         hasCashback: false,
         cashbackAmount: 0,
         cashbackRule: null,
       };
     }
-
-    // Calculate cashback for each rule
-    const calculatedRules = applicableRules.map((rule) => {
-      let amount = 0;
-      
-      if (rule.cashbackType === "fixed") {
-        amount = rule.cashbackValue;
-      } else if (rule.cashbackType === "percentage") {
-        // Calculate percentage of final price
-        amount = (args.finalPrice * rule.cashbackValue) / 100;
-      }
-
-      return {
-        rule,
-        amount: Math.round(amount), // Round to nearest rupee
-      };
-    });
-
-    // Find the highest cashback amount (as per priority logic)
-    const bestCashback = calculatedRules.reduce((best, current) => {
-      return current.amount > best.amount ? current : best;
-    });
-
-    return {
-      hasCashback: true,
-      cashbackAmount: bestCashback.amount,
-      cashbackRule: bestCashback.rule,
-    };
   },
 });
 
@@ -107,23 +117,29 @@ export const calculateCartCashback = query({
 
     // Calculate cashback for each item
     for (const item of args.items) {
-      const cashbackResult = await ctx.runQuery(api.cashbackHelpers.calculateItemCashback, {
-        productId: item.productId,
-        variantId: item.variantId,
-        finalPrice: item.finalPrice,
-      });
-
-      if (cashbackResult.hasCashback) {
-        const itemTotalCashback = cashbackResult.cashbackAmount * item.quantity;
-        totalCashback += itemTotalCashback;
-
-        itemCashbacks.push({
+      try {
+        const cashbackResult = await ctx.runQuery(api.cashbackHelpers.calculateItemCashback, {
           productId: item.productId,
           variantId: item.variantId,
-          cashbackPerUnit: cashbackResult.cashbackAmount,
-          totalCashback: itemTotalCashback,
-          quantity: item.quantity,
+          finalPrice: item.finalPrice,
         });
+
+        if (cashbackResult.hasCashback) {
+          const itemTotalCashback = cashbackResult.cashbackAmount * item.quantity;
+          totalCashback += itemTotalCashback;
+
+          itemCashbacks.push({
+            productId: item.productId,
+            variantId: item.variantId,
+            cashbackPerUnit: cashbackResult.cashbackAmount,
+            totalCashback: itemTotalCashback,
+            quantity: item.quantity,
+          });
+        }
+      } catch (error) {
+        // Skip this item if cashback calculation fails
+        console.error("Failed to calculate cashback for item:", item.productId, error);
+        continue;
       }
     }
 

@@ -181,13 +181,23 @@ function CheckoutPageInner() {
   );
 
   // Calculate cashback for cart items
+  // Skip if no cart items or if variants are not proper IDs
+  // Variants must start with "j" to be valid Convex IDs
+  const shouldFetchCashback = cartItems && cartItems.length > 0 && 
+    cartItems.every(item => {
+      return item.productId && 
+             item.productId.startsWith("j") && 
+             item.variant && 
+             item.variant.startsWith("j");
+    });
+    
   const cashbackData = useQuery(
     api.cashbackHelpers.calculateCartCashback,
-    cartItems && cartItems.length > 0
+    shouldFetchCashback
       ? {
           items: cartItems.map((item) => ({
             productId: item.productId as Id<"products">,
-            variantId: ('variantId' in item ? item.variantId : item.variant) as Id<"variants">,
+            variantId: item.variant as Id<"variants">,
             finalPrice: item.price,
             quantity: item.quantity,
           })),
