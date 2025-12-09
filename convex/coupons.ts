@@ -259,10 +259,27 @@ export const validateCoupon = query({
       });
     }
     
-    // Check date range
-    if (now < coupon.startDate || now > coupon.endDate) {
+    // Check date range with detailed feedback
+    if (now < coupon.startDate) {
+      const startDateStr = new Date(coupon.startDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
       throw new ConvexError({
-        message: "This coupon has expired or is not yet active",
+        message: `This coupon is not yet active. It will be available from ${startDateStr}`,
+        code: "BAD_REQUEST",
+      });
+    }
+    
+    if (now > coupon.endDate) {
+      const endDateStr = new Date(coupon.endDate).toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+      throw new ConvexError({
+        message: `This coupon expired on ${endDateStr}`,
         code: "BAD_REQUEST",
       });
     }
@@ -293,18 +310,21 @@ export const validateCoupon = query({
       }
     }
 
-    // Check minimum cart value
-    if (coupon.minCartValue && args.cartTotal < coupon.minCartValue) {
+    // Check if cart has items
+    if (!args.cartItems || args.cartItems.length === 0) {
       throw new ConvexError({
-        message: `Minimum cart value of ₹${coupon.minCartValue} required`,
+        message: "Your cart is empty",
         code: "BAD_REQUEST",
       });
     }
 
-    // Check if cart has eligible items
-    if (!args.cartItems || args.cartItems.length === 0) {
+    // Calculate total quantity in cart
+    const totalQuantity = args.cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+    // Check minimum cart value with detailed feedback
+    if (coupon.minCartValue && args.cartTotal < coupon.minCartValue) {
       throw new ConvexError({
-        message: "Cart is empty",
+        message: `Requires ₹${coupon.minCartValue} minimum (your subtotal: ₹${Math.round(args.cartTotal)})`,
         code: "BAD_REQUEST",
       });
     }
@@ -357,20 +377,22 @@ export const validateCoupon = query({
       }
     }
 
+    // Check if any items are eligible
     if (eligibleItems.length === 0) {
       throw new ConvexError({
-        message: "No items in your cart are eligible for this coupon",
+        message: "This coupon is not applicable on the items in your cart",
         code: "BAD_REQUEST",
       });
     }
 
-    // Calculate eligible total
+    // Calculate eligible total and quantity
     const eligibleTotal = eligibleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const eligibleQuantity = eligibleItems.reduce((sum, item) => sum + item.quantity, 0);
 
-    // Check minimum purchase against eligible items
+    // Check minimum purchase against eligible items with detailed feedback
     if (coupon.minPurchase && eligibleTotal < coupon.minPurchase) {
       throw new ConvexError({
-        message: `Minimum purchase of ₹${coupon.minPurchase} required for eligible products`,
+        message: `Requires ₹${coupon.minPurchase} minimum on eligible items (your eligible total: ₹${Math.round(eligibleTotal)})`,
         code: "BAD_REQUEST",
       });
     }
