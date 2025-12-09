@@ -982,6 +982,60 @@ export const getOrderByTrackingToken = query({
   },
 });
 
+// Check inventory availability for order items
+export const checkOrderInventory = query({
+  args: {
+    orderId: v.id("orders"),
+  },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Get all variants to check inventory
+    const allVariants = await ctx.db.query("variants").collect();
+    const unavailableItems: Array<{ productTitle: string; variant: string; requested: number; available: number }> = [];
+
+    for (const item of order.items) {
+      // Find the variant by matching productId and variant title
+      const variant = allVariants.find(
+        (v) => v.productId === item.productId && v.title === item.variant
+      );
+
+      if (!variant) {
+        unavailableItems.push({
+          productTitle: item.productTitle,
+          variant: item.variant,
+          requested: item.quantity,
+          available: 0,
+        });
+        continue;
+      }
+
+      // Check if variant has sufficient stock
+      const availableStock = variant.inventoryQuantity || 0;
+      if (availableStock < item.quantity) {
+        unavailableItems.push({
+          productTitle: item.productTitle,
+          variant: item.variant,
+          requested: item.quantity,
+          available: availableStock,
+        });
+      }
+    }
+
+    return {
+      available: unavailableItems.length === 0,
+      unavailableItems,
+    };
+  },
+});
+
 // Retry payment for failed order
 export const retryPayment = mutation({
   args: {
@@ -1004,17 +1058,46 @@ export const retryPayment = mutation({
       });
     }
 
+    // Check inventory availability before allowing retry
+    const allVariants = await ctx.db.query("variants").collect();
+    const unavailableItems: string[] = [];
+
+    for (const item of order.items) {
+      const variant = allVariants.find(
+        (v) => v.productId === item.productId && v.title === item.variant
+      );
+
+      if (!variant || (variant.inventoryQuantity || 0) < item.quantity) {
+        unavailableItems.push(`${item.productTitle} (${item.variant})`);
+      }
+    }
+
+    if (unavailableItems.length > 0) {
+      throw new ConvexError({
+        message: `Some items are out of stock: ${unavailableItems.join(", ")}`,
+        code: "BAD_REQUEST",
+      });
+    }
+
     // Reset payment status to pending to allow retry
     await ctx.db.patch(order._id, {
       paymentStatus: "pending",
       status: "processing",
     });
 
+    // Calculate remaining amount after wallet deduction
+    const walletAmountUsed = order.walletAmountUsed || 0;
+    const couponDiscount = order.couponDiscount || 0;
+    const subtotal = order.subtotal + order.shippingFee;
+    const codFee = order.codFee || 0;
+    const remainingAmount = Math.max(0, subtotal - couponDiscount - walletAmountUsed + codFee);
+
     // Return order data needed for payment initiation
     return {
       orderId: order._id,
-      total: order.total,
-      walletAmountUsed: order.walletAmountUsed || 0,
+      orderNumber: order.orderNumber || order.failedOrderNumber,
+      remainingAmount,
+      shippingPhone: order.shippingAddress.phone,
     };
   },
 });

@@ -1,23 +1,54 @@
-import { useQuery } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Link, useParams } from "react-router-dom";
-import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon } from "lucide-react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, RefreshCwIcon, AlertTriangleIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { toast } from "sonner";
+import { useState } from "react";
+
+// PhonePe TypeScript declarations
+declare global {
+  interface Window {
+    PhonePeCheckout?: {
+      transact: (config: {
+        tokenUrl: string;
+        callback: (response: 'USER_CANCEL' | 'CONCLUDED') => void;
+        type: 'IFRAME';
+      }) => void;
+      closePage: () => void;
+    };
+  }
+}
 
 function OrderDetailPageInner() {
   const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
   const order = useQuery(
     api.orders.getOrder,
     orderId ? { orderId: orderId as Id<"orders"> } : "skip"
   );
+  const inventoryCheck = useQuery(
+    api.orders.checkOrderInventory,
+    orderId && order?.paymentStatus === "failed" ? { orderId: orderId as Id<"orders"> } : "skip"
+  );
+  
+  const retryPayment = useMutation(api.orders.retryPayment);
+  const initiatePayment = useAction(api.phonepe.initiatePayment);
+  const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
+  const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
+  
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [currentMerchantTxnId, setCurrentMerchantTxnId] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 5;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -46,6 +77,122 @@ function OrderDetailPageInner() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // PhonePe payment callback handler
+  const handlePhonePeCallback = async (response: 'USER_CANCEL' | 'CONCLUDED') => {
+    console.log("PhonePe callback received:", response);
+    
+    if (response === 'USER_CANCEL') {
+      // User cancelled payment
+      if (currentMerchantTxnId) {
+        try {
+          await updatePaymentStatus({
+            merchantTransactionId: currentMerchantTxnId,
+            paymentStatus: "failed",
+          });
+        } catch (error) {
+          console.error("Failed to update payment status:", error);
+        }
+      }
+      setIsRetrying(false);
+      setRetryCount(0);
+      toast.error("Payment cancelled");
+      return;
+    }
+    
+    if (response === 'CONCLUDED') {
+      if (!currentMerchantTxnId) {
+        toast.error("Unable to verify payment");
+        setIsRetrying(false);
+        return;
+      }
+      
+      try {
+        const currentRetry = retryCount + 1;
+        setRetryCount(currentRetry);
+        
+        const phonepeStatus = await checkPaymentStatus({
+          merchantTransactionId: currentMerchantTxnId,
+        });
+        
+        if (phonepeStatus.paymentStatus === "success") {
+          setRetryCount(0);
+          setIsRetrying(false);
+          toast.success("Payment successful!");
+          // Reload the page to show updated order
+          window.location.reload();
+          return;
+        } else if (phonepeStatus.paymentStatus === "failed") {
+          setRetryCount(0);
+          setIsRetrying(false);
+          toast.error("Payment failed");
+          return;
+        }
+        
+        // Still pending - retry
+        if (currentRetry >= maxRetries) {
+          setIsRetrying(false);
+          toast.error("Unable to verify payment. Please check your order status.");
+        } else {
+          setTimeout(() => handlePhonePeCallback('CONCLUDED'), 2000);
+        }
+      } catch (error) {
+        console.error("Error verifying payment:", error);
+        setIsRetrying(false);
+        toast.error("Failed to verify payment");
+      }
+    }
+  };
+
+  // Handle retry payment button click
+  const handleRetryPayment = async () => {
+    if (!orderId) return;
+    
+    setIsRetrying(true);
+    setRetryCount(0);
+    
+    try {
+      // First retry the payment (this validates inventory)
+      const retryResult = await retryPayment({
+        orderId: orderId as Id<"orders">,
+      });
+      
+      // Initiate PhonePe payment
+      const paymentResult = await initiatePayment({
+        orderId: retryResult.orderId,
+        orderNumber: retryResult.orderNumber,
+        amount: retryResult.remainingAmount,
+        customerPhone: retryResult.shippingPhone,
+      });
+      
+      if (paymentResult.success && paymentResult.paymentUrl) {
+        setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
+        
+        if (!window.PhonePeCheckout) {
+          toast.error("Payment service not available. Please refresh and try again.");
+          setIsRetrying(false);
+          return;
+        }
+        
+        // Open PhonePe payment in iframe
+        window.PhonePeCheckout.transact({
+          tokenUrl: paymentResult.paymentUrl,
+          callback: handlePhonePeCallback,
+          type: "IFRAME"
+        });
+      } else {
+        throw new Error("Failed to initiate payment");
+      }
+    } catch (error) {
+      setIsRetrying(false);
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error as { data?: { message?: string } };
+        toast.error(convexError.data?.message || "Failed to retry payment");
+      } else {
+        toast.error("Failed to retry payment. Please try again.");
+      }
+    }
   };
 
   if (order === undefined) {
@@ -85,15 +232,40 @@ function OrderDetailPageInner() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold mb-2">Order Details</h1>
-              <p className="text-lg text-muted-foreground">{order.orderNumber}</p>
+              <p className="text-lg text-muted-foreground">
+                {order.orderNumber || order.failedOrderNumber || "Pending"}
+              </p>
               <p className="text-sm text-muted-foreground">
                 Placed on {formatDate(order._creationTime)}
               </p>
             </div>
-            <Badge className={`${getStatusColor(order.status)} text-base px-4 py-2`}>
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-            </Badge>
+            <div className="flex flex-col items-end gap-2">
+              <Badge className={`${getStatusColor(order.status)} text-base px-4 py-2`}>
+                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              </Badge>
+              {order.paymentStatus === "failed" && (
+                <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
+                  Payment Failed
+                </Badge>
+              )}
+            </div>
           </div>
+          
+          {order.paymentStatus === "failed" && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangleIcon className="size-5 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                    Payment was not completed
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    You can retry payment for this order. We'll check inventory availability before processing.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -402,6 +574,42 @@ function OrderDetailPageInner() {
                 )}
 
                 <Separator />
+
+                {/* Retry Payment Section */}
+                {order.paymentStatus === "failed" && (
+                  <>
+                    {inventoryCheck && !inventoryCheck.available && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangleIcon className="size-4 text-red-600 mt-0.5 shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-medium text-red-900 dark:text-red-100 mb-1">
+                              Items Out of Stock
+                            </p>
+                            <p className="text-xs text-red-700 dark:text-red-300">
+                              {inventoryCheck.unavailableItems.map((item) => (
+                                <span key={item.variant} className="block">
+                                  {item.productTitle}: Need {item.requested}, only {item.available} available
+                                </span>
+                              ))}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    <Button
+                      className="w-full"
+                      onClick={handleRetryPayment}
+                      disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
+                    >
+                      <RefreshCwIcon className={`size-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                      {isRetrying ? 'Processing...' : 'Retry Payment'}
+                    </Button>
+
+                    <Separator />
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <Link to="/orders" className="block">
