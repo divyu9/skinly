@@ -29,7 +29,8 @@ import {
   MessageCircleIcon,
   CheckCircleIcon,
   ClockIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
+  CoinsIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { toast } from "sonner";
@@ -215,6 +216,12 @@ export default function ProductDetailPage() {
     productData && productData.variants[0]
       ? { productId: productData._id, variantId: productData.variants[0]._id }
       : "skip"
+  );
+  
+  // Fetch cashback info for this product
+  const cashbackInfo = useQuery(
+    api.cashbackHelpers.getProductCashbackInfo,
+    productData ? { productId: productData._id } : "skip"
   );
   
   // Track product view
@@ -1195,6 +1202,30 @@ export default function ProductDetailPage() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Cashback Section */}
+                {cashbackInfo && cashbackInfo.hasCashback && (
+                  <div className="mt-4">
+                    <div className="border border-amber-500/50 rounded-lg p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center size-10 rounded-full bg-amber-500/20 shrink-0">
+                          <CoinsIcon className="size-5 text-amber-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                              Earn {cashbackInfo.displayText} Skinly Coins
+                            </span>
+                          </div>
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            Get cashback on this purchase! Redeem on your next order.
+                          </p>
+                        </div>
+                        <SparklesIcon className="size-5 text-amber-500 shrink-0" />
+                      </div>
                     </div>
                   </div>
                 )}
