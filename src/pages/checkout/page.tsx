@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -83,6 +83,19 @@ function CheckoutPageInner() {
   const [showPaymentVerificationFailed, setShowPaymentVerificationFailed] = useState(false);
   const maxRetries = 5; // 5 retries = ~10 seconds total
   const [guestSessionId] = useState(() => getGuestSessionId());
+  
+  // Coupon state
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    coupon: {
+      _id: Id<"coupons">;
+      code: string;
+      description: string;
+    };
+    discountAmount: number;
+    eligibleItemsCount: number;
+  } | null>(null);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -167,17 +180,21 @@ function CheckoutPageInner() {
       : "skip"
   );
 
+  // Calculate coupon discount
+  const couponDiscount = appliedCoupon?.discountAmount || 0;
+  
   // Calculate wallet amount to use
   const walletBalance = walletData?.balance || 0;
   const maxWalletUsage = walletMaxUsage?.maxUsage || 0;
-  const walletAmount = useWallet ? Math.min(maxWalletUsage, total) : 0;
+  const totalAfterCoupon = Math.max(0, total - couponDiscount);
+  const walletAmount = useWallet ? Math.min(maxWalletUsage, totalAfterCoupon) : 0;
 
   // Calculate final total including COD fee if COD is selected
   const codFee = formData.paymentMethod === "cod" && codAvailability?.available
     ? codAvailability.codFee
     : 0;
-  const subtotalAfterWallet = total - walletAmount;
-  const finalTotal = subtotalAfterWallet + codFee;
+  const subtotalAfterDiscounts = totalAfterCoupon - walletAmount;
+  const finalTotal = subtotalAfterDiscounts + codFee;
 
   // Calculate GST breakdown based on customer's state
   const gstBreakdown = useMemo(() => {
@@ -186,6 +203,48 @@ function CheckoutPageInner() {
     }
     return calculateGST(finalTotal, formData.state);
   }, [finalTotal, formData.state]);
+
+  // Handle coupon apply
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error("Please enter a coupon code");
+      return;
+    }
+
+    setIsApplyingCoupon(true);
+    try {
+      const result = await convex.query(api.coupons.validateCoupon, {
+        code: couponCode.trim(),
+        cartTotal: total,
+        userEmail: formData.email || undefined,
+        cartItems: cartItems?.map((item) => ({
+          variantId: item.variantId,
+          productId: item.productId,
+          productTitle: item.productTitle,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+      });
+      
+      setAppliedCoupon(result);
+      toast.success(`Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}`);
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Invalid coupon code");
+      }
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
+  // Handle coupon removal
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode("");
+    toast.success("Coupon removed");
+  };
 
   // Loading state
   if (authLoading || (isAuthenticated && dbCartItems === undefined)) {
@@ -868,8 +927,8 @@ function CheckoutPageInner() {
                 </Card>
               )}
 
-              {/* Wallet Payment */}
-              {isAuthenticated && walletBalance > 0 && walletMaxUsage?.canUseWallet && (
+              {/* Wallet Payment - Always show for authenticated users */}
+              {isAuthenticated && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -891,34 +950,45 @@ function CheckoutPageInner() {
                       )}
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="useWallet" 
-                        checked={useWallet}
-                        onCheckedChange={(checked) => setUseWallet(checked === true)}
-                      />
-                      <Label
-                        htmlFor="useWallet"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                      >
-                        Use wallet balance for this order
-                      </Label>
-                    </div>
-
-                    {useWallet && walletAmount > 0 && (
-                      <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                        <WalletIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
-                        <div className="text-sm">
-                          <p className="font-medium text-green-900 dark:text-green-100">
-                            ₹{walletAmount.toFixed(2)} will be deducted from your wallet
-                          </p>
-                          {walletAmount >= total && (
-                            <p className="text-green-700 dark:text-green-300 mt-1">
-                              Your order will be fully paid with wallet balance!
-                            </p>
-                          )}
+                    {walletBalance > 0 && walletMaxUsage?.canUseWallet ? (
+                      <>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox 
+                            id="useWallet" 
+                            checked={useWallet}
+                            onCheckedChange={(checked) => setUseWallet(checked === true)}
+                          />
+                          <Label
+                            htmlFor="useWallet"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            Use wallet balance for this order
+                          </Label>
                         </div>
-                      </div>
+
+                        {useWallet && walletAmount > 0 && (
+                          <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                            <WalletIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                            <div className="text-sm">
+                              <p className="font-medium text-green-900 dark:text-green-100">
+                                ₹{walletAmount.toFixed(2)} will be deducted from your wallet
+                              </p>
+                              {walletAmount >= totalAfterCoupon && (
+                                <p className="text-green-700 dark:text-green-300 mt-1">
+                                  Your order will be fully paid with wallet balance!
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {walletBalance === 0 
+                          ? "Your wallet is empty. You can add funds after completing orders or redeeming coupons."
+                          : "Wallet cannot be used for this order."
+                        }
+                      </p>
                     )}
                   </CardContent>
                 </Card>
@@ -1139,6 +1209,62 @@ function CheckoutPageInner() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                <Separator />
+
+                {/* Coupon Code Section */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <TagIcon className="size-4" />
+                    <span>Have a Coupon?</span>
+                  </div>
+                  
+                  {!appliedCoupon ? (
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Enter coupon code"
+                        value={couponCode}
+                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        disabled={isApplyingCoupon}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleApplyCoupon}
+                        disabled={!couponCode.trim() || isApplyingCoupon}
+                      >
+                        {isApplyingCoupon ? "Applying..." : "Apply"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                      <TagIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                            {appliedCoupon.coupon.code}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleRemoveCoupon}
+                            className="h-6 w-6 p-0 text-green-600 hover:text-green-700"
+                          >
+                            <XIcon className="size-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
+                          {appliedCoupon.coupon.description}
+                        </p>
+                        <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                          You're saving ₹{appliedCoupon.discountAmount.toFixed(0)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
