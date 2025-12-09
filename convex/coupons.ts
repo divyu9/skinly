@@ -380,7 +380,7 @@ export const validateCoupon = query({
     // Check if any items are eligible
     if (eligibleItems.length === 0) {
       throw new ConvexError({
-        message: "This coupon is not applicable on the items in your cart",
+        message: "This coupon does not apply to the items in your cart",
         code: "BAD_REQUEST",
       });
     }

@@ -262,7 +262,7 @@ function CheckoutPageInner() {
       });
 
       if (validCartItems.length === 0) {
-        setCouponMessage({ type: 'error', text: 'Unable to apply coupon to items in your cart' });
+        setCouponMessage({ type: 'error', text: 'This coupon does not apply to the items in your cart' });
         setIsApplyingCoupon(false);
         return;
       }
@@ -286,7 +286,7 @@ function CheckoutPageInner() {
       setTimeout(() => setCouponMessage(null), 2000);
     } catch (error) {
       // Extract user-friendly error message from ConvexError
-      let errorMessage = "Unable to apply coupon";
+      let errorMessage = "Coupon could not be applied";
       
       if (error && typeof error === 'object' && 'data' in error) {
         const convexError = error as { data?: { message?: string } };
