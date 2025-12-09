@@ -28,7 +28,7 @@ export const createOrder = mutation({
     sessionId: v.optional(v.string()), // For guest checkout
     guestEmail: v.optional(v.string()), // Required for guest checkout
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ orderId: Id<"orders">; orderNumber?: string; remainingAmount: number; trackingToken?: string }> => {
     const identity = await ctx.auth.getUserIdentity();
     const isGuest = !identity;
     
@@ -922,7 +922,7 @@ export const updatePaymentStatus = mutation({
               recipientUserId: order.userId,
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber,
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
                 order_total: `₹${order.total.toFixed(2)}`,
                 payment_method: order.paymentMethod === "cod" ? "Partial COD" : "Prepaid",
               },

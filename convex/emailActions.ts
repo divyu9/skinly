@@ -101,7 +101,7 @@ export const sendEmailNotification = action({
 
       // Prepare email data
       const emailData = {
-        orderNumber: order.orderNumber,
+        orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
         customerName: order.shippingAddress.fullName,
         items: order.items,
         subtotal: order.subtotal,
@@ -109,7 +109,7 @@ export const sendEmailNotification = action({
         total: order.total,
         shippingAddress: order.shippingAddress,
         trackingUrl: order.trackingUrl,
-        awbNumber: order.awbNumber,
+        awbNumber: order.awbNumber || "",
       };
 
       // Check for custom active template first

@@ -648,7 +648,7 @@ export const bulkCreateShipments = action({
         if (order.status !== "processing") {
           results.failed.push({
             orderId,
-            orderNumber: order.orderNumber,
+            orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
             error: `Order status is ${order.status}, must be processing`,
           });
           continue;
@@ -657,7 +657,7 @@ export const bulkCreateShipments = action({
         if (order.awbNumber) {
           results.failed.push({
             orderId,
-            orderNumber: order.orderNumber,
+            orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
             error: "Shipment already created",
           });
           continue;
@@ -671,13 +671,13 @@ export const bulkCreateShipments = action({
         if (result.success && result.awbNumber) {
           results.successful.push({
             orderId,
-            orderNumber: order.orderNumber,
+            orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
             awbNumber: result.awbNumber,
           });
         } else {
           results.failed.push({
             orderId,
-            orderNumber: order.orderNumber,
+            orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
             error: result.message || "Unknown error",
           });
         }
@@ -688,7 +688,7 @@ export const bulkCreateShipments = action({
           const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
             orderId,
           });
-          orderNumber = order.orderNumber;
+          orderNumber = order.orderNumber || order.failedOrderNumber || "Pending";
         } catch {
           // Ignore error getting order number
         }
@@ -733,13 +733,13 @@ export const bulkFetchLabels = action({
         if (!order.labelUrl) {
           errors.push({
             orderId,
-            orderNumber: order.orderNumber,
+            orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
             error: "No label URL found",
           });
           continue;
         }
 
-        console.log(`Fetching label for ${order.orderNumber} from ${order.labelUrl}`);
+        console.log(`Fetching label for ${order.orderNumber || order.failedOrderNumber || "Pending"} from ${order.labelUrl}`);
 
         // Fetch the PDF from RapidShyp (backend has no CORS restrictions)
         const response = await fetch(order.labelUrl, {
@@ -758,14 +758,14 @@ export const bulkFetchLabels = action({
           throw new Error('Empty PDF file');
         }
 
-        console.log(`Fetched ${pdfBuffer.byteLength} bytes for ${order.orderNumber}`);
+        console.log(`Fetched ${pdfBuffer.byteLength} bytes for ${order.orderNumber || order.failedOrderNumber || "Pending"}`);
 
         // Convert to base64 for transport to frontend
         const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
 
         labels.push({
           orderId,
-          orderNumber: order.orderNumber,
+          orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
           pdfBase64,
         });
       } catch (error) {
@@ -775,7 +775,7 @@ export const bulkFetchLabels = action({
           const order = await ctx.runQuery(api.admin.orders.getOrderDetails, {
             orderId,
           });
-          orderNumber = order.orderNumber;
+          orderNumber = order.orderNumber || order.failedOrderNumber || "Pending";
         } catch {
           // Ignore error getting order number
         }
