@@ -481,6 +481,12 @@ function CheckoutPageInner() {
         merchantTxnId = sessionStorage.getItem('skinly_merchant_txn_id');
       }
       
+      // Get orderId for redirect
+      let orderId = currentOrderId;
+      if (!orderId) {
+        orderId = sessionStorage.getItem('skinly_order_id') as Id<"orders"> | null;
+      }
+      
       // Update order status to failed if we have transaction ID
       if (merchantTxnId) {
         try {
@@ -500,7 +506,16 @@ function CheckoutPageInner() {
       // Clear sessionStorage
       sessionStorage.removeItem('skinly_merchant_txn_id');
       sessionStorage.removeItem('skinly_order_id');
-      toast.error("Payment cancelled");
+      
+      // Redirect to failed order page if we have orderId
+      if (orderId) {
+        toast.error("Payment cancelled");
+        setTimeout(() => {
+          navigate(`/orders/${orderId}`);
+        }, 300);
+      } else {
+        toast.error("Payment cancelled");
+      }
       return;
     }
     
@@ -564,10 +579,14 @@ function CheckoutPageInner() {
             sessionStorage.removeItem('skinly_merchant_txn_id');
             sessionStorage.removeItem('skinly_order_id');
             setRetryCount(0);
-            toast.error("Payment failed");
-            setShowPaymentVerificationFailed(true);
             setIsRedirectingToPayment(false);
             setIsSubmitting(false);
+            
+            // Redirect to failed order page
+            toast.error("Payment failed");
+            setTimeout(() => {
+              navigate(`/orders/${orderId}`);
+            }, 300);
             return;
           }
           

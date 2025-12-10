@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { api } from "@/convex/_generated/api.js";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useAuth } from "@/hooks/use-auth";
@@ -15,12 +15,22 @@ function useUpdateCurrentUserEffect() {
   const syncGuestCart = useMutation(api.cart.syncGuestCart);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [userCreated, setUserCreated] = useState(false);
+  const hasRunRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
       setUserCreated(false);
+      hasRunRef.current = false;
       return;
     }
+    
+    // Prevent multiple runs
+    if (hasRunRef.current) {
+      return;
+    }
+    
+    hasRunRef.current = true;
+    
     async function createUser() {
       setIsCreatingUser(true);
       try {
@@ -32,22 +42,28 @@ function useUpdateCurrentUserEffect() {
           try {
             const guestCart = JSON.parse(guestCartData);
             if (Array.isArray(guestCart) && guestCart.length > 0) {
+              console.log("Syncing guest cart with", guestCart.length, "items");
               await syncGuestCart({ guestCartItems: guestCart });
+              console.log("Guest cart sync successful");
               // Clear guest cart after successful sync
               localStorage.removeItem(GUEST_CART_KEY);
             }
           } catch (err) {
             console.error("Failed to sync guest cart:", err);
+            // Don't clear localStorage on error so user doesn't lose cart
           }
         }
         
         setUserCreated(true);
+      } catch (err) {
+        console.error("Failed to create/update user:", err);
+        hasRunRef.current = false; // Allow retry on error
       } finally {
         setIsCreatingUser(false);
       }
     }
     createUser();
-  }, [isAuthenticated, updateCurrentUser, syncGuestCart, sub]);
+  }, [isAuthenticated, updateCurrentUser, syncGuestCart]);
 
   return { isCreatingUser, userCreated };
 }
