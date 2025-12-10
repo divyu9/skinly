@@ -562,6 +562,12 @@ function CheckoutPageInner() {
             setRetryCount(0);
             setIsRedirectingToPayment(false);
             setIsSubmitting(false);
+            
+            // Clear guest cart on successful payment
+            if (!isAuthenticated) {
+              clearGuestCart();
+            }
+            
             toast.success("Payment successful!");
             setTimeout(() => {
               // For guests with tracking token, use tracking page
@@ -746,17 +752,16 @@ function CheckoutPageInner() {
       
       console.log("Order created successfully:", result);
 
-      // Clear guest cart if successful
-      if (!isAuthenticated) {
-        clearGuestCart();
-      }
-
       // Handle payment based on method
       // Check if order was fully paid by wallet
       const remainingAmount = result.remainingAmount || 0;
       
       if (remainingAmount === 0) {
-        // Order fully paid by wallet
+        // Order fully paid by wallet - clear guest cart on success
+        if (!isAuthenticated) {
+          clearGuestCart();
+        }
+        
         toast.success("Order placed successfully!");
         
         // For guests, navigate with tracking token
@@ -849,7 +854,11 @@ function CheckoutPageInner() {
             throw new Error("Failed to initiate prepaid payment");
           }
         } else {
-          // Full COD: Go directly to order page
+          // Full COD: Go directly to order page - clear guest cart on success
+          if (!isAuthenticated) {
+            clearGuestCart();
+          }
+          
           toast.success("Order placed successfully!");
           
           // For guests, navigate with tracking token
