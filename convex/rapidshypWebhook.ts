@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import {
+  triggerOrderDispatchedEmail,
+  triggerOrderDeliveredEmail,
+  triggerOrderCancelledEmail,
+} from "./emailOrderTriggers";
 
 // Internal mutation to process RapidShyp webhook updates
 export const processWebhookUpdate = internalMutation({
@@ -138,6 +143,22 @@ export const processWebhookUpdate = internalMutation({
 
             console.log(`Credited cashback: ₹${order.cashbackAmount} to user`);
           }
+        }
+        
+        // Send email notifications based on status change
+        try {
+          const user = order.userId ? await ctx.db.get(order.userId) : null;
+          
+          if (newOrderStatus === "shipped") {
+            await triggerOrderDispatchedEmail(ctx, order, user);
+          } else if (newOrderStatus === "delivered") {
+            await triggerOrderDeliveredEmail(ctx, order, user);
+          } else if (newOrderStatus === "cancelled") {
+            await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled by logistics partner");
+          }
+        } catch (error) {
+          console.error("Failed to trigger email notification:", error);
+          // Don't fail webhook processing if email fails
         }
       } else {
         console.log(`No status update needed. Status remains: ${order.status}`);

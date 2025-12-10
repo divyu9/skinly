@@ -2,6 +2,11 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import { ConvexError } from "convex/values";
 import { api } from "../_generated/api.js";
+import {
+  triggerOrderDispatchedEmail,
+  triggerOrderDeliveredEmail,
+  triggerOrderCancelledEmail,
+} from "../emailOrderTriggers";
 
 // Get all orders for admin (not restricted to current user)
 export const getAllOrders = query({
@@ -173,6 +178,13 @@ export const updateShippingInfo = mutation({
             priority: 8,
           }
         );
+        
+        // Send order dispatched email
+        // Get the updated order to get the latest status
+        const updatedOrder = await ctx.db.get(orderId);
+        if (updatedOrder) {
+          await triggerOrderDispatchedEmail(ctx, updatedOrder, user);
+        }
       } catch (error) {
         console.error("Failed to queue order dispatched WhatsApp:", error);
       }
@@ -240,6 +252,9 @@ export const updateOrderStatus = mutation({
               priority: 8,
             }
           );
+          
+          // Send order dispatched email
+          await triggerOrderDispatchedEmail(ctx, order, user);
         } else if (args.status === "delivered") {
           // Process cashback if not already credited
           if (!order.cashbackCredited) {
@@ -359,6 +374,9 @@ export const updateOrderStatus = mutation({
               priority: 3, // Lower priority for reminders
             }
           );
+          
+          // Send order delivered email
+          await triggerOrderDeliveredEmail(ctx, order, user);
         } else if (args.status === "cancelled") {
           // Order cancelled
           await ctx.scheduler.runAfter(
@@ -376,6 +394,9 @@ export const updateOrderStatus = mutation({
               priority: 8,
             }
           );
+          
+          // Send order cancelled email
+          await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled by admin");
         }
       } catch (error) {
         console.error("Failed to queue order status WhatsApp:", error);

@@ -4,6 +4,10 @@ import { ConvexError } from "convex/values";
 import { calculateGST } from "./gst";
 import { internal, api } from "./_generated/api";
 import type { Id, Doc } from "./_generated/dataModel.d.ts";
+import {
+  triggerOrderConfirmedEmail,
+  triggerPaymentFailedEmail,
+} from "./emailOrderTriggers";
 
 // Create a new order (supports both authenticated and guest checkout)
 export const createOrder = mutation({
@@ -490,25 +494,20 @@ export const createOrder = mutation({
       }
     }
 
-    // TODO: Re-enable with MSG91 email system
-    // Send email notification (order confirmed)
-    // if (args.customerEmail) {
-    //   try {
-    //     await ctx.scheduler.runAfter(
-    //       2000,
-    //       api.emailMessaging.queueMessage,
-    //       {
-    //         usecaseKey: "order_confirmed",
-    //         recipientEmail: args.customerEmail,
-    //         variables: {...},
-    //         priority: 8,
-    //       }
-    //     );
-    //   } catch (error) {
-    //     console.error("Failed to schedule email notification:", error);
-    //     // Don't fail order creation if email fails
-    //   }
-    // }
+    // Send email notification (order confirmed) for COD and wallet-paid orders
+    // For prepaid orders, email will be sent after payment success
+    if (args.paymentMethod === "cod" || walletAmountUsed >= originalTotal) {
+      try {
+        // Get the created order
+        const createdOrder = await ctx.db.get(orderId);
+        if (createdOrder) {
+          await triggerOrderConfirmedEmail(ctx, createdOrder, user);
+        }
+      } catch (error) {
+        console.error("Failed to trigger order confirmed email:", error);
+        // Don't fail order creation if email fails
+      }
+    }
 
     return { 
       orderId, 
@@ -915,6 +914,9 @@ export const updatePaymentStatus = mutation({
               }
             );
           }
+          
+          // Send order confirmed email for successful payment
+          await triggerOrderConfirmedEmail(ctx, order, user);
         } else if (args.paymentStatus === "failed") {
           // Payment failed - send payment failed notification
           await ctx.scheduler.runAfter(
@@ -933,6 +935,9 @@ export const updatePaymentStatus = mutation({
               priority: 8,
             }
           );
+          
+          // Send payment failed email
+          await triggerPaymentFailedEmail(ctx, order, user, "Payment could not be processed. Please try again.");
         }
       } catch (error) {
         console.error("Failed to queue payment status WhatsApp:", error);
