@@ -490,22 +490,25 @@ export const createOrder = mutation({
       }
     }
 
+    // TODO: Re-enable with MSG91 email system
     // Send email notification (order confirmed)
-    if (args.customerEmail) {
-      try {
-        await ctx.scheduler.runAfter(
-          2000,
-          api.emailActions.sendEmailNotification,
-          {
-            orderId,
-            emailType: "order_confirmed",
-          }
-        );
-      } catch (error) {
-        console.error("Failed to schedule email notification:", error);
-        // Don't fail order creation if email fails
-      }
-    }
+    // if (args.customerEmail) {
+    //   try {
+    //     await ctx.scheduler.runAfter(
+    //       2000,
+    //       api.emailMessaging.queueMessage,
+    //       {
+    //         usecaseKey: "order_confirmed",
+    //         recipientEmail: args.customerEmail,
+    //         variables: {...},
+    //         priority: 8,
+    //       }
+    //     );
+    //   } catch (error) {
+    //     console.error("Failed to schedule email notification:", error);
+    //     // Don't fail order creation if email fails
+    //   }
+    // }
 
     return { 
       orderId, 
