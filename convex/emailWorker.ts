@@ -81,7 +81,8 @@ export const processMessage = action({
           name: "Skinly",
         },
         domain: "mail.goskinly.com",
-        subject: args.message.subject || "Update from Skinly",
+        // Note: When using template_id, the subject is defined in the template
+        // and should NOT be sent in the request body
       };
 
       // Store request details
