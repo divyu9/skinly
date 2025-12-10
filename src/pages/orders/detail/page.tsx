@@ -7,10 +7,6 @@ import { Link, useParams, useNavigate } from "react-router-dom";
 import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, RefreshCwIcon, AlertTriangleIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -32,7 +28,7 @@ function OrderDetailPageInner() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const order = useQuery(
-    api.orders.getOrder,
+    api.orders.getOrderPublic,
     orderId ? { orderId: orderId as Id<"orders"> } : "skip"
   );
   const inventoryCheck = useQuery(
@@ -631,34 +627,7 @@ function OrderDetailPageInner() {
 }
 
 export default function OrderDetailPage() {
-  return (
-    <>
-      <Unauthenticated>
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <PackageIcon />
-              </EmptyMedia>
-              <EmptyTitle>Please sign in to view order</EmptyTitle>
-              <EmptyDescription>
-                You need to be logged in to see order details
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              <SignInButton />
-            </EmptyContent>
-          </Empty>
-        </div>
-      </Unauthenticated>
-      <AuthLoading>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <Skeleton className="h-96 w-full max-w-5xl" />
-        </div>
-      </AuthLoading>
-      <Authenticated>
-        <OrderDetailPageInner />
-      </Authenticated>
-    </>
-  );
+  // Allow both authenticated and guest users to view orders
+  // Auth checks are handled by the getOrderPublic query
+  return <OrderDetailPageInner />;
 }

@@ -611,6 +611,50 @@ export const getOrderInternal = internalQuery({
   },
 });
 
+// Public query to get order by ID (supports both authenticated and guest orders)
+export const getOrderPublic = query({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const order = await ctx.db.get(args.orderId);
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // If user is authenticated, verify they own the order
+    if (identity) {
+      const user = await ctx.db
+        .query("users")
+        .withIndex("by_token", (q) =>
+          q.eq("tokenIdentifier", identity.tokenIdentifier)
+        )
+        .unique();
+
+      if (user && order.userId && order.userId !== user._id) {
+        throw new ConvexError({
+          message: "Unauthorized",
+          code: "FORBIDDEN",
+        });
+      }
+    }
+    // For unauthenticated users, allow access to guest orders only
+    else {
+      if (!order.isGuest) {
+        throw new ConvexError({
+          message: "This order requires authentication to view",
+          code: "UNAUTHENTICATED",
+        });
+      }
+    }
+
+    return order;
+  },
+});
+
 // Update order status
 export const updateOrderStatus = mutation({
   args: {
