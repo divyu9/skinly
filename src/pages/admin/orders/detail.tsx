@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
-import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon, AlertCircleIcon, PackageOpenIcon, RefreshCwIcon } from "lucide-react";
+import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon, AlertCircleIcon, PackageOpenIcon, RefreshCwIcon, EditIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -41,6 +41,34 @@ function OrderDetailPageInner() {
     "order_confirmed" | "order_dispatched" | "order_delivered" | "order_cancelled" | "payment_failed"
   >("order_confirmed");
   const [sendingEmail, setSendingEmail] = useState(false);
+  
+  // Edit dialogs state
+  const [showEditCustomerDialog, setShowEditCustomerDialog] = useState(false);
+  const [showEditAddressDialog, setShowEditAddressDialog] = useState(false);
+  const [showEditItemsDialog, setShowEditItemsDialog] = useState(false);
+  const [customerForm, setCustomerForm] = useState({
+    fullName: "",
+    phone: "",
+    email: "",
+  });
+  const [addressForm, setAddressForm] = useState({
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    state: "",
+    pincode: "",
+  });
+  const [itemsForm, setItemsForm] = useState<Array<{
+    productId: string;
+    productTitle: string;
+    productImage?: string;
+    variant: string;
+    price: number;
+    quantity: number;
+    phoneModel?: string;
+    phoneBrand?: string;
+    coverage?: "only_back" | "full_body_wrap";
+  }>>([]);
 
   const order = useQuery(
     api.admin.orders.getOrderDetails,
@@ -56,6 +84,9 @@ function OrderDetailPageInner() {
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const sendOrderEmail = useMutation(api.admin.orders.sendOrderStatusEmail);
+  const updateCustomerInfo = useMutation(api.admin.orders.updateCustomerInfo);
+  const updateShippingAddress = useMutation(api.admin.orders.updateOrderShippingAddress);
+  const updateOrderItems = useMutation(api.admin.orders.updateOrderItems);
   const createShipment = useAction(api.rapidshyp.createShipment);
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
@@ -156,6 +187,51 @@ function OrderDetailPageInner() {
       toast.error("Failed to send email");
     } finally {
       setSendingEmail(false);
+    }
+  };
+  
+  const handleUpdateCustomerInfo = async () => {
+    if (!orderId || !order) return;
+    try {
+      await updateCustomerInfo({
+        orderId: orderId as Id<"orders">,
+        fullName: customerForm.fullName,
+        phone: customerForm.phone,
+        customerEmail: order.userId ? customerForm.email : undefined,
+        guestEmail: !order.userId ? customerForm.email : undefined,
+      });
+      toast.success("Customer information updated");
+      setShowEditCustomerDialog(false);
+    } catch (error) {
+      toast.error("Failed to update customer information");
+    }
+  };
+  
+  const handleUpdateShippingAddress = async () => {
+    if (!orderId) return;
+    try {
+      await updateShippingAddress({
+        orderId: orderId as Id<"orders">,
+        ...addressForm,
+      });
+      toast.success("Shipping address updated");
+      setShowEditAddressDialog(false);
+    } catch (error) {
+      toast.error("Failed to update shipping address");
+    }
+  };
+  
+  const handleUpdateOrderItems = async () => {
+    if (!orderId) return;
+    try {
+      await updateOrderItems({
+        orderId: orderId as Id<"orders">,
+        items: itemsForm,
+      });
+      toast.success("Order items updated");
+      setShowEditItemsDialog(false);
+    } catch (error) {
+      toast.error("Failed to update order items");
     }
   };
 
@@ -574,7 +650,20 @@ function OrderDetailPageInner() {
         <div className="lg:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Order Items ({order.items.length})</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Order Items ({order.items.length})</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setItemsForm([...order.items]);
+                    setShowEditItemsDialog(true);
+                  }}
+                >
+                  <EditIcon className="size-3 mr-1" />
+                  Edit Items
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -1156,13 +1245,32 @@ function OrderDetailPageInner() {
           {/* Customer Info & Shipping Address Combined */}
           <Card>
             <CardHeader>
-              <CardTitle>Customer & Shipping Details</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Customer & Shipping Details</CardTitle>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Customer Info */}
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Customer</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase">Customer</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setCustomerForm({
+                          fullName: order.shippingAddress.fullName,
+                          phone: order.shippingAddress.phone,
+                          email: order.user?.email || order.customerEmail || order.guestEmail || "",
+                        });
+                        setShowEditCustomerDialog(true);
+                      }}
+                    >
+                      <EditIcon className="size-3 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
                   <div>
                     <p className="text-xs text-muted-foreground uppercase mb-1">Name</p>
                     <p className="font-medium">{order.shippingAddress.fullName}</p>
@@ -1171,17 +1279,38 @@ function OrderDetailPageInner() {
                     <p className="text-xs text-muted-foreground uppercase mb-1">Phone</p>
                     <p className="font-medium">{order.shippingAddress.phone}</p>
                   </div>
-                  {order.user?.email && (
+                  {(order.user?.email || order.customerEmail || order.guestEmail) && (
                     <div>
                       <p className="text-xs text-muted-foreground uppercase mb-1">Email</p>
-                      <p className="font-medium break-all">{order.user.email}</p>
+                      <p className="font-medium break-all">
+                        {order.user?.email || order.customerEmail || order.guestEmail}
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* Shipping Address */}
                 <div className="space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-3">Shipping Address</p>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase">Shipping Address</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setAddressForm({
+                          addressLine1: order.shippingAddress.addressLine1,
+                          addressLine2: order.shippingAddress.addressLine2 || "",
+                          city: order.shippingAddress.city,
+                          state: order.shippingAddress.state,
+                          pincode: order.shippingAddress.pincode,
+                        });
+                        setShowEditAddressDialog(true);
+                      }}
+                    >
+                      <EditIcon className="size-3 mr-1" />
+                      Edit
+                    </Button>
+                  </div>
                   <div>
                     <p className="text-sm leading-relaxed">
                       {order.shippingAddress.addressLine1}
@@ -1645,6 +1774,192 @@ function OrderDetailPageInner() {
                   Send Email
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Customer Info Dialog */}
+      <Dialog open={showEditCustomerDialog} onOpenChange={setShowEditCustomerDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Customer Information</DialogTitle>
+            <DialogDescription>
+              Update customer name, phone, and email
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="customer-name">Full Name</Label>
+              <Input
+                id="customer-name"
+                value={customerForm.fullName}
+                onChange={(e) => setCustomerForm({ ...customerForm, fullName: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-phone">Phone</Label>
+              <Input
+                id="customer-phone"
+                value={customerForm.phone}
+                onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer-email">Email</Label>
+              <Input
+                id="customer-email"
+                type="email"
+                value={customerForm.email}
+                onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditCustomerDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateCustomerInfo}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Shipping Address Dialog */}
+      <Dialog open={showEditAddressDialog} onOpenChange={setShowEditAddressDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Shipping Address</DialogTitle>
+            <DialogDescription>
+              Update the shipping address for this order
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="address-line1">Address Line 1</Label>
+              <Input
+                id="address-line1"
+                value={addressForm.addressLine1}
+                onChange={(e) => setAddressForm({ ...addressForm, addressLine1: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="address-line2">Address Line 2 (Optional)</Label>
+              <Input
+                id="address-line2"
+                value={addressForm.addressLine2}
+                onChange={(e) => setAddressForm({ ...addressForm, addressLine2: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  value={addressForm.city}
+                  onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">State</Label>
+                <Input
+                  id="state"
+                  value={addressForm.state}
+                  onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="pincode">Pincode</Label>
+              <Input
+                id="pincode"
+                value={addressForm.pincode}
+                onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditAddressDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateShippingAddress}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Order Items Dialog */}
+      <Dialog open={showEditItemsDialog} onOpenChange={setShowEditItemsDialog}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Order Items</DialogTitle>
+            <DialogDescription>
+              Modify quantities, prices, or remove items. Subtotal and total will be recalculated.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {itemsForm.map((item, idx) => (
+              <div key={idx} className="flex gap-4 p-4 border rounded-lg">
+                <div className="flex-1 space-y-2">
+                  <p className="font-medium text-sm">{item.productTitle}</p>
+                  <p className="text-xs text-muted-foreground">Variant: {item.variant}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor={`price-${idx}`} className="text-xs">Price (₹)</Label>
+                      <Input
+                        id={`price-${idx}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.price}
+                        onChange={(e) => {
+                          const newItems = [...itemsForm];
+                          newItems[idx].price = parseFloat(e.target.value) || 0;
+                          setItemsForm(newItems);
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`quantity-${idx}`} className="text-xs">Quantity</Label>
+                      <Input
+                        id={`quantity-${idx}`}
+                        type="number"
+                        min="1"
+                        value={item.quantity}
+                        onChange={(e) => {
+                          const newItems = [...itemsForm];
+                          newItems[idx].quantity = parseInt(e.target.value) || 1;
+                          setItemsForm(newItems);
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-sm font-medium">
+                    Subtotal: ₹{(item.price * item.quantity).toFixed(0)}
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  onClick={() => {
+                    const newItems = itemsForm.filter((_, i) => i !== idx);
+                    setItemsForm(newItems);
+                  }}
+                >
+                  <TrashIcon className="size-4" />
+                </Button>
+              </div>
+            ))}
+            {itemsForm.length === 0 && (
+              <p className="text-center text-muted-foreground py-8">
+                No items. Add at least one item to save.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditItemsDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateOrderItems} disabled={itemsForm.length === 0}>
+              Save Changes
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -978,3 +978,139 @@ export const restoreOrders = mutation({
     return { success: true, restoredCount: args.orderIds.length };
   },
 });
+
+// Update customer information
+export const updateCustomerInfo = mutation({
+  args: {
+    orderId: v.id("orders"),
+    fullName: v.string(),
+    phone: v.string(),
+    customerEmail: v.optional(v.string()),
+    guestEmail: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Update customer info and shipping address name/phone
+    await ctx.db.patch(args.orderId, {
+      shippingAddress: {
+        ...order.shippingAddress,
+        fullName: args.fullName,
+        phone: args.phone,
+      },
+      customerEmail: args.customerEmail,
+      guestEmail: args.guestEmail,
+    });
+
+    return { success: true };
+  },
+});
+
+// Update shipping address
+export const updateOrderShippingAddress = mutation({
+  args: {
+    orderId: v.id("orders"),
+    addressLine1: v.string(),
+    addressLine2: v.optional(v.string()),
+    city: v.string(),
+    state: v.string(),
+    pincode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Update shipping address
+    await ctx.db.patch(args.orderId, {
+      shippingAddress: {
+        ...order.shippingAddress,
+        addressLine1: args.addressLine1,
+        addressLine2: args.addressLine2 || "",
+        city: args.city,
+        state: args.state,
+        pincode: args.pincode,
+      },
+    });
+
+    return { success: true };
+  },
+});
+
+// Update order items
+export const updateOrderItems = mutation({
+  args: {
+    orderId: v.id("orders"),
+    items: v.array(
+      v.object({
+        productId: v.string(),
+        productTitle: v.string(),
+        productImage: v.optional(v.string()),
+        variant: v.string(),
+        price: v.number(),
+        quantity: v.number(),
+        phoneModel: v.optional(v.string()),
+        phoneBrand: v.optional(v.string()),
+        coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Recalculate subtotal based on new items
+    const subtotal = args.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Keep existing fees but update total
+    const total = subtotal + order.shippingFee + (order.codFee || 0);
+
+    // Update order items and totals
+    await ctx.db.patch(args.orderId, {
+      items: args.items,
+      subtotal,
+      total,
+    });
+
+    return { success: true };
+  },
+});
