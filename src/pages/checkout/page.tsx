@@ -629,6 +629,12 @@ function CheckoutPageInner() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Place Order clicked - starting checkout", { 
+      isAuthenticated, 
+      guestCartLength: guestCart.length,
+      cartItemsLength: cartItems?.length || 0,
+      paymentMethod: formData.paymentMethod 
+    });
     
     // Validate all required fields
     if (!formData.fullName.trim()) {
@@ -687,10 +693,15 @@ function CheckoutPageInner() {
     try {
       // For guest users, sync cart to database first
       if (!isAuthenticated && guestCart.length > 0) {
+        console.log("Syncing guest cart to database", { 
+          sessionId: guestSessionId, 
+          itemCount: guestCart.length 
+        });
         await syncGuestCartToDb({
           sessionId: guestSessionId,
           guestCartItems: guestCart,
         });
+        console.log("Guest cart synced successfully");
       }
       // Prepare COD fields
       let codFeeAmount = 0;
@@ -704,6 +715,13 @@ function CheckoutPageInner() {
       }
 
       // Create order first
+      console.log("Creating order with params:", {
+        isGuest: !isAuthenticated,
+        sessionId: !isAuthenticated ? guestSessionId : undefined,
+        guestEmail: !isAuthenticated ? formData.email : undefined,
+        paymentMethod: formData.paymentMethod
+      });
+      
       const result = await createOrder({
         shippingAddress: {
           fullName: formData.fullName,
@@ -725,6 +743,8 @@ function CheckoutPageInner() {
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,
       });
+      
+      console.log("Order created successfully:", result);
 
       // Clear guest cart if successful
       if (!isAuthenticated) {
@@ -845,7 +865,20 @@ function CheckoutPageInner() {
         navigate(`/orders/${result.orderId}`);
       }
     } catch (error) {
-      toast.error("Failed to place order. Please try again.");
+      console.error("Order creation error:", error);
+      
+      // Extract detailed error message
+      let errorMessage = "Failed to place order. Please try again.";
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error as { data?: { message?: string; code?: string } };
+        if (convexError.data?.message) {
+          errorMessage = convexError.data.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      toast.error(errorMessage);
       setIsSubmitting(false);
       setIsRedirectingToPayment(false);
     }
