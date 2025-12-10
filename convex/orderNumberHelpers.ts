@@ -58,26 +58,24 @@ export const generateOrderNumber = internalMutation({
       .withIndex("by_key", (q) => q.eq("key", "order_counter"))
       .first();
 
-    let currentValue = 4001;
+    let nextValue: number;
     if (counter) {
-      currentValue = counter.value as number;
+      // Read current value and immediately increment it
+      const currentValue = counter.value as number;
+      nextValue = currentValue + 1;
+      await ctx.db.patch(counter._id, {
+        value: nextValue,
+      });
     } else {
-      // Initialize
+      // Initialize with 4001 as the first order number
+      nextValue = 4001;
       await ctx.db.insert("settings", {
         key: "order_counter",
-        value: 4001,
+        value: nextValue + 1, // Set counter to 4002 for next order
       });
     }
 
-    const orderNumber = `#${currentValue}`;
-    
-    // Increment counter
-    if (counter) {
-      await ctx.db.patch(counter._id, {
-        value: currentValue + 1,
-      });
-    }
-
+    const orderNumber = `#${nextValue}`;
     return orderNumber;
   },
 });
@@ -95,26 +93,24 @@ export const generateFailedOrderNumber = internalMutation({
       .withIndex("by_key", (q) => q.eq("key", counterKey))
       .first();
 
-    let currentValue = 1;
+    let nextValue: number;
     if (counter) {
-      currentValue = counter.value as number;
+      // Read current value and immediately increment it
+      const currentValue = counter.value as number;
+      nextValue = currentValue + 1;
+      await ctx.db.patch(counter._id, {
+        value: nextValue,
+      });
     } else {
-      // Initialize
+      // Initialize with 1 as the first failed order number
+      nextValue = 1;
       await ctx.db.insert("settings", {
         key: counterKey,
-        value: 1,
+        value: nextValue + 1, // Set counter to 2 for next failed order
       });
     }
 
-    const failedOrderNumber = `F${yearSuffix}-${String(currentValue).padStart(3, "0")}`;
-    
-    // Increment counter
-    if (counter) {
-      await ctx.db.patch(counter._id, {
-        value: currentValue + 1,
-      });
-    }
-
+    const failedOrderNumber = `F${yearSuffix}-${String(nextValue).padStart(3, "0")}`;
     return failedOrderNumber;
   },
 });
