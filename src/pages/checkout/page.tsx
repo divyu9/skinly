@@ -22,6 +22,7 @@ import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { CheckoutUpsells } from "./_components/checkout-upsells.tsx";
 
 // PhonePe TypeScript declarations
 declare global {
@@ -1571,6 +1572,21 @@ function CheckoutPageInner() {
                     )}
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Checkout Upsells - show recommended products */}
+              {cartItems && cartItems.length > 0 && (
+                <CheckoutUpsells 
+                  cartItems={cartItems.map(item => ({
+                    productId: item.productId,
+                    variant: item.variant,
+                    price: item.price,
+                    quantity: item.quantity,
+                    phoneModel: item.phoneModel,
+                    phoneBrand: item.phoneBrand,
+                    coverage: item.coverage,
+                  }))}
+                />
               )}
 
               <Button

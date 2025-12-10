@@ -251,13 +251,22 @@ function OrderDetailPageInner() {
             <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
               <div className="flex items-start gap-3">
                 <AlertTriangleIcon className="size-5 text-amber-600 mt-0.5 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
                     Payment was not completed
                   </p>
-                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-3 md:mb-0">
                     You can retry payment for this order. We'll check inventory availability before processing.
                   </p>
+                  {/* Mobile: Show retry button below text */}
+                  <Button
+                    className="w-full md:hidden mt-2"
+                    onClick={handleRetryPayment}
+                    disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
+                  >
+                    <RefreshCwIcon className={`size-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                    {isRetrying ? 'Processing...' : 'Retry Payment'}
+                  </Button>
                 </div>
               </div>
             </div>
@@ -594,8 +603,9 @@ function OrderDetailPageInner() {
                       </div>
                     )}
                     
+                    {/* Desktop/Tablet: Show retry button in sidebar */}
                     <Button
-                      className="w-full"
+                      className="w-full hidden md:block"
                       onClick={handleRetryPayment}
                       disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
                     >

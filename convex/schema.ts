@@ -1033,4 +1033,58 @@ export default defineSchema({
     .index("by_success", ["success"])
     .index("by_created_at", ["createdAt"])
     .index("by_error_type", ["errorType"]),
+
+  // Checkout Upsells (admin-configured upsell rules for checkout page)
+  checkoutUpsells: defineTable({
+    ruleName: v.string(), // Admin-friendly name (e.g., "Camera Protector for iPhone Users")
+    isActive: v.boolean(), // Whether this rule is currently active
+    priority: v.number(), // Higher = shown first (1-100)
+    
+    // Matching logic (all conditions must match)
+    matchLogic: v.union(v.literal("all"), v.literal("any")), // "all" = AND, "any" = OR
+    
+    // Trigger conditions
+    cartValueMin: v.optional(v.number()), // Minimum cart value
+    cartValueMax: v.optional(v.number()), // Maximum cart value
+    cartValueOperator: v.optional(v.union(v.literal(">="), v.literal("<="), v.literal("between"))),
+    
+    cartItemCountMin: v.optional(v.number()), // Minimum cart item count
+    cartItemCountMax: v.optional(v.number()), // Maximum cart item count
+    cartItemCountOperator: v.optional(v.union(v.literal(">="), v.literal("<="), v.literal("between"))),
+    
+    // Cart must contain these (at least one item matching)
+    containsProductIds: v.optional(v.array(v.id("products"))),
+    containsCollectionIds: v.optional(v.array(v.id("collections"))),
+    containsVariantIds: v.optional(v.array(v.id("variants"))),
+    containsPhoneBrands: v.optional(v.array(v.string())), // e.g., ["Apple", "Samsung"]
+    containsGadgetCategories: v.optional(v.array(v.union(
+      v.literal("phone"),
+      v.literal("laptop"),
+      v.literal("tablet"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("drone"),
+      v.literal("charger"),
+      v.literal("console"),
+      v.literal("mac-mini"),
+      v.literal("cover"),
+      v.literal("accessory")
+    ))),
+    
+    // Upsell products to show (max 3 will be shown)
+    upsellProducts: v.array(v.object({
+      productId: v.id("products"),
+      variantId: v.id("variants"),
+      discountedPrice: v.optional(v.number()), // Optional discounted price for this upsell
+    })),
+    
+    // Metadata
+    createdBy: v.optional(v.string()), // Admin email
+    createdAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_active", ["isActive"])
+    .index("by_priority", ["priority"])
+    .index("by_active_and_priority", ["isActive", "priority"]),
 });

@@ -86,7 +86,6 @@ export default function ProductDetailPage() {
   const [reviewImages, setReviewImages] = useState<File[]>([]);
   const [reviewVideos, setReviewVideos] = useState<File[]>([]);
   const [uploadingReview, setUploadingReview] = useState(false);
-  const [crossSellDialogOpen, setCrossSellDialogOpen] = useState(false);
   
   // Mockup image state
   const [mockupUrl, setMockupUrl] = useState<string | null>(null);
@@ -421,7 +420,6 @@ export default function ProductDetailPage() {
       );
       
       toast.success("Added to cart!");
-      setCrossSellDialogOpen(false);
     } catch (error) {
       if (error instanceof ConvexError && error.data.code === "UNAUTHENTICATED") {
         addToGuestCart({
@@ -445,7 +443,6 @@ export default function ProductDetailPage() {
         );
         
         toast.success("Added to cart!");
-        setCrossSellDialogOpen(false);
       } else {
         toast.error("Failed to add to cart");
       }
@@ -1025,13 +1022,7 @@ export default function ProductDetailPage() {
                         toast.error("Please select your phone model first");
                         return;
                       }
-                      
-                      // Show cross-sell dialog if products available, otherwise add directly
-                      if (crossSellProducts && crossSellProducts.length > 0) {
-                        setCrossSellDialogOpen(true);
-                      } else {
-                        handleAddToCart();
-                      }
+                      handleAddToCart();
                     }}
                     disabled={isAdding || isBuyingNow || (isPhoneSkin && !phoneModel)}
                   >
@@ -1623,82 +1614,6 @@ export default function ProductDetailPage() {
                 {uploadingReview ? "Uploading..." : "Submit Review"}
               </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cross-Sell Dialog */}
-      <Dialog open={crossSellDialogOpen} onOpenChange={setCrossSellDialogOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col p-0">
-          <DialogHeader className="px-5 pt-5 pb-3">
-            <DialogTitle className="text-lg leading-tight">The skin's got your back... but what about the front?</DialogTitle>
-            <DialogDescription className="text-xs">
-              Complete 360° protection
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Scrollable content area */}
-          <div className="flex-1 overflow-y-auto px-5">
-            <div className="grid grid-cols-2 gap-2 pb-3">
-              {crossSellProducts?.map((crossSellProduct) => {
-                const minPrice = crossSellProduct.variants.length > 0 
-                  ? Math.min(...crossSellProduct.variants.map(v => v.price))
-                  : 0;
-                
-                return (
-                  <button
-                    key={crossSellProduct._id}
-                    onClick={() => {
-                      navigate(`/products/detail?slug=${crossSellProduct.slug}`);
-                      setCrossSellDialogOpen(false);
-                    }}
-                    className="group relative overflow-hidden rounded-md border border-border hover:border-primary transition-all text-left"
-                  >
-                    <div className="aspect-[4/3] overflow-hidden bg-muted">
-                      {crossSellProduct.images[0] ? (
-                        <img
-                          src={crossSellProduct.images[0].url}
-                          alt={crossSellProduct.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <PackageIcon className="size-6 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-2">
-                      <h4 className="font-medium text-[10px] leading-tight mb-0.5 line-clamp-2">
-                        {crossSellProduct.title}
-                      </h4>
-                      <div className="text-primary font-bold text-xs">
-                        ₹{minPrice.toFixed(0)}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Fixed action buttons */}
-          <div className="flex flex-col gap-2 px-5 pb-5 pt-3 border-t bg-background">
-            <Button 
-              size="default" 
-              onClick={handleAddToCart}
-              disabled={isAdding}
-              className="w-full"
-            >
-              {isAdding ? "Adding..." : "Just Add The Skin"}
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => setCrossSellDialogOpen(false)}
-              className="w-full text-xs h-8"
-            >
-              Continue Shopping
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
