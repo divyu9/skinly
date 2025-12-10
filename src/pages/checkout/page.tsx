@@ -1184,6 +1184,21 @@ function CheckoutPageInner() {
                 </CardContent>
               </Card>
 
+              {/* Checkout Upsells - show recommended products */}
+              {cartItems && cartItems.length > 0 && (
+                <CheckoutUpsells 
+                  cartItems={cartItems.map(item => ({
+                    productId: item.productId,
+                    variant: item.variant,
+                    price: item.price,
+                    quantity: item.quantity,
+                    phoneModel: item.phoneModel,
+                    phoneBrand: item.phoneBrand,
+                    coverage: item.coverage,
+                  }))}
+                />
+              )}
+
               {/* Shipping Information */}
               <Card>
                 <CardHeader>
@@ -1572,21 +1587,6 @@ function CheckoutPageInner() {
                     )}
                   </CardContent>
                 </Card>
-              )}
-
-              {/* Checkout Upsells - show recommended products */}
-              {cartItems && cartItems.length > 0 && (
-                <CheckoutUpsells 
-                  cartItems={cartItems.map(item => ({
-                    productId: item.productId,
-                    variant: item.variant,
-                    price: item.price,
-                    quantity: item.quantity,
-                    phoneModel: item.phoneModel,
-                    phoneBrand: item.phoneBrand,
-                    coverage: item.coverage,
-                  }))}
-                />
               )}
 
               <Button
