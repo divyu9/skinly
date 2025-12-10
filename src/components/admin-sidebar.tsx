@@ -24,6 +24,7 @@ import {
   Home,
   Bug,
   Coins,
+  TrendingUp,
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 
@@ -49,6 +50,7 @@ export function AdminSidebar() {
     { path: "/backend-skinly/shipping", label: "Shipping Settings", icon: Truck },
     { path: "/backend-skinly/wallet", label: "Wallet", icon: Wallet },
     { path: "/backend-skinly/cashback", label: "Cashback", icon: Coins },
+    { path: "/backend-skinly/upsells", label: "Upsells", icon: TrendingUp },
     { path: "/backend-skinly/emails", label: "Email Templates", icon: Mail },
     { path: "/backend-skinly/bugs", label: "Bug Reports", icon: Bug },
     { path: "/backend-skinly/whatsapp", label: "WhatsApp", icon: MessageCircle },
