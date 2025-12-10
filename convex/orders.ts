@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { calculateGST } from "./gst";
 import { internal, api } from "./_generated/api";
@@ -587,6 +587,23 @@ export const getOrder = query({
       throw new ConvexError({
         message: "Unauthorized",
         code: "FORBIDDEN",
+      });
+    }
+
+    return order;
+  },
+});
+
+// Internal query to get order by ID without auth checks (for backend use only)
+export const getOrderInternal = internalQuery({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
       });
     }
 

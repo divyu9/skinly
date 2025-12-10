@@ -3,7 +3,7 @@
 import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { ConvexError } from "convex/values";
-import { api } from "./_generated/api.js";
+import { api, internal } from "./_generated/api.js";
 import crypto from "crypto";
 
 // PhonePe API Configuration
@@ -68,8 +68,8 @@ export const initiatePayment = action({
     transactionId: string;
   }> => {
     try {
-      // Get order details
-      const order = await ctx.runQuery(api.orders.getOrder, {
+      // Get order details using internal query (supports both authenticated and guest orders)
+      const order = await ctx.runQuery(internal.orders.getOrderInternal, {
         orderId: args.orderId,
       });
 
