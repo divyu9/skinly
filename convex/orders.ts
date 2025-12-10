@@ -998,7 +998,7 @@ export const updatePaymentStatus = mutation({
           );
           
           // Send payment failed email
-          await triggerPaymentFailedEmail(ctx, order, user, "Payment could not be processed. Please try again.");
+          await triggerPaymentFailedEmail(ctx, order, user);
         }
       } catch (error) {
         console.error("Failed to queue payment status WhatsApp:", error);

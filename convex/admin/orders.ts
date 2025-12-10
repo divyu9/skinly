@@ -398,7 +398,7 @@ export const updateOrderStatus = mutation({
           );
           
           // Send order cancelled email
-          await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled by admin");
+          await triggerOrderCancelledEmail(ctx, order, user);
         } else if (args.status === "processing") {
           // Order marked as processing (e.g., reactivated from cancelled)
           // Send order confirmed email
@@ -449,7 +449,7 @@ export const updateOrderPaymentStatus = mutation({
     if (oldPaymentStatus !== args.paymentStatus && args.paymentStatus === "failed") {
       try {
         const user = order.userId ? await ctx.db.get(order.userId) : null;
-        await triggerPaymentFailedEmail(ctx, order, user, "Payment failed");
+        await triggerPaymentFailedEmail(ctx, order, user);
       } catch (error) {
         console.error("Failed to send payment failed email:", error);
       }
@@ -503,10 +503,10 @@ export const sendOrderStatusEmail = mutation({
           await triggerOrderDeliveredEmail(ctx, order, user);
           break;
         case "order_cancelled":
-          await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled");
+          await triggerOrderCancelledEmail(ctx, order, user);
           break;
         case "payment_failed":
-          await triggerPaymentFailedEmail(ctx, order, user, "Payment failed");
+          await triggerPaymentFailedEmail(ctx, order, user);
           break;
       }
 

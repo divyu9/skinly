@@ -86,12 +86,11 @@ export async function triggerOrderConfirmedEmail(
         recipientEmail,
         recipientUserId: order.userId,
         variables: {
-          customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-          order_number: order.orderNumber || order.failedOrderNumber || "Pending",
-          order_total: `₹${order.total.toFixed(2)}`,
-          items_list: itemsList,
-          shipping_address: shippingAddress,
-          payment_method: paymentMethod,
+          customerName: order.shippingAddress.fullName || user?.name || "Customer",
+          orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
+          productName: itemsList,
+          amount: `₹${order.total.toFixed(2)}`,
+          productImage: "",
         },
         priority: 8,
       }
@@ -127,10 +126,21 @@ export async function triggerOrderDispatchedEmail(
       return;
     }
 
-    const trackingNumber = order.awbNumber || "Not available";
-    const trackingLink = order.trackingUrl || "#";
-    const courierName = order.courierName || "Courier";
-    const estimatedDelivery = "3-5 business days";
+    // Format items list
+    const itemsList = order.items
+      .map((item) => {
+        const coverage = item.coverage === "full_body_wrap" 
+          ? "Full Body Wrap" 
+          : item.coverage === "only_back" 
+            ? "Only Back" 
+            : "";
+        const model = item.phoneModel || "";
+        const details = coverage && model 
+          ? `${model} - ${coverage}` 
+          : coverage || model;
+        return `${item.productTitle}${details ? ` (${details})` : ""} x ${item.quantity}`;
+      })
+      .join(", ");
 
     await ctx.scheduler.runAfter(
       0,
@@ -140,12 +150,11 @@ export async function triggerOrderDispatchedEmail(
         recipientEmail,
         recipientUserId: order.userId,
         variables: {
-          customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-          order_number: order.orderNumber || order.failedOrderNumber || "Pending",
-          tracking_number: trackingNumber,
-          tracking_link: trackingLink,
-          courier_name: courierName,
-          estimated_delivery: estimatedDelivery,
+          customerName: order.shippingAddress.fullName || user?.name || "Customer",
+          orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
+          productName: itemsList,
+          amount: `₹${order.total.toFixed(2)}`,
+          productImage: "",
         },
         priority: 8,
       }
@@ -180,12 +189,21 @@ export async function triggerOrderDeliveredEmail(
       return;
     }
 
-    const deliveryDate = new Date().toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-    const reviewLink = `https://goskinly.com/orders/${order._id}`;
+    // Format items list
+    const itemsList = order.items
+      .map((item) => {
+        const coverage = item.coverage === "full_body_wrap" 
+          ? "Full Body Wrap" 
+          : item.coverage === "only_back" 
+            ? "Only Back" 
+            : "";
+        const model = item.phoneModel || "";
+        const details = coverage && model 
+          ? `${model} - ${coverage}` 
+          : coverage || model;
+        return `${item.productTitle}${details ? ` (${details})` : ""} x ${item.quantity}`;
+      })
+      .join(", ");
 
     await ctx.scheduler.runAfter(
       0,
@@ -195,10 +213,11 @@ export async function triggerOrderDeliveredEmail(
         recipientEmail,
         recipientUserId: order.userId,
         variables: {
-          customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-          order_number: order.orderNumber || order.failedOrderNumber || "Pending",
-          delivery_date: deliveryDate,
-          review_link: reviewLink,
+          customerName: order.shippingAddress.fullName || user?.name || "Customer",
+          orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
+          productName: itemsList,
+          amount: `₹${order.total.toFixed(2)}`,
+          productImage: "",
         },
         priority: 8,
       }
@@ -214,8 +233,7 @@ export async function triggerOrderDeliveredEmail(
 export async function triggerOrderCancelledEmail(
   ctx: Ctx,
   order: Doc<"orders">,
-  user: { name?: string } | null,
-  cancellationReason: string = "Order was cancelled"
+  user: { name?: string } | null
 ) {
   const recipientEmail = getCustomerEmail(order);
   if (!recipientEmail) {
@@ -234,9 +252,21 @@ export async function triggerOrderCancelledEmail(
       return;
     }
 
-    // Calculate refund amount (wallet + prepaid amount)
-    const refundAmount = (order.walletAmountUsed || 0);
-    const refundMethod = refundAmount > 0 ? "Wallet Credit" : "No refund required";
+    // Format items list
+    const itemsList = order.items
+      .map((item) => {
+        const coverage = item.coverage === "full_body_wrap" 
+          ? "Full Body Wrap" 
+          : item.coverage === "only_back" 
+            ? "Only Back" 
+            : "";
+        const model = item.phoneModel || "";
+        const details = coverage && model 
+          ? `${model} - ${coverage}` 
+          : coverage || model;
+        return `${item.productTitle}${details ? ` (${details})` : ""} x ${item.quantity}`;
+      })
+      .join(", ");
 
     await ctx.scheduler.runAfter(
       0,
@@ -246,11 +276,11 @@ export async function triggerOrderCancelledEmail(
         recipientEmail,
         recipientUserId: order.userId,
         variables: {
-          customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-          order_number: order.orderNumber || order.failedOrderNumber || "Pending",
-          cancellation_reason: cancellationReason,
-          refund_amount: refundAmount > 0 ? `₹${refundAmount.toFixed(2)}` : "N/A",
-          refund_method: refundMethod,
+          customerName: order.shippingAddress.fullName || user?.name || "Customer",
+          orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
+          productName: itemsList,
+          amount: `₹${order.total.toFixed(2)}`,
+          productImage: "",
         },
         priority: 8,
       }
@@ -266,8 +296,7 @@ export async function triggerOrderCancelledEmail(
 export async function triggerPaymentFailedEmail(
   ctx: Ctx,
   order: Doc<"orders">,
-  user: { name?: string } | null,
-  failureReason: string = "Payment could not be processed"
+  user: { name?: string } | null
 ) {
   const recipientEmail = getCustomerEmail(order);
   if (!recipientEmail) {
@@ -286,7 +315,21 @@ export async function triggerPaymentFailedEmail(
       return;
     }
 
-    const retryLink = `https://goskinly.com/orders/${order._id}`;
+    // Format items list
+    const itemsList = order.items
+      .map((item) => {
+        const coverage = item.coverage === "full_body_wrap" 
+          ? "Full Body Wrap" 
+          : item.coverage === "only_back" 
+            ? "Only Back" 
+            : "";
+        const model = item.phoneModel || "";
+        const details = coverage && model 
+          ? `${model} - ${coverage}` 
+          : coverage || model;
+        return `${item.productTitle}${details ? ` (${details})` : ""} x ${item.quantity}`;
+      })
+      .join(", ");
 
     await ctx.scheduler.runAfter(
       0,
@@ -296,11 +339,11 @@ export async function triggerPaymentFailedEmail(
         recipientEmail,
         recipientUserId: order.userId,
         variables: {
-          customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-          order_number: order.orderNumber || order.failedOrderNumber || "Pending",
-          payment_amount: `₹${order.total.toFixed(2)}`,
-          failure_reason: failureReason,
-          retry_link: retryLink,
+          customerName: order.shippingAddress.fullName || user?.name || "Customer",
+          orderNumber: order.orderNumber || order.failedOrderNumber || "Pending",
+          productName: itemsList,
+          amount: `₹${order.total.toFixed(2)}`,
+          productImage: "",
         },
         priority: 8,
       }

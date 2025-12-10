@@ -154,7 +154,7 @@ export const processWebhookUpdate = internalMutation({
           } else if (newOrderStatus === "delivered") {
             await triggerOrderDeliveredEmail(ctx, order, user);
           } else if (newOrderStatus === "cancelled") {
-            await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled by logistics partner");
+            await triggerOrderCancelledEmail(ctx, order, user);
           }
         } catch (error) {
           console.error("Failed to trigger email notification:", error);
