@@ -25,6 +25,7 @@ import type * as collections from "../collections.js";
 import type * as coupons from "../coupons.js";
 import type * as emailActions from "../emailActions.js";
 import type * as emailActionsInternal from "../emailActionsInternal.js";
+import type * as emailSeed from "../emailSeed.js";
 import type * as emailTemplateActions from "../emailTemplateActions.js";
 import type * as emailTemplateManagement from "../emailTemplateManagement.js";
 import type * as emailTemplates from "../emailTemplates.js";
@@ -105,6 +106,7 @@ declare const fullApi: ApiFromModules<{
   coupons: typeof coupons;
   emailActions: typeof emailActions;
   emailActionsInternal: typeof emailActionsInternal;
+  emailSeed: typeof emailSeed;
   emailTemplateActions: typeof emailTemplateActions;
   emailTemplateManagement: typeof emailTemplateManagement;
   emailTemplates: typeof emailTemplates;
