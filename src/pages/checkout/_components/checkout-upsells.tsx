@@ -98,6 +98,14 @@ export function CheckoutUpsells({ cartItems }: CheckoutUpsellsProps) {
     return null;
   }
 
+  // Calculate total savings across all upsells
+  const totalSavings = upsells.reduce((sum, upsell) => {
+    if (upsell.discountedPrice) {
+      return sum + (upsell.originalPrice - upsell.discountedPrice);
+    }
+    return sum;
+  }, 0);
+
   return (
     <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
       <CardHeader>
@@ -106,7 +114,7 @@ export function CheckoutUpsells({ cartItems }: CheckoutUpsellsProps) {
           <CardTitle>Complete Your Order</CardTitle>
         </div>
         <p className="text-sm text-muted-foreground">
-          Customers who bought these items also added:
+          Surprise Deal : Only for this Order - Save ₹{totalSavings.toFixed(0)}
         </p>
       </CardHeader>
       <CardContent>
