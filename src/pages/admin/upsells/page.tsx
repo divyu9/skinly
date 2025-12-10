@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
@@ -19,9 +20,11 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
-export default function CheckoutUpsellsPage() {
+function CheckoutUpsellsPageInner() {
   const rules = useQuery(api.checkoutUpsells.listAllRules, {});
   const createRule = useMutation(api.checkoutUpsells.createRule);
   const updateRule = useMutation(api.checkoutUpsells.updateRule);
@@ -330,5 +333,33 @@ export default function CheckoutUpsellsPage() {
         </Dialog>
       </AdminPageWrapper>
     </AdminLayout>
+  );
+}
+
+export default function CheckoutUpsellsPage() {
+  return (
+    <>
+      <Unauthenticated>
+        <div className="flex items-center justify-center min-h-screen">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-12 text-center">
+              <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
+              <p className="text-muted-foreground mb-6">
+                You need to sign in to access the admin panel
+              </p>
+              <SignInButton />
+            </CardContent>
+          </Card>
+        </div>
+      </Unauthenticated>
+      <AuthLoading>
+        <div className="flex items-center justify-center min-h-screen">
+          <Skeleton className="h-96 w-full max-w-4xl" />
+        </div>
+      </AuthLoading>
+      <Authenticated>
+        <CheckoutUpsellsPageInner />
+      </Authenticated>
+    </>
   );
 }
