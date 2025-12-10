@@ -155,10 +155,30 @@ export const resetEmailUsecases = mutation({
     }
 
     // Re-seed
-    const result = await seedEmailUsecases(ctx, {});
+    const now = Date.now();
+    let createdCount = 0;
+
+    for (const usecase of DEFAULT_EMAIL_USECASES) {
+      await ctx.db.insert("emailUsecaseTemplates", {
+        usecaseKey: usecase.usecaseKey,
+        displayName: usecase.displayName,
+        description: usecase.description,
+        enabled: false,
+        templateName: undefined,
+        msg91TemplateId: undefined,
+        templateId: undefined,
+        variableMapping: undefined,
+        isTransactional: usecase.isTransactional,
+        lastUpdatedBy: "system_seed",
+        lastUpdatedAt: now,
+      });
+      createdCount++;
+    }
+
     return {
       deleted: allUsecases.length,
-      ...result,
+      created: createdCount,
+      success: true,
     };
   },
 });

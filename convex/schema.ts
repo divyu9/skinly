@@ -858,8 +858,9 @@ export default defineSchema({
     .index("by_target_and_active", ["targetType", "targetId", "isActive"])
     .index("by_active", ["isActive"]),
 
-  // Email Templates (admin-managed custom HTML templates)
-  emailTemplates: defineTable({
+  // Email Templates (admin-managed custom HTML templates - OLD RESEND SYSTEM, deprecated)
+  // Keeping for backward compatibility, will be migrated to MSG91 system
+  emailTemplatesLegacy: defineTable({
     templateType: v.union(
       v.literal("order_confirmed"),
       v.literal("order_dispatched"),
