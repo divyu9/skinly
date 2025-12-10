@@ -911,4 +911,125 @@ export default defineSchema({
     fileType: v.string(), // MIME type (e.g., "image/jpeg", "video/mp4")
   })
     .index("by_bug_report", ["bugReportId"]),
+
+  // MSG91 Email Use-case Templates
+  emailUsecaseTemplates: defineTable({
+    usecaseKey: v.string(), // Unique key (e.g., "order_confirmed", "abandoned_cart")
+    displayName: v.string(), // Friendly name for UI (e.g., "Order Confirmed")
+    description: v.optional(v.string()), // Description of when this usecase triggers
+    enabled: v.boolean(), // ON/OFF toggle
+    templateName: v.optional(v.string()), // Selected template name (e.g., "Order Confirmed - v1")
+    msg91TemplateId: v.optional(v.string()), // MSG91 template ID
+    templateId: v.optional(v.id("emailTemplates")), // Link to email template (for variable mapping)
+    // Variable mapping configuration
+    variableMapping: v.optional(v.array(v.object({
+      templateVariable: v.string(), // Template variable name (e.g., "customer_name", "order_number")
+      sourceFields: v.array(v.string()), // Source fields to combine (e.g., ["brand_name", "model_name"])
+      separator: v.optional(v.string()), // Separator for multiple fields (default: " ")
+    }))),
+    isTransactional: v.boolean(), // Transactional vs marketing
+    lastUpdatedBy: v.optional(v.string()), // Admin email who made the change
+    lastUpdatedAt: v.optional(v.number()), // Timestamp of last update
+  }).index("by_usecase_key", ["usecaseKey"]),
+
+  // MSG91 Email Use-case Audit Trail
+  emailUsecaseAudit: defineTable({
+    usecaseKey: v.string(), // Which use-case was changed
+    fieldChanged: v.string(), // "enabled" or "template_id"
+    oldValue: v.optional(v.string()), // Previous value
+    newValue: v.optional(v.string()), // New value
+    changedBy: v.string(), // Admin email
+    changedAt: v.number(), // Timestamp
+  })
+    .index("by_usecase_key", ["usecaseKey"])
+    .index("by_changed_at", ["changedAt"]),
+
+  // MSG91 Email Templates
+  emailTemplates: defineTable({
+    templateName: v.string(), // Template name (e.g., "Order Confirmed - v1")
+    msg91TemplateId: v.string(), // MSG91 template ID
+    templateType: v.union(v.literal("transactional"), v.literal("marketing")), // Type
+    templateSubject: v.optional(v.string()), // Email subject line
+    variables: v.optional(v.array(v.string())), // List of variables in template
+    status: v.union(v.literal("active"), v.literal("inactive")), // Status
+    createdAt: v.optional(v.number()), // When created
+  })
+    .index("by_msg91_id", ["msg91TemplateId"])
+    .index("by_status", ["status"]),
+
+  // MSG91 Email Messages Log
+  emailMessages: defineTable({
+    usecaseKey: v.string(), // Which use-case triggered this (e.g., "order_confirmed")
+    recipientEmail: v.string(), // Email address
+    recipientUserId: v.optional(v.id("users")), // User ID if available
+    msg91TemplateId: v.string(), // Template ID used
+    templateName: v.string(), // Template name for reference
+    subject: v.optional(v.string()), // Email subject
+    variables: v.optional(v.record(v.string(), v.string())), // Variables sent (as JSON object)
+    status: v.union(
+      v.literal("pending"), // Queued for sending
+      v.literal("sent"), // Sent to MSG91
+      v.literal("delivered"), // Delivered to recipient
+      v.literal("failed") // Failed to send
+    ),
+    providerMessageId: v.optional(v.string()), // Message ID from MSG91
+    errorMessage: v.optional(v.string()), // Error details if failed
+    retryCount: v.number(), // Number of retry attempts
+    sentAt: v.optional(v.number()), // When sent successfully
+    deliveredAt: v.optional(v.number()), // When delivered
+    createdAt: v.number(), // When queued
+  })
+    .index("by_usecase", ["usecaseKey"])
+    .index("by_recipient", ["recipientEmail"])
+    .index("by_status", ["status"])
+    .index("by_user", ["recipientUserId"])
+    .index("by_provider_message_id", ["providerMessageId"])
+    .index("by_created_at", ["createdAt"]),
+
+  // MSG91 Email Message Queue (for worker processing)
+  emailQueue: defineTable({
+    messageId: v.id("emailMessages"), // Reference to message
+    priority: v.number(), // Higher = more urgent (1-10)
+    scheduledFor: v.number(), // When to send (for retry delays)
+    attempts: v.number(), // Number of processing attempts
+    status: v.union(
+      v.literal("pending"), // Waiting to be processed
+      v.literal("processing"), // Currently being processed
+      v.literal("completed"), // Successfully sent
+      v.literal("failed") // Permanently failed (max retries)
+    ),
+    lastAttemptAt: v.optional(v.number()), // Last processing attempt
+    nextRetryAt: v.optional(v.number()), // Next retry time
+    errorMessage: v.optional(v.string()), // Latest error
+  })
+    .index("by_status", ["status"])
+    .index("by_scheduled", ["scheduledFor"])
+    .index("by_message", ["messageId"])
+    .index("by_status_and_scheduled", ["status", "scheduledFor"]),
+
+  // MSG91 Email Debug Logs (detailed API call logs for debugging)
+  emailDebugLogs: defineTable({
+    messageId: v.id("emailMessages"), // Related message
+    usecaseKey: v.string(), // Use case that triggered this
+    recipientEmail: v.string(), // Email address (for filtering)
+    templateId: v.string(), // MSG91 template ID used
+    // Request details
+    requestUrl: v.string(), // Full URL
+    requestBody: v.string(), // JSON string of request body
+    requestVariables: v.optional(v.string()), // JSON string of variables
+    // Response details
+    responseStatus: v.number(), // HTTP status code
+    responseBody: v.string(), // Full response body
+    // Parsed error information
+    success: v.boolean(), // Whether the API call succeeded
+    errorType: v.optional(v.string()), // Parsed error type
+    errorMessage: v.optional(v.string()), // Human-readable error message
+    // Metadata
+    createdAt: v.number(), // When this log was created
+  })
+    .index("by_message", ["messageId"])
+    .index("by_usecase", ["usecaseKey"])
+    .index("by_success", ["success"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_error_type", ["errorType"]),
 });
