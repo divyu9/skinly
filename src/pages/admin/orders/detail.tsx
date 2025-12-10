@@ -29,6 +29,18 @@ function OrderDetailPageInner() {
     trackingUrl: "",
     shippingStatus: "",
   });
+  
+  // Email confirmation dialog state
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [emailDialogData, setEmailDialogData] = useState<{
+    newStatus?: string;
+    oldStatus?: string;
+    isPaymentStatus?: boolean;
+  }>({});
+  const [selectedEmailType, setSelectedEmailType] = useState<
+    "order_confirmed" | "order_dispatched" | "order_delivered" | "order_cancelled" | "payment_failed"
+  >("order_confirmed");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const order = useQuery(
     api.admin.orders.getOrderDetails,
@@ -43,6 +55,7 @@ function OrderDetailPageInner() {
   const updateOrderStatus = useMutation(api.admin.orders.updateOrderStatus);
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
+  const sendOrderEmail = useMutation(api.admin.orders.sendOrderStatusEmail);
   const createShipment = useAction(api.rapidshyp.createShipment);
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
@@ -83,10 +96,23 @@ function OrderDetailPageInner() {
   const handleStatusChange = async (
     status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
   ) => {
-    if (!orderId) return;
+    if (!orderId || !order) return;
     try {
+      const oldStatus = order.status;
       await updateOrderStatus({ orderId: orderId as Id<"orders">, status });
       toast.success("Order status updated");
+      
+      // Determine default email type based on new status
+      let defaultEmailType: typeof selectedEmailType = "order_confirmed";
+      if (status === "processing") defaultEmailType = "order_confirmed";
+      else if (status === "shipped") defaultEmailType = "order_dispatched";
+      else if (status === "delivered") defaultEmailType = "order_delivered";
+      else if (status === "cancelled") defaultEmailType = "order_cancelled";
+      
+      // Show email confirmation dialog
+      setSelectedEmailType(defaultEmailType);
+      setEmailDialogData({ newStatus: status, oldStatus, isPaymentStatus: false });
+      setShowEmailDialog(true);
     } catch (error) {
       toast.error("Failed to update status");
     }
@@ -95,12 +121,41 @@ function OrderDetailPageInner() {
   const handlePaymentStatusChange = async (
     paymentStatus: "pending" | "success" | "failed"
   ) => {
-    if (!orderId) return;
+    if (!orderId || !order) return;
     try {
+      const oldPaymentStatus = order.paymentStatus;
       await updatePaymentStatus({ orderId: orderId as Id<"orders">, paymentStatus });
       toast.success("Payment status updated");
+      
+      // Show email dialog only for failed payments
+      if (paymentStatus === "failed") {
+        setSelectedEmailType("payment_failed");
+        setEmailDialogData({ 
+          newStatus: paymentStatus, 
+          oldStatus: oldPaymentStatus, 
+          isPaymentStatus: true 
+        });
+        setShowEmailDialog(true);
+      }
     } catch (error) {
       toast.error("Failed to update payment status");
+    }
+  };
+  
+  const handleSendEmail = async () => {
+    if (!orderId) return;
+    setSendingEmail(true);
+    try {
+      await sendOrderEmail({
+        orderId: orderId as Id<"orders">,
+        emailType: selectedEmailType,
+      });
+      toast.success("Email sent successfully!");
+      setShowEmailDialog(false);
+    } catch (error) {
+      toast.error("Failed to send email");
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -1523,6 +1578,71 @@ function OrderDetailPageInner() {
                 <>
                   <AlertCircleIcon className="size-4 mr-2" />
                   Record Action
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Confirmation Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Email Notification?</DialogTitle>
+            <DialogDescription>
+              {emailDialogData.isPaymentStatus 
+                ? `Payment status changed to ${emailDialogData.newStatus}.`
+                : `Order status changed from ${emailDialogData.oldStatus} to ${emailDialogData.newStatus}.`
+              }
+              <br />
+              Would you like to send an email notification to the customer?
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="email-type">Email Type</Label>
+              <Select
+                value={selectedEmailType}
+                onValueChange={(value) =>
+                  setSelectedEmailType(
+                    value as typeof selectedEmailType
+                  )
+                }
+              >
+                <SelectTrigger id="email-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="order_confirmed">Order Confirmed</SelectItem>
+                  <SelectItem value="order_dispatched">Order Dispatched</SelectItem>
+                  <SelectItem value="order_delivered">Order Delivered</SelectItem>
+                  <SelectItem value="order_cancelled">Order Cancelled</SelectItem>
+                  <SelectItem value="payment_failed">Payment Failed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEmailDialog(false)}
+              disabled={sendingEmail}
+            >
+              Skip
+            </Button>
+            <Button onClick={handleSendEmail} disabled={sendingEmail}>
+              {sendingEmail ? (
+                <>
+                  <Spinner className="size-4 mr-2" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <SendIcon className="size-4 mr-2" />
+                  Send Email
                 </>
               )}
             </Button>

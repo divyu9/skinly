@@ -3,9 +3,11 @@ import { query, mutation } from "../_generated/server";
 import { ConvexError } from "convex/values";
 import { api } from "../_generated/api.js";
 import {
+  triggerOrderConfirmedEmail,
   triggerOrderDispatchedEmail,
   triggerOrderDeliveredEmail,
   triggerOrderCancelledEmail,
+  triggerPaymentFailedEmail,
 } from "../emailOrderTriggers";
 
 // Get all orders for admin (not restricted to current user)
@@ -397,6 +399,10 @@ export const updateOrderStatus = mutation({
           
           // Send order cancelled email
           await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled by admin");
+        } else if (args.status === "processing") {
+          // Order marked as processing (e.g., reactivated from cancelled)
+          // Send order confirmed email
+          await triggerOrderConfirmedEmail(ctx, order, user);
         }
       } catch (error) {
         console.error("Failed to queue order status WhatsApp:", error);
@@ -426,9 +432,92 @@ export const updateOrderPaymentStatus = mutation({
       });
     }
 
+    // Get order to check for payment status change
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const oldPaymentStatus = order.paymentStatus;
+
     await ctx.db.patch(args.orderId, { paymentStatus: args.paymentStatus });
 
+    // Send email notification if payment status changed to failed
+    if (oldPaymentStatus !== args.paymentStatus && args.paymentStatus === "failed") {
+      try {
+        const user = order.userId ? await ctx.db.get(order.userId) : null;
+        await triggerPaymentFailedEmail(ctx, order, user, "Payment failed");
+      } catch (error) {
+        console.error("Failed to send payment failed email:", error);
+      }
+    }
+
     return { success: true };
+  },
+});
+
+// Manually send order status email (admin only)
+export const sendOrderStatusEmail = mutation({
+  args: {
+    orderId: v.id("orders"),
+    emailType: v.union(
+      v.literal("order_confirmed"),
+      v.literal("order_dispatched"),
+      v.literal("order_delivered"),
+      v.literal("order_cancelled"),
+      v.literal("payment_failed")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const user = order.userId ? await ctx.db.get(order.userId) : null;
+
+    try {
+      // Trigger the appropriate email based on type
+      switch (args.emailType) {
+        case "order_confirmed":
+          await triggerOrderConfirmedEmail(ctx, order, user);
+          break;
+        case "order_dispatched":
+          await triggerOrderDispatchedEmail(ctx, order, user);
+          break;
+        case "order_delivered":
+          await triggerOrderDeliveredEmail(ctx, order, user);
+          break;
+        case "order_cancelled":
+          await triggerOrderCancelledEmail(ctx, order, user, "Order was cancelled");
+          break;
+        case "payment_failed":
+          await triggerPaymentFailedEmail(ctx, order, user, "Payment failed");
+          break;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to send order email:", error);
+      throw new ConvexError({
+        message: "Failed to send email",
+        code: "EXTERNAL_SERVICE_ERROR",
+      });
+    }
   },
 });
 
