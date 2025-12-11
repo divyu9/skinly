@@ -41,6 +41,7 @@ function OrderDetailPageInner() {
     "order_confirmed" | "order_dispatched" | "order_delivered" | "order_cancelled" | "payment_failed"
   >("order_confirmed");
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [sendWhatsApp, setSendWhatsApp] = useState(true);
   
   // Edit dialogs state
   const [showEditCustomerDialog, setShowEditCustomerDialog] = useState(false);
@@ -84,6 +85,7 @@ function OrderDetailPageInner() {
   const updatePaymentStatus = useMutation(api.admin.orders.updateOrderPaymentStatus);
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const sendOrderEmail = useMutation(api.admin.orders.sendOrderStatusEmail);
+  const sendOrderWhatsApp = useMutation(api.admin.orders.sendOrderStatusWhatsApp);
   const updateCustomerInfo = useMutation(api.admin.orders.updateCustomerInfo);
   const updateShippingAddress = useMutation(api.admin.orders.updateOrderShippingAddress);
   const updateOrderItems = useMutation(api.admin.orders.updateOrderItems);
@@ -143,6 +145,7 @@ function OrderDetailPageInner() {
       // Show email confirmation dialog
       setSelectedEmailType(defaultEmailType);
       setEmailDialogData({ newStatus: status, oldStatus, isPaymentStatus: false });
+      setSendWhatsApp(true); // Default to checked
       setShowEmailDialog(true);
     } catch (error) {
       toast.error("Failed to update status");
@@ -166,6 +169,7 @@ function OrderDetailPageInner() {
           oldStatus: oldPaymentStatus, 
           isPaymentStatus: true 
         });
+        setSendWhatsApp(true); // Default to checked
         setShowEmailDialog(true);
       }
     } catch (error) {
@@ -177,11 +181,37 @@ function OrderDetailPageInner() {
     if (!orderId) return;
     setSendingEmail(true);
     try {
+      let emailSent = false;
+      let whatsappSent = false;
+      
+      // Send email
       await sendOrderEmail({
         orderId: orderId as Id<"orders">,
         emailType: selectedEmailType,
       });
-      toast.success("Email sent successfully!");
+      emailSent = true;
+      
+      // Send WhatsApp if checkbox is checked
+      if (sendWhatsApp) {
+        try {
+          await sendOrderWhatsApp({
+            orderId: orderId as Id<"orders">,
+            whatsappType: selectedEmailType,
+          });
+          whatsappSent = true;
+        } catch (whatsappError) {
+          console.error("WhatsApp send failed:", whatsappError);
+          toast.warning("Email sent, but WhatsApp notification failed");
+        }
+      }
+      
+      // Show success message
+      if (emailSent && whatsappSent) {
+        toast.success("Email and WhatsApp sent successfully!");
+      } else if (emailSent) {
+        toast.success("Email sent successfully!");
+      }
+      
       setShowEmailDialog(false);
     } catch (error) {
       toast.error("Failed to send email");
@@ -1751,6 +1781,20 @@ function OrderDetailPageInner() {
                   <SelectItem value="payment_failed">Payment Failed</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="send-whatsapp"
+                checked={sendWhatsApp}
+                onCheckedChange={(checked) => setSendWhatsApp(checked === true)}
+              />
+              <Label
+                htmlFor="send-whatsapp"
+                className="text-sm font-normal cursor-pointer"
+              >
+                Also send WhatsApp notification
+              </Label>
             </div>
           </div>
 

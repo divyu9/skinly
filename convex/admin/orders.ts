@@ -521,6 +521,142 @@ export const sendOrderStatusEmail = mutation({
   },
 });
 
+// Send WhatsApp notification for order status change
+export const sendOrderStatusWhatsApp = mutation({
+  args: {
+    orderId: v.id("orders"),
+    whatsappType: v.union(
+      v.literal("order_confirmed"),
+      v.literal("order_dispatched"),
+      v.literal("order_delivered"),
+      v.literal("order_cancelled"),
+      v.literal("payment_failed")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const order = await ctx.db.get(args.orderId);
+    if (!order) {
+      throw new ConvexError({
+        message: "Order not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const user = order.userId ? await ctx.db.get(order.userId) : null;
+
+    try {
+      // Prepare common variables
+      const customerName = order.shippingAddress.fullName || user?.name || "Customer";
+      const orderNumber = order.orderNumber || order.failedOrderNumber || "Pending";
+
+      // Queue the appropriate WhatsApp message based on type
+      switch (args.whatsappType) {
+        case "order_confirmed":
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_confirmed",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: customerName,
+                order_number: orderNumber,
+                order_total: order.total.toFixed(2),
+              },
+              priority: 8,
+            }
+          );
+          break;
+        case "order_dispatched":
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_dispatched",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: customerName,
+                order_number: orderNumber,
+                awb_number: order.awbNumber || "Not available",
+                courier_name: order.courierName || "courier partner",
+                tracking_url: order.trackingUrl || "",
+              },
+              priority: 8,
+            }
+          );
+          break;
+        case "order_delivered":
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_delivered",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: customerName,
+                order_number: orderNumber,
+              },
+              priority: 8,
+            }
+          );
+          break;
+        case "order_cancelled":
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_cancelled",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: customerName,
+                order_number: orderNumber,
+              },
+              priority: 8,
+            }
+          );
+          break;
+        case "payment_failed":
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "payment_failed",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: customerName,
+                order_number: orderNumber,
+                payment_amount: order.total.toFixed(2),
+              },
+              priority: 8,
+            }
+          );
+          break;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("Failed to send order WhatsApp:", error);
+      throw new ConvexError({
+        message: "Failed to send WhatsApp notification",
+        code: "EXTERNAL_SERVICE_ERROR",
+      });
+    }
+  },
+});
+
 // Get order statistics
 export const getOrderStats = query({
   args: {},
