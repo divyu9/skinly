@@ -90,6 +90,8 @@ export const queueMessage = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
+    console.log(`queueMessage called for ${args.usecaseKey} to ${args.recipientPhone}`);
+
     // Get the use-case configuration
     const usecase = await ctx.db
       .query("whUsecaseTemplates")
@@ -97,11 +99,14 @@ export const queueMessage = mutation({
       .unique();
 
     if (!usecase) {
+      console.error(`Use-case '${args.usecaseKey}' not found in database`);
       throw new ConvexError({
         message: `Use-case '${args.usecaseKey}' not found`,
         code: "NOT_FOUND",
       });
     }
+
+    console.log(`Use-case ${args.usecaseKey}: enabled=${usecase.enabled}, template=${usecase.providerTemplateId}, isTransactional=${usecase.isTransactional}`);
 
     // Check if use-case is enabled
     if (!usecase.enabled) {
@@ -117,6 +122,7 @@ export const queueMessage = mutation({
 
     // Clean phone number
     const cleanedPhone = cleanPhoneNumber(args.recipientPhone);
+    console.log(`Cleaned phone: ${args.recipientPhone} -> ${cleanedPhone}`);
 
     // Apply variable mappings if configured
     let finalVariables = args.variables || {};
@@ -145,22 +151,30 @@ export const queueMessage = mutation({
       .withIndex("by_phone", (q) => q.eq("phoneNumber", cleanedPhone))
       .unique();
 
+    console.log(`Consent check for ${cleanedPhone}: ${consent ? `found (${consent.consentType})` : 'not found'}, isTransactional=${usecase.isTransactional}`);
+
     let hasConsent = false;
     if (!consent) {
       // No consent record - allow transactional, deny marketing
       hasConsent = usecase.isTransactional;
+      console.log(`No consent record, allowing transactional: ${hasConsent}`);
     } else if (consent.consentType === "none") {
       hasConsent = false; // User opted out completely
+      console.log(`User opted out completely`);
     } else if (consent.consentType === "transactional_only" && !usecase.isTransactional) {
       hasConsent = false; // User only wants transactional
+      console.log(`User only wants transactional, but this is marketing`);
     } else {
       hasConsent = true; // "all" consent or transactional message to transactional_only user
+      console.log(`User has consent: ${consent.consentType}`);
     }
 
     if (!hasConsent) {
-      console.log(`User ${cleanedPhone} has not consented to ${usecase.isTransactional ? 'transactional' : 'marketing'} messages`);
+      console.log(`BLOCKED: User ${cleanedPhone} has not consented to ${usecase.isTransactional ? 'transactional' : 'marketing'} messages`);
       return { queued: false, reason: "no_consent" };
     }
+
+    console.log(`Consent check passed, proceeding to queue message`);
 
     // Create message record
     const messageId = await ctx.db.insert("whatsappMessages", {

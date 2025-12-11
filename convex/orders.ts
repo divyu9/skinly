@@ -381,34 +381,27 @@ export const createOrder = mutation({
 
     // Send admin notification
     try {
+      console.log("Attempting to send admin notification for order:", orderNumber);
+      
       // Get admin notification settings
       const adminSettings = await ctx.db
         .query("settings")
         .withIndex("by_key", (q) => q.eq("key", "whatsapp_admin_notifications"))
         .unique();
 
+      console.log("Admin settings:", adminSettings ? "Found" : "Not found");
+
       if (adminSettings) {
         const config = typeof adminSettings.value === "string"
           ? JSON.parse(adminSettings.value)
           : adminSettings.value;
 
-        if (config.enabled && config.adminPhone) {
-          // Format products list
-          const productsList = cartItems
-            .map((item) => {
-              const coverage = item.coverage === "full_body_wrap" 
-                ? "Full Body" 
-                : item.coverage === "only_back" 
-                  ? "Only Back" 
-                  : "";
-              const model = item.phoneModel || item.phoneBrand || "";
-              const details = coverage && model 
-                ? `${model} - ${coverage}` 
-                : coverage || model;
-              return `${item.productTitle}${details ? ` (${details})` : ""}`;
-            })
-            .join(", ");
+        console.log("Admin config:", {
+          enabled: config.enabled,
+          adminPhone: config.adminPhone,
+        });
 
+        if (config.enabled && config.adminPhone) {
           // Format payment type
           let paymentType = args.paymentMethod.toUpperCase();
           if (args.paymentMethod === "cod") {
@@ -421,23 +414,33 @@ export const createOrder = mutation({
             paymentType = "PhonePe";
           }
 
+          const adminVars = {
+            order_number: orderNumber || "Pending",
+            amount: `${total.toFixed(2)}`,
+            customer_name: args.shippingAddress.fullName || user?.name || "Customer",
+            number_of_products: cartItems.length.toString(),
+            payment_mode: paymentType,
+          };
+
+          console.log("Scheduling admin notification with variables:", adminVars);
+
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
             {
               usecaseKey: "admin_new_order",
               recipientPhone: config.adminPhone,
-              variables: {
-                order_number: orderNumber || "Pending",
-                amount: `${total.toFixed(2)}`,
-                customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-                number_of_products: cartItems.length.toString(),
-                payment_mode: paymentType,
-              },
+              variables: adminVars,
               priority: 9, // High priority for admin notifications
             }
           );
+
+          console.log("Admin notification scheduled successfully");
+        } else {
+          console.log("Admin notifications disabled or no phone configured");
         }
+      } else {
+        console.log("No admin settings found");
       }
     } catch (error) {
       console.error("Failed to queue admin WhatsApp notification:", error);
