@@ -80,6 +80,9 @@ const PREDEFINED_VARIABLES = [
   { value: "order_url", label: "Order URL" },
   { value: "shop_url", label: "Shop URL" },
   
+  // Request Information
+  { value: "request_number", label: "Request Number" },
+  
   // Other
   { value: "stock_notification", label: "Stock Notification" },
   { value: "return_policy", label: "Return Policy" },

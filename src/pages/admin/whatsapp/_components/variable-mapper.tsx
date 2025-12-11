@@ -96,6 +96,9 @@ const AVAILABLE_SOURCE_FIELDS: Record<string, string[]> = {
     "order_url",
     "shop_url",
   ],
+  request: [
+    "request_number",
+  ],
   other: [
     "stock_notification",
     "return_policy",
@@ -236,6 +239,7 @@ export function VariableMapper({ usecaseKey, usecaseName }: VariableMapperProps)
       return [
         ...AVAILABLE_SOURCE_FIELDS.customer,
         ...AVAILABLE_SOURCE_FIELDS.product,
+        ...AVAILABLE_SOURCE_FIELDS.request,
         ...AVAILABLE_SOURCE_FIELDS.other,
       ];
     }
