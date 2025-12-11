@@ -31,23 +31,77 @@ interface VariableMapperProps {
 
 // Common source fields available for mapping
 const AVAILABLE_SOURCE_FIELDS: Record<string, string[]> = {
+  customer: [
+    "customer_name",
+    "phone_number",
+    "email",
+    "customer_id",
+  ],
   order: [
     "order_number",
-    "customer_name",
+    "order_id",
+    "order_date",
+    "order_status",
+    "number_of_products",
     "order_total",
-    "tracking_url",
-    "awb_number",
-    "courier_name",
+    "subtotal",
+    "tax_amount",
+    "shipping_cost",
+  ],
+  payment: [
+    "payment_mode",
+    "payment_status",
+    "amount",
+    "discount",
+    "discount_percentage",
+    "discount_amount",
+    "wallet_amount",
+    "cashback_amount",
     "cod_amount",
     "cod_fee",
     "prepaid_amount",
   ],
-  product: ["product_name", "product_url"],
-  customer: ["customer_name", "customer_email", "customer_phone"],
-  model: ["brand_name", "model_name", "category"],
-  otp: ["otp"],
-  review: ["review_url"],
-  cart: ["cart_url", "coupon_code", "discount"],
+  shipping: [
+    "tracking_url",
+    "awb_number",
+    "courier_name",
+    "estimated_delivery",
+    "shipping_address",
+  ],
+  address: [
+    "address_line1",
+    "address_line2",
+    "city",
+    "state",
+    "pincode",
+  ],
+  product: [
+    "product_name",
+    "product_url",
+    "brand_name",
+    "model_name",
+    "product_price",
+    "product_quantity",
+    "product_image",
+  ],
+  coupon: [
+    "coupon_code",
+  ],
+  otp: [
+    "otp",
+  ],
+  urls: [
+    "review_url",
+    "cart_url",
+    "order_url",
+    "shop_url",
+  ],
+  other: [
+    "stock_notification",
+    "return_policy",
+    "support_number",
+    "company_name",
+  ],
 };
 
 export function VariableMapper({ usecaseKey, usecaseName }: VariableMapperProps) {
@@ -126,13 +180,65 @@ export function VariableMapper({ usecaseKey, usecaseName }: VariableMapperProps)
   // Get all available source fields for this use case type
   const getAvailableFields = (): string[] => {
     const key = usecaseKey.toLowerCase();
-    if (key.includes("order")) return AVAILABLE_SOURCE_FIELDS.order;
-    if (key.includes("model")) return AVAILABLE_SOURCE_FIELDS.model;
-    if (key.includes("otp")) return AVAILABLE_SOURCE_FIELDS.otp;
-    if (key.includes("product") || key.includes("stock"))
-      return AVAILABLE_SOURCE_FIELDS.product;
-    if (key.includes("review")) return [...AVAILABLE_SOURCE_FIELDS.customer, ...AVAILABLE_SOURCE_FIELDS.review];
-    if (key.includes("cart")) return [...AVAILABLE_SOURCE_FIELDS.customer, ...AVAILABLE_SOURCE_FIELDS.cart];
+    
+    // Order-related use cases: show customer, order, payment, shipping, address, product
+    if (key.includes("order")) {
+      return [
+        ...AVAILABLE_SOURCE_FIELDS.customer,
+        ...AVAILABLE_SOURCE_FIELDS.order,
+        ...AVAILABLE_SOURCE_FIELDS.payment,
+        ...AVAILABLE_SOURCE_FIELDS.shipping,
+        ...AVAILABLE_SOURCE_FIELDS.address,
+        ...AVAILABLE_SOURCE_FIELDS.product,
+        ...AVAILABLE_SOURCE_FIELDS.urls,
+      ];
+    }
+    
+    // OTP use cases
+    if (key.includes("otp")) {
+      return [
+        ...AVAILABLE_SOURCE_FIELDS.customer,
+        ...AVAILABLE_SOURCE_FIELDS.otp,
+      ];
+    }
+    
+    // Product/Stock use cases
+    if (key.includes("product") || key.includes("stock")) {
+      return [
+        ...AVAILABLE_SOURCE_FIELDS.customer,
+        ...AVAILABLE_SOURCE_FIELDS.product,
+        ...AVAILABLE_SOURCE_FIELDS.urls,
+      ];
+    }
+    
+    // Review use cases
+    if (key.includes("review")) {
+      return [
+        ...AVAILABLE_SOURCE_FIELDS.customer,
+        ...AVAILABLE_SOURCE_FIELDS.order,
+        ...AVAILABLE_SOURCE_FIELDS.product,
+        ...AVAILABLE_SOURCE_FIELDS.urls,
+      ];
+    }
+    
+    // Cart use cases
+    if (key.includes("cart")) {
+      return [
+        ...AVAILABLE_SOURCE_FIELDS.customer,
+        ...AVAILABLE_SOURCE_FIELDS.payment,
+        ...AVAILABLE_SOURCE_FIELDS.coupon,
+        ...AVAILABLE_SOURCE_FIELDS.urls,
+      ];
+    }
+    
+    // Model request use cases
+    if (key.includes("model")) {
+      return [
+        ...AVAILABLE_SOURCE_FIELDS.customer,
+        ...AVAILABLE_SOURCE_FIELDS.product,
+        ...AVAILABLE_SOURCE_FIELDS.other,
+      ];
+    }
     
     // Default: all fields
     return Object.values(AVAILABLE_SOURCE_FIELDS).flat();
