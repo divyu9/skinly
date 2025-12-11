@@ -132,8 +132,17 @@ function OrderDetailPageInner() {
     if (!orderId || !order) return;
     try {
       const oldStatus = order.status;
-      await updateOrderStatus({ orderId: orderId as Id<"orders">, status });
-      toast.success("Order status updated");
+      const result = await updateOrderStatus({ orderId: orderId as Id<"orders">, status });
+      
+      // Check for WhatsApp errors
+      if (result.whatsappErrors && result.whatsappErrors.length > 0) {
+        toast.warning("Status updated but WhatsApp notification failed", {
+          description: result.whatsappErrors[0],
+          duration: 8000,
+        });
+      } else {
+        toast.success("Order status and WhatsApp notification sent");
+      }
       
       // Determine default email type based on new status
       let defaultEmailType: typeof selectedEmailType = "order_confirmed";

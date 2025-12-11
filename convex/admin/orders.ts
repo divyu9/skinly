@@ -160,9 +160,12 @@ export const updateShippingInfo = mutation({
     await ctx.db.patch(orderId, updateData);
 
     // Send order dispatched notification if AWB is added for first time
+    const whatsappErrors: string[] = [];
     if (isNewAWB && args.awbNumber) {
+      const user = order.userId ? await ctx.db.get(order.userId) : null;
+      
+      // Send WhatsApp
       try {
-        const user = order.userId ? await ctx.db.get(order.userId) : null;
         await ctx.scheduler.runAfter(
           0,
           api.whatsappMessaging.queueMessage,
@@ -180,19 +183,28 @@ export const updateShippingInfo = mutation({
             priority: 8,
           }
         );
-        
-        // Send order dispatched email
-        // Get the updated order to get the latest status
+        console.log(`WhatsApp queued: order_dispatched for order ${order.orderNumber}`);
+      } catch (error) {
+        const errMsg = `Failed to queue order_dispatched WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
+        console.error(errMsg);
+        whatsappErrors.push(errMsg);
+      }
+      
+      // Send order dispatched email
+      try {
         const updatedOrder = await ctx.db.get(orderId);
         if (updatedOrder) {
           await triggerOrderDispatchedEmail(ctx, updatedOrder, user);
         }
       } catch (error) {
-        console.error("Failed to queue order dispatched WhatsApp:", error);
+        console.error("Failed to send order dispatched email:", error);
       }
     }
 
-    return { success: true };
+    return { 
+      success: true,
+      whatsappErrors: whatsappErrors.length > 0 ? whatsappErrors : undefined
+    };
   },
 });
 
@@ -231,12 +243,13 @@ export const updateOrderStatus = mutation({
     await ctx.db.patch(args.orderId, { status: args.status });
 
     // Send WhatsApp notifications based on status change
+    const whatsappErrors: string[] = [];
     if (oldStatus !== args.status) {
-      try {
-        const user = order.userId ? await ctx.db.get(order.userId) : null;
+      const user = order.userId ? await ctx.db.get(order.userId) : null;
 
-        if (args.status === "shipped" && order.awbNumber) {
-          // Order shipped
+      if (args.status === "shipped" && order.awbNumber) {
+        // Order shipped
+        try {
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
@@ -254,79 +267,90 @@ export const updateOrderStatus = mutation({
               priority: 8,
             }
           );
-          
-          // Send order dispatched email
+          console.log(`WhatsApp queued: order_dispatched for order ${order.orderNumber}`);
+        } catch (error) {
+          const errMsg = `Failed to queue order_dispatched WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(errMsg);
+          whatsappErrors.push(errMsg);
+        }
+        
+        // Send order dispatched email
+        try {
           await triggerOrderDispatchedEmail(ctx, order, user);
-        } else if (args.status === "delivered") {
-          // Process cashback if not already credited
-          if (!order.cashbackCredited) {
-            // Get all variants to map order items to variant IDs
-            const allVariants = await ctx.db.query("variants").collect();
-            const allProducts = await ctx.db.query("products").collect();
+        } catch (error) {
+          console.error("Failed to send order dispatched email:", error);
+        }
+      } else if (args.status === "delivered") {
+        // Process cashback if not already credited
+        if (!order.cashbackCredited) {
+          // Get all variants to map order items to variant IDs
+          const allVariants = await ctx.db.query("variants").collect();
+          const allProducts = await ctx.db.query("products").collect();
 
-            // Build items array for cashback calculation
-            const itemsForCashback = order.items
-              .map((item) => {
-                // Find the product
-                const product = allProducts.find((p) => p._id === item.productId);
-                if (!product) return null;
+          // Build items array for cashback calculation
+          const itemsForCashback = order.items
+            .map((item) => {
+              // Find the product
+              const product = allProducts.find((p) => p._id === item.productId);
+              if (!product) return null;
 
-                // Find the variant by matching productId and variant title
-                const variant = allVariants.find(
-                  (v) => v.productId === item.productId && v.title === item.variant
-                );
-                if (!variant) return null;
+              // Find the variant by matching productId and variant title
+              const variant = allVariants.find(
+                (v) => v.productId === item.productId && v.title === item.variant
+              );
+              if (!variant) return null;
 
-                // Calculate final unit price (item price is already after discounts from order creation)
-                const finalPrice = item.price;
+              // Calculate final unit price (item price is already after discounts from order creation)
+              const finalPrice = item.price;
 
-                return {
-                  productId: product._id,
-                  variantId: variant._id,
-                  finalPrice,
-                  quantity: item.quantity,
-                };
-              })
-              .filter((item) => item !== null);
+              return {
+                productId: product._id,
+                variantId: variant._id,
+                finalPrice,
+                quantity: item.quantity,
+              };
+            })
+            .filter((item) => item !== null);
 
-            if (itemsForCashback.length > 0) {
-              // Calculate total cashback for the order
-              const cashbackResult = await ctx.runQuery(api.cashbackHelpers.calculateCartCashback, {
-                items: itemsForCashback,
+          if (itemsForCashback.length > 0) {
+            // Calculate total cashback for the order
+            const cashbackResult = await ctx.runQuery(api.cashbackHelpers.calculateCartCashback, {
+              items: itemsForCashback,
+            });
+
+            if (cashbackResult.totalCashback > 0 && order.userId) {
+              const currentBalance = user?.walletBalance || 0;
+              const newBalance = currentBalance + cashbackResult.totalCashback;
+
+              // Update user's wallet balance
+              await ctx.db.patch(order.userId, {
+                walletBalance: newBalance,
               });
 
-              if (cashbackResult.totalCashback > 0 && order.userId) {
-                const currentBalance = user?.walletBalance || 0;
-                const newBalance = currentBalance + cashbackResult.totalCashback;
+              // Create wallet transaction record
+              await ctx.db.insert("walletTransactions", {
+                userId: order.userId,
+                transactionType: "credit",
+                amount: cashbackResult.totalCashback,
+                source: "cashback",
+                balanceBefore: currentBalance,
+                balanceAfter: newBalance,
+                description: `Cashback from order #${order.orderNumber}`,
+                relatedOrderId: order._id,
+                createdAt: Date.now(),
+              });
 
-                // Update user's wallet balance
-                await ctx.db.patch(order.userId, {
-                  walletBalance: newBalance,
-                });
-
-                // Create wallet transaction record
-                await ctx.db.insert("walletTransactions", {
-                  userId: order.userId,
-                  transactionType: "credit",
-                  amount: cashbackResult.totalCashback,
-                  source: "cashback",
-                  balanceBefore: currentBalance,
-                  balanceAfter: newBalance,
-                  description: `Cashback from order #${order.orderNumber}`,
-                  relatedOrderId: order._id,
-                  createdAt: Date.now(),
-                });
-
-                // Mark order as cashback credited
-                await ctx.db.patch(args.orderId, {
-                  cashbackAmount: cashbackResult.totalCashback,
-                  cashbackCredited: true,
-                });
-              }
+              // Mark order as cashback credited
+              await ctx.db.patch(args.orderId, {
+                cashbackAmount: cashbackResult.totalCashback,
+                cashbackCredited: true,
+              });
             }
           }
+        }
 
-          // Order delivered - send delivery confirmation
+        // Order delivered - send delivery confirmation
+        try {
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
@@ -342,8 +366,15 @@ export const updateOrderStatus = mutation({
               priority: 7,
             }
           );
+          console.log(`WhatsApp queued: order_delivered for order ${order.orderNumber}`);
+        } catch (error) {
+          const errMsg = `Failed to queue order_delivered WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(errMsg);
+          whatsappErrors.push(errMsg);
+        }
 
-          // Send review request after 2 hours (7200000 ms)
+        // Send review request after 2 hours (7200000 ms)
+        try {
           await ctx.scheduler.runAfter(
             7200000,
             api.whatsappMessaging.queueMessage,
@@ -359,8 +390,12 @@ export const updateOrderStatus = mutation({
               priority: 5,
             }
           );
+        } catch (error) {
+          console.error("Failed to queue review_request WhatsApp:", error);
+        }
 
-          // Send review reminder after 7 days (604800000 ms)
+        // Send review reminder after 7 days (604800000 ms)
+        try {
           await ctx.scheduler.runAfter(
             604800000,
             api.whatsappMessaging.queueMessage,
@@ -376,11 +411,19 @@ export const updateOrderStatus = mutation({
               priority: 3, // Lower priority for reminders
             }
           );
-          
-          // Send order delivered email
+        } catch (error) {
+          console.error("Failed to queue review_reminder WhatsApp:", error);
+        }
+        
+        // Send order delivered email
+        try {
           await triggerOrderDeliveredEmail(ctx, order, user);
-        } else if (args.status === "cancelled") {
-          // Order cancelled
+        } catch (error) {
+          console.error("Failed to send order delivered email:", error);
+        }
+      } else if (args.status === "cancelled") {
+        // Order cancelled
+        try {
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
@@ -396,20 +439,58 @@ export const updateOrderStatus = mutation({
               priority: 8,
             }
           );
-          
-          // Send order cancelled email
-          await triggerOrderCancelledEmail(ctx, order, user);
-        } else if (args.status === "processing") {
-          // Order marked as processing (e.g., reactivated from cancelled)
-          // Send order confirmed email
-          await triggerOrderConfirmedEmail(ctx, order, user);
+          console.log(`WhatsApp queued: order_cancelled for order ${order.orderNumber}`);
+        } catch (error) {
+          const errMsg = `Failed to queue order_cancelled WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(errMsg);
+          whatsappErrors.push(errMsg);
         }
-      } catch (error) {
-        console.error("Failed to queue order status WhatsApp:", error);
+        
+        // Send order cancelled email
+        try {
+          await triggerOrderCancelledEmail(ctx, order, user);
+        } catch (error) {
+          console.error("Failed to send order cancelled email:", error);
+        }
+      } else if (args.status === "processing") {
+        // Order marked as processing (e.g., reactivated from cancelled)
+        // Send order confirmed WhatsApp
+        try {
+          await ctx.scheduler.runAfter(
+            0,
+            api.whatsappMessaging.queueMessage,
+            {
+              usecaseKey: "order_confirmed",
+              recipientPhone: order.shippingAddress.phone,
+              recipientUserId: order.userId,
+              variables: {
+                customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                order_total: `₹${order.total.toFixed(2)}`,
+              },
+              priority: 8,
+            }
+          );
+          console.log(`WhatsApp queued: order_confirmed for order ${order.orderNumber}`);
+        } catch (error) {
+          const errMsg = `Failed to queue order_confirmed WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
+          console.error(errMsg);
+          whatsappErrors.push(errMsg);
+        }
+        
+        // Send order confirmed email
+        try {
+          await triggerOrderConfirmedEmail(ctx, order, user);
+        } catch (error) {
+          console.error("Failed to send order confirmed email:", error);
+        }
       }
     }
 
-    return { success: true };
+    return { 
+      success: true, 
+      whatsappErrors: whatsappErrors.length > 0 ? whatsappErrors : undefined 
+    };
   },
 });
 
