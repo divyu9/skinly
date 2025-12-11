@@ -454,13 +454,13 @@ export const updateOrderStatus = mutation({
         }
       } else if (args.status === "processing") {
         // Order marked as processing (e.g., reactivated from cancelled)
-        // Send order confirmed WhatsApp
+        // Send order received WhatsApp
         try {
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
             {
-              usecaseKey: "order_confirmed",
+              usecaseKey: "order_received",
               recipientPhone: order.shippingAddress.phone,
               recipientUserId: order.userId,
               variables: {
@@ -471,9 +471,9 @@ export const updateOrderStatus = mutation({
               priority: 8,
             }
           );
-          console.log(`WhatsApp queued: order_confirmed for order ${order.orderNumber}`);
+          console.log(`WhatsApp queued: order_received for order ${order.orderNumber}`);
         } catch (error) {
-          const errMsg = `Failed to queue order_confirmed WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
+          const errMsg = `Failed to queue order_received WhatsApp: ${error instanceof Error ? error.message : String(error)}`;
           console.error(errMsg);
           whatsappErrors.push(errMsg);
         }
@@ -645,7 +645,7 @@ export const sendOrderStatusWhatsApp = mutation({
             0,
             api.whatsappMessaging.queueMessage,
             {
-              usecaseKey: "order_confirmed",
+              usecaseKey: "order_received",
               recipientPhone: order.shippingAddress.phone,
               recipientUserId: order.userId,
               variables: {
