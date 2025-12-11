@@ -18,23 +18,73 @@ import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 
 const PREDEFINED_VARIABLES = [
+  // Customer Information
   { value: "customer_name", label: "Customer Name" },
-  { value: "order_number", label: "Order Number" },
-  { value: "order_id", label: "Order ID" },
   { value: "phone_number", label: "Phone Number" },
   { value: "email", label: "Email" },
+  { value: "customer_id", label: "Customer ID" },
+  
+  // Order Information
+  { value: "order_number", label: "Order Number" },
+  { value: "order_id", label: "Order ID" },
+  { value: "order_date", label: "Order Date" },
+  { value: "order_status", label: "Order Status" },
+  { value: "number_of_products", label: "Number of Products" },
+  { value: "order_total", label: "Order Total" },
+  { value: "subtotal", label: "Subtotal" },
+  { value: "tax_amount", label: "Tax Amount" },
+  { value: "shipping_cost", label: "Shipping Cost" },
+  
+  // Payment Information
+  { value: "payment_mode", label: "Payment Mode" },
+  { value: "payment_status", label: "Payment Status" },
+  { value: "amount", label: "Amount" },
+  { value: "discount", label: "Discount" },
+  { value: "discount_percentage", label: "Discount Percentage" },
+  { value: "discount_amount", label: "Discount Amount" },
+  { value: "wallet_amount", label: "Wallet Amount" },
+  { value: "cashback_amount", label: "Cashback Amount" },
+  
+  // Shipping Information
   { value: "tracking_url", label: "Tracking URL" },
   { value: "awb_number", label: "AWB Number" },
   { value: "courier_name", label: "Courier Name" },
+  { value: "estimated_delivery", label: "Estimated Delivery" },
+  { value: "shipping_address", label: "Shipping Address" },
+  
+  // Address Information
+  { value: "address_line1", label: "Address Line 1" },
+  { value: "address_line2", label: "Address Line 2" },
+  { value: "city", label: "City" },
+  { value: "state", label: "State" },
+  { value: "pincode", label: "Pincode" },
+  
+  // Product Information
   { value: "product_name", label: "Product Name" },
   { value: "product_url", label: "Product URL" },
-  { value: "coupon_code", label: "Coupon Code" },
-  { value: "discount", label: "Discount" },
-  { value: "otp", label: "OTP" },
   { value: "brand_name", label: "Brand Name" },
   { value: "model_name", label: "Model Name" },
+  { value: "product_price", label: "Product Price" },
+  { value: "product_quantity", label: "Product Quantity" },
+  { value: "product_image", label: "Product Image" },
+  
+  // Coupon & Discount
+  { value: "coupon_code", label: "Coupon Code" },
+  
+  // OTP & Authentication
+  { value: "otp", label: "OTP" },
+  
+  // URLs & Links
   { value: "review_url", label: "Review URL" },
   { value: "cart_url", label: "Cart URL" },
+  { value: "order_url", label: "Order URL" },
+  { value: "shop_url", label: "Shop URL" },
+  
+  // Other
+  { value: "stock_notification", label: "Stock Notification" },
+  { value: "return_policy", label: "Return Policy" },
+  { value: "support_number", label: "Support Number" },
+  { value: "company_name", label: "Company Name" },
 ];
 
 interface VariablesMultiSelectProps {
