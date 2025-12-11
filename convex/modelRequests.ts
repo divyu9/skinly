@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 /**
  * Check if a model already exists in supportedModels (case-insensitive)
@@ -120,7 +120,7 @@ export const createModelRequest = mutation({
     ),
     whatsappPhone: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ requestId: string; requestNumber: string }> => {
     // Validate required fields
     if (!args.brandName.trim()) {
       throw new ConvexError({
@@ -178,8 +178,8 @@ export const createModelRequest = mutation({
       }
     }
 
-    // Create request
-    const requestId = await ctx.db.insert("modelRequests", {
+    // Create request first without request number
+    const tempRequestId = await ctx.db.insert("modelRequests", {
       brandName: args.brandName.trim(),
       modelName: args.modelName.trim(),
       category: args.category,
@@ -188,6 +188,23 @@ export const createModelRequest = mutation({
       userEmail,
       status: "pending",
       requestedAt: Date.now(),
+    });
+
+    // Generate and update with request number
+    await ctx.scheduler.runAfter(
+      0,
+      internal.orderNumberHelpers.generateModelRequestNumber,
+      {}
+    );
+    
+    // For now, manually generate the request number to return immediately
+    const existingRequests = await ctx.db.query("modelRequests").collect();
+    const requestCount = existingRequests.length;
+    const finalRequestNumber = `MR-${String(requestCount).padStart(2, "0")}`;
+    
+    // Update the request with the generated number
+    await ctx.db.patch(tempRequestId, {
+      requestNumber: finalRequestNumber,
     });
 
     // Queue WhatsApp confirmation (model_requested)
@@ -202,6 +219,7 @@ export const createModelRequest = mutation({
           variables: {
             // Send combined brand + model name for single-variable template
             model_name: `${args.brandName.trim()} ${args.modelName.trim()}`,
+            request_number: finalRequestNumber,
           },
           priority: 7,
         }
@@ -210,7 +228,30 @@ export const createModelRequest = mutation({
       console.error(`Failed to queue model request WhatsApp for ${args.whatsappPhone}:`, error);
     }
 
-    return { requestId };
+    // Queue Email confirmation (model_requested) if email available
+    if (userEmail) {
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          api.emailMessaging.queueMessage,
+          {
+            usecaseKey: "model_requested",
+            recipientEmail: userEmail,
+            recipientUserId: userId,
+            variables: {
+              brand_name: args.brandName.trim(),
+              model_name: args.modelName.trim(),
+              request_number: finalRequestNumber,
+            },
+            priority: 7,
+          }
+        );
+      } catch (error) {
+        console.error(`Failed to queue model request email for ${userEmail}:`, error);
+      }
+    }
+
+    return { requestId: tempRequestId, requestNumber: finalRequestNumber };
   },
 });
 
@@ -315,12 +356,36 @@ export const approveModelRequests = mutation({
             variables: {
               brand_name: request.brandName,
               model_name: request.modelName,
+              request_number: request.requestNumber || "MR-01",
             },
             priority: 6,
           }
         );
       } catch (error) {
         console.error(`Failed to queue model approved WhatsApp for ${request.whatsappPhone}:`, error);
+      }
+
+      // Send Email notification for approval if email available
+      if (request.userEmail) {
+        try {
+          await ctx.scheduler.runAfter(
+            0,
+            api.emailMessaging.queueMessage,
+            {
+              usecaseKey: "model_added",
+              recipientEmail: request.userEmail,
+              recipientUserId: request.userId,
+              variables: {
+                brand_name: request.brandName,
+                model_name: request.modelName,
+                request_number: request.requestNumber || "MR-01",
+              },
+              priority: 6,
+            }
+          );
+        } catch (error) {
+          console.error(`Failed to queue model approved email for ${request.userEmail}:`, error);
+        }
       }
 
       successCount++;
@@ -424,12 +489,36 @@ export const rejectModelRequest = mutation({
           variables: {
             brand_name: request.brandName,
             model_name: request.modelName,
+            request_number: request.requestNumber || "MR-01",
           },
           priority: 6,
         }
       );
     } catch (error) {
       console.error(`Failed to queue model rejected WhatsApp for ${request.whatsappPhone}:`, error);
+    }
+
+    // Send Email notification for rejection if email available
+    if (request.userEmail) {
+      try {
+        await ctx.scheduler.runAfter(
+          0,
+          api.emailMessaging.queueMessage,
+          {
+            usecaseKey: "model_request_rejected",
+            recipientEmail: request.userEmail,
+            recipientUserId: request.userId,
+            variables: {
+              brand_name: request.brandName,
+              model_name: request.modelName,
+              request_number: request.requestNumber || "MR-01",
+            },
+            priority: 6,
+          }
+        );
+      } catch (error) {
+        console.error(`Failed to queue model rejected email for ${request.userEmail}:`, error);
+      }
     }
 
     return { success: true };

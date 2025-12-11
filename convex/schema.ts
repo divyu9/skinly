@@ -525,6 +525,7 @@ export default defineSchema({
     .index("by_started_at", ["startedAt"]),
 
   modelRequests: defineTable({
+    requestNumber: v.optional(v.string()), // Request ID (e.g., MR-01, MR-02)
     brandName: v.string(), // Brand name requested
     modelName: v.string(), // Model name requested
     category: v.union(
@@ -549,7 +550,8 @@ export default defineSchema({
     requestedAt: v.number(), // Timestamp when requested
     approvedAt: v.optional(v.number()), // Timestamp when admin approved
   })
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_request_number", ["requestNumber"]),
 
   codSettings: defineTable({
     // Master toggle

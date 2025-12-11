@@ -114,3 +114,36 @@ export const generateFailedOrderNumber = internalMutation({
     return failedOrderNumber;
   },
 });
+
+// Generate model request number
+export const generateModelRequestNumber = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const counterKey = "model_request_counter";
+
+    const counter = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", counterKey))
+      .first();
+
+    let nextValue: number;
+    if (counter) {
+      // Read current value and immediately increment it
+      const currentValue = counter.value as number;
+      nextValue = currentValue + 1;
+      await ctx.db.patch(counter._id, {
+        value: nextValue,
+      });
+    } else {
+      // Initialize with 1 as the first model request number
+      nextValue = 1;
+      await ctx.db.insert("settings", {
+        key: counterKey,
+        value: nextValue + 1, // Set counter to 2 for next request
+      });
+    }
+
+    const requestNumber = `MR-${String(nextValue).padStart(2, "0")}`;
+    return requestNumber;
+  },
+});

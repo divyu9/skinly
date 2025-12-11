@@ -798,6 +798,7 @@ export default function AdminModelsPage() {
                           }}
                         />
                       </TableHead>
+                      <TableHead>Request ID</TableHead>
                       <TableHead>Brand</TableHead>
                       <TableHead>Model</TableHead>
                       <TableHead>Category</TableHead>
@@ -824,6 +825,11 @@ export default function AdminModelsPage() {
                             }}
                             disabled={request.status !== "pending"}
                           />
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="font-mono">
+                            {request.requestNumber || "—"}
+                          </Badge>
                         </TableCell>
                         <TableCell className="font-medium">{request.brandName}</TableCell>
                         <TableCell>{request.modelName}</TableCell>
