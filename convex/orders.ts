@@ -429,11 +429,10 @@ export const createOrder = mutation({
               recipientPhone: config.adminPhone,
               variables: {
                 order_number: orderNumber || "Pending",
-                order_amount: `₹${total.toFixed(2)}`,
-                payment_type: paymentType,
-                products: productsList,
-                city: args.shippingAddress.city,
-                coupon_code: "", // TODO: Add coupon support
+                amount: `${total.toFixed(2)}`,
+                customer_name: args.shippingAddress.fullName || user?.name || "Customer",
+                number_of_products: cartItems.length.toString(),
+                payment_mode: paymentType,
               },
               priority: 9, // High priority for admin notifications
             }

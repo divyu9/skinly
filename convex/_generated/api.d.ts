@@ -34,6 +34,7 @@ import type * as emailWorkerInternal from "../emailWorkerInternal.js";
 import type * as ensureGadgetCategory from "../ensureGadgetCategory.js";
 import type * as exports from "../exports.js";
 import type * as fixCoupon from "../fixCoupon.js";
+import type * as fixOrderReceivedMapping from "../fixOrderReceivedMapping.js";
 import type * as googleDriveImport from "../googleDriveImport.js";
 import type * as googleDriveImportPublic from "../googleDriveImportPublic.js";
 import type * as gst from "../gst.js";
@@ -117,6 +118,7 @@ declare const fullApi: ApiFromModules<{
   ensureGadgetCategory: typeof ensureGadgetCategory;
   exports: typeof exports;
   fixCoupon: typeof fixCoupon;
+  fixOrderReceivedMapping: typeof fixOrderReceivedMapping;
   googleDriveImport: typeof googleDriveImport;
   googleDriveImportPublic: typeof googleDriveImportPublic;
   gst: typeof gst;
