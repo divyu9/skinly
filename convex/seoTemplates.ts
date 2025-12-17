@@ -345,11 +345,13 @@ export const reinitializeTemplates = mutation({
       layoutConfig: {
         sections: [
           { id: "hero", label: "Hero Banner", enabled: true, order: 1 },
-          { id: "intro", label: "Brand Introduction", enabled: true, order: 2 },
-          { id: "products", label: "Product Grid", enabled: true, order: 3 },
-          { id: "story", label: "Brand Story", enabled: true, order: 4 },
-          { id: "comparison", label: "Comparison", enabled: true, order: 5 },
-          { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+          { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+          { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+          { id: "intro", label: "Brand Introduction", enabled: true, order: 4 },
+          { id: "products", label: "Product Grid", enabled: true, order: 5 },
+          { id: "story", label: "Brand Story", enabled: true, order: 6 },
+          { id: "comparison", label: "Comparison", enabled: true, order: 7 },
+          { id: "faqs", label: "FAQs", enabled: true, order: 8 },
         ],
       },
       defaultFilters: {
@@ -378,11 +380,13 @@ export const reinitializeTemplates = mutation({
       layoutConfig: {
         sections: [
           { id: "hero", label: "Device Hero", enabled: true, order: 1 },
-          { id: "showcase", label: "Device Showcase", enabled: true, order: 2 },
-          { id: "selector", label: "Model Selector", enabled: true, order: 3 },
-          { id: "products", label: "Product Grid", enabled: true, order: 4 },
-          { id: "comparison", label: "Comparison", enabled: true, order: 5 },
-          { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+          { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+          { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+          { id: "showcase", label: "Device Showcase", enabled: true, order: 4 },
+          { id: "selector", label: "Model Selector", enabled: true, order: 5 },
+          { id: "products", label: "Product Grid", enabled: true, order: 6 },
+          { id: "comparison", label: "Comparison", enabled: true, order: 7 },
+          { id: "faqs", label: "FAQs", enabled: true, order: 8 },
         ],
       },
       defaultFilters: {
@@ -411,10 +415,12 @@ export const reinitializeTemplates = mutation({
       layoutConfig: {
         sections: [
           { id: "hero", label: "Product Hero", enabled: true, order: 1 },
-          { id: "features", label: "Feature Highlights", enabled: true, order: 2 },
-          { id: "products", label: "Product Grid", enabled: true, order: 3 },
-          { id: "comparison", label: "Comparison", enabled: true, order: 4 },
-          { id: "faqs", label: "FAQs", enabled: true, order: 5 },
+          { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+          { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+          { id: "features", label: "Feature Highlights", enabled: true, order: 4 },
+          { id: "products", label: "Product Grid", enabled: true, order: 5 },
+          { id: "comparison", label: "Comparison", enabled: true, order: 6 },
+          { id: "faqs", label: "FAQs", enabled: true, order: 7 },
         ],
       },
       defaultFilters: {
@@ -443,10 +449,12 @@ export const reinitializeTemplates = mutation({
       layoutConfig: {
         sections: [
           { id: "hero", label: "Skin Type Hero", enabled: true, order: 1 },
-          { id: "benefits", label: "Benefits", enabled: true, order: 2 },
-          { id: "products", label: "Product Grid", enabled: true, order: 3 },
-          { id: "guide", label: "Installation Guide", enabled: true, order: 4 },
-          { id: "faqs", label: "FAQs", enabled: true, order: 5 },
+          { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+          { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+          { id: "benefits", label: "Benefits", enabled: true, order: 4 },
+          { id: "products", label: "Product Grid", enabled: true, order: 5 },
+          { id: "guide", label: "Installation Guide", enabled: true, order: 6 },
+          { id: "faqs", label: "FAQs", enabled: true, order: 7 },
         ],
       },
       defaultFilters: {
