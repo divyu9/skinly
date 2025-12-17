@@ -162,7 +162,7 @@ export default function ProductsPage() {
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
   const [gadgetFilter, setGadgetFilter] = useState<string | null>(null);
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [productTypeFilter, setProductTypeFilter] = useState<string | null>(null);
   
   // Get collection if collection parameter is present
   const collection = useQuery(
@@ -297,27 +297,40 @@ export default function ProductsPage() {
       filtered = filtered.filter(p => p.gadgetCategory === gadgetFilter);
     }
     
-    // Filter by product category (Cases, Camera Rings, etc.)
-    if (categoryFilter) {
-      const categoryLower = categoryFilter.toLowerCase();
-      filtered = filtered.filter(p => {
-        const title = p.title.toLowerCase();
-        const tags = p.tags.toLowerCase();
-        
-        if (categoryFilter === 'cover-and-case') {
+    // Filter by product type
+    if (productTypeFilter) {
+      if (productTypeFilter === 'skins') {
+        // Show products with gadgetCategory (phone, laptop, tablet, etc.)
+        filtered = filtered.filter(p => p.gadgetCategory !== undefined && p.gadgetCategory !== null);
+      } else if (productTypeFilter === 'cover-and-case') {
+        const filteredByType = filtered.filter(p => {
+          const title = p.title.toLowerCase();
+          const tags = p.tags.toLowerCase();
           return title.includes('cover') || title.includes('case') || tags.includes('cover') || tags.includes('case');
-        }
-        if (categoryFilter === 'camera-rings') {
+        });
+        filtered = filteredByType;
+      } else if (productTypeFilter === 'camera-rings') {
+        const filteredByType = filtered.filter(p => {
+          const title = p.title.toLowerCase();
+          const tags = p.tags.toLowerCase();
           return title.includes('camera ring') || title.includes('camera protector') || tags.includes('camera ring') || tags.includes('camera protector');
-        }
-        if (categoryFilter === 'magneto-x') {
+        });
+        filtered = filteredByType;
+      } else if (productTypeFilter === 'magneto-x') {
+        const filteredByType = filtered.filter(p => {
+          const title = p.title.toLowerCase();
+          const tags = p.tags.toLowerCase();
           return title.includes('magneto') || tags.includes('magneto');
-        }
-        if (categoryFilter === 'autoapply-glasses') {
+        });
+        filtered = filteredByType;
+      } else if (productTypeFilter === 'autoapply-glasses') {
+        const filteredByType = filtered.filter(p => {
+          const title = p.title.toLowerCase();
+          const tags = p.tags.toLowerCase();
           return title.includes('autoapply') || title.includes('tempered glass') || title.includes('screen protector') || tags.includes('autoapply') || tags.includes('tempered glass');
-        }
-        return false;
-      });
+        });
+        filtered = filteredByType;
+      }
     }
     
     // Filter by device (when not coming from phone selector)
@@ -340,12 +353,19 @@ export default function ProductsPage() {
     // Filter by finish
     if (finishFilter) {
       filtered = filtered.filter(p => {
+        const title = p.title.toLowerCase();
+        
+        // Special handling for membranes - match products with "gloss membrane" or "matte membrane"
+        if (finishFilter === 'membrane') {
+          const titleNoSpaces = title.replace(/\s+/g, '');
+          return titleNoSpaces.includes('glossmembrane') || titleNoSpaces.includes('mattemembrane');
+        }
+        
         // Use finishType field if available
         if (p.finishType) {
           return p.finishType === finishFilter;
         }
         // Fallback to title matching if finishType not set
-        const title = p.title.toLowerCase();
         if (finishFilter === 'matte') return title.includes('matte');
         if (finishFilter === 'embossed') return title.includes('3d textured') || title.includes('3d embossed');
         if (finishFilter === 'transparent') return title.includes('tranzy');
@@ -364,7 +384,7 @@ export default function ProductsPage() {
     }
     
     return filtered;
-  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter, gadgetFilter, categoryFilter]);
+  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter, gadgetFilter, productTypeFilter]);
   
   // Apply sorting and stock filtering
   const sortedAndFilteredProducts = useMemo(() => {
@@ -684,15 +704,74 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Gadget Category Tabs - Only show when not filtered by brand/model */}
+          {/* Product Type Tabs - First level navigation */}
           {!brandFilter && !modelFilter && (
+            <div className="mb-4">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                <button
+                  onClick={() => setProductTypeFilter('skins')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    productTypeFilter === 'skins'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <Package2 className="size-4" />
+                  Skins
+                </button>
+                <button
+                  onClick={() => setProductTypeFilter('cover-and-case')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    productTypeFilter === 'cover-and-case'
+                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  Cases And Covers
+                </button>
+                <button
+                  onClick={() => setProductTypeFilter('camera-rings')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    productTypeFilter === 'camera-rings'
+                      ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  Camera Rings
+                </button>
+                <button
+                  onClick={() => setProductTypeFilter('magneto-x')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    productTypeFilter === 'magneto-x'
+                      ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  Magneto X
+                </button>
+                <button
+                  onClick={() => setProductTypeFilter('autoapply-glasses')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    productTypeFilter === 'autoapply-glasses'
+                      ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  AutoApply HQ Glasses
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Gadget Category Tabs - Only show when Skins product type is selected */}
+          {!brandFilter && !modelFilter && productTypeFilter === 'skins' && (
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
                   onClick={() => setGadgetFilter(null)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
                     !gadgetFilter
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg scale-105'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
                 >
@@ -780,71 +859,21 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Product Category Tabs - Second row for popular product types */}
-          {!brandFilter && !modelFilter && (
-            <div className="mb-6">
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                <button
-                  onClick={() => setCategoryFilter(null)}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    !categoryFilter
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  All Products
-                </button>
-                <button
-                  onClick={() => setCategoryFilter('cover-and-case')}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    categoryFilter === 'cover-and-case'
-                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-md'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  Cases And Covers
-                </button>
-                <button
-                  onClick={() => setCategoryFilter('camera-rings')}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    categoryFilter === 'camera-rings'
-                      ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-md'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  Camera Rings
-                </button>
-                <button
-                  onClick={() => setCategoryFilter('magneto-x')}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    categoryFilter === 'magneto-x'
-                      ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-md'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  Magneto X
-                </button>
-                <button
-                  onClick={() => setCategoryFilter('autoapply-glasses')}
-                  className={`px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    categoryFilter === 'autoapply-glasses'
-                      ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-md'
-                      : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  AutoApply HQ Glasses
-                </button>
-              </div>
-            </div>
-          )}
 
-          {/* Finish Tabs - Only show if brand and model are selected */}
-          {brandFilter && modelFilter && (
+
+          {/* Finish Tabs - Only show when Skins product type is selected OR brand+model selected */}
+          {((!brandFilter && !modelFilter && productTypeFilter === 'skins') || (brandFilter && modelFilter)) && (
             <div className="mb-4 sm:mb-6">
               <div className="border-b">
                 <div className="flex gap-1 overflow-x-auto no-scrollbar">
                   <button
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=matte`}
+                    onClick={() => {
+                      if (brandFilter && modelFilter) {
+                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=matte`;
+                      } else {
+                        window.location.href = `/products?finish=matte`;
+                      }
+                    }}
                     className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
                       finishFilter === 'matte' 
                         ? 'border-primary text-primary' 
@@ -854,7 +883,13 @@ export default function ProductsPage() {
                     Matte
                   </button>
                   <button
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=embossed`}
+                    onClick={() => {
+                      if (brandFilter && modelFilter) {
+                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=embossed`;
+                      } else {
+                        window.location.href = `/products?finish=embossed`;
+                      }
+                    }}
                     className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
                       finishFilter === 'embossed' 
                         ? 'border-primary text-primary' 
@@ -864,7 +899,13 @@ export default function ProductsPage() {
                     3D Embossed
                   </button>
                   <button
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=transparent`}
+                    onClick={() => {
+                      if (brandFilter && modelFilter) {
+                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=transparent`;
+                      } else {
+                        window.location.href = `/products?finish=transparent`;
+                      }
+                    }}
                     className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
                       finishFilter === 'transparent' 
                         ? 'border-primary text-primary' 
@@ -872,6 +913,22 @@ export default function ProductsPage() {
                     }`}
                   >
                     Transparent
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (brandFilter && modelFilter) {
+                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=membrane`;
+                      } else {
+                        window.location.href = `/products?finish=membrane`;
+                      }
+                    }}
+                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                      finishFilter === 'membrane' 
+                        ? 'border-primary text-primary' 
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Membranes
                   </button>
                   <button
                     onClick={() => {
@@ -983,12 +1040,12 @@ export default function ProductsPage() {
                 </SelectContent>
               </Select>
 
-              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter || categoryFilter) && (
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter || productTypeFilter) && (
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
                   setGadgetFilter(null);
-                  setCategoryFilter(null);
+                  setProductTypeFilter(null);
                   window.location.href = '/products';
                 }} className="h-8 sm:h-10 text-xs sm:text-sm">
                   Clear All
