@@ -221,7 +221,7 @@ export const createShipment = action({
           console.log(`Item: ${item.productTitle}, unitPrice:`, item.price, 'Tax amount:', taxAmount);
           return {
             itemName: item.productTitle,
-            sku: item.variant,
+            sku: item.sku || item.variant, // Use SKU field for new orders, fallback to variant
             units: item.quantity,
             unitPrice: item.price, // Tax-inclusive price (as number)
             tax: taxAmount, // GST amount in rupees (as number)
