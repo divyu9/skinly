@@ -40,6 +40,7 @@ import {
   Loader2,
   Wand2,
   MoreVertical,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -186,6 +187,29 @@ export default function SEOPagesPage() {
       default:
         return "";
     }
+  };
+
+  const getPreviewUrl = (page: Page) => {
+    const baseUrl = window.location.origin;
+    switch (page.pageType) {
+      case "brand":
+        return `${baseUrl}/brand/${page.slug}`;
+      case "device":
+        return `${baseUrl}/device/${page.slug}`;
+      case "product":
+        return `${baseUrl}/product/${page.slug}`;
+      case "skin-type":
+        return `${baseUrl}/skin-type/${page.slug}`;
+      case "keyword":
+        return `${baseUrl}/${page.slug}`;
+      default:
+        return `${baseUrl}/${page.slug}`;
+    }
+  };
+
+  const handlePreview = (page: Page) => {
+    const url = getPreviewUrl(page);
+    window.open(url, "_blank");
   };
 
   if (pages === undefined) {
@@ -347,6 +371,10 @@ export default function SEOPagesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handlePreview(page)}>
+                          <ExternalLink className="mr-2 h-4 w-4" />
+                          Preview
+                        </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to={`/backend-skinly/seo-pages/${page._id}`}>
                             <Edit className="mr-2 h-4 w-4" />
