@@ -1386,7 +1386,7 @@ function OrderDetailPageInner() {
                   )}
                 </span>
               </div>
-              {order.codFee && order.codFee > 0 && (
+              {order.codFee !== undefined && order.codFee > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">COD Fee</span>
                   <span>₹{order.codFee.toFixed(0)}</span>
