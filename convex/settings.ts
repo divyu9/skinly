@@ -9,7 +9,7 @@ export const getSetting = query({
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", args.key))
       .first();
-    return setting?.value ?? null;
+    return setting ?? null;
   },
 });
 

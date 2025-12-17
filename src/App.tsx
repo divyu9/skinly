@@ -38,6 +38,7 @@ import AdminCashbackPage from "./pages/admin/cashback/page.tsx";
 import AdminEmailsPage from "./pages/admin/emails/page.tsx";
 import AdminBugsPage from "./pages/admin/bugs/page.tsx";
 import AdminUpsellsPage from "./pages/admin/upsells/page.tsx";
+import AdminSEOTemplatesPage from "./pages/admin/seo-templates/page.tsx";
 import AdminMigrationPage from "./pages/admin/migration.tsx";
 import AdminSitemapGeneratorPage from "./pages/admin/sitemap-generator.tsx";
 import AdminShippingPage from "./pages/admin/shipping.tsx";
@@ -91,6 +92,7 @@ export default function App() {
           <Route path="/backend-skinly/emails" element={<AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/bugs" element={<AdminPageWrapper><AdminBugsPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/upsells" element={<AdminPageWrapper><AdminUpsellsPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/seo-templates" element={<AdminPageWrapper><AdminSEOTemplatesPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/mockups/missing" element={<AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/google-drive-import" element={<AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper>} />

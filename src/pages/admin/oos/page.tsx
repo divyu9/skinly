@@ -39,7 +39,7 @@ function AdminOOSPageInner() {
     );
   }
 
-  const isEnabled = autoSortOOS === true;
+  const isEnabled = autoSortOOS?.value === true;
 
   return (
     <div className="space-y-6">

@@ -421,7 +421,7 @@ export default function ProductsPage() {
     }
     
     // Auto-sort by stock status if enabled (in-stock first, OOS last)
-    if (autoSortOOS === true) {
+    if (autoSortOOS?.value === true) {
       result.sort((a, b) => {
         const aInStock = a.variants.some(v => v.available && v.inventory_quantity > 0);
         const bInStock = b.variants.some(v => v.available && v.inventory_quantity > 0);

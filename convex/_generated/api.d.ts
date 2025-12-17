@@ -63,6 +63,7 @@ import type * as reviews from "../reviews.js";
 import type * as rollsManagement from "../rollsManagement.js";
 import type * as runMigration from "../runMigration.js";
 import type * as seedModels from "../seedModels.js";
+import type * as seoContentGenerator from "../seoContentGenerator.js";
 import type * as seoPages from "../seoPages.js";
 import type * as seoTemplates from "../seoTemplates.js";
 import type * as settings from "../settings.js";
@@ -149,6 +150,7 @@ declare const fullApi: ApiFromModules<{
   rollsManagement: typeof rollsManagement;
   runMigration: typeof runMigration;
   seedModels: typeof seedModels;
+  seoContentGenerator: typeof seoContentGenerator;
   seoPages: typeof seoPages;
   seoTemplates: typeof seoTemplates;
   settings: typeof settings;
