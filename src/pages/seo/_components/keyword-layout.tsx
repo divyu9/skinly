@@ -47,10 +47,10 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
     });
   };
   
-  // Get enabled sections sorted by order
-  const enabledSections = template?.layoutConfig.sections
+  // Get enabled sections sorted by order - prioritize page overrides, fallback to global template
+  const enabledSections = (page.layoutOverrides?.sections || template?.layoutConfig.sections || [])
     .filter(section => section.enabled)
-    .sort((a, b) => a.order - b.order) || [];
+    .sort((a, b) => a.order - b.order);
   
   // Helper to check if a section is enabled
   const isSectionEnabled = (sectionId: string) => {

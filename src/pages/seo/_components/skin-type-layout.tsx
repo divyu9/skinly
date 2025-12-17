@@ -184,10 +184,10 @@ export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
     "faqs": renderFaqs,
   };
 
-  // Get enabled sections in order
-  const sections = template?.layoutConfig.sections
+  // Get enabled sections in order - prioritize page overrides, fallback to global template
+  const sections = (page.layoutOverrides?.sections || template?.layoutConfig.sections || [])
     .filter(s => s.enabled)
-    .sort((a, b) => a.order - b.order) || [];
+    .sort((a, b) => a.order - b.order);
 
   return (
     <>
