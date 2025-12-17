@@ -285,10 +285,12 @@ export const initializeDefaultTemplates = mutation({
       layoutConfig: {
         sections: [
           { id: "hero", label: "SEO Hero", enabled: true, order: 1 },
-          { id: "content", label: "SEO Content", enabled: true, order: 2 },
-          { id: "products", label: "Wide Product Grid", enabled: true, order: 3 },
-          { id: "faqs", label: "FAQs", enabled: true, order: 4 },
-          { id: "cta", label: "Call to Action", enabled: true, order: 5 },
+          { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+          { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+          { id: "content", label: "SEO Content", enabled: true, order: 4 },
+          { id: "products", label: "Wide Product Grid", enabled: true, order: 5 },
+          { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+          { id: "cta", label: "Call to Action", enabled: true, order: 7 },
         ],
       },
       defaultFilters: {
