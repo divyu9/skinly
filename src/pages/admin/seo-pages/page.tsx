@@ -43,6 +43,7 @@ import {
   ExternalLink,
   Link as LinkIcon,
   Image,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -88,8 +89,12 @@ export default function SEOPagesPage() {
   const bulkTogglePublish = useMutation(api.seoPages.bulkTogglePublish);
   const bulkDeletePages = useMutation(api.seoPages.bulkDeletePages);
   const updateHeroImage = useMutation(api.seoPages.updateHeroImage);
+  const syncPageWithTemplate = useMutation(api.seoPages.syncPageWithTemplate);
+  const syncAllPagesWithTemplates = useMutation(api.seoPages.syncAllPagesWithTemplates);
 
   const [uploadingPageId, setUploadingPageId] = useState<Id<"seoPages"> | null>(null);
+  const [syncingPageId, setSyncingPageId] = useState<Id<"seoPages"> | null>(null);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   const handleClone = async (pageId: Id<"seoPages">) => {
     try {
@@ -268,6 +273,40 @@ export default function SEOPagesPage() {
     }
   };
 
+  const handleSyncPage = async (pageId: Id<"seoPages">) => {
+    try {
+      setSyncingPageId(pageId);
+      const result = await syncPageWithTemplate({ pageId });
+      if (result.addedSections > 0) {
+        toast.success(`Synced with template! Added ${result.addedSections} new section${result.addedSections > 1 ? 's' : ''}.`);
+      } else {
+        toast.info("Page is already up to date with template.");
+      }
+    } catch (error) {
+      toast.error("Failed to sync page with template");
+      console.error(error);
+    } finally {
+      setSyncingPageId(null);
+    }
+  };
+
+  const handleSyncAllPages = async () => {
+    try {
+      setIsSyncingAll(true);
+      const result = await syncAllPagesWithTemplates();
+      if (result.syncedPages > 0) {
+        toast.success(`Synced ${result.syncedPages} page${result.syncedPages > 1 ? 's' : ''} with templates! Added ${result.totalAddedSections} section${result.totalAddedSections > 1 ? 's' : ''}.`);
+      } else {
+        toast.info("All pages are already up to date with their templates.");
+      }
+    } catch (error) {
+      toast.error("Failed to sync pages");
+      console.error(error);
+    } finally {
+      setIsSyncingAll(false);
+    }
+  };
+
   if (pages === undefined) {
     return (
       <AdminLayout>
@@ -289,6 +328,23 @@ export default function SEOPagesPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleSyncAllPages}
+            disabled={isSyncingAll}
+          >
+            {isSyncingAll ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Sync All Pages
+              </>
+            )}
+          </Button>
           <Button variant="outline" asChild>
             <Link to="/backend-skinly/seo-pages/auto-generate">
               <Wand2 className="mr-2 h-4 w-4" />
@@ -448,6 +504,22 @@ export default function SEOPagesPage() {
                             <>
                               <Image className="mr-2 h-4 w-4" />
                               Upload Hero Image
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleSyncPage(page._id)}
+                          disabled={syncingPageId === page._id}
+                        >
+                          {syncingPageId === page._id ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Syncing...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="mr-2 h-4 w-4" />
+                              Sync with Template
                             </>
                           )}
                         </DropdownMenuItem>

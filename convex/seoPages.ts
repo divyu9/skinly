@@ -490,3 +490,123 @@ export const updateHeroImage = mutation({
     return { success: true };
   },
 });
+
+// Sync a single page with its template
+export const syncPageWithTemplate = mutation({
+  args: {
+    pageId: v.id("seoPages"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const page = await ctx.db.get(args.pageId);
+    if (!page) {
+      throw new Error("Page not found");
+    }
+
+    // Get the template for this page type
+    const templates = await ctx.db
+      .query("seoPageTemplates")
+      .filter((q) => q.eq(q.field("pageType"), page.pageType))
+      .collect();
+
+    if (templates.length === 0) {
+      throw new Error("Template not found for page type");
+    }
+
+    const template = templates[0];
+    const templateSections = template.layoutConfig.sections;
+
+    // Merge page overrides with template sections
+    // Keep existing page overrides, add new sections from template
+    const existingOverrides = page.layoutOverrides?.sections || [];
+    const existingSectionIds = new Set(existingOverrides.map(s => s.id));
+
+    // Add template sections that don't exist in page overrides
+    const mergedSections = [...existingOverrides];
+    
+    for (const templateSection of templateSections) {
+      if (!existingSectionIds.has(templateSection.id)) {
+        mergedSections.push(templateSection);
+      }
+    }
+
+    // Update the page with merged sections
+    await ctx.db.patch(args.pageId, {
+      layoutOverrides: {
+        sections: mergedSections,
+      },
+      updatedAt: Date.now(),
+      updatedBy: identity.email,
+    });
+
+    return { 
+      success: true, 
+      addedSections: mergedSections.length - existingOverrides.length 
+    };
+  },
+});
+
+// Sync all pages with their templates
+export const syncAllPagesWithTemplates = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const pages = await ctx.db.query("seoPages").collect();
+    const templates = await ctx.db.query("seoPageTemplates").collect();
+    
+    // Create a map of templates by page type for quick lookup
+    const templateMap = new Map();
+    for (const template of templates) {
+      templateMap.set(template.pageType, template);
+    }
+
+    let syncedCount = 0;
+    let totalAddedSections = 0;
+
+    for (const page of pages) {
+      const template = templateMap.get(page.pageType);
+      if (!template) continue;
+
+      const templateSections = template.layoutConfig.sections;
+      const existingOverrides = page.layoutOverrides?.sections || [];
+      const existingSectionIds = new Set(existingOverrides.map(s => s.id));
+
+      // Add template sections that don't exist in page overrides
+      const mergedSections = [...existingOverrides];
+      
+      for (const templateSection of templateSections) {
+        if (!existingSectionIds.has(templateSection.id)) {
+          mergedSections.push(templateSection);
+          totalAddedSections++;
+        }
+      }
+
+      // Only update if there are new sections to add
+      if (mergedSections.length > existingOverrides.length) {
+        await ctx.db.patch(page._id, {
+          layoutOverrides: {
+            sections: mergedSections,
+          },
+          updatedAt: Date.now(),
+          updatedBy: identity.email,
+        });
+        syncedCount++;
+      }
+    }
+
+    return { 
+      success: true, 
+      syncedPages: syncedCount,
+      totalAddedSections: totalAddedSections,
+      totalPages: pages.length
+    };
+  },
+});
