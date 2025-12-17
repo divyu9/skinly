@@ -41,6 +41,7 @@ import {
   Wand2,
   MoreVertical,
   ExternalLink,
+  Link as LinkIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -207,9 +208,33 @@ export default function SEOPagesPage() {
     }
   };
 
+  const getProductionUrl = (page: Page) => {
+    const productionDomain = "https://goskinly.com";
+    switch (page.pageType) {
+      case "brand":
+        return `${productionDomain}/brand/${page.slug}`;
+      case "device":
+        return `${productionDomain}/device/${page.slug}`;
+      case "product":
+        return `${productionDomain}/product/${page.slug}`;
+      case "skin-type":
+        return `${productionDomain}/skin-type/${page.slug}`;
+      case "keyword":
+        return `${productionDomain}/${page.slug}`;
+      default:
+        return `${productionDomain}/${page.slug}`;
+    }
+  };
+
   const handlePreview = (page: Page) => {
     const url = getPreviewUrl(page);
     window.open(url, "_blank");
+  };
+
+  const handleCopyProductionUrl = (page: Page) => {
+    const url = getProductionUrl(page);
+    navigator.clipboard.writeText(url);
+    toast.success("Production URL copied to clipboard");
   };
 
   if (pages === undefined) {
@@ -373,7 +398,11 @@ export default function SEOPagesPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handlePreview(page)}>
                           <ExternalLink className="mr-2 h-4 w-4" />
-                          Preview
+                          Preview (Dev)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCopyProductionUrl(page)}>
+                          <LinkIcon className="mr-2 h-4 w-4" />
+                          Copy Production URL
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to={`/backend-skinly/seo-pages/${page._id}`}>
