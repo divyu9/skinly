@@ -394,8 +394,8 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!product) return;
-    // Only require phoneModel for phone skins
-    if (isPhoneSkin && !phoneModel) return;
+    // Require model selection for all products that need device selector
+    if (needsDeviceSelector && !phoneModel) return;
     
     setIsAdding(true);
     
@@ -460,9 +460,9 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = async () => {
     if (!product) return;
-    // Only require phoneModel for phone skins
-    if (isPhoneSkin && !phoneModel) {
-      toast.error("Please select your phone model first");
+    // Require model selection for all products that need device selector
+    if (needsDeviceSelector && !phoneModel) {
+      toast.error("Please select your device model first");
       return;
     }
     
@@ -911,8 +911,8 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Phone Model Selection - Only for phone skins */}
-              {isPhoneSkin && (
+              {/* Device Model Selection - For all device types that need it */}
+              {needsDeviceSelector && (
                 phoneModel ? (
                   <div className="space-y-4">
                     <Card className="border-primary/20 bg-primary/5">
@@ -935,44 +935,56 @@ export default function ProductDetailPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Coverage Selection */}
-                    <div className="space-y-2">
-                      <label className="text-sm font-semibold">Select Coverage</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          onClick={() => setSelectedCoverage("only_back")}
-                          className={`p-4 rounded-lg border-2 transition-all text-left ${
-                            selectedCoverage === "only_back"
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <div className="font-medium text-sm">Only Back</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Back coverage only
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => setSelectedCoverage("full_body_wrap")}
-                          className={`p-4 rounded-lg border-2 transition-all text-left ${
-                            selectedCoverage === "full_body_wrap"
-                              ? "border-primary bg-primary/10"
-                              : "border-border hover:border-primary/50"
-                          }`}
-                        >
-                          <div className="font-medium text-sm">Full Body Wrap</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Complete protection
-                          </div>
-                        </button>
+                    {/* Coverage Selection - Only for phone skins */}
+                    {isPhoneSkin && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-semibold">Select Coverage</label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            onClick={() => setSelectedCoverage("only_back")}
+                            className={`p-4 rounded-lg border-2 transition-all text-left ${
+                              selectedCoverage === "only_back"
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className="font-medium text-sm">Only Back</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Back coverage only
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => setSelectedCoverage("full_body_wrap")}
+                            className={`p-4 rounded-lg border-2 transition-all text-left ${
+                              selectedCoverage === "full_body_wrap"
+                                ? "border-primary bg-primary/10"
+                                : "border-border hover:border-primary/50"
+                            }`}
+                          >
+                            <div className="font-medium text-sm">Full Body Wrap</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Complete protection
+                            </div>
+                          </button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <Card className="border-amber-500/50 bg-amber-500/10">
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="text-xl shrink-0">📱</div>
+                        <div className="text-xl shrink-0">
+                          {deviceCategory === "phone" && "📱"}
+                          {deviceCategory === "laptop" && "💻"}
+                          {deviceCategory === "tablet" && "📱"}
+                          {deviceCategory === "camera" && "📷"}
+                          {deviceCategory === "lens" && "🔍"}
+                          {deviceCategory === "drone" && "🚁"}
+                          {deviceCategory === "console" && "🎮"}
+                          {deviceCategory === "charger" && "🔌"}
+                          {!deviceCategory && "📦"}
+                        </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold">Select Your Device</p>
                           <p className="text-xs text-muted-foreground mt-1">

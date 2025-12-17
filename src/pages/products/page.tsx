@@ -765,6 +765,17 @@ export default function ProductsPage() {
                   <Gamepad2 className="size-4" />
                   Consoles
                 </button>
+                <button
+                  onClick={() => setGadgetFilter('drone')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                    gadgetFilter === 'drone'
+                      ? 'bg-gradient-to-r from-teal-500 to-green-500 text-white shadow-lg scale-105'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 2v3"/><path d="M12 19v3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="m5 7 14 10"/><path d="m5 17 14-10"/><circle cx="12" cy="12" r="2"/></svg>
+                  Drones
+                </button>
               </div>
             </div>
           )}

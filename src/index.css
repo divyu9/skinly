@@ -169,21 +169,24 @@
   animation: marquee 7.5s linear infinite;
 }
 
-/* Shake animation for Buy Now button */
+/* Shake animation for Buy Now button - loops with pauses */
 @keyframes shake {
   0%, 100% {
     transform: translateX(0);
   }
-  10%, 30%, 50%, 70%, 90% {
+  5%, 15%, 25%, 35% {
     transform: translateX(-2px);
   }
-  20%, 40%, 60%, 80% {
+  10%, 20%, 30% {
     transform: translateX(2px);
+  }
+  40%, 100% {
+    transform: translateX(0);
   }
 }
 
 .animate-shake {
-  animation: shake 0.6s ease-in-out 0.5s 2;
+  animation: shake 2s ease-in-out 0.5s infinite;
 }
 
 /* Hide scrollbar for horizontal tabs */
