@@ -53,7 +53,8 @@ export default function AutoGenerateSEOPages() {
   const createPage = useMutation(api.seoPages.createPage);
   const generateContent = useAction(api.seoContentGenerator.generateSEOContent);
 
-  const openAIEnabled = openAIKeySetting?.value;
+  const openAIEnabled = openAIKeySetting?.value ? true : false;
+  const isKeyCheckLoading = openAIKeySetting === undefined;
 
   const parseInput = () => {
     const lines = inputText
@@ -118,6 +119,9 @@ export default function AutoGenerateSEOPages() {
 
     setIsGenerating(true);
     setCurrentIndex(0);
+
+    let successCount = 0;
+    let errorCount = 0;
 
     for (let i = 0; i < items.length; i++) {
       setCurrentIndex(i);
@@ -194,6 +198,7 @@ export default function AutoGenerateSEOPages() {
             idx === i ? { ...it, status: "success", pageId: result.pageId } : it
           )
         );
+        successCount++;
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown error";
@@ -204,12 +209,11 @@ export default function AutoGenerateSEOPages() {
             idx === i ? { ...it, status: "error", error: errorMessage } : it
           )
         );
+        errorCount++;
       }
     }
 
     setIsGenerating(false);
-    const successCount = items.filter((it) => it.status === "success").length;
-    const errorCount = items.filter((it) => it.status === "error").length;
 
     if (errorCount === 0) {
       toast.success(`Successfully generated ${successCount} pages!`);
@@ -239,7 +243,7 @@ export default function AutoGenerateSEOPages() {
         </Button>
       </div>
 
-      {!openAIEnabled && (
+      {!isKeyCheckLoading && !openAIEnabled && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>

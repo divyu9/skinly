@@ -48,7 +48,8 @@ export default function NewSEOPage() {
   const createPage = useMutation(api.seoPages.createPage);
   const generateContent = useAction(api.seoContentGenerator.generateSEOContent);
 
-  const openAIEnabled = openAIKeySetting?.value;
+  const openAIEnabled = openAIKeySetting?.value ? true : false;
+  const isKeyCheckLoading = openAIKeySetting === undefined;
 
   const generateSlug = (text: string) => {
     return text
@@ -195,7 +196,7 @@ export default function NewSEOPage() {
         </div>
       </div>
 
-      {!openAIEnabled && useAI && (
+      {!isKeyCheckLoading && !openAIEnabled && useAI && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
