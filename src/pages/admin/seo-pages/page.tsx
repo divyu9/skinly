@@ -50,6 +50,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 type PageType = "brand" | "device" | "product" | "skin-type" | "keyword";
 
@@ -189,14 +190,17 @@ export default function SEOPagesPage() {
 
   if (pages === undefined) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <AdminLayout>
+      <div className="py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">SEO Landing Pages</h1>
@@ -407,5 +411,6 @@ export default function SEOPagesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </AdminLayout>
   );
 }

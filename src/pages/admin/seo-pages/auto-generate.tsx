@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 type PageType = "keyword" | "device" | "brand" | "skin_type";
 
@@ -224,7 +225,8 @@ export default function AutoGenerateSEOPages() {
   const errorCount = items.filter((it) => it.status === "error").length;
 
   return (
-    <div className="space-y-6">
+    <AdminLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Auto-Generate SEO Pages</h1>
@@ -469,5 +471,6 @@ export default function AutoGenerateSEOPages() {
         </Card>
       )}
     </div>
+    </AdminLayout>
   );
 }

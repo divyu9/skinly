@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.t
 import { Loader2, Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 type PageType = "brand" | "device" | "product" | "skin-type" | "keyword";
 
@@ -88,15 +89,18 @@ export default function SEOTemplatesPage() {
 
   if (templates === undefined) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <AdminLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AdminLayout>
     );
   }
 
   if (templates.length === 0) {
     return (
-      <div className="container mx-auto max-w-4xl py-8">
+      <AdminLayout>
+        <div className="max-w-4xl py-8">
         <Card>
           <CardHeader>
             <CardTitle>SEO Page Templates</CardTitle>
@@ -112,11 +116,13 @@ export default function SEOTemplatesPage() {
           </CardContent>
         </Card>
       </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-6xl py-8 space-y-6">
+    <AdminLayout>
+      <div className="max-w-6xl py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">SEO Page Templates</h1>
@@ -283,5 +289,6 @@ export default function SEOTemplatesPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </AdminLayout>
   );
 }

@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { Loader2, Save, Sparkles, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 type PageType = "keyword" | "device" | "brand" | "skin_type";
 
@@ -162,7 +163,8 @@ export default function NewSEOPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <AdminLayout>
+      <div className="py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Create SEO Page</h1>
@@ -391,5 +393,6 @@ export default function NewSEOPage() {
         </div>
       </div>
     </div>
+    </AdminLayout>
   );
 }
