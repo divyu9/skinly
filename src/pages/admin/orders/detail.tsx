@@ -1378,7 +1378,13 @@ function OrderDetailPageInner() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shipping</span>
-                <span>₹{order.shippingFee.toFixed(0)}</span>
+                <span>
+                  {order.shippingFee === 0 ? (
+                    <span className="text-green-600 font-medium">FREE</span>
+                  ) : (
+                    `₹${order.shippingFee.toFixed(0)}`
+                  )}
+                </span>
               </div>
               {order.codFee && order.codFee > 0 && (
                 <div className="flex justify-between text-sm">
