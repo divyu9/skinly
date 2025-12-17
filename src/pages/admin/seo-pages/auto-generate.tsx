@@ -104,7 +104,7 @@ export default function AutoGenerateSEOPages() {
       case "device":
         return `${value} Skins & Wraps`;
       case "brand":
-        return `${value} Device Skins`;
+        return `${value} Skins`;
       case "skin_type":
         return `${value} Skins`;
       default:
