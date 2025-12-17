@@ -5,6 +5,7 @@ import { api } from "@/convex/_generated/api.js";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { CartButton } from "@/components/cart.tsx";
+import { SignInButton } from "@/components/ui/signin.tsx";
 import {
   Sheet,
   SheetContent,
@@ -37,6 +38,7 @@ import {
   LogOutIcon,
   CheckIcon,
   XIcon,
+  LogInIcon,
 } from "lucide-react";
 
 interface MobileNavProps {
@@ -151,20 +153,31 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={() => setAccountPanelOpen(true)}>
-              <UserIcon className="size-4 mr-2" />
-              View Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link to="/orders" className="cursor-pointer">
-                <ShoppingBagIcon className="size-4 mr-2" />
-                My Orders
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOutIcon className="size-4 mr-2" />
-              Logout
-            </DropdownMenuItem>
+            {user ? (
+              <>
+                <DropdownMenuItem onClick={() => setAccountPanelOpen(true)}>
+                  <UserIcon className="size-4 mr-2" />
+                  View Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/orders" className="cursor-pointer">
+                    <ShoppingBagIcon className="size-4 mr-2" />
+                    My Orders
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOutIcon className="size-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <DropdownMenuItem asChild>
+                <SignInButton className="w-full cursor-pointer">
+                  <LogInIcon className="size-4 mr-2" />
+                  Sign In
+                </SignInButton>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         
@@ -229,121 +242,171 @@ export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: Mobil
             <SheetTitle>My Account</SheetTitle>
           </SheetHeader>
           
-          <div className="mt-6 space-y-4">
-            {/* Name Section */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground mb-1">Name</p>
-                    {editingName ? (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          placeholder="Enter your name"
-                          className="h-9"
-                        />
-                        <Button size="icon" variant="ghost" onClick={handleSaveName} className="size-8">
-                          <CheckIcon className="size-4 text-green-600" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={handleCancelEdit} className="size-8">
-                          <XIcon className="size-4 text-red-600" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <p className="text-lg font-semibold">
-                          Hi, {profileData?.name || "Guest"}
-                        </p>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={handleEditName}
-                          className="size-7"
-                        >
-                          <PencilIcon className="size-3.5" />
-                        </Button>
-                      </div>
-                    )}
+          {user ? (
+            <div className="mt-6 space-y-4">
+              {/* Name Section */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="text-xs text-muted-foreground mb-1">Name</p>
+                      {editingName ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            placeholder="Enter your name"
+                            className="h-9"
+                          />
+                          <Button size="icon" variant="ghost" onClick={handleSaveName} className="size-8">
+                            <CheckIcon className="size-4 text-green-600" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={handleCancelEdit} className="size-8">
+                            <XIcon className="size-4 text-red-600" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-semibold">
+                            Hi, {profileData?.name || "Guest"}
+                          </p>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={handleEditName}
+                            className="size-7"
+                          >
+                            <PencilIcon className="size-3.5" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* Contact Information */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <MailIcon className="size-4" />
-                    <p className="text-xs">Email</p>
+              {/* Contact Information */}
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <MailIcon className="size-4" />
+                      <p className="text-xs">Email</p>
+                    </div>
+                    <p className="text-sm font-medium pl-6">
+                      {profileData?.email || "Not provided"}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium pl-6">
-                    {profileData?.email || "Not provided"}
-                  </p>
-                </div>
-                
-                <Separator />
-                
-                <div>
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <PhoneIcon className="size-4" />
-                    <p className="text-xs">Phone</p>
+                  
+                  <Separator />
+                  
+                  <div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <PhoneIcon className="size-4" />
+                      <p className="text-xs">Phone</p>
+                    </div>
+                    <p className="text-sm font-medium pl-6">
+                      {profileData?.phone || "Not provided"}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium pl-6">
-                    {profileData?.phone || "Not provided"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* My Orders Button */}
-            <Button asChild className="w-full" variant="outline" size="lg">
-              <Link to="/orders" onClick={() => setAccountPanelOpen(false)}>
-                <ShoppingBagIcon className="size-4 mr-2" />
-                My Orders
-              </Link>
-            </Button>
+              {/* My Orders Button */}
+              <Button asChild className="w-full" variant="outline" size="lg">
+                <Link to="/orders" onClick={() => setAccountPanelOpen(false)}>
+                  <ShoppingBagIcon className="size-4 mr-2" />
+                  My Orders
+                </Link>
+              </Button>
 
-            {/* Wallet Information */}
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <div>
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <WalletIcon className="size-4" />
-                    <p className="text-xs">Wallet Balance</p>
+              {/* Wallet Information */}
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <WalletIcon className="size-4" />
+                      <p className="text-xs">Wallet Balance</p>
+                    </div>
+                    <p className="text-2xl font-bold text-primary pl-6">
+                      ₹{profileData?.walletBalance?.toFixed(2) || "0.00"}
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold text-primary pl-6">
-                    ₹{profileData?.walletBalance?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-                
-                <Separator />
-                
-                <div>
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <TrophyIcon className="size-4" />
-                    <p className="text-xs">Cashback Earned</p>
+                  
+                  <Separator />
+                  
+                  <div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <TrophyIcon className="size-4" />
+                      <p className="text-xs">Cashback Earned</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-600 pl-6">
+                      ₹{profileData?.totalCashbackEarned?.toFixed(2) || "0.00"}
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold text-green-600 pl-6">
-                    ₹{profileData?.totalCashbackEarned?.toFixed(2) || "0.00"}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* Logout Button */}
-            <Button
-              variant="destructive"
-              className="w-full"
-              size="lg"
-              onClick={handleLogout}
-            >
-              <LogOutIcon className="size-4 mr-2" />
-              Logout
-            </Button>
-          </div>
+              {/* Logout Button */}
+              <Button
+                variant="destructive"
+                className="w-full"
+                size="lg"
+                onClick={handleLogout}
+              >
+                <LogOutIcon className="size-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          ) : (
+            <div className="mt-6 space-y-6">
+              {/* Welcome Message */}
+              <Card>
+                <CardContent className="pt-6 text-center space-y-4">
+                  <div className="size-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <UserIcon className="size-10 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold mb-2">Welcome to Skinly!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Sign in to access your account, view orders, and manage your wallet.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sign In Button */}
+              <SignInButton className="w-full" size="lg">
+                <LogInIcon className="size-4 mr-2" />
+                Sign In
+              </SignInButton>
+
+              {/* Benefits List */}
+              <Card>
+                <CardContent className="pt-6">
+                  <h4 className="font-semibold mb-3 text-sm">Benefits of signing in:</h4>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex items-start gap-2">
+                      <CheckIcon className="size-4 text-primary mt-0.5 shrink-0" />
+                      <span>Track your orders in real-time</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckIcon className="size-4 text-primary mt-0.5 shrink-0" />
+                      <span>Manage your wallet and cashback</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckIcon className="size-4 text-primary mt-0.5 shrink-0" />
+                      <span>Save your favorite designs</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <CheckIcon className="size-4 text-primary mt-0.5 shrink-0" />
+                      <span>Faster checkout experience</span>
+                    </li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </SheetContent>
       </Sheet>
     </>
