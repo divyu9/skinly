@@ -451,11 +451,9 @@ export default function DevicesPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      asChild
+                      onClick={() => setRequestDialogOpen(true)}
                     >
-                      <Link to="/backend-skinly/models">
-                        Request Your Model →
-                      </Link>
+                      Request Your Model →
                     </Button>
                   </div>
                 ) : searchQuery.trim() ? (
@@ -480,13 +478,11 @@ export default function DevicesPage() {
                 <span>Can't Find Your Device?</span>
               </div>
               <Button
-                asChild
+                onClick={() => setRequestDialogOpen(true)}
                 className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
               >
-                <Link to="/backend-skinly/models">
-                  <ZapIcon className="size-4 mr-2" />
-                  Request Your Model
-                </Link>
+                <ZapIcon className="size-4 mr-2" />
+                Request Your Model
               </Button>
               <p className="text-xs text-muted-foreground">
                 we'll add it with high priority

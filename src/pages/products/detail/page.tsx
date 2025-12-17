@@ -1449,11 +1449,12 @@ export default function ProductDetailPage() {
                     <p className="text-sm text-muted-foreground">Can't find your model?</p>
                     <Button
                       variant="outline"
-                      asChild
+                      onClick={() => {
+                        setModelDialogOpen(false);
+                        setRequestDialogOpen(true);
+                      }}
                     >
-                      <Link to="/backend-skinly/models">
-                        Request Your Model →
-                      </Link>
+                      Request Your Model →
                     </Button>
                   </div>
                 )}
