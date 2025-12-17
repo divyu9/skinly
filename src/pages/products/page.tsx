@@ -999,47 +999,43 @@ export default function ProductsPage() {
               // Check if all variants are out of stock
               const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
 
+              const productUrl = `/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`;
+              
               return (
-                <Card key={product._id} className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0">
-                  <div className="relative aspect-square overflow-hidden bg-muted">
-                    <ProductImage 
-                      product={product} 
-                      brandFilter={brandFilter} 
-                      modelFilter={modelFilter}
-                    />
-                    {isOutOfStock && autoSortOOS && (
-                      <div className="absolute top-2 left-2 right-2">
-                        <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">
-                          Sold Out
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
-                  <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
-                    <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-lg sm:leading-normal line-clamp-2">{product.title}</h3>
-                    <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
-                    {isOutOfStock && autoSortOOS ? (
-                      <Button 
-                        className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4" 
-                        variant="outline"
-                        asChild
-                      >
-                        <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
+                <Link key={product._id} to={productUrl}>
+                  <Card className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0 cursor-pointer">
+                    <div className="relative aspect-square overflow-hidden bg-muted">
+                      <ProductImage 
+                        product={product} 
+                        brandFilter={brandFilter} 
+                        modelFilter={modelFilter}
+                      />
+                      {isOutOfStock && autoSortOOS && (
+                        <div className="absolute top-2 left-2 right-2">
+                          <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">
+                            Sold Out
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
+                    <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                      <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-lg sm:leading-normal line-clamp-2">{product.title}</h3>
+                      <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
+                      {isOutOfStock && autoSortOOS ? (
+                        <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground">
                           <BellIcon className="size-3 sm:size-4 mr-1" />
                           <span className="hidden sm:inline">Request Restock</span>
                           <span className="sm:hidden">Restock</span>
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4" asChild>
-                        <Link to={`/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`}>
-                          <span className="hidden sm:inline">Select My Phone Model</span>
+                        </div>
+                      ) : (
+                        <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-md text-primary-foreground font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary hover:bg-primary/90">
+                          <span className="hidden sm:inline">Select Your Device</span>
                           <span className="sm:hidden">Select</span>
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
-                </Card>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </Link>
               );
             })}
           </div>

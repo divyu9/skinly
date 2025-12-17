@@ -106,18 +106,27 @@ export default function ProductDetailPage() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [confirmedNotMatch, setConfirmedNotMatch] = useState(false);
   
-  // Fetch phone models from database for brand/model selector
-  const phoneModelsFromDb = useQuery(api.supportedModels.listAll, { 
-    category: "phone", 
+  // Query local database
+  const productData = useQuery(
+    api.products.getProductBySlug, 
+    productSlug ? { slug: productSlug } : "skip"
+  );
+  
+  // Determine device category from product data
+  const deviceCategory = productData?.gadgetCategory || "phone";
+  
+  // Fetch models from database for the specific device category
+  const deviceModelsFromDb = useQuery(api.supportedModels.listAll, { 
+    category: deviceCategory as "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini",
     isActive: true 
   });
   
-  // Group phone models by brand from database
-  const phoneModelsByBrand = useMemo(() => {
-    if (!phoneModelsFromDb) return {};
+  // Group device models by brand from database
+  const deviceModelsByBrand = useMemo(() => {
+    if (!deviceModelsFromDb) return {};
     
     const grouped: Record<string, string[]> = {};
-    phoneModelsFromDb.forEach(model => {
+    deviceModelsFromDb.forEach(model => {
       if (!grouped[model.brandName]) {
         grouped[model.brandName] = [];
       }
@@ -130,7 +139,10 @@ export default function ProductDetailPage() {
     });
     
     return grouped;
-  }, [phoneModelsFromDb]);
+  }, [deviceModelsFromDb]);
+  
+  // Keep phoneModelsByBrand for backward compatibility
+  const phoneModelsByBrand = deviceModelsByBrand;
   
   // Filter models based on search
   const filteredModels = useMemo(() => {
@@ -161,12 +173,6 @@ export default function ProductDetailPage() {
     setModelSearch("");
   };
   
-  // Query local database
-  const productData = useQuery(
-    api.products.getProductBySlug, 
-    productSlug ? { slug: productSlug } : "skip"
-  );
-  
   const reviews = useQuery(
     api.reviews.getProductReviews,
     productData ? { productId: productData._id } : "skip"
@@ -192,10 +198,10 @@ export default function ProductDetailPage() {
   
   // Get all brands for the request dialog
   const allBrands = useMemo(() => {
-    if (!phoneModelsFromDb) return [];
-    const brands = new Set(phoneModelsFromDb.map(m => m.brandName));
+    if (!deviceModelsFromDb) return [];
+    const brands = new Set(deviceModelsFromDb.map(m => m.brandName));
     return Array.from(brands).sort();
-  }, [phoneModelsFromDb]);
+  }, [deviceModelsFromDb]);
   
   // Query mockup file URL from database
   const mockupFileUrl = useQuery(
@@ -315,22 +321,17 @@ export default function ProductDetailPage() {
     return images.length > 0 ? images : productData.images;
   }, [productData, phoneModel, mockupUrl]);
   
-  // Determine if this product needs phone model selection
-  // Includes: phone skins and membranes
-  // Excludes: cases, covers, camera rings, tempered glass
-  const isPhoneSkin = productData ? (() => {
+  // Determine if this product needs device model selection
+  // Includes: skins for phones, laptops, cameras, tablets, drones, etc.
+  // Excludes: cases, covers, camera rings, tempered glass, accessories
+  const needsDeviceSelector = productData ? (() => {
     const titleLower = productData.title.toLowerCase();
-    const tagsLower = productData.tags?.map(t => t.toLowerCase()) || [];
+    const category = productData.gadgetCategory;
     
-    // Check if it's a membrane (matte or gloss) - these need phone selector
-    const isMembrane = 
-      (titleLower.includes("membrane") && titleLower.includes("3 layer")) ||
-      (titleLower.includes("matte membrane") || titleLower.includes("gloss membrane"));
-    
-    if (isMembrane) return true;
-    
-    // Exclude products that are not skins
-    const isNotSkin = 
+    // Exclude products that don't need model selection
+    const isAccessory = 
+      category === "accessory" ||
+      category === "cover" ||
       titleLower.includes("case") ||
       titleLower.includes("cover") ||
       titleLower.includes("camera ring") ||
@@ -339,14 +340,20 @@ export default function ProductDetailPage() {
       titleLower.includes("screen guard") ||
       titleLower.includes("protector");
     
-    if (isNotSkin) return false;
+    if (isAccessory) return false;
     
-    // Check if it's actually a phone skin
-    const isSkin = titleLower.includes("phone skin") ||
-      titleLower.includes("skin") && (titleLower.includes("phone") || titleLower.includes("matte") || titleLower.includes("3d embossed") || titleLower.includes("transparent"));
+    // If it has a gadgetCategory that's device-specific, it needs selector
+    if (category && ["phone", "laptop", "tablet", "camera", "lens", "drone", "console", "charger", "mac-mini"].includes(category)) {
+      return true;
+    }
     
+    // Fallback: check if it's a skin
+    const isSkin = titleLower.includes("skin") || titleLower.includes("membrane");
     return isSkin;
   })() : false;
+  
+  // Keep isPhoneSkin for backward compatibility (check if it's specifically a phone product)
+  const isPhoneSkin = needsDeviceSelector && (deviceCategory === "phone" || !productData?.gadgetCategory);
   
   // Fetch cross-sell products
   const crossSellProducts = useQuery(
@@ -967,7 +974,7 @@ export default function ProductDetailPage() {
                       <div className="flex items-center gap-3">
                         <div className="text-xl shrink-0">📱</div>
                         <div className="flex-1">
-                          <p className="text-sm font-semibold">Select Your Phone Model</p>
+                          <p className="text-sm font-semibold">Select Your Device</p>
                           <p className="text-xs text-muted-foreground mt-1">
                             Ensure perfect fit for your device
                           </p>
@@ -1030,7 +1037,7 @@ export default function ProductDetailPage() {
                     {isAdding ? "Adding..." : "Add to Cart"}
                   </Button>
                   <Button
-                    className="flex-1"
+                    className="flex-1 animate-shake"
                     size="lg"
                     onClick={handleBuyNow}
                     disabled={isAdding || isBuyingNow || (isPhoneSkin && !phoneModel)}
@@ -1401,8 +1408,8 @@ export default function ProductDetailPage() {
           {!selectedBrand ? (
             <>
               <DialogHeader>
-                <DialogTitle>Select Phone Brand</DialogTitle>
-                <DialogDescription>Choose your phone brand to see available models</DialogDescription>
+                <DialogTitle>Select Device Brand</DialogTitle>
+                <DialogDescription>Choose your device brand to see available models</DialogDescription>
               </DialogHeader>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pr-2">
                 {Object.keys(phoneModelsByBrand).sort().map((brand) => (
