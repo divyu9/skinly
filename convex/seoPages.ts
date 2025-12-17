@@ -610,3 +610,40 @@ export const syncAllPagesWithTemplates = mutation({
     };
   },
 });
+
+// Regenerate content for a page (to fix poor quality content)
+export const regeneratePageContent = mutation({
+  args: {
+    pageId: v.id("seoPages"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const page = await ctx.db.get(args.pageId);
+    if (!page) {
+      throw new Error("Page not found");
+    }
+
+    // Extract the value from the page's heading or slug
+    // This will be used as the input for regeneration
+    const value = page.h1Heading
+      .replace(/Skins for |Phone Skins for |Skins & Wraps|Device Skins|Skins/gi, "")
+      .trim();
+
+    // Mark page for regeneration
+    // The actual regeneration will be done by the frontend calling the AI action
+    await ctx.db.patch(args.pageId, {
+      updatedAt: Date.now(),
+      updatedBy: identity.email,
+    });
+
+    return { 
+      success: true,
+      pageType: page.pageType,
+      value: value
+    };
+  },
+});

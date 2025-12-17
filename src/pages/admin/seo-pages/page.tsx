@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -91,10 +91,14 @@ export default function SEOPagesPage() {
   const updateHeroImage = useMutation(api.seoPages.updateHeroImage);
   const syncPageWithTemplate = useMutation(api.seoPages.syncPageWithTemplate);
   const syncAllPagesWithTemplates = useMutation(api.seoPages.syncAllPagesWithTemplates);
+  const regeneratePageContent = useMutation(api.seoPages.regeneratePageContent);
+  const updatePage = useMutation(api.seoPages.updatePage);
+  const generateContent = useAction(api.seoContentGenerator.generateSEOContent);
 
   const [uploadingPageId, setUploadingPageId] = useState<Id<"seoPages"> | null>(null);
   const [syncingPageId, setSyncingPageId] = useState<Id<"seoPages"> | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const [regeneratingPageId, setRegeneratingPageId] = useState<Id<"seoPages"> | null>(null);
 
   const handleClone = async (pageId: Id<"seoPages">) => {
     try {
@@ -304,6 +308,73 @@ export default function SEOPagesPage() {
       console.error(error);
     } finally {
       setIsSyncingAll(false);
+    }
+  };
+
+  const handleRegenerateContent = async (page: Page) => {
+    try {
+      setRegeneratingPageId(page._id);
+      
+      // First, get page info
+      const result = await regeneratePageContent({ pageId: page._id });
+      
+      // Extract value based on page type
+      const value = result.value;
+      
+      // Build AI parameters with proper metadata
+      const aiParams: {
+        pageType: "brand" | "device" | "product" | "skin-type" | "keyword";
+        keywords: string[];
+        brandName?: string;
+        deviceCategory?: string;
+        productType?: string;
+        designType?: string;
+      } = {
+        pageType: result.pageType,
+        keywords: [value],
+      };
+
+      // Add type-specific metadata
+      switch (result.pageType) {
+        case "brand":
+          aiParams.brandName = value;
+          break;
+        case "device":
+          aiParams.deviceCategory = value;
+          break;
+        case "product":
+          aiParams.productType = value;
+          break;
+        case "skin-type":
+          aiParams.designType = value;
+          break;
+      }
+
+      // Generate new content
+      const aiContent = await generateContent(aiParams);
+      
+      if (aiContent.success && aiContent.contentHTML) {
+        // Update page with new content
+        const firstParagraph = aiContent.contentHTML.match(/<p>(.*?)<\/p>/)?.[1] || "";
+        const metaDescription = firstParagraph.replace(/<[^>]*>/g, "").substring(0, 160);
+        
+        await updatePage({
+          pageId: page._id,
+          contentHTML: aiContent.contentHTML,
+          metaDescription: metaDescription,
+          faqs: aiContent.faqs || [],
+          imageAltTexts: aiContent.imageAltTexts || [],
+        });
+        
+        toast.success("Content regenerated successfully!");
+      } else {
+        toast.error(`Failed to regenerate: ${aiContent.error || "Unknown error"}`);
+      }
+    } catch (error) {
+      toast.error("Failed to regenerate content");
+      console.error(error);
+    } finally {
+      setRegeneratingPageId(null);
     }
   };
 
@@ -520,6 +591,22 @@ export default function SEOPagesPage() {
                             <>
                               <RefreshCw className="mr-2 h-4 w-4" />
                               Sync with Template
+                            </>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleRegenerateContent(page)}
+                          disabled={regeneratingPageId === page._id}
+                        >
+                          {regeneratingPageId === page._id ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Regenerating...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="mr-2 h-4 w-4" />
+                              Regenerate Content
                             </>
                           )}
                         </DropdownMenuItem>

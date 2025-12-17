@@ -146,10 +146,37 @@ export default function AutoGenerateSEOPages() {
         if (openAIEnabled) {
           try {
             const apiPageType = pageType === "skin_type" ? "skin-type" : pageType;
-            const aiContent = await generateContent({
+            
+            // Build AI generation parameters with proper metadata
+            const aiParams: {
+              pageType: "brand" | "device" | "product" | "skin-type" | "keyword";
+              keywords: string[];
+              brandName?: string;
+              deviceCategory?: string;
+              productType?: string;
+              designType?: string;
+            } = {
               pageType: apiPageType,
               keywords: [item.value],
-            });
+            };
+
+            // Add type-specific metadata
+            switch (pageType) {
+              case "brand":
+                aiParams.brandName = item.value;
+                break;
+              case "device":
+                aiParams.deviceCategory = item.value;
+                break;
+              case "skin_type":
+                aiParams.designType = item.value;
+                break;
+              default:
+                // For keyword pages, no additional metadata needed
+                break;
+            }
+
+            const aiContent = await generateContent(aiParams);
 
             if (aiContent.success && aiContent.contentHTML) {
               content = aiContent.contentHTML;

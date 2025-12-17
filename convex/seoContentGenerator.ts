@@ -124,37 +124,49 @@ function buildPrompt(args: {
 
   switch (args.pageType) {
     case "brand":
+      if (!args.brandName) {
+        console.warn("⚠️ SEO Content Generation: Missing brandName - content quality will be poor");
+      }
       contextSection = `
 Page Type: Brand Landing Page
-Brand Name: ${args.brandName || "Unknown Brand"}
+Brand Name: ${args.brandName || "[ERROR: BRAND NAME MISSING]"}
 Device Types: Mobiles, Tablets, Laptops, Cameras, Drones, Chargers, Consoles, etc.
 
-Create content that showcases all ${args.brandName || "brand"} devices we support.`;
+Create content that showcases all ${args.brandName || "[BRAND]"} devices we support.`;
       break;
 
     case "device":
+      if (!args.deviceCategory) {
+        console.warn("⚠️ SEO Content Generation: Missing deviceCategory - content quality will be poor");
+      }
       contextSection = `
 Page Type: Device Category Landing Page
-Device Category: ${args.deviceCategory || "Unknown Device"}
+Device Category: ${args.deviceCategory || "[ERROR: DEVICE CATEGORY MISSING]"}
 Models Supported: ${args.modelNames?.join(", ") || "Various models"}
 
-Create content focused on ${args.deviceCategory || "device"} skins with emphasis on perfect fit and model compatibility.`;
+Create content focused on ${args.deviceCategory || "[DEVICE]"} skins with emphasis on perfect fit and model compatibility.`;
       break;
 
     case "product":
+      if (!args.productType) {
+        console.warn("⚠️ SEO Content Generation: Missing productType - content quality will be poor");
+      }
       contextSection = `
 Page Type: Product Type Landing Page
-Product Type: ${args.productType || "Unknown Product"}
+Product Type: ${args.productType || "[ERROR: PRODUCT TYPE MISSING]"}
 
-Create content highlighting the features and benefits of ${args.productType || "product"}.`;
+Create content highlighting the features and benefits of ${args.productType || "[PRODUCT]"} skins.`;
       break;
 
     case "skin-type":
+      if (!args.designType) {
+        console.warn("⚠️ SEO Content Generation: Missing designType - content quality will be poor");
+      }
       contextSection = `
 Page Type: Skin Design Landing Page
-Design Type: ${args.designType || "Unknown Design"}
+Design Type: ${args.designType || "[ERROR: DESIGN TYPE MISSING]"}
 
-Create content showcasing the unique style and benefits of ${args.designType || "design"} skins.`;
+Create content showcasing the unique style and benefits of ${args.designType || "[DESIGN]"} skins.`;
       break;
 
     case "keyword":
