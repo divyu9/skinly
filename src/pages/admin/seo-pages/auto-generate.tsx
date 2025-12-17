@@ -50,6 +50,7 @@ export default function AutoGenerateSEOPages() {
   const openAIKeySetting = useQuery(api.settings.getSetting, {
     key: "openaiApiKey",
   });
+  const templates = useQuery(api.seoTemplates.getTemplates, {});
   const createPage = useMutation(api.seoPages.createPage);
   const generateContent = useAction(api.seoContentGenerator.generateSEOContent);
 
@@ -86,7 +87,7 @@ export default function AutoGenerateSEOPages() {
       case "keyword":
         return base;
       case "device":
-        return `skins-for-${base}`;
+        return `${base}-skins`;
       case "brand":
         return `${base}-skins`;
       case "skin_type":
@@ -203,8 +204,16 @@ export default function AutoGenerateSEOPages() {
           ];
         }
 
-        // Create the page
+        // Get template for this page type to copy its layout sections
         const apiPageType = pageType === "skin_type" ? "skin-type" : pageType;
+        const template = templates?.find((t) => t.pageType === apiPageType);
+        
+        // Copy template sections to page layoutOverrides (template as source of truth)
+        const layoutOverrides = template?.layoutConfig?.sections
+          ? { sections: template.layoutConfig.sections }
+          : undefined;
+
+        // Create the page
         const result = await createPage({
           pageType: apiPageType,
           slug,
@@ -216,6 +225,7 @@ export default function AutoGenerateSEOPages() {
           keywords: [item.value],
           imageAltTexts: [],
           filterConfig: {},
+          layoutOverrides,
           isPublished: false,
         });
 

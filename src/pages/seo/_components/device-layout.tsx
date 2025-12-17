@@ -191,9 +191,7 @@ export default function DevicePageLayout({ page }: DevicePageLayoutProps) {
     "gadget-selector": () => <GadgetSelector onDeviceSelect={openDialogForDevice} onPhoneSelect={scrollToPhoneBrandSelector} />,
     "phone-brand-selector": () => <div ref={phoneBrandSelectorRef}><PhoneBrandSelector /></div>,
     "showcase": renderShowcase,
-    "selector": renderShowcase,
     "products": renderProducts,
-    "comparison": renderContent,
     "faqs": renderFaqs,
   };
 

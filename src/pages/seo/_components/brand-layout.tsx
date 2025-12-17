@@ -194,8 +194,6 @@ export default function BrandPageLayout({ page }: BrandPageLayoutProps) {
     "phone-brand-selector": () => <div ref={phoneBrandSelectorRef}><PhoneBrandSelector /></div>,
     "intro": renderIntro,
     "products": renderProducts,
-    "story": renderIntro,
-    "comparison": renderIntro,
     "faqs": renderFaqs,
   };
 
