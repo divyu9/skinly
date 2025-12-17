@@ -42,6 +42,7 @@ import {
   MoreVertical,
   ExternalLink,
   Link as LinkIcon,
+  Image,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
@@ -86,6 +87,9 @@ export default function SEOPagesPage() {
   const togglePublish = useMutation(api.seoPages.togglePublish);
   const bulkTogglePublish = useMutation(api.seoPages.bulkTogglePublish);
   const bulkDeletePages = useMutation(api.seoPages.bulkDeletePages);
+  const updateHeroImage = useMutation(api.seoPages.updateHeroImage);
+
+  const [uploadingPageId, setUploadingPageId] = useState<Id<"seoPages"> | null>(null);
 
   const handleClone = async (pageId: Id<"seoPages">) => {
     try {
@@ -235,6 +239,33 @@ export default function SEOPagesPage() {
     const url = getProductionUrl(page);
     navigator.clipboard.writeText(url);
     toast.success("Production URL copied to clipboard");
+  };
+
+  const handleUploadHeroImage = async (pageId: Id<"seoPages">, file: File) => {
+    try {
+      setUploadingPageId(pageId);
+      
+      // Create a simple prompt to paste URL
+      const url = prompt("Paste the image URL from Files & Media (must start with https://cdn.hercules.app/file_):");
+      
+      if (!url) {
+        toast.info("Upload cancelled");
+        return;
+      }
+
+      if (!url.startsWith("https://cdn.hercules.app/file_")) {
+        toast.error("Invalid URL. Please upload the image to Files & Media first and paste the URL here.");
+        return;
+      }
+
+      await updateHeroImage({ pageId, heroImageUrl: url });
+      toast.success("Hero image updated successfully!");
+    } catch (error) {
+      toast.error("Failed to update hero image");
+      console.error(error);
+    } finally {
+      setUploadingPageId(null);
+    }
   };
 
   if (pages === undefined) {
@@ -403,6 +434,22 @@ export default function SEOPagesPage() {
                         <DropdownMenuItem onClick={() => handleCopyProductionUrl(page)}>
                           <LinkIcon className="mr-2 h-4 w-4" />
                           Copy Production URL
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleUploadHeroImage(page._id, null as unknown as File)}
+                          disabled={uploadingPageId === page._id}
+                        >
+                          {uploadingPageId === page._id ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>
+                              <Image className="mr-2 h-4 w-4" />
+                              Upload Hero Image
+                            </>
+                          )}
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to={`/backend-skinly/seo-pages/${page._id}`}>

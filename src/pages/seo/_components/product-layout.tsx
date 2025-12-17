@@ -52,8 +52,22 @@ export default function ProductPageLayout({ page }: ProductPageLayoutProps) {
 
   // Section renderers
   const renderHero = () => (
-    <section className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border-b">
-      <div className="container mx-auto px-4 py-12 md:py-20">
+    <section className="relative border-b overflow-hidden">
+      {/* Hero Background - Image or Gradient */}
+      {page.heroImageUrl ? (
+        <>
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${page.heroImageUrl})` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/80 to-background/90" />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
+      )}
+      
+      {/* Hero Content */}
+      <div className="relative container mx-auto px-4 py-12 md:py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
           <div className="order-2 lg:order-1">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 text-balance">

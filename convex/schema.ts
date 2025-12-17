@@ -434,6 +434,7 @@ export default defineSchema({
     // Content
     h1Heading: v.string(),
     contentHTML: v.string(), // Rich HTML content (1000+ words)
+    heroImageUrl: v.optional(v.string()), // Hero banner image URL
     // FAQs
     faqs: v.array(v.object({
       question: v.string(),

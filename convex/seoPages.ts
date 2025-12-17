@@ -463,3 +463,30 @@ export const changePageType = mutation({
     return { success: true };
   },
 });
+
+// Update hero image
+export const updateHeroImage = mutation({
+  args: {
+    pageId: v.id("seoPages"),
+    heroImageUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const page = await ctx.db.get(args.pageId);
+    if (!page) {
+      throw new Error("Page not found");
+    }
+
+    await ctx.db.patch(args.pageId, {
+      heroImageUrl: args.heroImageUrl,
+      updatedAt: Date.now(),
+      updatedBy: identity.email,
+    });
+
+    return { success: true };
+  },
+});

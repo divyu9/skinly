@@ -62,8 +62,22 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
     switch (sectionId) {
       case "hero":
         return (
-          <section key={sectionId} className="bg-gradient-to-br from-primary/10 via-background to-background border-b">
-            <div className="container mx-auto px-4 py-16 md:py-24">
+          <section key={sectionId} className="relative border-b overflow-hidden">
+            {/* Hero Background - Image or Gradient */}
+            {page.heroImageUrl ? (
+              <>
+                <div 
+                  className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+                  style={{ backgroundImage: `url(${page.heroImageUrl})` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/80 to-background/90" />
+              </>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
+            )}
+            
+            {/* Hero Content */}
+            <div className="relative container mx-auto px-4 py-16 md:py-24">
               <div className="max-w-4xl mx-auto text-center">
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-balance">
                   {page.h1Heading}

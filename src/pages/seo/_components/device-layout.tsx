@@ -49,8 +49,22 @@ export default function DevicePageLayout({ page }: DevicePageLayoutProps) {
 
   // Section renderers
   const renderHero = () => (
-    <section className="relative bg-gradient-to-br from-primary/10 via-background to-accent/5 border-b overflow-hidden">
-      <div className="container mx-auto px-4 py-16 md:py-24">
+    <section className="relative border-b overflow-hidden">
+      {/* Hero Background - Image or Gradient */}
+      {page.heroImageUrl ? (
+        <>
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: `url(${page.heroImageUrl})` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/90 via-background/80 to-background/90" />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent/5" />
+      )}
+      
+      {/* Hero Content */}
+      <div className="relative container mx-auto px-4 py-16 md:py-24">
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl mx-auto">
           <div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-balance">
