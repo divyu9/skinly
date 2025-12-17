@@ -377,6 +377,103 @@ export default defineSchema({
     value: v.union(v.boolean(), v.string(), v.number()), // Setting value
   }).index("by_key", ["key"]),
 
+  // SEO Page Templates (Global templates for each page type)
+  seoPageTemplates: defineTable({
+    pageType: v.union(
+      v.literal("brand"),
+      v.literal("device"),
+      v.literal("product"),
+      v.literal("skin-type"),
+      v.literal("keyword")
+    ),
+    displayName: v.string(), // Friendly name (e.g., "Brand Pages")
+    description: v.optional(v.string()), // Description of this template
+    // Layout configuration
+    layoutConfig: v.object({
+      sections: v.array(v.object({
+        id: v.string(), // Section ID (e.g., "hero", "products", "faqs")
+        label: v.string(), // Display name
+        enabled: v.boolean(), // Whether section is shown
+        order: v.number(), // Display order (lower = earlier)
+      })),
+    }),
+    // Default filter rules
+    defaultFilters: v.object({
+      autoCategorize: v.optional(v.boolean()), // Auto-categorize by gadget type (for brand pages)
+      filterByBrand: v.optional(v.boolean()), // Filter products by brand
+      filterByDevice: v.optional(v.boolean()), // Filter products by device category
+      filterByProduct: v.optional(v.boolean()), // Filter products by product type
+      filterByDesign: v.optional(v.boolean()), // Filter products by design type
+      showModelSelector: v.optional(v.boolean()), // Show brand-model selector (for device pages)
+    }),
+    // Content structure for AI generation
+    contentStructure: v.object({
+      h1Pattern: v.string(), // e.g., "{Brand} Skins - Premium Protection"
+      introLength: v.string(), // e.g., "2-3 paragraphs"
+      includeSections: v.array(v.string()), // e.g., ["benefits", "features", "installation"]
+      keywordsToInclude: v.array(v.string()), // e.g., ["premium", "high-quality", "durable"]
+    }),
+    updatedAt: v.optional(v.number()),
+    updatedBy: v.optional(v.string()), // Admin email
+  }).index("by_page_type", ["pageType"]),
+
+  // SEO Pages (Actual landing pages)
+  seoPages: defineTable({
+    pageType: v.union(
+      v.literal("brand"),
+      v.literal("device"),
+      v.literal("product"),
+      v.literal("skin-type"),
+      v.literal("keyword")
+    ),
+    // SEO Meta
+    metaTitle: v.string(), // Max 70 chars
+    metaDescription: v.string(), // Max 160 chars
+    slug: v.string(), // Unique, SEO-friendly URL slug
+    canonicalUrl: v.optional(v.string()), // Optional canonical URL
+    // Content
+    h1Heading: v.string(),
+    contentHTML: v.string(), // Rich HTML content (1000+ words)
+    // FAQs
+    faqs: v.array(v.object({
+      question: v.string(),
+      answer: v.string(),
+    })),
+    // Keywords and images
+    keywords: v.array(v.string()), // Keywords array
+    imageAltTexts: v.array(v.string()), // 15+ alt text variations
+    // Filters for dynamic product display
+    filterConfig: v.object({
+      brandName: v.optional(v.string()), // Filter by specific brand
+      gadgetCategory: v.optional(v.string()), // Filter by device category
+      productType: v.optional(v.string()), // Filter by product type (skins, cases, etc.)
+      designType: v.optional(v.string()), // Filter by design type (anime, carbon fiber, etc.)
+      autoCategorize: v.optional(v.boolean()), // Auto-categorize products (for brand pages)
+      showModelSelector: v.optional(v.boolean()), // Show model selector (for device pages)
+    }),
+    // Layout overrides (optional - overrides template defaults)
+    layoutOverrides: v.optional(v.object({
+      sections: v.optional(v.array(v.object({
+        id: v.string(),
+        label: v.string(),
+        enabled: v.boolean(),
+        order: v.number(),
+      }))),
+    })),
+    // Publishing
+    isPublished: v.boolean(),
+    publishedAt: v.optional(v.number()),
+    // Audit trail
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+    createdBy: v.optional(v.string()), // Admin email
+    updatedBy: v.optional(v.string()), // Admin email
+  })
+    .index("by_slug", ["slug"])
+    .index("by_page_type", ["pageType"])
+    .index("by_published", ["isPublished"])
+    .index("by_page_type_and_published", ["pageType", "isPublished"]),
+
   supportedModels: defineTable({
     brandName: v.string(), // e.g., "Apple", "Samsung", "OnePlus"
     modelName: v.string(), // e.g., "iPhone 15 Pro Max", "Galaxy S24 Ultra"
