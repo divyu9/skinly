@@ -205,6 +205,43 @@ export const createOrder = mutation({
       ? `TRK-${Date.now()}-${Math.random().toString(36).substr(2, 20)}-${Math.random().toString(36).substr(2, 20)}`
       : undefined;
 
+    // Fetch SKUs for all cart items from variants table
+    const itemsWithSku = await Promise.all(
+      cartItems.map(async (item) => {
+        // Try to find the variant by productId and title match
+        const product = await ctx.db
+          .query("products")
+          .filter((q) => q.eq(q.field("title"), item.productTitle))
+          .first();
+        
+        let sku: string | undefined;
+        if (product) {
+          const variant = await ctx.db
+            .query("variants")
+            .withIndex("by_product", (q) => q.eq("productId", product._id))
+            .filter((q) => q.eq(q.field("title"), item.variant))
+            .first();
+          
+          if (variant) {
+            sku = variant.sku;
+          }
+        }
+        
+        return {
+          productId: item.productId,
+          productTitle: item.productTitle,
+          productImage: item.productImage,
+          variant: item.variant,
+          sku, // Add SKU field
+          price: item.price,
+          quantity: item.quantity,
+          phoneModel: item.phoneModel,
+          phoneBrand: item.phoneBrand,
+          coverage: item.coverage,
+        };
+      })
+    );
+
     // Create order
     const orderId = await ctx.db.insert("orders", {
       userId: user?._id,
@@ -214,17 +251,7 @@ export const createOrder = mutation({
       orderNumber,
       customerEmail: args.customerEmail || args.guestEmail,
       status: "processing",
-      items: cartItems.map((item) => ({
-        productId: item.productId,
-        productTitle: item.productTitle,
-        productImage: item.productImage,
-        variant: item.variant,
-        price: item.price,
-        quantity: item.quantity,
-        phoneModel: item.phoneModel,
-        phoneBrand: item.phoneBrand,
-        coverage: item.coverage,
-      })),
+      items: itemsWithSku,
       subtotal,
       shippingFee,
       total: originalTotal, // Store original total (for display)

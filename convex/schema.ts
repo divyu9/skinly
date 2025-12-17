@@ -53,6 +53,7 @@ export default defineSchema({
         productTitle: v.string(),
         productImage: v.optional(v.string()),
         variant: v.string(),
+        sku: v.optional(v.string()), // SKU from variants table (for new orders)
         price: v.number(),
         quantity: v.number(),
         phoneModel: v.optional(v.string()),

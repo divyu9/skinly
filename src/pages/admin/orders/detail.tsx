@@ -731,7 +731,7 @@ function OrderDetailPageInner() {
                               : "Only Back"}
                           </p>
                         )}
-                        <p className="font-medium text-foreground">SKU: {item.variant}</p>
+                        <p className="font-medium text-foreground">SKU: {item.sku || item.variant}</p>
                       </div>
                       <p className="font-medium">
                         ₹{item.price.toFixed(0)} × {item.quantity} = ₹
