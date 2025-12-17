@@ -40,40 +40,96 @@ export default function SEOPage() {
     return <NotFound />;
   }
 
+  // Determine current URL based on page type
+  const getCurrentUrl = () => {
+    const baseUrl = "https://goskinly.com"; // Production domain
+    switch (page.pageType) {
+      case "brand":
+        return `${baseUrl}/brand/${page.slug}`;
+      case "device":
+        return `${baseUrl}/device/${page.slug}`;
+      case "product":
+        return `${baseUrl}/product/${page.slug}`;
+      case "skin-type":
+        return `${baseUrl}/skin-type/${page.slug}`;
+      case "keyword":
+        return `${baseUrl}/${page.slug}`;
+      default:
+        return baseUrl;
+    }
+  };
+
+  const currentUrl = getCurrentUrl();
+
   return (
     <>
       {/* SEO Meta Tags */}
       <Helmet>
         <title>{page.metaTitle}</title>
         <meta name="description" content={page.metaDescription} />
-        {page.canonicalUrl && <link rel="canonical" href={page.canonicalUrl} />}
+        <link rel="canonical" href={page.canonicalUrl || currentUrl} />
+        <meta name="keywords" content={page.keywords.join(", ")} />
         
         {/* Open Graph */}
         <meta property="og:title" content={page.metaTitle} />
         <meta property="og:description" content={page.metaDescription} />
         <meta property="og:type" content="website" />
+        <meta property="og:url" content={currentUrl} />
+        <meta property="og:site_name" content="GoSkinly" />
         
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={page.metaTitle} />
         <meta name="twitter:description" content={page.metaDescription} />
         
-        {/* Structured Data - Article */}
+        {/* Organization Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "Article",
-            "headline": page.h1Heading,
+            "@type": "Organization",
+            "name": "GoSkinly",
+            "url": "https://goskinly.com",
+            "logo": "https://goskinly.com/logo.png",
+            "description": "Premium phone skins and protection accessories",
+            "sameAs": []
+          })}
+        </script>
+
+        {/* WebPage Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "WebPage",
+            "name": page.metaTitle,
             "description": page.metaDescription,
-            "datePublished": new Date(page._creationTime).toISOString(),
-            "author": {
+            "url": currentUrl,
+            "datePublished": new Date(page.createdAt).toISOString(),
+            "dateModified": new Date(page.updatedAt || page.createdAt).toISOString(),
+            "publisher": {
               "@type": "Organization",
               "name": "GoSkinly"
+            },
+            "breadcrumb": {
+              "@type": "BreadcrumbList",
+              "itemListElement": [
+                {
+                  "@type": "ListItem",
+                  "position": 1,
+                  "name": "Home",
+                  "item": "https://goskinly.com"
+                },
+                {
+                  "@type": "ListItem",
+                  "position": 2,
+                  "name": page.h1Heading,
+                  "item": currentUrl
+                }
+              ]
             }
           })}
         </script>
         
-        {/* Structured Data - FAQs */}
+        {/* FAQPage Structured Data */}
         {page.faqs && page.faqs.length > 0 && (
           <script type="application/ld+json">
             {JSON.stringify({
@@ -87,6 +143,19 @@ export default function SEOPage() {
                   "text": faq.answer
                 }
               }))
+            })}
+          </script>
+        )}
+
+        {/* Product Collection Structured Data (for product-related pages) */}
+        {(page.pageType === "brand" || page.pageType === "device" || page.pageType === "product" || page.pageType === "skin-type") && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "CollectionPage",
+              "name": page.h1Heading,
+              "description": page.metaDescription,
+              "url": currentUrl
             })}
           </script>
         )}

@@ -63,6 +63,41 @@ export const getSitemapUrls = query({
       });
     });
 
+    // Get all published SEO pages
+    const seoPages = await ctx.db
+      .query("seoPages")
+      .filter((q) => q.eq(q.field("isPublished"), true))
+      .collect();
+
+    seoPages.forEach((page) => {
+      // Determine URL path based on page type
+      let path = "";
+      switch (page.pageType) {
+        case "brand":
+          path = `/brand/${page.slug}`;
+          break;
+        case "device":
+          path = `/device/${page.slug}`;
+          break;
+        case "product":
+          path = `/product/${page.slug}`;
+          break;
+        case "skin-type":
+          path = `/skin-type/${page.slug}`;
+          break;
+        case "keyword":
+          path = `/${page.slug}`;
+          break;
+      }
+
+      urls.push({
+        url: `${baseUrl}${path}`,
+        lastmod: new Date(page.updatedAt || page.createdAt).toISOString(),
+        changefreq: "weekly",
+        priority: 0.85, // High priority for SEO landing pages
+      });
+    });
+
     return urls;
   },
 });
