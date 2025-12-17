@@ -1,0 +1,103 @@
+import { useParams } from "react-router-dom";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { Helmet } from "react-helmet-async";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import KeywordPageLayout from "./_components/keyword-layout.tsx";
+import DevicePageLayout from "./_components/device-layout.tsx";
+import BrandPageLayout from "./_components/brand-layout.tsx";
+import SkinTypePageLayout from "./_components/skin-type-layout.tsx";
+import ProductPageLayout from "./_components/product-layout.tsx";
+import NotFound from "../NotFound.tsx";
+
+export default function SEOPage() {
+  const params = useParams<{ slug?: string }>();
+  // Extract slug from either :slug param or root-level param
+  const slug = params.slug || "";
+  const page = useQuery(api.seoPages.getPageBySlug, { slug });
+
+  // Loading state
+  if (page === undefined) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-12">
+          <Skeleton className="h-12 w-3/4 mb-6" />
+          <Skeleton className="h-6 w-full mb-4" />
+          <Skeleton className="h-6 w-full mb-4" />
+          <Skeleton className="h-6 w-2/3 mb-8" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-64 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not found or unpublished
+  if (!page || !page.isPublished) {
+    return <NotFound />;
+  }
+
+  return (
+    <>
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>{page.metaTitle}</title>
+        <meta name="description" content={page.metaDescription} />
+        {page.canonicalUrl && <link rel="canonical" href={page.canonicalUrl} />}
+        
+        {/* Open Graph */}
+        <meta property="og:title" content={page.metaTitle} />
+        <meta property="og:description" content={page.metaDescription} />
+        <meta property="og:type" content="website" />
+        
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={page.metaTitle} />
+        <meta name="twitter:description" content={page.metaDescription} />
+        
+        {/* Structured Data - Article */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": page.h1Heading,
+            "description": page.metaDescription,
+            "datePublished": new Date(page._creationTime).toISOString(),
+            "author": {
+              "@type": "Organization",
+              "name": "GoSkinly"
+            }
+          })}
+        </script>
+        
+        {/* Structured Data - FAQs */}
+        {page.faqs && page.faqs.length > 0 && (
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "mainEntity": page.faqs.map((faq) => ({
+                "@type": "Question",
+                "name": faq.question,
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": faq.answer
+                }
+              }))
+            })}
+          </script>
+        )}
+      </Helmet>
+
+      {/* Render appropriate layout based on page type */}
+      {page.pageType === "keyword" && <KeywordPageLayout page={page} />}
+      {page.pageType === "device" && <DevicePageLayout page={page} />}
+      {page.pageType === "brand" && <BrandPageLayout page={page} />}
+      {page.pageType === "skin-type" && <SkinTypePageLayout page={page} />}
+      {page.pageType === "product" && <ProductPageLayout page={page} />}
+    </>
+  );
+}
