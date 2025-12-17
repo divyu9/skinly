@@ -40,6 +40,8 @@ import AdminBugsPage from "./pages/admin/bugs/page.tsx";
 import AdminUpsellsPage from "./pages/admin/upsells/page.tsx";
 import AdminSEOTemplatesPage from "./pages/admin/seo-templates/page.tsx";
 import AdminSEOPagesPage from "./pages/admin/seo-pages/page.tsx";
+import AdminSEOPagesNewPage from "./pages/admin/seo-pages/new.tsx";
+import AdminSEOPagesAutoGeneratePage from "./pages/admin/seo-pages/auto-generate.tsx";
 import AdminMigrationPage from "./pages/admin/migration.tsx";
 import AdminSitemapGeneratorPage from "./pages/admin/sitemap-generator.tsx";
 import AdminShippingPage from "./pages/admin/shipping.tsx";
@@ -95,6 +97,8 @@ export default function App() {
           <Route path="/backend-skinly/upsells" element={<AdminPageWrapper><AdminUpsellsPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/seo-templates" element={<AdminPageWrapper><AdminSEOTemplatesPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/seo-pages" element={<AdminPageWrapper><AdminSEOPagesPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/seo-pages/new" element={<AdminPageWrapper><AdminSEOPagesNewPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/seo-pages/auto-generate" element={<AdminPageWrapper><AdminSEOPagesAutoGeneratePage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/mockups" element={<AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/mockups/missing" element={<AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/google-drive-import" element={<AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper>} />
