@@ -51,6 +51,7 @@ export default function SEOTemplatesPage() {
   const templates = useQuery(api.seoTemplates.getTemplates);
   const updateTemplate = useMutation(api.seoTemplates.updateTemplate);
   const initializeTemplates = useMutation(api.seoTemplates.initializeDefaultTemplates);
+  const reinitializeTemplates = useMutation(api.seoTemplates.reinitializeTemplates);
 
   const [selectedType, setSelectedType] = useState<PageType>("brand");
   const [isSaving, setIsSaving] = useState(false);
@@ -58,6 +59,7 @@ export default function SEOTemplatesPage() {
   const [newSection, setNewSection] = useState("");
   const [newKeyword, setNewKeyword] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
+  const [isReinitializing, setIsReinitializing] = useState(false);
 
   const currentTemplate = templates?.find((t) => t.pageType === selectedType);
 
@@ -83,6 +85,24 @@ export default function SEOTemplatesPage() {
     } catch (error) {
       toast.error("Failed to initialize templates");
       console.error(error);
+    }
+  };
+
+  const handleReinitialize = async () => {
+    if (!confirm("This will delete ALL existing templates and create fresh defaults. You'll lose any customizations. Continue?")) {
+      return;
+    }
+
+    setIsReinitializing(true);
+    try {
+      const result = await reinitializeTemplates({});
+      toast.success(`Templates re-initialized successfully. Deleted ${result.deleted}, created ${result.created}`);
+      setHasChanges(false);
+    } catch (error) {
+      toast.error("Failed to re-initialize templates");
+      console.error(error);
+    } finally {
+      setIsReinitializing(false);
     }
   };
 
@@ -232,6 +252,18 @@ export default function SEOTemplatesPage() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="destructive" 
+              onClick={handleReinitialize} 
+              disabled={isReinitializing}
+            >
+              {isReinitializing ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="mr-2 h-4 w-4" />
+              )}
+              Re-Initialize All
+            </Button>
             {hasChanges && (
               <Button variant="outline" onClick={handleReset}>
                 <RotateCcw className="mr-2 h-4 w-4" />
