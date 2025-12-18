@@ -58,7 +58,7 @@ export const generateSEOContent = action({
             {
               role: "system",
               content:
-                "You are an expert SEO content writer for GoSkinly, a premium mobile and device skin brand based in Noida, India. Write engaging, SEO-optimized, plagiarism-free content that converts visitors into customers.",
+                "You are an expert SEO content writer for GoSkinly, a premium mobile and device skin brand. Write engaging, SEO-optimized, plagiarism-free content that converts visitors into customers. Never include specific location references unless explicitly requested.",
             },
             {
               role: "user",
@@ -194,10 +194,9 @@ Please provide the content in the following JSON format:
     - Installation guide (brief)
     - Compatibility information
     - Why choose GoSkinly section
-    - Comparison with competitors
-    - Local SEO: Include 'GoSkinly – Noida, India' naturally
     - Use semantic HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>
-    - Make it engaging, conversion-focused, and plagiarism-free",
+    - Make it engaging, conversion-focused, and plagiarism-free
+    - DO NOT include any location or city references",
   
   "faqs": [
     {"question": "Question 1?", "answer": "Detailed answer with keywords"},
@@ -212,14 +211,15 @@ Please provide the content in the following JSON format:
   ]
 }
 
-Important:
+CRITICAL REQUIREMENTS:
 - Write naturally, avoid keyword stuffing
 - Make content unique and engaging
 - Focus on benefits and conversion
-- Include local SEO naturally
 - Use proper HTML formatting
 - Make FAQs schema-ready
-- Ensure all content is plagiarism-free`;
+- Ensure all content is plagiarism-free
+- NEVER include location references (no city names, no "Noida", no "India" unless specifically required)
+- Keep sentences complete and professional`;
 }
 
 // Parse AI-generated content

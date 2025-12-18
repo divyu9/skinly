@@ -181,9 +181,21 @@ export default function AutoGenerateSEOPages() {
 
             if (aiContent.success && aiContent.contentHTML) {
               content = aiContent.contentHTML;
-              // Generate meta description from first paragraph
+              // Generate meta description from first paragraph - ensure complete sentence
               const firstParagraph = aiContent.contentHTML.match(/<p>(.*?)<\/p>/)?.[1] || "";
-              metaDescription = firstParagraph.replace(/<[^>]*>/g, "").substring(0, 160);
+              const cleanText = firstParagraph.replace(/<[^>]*>/g, "");
+              
+              // Find a complete sentence within 155-160 chars, or fallback to 160 char limit
+              let description = cleanText.substring(0, 160);
+              if (cleanText.length > 160) {
+                // Try to find the last sentence ending (. ! ?) before 160 chars
+                const sentenceMatch = cleanText.substring(0, 160).match(/(.*[.!?])\s/);
+                if (sentenceMatch && sentenceMatch[1].length >= 100) {
+                  description = sentenceMatch[1].trim();
+                }
+              }
+              
+              metaDescription = description;
               faqs = aiContent.faqs || [];
             }
           } catch (error) {

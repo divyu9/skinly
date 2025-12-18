@@ -205,20 +205,7 @@ export default function SEOPagesPage() {
 
   const getPreviewUrl = (page: Page) => {
     const baseUrl = window.location.origin;
-    switch (page.pageType) {
-      case "brand":
-        return `${baseUrl}/brand/${page.slug}`;
-      case "device":
-        return `${baseUrl}/device/${page.slug}`;
-      case "product":
-        return `${baseUrl}/product/${page.slug}`;
-      case "skin-type":
-        return `${baseUrl}/skin-type/${page.slug}`;
-      case "keyword":
-        return `${baseUrl}/${page.slug}`;
-      default:
-        return `${baseUrl}/${page.slug}`;
-    }
+    return `${baseUrl}/${page.slug}`;
   };
 
   const getProductionUrl = (page: Page) => {

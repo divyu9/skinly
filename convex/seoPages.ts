@@ -121,6 +121,19 @@ export const getPageById = query({
   },
 });
 
+// Alias for getPageById (used by edit page)
+export const getPage = query({
+  args: { pageId: v.id("seoPages") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    return await ctx.db.get(args.pageId);
+  },
+});
+
 // Get all published pages (for sitemap)
 export const getAllPublishedPages = query({
   args: {},
