@@ -82,7 +82,7 @@ export default function ProductPageLayout({ page }: ProductPageLayoutProps) {
                     ? `${page.metaDescription.substring(0, 160)}...` 
                     : page.metaDescription}
               </p>
-              {page.metaDescription.length > 160 && (
+              {page.metaDescription.length >= 150 && (
                 <button
                   onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                   className="text-primary hover:underline mt-2 text-base font-medium"
