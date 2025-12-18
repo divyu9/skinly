@@ -41,6 +41,7 @@ import type * as gst from "../gst.js";
 import type * as http from "../http.js";
 import type * as loginOtp from "../loginOtp.js";
 import type * as migrateGst from "../migrateGst.js";
+import type * as migrateOpenAIKey from "../migrateOpenAIKey.js";
 import type * as migrateOrderStatuses from "../migrateOrderStatuses.js";
 import type * as migrateProductFields from "../migrateProductFields.js";
 import type * as migrateShippingFields from "../migrateShippingFields.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   loginOtp: typeof loginOtp;
   migrateGst: typeof migrateGst;
+  migrateOpenAIKey: typeof migrateOpenAIKey;
   migrateOrderStatuses: typeof migrateOrderStatuses;
   migrateProductFields: typeof migrateProductFields;
   migrateShippingFields: typeof migrateShippingFields;
