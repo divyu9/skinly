@@ -406,8 +406,8 @@ export default function ProductDetailPage() {
 
   const handleAddToCart = async () => {
     if (!product) return;
-    // Require model selection for all products that need device selector
-    if (needsDeviceSelector && !phoneModel) return;
+    // Require model selection only for skin products
+    if (isSkinProduct && needsDeviceSelector && !phoneModel) return;
     
     setIsAdding(true);
     
@@ -472,8 +472,8 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = async () => {
     if (!product) return;
-    // Require model selection for all products that need device selector
-    if (needsDeviceSelector && !phoneModel) {
+    // Require model selection only for skin products
+    if (isSkinProduct && needsDeviceSelector && !phoneModel) {
       toast.error("Please select your device model first");
       return;
     }
