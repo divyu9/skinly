@@ -47,6 +47,7 @@ export const updateTemplate = mutation({
     ),
     displayName: v.optional(v.string()),
     description: v.optional(v.string()),
+    defaultHeroImage: v.optional(v.string()),
     layoutConfig: v.optional(
       v.object({
         sections: v.array(
@@ -97,6 +98,7 @@ export const updateTemplate = mutation({
 
     if (args.displayName !== undefined) updates.displayName = args.displayName;
     if (args.description !== undefined) updates.description = args.description;
+    if (args.defaultHeroImage !== undefined) updates.defaultHeroImage = args.defaultHeroImage;
     if (args.layoutConfig !== undefined)
       updates.layoutConfig = args.layoutConfig;
     if (args.defaultFilters !== undefined)
@@ -114,6 +116,7 @@ export const updateTemplate = mutation({
         pageType: args.pageType,
         displayName: args.displayName || args.pageType,
         description: args.description,
+        defaultHeroImage: args.defaultHeroImage,
         layoutConfig: args.layoutConfig || {
           sections: [],
         },
@@ -517,6 +520,45 @@ export const reinitializeTemplates = mutation({
       message: "Templates re-initialized successfully", 
       deleted: existing.length, 
       created: 5 
+    };
+  },
+});
+
+// Initialize default hero images for templates
+export const initializeDefaultHeroImages = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    const heroImageMap: Record<string, string> = {
+      brand: "https://cdn.hercules.app/file_TTzspgzZHTPer5BlbFkBEwTv",
+      device: "https://cdn.hercules.app/file_SLIDqJBWTItllHEEDr05Il5U",
+      keyword: "https://cdn.hercules.app/file_iIOCvr6i3EsGFeGd2zOn77Qm",
+      "skin-type": "https://cdn.hercules.app/file_iIOCvr6i3EsGFeGd2zOn77Qm",
+    };
+
+    const templates = await ctx.db.query("seoPageTemplates").collect();
+    let updatedCount = 0;
+
+    for (const template of templates) {
+      const heroImage = heroImageMap[template.pageType];
+      if (heroImage) {
+        await ctx.db.patch(template._id, {
+          defaultHeroImage: heroImage,
+          updatedAt: Date.now(),
+          updatedBy: identity.email,
+        });
+        updatedCount++;
+      }
+    }
+
+    return { 
+      success: true, 
+      updatedCount,
+      message: `Updated ${updatedCount} templates with default hero images` 
     };
   },
 });

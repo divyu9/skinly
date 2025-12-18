@@ -389,6 +389,7 @@ export default defineSchema({
     ),
     displayName: v.string(), // Friendly name (e.g., "Brand Pages")
     description: v.optional(v.string()), // Description of this template
+    defaultHeroImage: v.optional(v.string()), // Default hero image URL for this page type
     // Layout configuration
     layoutConfig: v.object({
       sections: v.array(v.object({

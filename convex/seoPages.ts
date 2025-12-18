@@ -660,3 +660,47 @@ export const regeneratePageContent = mutation({
     };
   },
 });
+
+// Update hero images for all pages of a specific type
+export const updateHeroImagesByPageType = mutation({
+  args: {
+    pageType: v.union(
+      v.literal("brand"),
+      v.literal("device"),
+      v.literal("product"),
+      v.literal("skin-type"),
+      v.literal("keyword")
+    ),
+    heroImageUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get all pages of this type
+    const pages = await ctx.db
+      .query("seoPages")
+      .filter((q) => q.eq(q.field("pageType"), args.pageType))
+      .collect();
+
+    let updatedCount = 0;
+
+    // Update each page
+    for (const page of pages) {
+      await ctx.db.patch(page._id, {
+        heroImageUrl: args.heroImageUrl,
+        updatedAt: Date.now(),
+        updatedBy: identity.email,
+      });
+      updatedCount++;
+    }
+
+    return { 
+      success: true, 
+      updatedCount,
+      totalPages: pages.length
+    };
+  },
+});

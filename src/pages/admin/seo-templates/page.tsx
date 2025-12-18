@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { Loader2, Save, RotateCcw, ArrowUp, ArrowDown, X, Plus } from "lucide-react";
+import { Loader2, Save, RotateCcw, ArrowUp, ArrowDown, X, Plus, Image } from "lucide-react";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -21,6 +21,7 @@ type Template = {
   pageType: PageType;
   displayName: string;
   description?: string;
+  defaultHeroImage?: string;
   layoutConfig: {
     sections: Array<{
       id: string;
@@ -52,6 +53,8 @@ export default function SEOTemplatesPage() {
   const updateTemplate = useMutation(api.seoTemplates.updateTemplate);
   const initializeTemplates = useMutation(api.seoTemplates.initializeDefaultTemplates);
   const reinitializeTemplates = useMutation(api.seoTemplates.reinitializeTemplates);
+  const initializeDefaultHeroImages = useMutation(api.seoTemplates.initializeDefaultHeroImages);
+  const updateHeroImagesByPageType = useMutation(api.seoPages.updateHeroImagesByPageType);
 
   const [selectedType, setSelectedType] = useState<PageType>("brand");
   const [isSaving, setIsSaving] = useState(false);
@@ -60,6 +63,8 @@ export default function SEOTemplatesPage() {
   const [newKeyword, setNewKeyword] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
   const [isReinitializing, setIsReinitializing] = useState(false);
+  const [isInitializingHeroImages, setIsInitializingHeroImages] = useState(false);
+  const [isApplyingHeroImage, setIsApplyingHeroImage] = useState(false);
 
   const currentTemplate = templates?.find((t) => t.pageType === selectedType);
 
@@ -70,6 +75,7 @@ export default function SEOTemplatesPage() {
         pageType: currentTemplate.pageType,
         displayName: currentTemplate.displayName,
         description: currentTemplate.description,
+        defaultHeroImage: currentTemplate.defaultHeroImage,
         layoutConfig: currentTemplate.layoutConfig,
         defaultFilters: currentTemplate.defaultFilters,
         contentStructure: currentTemplate.contentStructure,
@@ -106,6 +112,44 @@ export default function SEOTemplatesPage() {
     }
   };
 
+  const handleInitializeHeroImages = async () => {
+    setIsInitializingHeroImages(true);
+    try {
+      const result = await initializeDefaultHeroImages({});
+      toast.success(result.message);
+    } catch (error) {
+      toast.error("Failed to initialize hero images");
+      console.error(error);
+    } finally {
+      setIsInitializingHeroImages(false);
+    }
+  };
+
+  const handleApplyHeroImageToPages = async () => {
+    if (!editedTemplate?.defaultHeroImage) {
+      toast.error("No hero image set for this template");
+      return;
+    }
+
+    if (!confirm(`This will update the hero image for ALL ${selectedType} pages. This will overwrite any custom hero images. Continue?`)) {
+      return;
+    }
+
+    setIsApplyingHeroImage(true);
+    try {
+      const result = await updateHeroImagesByPageType({
+        pageType: selectedType,
+        heroImageUrl: editedTemplate.defaultHeroImage,
+      });
+      toast.success(`Updated hero image for ${result.updatedCount} pages`);
+    } catch (error) {
+      toast.error("Failed to apply hero image to pages");
+      console.error(error);
+    } finally {
+      setIsApplyingHeroImage(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!editedTemplate) return;
 
@@ -115,6 +159,7 @@ export default function SEOTemplatesPage() {
         pageType: selectedType,
         displayName: editedTemplate.displayName,
         description: editedTemplate.description,
+        defaultHeroImage: editedTemplate.defaultHeroImage,
         layoutConfig: editedTemplate.layoutConfig,
         defaultFilters: editedTemplate.defaultFilters,
         contentStructure: editedTemplate.contentStructure,
@@ -135,6 +180,7 @@ export default function SEOTemplatesPage() {
         pageType: currentTemplate.pageType,
         displayName: currentTemplate.displayName,
         description: currentTemplate.description,
+        defaultHeroImage: currentTemplate.defaultHeroImage,
         layoutConfig: currentTemplate.layoutConfig,
         defaultFilters: currentTemplate.defaultFilters,
         contentStructure: currentTemplate.contentStructure,
@@ -253,6 +299,18 @@ export default function SEOTemplatesPage() {
           </div>
           <div className="flex gap-2">
             <Button 
+              variant="outline" 
+              onClick={handleInitializeHeroImages} 
+              disabled={isInitializingHeroImages}
+            >
+              {isInitializingHeroImages ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Image className="mr-2 h-4 w-4" />
+              )}
+              Set Default Hero Images
+            </Button>
+            <Button 
               variant="destructive" 
               onClick={handleReinitialize} 
               disabled={isReinitializing}
@@ -327,6 +385,58 @@ export default function SEOTemplatesPage() {
                         placeholder="Describe this template's purpose"
                         rows={2}
                       />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Default Hero Image</CardTitle>
+                    <CardDescription>
+                      Set the default hero banner image for all pages of this type
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="defaultHeroImage">Hero Image URL</Label>
+                      <Input
+                        id="defaultHeroImage"
+                        value={editedTemplate.defaultHeroImage || ""}
+                        onChange={(e) => updateField("defaultHeroImage", e.target.value)}
+                        placeholder="https://cdn.hercules.app/file_..."
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Use a Hercules CDN URL (https://cdn.hercules.app/file_...)
+                      </p>
+                    </div>
+                    {editedTemplate.defaultHeroImage && (
+                      <div className="space-y-2">
+                        <Label>Preview</Label>
+                        <div className="border rounded-lg overflow-hidden">
+                          <img 
+                            src={editedTemplate.defaultHeroImage} 
+                            alt="Hero preview" 
+                            className="w-full h-48 object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-2 pt-2">
+                      <Button 
+                        onClick={handleApplyHeroImageToPages}
+                        disabled={!editedTemplate.defaultHeroImage || isApplyingHeroImage}
+                        variant="secondary"
+                      >
+                        {isApplyingHeroImage ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <Image className="mr-2 h-4 w-4" />
+                        )}
+                        Apply to All {editedTemplate.displayName}
+                      </Button>
+                      <p className="text-xs text-muted-foreground flex items-center">
+                        This will update all existing pages of this type
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
