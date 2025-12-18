@@ -328,9 +328,71 @@ export default function SEOPagesPage() {
       const aiContent = await generateContent(aiParams);
       
       if (aiContent.success && aiContent.contentHTML) {
-        // Update page with new content
+        // Generate meta description with STRICT rules:
+        // 1. Always one complete grammatically correct sentence
+        // 2. Never cut off last word or end mid-sentence
+        // 3. If > 160 chars, shorten by removing non-essential words
+        // 4. Output only ONE complete sentence
+        
         const firstParagraph = aiContent.contentHTML.match(/<p>(.*?)<\/p>/)?.[1] || "";
-        const metaDescription = firstParagraph.replace(/<[^>]*>/g, "").substring(0, 160);
+        const cleanText = firstParagraph.replace(/<[^>]*>/g, "").trim();
+        
+        // Extract first complete sentence (ending with . ! or ?)
+        const firstSentenceMatch = cleanText.match(/^[^.!?]+[.!?]/);
+        let sentence = firstSentenceMatch ? firstSentenceMatch[0].trim() : cleanText;
+        
+        let metaDescription = "";
+        
+        // If sentence is <= 160 chars, use it as-is
+        if (sentence.length <= 160) {
+          metaDescription = sentence;
+        } else {
+          // Sentence is too long - intelligently shorten it
+          // 1. Remove parenthetical statements
+          sentence = sentence.replace(/\s*\([^)]*\)\s*/g, ' ');
+          
+          // 2. Remove phrases after commas if still too long
+          if (sentence.length > 160) {
+            const parts = sentence.split(',');
+            sentence = parts[0].trim();
+            if (!/[.!?]$/.test(sentence)) {
+              sentence += '.';
+            }
+          }
+          
+          // 3. Remove prepositional phrases
+          if (sentence.length > 160) {
+            sentence = sentence.replace(/\s+(for|with|at|in|on|to|from|by)\s+[^.!?]+[.!?]/, '.');
+          }
+          
+          // 4. Last resort: truncate at word boundary
+          if (sentence.length > 160) {
+            let truncated = sentence.substring(0, 157);
+            const lastSpace = truncated.lastIndexOf(' ');
+            if (lastSpace > 100) {
+              truncated = truncated.substring(0, lastSpace);
+            }
+            truncated = truncated.replace(/[,;:]$/, '');
+            if (!/[.!?]$/.test(truncated)) {
+              truncated += '.';
+            }
+            sentence = truncated;
+          }
+          
+          // Clean up
+          sentence = sentence.replace(/\s+/g, ' ').trim();
+          metaDescription = sentence;
+        }
+        
+        // Final safety check
+        if (metaDescription && !/[.!?]$/.test(metaDescription)) {
+          metaDescription += '.';
+        }
+        
+        // Fallback
+        if (!metaDescription || metaDescription.length === 0) {
+          metaDescription = `Discover ${value} at GoSkinly.`;
+        }
         
         await updatePage({
           pageId: page._id,
