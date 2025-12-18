@@ -58,7 +58,7 @@ export const generateSEOContent = action({
             {
               role: "system",
               content:
-                "You are an expert SEO content writer for GoSkinly, a premium mobile and device skin brand. Write engaging, SEO-optimized, plagiarism-free content that converts visitors into customers. Never include specific location references unless explicitly requested.",
+                "You are an expert SEO content writer for GoSkinly, a premium mobile and device skin brand. Write engaging, SEO-optimized, plagiarism-free content that converts visitors into customers. Never include specific location references unless explicitly requested.\n\nIMPORTANT BUSINESS CONTEXT:\nGoSkinly sells decorative vinyl skins/wraps/decals FOR electronic devices (phones, laptops, tablets, cameras, drones, chargers, consoles, etc.). Design keywords refer to the VISUAL THEME on the skin:\n- 'Car skins' = skins WITH car-themed designs (Ferrari logos, racing stripes) applied TO phones/laptops\n- 'Anime skins' = skins WITH anime character artwork applied TO devices\n- 'God skins' = skins WITH deity/religious imagery applied TO devices\n- 'Nature skins' = skins WITH nature photography/art applied TO devices\n- 'Girlish skins' = skins WITH feminine/cute designs applied TO devices\n- 'Sports skins' = skins WITH team logos/sports themes applied TO devices\n\nThe skin is ALWAYS a protective vinyl decal applied TO electronic gadgets, featuring the themed design. NEVER write as if the skin is applied to cars, gods, nature objects, etc.",
             },
             {
               role: "user",
@@ -166,7 +166,7 @@ Create content highlighting the features and benefits of ${args.productType || "
 Page Type: Skin Design Landing Page
 Design Type: ${args.designType || "[ERROR: DESIGN TYPE MISSING]"}
 
-Create content showcasing the unique style and benefits of ${args.designType || "[DESIGN]"} skins.`;
+Create content showcasing vinyl device skins featuring ${args.designType || "[DESIGN]"} themed designs. These are decorative skins applied TO phones/laptops/gadgets WITH ${args.designType || "[DESIGN]"} artwork/imagery on them.`;
       break;
 
     case "keyword":
@@ -174,7 +174,7 @@ Create content showcasing the unique style and benefits of ${args.designType || 
 Page Type: SEO Keyword Landing Page
 Target Keywords: ${keywordsList}
 
-Create comprehensive SEO content targeting these keywords naturally.`;
+Create comprehensive SEO content targeting these keywords naturally. Remember: if keywords mention designs (cars, anime, nature, etc.), these refer to the themed artwork ON device skins, not skins FOR those objects.`;
       break;
   }
 
