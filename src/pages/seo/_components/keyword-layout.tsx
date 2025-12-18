@@ -32,7 +32,6 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
   
   // Refs for scrolling
   const phoneBrandSelectorRef = useRef<HTMLDivElement>(null);
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   
   // Function to open dialog with specific device type
   const openDialogForDevice = (deviceType: DeviceType) => {
@@ -83,23 +82,9 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
                 <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-balance">
                   {page.h1Heading}
                 </h1>
-                <div className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  <p>
-                    {isDescriptionExpanded 
-                      ? page.metaDescription 
-                      : page.metaDescription.length > 160 
-                        ? `${page.metaDescription.substring(0, 160)}...` 
-                        : page.metaDescription}
-                  </p>
-                  {page.metaDescription.length >= 150 && (
-                    <button
-                      onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                      className="text-primary hover:underline mt-2 text-base font-medium"
-                    >
-                      {isDescriptionExpanded ? 'Show less' : 'Read more'}
-                    </button>
-                  )}
-                </div>
+                <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+                  {page.metaDescription}
+                </p>
                 <div className="flex flex-wrap gap-4 justify-center">
                   <Button size="lg" asChild>
                     <Link to="/products">

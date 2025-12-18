@@ -181,21 +181,53 @@ export default function AutoGenerateSEOPages() {
 
             if (aiContent.success && aiContent.contentHTML) {
               content = aiContent.contentHTML;
-              // Generate meta description from first paragraph - ensure complete sentence
-              const firstParagraph = aiContent.contentHTML.match(/<p>(.*?)<\/p>/)?.[1] || "";
-              const cleanText = firstParagraph.replace(/<[^>]*>/g, "");
               
-              // Find a complete sentence within 155-160 chars, or fallback to 160 char limit
-              let description = cleanText.substring(0, 160);
-              if (cleanText.length > 160) {
-                // Try to find the last sentence ending (. ! ?) before 160 chars
-                const sentenceMatch = cleanText.substring(0, 160).match(/(.*[.!?])\s/);
-                if (sentenceMatch && sentenceMatch[1].length >= 100) {
-                  description = sentenceMatch[1].trim();
+              // Generate meta description - MUST be complete sentence, 1-liner, max 160 chars
+              const firstParagraph = aiContent.contentHTML.match(/<p>(.*?)<\/p>/)?.[1] || "";
+              const cleanText = firstParagraph.replace(/<[^>]*>/g, "").trim();
+              
+              // Split into sentences by looking for . ! ? followed by space or end of string
+              const sentences = cleanText.split(/([.!?])\s+/).reduce((acc: string[], curr: string, i: number, arr: string[]) => {
+                if (i % 2 === 0 && curr) {
+                  // This is the sentence content
+                  const punctuation = arr[i + 1] || '';
+                  acc.push(curr + punctuation);
+                }
+                return acc;
+              }, []);
+              
+              // Try to find a suitable sentence (complete, <= 160 chars, ideally 23-25 words)
+              let description = "";
+              for (const sentence of sentences) {
+                const trimmed = sentence.trim();
+                const wordCount = trimmed.split(/\s+/).length;
+                
+                // Check if this sentence fits our criteria
+                if (trimmed.length <= 160 && trimmed.length > 0) {
+                  description = trimmed;
+                  // Prefer sentences with 23-25 words, but accept any complete sentence
+                  if (wordCount >= 15 && wordCount <= 25) {
+                    break;
+                  }
                 }
               }
               
-              metaDescription = description;
+              // Fallback: if no suitable sentence found, use first sentence truncated at word boundary
+              if (!description && cleanText.length > 0) {
+                let truncated = cleanText.substring(0, 160);
+                // Find last complete word before 160 chars
+                const lastSpace = truncated.lastIndexOf(' ');
+                if (lastSpace > 100) {
+                  truncated = truncated.substring(0, lastSpace);
+                }
+                // Ensure it ends with punctuation
+                if (!/[.!?]$/.test(truncated)) {
+                  truncated += '.';
+                }
+                description = truncated;
+              }
+              
+              metaDescription = description || `Discover ${item.value} at GoSkinly.`;
               faqs = aiContent.faqs || [];
             }
           } catch (error) {
