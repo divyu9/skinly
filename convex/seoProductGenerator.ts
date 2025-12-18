@@ -30,7 +30,7 @@ export const generateProductSEO = action({
       });
     }
 
-    const apiKey = String(apiKeyRecord);
+    const apiKey = String(apiKeyRecord.value);
     if (!apiKey || apiKey.trim() === "") {
       throw new ConvexError({
         message: "OpenAI API key is empty. Please configure it in settings.",
