@@ -41,7 +41,7 @@ export default function SitemapGenerator() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success("Sitemap downloaded! Upload it to the Files & Media tab as 'sitemap.xml'");
+    toast.success("Updated sitemap downloaded! Upload it to the Files & Media tab as 'sitemap.xml'");
   };
 
   const copySitemap = () => {
@@ -69,7 +69,7 @@ export default function SitemapGenerator() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2">Sitemap Generator</h1>
           <p className="text-muted-foreground">
-            Generate and download your sitemap.xml for Google Search Console
+            Generate and download your updated sitemap.xml with all current pages and products
           </p>
         </div>
 
@@ -78,18 +78,18 @@ export default function SitemapGenerator() {
             <CardHeader>
               <CardTitle>Sitemap Statistics</CardTitle>
               <CardDescription>
-                Your sitemap includes {urls.length} URLs across products, collections, and static pages
+                Your sitemap includes {urls.length} URLs across products, collections, SEO pages, and static pages
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="space-y-1">
                   <div className="text-2xl font-bold">{urls.length}</div>
                   <div className="text-xs text-muted-foreground">Total URLs</div>
                 </div>
                 <div className="space-y-1">
                   <div className="text-2xl font-bold">
-                    {urls.filter((u) => u.url.includes("/products/")).length}
+                    {urls.filter((u) => u.url.includes("/products/detail")).length}
                   </div>
                   <div className="text-xs text-muted-foreground">Products</div>
                 </div>
@@ -101,7 +101,26 @@ export default function SitemapGenerator() {
                 </div>
                 <div className="space-y-1">
                   <div className="text-2xl font-bold">
-                    {urls.filter((u) => !u.url.includes("/products/") && !u.url.includes("collection=")).length}
+                    {urls.filter((u) => {
+                      const url = u.url;
+                      return !url.includes("/products/") && 
+                             !url.includes("collection=") && 
+                             !url.includes("/policies/") && 
+                             !url.includes("/devices") && 
+                             url !== "https://goskinly.com/";
+                    }).length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">SEO Pages</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-2xl font-bold">
+                    {urls.filter((u) => {
+                      const url = u.url;
+                      return url.includes("/policies/") || 
+                             url.includes("/devices") || 
+                             url === "https://goskinly.com/" ||
+                             url === "https://goskinly.com/products";
+                    }).length}
                   </div>
                   <div className="text-xs text-muted-foreground">Static Pages</div>
                 </div>
@@ -111,16 +130,16 @@ export default function SitemapGenerator() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Download Sitemap</CardTitle>
+              <CardTitle>Generate & Download Sitemap</CardTitle>
               <CardDescription>
-                Download the sitemap.xml file and upload it to Files & Media
+                Create an updated sitemap.xml with all current pages and upload it to Files & Media
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
                 <Button onClick={downloadSitemap} className="flex-1">
                   <Download className="h-4 w-4 mr-2" />
-                  Download sitemap.xml
+                  Generate & Download Updated Sitemap
                 </Button>
                 <Button onClick={copySitemap} variant="outline">
                   {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : null}
@@ -131,7 +150,7 @@ export default function SitemapGenerator() {
               <div className="space-y-3 text-sm">
                 <div className="font-medium">Instructions:</div>
                 <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                  <li>Click "Download sitemap.xml" button above</li>
+                  <li>Click "Generate & Download Updated Sitemap" button above</li>
                   <li>
                     Go to the{" "}
                     <Button
@@ -144,7 +163,7 @@ export default function SitemapGenerator() {
                     </Button>
                   </li>
                   <li>Upload the sitemap.xml file (delete old one if exists)</li>
-                  <li>Your sitemap will be live at: https://skinly.onhercules.app/sitemap.xml</li>
+                  <li>Your sitemap will be live at: https://goskinly.com/sitemap.xml</li>
                 </ol>
               </div>
 
@@ -153,6 +172,7 @@ export default function SitemapGenerator() {
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• After adding new products</li>
                   <li>• After adding new collections</li>
+                  <li>• After creating/publishing new SEO pages</li>
                   <li>• Monthly (recommended for best SEO)</li>
                 </ul>
               </div>
@@ -182,7 +202,7 @@ export default function SitemapGenerator() {
                       <ExternalLink className="inline h-3 w-3 ml-1" />
                     </a>
                   </li>
-                  <li>Add property: https://skinly.onhercules.app</li>
+                  <li>Add property: https://goskinly.com</li>
                   <li>Verify ownership (via Google Analytics if already set up)</li>
                   <li>
                     Go to Sitemaps section and submit: <code className="bg-muted px-1 py-0.5 rounded">sitemap.xml</code>

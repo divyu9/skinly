@@ -8,7 +8,7 @@ import { v } from "convex/values";
 export const getSitemapUrls = query({
   args: {},
   handler: async (ctx) => {
-    const baseUrl = "https://skinly.onhercules.app";
+    const baseUrl = "https://goskinly.com";
     
     const urls: Array<{
       url: string;
@@ -20,7 +20,7 @@ export const getSitemapUrls = query({
     // Static pages
     const staticPages = [
       { path: "/", priority: 1.0, changefreq: "daily" as const },
-      { path: "/shop", priority: 0.9, changefreq: "daily" as const },
+      { path: "/products", priority: 0.9, changefreq: "daily" as const },
       { path: "/devices", priority: 0.9, changefreq: "weekly" as const },
       { path: "/policies/privacy", priority: 0.3, changefreq: "monthly" as const },
       { path: "/policies/terms", priority: 0.3, changefreq: "monthly" as const },
@@ -44,7 +44,7 @@ export const getSitemapUrls = query({
     
     products.forEach((product) => {
       urls.push({
-        url: `${baseUrl}/products/${product._id}`,
+        url: `${baseUrl}/products/detail?id=${product._id}`,
         lastmod: new Date(product._creationTime).toISOString(),
         changefreq: "weekly",
         priority: 0.8,
@@ -70,28 +70,9 @@ export const getSitemapUrls = query({
       .collect();
 
     seoPages.forEach((page) => {
-      // Determine URL path based on page type
-      let path = "";
-      switch (page.pageType) {
-        case "brand":
-          path = `/brand/${page.slug}`;
-          break;
-        case "device":
-          path = `/device/${page.slug}`;
-          break;
-        case "product":
-          path = `/product/${page.slug}`;
-          break;
-        case "skin-type":
-          path = `/skin-type/${page.slug}`;
-          break;
-        case "keyword":
-          path = `/${page.slug}`;
-          break;
-      }
-
+      // All SEO pages use root-level URLs
       urls.push({
-        url: `${baseUrl}${path}`,
+        url: `${baseUrl}/${page.slug}`,
         lastmod: new Date(page.updatedAt || page.createdAt).toISOString(),
         changefreq: "weekly",
         priority: 0.85, // High priority for SEO landing pages
