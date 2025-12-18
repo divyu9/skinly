@@ -265,6 +265,88 @@ export const getProductBySlug = query({
   },
 });
 
+// Search products by title and SKU
+export const searchProducts = query({
+  args: { 
+    query: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
+    const searchQuery = args.query.toLowerCase().trim();
+    
+    if (searchQuery.length < 2) {
+      return [];
+    }
+    
+    // Normalize search query (remove spaces and special chars for better matching)
+    const normalizeText = (text: string): string => {
+      return text.toLowerCase().replace(/[\s\-_]/g, '');
+    };
+    
+    const normalizedSearchTerms = searchQuery.split(/\s+/).filter(term => term.length > 0).map(normalizeText);
+    
+    // Get all active products
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    
+    // Get all variants for SKU search
+    const allVariants = await ctx.db.query("variants").collect();
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+    
+    // Search products by title
+    const matchingProducts = products.filter(product => {
+      const normalizedTitle = normalizeText(product.title);
+      // Check if ALL search terms are present in the title
+      return normalizedSearchTerms.every(term => normalizedTitle.includes(term));
+    });
+    
+    // Also search by SKU
+    const productsBySku = new Set<string>();
+    for (const variant of allVariants) {
+      if (variant.sku) {
+        const normalizedSku = normalizeText(variant.sku);
+        if (normalizedSearchTerms.every(term => normalizedSku.includes(term))) {
+          productsBySku.add(variant.productId);
+        }
+      }
+    }
+    
+    // Combine results (products found by title or SKU)
+    const combinedProductIds = new Set([
+      ...matchingProducts.map(p => p._id),
+      ...Array.from(productsBySku)
+    ]);
+    
+    // Build final results with variants
+    const results = products
+      .filter(p => combinedProductIds.has(p._id))
+      .slice(0, limit)
+      .map(product => ({
+        _id: product._id,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        status: product.status,
+        images: product.images,
+        tags: product.tags,
+        variants: variantsByProduct.get(product._id) || [],
+      }));
+    
+    return results;
+  },
+});
+
 // Create product
 export const createProduct = mutation({
   args: {

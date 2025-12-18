@@ -18,6 +18,7 @@ interface DeviceSelectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialDeviceType?: DeviceType;
+  onRequestModel?: (category: DeviceType, brand: string) => void;
 }
 
 // Brand logo mapping - updated with new brand logos
@@ -53,7 +54,7 @@ const brandLogos: Record<string, string> = {
   "iQOO": "https://cdn.hercules.app/file_m1bBgRqmZsG4VorENlmoX7w0",
 };
 
-export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: DeviceSelectorDialogProps) {
+export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, onRequestModel }: DeviceSelectorDialogProps) {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(null);
@@ -356,18 +357,27 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
                   </div>
                 ) : availableModels.length === 0 ? (
                   <div className="text-center py-8 space-y-4">
-                    <p className="text-muted-foreground">
-                      No models found
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        onOpenChange(false);
-                        navigate(`/products/request?category=${selectedDeviceType}&brand=${selectedBrand}`);
-                      }}
-                    >
-                      Request Your Model
-                    </Button>
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <span>❓</span>
+                        <span>Can't Find Your Device ?</span>
+                      </div>
+                      <Button
+                        onClick={() => {
+                          onOpenChange(false);
+                          if (onRequestModel && selectedDeviceType && selectedBrand) {
+                            onRequestModel(selectedDeviceType, selectedBrand);
+                          }
+                        }}
+                        className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                      >
+                        <span className="mr-2">⚡</span>
+                        Request Your Model
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        we'll add it with high priority
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -382,16 +392,29 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType }: 
                       </button>
                     ))}
                     {/* Request Your Model button at the bottom of the list */}
-                    <Button
-                      variant="outline"
-                      className="w-full mt-4"
-                      onClick={() => {
-                        onOpenChange(false);
-                        navigate(`/products/request?category=${selectedDeviceType}&brand=${selectedBrand}`);
-                      }}
-                    >
-                      Don't see your model? Request it here
-                    </Button>
+                    <div className="mt-6 pt-4 border-t border-border">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                          <span>❓</span>
+                          <span>Can't Find Your Device ?</span>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            onOpenChange(false);
+                            if (onRequestModel && selectedDeviceType && selectedBrand) {
+                              onRequestModel(selectedDeviceType, selectedBrand);
+                            }
+                          }}
+                          className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                        >
+                          <span className="mr-2">⚡</span>
+                          Request Your Model
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          we'll add it with high priority
+                        </p>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>

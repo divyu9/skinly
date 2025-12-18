@@ -265,6 +265,14 @@ export default function Index() {
       : "skip"
   );
 
+  // Server-side product search with debounce
+  const productSearchResults = useQuery(
+    api.products.searchProducts,
+    debouncedSearchQuery.trim().length >= 2 
+      ? { query: debouncedSearchQuery, limit: 15 }
+      : "skip"
+  );
+
   // Helper function to normalize text for search (removes spaces and special chars)
   const normalizeForSearch = (text: string): string => {
     return text.toLowerCase().replace(/[\s\-_]/g, '');
@@ -274,9 +282,6 @@ export default function Index() {
   const searchResults = useMemo(() => {
     const query = homeSearchQuery.toLowerCase().trim();
     if (!query) return { devices: [], designs: [], skus: [] };
-
-    const searchTerms = query.split(/\s+/).filter(term => term.length > 0);
-    const normalizedSearchTerms = searchTerms.map(normalizeForSearch);
     
     // 1. Device Models from server-side search
     const deviceMatches = (deviceSearchResults || []).map(model => {
@@ -308,21 +313,25 @@ export default function Index() {
       };
     });
 
-    // 2. Search Product Designs (titles) - ALL terms must match
-    const designMatches = products.filter(product => {
-      const normalizedTitle = normalizeForSearch(product.title);
-      return normalizedSearchTerms.every(term => normalizedTitle.includes(term));
-    }).slice(0, 10);
+    // 2. Products from server-side search (includes both title and SKU matches)
+    const productsFromSearch = productSearchResults || [];
+    const designMatches = productsFromSearch.map(product => ({
+      _id: product._id,
+      title: product.title,
+      slug: product.slug,
+      description: product.description,
+      status: product.status,
+      images: product.images,
+      tags: product.tags,
+      variants: product.variants,
+    }));
 
-    // 3. Search SKUs - ALL terms must match
-    const skuMatches: Array<{ product: ConvexProduct; variant: ConvexProduct['variants'][0] }> = [];
-    products.forEach(product => {
+    // 3. Extract SKU matches from product search results
+    const skuMatches: Array<{ product: typeof designMatches[0]; variant: typeof designMatches[0]['variants'][0] }> = [];
+    productsFromSearch.forEach(product => {
       product.variants.forEach(variant => {
-        if (variant.sku) {
-          const normalizedSku = normalizeForSearch(variant.sku);
-          if (normalizedSearchTerms.every(term => normalizedSku.includes(term))) {
-            skuMatches.push({ product, variant });
-          }
+        if (variant.sku && normalizeForSearch(variant.sku).includes(normalizeForSearch(query))) {
+          skuMatches.push({ product: product as typeof designMatches[0], variant });
         }
       });
     });
@@ -332,7 +341,7 @@ export default function Index() {
       designs: designMatches,
       skus: skuMatches.slice(0, 10)
     };
-  }, [homeSearchQuery, products, deviceSearchResults]);
+  }, [homeSearchQuery, deviceSearchResults, productSearchResults]);
 
   const hasSearchResults = searchResults.devices.length > 0 || 
                           searchResults.designs.length > 0 || 
@@ -522,7 +531,7 @@ export default function Index() {
             {showSearchResults && homeSearchQuery.trim().length > 0 && (
               <Card className="mt-2 max-h-[500px] overflow-y-auto border-2">
                 <CardContent className="p-4">
-                  {debouncedSearchQuery.trim().length >= 2 && deviceSearchResults === undefined ? (
+                  {debouncedSearchQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
                     // Loading state while searching
                     <div className="flex flex-col items-center justify-center py-12 gap-3">
                       <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
@@ -796,6 +805,11 @@ export default function Index() {
         open={dialogOpen} 
         onOpenChange={setDialogOpen}
         initialDeviceType={dialogDeviceType}
+        onRequestModel={(category, brand) => {
+          setRequestCategory(category);
+          setRequestBrand(brand);
+          setRequestDialogOpen(true);
+        }}
       />
 
       {/* Phone Brand Selector - On Page */}
@@ -880,16 +894,27 @@ export default function Index() {
                     </div>
                   ) : filteredPhoneModels.length === 0 ? (
                     <div className="text-center py-8 space-y-4">
-                      <p className="text-muted-foreground">No models found</p>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedPhoneBrand(null);
-                          navigate(`/products/request?category=phone&brand=${selectedPhoneBrand}`);
-                        }}
-                      >
-                        Request Your Model
-                      </Button>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                          <HelpCircleIcon className="size-4" />
+                          <span>Can't Find Your Device ?</span>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            setRequestCategory("phone");
+                            setRequestBrand(selectedPhoneBrand || "");
+                            setSelectedPhoneBrand(null);
+                            setRequestDialogOpen(true);
+                          }}
+                          className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                        >
+                          <ZapIcon className="size-4 mr-2" />
+                          Request Your Model
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          we'll add it with high priority
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <>
@@ -904,16 +929,29 @@ export default function Index() {
                         </button>
                       ))}
                       {/* Request Your Model button at the bottom of the list */}
-                      <Button
-                        variant="outline"
-                        className="w-full mt-4"
-                        onClick={() => {
-                          setSelectedPhoneBrand(null);
-                          navigate(`/products/request?category=phone&brand=${selectedPhoneBrand}`);
-                        }}
-                      >
-                        Don't see your model? Request it here
-                      </Button>
+                      <div className="mt-6 pt-4 border-t border-border">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                            <HelpCircleIcon className="size-4" />
+                            <span>Can't Find Your Device ?</span>
+                          </div>
+                          <Button
+                            onClick={() => {
+                              setRequestCategory("phone");
+                              setRequestBrand(selectedPhoneBrand || "");
+                              setSelectedPhoneBrand(null);
+                              setRequestDialogOpen(true);
+                            }}
+                            className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                          >
+                            <ZapIcon className="size-4 mr-2" />
+                            Request Your Model
+                          </Button>
+                          <p className="text-xs text-muted-foreground">
+                            we'll add it with high priority
+                          </p>
+                        </div>
+                      </div>
                     </>
                   )}
                 </div>
