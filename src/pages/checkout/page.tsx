@@ -255,14 +255,44 @@ function CheckoutPageInner() {
         return;
       }
 
-      // Filter cart items to only include those with valid Convex IDs
+      // Filter cart items to only include those with valid Convex product IDs
       const validCartItems = cartItems.filter(item => {
         const hasValidProductId = item.productId && typeof item.productId === 'string' && item.productId.startsWith('j');
-        const hasValidVariant = item.variant && typeof item.variant === 'string' && item.variant.startsWith('j');
-        return hasValidProductId && hasValidVariant;
+        return hasValidProductId;
       });
 
       if (validCartItems.length === 0) {
+        setCouponMessage({ type: 'error', text: 'This coupon does not apply to the items in your cart' });
+        setIsApplyingCoupon(false);
+        return;
+      }
+
+      // For each cart item, look up the actual variant ID
+      // Cart items store variant title as string, but we need variant IDs for validation
+      const cartItemsWithVariantIds = await Promise.all(
+        validCartItems.map(async (item) => {
+          // Fetch all variants for this product
+          const variants = await convex.query(api.products.getProductVariants, {
+            productId: item.productId as Id<"products">,
+          });
+          
+          // Find the variant that matches the cart item's variant title
+          const matchingVariant = variants.find(v => v.title === item.variant);
+          
+          return {
+            variantId: matchingVariant?._id as Id<"variants"> | undefined,
+            productId: item.productId as Id<"products">,
+            productTitle: item.productTitle,
+            price: item.price,
+            quantity: item.quantity,
+          };
+        })
+      );
+
+      // Filter out items where we couldn't find a matching variant
+      const itemsWithValidVariants = cartItemsWithVariantIds.filter(item => item.variantId);
+
+      if (itemsWithValidVariants.length === 0) {
         setCouponMessage({ type: 'error', text: 'This coupon does not apply to the items in your cart' });
         setIsApplyingCoupon(false);
         return;
@@ -272,9 +302,9 @@ function CheckoutPageInner() {
         code: couponCode.trim(),
         cartTotal: total,
         userEmail: formData.email || undefined,
-        cartItems: validCartItems.map((item) => ({
-          variantId: item.variant as Id<"variants">,
-          productId: item.productId as Id<"products">,
+        cartItems: itemsWithValidVariants.map((item) => ({
+          variantId: item.variantId!,
+          productId: item.productId,
           productTitle: item.productTitle,
           price: item.price,
           quantity: item.quantity,
