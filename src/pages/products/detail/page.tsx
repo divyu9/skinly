@@ -364,10 +364,13 @@ export default function ProductDetailPage() {
   // Keep isPhoneSkin for backward compatibility (check if it's specifically a phone product)
   const isPhoneSkin = needsDeviceSelector && (deviceCategory === "phone" || !productData?.gadgetCategory);
   
+  // Determine if product is a skin based on finishType field
+  const isSkinProduct = !!productData?.finishType;
+  
   // Fetch cross-sell products
   const crossSellProducts = useQuery(
     api.products.getCrossSellProducts,
-    phoneBrand && isPhoneSkin
+    phoneBrand && isSkinProduct
       ? { phoneBrand: phoneBrand, isPhoneSkin: true }
       : "skip"
   );
@@ -874,8 +877,8 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* USPs - Only for phone skins */}
-              {isPhoneSkin && (
+              {/* USPs - Only for skin products */}
+              {isSkinProduct && (
                 <div className="space-y-3">
                   {skinUSPs.map((usp, idx) => (
                     <div 
@@ -920,8 +923,8 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Device Model Selection - For all device types that need it */}
-              {needsDeviceSelector && (
+              {/* Device Model Selection - Only for skin products */}
+              {isSkinProduct && needsDeviceSelector && (
                 phoneModel ? (
                   <div className="space-y-4">
                     <Card className="border-primary/20 bg-primary/5">
@@ -944,8 +947,8 @@ export default function ProductDetailPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Coverage Selection - Only for phone skins */}
-                    {isPhoneSkin && (
+                    {/* Coverage Selection - Only for skin products */}
+                    {isSkinProduct && (
                       <div className="space-y-2">
                         <label className="text-sm font-semibold">Select Coverage</label>
                         <div className="grid grid-cols-2 gap-3">
@@ -1045,14 +1048,14 @@ export default function ProductDetailPage() {
                     size="lg"
                     variant="outline"
                     onClick={() => {
-                      // Only require phone model for phone skins
-                      if (isPhoneSkin && !phoneModel) {
-                        toast.error("Please select your phone model first");
+                      // Only require device model for skin products
+                      if (isSkinProduct && needsDeviceSelector && !phoneModel) {
+                        toast.error("Please select your device model first");
                         return;
                       }
                       handleAddToCart();
                     }}
-                    disabled={isAdding || isBuyingNow || (isPhoneSkin && !phoneModel)}
+                    disabled={isAdding || isBuyingNow || (isSkinProduct && needsDeviceSelector && !phoneModel)}
                   >
                     <ShoppingCartIcon className="size-5 mr-2" />
                     {isAdding ? "Adding..." : "Add to Cart"}
@@ -1061,7 +1064,7 @@ export default function ProductDetailPage() {
                     className="flex-1 animate-shake"
                     size="lg"
                     onClick={handleBuyNow}
-                    disabled={isAdding || isBuyingNow || (isPhoneSkin && !phoneModel)}
+                    disabled={isAdding || isBuyingNow || (isSkinProduct && needsDeviceSelector && !phoneModel)}
                   >
                     <ZapIcon className="size-5 mr-2" />
                     {isBuyingNow ? "Processing..." : "Buy Now"}
@@ -1148,7 +1151,7 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
                 
-                {isPhoneSkin && (
+                {isSkinProduct && (
                   <div className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
                     <AlertTriangleIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
                     <span className="text-foreground">
