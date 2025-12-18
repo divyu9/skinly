@@ -879,18 +879,42 @@ export default function Index() {
                       <p className="text-sm text-muted-foreground">Loading your models...</p>
                     </div>
                   ) : filteredPhoneModels.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">No models found</p>
-                  ) : (
-                    filteredPhoneModels.map((model, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handlePhoneModelSelect(model)}
-                        className="w-full flex items-center justify-between p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-muted/50 transition-all text-left"
+                    <div className="text-center py-8 space-y-4">
+                      <p className="text-muted-foreground">No models found</p>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedPhoneBrand(null);
+                          navigate(`/products/request?category=phone&brand=${selectedPhoneBrand}`);
+                        }}
                       >
-                        <span className="font-medium">{model}</span>
-                        <span className="text-primary">Select →</span>
-                      </button>
-                    ))
+                        Request Your Model
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      {filteredPhoneModels.map((model, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handlePhoneModelSelect(model)}
+                          className="w-full flex items-center justify-between p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-muted/50 transition-all text-left"
+                        >
+                          <span className="font-medium">{model}</span>
+                          <span className="text-primary">Select →</span>
+                        </button>
+                      ))}
+                      {/* Request Your Model button at the bottom of the list */}
+                      <Button
+                        variant="outline"
+                        className="w-full mt-4"
+                        onClick={() => {
+                          setSelectedPhoneBrand(null);
+                          navigate(`/products/request?category=phone&brand=${selectedPhoneBrand}`);
+                        }}
+                      >
+                        Don't see your model? Request it here
+                      </Button>
+                    </>
                   )}
                 </div>
               </DialogContent>
@@ -1071,9 +1095,11 @@ export default function Index() {
                 <Button 
                   className="w-full" 
                   variant="outline"
-                  onClick={() => toast.info("Magneto X product page coming soon!")}
+                  asChild
                 >
-                  Explore →
+                  <Link to="/products/detail?slug=magneto-x-type-c-ssd-enclosure-with-m-2-nvme-support">
+                    Explore →
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
