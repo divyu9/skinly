@@ -14,10 +14,13 @@ export default function SEOPage() {
   const params = useParams<{ slug?: string }>();
   // Extract slug from either :slug param or root-level param
   const slug = params.slug || "";
+  
+  // Check if this slug belongs to a product first (for SEO-friendly product URLs)
+  const product = useQuery(api.products.getProductBySlug, { slug });
   const page = useQuery(api.seoPages.getPageBySlug, { slug });
 
   // Loading state
-  if (page === undefined) {
+  if (page === undefined || product === undefined) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-12">
@@ -35,7 +38,13 @@ export default function SEOPage() {
     );
   }
 
-  // Not found or unpublished
+  // If this slug belongs to a product, redirect to product detail page
+  if (product) {
+    window.location.href = `/products/detail?slug=${slug}`;
+    return null;
+  }
+
+  // Not found or unpublished SEO page
   if (!page || !page.isPublished) {
     return <NotFound />;
   }

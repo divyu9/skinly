@@ -68,6 +68,7 @@ const skinUSPs = [
 export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const productId = searchParams.get('id');
   const productSlug = searchParams.get('slug');
   const phoneModel = searchParams.get('model');
   const phoneBrand = searchParams.get('brand');
@@ -106,11 +107,19 @@ export default function ProductDetailPage() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [confirmedNotMatch, setConfirmedNotMatch] = useState(false);
   
-  // Query local database
-  const productData = useQuery(
+  // Query local database - support both id and slug parameters
+  const productDataById = useQuery(
+    api.products.getProduct, 
+    productId ? { productId: productId as Id<"products"> } : "skip"
+  );
+  
+  const productDataBySlug = useQuery(
     api.products.getProductBySlug, 
     productSlug ? { slug: productSlug } : "skip"
   );
+  
+  // Use whichever data loaded (prioritize id lookup)
+  const productData = productDataById || productDataBySlug;
   
   // Determine device category from product data
   const deviceCategory = productData?.gadgetCategory || "phone";

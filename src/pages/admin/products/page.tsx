@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -1344,6 +1344,14 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                             <Button
                               size="sm"
                               variant="outline"
+                              onClick={() => window.open(`https://goskinly.com/${product.slug}`, '_blank')}
+                              title="View Product on Live Site"
+                            >
+                              <ExternalLinkIcon className="size-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => setManagingImagesProduct({
                                 id: product._id,
                                 title: product.title,
@@ -1354,7 +1362,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                               <ImagesIcon className="size-3" />
                             </Button>
                             <Link to={`/backend-skinly/products/${product._id}`}>
-                              <Button size="sm" variant="outline">
+                              <Button size="sm" variant="outline" title="Edit Product">
                                 <EditIcon className="size-3" />
                               </Button>
                             </Link>
@@ -1363,6 +1371,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                               variant="outline"
                               onClick={() => handleDelete(product._id)}
                               className="text-destructive hover:text-destructive"
+                              title="Delete Product"
                             >
                               <TrashIcon className="size-3" />
                             </Button>
