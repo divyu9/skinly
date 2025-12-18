@@ -26,6 +26,7 @@ export default function ProductPageLayout({ page }: ProductPageLayoutProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogDeviceType, setDialogDeviceType] = useState<DeviceType | undefined>(undefined);
   const phoneBrandSelectorRef = useRef<HTMLDivElement>(null);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   
   const openDialogForDevice = (deviceType: DeviceType) => {
     setDialogDeviceType(deviceType);
@@ -73,9 +74,23 @@ export default function ProductPageLayout({ page }: ProductPageLayoutProps) {
             <h1 className="text-4xl md:text-5xl font-bold mb-6 text-balance">
               {page.h1Heading}
             </h1>
-            <p className="text-xl text-muted-foreground mb-8">
-              {page.metaDescription}
-            </p>
+            <div className="text-xl text-muted-foreground mb-8">
+              <p>
+                {isDescriptionExpanded 
+                  ? page.metaDescription 
+                  : page.metaDescription.length > 160 
+                    ? `${page.metaDescription.substring(0, 160)}...` 
+                    : page.metaDescription}
+              </p>
+              {page.metaDescription.length > 160 && (
+                <button
+                  onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                  className="text-primary hover:underline mt-2 text-base font-medium"
+                >
+                  {isDescriptionExpanded ? 'Show less' : 'Read more'}
+                </button>
+              )}
+            </div>
             
             {featuredProduct && (
               <div className="mb-8">

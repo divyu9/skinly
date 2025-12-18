@@ -223,20 +223,7 @@ export default function SEOPagesPage() {
 
   const getProductionUrl = (page: Page) => {
     const productionDomain = "https://goskinly.com";
-    switch (page.pageType) {
-      case "brand":
-        return `${productionDomain}/brand/${page.slug}`;
-      case "device":
-        return `${productionDomain}/device/${page.slug}`;
-      case "product":
-        return `${productionDomain}/product/${page.slug}`;
-      case "skin-type":
-        return `${productionDomain}/skin-type/${page.slug}`;
-      case "keyword":
-        return `${productionDomain}/${page.slug}`;
-      default:
-        return `${productionDomain}/${page.slug}`;
-    }
+    return `${productionDomain}/${page.slug}`;
   };
 
   const handlePreview = (page: Page) => {
