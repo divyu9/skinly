@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, Navigate } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Helmet } from "react-helmet-async";
@@ -40,8 +40,7 @@ export default function SEOPage() {
 
   // If this slug belongs to a product, redirect to product detail page
   if (product) {
-    window.location.href = `/products/detail?slug=${slug}`;
-    return null;
+    return <Navigate to={`/products/detail?slug=${slug}`} replace />;
   }
 
   // Not found or unpublished SEO page

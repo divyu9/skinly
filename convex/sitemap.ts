@@ -44,7 +44,7 @@ export const getSitemapUrls = query({
     
     products.forEach((product) => {
       urls.push({
-        url: `${baseUrl}/products/detail?id=${product._id}`,
+        url: `${baseUrl}/${product.slug}`,
         lastmod: new Date(product._creationTime).toISOString(),
         changefreq: "weekly",
         priority: 0.8,
