@@ -59,7 +59,6 @@ import ShippingPolicy from "./pages/policies/shipping.tsx";
 import TermsOfService from "./pages/policies/terms.tsx";
 import PrivacyPolicy from "./pages/policies/privacy.tsx";
 import SEOPage from "./pages/seo/page.tsx";
-import KeywordPageHandler from "./pages/seo/keyword-page-handler.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 export default function App() {
@@ -124,14 +123,9 @@ export default function App() {
           <Route path="/policies/shipping" element={<ShippingPolicy />} />
           <Route path="/policies/terms" element={<TermsOfService />} />
           <Route path="/policies/privacy" element={<PrivacyPolicy />} />
-          {/* SEO Landing Pages - specific routes */}
-          <Route path="/brand/:slug" element={<SEOPage />} />
-          <Route path="/device/:slug" element={<SEOPage />} />
-          <Route path="/product/:slug" element={<SEOPage />} />
-          <Route path="/skin-type/:slug" element={<SEOPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          {/* SEO keyword pages (catch-all for root-level slugs) - must be second to last */}
-          <Route path="/:slug" element={<KeywordPageHandler />} />
+          {/* SEO landing pages (catch-all for root-level slugs) - must be second to last */}
+          <Route path="/:slug" element={<SEOPage />} />
           {/* 404 - must be absolute last */}
           <Route path="*" element={<NotFound />} />
           </Routes>

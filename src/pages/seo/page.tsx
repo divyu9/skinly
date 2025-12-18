@@ -40,23 +40,10 @@ export default function SEOPage() {
     return <NotFound />;
   }
 
-  // Determine current URL based on page type
+  // Determine current URL - all SEO pages are at root level
   const getCurrentUrl = () => {
     const baseUrl = "https://goskinly.com"; // Production domain
-    switch (page.pageType) {
-      case "brand":
-        return `${baseUrl}/brand/${page.slug}`;
-      case "device":
-        return `${baseUrl}/device/${page.slug}`;
-      case "product":
-        return `${baseUrl}/product/${page.slug}`;
-      case "skin-type":
-        return `${baseUrl}/skin-type/${page.slug}`;
-      case "keyword":
-        return `${baseUrl}/${page.slug}`;
-      default:
-        return baseUrl;
-    }
+    return `${baseUrl}/${page.slug}`;
   };
 
   const currentUrl = getCurrentUrl();
