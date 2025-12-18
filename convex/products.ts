@@ -354,6 +354,7 @@ export const createProduct = mutation({
     slug: v.string(),
     description: v.string(),
     metaDescription: v.optional(v.string()),
+    metaTitle: v.optional(v.string()),
     collectionId: v.optional(v.id("collections")),
     status: v.union(v.literal("active"), v.literal("draft"), v.literal("archived")),
     images: v.array(v.object({
@@ -407,6 +408,7 @@ export const createProduct = mutation({
       slug: args.slug,
       description: args.description,
       metaDescription: args.metaDescription,
+      metaTitle: args.metaTitle,
       collectionId: args.collectionId,
       status: args.status,
       images: args.images,
@@ -431,6 +433,7 @@ export const updateProduct = mutation({
     slug: v.optional(v.string()),
     description: v.optional(v.string()),
     metaDescription: v.optional(v.string()),
+    metaTitle: v.optional(v.string()),
     collectionId: v.optional(v.id("collections")),
     status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),
     images: v.optional(v.array(v.object({

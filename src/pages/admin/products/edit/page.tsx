@@ -41,6 +41,7 @@ function EditProductPageInner() {
     slug: string;
     description: string;
     metaDescription: string;
+    metaTitle: string;
     collectionId: Id<"collections"> | "";
     status: "active" | "draft" | "archived";
     images: Array<{ url: string; alt?: string }>;
@@ -55,6 +56,7 @@ function EditProductPageInner() {
     slug: "",
     description: "",
     metaDescription: "",
+    metaTitle: "",
     collectionId: "",
     status: "active",
     images: [{ url: "", alt: "" }],
@@ -77,6 +79,7 @@ function EditProductPageInner() {
         slug: product.slug,
         description: product.description,
         metaDescription: product.metaDescription || "",
+        metaTitle: product.metaTitle || "",
         collectionId: product.collectionId || "",
         status: product.status,
         images: product.images.length > 0 ? product.images : [{ url: "", alt: "" }],
@@ -178,6 +181,7 @@ function EditProductPageInner() {
         slug: formData.slug,
         description: formData.description,
         metaDescription: formData.metaDescription || undefined,
+        metaTitle: formData.metaTitle || undefined,
         collectionId: formData.collectionId ? (formData.collectionId as Id<"collections">) : undefined,
         status: formData.status,
         images: formData.images.filter((img) => img.url),
@@ -279,6 +283,22 @@ function EditProductPageInner() {
                   value={formData.slug}
                   onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                 />
+              </div>
+
+              <div>
+                <Label htmlFor="metaTitle">Meta Title (SEO)</Label>
+                <div className="space-y-1">
+                  <Input
+                    id="metaTitle"
+                    placeholder="SEO-optimized title (50-60 chars recommended)"
+                    value={formData.metaTitle}
+                    onChange={(e) => setFormData({ ...formData, metaTitle: e.target.value })}
+                    maxLength={100}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {formData.metaTitle.length}/100 characters • Falls back to Product Title if empty
+                  </p>
+                </div>
               </div>
 
               <div>

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { 
   ArrowLeftIcon, 
   PackageIcon, 
@@ -760,6 +761,14 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>{productData?.metaTitle || productData?.title || "Product"} | Skinly</title>
+        {productData?.metaDescription && (
+          <meta name="description" content={productData.metaDescription} />
+        )}
+      </Helmet>
+
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">

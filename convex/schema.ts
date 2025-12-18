@@ -201,6 +201,7 @@ export default defineSchema({
     slug: v.string(),
     description: v.string(),
     metaDescription: v.optional(v.string()),
+    metaTitle: v.optional(v.string()),
     collectionId: v.optional(v.id("collections")),
     status: v.union(v.literal("active"), v.literal("draft"), v.literal("archived")),
     images: v.array(v.object({
