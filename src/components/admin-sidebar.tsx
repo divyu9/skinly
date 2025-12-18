@@ -28,6 +28,7 @@ import {
   FileText,
   Layout,
   Map,
+  Sparkles,
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 
@@ -57,6 +58,7 @@ export function AdminSidebar() {
     { path: "/backend-skinly/seo-templates", label: "SEO Templates", icon: Layout },
     { path: "/backend-skinly/seo-pages", label: "SEO Pages", icon: FileText },
     { path: "/backend-skinly/sitemap", label: "Sitemap", icon: Map },
+    { path: "/backend-skinly/seo-generator", label: "SEO Generator", icon: Sparkles },
     { path: "/backend-skinly/settings", label: "Settings", icon: Settings },
     { path: "/backend-skinly/emails", label: "Email Templates", icon: Mail },
     { path: "/backend-skinly/bugs", label: "Bug Reports", icon: Bug },

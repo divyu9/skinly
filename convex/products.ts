@@ -139,6 +139,8 @@ export const getAllProductsBasic = query({
         tags: product.tags,
         collectionId: product.collectionId,
         metaDescription: product.metaDescription,
+        metaTitle: product.metaTitle,
+        gadgetCategory: product.gadgetCategory,
         // Variant summary data
         variantCount: variantData.count,
         variantSkus: variantData.skus,

@@ -65,6 +65,7 @@ import type * as runMigration from "../runMigration.js";
 import type * as seedModels from "../seedModels.js";
 import type * as seoContentGenerator from "../seoContentGenerator.js";
 import type * as seoPages from "../seoPages.js";
+import type * as seoProductGenerator from "../seoProductGenerator.js";
 import type * as seoTemplates from "../seoTemplates.js";
 import type * as settings from "../settings.js";
 import type * as shipping from "../shipping.js";
@@ -152,6 +153,7 @@ declare const fullApi: ApiFromModules<{
   seedModels: typeof seedModels;
   seoContentGenerator: typeof seoContentGenerator;
   seoPages: typeof seoPages;
+  seoProductGenerator: typeof seoProductGenerator;
   seoTemplates: typeof seoTemplates;
   settings: typeof settings;
   shipping: typeof shipping;

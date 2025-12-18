@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SaveIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SaveIcon, SparklesIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -16,6 +16,7 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { SEOPreviewDialog } from "../_components/seo-preview-dialog.tsx";
 
 interface Variant {
   _id?: Id<"variants">;
@@ -70,6 +71,17 @@ function EditProductPageInner() {
 
   const [variants, setVariants] = useState<Variant[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // SEO generation state
+  const generateSEO = useAction(api.seoProductGenerator.generateProductSEO);
+  const [isGeneratingSEO, setIsGeneratingSEO] = useState(false);
+  const [showSEOPreview, setShowSEOPreview] = useState(false);
+  const [generatedSEO, setGeneratedSEO] = useState<{
+    metaTitle: string;
+    description: string;
+    metaDescription: string;
+    tags: string[];
+  } | null>(null);
 
   // Populate form when product loads
   useEffect(() => {
@@ -154,6 +166,43 @@ function EditProductPageInner() {
     const newVariants = [...variants];
     newVariants[index][field] = value;
     setVariants(newVariants);
+  };
+
+  const handleGenerateSEO = async () => {
+    if (!productId) return;
+    
+    setIsGeneratingSEO(true);
+    try {
+      const result = await generateSEO({ productId: productId as Id<"products"> });
+      setGeneratedSEO({
+        metaTitle: result.metaTitle,
+        description: result.description,
+        metaDescription: result.metaDescription,
+        tags: result.tags,
+      });
+      setShowSEOPreview(true);
+      toast.success("SEO content generated successfully!");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate SEO content";
+      toast.error(errorMessage);
+      console.error("SEO generation error:", error);
+    } finally {
+      setIsGeneratingSEO(false);
+    }
+  };
+
+  const handleApplySEO = () => {
+    if (!generatedSEO) return;
+    
+    setFormData({
+      ...formData,
+      metaTitle: generatedSEO.metaTitle,
+      description: generatedSEO.description,
+      metaDescription: generatedSEO.metaDescription,
+      tags: generatedSEO.tags.join(", "),
+    });
+    setShowSEOPreview(false);
+    toast.success("SEO content applied! Remember to save your changes.");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -333,6 +382,30 @@ function EditProductPageInner() {
                   onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* AI SEO Generation */}
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="h-5 w-5 text-primary" />
+                <CardTitle>AI SEO Content Generator</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Generate high-quality, SEO-optimized content for this product using AI. This will create a meta title, product description, meta description, and tags.
+              </p>
+              <Button
+                type="button"
+                onClick={handleGenerateSEO}
+                disabled={isGeneratingSEO}
+                variant="default"
+              >
+                <SparklesIcon className="h-4 w-4 mr-2" />
+                {isGeneratingSEO ? "Generating..." : "Generate SEO Content with AI"}
+              </Button>
             </CardContent>
           </Card>
 
@@ -609,6 +682,22 @@ function EditProductPageInner() {
           </Card>
         </div>
       </div>
+
+      {/* SEO Preview Dialog */}
+      {generatedSEO && (
+        <SEOPreviewDialog
+          open={showSEOPreview}
+          onOpenChange={setShowSEOPreview}
+          currentContent={{
+            metaTitle: formData.metaTitle,
+            description: formData.description,
+            metaDescription: formData.metaDescription,
+            tags: formData.tags.split(",").map(t => t.trim()).filter(t => t),
+          }}
+          generatedContent={generatedSEO}
+          onApply={handleApplySEO}
+        />
+      )}
     </form>
   );
 }
