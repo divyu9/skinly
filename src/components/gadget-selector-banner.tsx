@@ -24,44 +24,39 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
   return (
     <div 
       className={`transition-all duration-300 ${
-        isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
       }`}
     >
-      <Alert className="bg-gradient-to-r from-cyan-50 via-purple-50 to-pink-50 border-2 border-primary/40 shadow-lg">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <CheckCircle2Icon className="size-5 text-primary" />
+      <div className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg shadow-lg">
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <CheckCircle2Icon className="size-5 flex-shrink-0" />
+            <p className="text-sm font-medium leading-tight truncate">
+              <span className="font-bold">{brandName} - {modelName}</span> is available! All designs shown are reference – we'll send it for your exact model.
+            </p>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm sm:text-base font-bold text-foreground leading-tight mb-1">
-              Yay – we got you covered!
-            </h3>
-            <AlertDescription className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Your model <span className="font-semibold text-foreground break-words">{brandName} - {modelName}</span> is available. All pics are reference designs – we'll send it for your exact model.
-            </AlertDescription>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {onChangeDevice && (
               <Button
                 size="sm"
-                className="font-semibold whitespace-nowrap shadow-sm"
+                variant="secondary"
+                className="font-semibold whitespace-nowrap h-8 text-xs"
                 onClick={onChangeDevice}
               >
-                <RefreshCwIcon className="size-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Change Device</span>
+                <RefreshCwIcon className="size-3.5 mr-1.5" />
+                Change Device
               </Button>
             )}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 flex-shrink-0 hover:bg-primary/20"
+            <button
               onClick={handleDismiss}
+              className="size-8 flex items-center justify-center rounded-md hover:bg-white/20 transition-colors flex-shrink-0"
+              aria-label="Dismiss"
             >
               <XIcon className="size-4" />
-            </Button>
+            </button>
           </div>
         </div>
-      </Alert>
+      </div>
     </div>
   );
 }
