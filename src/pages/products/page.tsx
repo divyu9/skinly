@@ -795,7 +795,7 @@ export default function ProductsPage() {
           </div>
 
           {/* Gadget Selector Welcome Banner - Only show for Skins category with selected device */}
-          {productCategory === 'skin' && brandFilter && modelFilter && modelInfo && (
+          {productCategory === 'skin' && brandFilter && modelFilter && (
             <div className="mb-6 max-w-4xl mx-auto">
               <GadgetSelectorBanner 
                 brandName={brandFilter} 
