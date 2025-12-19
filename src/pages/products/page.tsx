@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2, Shield, Glasses, ShoppingBag, Video, Box, SlidersHorizontalIcon, XIcon } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2, Shield, Glasses, ShoppingBag, Video, Box } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
@@ -29,13 +29,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { Separator } from "@/components/ui/separator.tsx";
 import { trackSearch, trackCollectionView } from "@/lib/analytics.ts";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -771,10 +765,121 @@ export default function ProductsPage() {
             <CartButton />
           </div>
         </div>
+        
+        {/* Product Category Extension Bar */}
+        {productCategories && (
+          <div className="border-t border-border bg-background/95 backdrop-blur-sm">
+            <div className="container mx-auto px-2 sm:px-4 py-3">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                {productCategories.map((category) => {
+                  const categoryConfig = {
+                    'skin': { icon: Package2, gradient: 'from-blue-500 to-purple-500' },
+                    'case-cover': { icon: Shield, gradient: 'from-teal-500 to-cyan-500' },
+                    'camera-ring': { icon: Video, gradient: 'from-violet-500 to-purple-500' },
+                    'magneto-x': { icon: Zap, gradient: 'from-red-500 to-pink-500' },
+                    'glass': { icon: Glasses, gradient: 'from-sky-500 to-blue-500' },
+                    'accessory': { icon: ShoppingBag, gradient: 'from-orange-500 to-amber-500' },
+                  };
+                  
+                  const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box, gradient: 'from-gray-500 to-slate-500' };
+                  const IconComponent = config.icon;
+                  
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => updateFilters({ productType: category.id })}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                        productCategory === category.id
+                          ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg`
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      <IconComponent className="size-4" />
+                      {category.displayName}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Animated Filter Bar - Shows when category is selected */}
+        {productCategory && (
+          <div className="border-t border-border bg-background/90 backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
+            <div className="container mx-auto px-2 sm:px-4 py-3">
+              <div className="space-y-3">
+                {/* Gadget Type Selector - Only for Skins */}
+                {productCategory === 'skin' && gadgetTypes && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Smartphone className="size-4 text-muted-foreground" />
+                      <Label className="text-xs font-semibold text-muted-foreground">GADGET TYPE</Label>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      <Button
+                        size="sm"
+                        variant={!gadgetFilter ? "default" : "outline"}
+                        onClick={() => updateFilters({ gadget: null })}
+                        className="h-8 whitespace-nowrap"
+                      >
+                        All Gadgets
+                      </Button>
+                      {gadgetTypes
+                        .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
+                        .map((gadgetType) => (
+                          <Button
+                            key={gadgetType._id}
+                            size="sm"
+                            variant={gadgetFilter === gadgetType.name ? "default" : "outline"}
+                            onClick={() => updateFilters({ gadget: gadgetType.name })}
+                            className="h-8 whitespace-nowrap"
+                          >
+                            {gadgetType.displayName}
+                          </Button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Finish Type Selector - Only for Skins with Gadget selected */}
+                {productCategory === 'skin' && gadgetFilter && finishTypes && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Box className="size-4 text-muted-foreground" />
+                      <Label className="text-xs font-semibold text-muted-foreground">FINISH TYPE</Label>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                      <Button
+                        size="sm"
+                        variant={!finishFilter ? "default" : "outline"}
+                        onClick={() => updateFilters({ finish: null })}
+                        className="h-8 whitespace-nowrap"
+                      >
+                        All Finishes
+                      </Button>
+                      {finishTypes.map((finishType) => (
+                        <Button
+                          key={finishType._id}
+                          size="sm"
+                          variant={finishFilter === finishType.name ? "default" : "outline"}
+                          onClick={() => updateFilters({ finish: finishType.name })}
+                          className="h-8 whitespace-nowrap"
+                        >
+                          {finishType.displayName}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Products Section */}
-      <section className="pt-16 sm:pt-24 pb-6 sm:pb-20 px-2 sm:px-4">
+      <section className="pt-32 sm:pt-40 pb-6 sm:pb-20 px-2 sm:px-4">
         <div className="container mx-auto">
           <div className="text-center mb-6 space-y-2">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
@@ -803,194 +908,36 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Product Category Pills */}
-          {productCategories && (
-            <div className="mb-4">
+          {/* Collection Pills - Only when device is selected */}
+          {allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
+            <div className="mb-6">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                {productCategories.map((category) => {
-                  const categoryConfig = {
-                    'skin': { icon: Package2, gradient: 'from-blue-500 to-purple-500' },
-                    'case-cover': { icon: Shield, gradient: 'from-teal-500 to-cyan-500' },
-                    'camera-ring': { icon: Video, gradient: 'from-violet-500 to-purple-500' },
-                    'magneto-x': { icon: Zap, gradient: 'from-red-500 to-pink-500' },
-                    'glass': { icon: Glasses, gradient: 'from-sky-500 to-blue-500' },
-                    'accessory': { icon: ShoppingBag, gradient: 'from-orange-500 to-amber-500' },
-                  };
-                  
-                  const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box, gradient: 'from-gray-500 to-slate-500' };
-                  const IconComponent = config.icon;
-                  
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => updateFilters({ productType: category.id })}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                        productCategory === category.id
-                          ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg scale-105`
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                    >
-                      <IconComponent className="size-4" />
-                      {category.displayName}
-                    </button>
-                  );
-                })}
+                <Button
+                  size="sm"
+                  variant={!collectionParam ? "default" : "outline"}
+                  onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
+                  className="h-8 whitespace-nowrap"
+                >
+                  All Collections
+                </Button>
+                {allCollections.map((col) => (
+                  <Button
+                    key={col._id}
+                    size="sm"
+                    variant={collectionParam === col.name ? "default" : "outline"}
+                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
+                    className="h-8 whitespace-nowrap"
+                  >
+                    {col.name}
+                  </Button>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Compact Filter Bar */}
+          {/* Sort and Actions Bar */}
           <div className="mb-6">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Filters Popover */}
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9">
-                    <SlidersHorizontalIcon className="size-4 mr-2" />
-                    Filters
-                    {(gadgetFilter || finishFilter || collectionParam) && (
-                      <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
-                        {[gadgetFilter, finishFilter, collectionParam].filter(Boolean).length}
-                      </Badge>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80" align="start">
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-semibold mb-3">Refine Your Search</h4>
-                    </div>
-
-                    {/* Gadget Type Filter - Only for Skins */}
-                    {productCategory === 'skin' && gadgetTypes && (
-                      <>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-semibold text-muted-foreground">GADGET TYPE</Label>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant={!gadgetFilter ? "default" : "outline"}
-                              onClick={() => updateFilters({ productType: 'skin', gadget: null })}
-                              className="h-8"
-                            >
-                              All Gadgets
-                            </Button>
-                            {gadgetTypes
-                              .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
-                              .map((gadgetType) => (
-                                <Button
-                                  key={gadgetType._id}
-                                  size="sm"
-                                  variant={gadgetFilter === gadgetType.name ? "default" : "outline"}
-                                  onClick={() => updateFilters({ productType: 'skin', gadget: gadgetType.name })}
-                                  className="h-8"
-                                >
-                                  {gadgetType.displayName}
-                                </Button>
-                              ))}
-                          </div>
-                        </div>
-                        <Separator />
-                      </>
-                    )}
-
-                    {/* Finish Type Filter - Only for Skins with Gadget selected */}
-                    {productCategory === 'skin' && gadgetFilter && finishTypes && (
-                      <>
-                        <div className="space-y-2">
-                          <Label className="text-xs font-semibold text-muted-foreground">FINISH TYPE</Label>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant={!finishFilter ? "default" : "outline"}
-                              onClick={() => updateFilters({ finish: null })}
-                              className="h-8"
-                            >
-                              All Finishes
-                            </Button>
-                            {finishTypes.map((finishType) => (
-                              <Button
-                                key={finishType._id}
-                                size="sm"
-                                variant={finishFilter === finishType.name ? "default" : "outline"}
-                                onClick={() => updateFilters({ finish: finishType.name })}
-                                className="h-8"
-                              >
-                                {finishType.displayName}
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                        <Separator />
-                      </>
-                    )}
-
-                    {/* Collections Filter - Only when device is selected */}
-                    {allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-muted-foreground">COLLECTIONS</Label>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            variant={!collectionParam ? "default" : "outline"}
-                            onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
-                            className="h-8"
-                          >
-                            All
-                          </Button>
-                          {allCollections.map((col) => (
-                            <Button
-                              key={col._id}
-                              size="sm"
-                              variant={collectionParam === col.name ? "default" : "outline"}
-                              onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
-                              className="h-8"
-                            >
-                              {col.name}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-
-              {/* Active Filter Chips */}
-              {gadgetFilter && (
-                <Badge variant="secondary" className="h-9 px-3 gap-2">
-                  {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
-                  <button
-                    onClick={() => updateFilters({ gadget: null })}
-                    className="hover:bg-secondary-foreground/20 rounded-full"
-                  >
-                    <XIcon className="size-3" />
-                  </button>
-                </Badge>
-              )}
-              {finishFilter && (
-                <Badge variant="secondary" className="h-9 px-3 gap-2">
-                  {finishTypes?.find(ft => ft.name === finishFilter)?.displayName || finishFilter}
-                  <button
-                    onClick={() => updateFilters({ finish: null })}
-                    className="hover:bg-secondary-foreground/20 rounded-full"
-                  >
-                    <XIcon className="size-3" />
-                  </button>
-                </Badge>
-              )}
-              {collectionParam && (
-                <Badge variant="secondary" className="h-9 px-3 gap-2">
-                  {collectionParam}
-                  <button
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter!)}&model=${encodeURIComponent(modelFilter!)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
-                    className="hover:bg-secondary-foreground/20 rounded-full"
-                  >
-                    <XIcon className="size-3" />
-                  </button>
-                </Badge>
-              )}
-
               {/* Spacer */}
               <div className="flex-1" />
 
