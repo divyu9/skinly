@@ -826,15 +826,15 @@ export default function ProductsPage() {
       {/* Products Section */}
       <section className="pt-56 sm:pt-64 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
         <div className="container mx-auto">
-          <div className="text-center mb-6 space-y-2">
-            <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
+          <div className="text-center mb-3 sm:mb-6 space-y-1 sm:space-y-2">
+            <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
               {searchQuery ? `Search Results` :
                collectionParam && collection ? collection.name :
                deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
                finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
                'Shop'}
             </h1>
-            <p className="text-sm sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+            <p className="text-xs sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
               {searchQuery 
                 ? `${sortedAndFilteredProducts.length} ${sortedAndFilteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
                 : `More than 500 Designs To Choose From Across Gadgets`
@@ -844,7 +844,7 @@ export default function ProductsPage() {
 
           {/* Gadget Selector Welcome Banner - Only show for Skins category with selected device */}
           {productCategory === 'skin' && brandFilter && modelFilter && (
-            <div className="mb-6 max-w-4xl mx-auto">
+            <div className="mb-3 sm:mb-6 max-w-4xl mx-auto">
               <GadgetSelectorBanner 
                 brandName={brandFilter} 
                 modelName={modelFilter}
@@ -855,7 +855,7 @@ export default function ProductsPage() {
 
           {/* Collection Pills - Only show for phone skins */}
           {productCategory === 'skin' && gadgetFilter === 'phone' && allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
-            <div className="mb-6">
+            <div className="mb-3 sm:mb-6">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
                   onClick={() => updateUrlParams({ collection: null })}
@@ -885,7 +885,7 @@ export default function ProductsPage() {
           )}
 
           {/* Sort and Actions Bar */}
-          <div className="mb-6">
+          <div className="mb-3 sm:mb-6">
             <div className="flex flex-wrap items-center gap-2">
               {/* Spacer */}
               <div className="flex-1" />
