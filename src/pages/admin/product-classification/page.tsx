@@ -41,6 +41,13 @@ export default function ProductClassificationPage() {
   const [isProductCategoryPreviewOpen, setIsProductCategoryPreviewOpen] = useState(false);
   const [isProductCategoryMigrateOpen, setIsProductCategoryMigrateOpen] = useState(false);
   
+  // Product category management state
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedProducts, setSelectedProducts] = useState<Set<Id<"products">>>(new Set());
+  const [productCategorySearch, setProductCategorySearch] = useState("");
+  const [isBulkUpdateDialogOpen, setIsBulkUpdateDialogOpen] = useState(false);
+  const [bulkUpdateCategory, setBulkUpdateCategory] = useState<string>("");
+  
   // Inline editing state for unclassified products
   const [editingProducts, setEditingProducts] = useState<Record<string, {
     gadgetCategory?: string;
@@ -70,6 +77,14 @@ export default function ProductClassificationPage() {
     api.migrateProductCategory.previewProductCategoryMigration,
     isProductCategoryPreviewOpen ? { limit: 100 } : "skip"
   );
+  
+  // Product category management queries
+  const categoryStats = useQuery(api.productCategories.getCategoryStats, {});
+  const categorizedProducts = useQuery(
+    api.productCategories.getProductsByCategory,
+    { category: selectedCategory === "all" ? undefined : selectedCategory, limit: 100 }
+  );
+  const uncategorizedProducts = useQuery(api.productCategories.getUncategorizedProducts, {});
 
   // Mutations
   const applyAutoClassification = useMutation(api.productClassification.applyAutoClassification);
@@ -91,6 +106,10 @@ export default function ProductClassificationPage() {
   
   // Product category migration mutations
   const migrateProductCategories = useMutation(api.migrateProductCategory.migrateProductsToProductCategory);
+  
+  // Product category management mutations
+  const updateProductCategory = useMutation(api.productCategories.updateProductCategory);
+  const bulkUpdateCategories = useMutation(api.productCategories.bulkUpdateProductCategories);
 
   const handleSeedFinishTypes = async () => {
     try {
@@ -388,6 +407,65 @@ export default function ProductClassificationPage() {
     }
   };
 
+  // Product category management handlers
+  const handleToggleProductSelection = (productId: Id<"products">) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (!categorizedProducts?.products) return;
+    const allIds = categorizedProducts.products.map(p => p._id);
+    setSelectedProducts(new Set(allIds));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedProducts(new Set());
+  };
+
+  const handleBulkUpdateCategories = async () => {
+    if (selectedProducts.size === 0 || !bulkUpdateCategory) {
+      toast.error("Please select products and a category");
+      return;
+    }
+
+    try {
+      const result = await bulkUpdateCategories({
+        productIds: Array.from(selectedProducts),
+        category: bulkUpdateCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory",
+      });
+      toast.success(result.message);
+      setIsBulkUpdateDialogOpen(false);
+      setSelectedProducts(new Set());
+      setBulkUpdateCategory("");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to bulk update categories";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleInlineCategoryChange = async (productId: Id<"products">, category: string) => {
+    try {
+      await updateProductCategory({
+        productId,
+        category: category === "none" ? null : category as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory",
+      });
+      toast.success("Product category updated");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update category";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="container mx-auto space-y-6 py-8">
@@ -549,6 +627,9 @@ export default function ProductClassificationPage() {
             <TabsTrigger value="stats">Statistics</TabsTrigger>
             <TabsTrigger value="manage">Manage Finish Types</TabsTrigger>
             <TabsTrigger value="manage-gadgets">Manage Gadget Types</TabsTrigger>
+            <TabsTrigger value="manage-categories">
+              Manage Product Categories
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="browse" className="space-y-4">
@@ -1093,6 +1174,273 @@ export default function ProductClassificationPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="manage-categories" className="space-y-4">
+            {/* Category Stats Overview */}
+            <div className="grid gap-4 md:grid-cols-7">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Skin</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {categoryStats?.skin ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Cover & Case</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {categoryStats?.["case-cover"] ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Camera Rings</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {categoryStats?.["camera-ring"] ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Magneto</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {categoryStats?.["magneto-x"] ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Protectors</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {categoryStats?.glass ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Accessory</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    {categoryStats?.accessory ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-yellow-500">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Uncategorized</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {categoryStats?.uncategorized ?? 0}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Product Category Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Product Category Management</CardTitle>
+                    <CardDescription>
+                      Bulk manage and assign product categories
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    {selectedProducts.size > 0 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDeselectAll}
+                        >
+                          Deselect All ({selectedProducts.size})
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => setIsBulkUpdateDialogOpen(true)}
+                        >
+                          Bulk Update Category
+                        </Button>
+                      </>
+                    )}
+                    {selectedProducts.size === 0 && categorizedProducts?.products && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAll}
+                      >
+                        Select All
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="mb-2 block text-sm font-medium">
+                      Filter by Category
+                    </label>
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Products</SelectItem>
+                        <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                        <SelectItem value="skin">Skin</SelectItem>
+                        <SelectItem value="case-cover">Cover & Case</SelectItem>
+                        <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                        <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                        <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                        <SelectItem value="accessory">Accessory</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {categorizedProducts === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : categorizedProducts.products.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Package className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">No Products</h3>
+                    <p className="text-sm text-muted-foreground">
+                      No products found in this category
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <input
+                              type="checkbox"
+                              checked={selectedProducts.size === categorizedProducts.products.length && categorizedProducts.products.length > 0}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  handleSelectAll();
+                                } else {
+                                  handleDeselectAll();
+                                }
+                              }}
+                              className="h-4 w-4"
+                            />
+                          </TableHead>
+                          <TableHead className="min-w-[300px]">Product Name</TableHead>
+                          <TableHead className="min-w-[180px]">Current Category</TableHead>
+                          <TableHead className="min-w-[180px]">Change Category</TableHead>
+                          <TableHead className="min-w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categorizedProducts.products.map((product) => (
+                          <TableRow key={product._id}>
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                checked={selectedProducts.has(product._id)}
+                                onChange={() => handleToggleProductSelection(product._id)}
+                                className="h-4 w-4"
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="break-words">
+                                {product.title}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {product.productCategory ? (
+                                <Badge variant="default" className="text-xs">
+                                  {product.productCategory === "case-cover" ? "Cover & Case" :
+                                   product.productCategory === "camera-ring" ? "Camera Rings" :
+                                   product.productCategory === "magneto-x" ? "Magneto & More" :
+                                   product.productCategory === "glass" ? "Membrane / Protectors" :
+                                   product.productCategory.charAt(0).toUpperCase() + product.productCategory.slice(1)}
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs">Uncategorized</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={product.productCategory || "none"}
+                                onValueChange={(value) => handleInlineCategoryChange(product._id, value)}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">-- None --</SelectItem>
+                                  <SelectItem value="skin">Skin</SelectItem>
+                                  <SelectItem value="case-cover">Cover & Case</SelectItem>
+                                  <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                                  <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                                  <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                                  <SelectItem value="accessory">Accessory</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const productUrl = product.slug 
+                                    ? `/products/${product.slug}`
+                                    : `/products/detail?id=${product._id}`;
+                                  window.open(productUrl, "_blank");
+                                }}
+                                title="View on frontend"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                
+                {categorizedProducts && categorizedProducts.hasMore && (
+                  <div className="text-center text-sm text-muted-foreground pt-2">
+                    Showing {categorizedProducts.products.length} of {categorizedProducts.total} products. 
+                    <br />
+                    Adjust filters to see more.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Uncategorized Products Section */}
+            {selectedCategory === "uncategorized" && uncategorizedProducts && uncategorizedProducts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Uncategorized Products</CardTitle>
+                  <CardDescription>
+                    Products without a category assignment ({uncategorizedProducts.length} products)
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
 
         {/* Preview Dialog */}
@@ -1536,6 +1884,55 @@ export default function ProductClassificationPage() {
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
                 Confirm Migration
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Update Category Dialog */}
+        <Dialog open={isBulkUpdateDialogOpen} onOpenChange={setIsBulkUpdateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Bulk Update Product Categories</DialogTitle>
+              <DialogDescription>
+                Update {selectedProducts.size} selected products to a new category
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="bulk-category">Select Category</Label>
+                <Select value={bulkUpdateCategory} onValueChange={setBulkUpdateCategory}>
+                  <SelectTrigger id="bulk-category">
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="skin">Skin</SelectItem>
+                    <SelectItem value="case-cover">Cover & Case</SelectItem>
+                    <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                    <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                    <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                    <SelectItem value="accessory">Accessory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-lg border bg-muted p-3">
+                <p className="text-sm text-muted-foreground">
+                  This will update {selectedProducts.size} products to the selected category.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsBulkUpdateDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleBulkUpdateCategories}
+                disabled={!bulkUpdateCategory}
+              >
+                Update {selectedProducts.size} Products
               </Button>
             </DialogFooter>
           </DialogContent>

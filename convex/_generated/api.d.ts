@@ -61,6 +61,7 @@ import type * as phoneCollections from "../phoneCollections.js";
 import type * as phoneCollectionsHelpers from "../phoneCollectionsHelpers.js";
 import type * as phoneCollectionsQueries from "../phoneCollectionsQueries.js";
 import type * as phonepe from "../phonepe.js";
+import type * as productCategories from "../productCategories.js";
 import type * as productClassification from "../productClassification.js";
 import type * as products from "../products.js";
 import type * as rapidshyp from "../rapidshyp.js";
@@ -155,6 +156,7 @@ declare const fullApi: ApiFromModules<{
   phoneCollectionsHelpers: typeof phoneCollectionsHelpers;
   phoneCollectionsQueries: typeof phoneCollectionsQueries;
   phonepe: typeof phonepe;
+  productCategories: typeof productCategories;
   productClassification: typeof productClassification;
   products: typeof products;
   rapidshyp: typeof rapidshyp;

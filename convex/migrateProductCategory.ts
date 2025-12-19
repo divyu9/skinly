@@ -25,37 +25,52 @@ export const migrateProductsToProductCategory = mutation({
         
         let productCategory: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null = null;
         
-        // Check for Magneto X
-        if (combined.includes("magneto")) {
+        // Rule 1: Skin
+        const skinKeywords = [
+          "skin for",
+          "matte skin",
+          "matte finish",
+          "3d textured",
+          "3d skin",
+          "tranzy skin",
+          // Gadget-specific patterns
+          "phone skin",
+          "laptop skin",
+          "tablet skin",
+          "ipad skin",
+          "console skin",
+          "camera skin",
+          "drone skin",
+          "charger skin"
+        ];
+        const hasSkinKeyword = skinKeywords.some(keyword => combined.includes(keyword));
+        
+        // Rule 2: Camera Rings
+        const hasCameraRing = combined.includes("camera ring");
+        
+        // Rule 3: Cover & Case
+        const hasCover = combined.includes("cover") || combined.includes("case");
+        
+        // Rule 4: Magneto & More
+        const hasMagneto = combined.includes("magneto");
+        
+        // Rule 5: Membrane/Protectors
+        const hasProtector = combined.includes("matte membrane") || 
+                            combined.includes("gloss membrane") || 
+                            combined.includes("autoapply");
+        
+        // Apply rules in priority order
+        if (hasMagneto) {
           productCategory = "magneto-x";
-        }
-        // Check for Cases & Covers
-        else if (combined.includes("case") || combined.includes("cover")) {
-          productCategory = "case-cover";
-        }
-        // Check for Camera Rings
-        else if (combined.includes("camera ring") || combined.includes("camera protector")) {
+        } else if (hasCameraRing) {
           productCategory = "camera-ring";
-        }
-        // Check for Glasses/Screen Protectors
-        else if (combined.includes("autoapply") || combined.includes("tempered glass") || combined.includes("screen protector") || combined.includes("membrane") || combined.includes("protector")) {
+        } else if (hasCover) {
+          productCategory = "case-cover";
+        } else if (hasProtector) {
           productCategory = "glass";
-        }
-        // Check for Skins (has a gadget type like phone, laptop, etc.)
-        else if (product.gadgetTypeId || product.gadgetCategory) {
-          // If it has a gadget association, it's likely a skin
-          // Exclude accessories
-          const isAccessory = combined.includes("stand") || combined.includes("holder") || 
-                             combined.includes("mount") || combined.includes("charger");
-          
-          if (!isAccessory) {
-            productCategory = "skin";
-          } else {
-            productCategory = "accessory";
-          }
-        }
-        // Fallback to accessory
-        else {
+        } else if (hasSkinKeyword || product.gadgetTypeId || product.gadgetCategory) {
+          productCategory = "skin";
+        } else {
           productCategory = "accessory";
         }
         
@@ -95,18 +110,51 @@ export const previewProductCategoryMigration = query({
       
       let suggestedCategory: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null = null;
       
-      if (combined.includes("magneto")) {
+      // Rule 1: Skin
+      const skinKeywords = [
+        "skin for",
+        "matte skin",
+        "matte finish",
+        "3d textured",
+        "3d skin",
+        "tranzy skin",
+        // Gadget-specific patterns
+        "phone skin",
+        "laptop skin",
+        "tablet skin",
+        "ipad skin",
+        "console skin",
+        "camera skin",
+        "drone skin",
+        "charger skin"
+      ];
+      const hasSkinKeyword = skinKeywords.some(keyword => combined.includes(keyword));
+      
+      // Rule 2: Camera Rings
+      const hasCameraRing = combined.includes("camera ring");
+      
+      // Rule 3: Cover & Case
+      const hasCover = combined.includes("cover") || combined.includes("case");
+      
+      // Rule 4: Magneto & More
+      const hasMagneto = combined.includes("magneto");
+      
+      // Rule 5: Membrane/Protectors
+      const hasProtector = combined.includes("matte membrane") || 
+                          combined.includes("gloss membrane") || 
+                          combined.includes("autoapply");
+      
+      // Apply rules in priority order
+      if (hasMagneto) {
         suggestedCategory = "magneto-x";
-      } else if (combined.includes("case") || combined.includes("cover")) {
-        suggestedCategory = "case-cover";
-      } else if (combined.includes("camera ring") || combined.includes("camera protector")) {
+      } else if (hasCameraRing) {
         suggestedCategory = "camera-ring";
-      } else if (combined.includes("autoapply") || combined.includes("tempered glass") || combined.includes("screen protector") || combined.includes("membrane") || combined.includes("protector")) {
+      } else if (hasCover) {
+        suggestedCategory = "case-cover";
+      } else if (hasProtector) {
         suggestedCategory = "glass";
-      } else if (product.gadgetTypeId || product.gadgetCategory) {
-        const isAccessory = combined.includes("stand") || combined.includes("holder") || 
-                           combined.includes("mount") || combined.includes("charger");
-        suggestedCategory = isAccessory ? "accessory" : "skin";
+      } else if (hasSkinKeyword || product.gadgetTypeId || product.gadgetCategory) {
+        suggestedCategory = "skin";
       } else {
         suggestedCategory = "accessory";
       }
