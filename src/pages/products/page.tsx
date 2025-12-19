@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
 import { HeaderSearch } from "@/components/header-search.tsx";
+import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -130,6 +131,9 @@ export default function ProductsPage() {
   const [modelRequestPhone, setModelRequestPhone] = useState("");
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
+  // Device selector dialog state
+  const [isDeviceSelectorOpen, setIsDeviceSelectorOpen] = useState(false);
+  
   // Get URL parameters (must be before queries that depend on them)
   const urlParams = new URLSearchParams(window.location.search);
   const deviceFilter = urlParams.get('device');
@@ -172,8 +176,8 @@ export default function ProductsPage() {
     if (fromGadgetSelector && modelGadgetType && !smartFiltersApplied) {
       // Set product category to "skin"
       setProductCategory("skin");
-      // Set gadget filter to the model's gadget type display name
-      setGadgetFilter(modelGadgetType.displayName);
+      // Set gadget filter to the model's gadget type name (lowercase, e.g., "laptop")
+      setGadgetFilter(modelGadgetType.name);
       setSmartFiltersApplied(true);
     }
   }, [fromGadgetSelector, modelGadgetType, smartFiltersApplied]);
@@ -789,7 +793,11 @@ export default function ProductsPage() {
           {/* Gadget Selector Welcome Banner */}
           {fromGadgetSelector && brandFilter && modelFilter && modelInfo && (
             <div className="mb-6 max-w-4xl mx-auto">
-              <GadgetSelectorBanner brandName={brandFilter} modelName={modelFilter} />
+              <GadgetSelectorBanner 
+                brandName={brandFilter} 
+                modelName={modelFilter}
+                onChangeDevice={() => setIsDeviceSelectorOpen(true)}
+              />
             </div>
           )}
 
@@ -1232,6 +1240,12 @@ export default function ProductsPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Device Selector Dialog */}
+      <DeviceSelectorDialog
+        open={isDeviceSelectorOpen}
+        onOpenChange={setIsDeviceSelectorOpen}
+      />
     </div>
   );
 }
