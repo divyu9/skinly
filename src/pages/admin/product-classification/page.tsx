@@ -195,10 +195,11 @@ export default function ProductClassificationPage() {
 
   const handleSyncProductCounts = async () => {
     try {
-      await recalculateCounts({});
-      toast.success("Product counts synced successfully");
+      const result = await recalculateCounts({});
+      toast.success(result.message);
     } catch (error) {
-      toast.error("Failed to sync product counts");
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync product counts";
+      toast.error(errorMessage);
       console.error(error);
     }
   };
@@ -282,10 +283,11 @@ export default function ProductClassificationPage() {
 
   const handleSyncGadgetCounts = async () => {
     try {
-      await recalculateGadgetCounts({});
-      toast.success("Gadget type product counts synced successfully");
+      const result = await recalculateGadgetCounts({});
+      toast.success(result.message);
     } catch (error) {
-      toast.error("Failed to sync gadget type product counts");
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync gadget type product counts";
+      toast.error(errorMessage);
       console.error(error);
     }
   };
@@ -294,10 +296,9 @@ export default function ProductClassificationPage() {
     try {
       const result = await migrateGadgetTypes({});
       toast.success(result.message);
-      // Refresh counts after migration
-      await recalculateGadgetCounts({});
     } catch (error) {
-      toast.error("Failed to migrate gadget types");
+      const errorMessage = error instanceof Error ? error.message : "Failed to migrate gadget types";
+      toast.error(errorMessage);
       console.error(error);
     }
   };

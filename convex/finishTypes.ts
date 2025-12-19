@@ -141,16 +141,22 @@ export const recalculateAllCounts = mutation({
   handler: async (ctx) => {
     const finishTypes = await ctx.db.query("finishTypes").collect();
     
+    // Fetch all products once (more efficient)
+    const allProducts = await ctx.db.query("products").collect();
+    
     for (const finishType of finishTypes) {
-      const products = await ctx.db
-        .query("products")
-        .withIndex("by_finish_type", (q) => q.eq("finishTypeId", finishType._id))
-        .collect();
+      const count = allProducts.filter(p => p.finishTypeId === finishType._id).length;
 
       await ctx.db.patch(finishType._id, {
-        productCount: products.length,
+        productCount: count,
       });
     }
+    
+    return {
+      success: true,
+      message: `Updated counts for ${finishTypes.length} finish types`,
+      finishTypes: finishTypes.length,
+    };
   },
 });
 

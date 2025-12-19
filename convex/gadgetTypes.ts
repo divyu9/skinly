@@ -104,9 +104,11 @@ export const recalculateProductCounts = mutation({
   handler: async (ctx) => {
     const gadgetTypes = await ctx.db.query("gadgetTypes").collect();
     
+    // Fetch all products once (more efficient)
+    const allProducts = await ctx.db.query("products").collect();
+    
+    // Count for each gadget type
     for (const gadgetType of gadgetTypes) {
-      // Count by gadgetTypeId (new field) OR gadgetCategory (legacy field matching by name)
-      const allProducts = await ctx.db.query("products").collect();
       const count = allProducts.filter(p => 
         p.gadgetTypeId === gadgetType._id || p.gadgetCategory === gadgetType.name
       ).length;
@@ -114,7 +116,11 @@ export const recalculateProductCounts = mutation({
       await ctx.db.patch(gadgetType._id, { productCount: count });
     }
     
-    return gadgetTypes.length;
+    return { 
+      success: true,
+      message: `Updated counts for ${gadgetTypes.length} gadget types`,
+      gadgetTypes: gadgetTypes.length,
+    };
   },
 });
 
@@ -159,14 +165,34 @@ export const migrateProductGadgetTypes = mutation({
       }
     }
     
+    // Auto-sync product counts after migration
+    const allProductsAfter = await ctx.db.query("products").collect();
+    for (const gadgetType of gadgetTypes) {
+      const count = allProductsAfter.filter(p => 
+        p.gadgetTypeId === gadgetType._id || p.gadgetCategory === gadgetType.name
+      ).length;
+      await ctx.db.patch(gadgetType._id, { productCount: count });
+    }
+    
     const failedList = Array.from(failedCategories).join(", ");
+    
+    // Provide helpful message based on results
+    let message = "";
+    if (migrated === 0 && skipped > 0 && failed === 0) {
+      message = `✓ All ${skipped} products already migrated! Product counts have been synced.`;
+    } else if (migrated > 0) {
+      message = `✓ Migrated ${migrated} products, skipped ${skipped}, failed ${failed}${failed > 0 ? ` (categories not found: ${failedList})` : ''}. Product counts synced.`;
+    } else {
+      message = `Migrated ${migrated} products, skipped ${skipped}, failed ${failed}${failed > 0 ? ` (categories not found: ${failedList})` : ''}`;
+    }
     
     return { 
       success: true,
       migrated, 
       skipped,
       failed,
-      message: `Migrated ${migrated} products, skipped ${skipped}, failed ${failed}${failed > 0 ? ` (categories not found: ${failedList})` : ''}` 
+      message,
+      autoSynced: true
     };
   },
 });
