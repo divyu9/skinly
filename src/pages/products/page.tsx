@@ -773,7 +773,7 @@ export default function ProductsPage() {
         
         {/* Product Category Extension Bar */}
         {productCategories && (
-          <div className="border-t border-border bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 dark:from-blue-950/30 dark:via-purple-950/30 dark:to-pink-950/30">
+          <div className="border-t border-border bg-white dark:bg-gray-950">
             <div className="container mx-auto px-2 sm:px-4 py-3">
               <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
                 {productCategories.map((category) => {
@@ -823,7 +823,7 @@ export default function ProductsPage() {
         
         {/* Animated Filter Bar - Shows when category is selected */}
         {productCategory && (
-          <div className="border-t border-border bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 dark:from-indigo-950/40 dark:via-purple-950/40 dark:to-blue-950/40 backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
+          <div className="border-t border-border bg-white dark:bg-gray-950 backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
             <div className="container mx-auto px-2 sm:px-4 py-3">
               {/* Show full gadget selector when no gadget is selected */}
               {productCategory === 'skin' && !gadgetFilter && gadgetTypes && (
@@ -914,7 +914,7 @@ export default function ProductsPage() {
       </nav>
 
       {/* Products Section */}
-      <section className="pt-44 sm:pt-52 pb-6 sm:pb-20 px-2 sm:px-4">
+      <section className="pt-44 sm:pt-52 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
         <div className="container mx-auto">
           <div className="text-center mb-6 space-y-2">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
