@@ -292,12 +292,9 @@ export default function ProductsPage() {
     
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.pushState({}, '', newUrl);
-    
-    // Force re-render by updating the URL params in state
-    window.dispatchEvent(new PopStateEvent('popstate'));
   }, []);
   
-  // Handle browser back/forward
+  // Handle browser back/forward and URL changes
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
@@ -310,6 +307,25 @@ export default function ProductsPage() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
   
+  // Sync URL params to state when collection changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlProductCategory = params.get('productType') as typeof productCategory;
+    const urlGadget = params.get('gadget');
+    const urlFinish = params.get('finish');
+    
+    // Only update if values actually changed to avoid loops
+    if (urlProductCategory !== productCategory) {
+      setProductCategory(urlProductCategory);
+    }
+    if (urlGadget !== gadgetFilter) {
+      setGadgetFilter(urlGadget);
+    }
+    if (urlFinish !== finishFilter) {
+      setFinishFilter(urlFinish);
+    }
+  }, [collectionParam, productCategory, gadgetFilter, finishFilter]); // Re-run when collection or filters change
+  
   // Use paginated query - load 100 products at a time
   const { results: productsData, status, loadMore } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
@@ -318,7 +334,8 @@ export default function ProductsPage() {
       productCategory: productCategory || undefined,
       gadgetTypeId: gadgetTypeId || undefined,
       finishTypeId: finishTypeId || undefined,
-      ...(brandFilter && modelFilter ? { gadgetCategory: "phone" } : {})
+      // Use the actual model's category if available, not hardcoded "phone"
+      ...(brandFilter && modelFilter && modelInfo?.category ? { gadgetCategory: modelInfo.category } : {})
     },
     { initialNumItems: 100 }
   );
