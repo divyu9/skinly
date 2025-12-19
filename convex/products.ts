@@ -586,6 +586,14 @@ export const updateProduct = mutation({
     productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
     gadgetCategory: v.optional(v.string()),
     finishTypeId: v.optional(v.id("finishTypes")),
+    productCategory: v.optional(v.union(
+      v.literal("skin"),
+      v.literal("case-cover"),
+      v.literal("camera-ring"),
+      v.literal("magneto-x"),
+      v.literal("glass"),
+      v.literal("accessory")
+    )),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -616,6 +624,7 @@ export const updateProduct = mutation({
       productType?: "physical" | "digital";
       gadgetCategory?: "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
       finishTypeId?: Id<"finishTypes">;
+      productCategory?: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
     }> = {
       ...rawUpdates,
       gadgetCategory: rawUpdates.gadgetCategory as "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | undefined,

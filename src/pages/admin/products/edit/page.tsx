@@ -55,6 +55,7 @@ function EditProductPageInner() {
     productType: "physical" | "digital";
     gadgetCategory: string;
     finishTypeId: Id<"finishTypes"> | "";
+    productCategory: string;
   }>({
     title: "",
     slug: "",
@@ -72,6 +73,7 @@ function EditProductPageInner() {
     productType: "physical",
     gadgetCategory: "",
     finishTypeId: "",
+    productCategory: "",
   });
 
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -108,6 +110,7 @@ function EditProductPageInner() {
         productType: product.productType ?? "physical",
         gadgetCategory: product.gadgetCategory || "",
         finishTypeId: product.finishTypeId || "",
+        productCategory: product.productCategory || "",
       });
 
       setVariants(
@@ -249,6 +252,7 @@ function EditProductPageInner() {
         productType: formData.productType,
         gadgetCategory: formData.gadgetCategory || undefined,
         finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
+        productCategory: formData.productCategory ? (formData.productCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory") : undefined,
       });
 
       // Update or create variants
@@ -594,6 +598,26 @@ function EditProductPageInner() {
                     </SelectContent>
                   </Select>
                 )}
+              </div>
+
+              <div>
+                <Label htmlFor="productCategory">Product Category (Optional)</Label>
+                <Select
+                  value={formData.productCategory || undefined}
+                  onValueChange={(value) => setFormData({ ...formData, productCategory: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select product category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="skin">Skin</SelectItem>
+                    <SelectItem value="case-cover">Cover & Case</SelectItem>
+                    <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                    <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                    <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                    <SelectItem value="accessory">Accessory</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>

@@ -1176,79 +1176,132 @@ export default function ProductClassificationPage() {
           </TabsContent>
 
           <TabsContent value="manage-categories" className="space-y-4">
-            {/* Category Stats Overview */}
-            <div className="grid gap-4 md:grid-cols-7">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Skin</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {categoryStats?.skin ?? 0}
+            {/* Category Overview Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Category Overview</CardTitle>
+                <CardDescription>
+                  View all product categories used for shop page organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {categoryStats === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Category Name</TableHead>
+                            <TableHead>Internal ID</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Product Count</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="font-medium">Skin</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">skin</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Device skins and wraps
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats.skin}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Cover & Case</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">case-cover</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Phone cases and protective covers
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats["case-cover"]}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Camera Rings</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">camera-ring</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Camera lens protection rings
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats["camera-ring"]}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Magneto & More</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">magneto-x</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Magnetic accessories and gadgets
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats["magneto-x"]}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Membrane / Protectors</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">glass</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Screen protectors and membranes
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats.glass}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Accessory</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">accessory</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              General accessories and add-ons
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats.accessory}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="font-medium">Uncategorized</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">—</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Products without a category
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="destructive">{categoryStats.uncategorized}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+                      <h4 className="mb-2 font-semibold text-blue-900 dark:text-blue-100">
+                        About Product Categories
+                      </h4>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Product categories are core to your shop page organization and are defined at the system level. 
+                        These categories determine which tab products appear under on the <strong>/products</strong> page. 
+                        To assign products to categories, use the management section below or edit individual products.
+                      </p>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Cover & Case</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {categoryStats?.["case-cover"] ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Camera Rings</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {categoryStats?.["camera-ring"] ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Magneto</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {categoryStats?.["magneto-x"] ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Protectors</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {categoryStats?.glass ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Accessory</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
-                    {categoryStats?.accessory ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-yellow-500">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Uncategorized</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-yellow-600">
-                    {categoryStats?.uncategorized ?? 0}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* Product Category Management */}
             <Card>
