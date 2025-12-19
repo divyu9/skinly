@@ -243,12 +243,17 @@ export default function ProductsPage() {
       } else {
         params.delete('productType');
       }
-      // Clear dependent params
+      // Clear dependent params when category changes
       if (updates.gadget === undefined) {
         params.delete('gadget');
       }
       if (updates.finish === undefined) {
         params.delete('finish');
+      }
+      // Clear collection and gadget selector params when switching away from Skins
+      if (updates.productType !== 'skin') {
+        params.delete('collection');
+        params.delete('fromGadgetSelector');
       }
     }
     if (updates.gadget !== undefined) {
@@ -678,7 +683,7 @@ export default function ProductsPage() {
           </div>
         </nav>
 
-        <div className="pt-36 sm:pt-44 pb-6 sm:pb-20 px-2 sm:px-4">
+        <div className="pt-44 sm:pt-52 pb-6 sm:pb-20 px-2 sm:px-4">
           <div className="container mx-auto max-w-2xl">
             <Empty>
               <EmptyHeader>
@@ -909,7 +914,7 @@ export default function ProductsPage() {
       </nav>
 
       {/* Products Section */}
-      <section className="pt-36 sm:pt-44 pb-6 sm:pb-20 px-2 sm:px-4">
+      <section className="pt-44 sm:pt-52 pb-6 sm:pb-20 px-2 sm:px-4">
         <div className="container mx-auto">
           <div className="text-center mb-6 space-y-2">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
@@ -927,8 +932,8 @@ export default function ProductsPage() {
             </p>
           </div>
 
-          {/* Gadget Selector Welcome Banner - Show when brand and model are selected */}
-          {brandFilter && modelFilter && modelInfo && (
+          {/* Gadget Selector Welcome Banner - Only show for Skins category with selected device */}
+          {productCategory === 'skin' && brandFilter && modelFilter && modelInfo && (
             <div className="mb-6 max-w-4xl mx-auto">
               <GadgetSelectorBanner 
                 brandName={brandFilter} 
@@ -938,8 +943,8 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Collection Pills - Only when device is selected */}
-          {allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
+          {/* Collection Pills - Only show for Skins category when device is selected */}
+          {productCategory === 'skin' && allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
             <div className="mb-6">
               <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
                 <button
