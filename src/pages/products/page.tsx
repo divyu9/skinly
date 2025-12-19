@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
+import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -120,18 +121,45 @@ export default function ProductsPage() {
   const showFinish = urlParams.get('showFinish') === 'true';
   const urlSearchQuery = urlParams.get('search') || '';
   const collectionParam = urlParams.get('collection') || '';
+  const fromGadgetSelector = urlParams.get('fromGadgetSelector') === 'true';
   
-  // State declarations for filters (initialized from URL)
+  // Get model info if coming from gadget selector
+  const modelInfo = useQuery(
+    api.supportedModels.getModelInfo,
+    fromGadgetSelector && brandFilter && modelFilter
+      ? { brand: brandFilter, model: modelFilter }
+      : "skip"
+  );
+  
+  // Get gadget type from model category
+  const modelGadgetType = useQuery(
+    api.gadgetTypes.getByCategory,
+    modelInfo?.category ? { category: modelInfo.category } : "skip"
+  );
+  
+  // State declarations for filters (initialized from URL or smart defaults)
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
+  const [smartFiltersApplied, setSmartFiltersApplied] = useState(false);
   const [productCategory, setProductCategory] = useState<"skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null>(
     urlParams.get('productType') as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null
   );
   const [gadgetFilter, setGadgetFilter] = useState<string | null>(urlParams.get('gadget'));
   const [finishFilter, setFinishFilter] = useState<string | null>(urlParams.get('finish'));
   const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
+  
+  // Apply smart filters when coming from gadget selector
+  useEffect(() => {
+    if (fromGadgetSelector && modelGadgetType && !smartFiltersApplied) {
+      // Set product category to "skin"
+      setProductCategory("skin");
+      // Set gadget filter to the model's gadget type display name
+      setGadgetFilter(modelGadgetType.displayName);
+      setSmartFiltersApplied(true);
+    }
+  }, [fromGadgetSelector, modelGadgetType, smartFiltersApplied]);
   
   // Get finish types, gadget types, and product categories for filtering
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
@@ -708,6 +736,13 @@ export default function ProductsPage() {
               </div>
             </div>
           </div>
+
+          {/* Gadget Selector Welcome Banner */}
+          {fromGadgetSelector && modelFilter && modelInfo && (
+            <div className="mb-6 max-w-4xl mx-auto">
+              <GadgetSelectorBanner modelName={modelFilter} />
+            </div>
+          )}
 
           {/* Product Type Tabs - First level navigation */}
           {!brandFilter && !modelFilter && productCategories && (

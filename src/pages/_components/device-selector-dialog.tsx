@@ -127,12 +127,8 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   const handleModelSelect = (model: string) => {
     if (!selectedBrand) return;
     
-    // For phones, redirect to confirmation page; for other devices, go directly to products
-    if (selectedDeviceType === "phone") {
-      navigate(`/products/confirm?brand=${encodeURIComponent(selectedBrand)}&model=${encodeURIComponent(model)}`);
-    } else {
-      navigate(`/products?brand=${encodeURIComponent(selectedBrand)}&model=${encodeURIComponent(model)}&showFinish=true`);
-    }
+    // All devices go directly to products page with smart filters
+    navigate(`/products?brand=${encodeURIComponent(selectedBrand)}&model=${encodeURIComponent(model)}&fromGadgetSelector=true`);
     onOpenChange(false);
     
     // Reset state

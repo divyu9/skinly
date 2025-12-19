@@ -5,7 +5,7 @@ import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import ProductsPage from "./pages/products/page.tsx";
-import ProductConfirmPage from "./pages/products/confirm.tsx";
+// import ProductConfirmPage from "./pages/products/confirm.tsx"; // Deprecated - removed finish selection page
 import ProductDetailPage from "./pages/products/detail/page.tsx";
 import CheckoutPage from "./pages/checkout/page.tsx";
 import CartPage from "./pages/cart/page.tsx";
@@ -74,7 +74,7 @@ export default function App() {
           <Route path="/account" element={<AccountPage />} />
           <Route path="/account/wallet" element={<WalletPage />} />
           <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/confirm" element={<ProductConfirmPage />} />
+          {/* <Route path="/products/confirm" element={<ProductConfirmPage />} /> */} {/* Deprecated - removed finish selection page */}
           <Route path="/products/detail" element={<ProductDetailPage />} />
           <Route path="/products/:slug" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />

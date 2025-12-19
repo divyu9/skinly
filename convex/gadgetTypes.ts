@@ -42,6 +42,18 @@ export const get = query({
   },
 });
 
+// Get gadget type by category name (for smart filtering)
+export const getByCategory = query({
+  args: { category: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("gadgetTypes")
+      .filter((q) => q.eq(q.field("name"), args.category))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+  },
+});
+
 // Create a new gadget type
 export const create = mutation({
   args: {

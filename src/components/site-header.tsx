@@ -2,26 +2,34 @@ import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { MobileNav } from "./mobile-nav.tsx";
+import { HeaderSearch } from "./header-search.tsx";
 
 interface SiteHeaderProps {
   onGadgetSelectorClick?: () => void;
   onPhoneSelectorClick?: () => void;
+  onRequestModelClick?: () => void;
 }
 
-export function SiteHeader({ onGadgetSelectorClick, onPhoneSelectorClick }: SiteHeaderProps) {
+export function SiteHeader({ onGadgetSelectorClick, onPhoneSelectorClick, onRequestModelClick }: SiteHeaderProps) {
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
 
   return (
     <>
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
               className="h-12 md:h-16"
             />
           </Link>
+          
+          {/* Header Search - Hidden on mobile, shown on tablet+ */}
+          <div className="hidden md:flex flex-1 max-w-lg">
+            <HeaderSearch onRequestModelClick={onRequestModelClick || (() => {})} />
+          </div>
+          
           <MobileNav 
             onGadgetSelectorClick={onGadgetSelectorClick}
             onPhoneSelectorClick={onPhoneSelectorClick}

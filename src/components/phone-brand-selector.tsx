@@ -83,7 +83,7 @@ export function PhoneBrandSelector() {
   // Handle phone model selection
   const handlePhoneModelSelect = (model: string) => {
     if (!selectedPhoneBrand) return;
-    navigate(`/products/confirm?brand=${encodeURIComponent(selectedPhoneBrand)}&model=${encodeURIComponent(model)}`);
+    navigate(`/products?brand=${encodeURIComponent(selectedPhoneBrand)}&model=${encodeURIComponent(model)}&fromGadgetSelector=true`);
   };
 
   return (

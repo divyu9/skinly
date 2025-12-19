@@ -74,6 +74,24 @@ export const getByBrand = query({
   },
 });
 
+// Get model info by brand and model name (for smart product filtering)
+export const getModelInfo = query({
+  args: { 
+    brand: v.string(),
+    model: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const models = await ctx.db
+      .query("supportedModels")
+      .withIndex("by_brand", (q) => q.eq("brandName", args.brand))
+      .filter((q) => q.eq(q.field("modelName"), args.model))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .first();
+    
+    return models;
+  },
+});
+
 // Create a new model
 export const create = mutation({
   args: {
