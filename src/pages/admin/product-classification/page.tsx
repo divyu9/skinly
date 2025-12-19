@@ -553,7 +553,7 @@ export default function ProductClassificationPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="min-w-[200px]">Product Name</TableHead>
+                          <TableHead className="min-w-[300px]">Product Name</TableHead>
                           <TableHead className="min-w-[150px]">Current Status</TableHead>
                           <TableHead className="min-w-[180px]">Gadget Type</TableHead>
                           <TableHead className="min-w-[180px]">Finish Type</TableHead>
@@ -568,7 +568,7 @@ export default function ProductClassificationPage() {
                           return (
                             <TableRow key={product._id}>
                               <TableCell className="font-medium">
-                                <div className="max-w-[200px] truncate" title={product.title}>
+                                <div className="break-words">
                                   {product.title}
                                 </div>
                               </TableCell>
@@ -653,13 +653,14 @@ export default function ProductClassificationPage() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() =>
-                                      window.open(
-                                        `/backend-skinly/products/${product._id}`,
-                                        "_blank"
-                                      )
-                                    }
+                                    onClick={() => {
+                                      const productUrl = product.slug 
+                                        ? `/products/${product.slug}`
+                                        : `/products/detail?id=${product._id}`;
+                                      window.open(productUrl, "_blank");
+                                    }}
                                     disabled={isSaving}
+                                    title="View on frontend"
                                   >
                                     <ExternalLink className="h-3 w-3" />
                                   </Button>
