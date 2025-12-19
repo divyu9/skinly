@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { Sparkles, CheckCircle2, AlertCircle, Tag, Layers, Package } from "lucide-react";
+import { Sparkles, CheckCircle2, AlertCircle, Tag, Layers, Package, Plus, Edit, Trash2, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 
 export default function ProductClassificationPage() {
   type GadgetCategory = "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
@@ -21,10 +23,18 @@ export default function ProductClassificationPage() {
   const [selectedFinish, setSelectedFinish] = useState<string>("all");
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
   const [isApplyDialogOpen, setIsApplyDialogOpen] = useState(false);
+  
+  // Finish type management state
+  const [isCreateFinishTypeOpen, setIsCreateFinishTypeOpen] = useState(false);
+  const [isEditFinishTypeOpen, setIsEditFinishTypeOpen] = useState(false);
+  const [isDeleteFinishTypeOpen, setIsDeleteFinishTypeOpen] = useState(false);
+  const [selectedFinishType, setSelectedFinishType] = useState<Id<"finishTypes"> | null>(null);
+  const [finishTypeForm, setFinishTypeForm] = useState({ name: "", displayName: "" });
 
   // Queries
   const stats = useQuery(api.productClassification.getClassificationStats, {});
   const finishTypes = useQuery(api.finishTypes.listActive, {});
+  const allFinishTypes = useQuery(api.finishTypes.list, {}); // For management tab
   const preview = useQuery(api.productClassification.previewAutoClassification, {});
   const unclassified = useQuery(api.productClassification.getUnclassifiedProducts, {});
   const filtered = useQuery(
@@ -41,6 +51,10 @@ export default function ProductClassificationPage() {
   const applyAutoClassification = useMutation(api.productClassification.applyAutoClassification);
   const bulkUpdate = useMutation(api.productClassification.bulkUpdateClassification);
   const seedInitialFinishTypes = useMutation(api.finishTypes.seedInitialFinishTypes);
+  const createFinishType = useMutation(api.finishTypes.create);
+  const updateFinishType = useMutation(api.finishTypes.update);
+  const deleteFinishType = useMutation(api.finishTypes.remove);
+  const recalculateCounts = useMutation(api.finishTypes.recalculateAllCounts);
 
   const gadgetCategories = [
     "Phone",
@@ -94,6 +108,83 @@ export default function ProductClassificationPage() {
       toast.error("Failed to update products");
       console.error(error);
     }
+  };
+
+  // Finish type management handlers
+  const handleCreateFinishType = async () => {
+    try {
+      if (!finishTypeForm.displayName) {
+        toast.error("Display name is required");
+        return;
+      }
+      
+      // Auto-generate name from display name if not provided
+      const name = finishTypeForm.name || finishTypeForm.displayName.toLowerCase().replace(/\s+/g, "-");
+      
+      await createFinishType({ name, displayName: finishTypeForm.displayName });
+      toast.success("Finish type created successfully");
+      setIsCreateFinishTypeOpen(false);
+      setFinishTypeForm({ name: "", displayName: "" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create finish type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleEditFinishType = async () => {
+    if (!selectedFinishType) return;
+    
+    try {
+      await updateFinishType({
+        id: selectedFinishType,
+        displayName: finishTypeForm.displayName || undefined,
+      });
+      toast.success("Finish type updated successfully");
+      setIsEditFinishTypeOpen(false);
+      setFinishTypeForm({ name: "", displayName: "" });
+      setSelectedFinishType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update finish type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleDeleteFinishType = async () => {
+    if (!selectedFinishType) return;
+    
+    try {
+      await deleteFinishType({ id: selectedFinishType });
+      toast.success("Finish type deleted successfully");
+      setIsDeleteFinishTypeOpen(false);
+      setSelectedFinishType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete finish type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleSyncProductCounts = async () => {
+    try {
+      await recalculateCounts({});
+      toast.success("Product counts synced successfully");
+    } catch (error) {
+      toast.error("Failed to sync product counts");
+      console.error(error);
+    }
+  };
+
+  const openEditDialog = (finishType: { _id: Id<"finishTypes">; name: string; displayName: string }) => {
+    setSelectedFinishType(finishType._id);
+    setFinishTypeForm({ name: finishType.name, displayName: finishType.displayName });
+    setIsEditFinishTypeOpen(true);
+  };
+
+  const openDeleteDialog = (finishTypeId: Id<"finishTypes">) => {
+    setSelectedFinishType(finishTypeId);
+    setIsDeleteFinishTypeOpen(true);
   };
 
   return (
@@ -186,7 +277,7 @@ export default function ProductClassificationPage() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">
-                    {stats.byFinish ? Object.keys(stats.byFinish).length : 0}
+                    {stats.totalFinishTypes || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Finishes available
@@ -241,6 +332,7 @@ export default function ProductClassificationPage() {
               Unclassified ({unclassified?.length ?? 0})
             </TabsTrigger>
             <TabsTrigger value="stats">Statistics</TabsTrigger>
+            <TabsTrigger value="manage">Manage Finish Types</TabsTrigger>
           </TabsList>
 
           <TabsContent value="browse" className="space-y-4">
@@ -465,6 +557,119 @@ export default function ProductClassificationPage() {
               </Card>
             </div>
           </TabsContent>
+
+          <TabsContent value="manage" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Finish Types Management</CardTitle>
+                    <CardDescription>
+                      Create and manage finish types for product classification
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncProductCounts}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync Product Counts
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setFinishTypeForm({ name: "", displayName: "" });
+                        setIsCreateFinishTypeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Finish Type
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {allFinishTypes === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : allFinishTypes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Layers className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">No Finish Types</h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Create your first finish type to get started
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setFinishTypeForm({ name: "", displayName: "" });
+                        setIsCreateFinishTypeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Finish Type
+                    </Button>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Display Name</TableHead>
+                        <TableHead>Internal Name</TableHead>
+                        <TableHead>Product Count</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allFinishTypes.map((finishType) => (
+                        <TableRow key={finishType._id}>
+                          <TableCell className="font-medium">
+                            {finishType.displayName}
+                          </TableCell>
+                          <TableCell>
+                            <code className="rounded bg-muted px-2 py-1 text-sm">
+                              {finishType.name}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{finishType.productCount}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {finishType.isActive ? (
+                              <Badge variant="default">Active</Badge>
+                            ) : (
+                              <Badge variant="outline">Inactive</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(finishType)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteDialog(finishType._id)}
+                                disabled={finishType.productCount > 0}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Preview Dialog */}
@@ -536,6 +741,116 @@ export default function ProductClassificationPage() {
               </Button>
               <Button onClick={handleApplyAutoClassification}>
                 Apply Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Finish Type Dialog */}
+        <Dialog open={isCreateFinishTypeOpen} onOpenChange={setIsCreateFinishTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Finish Type</DialogTitle>
+              <DialogDescription>
+                Add a new finish type for product classification
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input
+                  id="displayName"
+                  placeholder="e.g., Glossy, Metallic, etc."
+                  value={finishTypeForm.displayName}
+                  onChange={(e) =>
+                    setFinishTypeForm({ ...finishTypeForm, displayName: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  This is the name that will be shown to users
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Internal Name (Optional)</Label>
+                <Input
+                  id="name"
+                  placeholder="Auto-generated from display name"
+                  value={finishTypeForm.name}
+                  onChange={(e) =>
+                    setFinishTypeForm({ ...finishTypeForm, name: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-generate. Use lowercase with hyphens (e.g., glossy, metallic)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateFinishTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateFinishType}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Finish Type Dialog */}
+        <Dialog open={isEditFinishTypeOpen} onOpenChange={setIsEditFinishTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Finish Type</DialogTitle>
+              <DialogDescription>
+                Update the finish type details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-displayName">Display Name</Label>
+                <Input
+                  id="edit-displayName"
+                  value={finishTypeForm.displayName}
+                  onChange={(e) =>
+                    setFinishTypeForm({ ...finishTypeForm, displayName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Internal Name</Label>
+                <Input
+                  id="edit-name"
+                  value={finishTypeForm.name}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Internal name cannot be changed
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditFinishTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditFinishType}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Finish Type Dialog */}
+        <Dialog open={isDeleteFinishTypeOpen} onOpenChange={setIsDeleteFinishTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Finish Type</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this finish type? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteFinishTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteFinishType}>
+                Delete
               </Button>
             </DialogFooter>
           </DialogContent>

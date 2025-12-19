@@ -426,6 +426,8 @@ export const getClassificationStats = query({
     // Count by finish type
     const byFinish: Record<string, number> = {};
     const finishTypes = await ctx.db.query("finishTypes").collect();
+    const totalFinishTypes = finishTypes.length;
+    
     for (const ft of finishTypes) {
       const count = products.filter(p => p.finishTypeId === ft._id).length;
       if (count > 0) {
@@ -440,6 +442,7 @@ export const getClassificationStats = query({
       partiallyClassified,
       byGadget,
       byFinish,
+      totalFinishTypes,
     };
   },
 });
