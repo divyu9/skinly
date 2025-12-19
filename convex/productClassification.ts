@@ -399,6 +399,91 @@ export const bulkUpdateClassification = mutation({
   },
 });
 
+// Update single product classification
+export const updateSingleProductClassification = mutation({
+  args: {
+    productId: v.id("products"),
+    gadgetCategory: v.optional(v.union(
+      v.literal("phone"),
+      v.literal("laptop"),
+      v.literal("tablet"),
+      v.literal("camera"),
+      v.literal("lens"),
+      v.literal("drone"),
+      v.literal("charger"),
+      v.literal("console"),
+      v.literal("mac-mini"),
+      v.literal("cover"),
+      v.literal("accessory")
+    )),
+    finishTypeId: v.optional(v.union(v.id("finishTypes"), v.null())),
+  },
+  handler: async (ctx, args) => {
+    const product = await ctx.db.get(args.productId);
+    
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+    
+    const updates: Partial<{
+      gadgetCategory: typeof args.gadgetCategory;
+      finishTypeId: Id<"finishTypes"> | undefined;
+    }> = {};
+    
+    if (args.gadgetCategory !== undefined) {
+      updates.gadgetCategory = args.gadgetCategory;
+    }
+    
+    if (args.finishTypeId !== undefined) {
+      if (args.finishTypeId === null) {
+        updates.finishTypeId = undefined;
+      } else {
+        updates.finishTypeId = args.finishTypeId;
+      }
+    }
+    
+    if (Object.keys(updates).length === 0) {
+      throw new ConvexError({
+        message: "No updates specified",
+        code: "BAD_REQUEST",
+      });
+    }
+    
+    // Update the product
+    await ctx.db.patch(args.productId, updates);
+    
+    // Recalculate product counts for affected finish types
+    const finishTypesToUpdate = new Set<Id<"finishTypes">>();
+    
+    if (product.finishTypeId) {
+      finishTypesToUpdate.add(product.finishTypeId);
+    }
+    
+    if (args.finishTypeId && args.finishTypeId !== null) {
+      finishTypesToUpdate.add(args.finishTypeId);
+    }
+    
+    for (const finishTypeId of finishTypesToUpdate) {
+      const productsWithFinish = await ctx.db
+        .query("products")
+        .withIndex("by_finish_type", (q) => q.eq("finishTypeId", finishTypeId))
+        .collect();
+      
+      await ctx.db.patch(finishTypeId, {
+        productCount: productsWithFinish.length,
+      });
+    }
+    
+    return {
+      success: true,
+      message: "Product classification updated successfully",
+    };
+  },
+});
+
 // Get classification statistics
 export const getClassificationStats = query({
   args: {},

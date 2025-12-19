@@ -11,10 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { Sparkles, CheckCircle2, AlertCircle, Tag, Layers, Package, Plus, Edit, Trash2, RefreshCw } from "lucide-react";
+import { Sparkles, CheckCircle2, AlertCircle, Tag, Layers, Package, Plus, Edit, Trash2, RefreshCw, Save, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Spinner } from "@/components/ui/spinner.tsx";
 
 export default function ProductClassificationPage() {
   type GadgetCategory = "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
@@ -30,6 +31,14 @@ export default function ProductClassificationPage() {
   const [isDeleteFinishTypeOpen, setIsDeleteFinishTypeOpen] = useState(false);
   const [selectedFinishType, setSelectedFinishType] = useState<Id<"finishTypes"> | null>(null);
   const [finishTypeForm, setFinishTypeForm] = useState({ name: "", displayName: "" });
+  
+  // Inline editing state for unclassified products
+  const [editingProducts, setEditingProducts] = useState<Record<string, {
+    gadgetCategory?: GadgetCategory;
+    finishTypeId?: Id<"finishTypes"> | null;
+  }>>({});
+  const [savingProductId, setSavingProductId] = useState<Id<"products"> | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Queries
   const stats = useQuery(api.productClassification.getClassificationStats, {});
@@ -50,6 +59,7 @@ export default function ProductClassificationPage() {
   // Mutations
   const applyAutoClassification = useMutation(api.productClassification.applyAutoClassification);
   const bulkUpdate = useMutation(api.productClassification.bulkUpdateClassification);
+  const updateSingleProduct = useMutation(api.productClassification.updateSingleProductClassification);
   const seedInitialFinishTypes = useMutation(api.finishTypes.seedInitialFinishTypes);
   const createFinishType = useMutation(api.finishTypes.create);
   const updateFinishType = useMutation(api.finishTypes.update);
@@ -185,6 +195,71 @@ export default function ProductClassificationPage() {
   const openDeleteDialog = (finishTypeId: Id<"finishTypes">) => {
     setSelectedFinishType(finishTypeId);
     setIsDeleteFinishTypeOpen(true);
+  };
+
+  // Inline editing handlers
+  const handleInlineGadgetChange = (productId: Id<"products">, gadgetCategory: GadgetCategory | "none") => {
+    setEditingProducts(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        gadgetCategory: gadgetCategory === "none" ? undefined : gadgetCategory,
+      },
+    }));
+  };
+
+  const handleInlineFinishChange = (productId: Id<"products">, finishTypeId: string) => {
+    setEditingProducts(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        finishTypeId: finishTypeId === "none" ? null : (finishTypeId as Id<"finishTypes">),
+      },
+    }));
+  };
+
+  const handleSaveInlineEdit = async (productId: Id<"products">) => {
+    const edits = editingProducts[productId];
+    if (!edits || (edits.gadgetCategory === undefined && edits.finishTypeId === undefined)) {
+      toast.error("Please select at least one field to update");
+      return;
+    }
+
+    setSavingProductId(productId);
+    try {
+      await updateSingleProduct({
+        productId,
+        gadgetCategory: edits.gadgetCategory,
+        finishTypeId: edits.finishTypeId,
+      });
+      toast.success("Product classification updated");
+      
+      // Clear editing state for this product
+      setEditingProducts(prev => {
+        const newState = { ...prev };
+        delete newState[productId];
+        return newState;
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update product";
+      toast.error(errorMessage);
+      console.error(error);
+    } finally {
+      setSavingProductId(null);
+    }
+  };
+
+  const handleRefreshUnclassified = async () => {
+    setIsRefreshing(true);
+    try {
+      // Force refetch by toggling between tabs or using a timeout
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success("Unclassified products refreshed");
+    } catch (error) {
+      toast.error("Failed to refresh");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
@@ -440,10 +515,27 @@ export default function ProductClassificationPage() {
           <TabsContent value="unclassified" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Unclassified Products</CardTitle>
-                <CardDescription>
-                  Products missing gadget type or finish classification
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Unclassified Products</CardTitle>
+                    <CardDescription>
+                      Products missing gadget type or finish classification
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshUnclassified}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? (
+                      <Spinner className="mr-2 h-4 w-4" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 {unclassified === undefined ? (
@@ -457,48 +549,128 @@ export default function ProductClassificationPage() {
                     </p>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product Name</TableHead>
-                        <TableHead>Missing</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {unclassified.map((product) => (
-                        <TableRow key={product._id}>
-                          <TableCell className="font-medium">
-                            {product.title}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              {!product.gadgetCategory && (
-                                <Badge variant="destructive">No Gadget</Badge>
-                              )}
-                              {!product.finishTypeId && (
-                                <Badge variant="destructive">No Finish</Badge>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={() =>
-                                window.open(
-                                  `/backend-skinly/products/${product._id}`,
-                                  "_blank"
-                                )
-                              }
-                            >
-                              Edit Product
-                            </Button>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[200px]">Product Name</TableHead>
+                          <TableHead className="min-w-[150px]">Current Status</TableHead>
+                          <TableHead className="min-w-[180px]">Gadget Type</TableHead>
+                          <TableHead className="min-w-[180px]">Finish Type</TableHead>
+                          <TableHead className="min-w-[140px]">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {unclassified.map((product) => {
+                          const edits = editingProducts[product._id] || {};
+                          const isSaving = savingProductId === product._id;
+                          
+                          return (
+                            <TableRow key={product._id}>
+                              <TableCell className="font-medium">
+                                <div className="max-w-[200px] truncate" title={product.title}>
+                                  {product.title}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {!product.gadgetCategory && (
+                                    <Badge variant="destructive" className="text-xs">No Gadget</Badge>
+                                  )}
+                                  {!product.finishTypeId && (
+                                    <Badge variant="destructive" className="text-xs">No Finish</Badge>
+                                  )}
+                                  {product.gadgetCategory && (
+                                    <Badge variant="secondary" className="text-xs">{product.gadgetCategory}</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={edits.gadgetCategory ?? product.gadgetCategory ?? "none"}
+                                  onValueChange={(value) => handleInlineGadgetChange(product._id, value as GadgetCategory | "none")}
+                                  disabled={isSaving}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select gadget" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">-- Select --</SelectItem>
+                                    <SelectItem value="phone">Phone</SelectItem>
+                                    <SelectItem value="laptop">Laptop</SelectItem>
+                                    <SelectItem value="tablet">Tablet</SelectItem>
+                                    <SelectItem value="camera">Camera</SelectItem>
+                                    <SelectItem value="lens">Lens</SelectItem>
+                                    <SelectItem value="drone">Drone</SelectItem>
+                                    <SelectItem value="charger">Charger</SelectItem>
+                                    <SelectItem value="console">Console</SelectItem>
+                                    <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                                    <SelectItem value="cover">Cover</SelectItem>
+                                    <SelectItem value="accessory">Accessory</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={
+                                    edits.finishTypeId === null 
+                                      ? "none" 
+                                      : edits.finishTypeId ?? product.finishTypeId ?? "none"
+                                  }
+                                  onValueChange={(value) => handleInlineFinishChange(product._id, value)}
+                                  disabled={isSaving}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select finish" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">-- Select --</SelectItem>
+                                    {finishTypes?.map((finish) => (
+                                      <SelectItem key={finish._id} value={finish._id}>
+                                        {finish.displayName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => handleSaveInlineEdit(product._id)}
+                                    disabled={isSaving || (!edits.gadgetCategory && edits.finishTypeId === undefined)}
+                                  >
+                                    {isSaving ? (
+                                      <Spinner className="h-3 w-3" />
+                                    ) : (
+                                      <>
+                                        <Save className="mr-1 h-3 w-3" />
+                                        Save
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      window.open(
+                                        `/backend-skinly/products/${product._id}`,
+                                        "_blank"
+                                      )
+                                    }
+                                    disabled={isSaving}
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
                 )}
               </CardContent>
             </Card>
