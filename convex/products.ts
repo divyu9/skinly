@@ -585,6 +585,7 @@ export const updateProduct = mutation({
     weight: v.optional(v.number()),
     productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
     gadgetCategory: v.optional(v.string()),
+    gadgetTypeId: v.optional(v.id("gadgetTypes")),
     finishTypeId: v.optional(v.id("finishTypes")),
     productCategory: v.optional(v.union(
       v.literal("skin"),
@@ -623,6 +624,7 @@ export const updateProduct = mutation({
       weight?: number;
       productType?: "physical" | "digital";
       gadgetCategory?: "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
+      gadgetTypeId?: Id<"gadgetTypes">;
       finishTypeId?: Id<"finishTypes">;
       productCategory?: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
     }> = {

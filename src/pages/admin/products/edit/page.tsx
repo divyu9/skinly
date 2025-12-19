@@ -32,6 +32,7 @@ function EditProductPageInner() {
   const navigate = useNavigate();
   const collections = useQuery(api.collections.getAllCollections, {});
   const finishTypes = useQuery(api.finishTypes.listActive, {});
+  const gadgetTypes = useQuery(api.gadgetTypes.listActive, {});
   const product = useQuery(api.products.getProduct, { productId: productId as Id<"products"> });
   const updateProduct = useMutation(api.products.updateProduct);
   const createVariant = useMutation(api.products.createVariant);
@@ -53,7 +54,7 @@ function EditProductPageInner() {
     height: string;
     weight: string;
     productType: "physical" | "digital";
-    gadgetCategory: string;
+    gadgetTypeId: Id<"gadgetTypes"> | "";
     finishTypeId: Id<"finishTypes"> | "";
     productCategory: string;
   }>({
@@ -71,7 +72,7 @@ function EditProductPageInner() {
     height: "2",
     weight: "100",
     productType: "physical",
-    gadgetCategory: "",
+    gadgetTypeId: "",
     finishTypeId: "",
     productCategory: "",
   });
@@ -108,7 +109,7 @@ function EditProductPageInner() {
         height: (product.height ?? 2).toString(),
         weight: (product.weight ?? 100).toString(),
         productType: product.productType ?? "physical",
-        gadgetCategory: product.gadgetCategory || "",
+        gadgetTypeId: product.gadgetTypeId || "",
         finishTypeId: product.finishTypeId || "",
         productCategory: product.productCategory || "",
       });
@@ -250,7 +251,7 @@ function EditProductPageInner() {
         height: parseFloat(formData.height),
         weight: parseFloat(formData.weight),
         productType: formData.productType,
-        gadgetCategory: formData.gadgetCategory || undefined,
+        gadgetTypeId: formData.gadgetTypeId ? (formData.gadgetTypeId as Id<"gadgetTypes">) : undefined,
         finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
         productCategory: formData.productCategory ? (formData.productCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory") : undefined,
       });
@@ -291,7 +292,7 @@ function EditProductPageInner() {
     }
   };
 
-  if (collections === undefined || product === undefined) {
+  if (collections === undefined || product === undefined || gadgetTypes === undefined) {
     return <Skeleton className="h-screen w-full" />;
   }
 
@@ -621,27 +622,30 @@ function EditProductPageInner() {
               </div>
 
               <div>
-                <Label htmlFor="gadgetCategory">Gadget Category (Optional)</Label>
-                <Select
-                  value={formData.gadgetCategory || undefined}
-                  onValueChange={(value) => setFormData({ ...formData, gadgetCategory: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select gadget type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Phone">Phone</SelectItem>
-                    <SelectItem value="Laptop">Laptop</SelectItem>
-                    <SelectItem value="Tablet">Tablet</SelectItem>
-                    <SelectItem value="iPad">iPad</SelectItem>
-                    <SelectItem value="Smartwatch">Smartwatch</SelectItem>
-                    <SelectItem value="Earbuds">Earbuds</SelectItem>
-                    <SelectItem value="Camera">Camera</SelectItem>
-                    <SelectItem value="Gaming Console">Gaming Console</SelectItem>
-                    <SelectItem value="Speaker">Speaker</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="gadgetType">Gadget Type (Optional)</Label>
+                {gadgetTypes === undefined ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : gadgetTypes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No gadget types available
+                  </p>
+                ) : (
+                  <Select
+                    value={formData.gadgetTypeId || undefined}
+                    onValueChange={(value) => setFormData({ ...formData, gadgetTypeId: value as Id<"gadgetTypes"> })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gadget type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gadgetTypes.map((gadgetType) => (
+                        <SelectItem key={gadgetType._id} value={gadgetType._id}>
+                          {gadgetType.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
 
               <div>

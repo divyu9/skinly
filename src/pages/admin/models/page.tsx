@@ -71,7 +71,7 @@ type Category = typeof CATEGORIES[number]["value"];
 interface ModelFormData {
   brandName: string;
   modelName: string;
-  category: Category;
+  category: string;
   isActive: boolean;
 }
 
@@ -128,7 +128,7 @@ export default function AdminModelsPage() {
 
   // Filter models
   const filteredModels = models
-    ?.filter((m: { category: Category; brandName: string; modelName: string; }) => {
+    ?.filter((m) => {
       if (categoryFilter !== "all" && m.category !== categoryFilter) return false;
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -139,7 +139,7 @@ export default function AdminModelsPage() {
       }
       return true;
     })
-    .sort((a: { _creationTime: number; }, b: { _creationTime: number; }) => b._creationTime - a._creationTime);
+    .sort((a, b) => b._creationTime - a._creationTime);
 
   const handleCreate = async () => {
     if (!formData.brandName.trim() || !formData.modelName.trim()) {
@@ -195,7 +195,7 @@ export default function AdminModelsPage() {
     _id: Id<"supportedModels">;
     brandName: string;
     modelName: string;
-    category: Category;
+    category: string;
     isActive: boolean;
   }) => {
     if (!model) return;
@@ -208,7 +208,7 @@ export default function AdminModelsPage() {
     setEditingModel({ id: model._id, data: formData });
   };
 
-  const getCategoryIcon = (category: Category) => {
+  const getCategoryIcon = (category: string) => {
     const cat = CATEGORIES.find((c) => c.value === category);
     const Icon = cat?.icon || PackageIcon;
     return <Icon className="size-4" />;
