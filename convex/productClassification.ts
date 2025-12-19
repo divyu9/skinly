@@ -213,12 +213,12 @@ export const applyAutoClassification = mutation({
         
         // Only update if we detected something and it's different from current value
         const updates: {
-          gadgetCategory?: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
+          gadgetCategory?: string;
           finishTypeId?: Id<"finishTypes">;
         } = {};
         
         if (detectedGadget && detectedGadget !== product.gadgetCategory) {
-          updates.gadgetCategory = detectedGadget as typeof updates.gadgetCategory;
+          updates.gadgetCategory = detectedGadget;
         }
         
         if (detectedFinish && detectedGadget !== "accessory") {
@@ -284,20 +284,7 @@ export const getUnclassifiedProducts = query({
 // Get products by classification status
 export const getProductsByClassification = query({
   args: {
-    gadgetCategory: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("laptop"),
-      v.literal("tablet"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("drone"),
-      v.literal("charger"),
-      v.literal("console"),
-      v.literal("mac-mini"),
-      v.literal("cover"),
-      v.literal("accessory"),
-      v.literal("unclassified")
-    )),
+    gadgetCategory: v.optional(v.string()), // Accept any string for dynamic gadget types
     finishTypeId: v.optional(v.id("finishTypes")),
   },
   handler: async (ctx, args) => {
@@ -309,11 +296,7 @@ export const getProductsByClassification = query({
     let filtered = products;
     
     if (args.gadgetCategory) {
-      if (args.gadgetCategory === "unclassified") {
-        filtered = filtered.filter(p => !p.gadgetCategory || !p.finishTypeId);
-      } else {
-        filtered = filtered.filter(p => p.gadgetCategory === args.gadgetCategory);
-      }
+      filtered = filtered.filter(p => p.gadgetCategory === args.gadgetCategory);
     }
     
     if (args.finishTypeId) {
@@ -328,19 +311,7 @@ export const getProductsByClassification = query({
 export const bulkUpdateClassification = mutation({
   args: {
     productIds: v.array(v.id("products")),
-    gadgetCategory: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("laptop"),
-      v.literal("tablet"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("drone"),
-      v.literal("charger"),
-      v.literal("console"),
-      v.literal("mac-mini"),
-      v.literal("cover"),
-      v.literal("accessory")
-    )),
+    gadgetCategory: v.optional(v.string()), // Accept any string for dynamic gadget types
     finishTypeId: v.optional(v.id("finishTypes")),
   },
   handler: async (ctx, args) => {
@@ -403,19 +374,8 @@ export const bulkUpdateClassification = mutation({
 export const updateSingleProductClassification = mutation({
   args: {
     productId: v.id("products"),
-    gadgetCategory: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("laptop"),
-      v.literal("tablet"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("drone"),
-      v.literal("charger"),
-      v.literal("console"),
-      v.literal("mac-mini"),
-      v.literal("cover"),
-      v.literal("accessory")
-    )),
+    gadgetCategory: v.optional(v.string()), // Accept any string for dynamic gadget types
+    gadgetTypeId: v.optional(v.id("gadgetTypes")), // Support new gadgetTypeId field
     finishTypeId: v.optional(v.union(v.id("finishTypes"), v.null())),
   },
   handler: async (ctx, args) => {
@@ -429,12 +389,29 @@ export const updateSingleProductClassification = mutation({
     }
     
     const updates: Partial<{
-      gadgetCategory: typeof args.gadgetCategory;
+      gadgetCategory: string;
+      gadgetTypeId: Id<"gadgetTypes">;
       finishTypeId: Id<"finishTypes"> | undefined;
     }> = {};
     
+    // Update gadgetCategory (legacy field)
     if (args.gadgetCategory !== undefined) {
       updates.gadgetCategory = args.gadgetCategory;
+    }
+    
+    // Update gadgetTypeId (new field) - look up from gadgetCategory if provided
+    if (args.gadgetTypeId !== undefined) {
+      updates.gadgetTypeId = args.gadgetTypeId;
+    } else if (args.gadgetCategory !== undefined) {
+      // Auto-populate gadgetTypeId from gadgetCategory name
+      const gadgetType = await ctx.db
+        .query("gadgetTypes")
+        .withIndex("by_name", (q) => q.eq("name", args.gadgetCategory!))
+        .first();
+      
+      if (gadgetType) {
+        updates.gadgetTypeId = gadgetType._id;
+      }
     }
     
     if (args.finishTypeId !== undefined) {
@@ -455,6 +432,24 @@ export const updateSingleProductClassification = mutation({
     // Update the product
     await ctx.db.patch(args.productId, updates);
     
+    // Recalculate product counts for affected gadget types
+    const gadgetTypesToUpdate = new Set<Id<"gadgetTypes">>();
+    
+    if (product.gadgetTypeId) {
+      gadgetTypesToUpdate.add(product.gadgetTypeId);
+    }
+    
+    if (updates.gadgetTypeId) {
+      gadgetTypesToUpdate.add(updates.gadgetTypeId);
+    }
+    
+    const allProducts = await ctx.db.query("products").collect();
+    
+    for (const gadgetTypeId of gadgetTypesToUpdate) {
+      const count = allProducts.filter(p => p.gadgetTypeId === gadgetTypeId).length;
+      await ctx.db.patch(gadgetTypeId, { productCount: count });
+    }
+    
     // Recalculate product counts for affected finish types
     const finishTypesToUpdate = new Set<Id<"finishTypes">>();
     
@@ -467,10 +462,7 @@ export const updateSingleProductClassification = mutation({
     }
     
     for (const finishTypeId of finishTypesToUpdate) {
-      const productsWithFinish = await ctx.db
-        .query("products")
-        .withIndex("by_finish_type", (q) => q.eq("finishTypeId", finishTypeId))
-        .collect();
+      const productsWithFinish = allProducts.filter(p => p.finishTypeId === finishTypeId);
       
       await ctx.db.patch(finishTypeId, {
         productCount: productsWithFinish.length,

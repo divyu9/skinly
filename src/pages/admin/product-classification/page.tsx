@@ -18,8 +18,6 @@ import { Label } from "@/components/ui/label.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 
 export default function ProductClassificationPage() {
-  type GadgetCategory = "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
-  
   const [selectedGadget, setSelectedGadget] = useState<string>("all");
   const [selectedFinish, setSelectedFinish] = useState<string>("all");
   const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
@@ -41,7 +39,7 @@ export default function ProductClassificationPage() {
   
   // Inline editing state for unclassified products
   const [editingProducts, setEditingProducts] = useState<Record<string, {
-    gadgetCategory?: GadgetCategory;
+    gadgetCategory?: string;
     finishTypeId?: Id<"finishTypes"> | null;
   }>>({});
   const [savingProductId, setSavingProductId] = useState<Id<"products"> | null>(null);
@@ -302,7 +300,7 @@ export default function ProductClassificationPage() {
   };
 
   // Inline editing handlers
-  const handleInlineGadgetChange = (productId: Id<"products">, gadgetCategory: GadgetCategory | "none") => {
+  const handleInlineGadgetChange = (productId: Id<"products">, gadgetCategory: string) => {
     setEditingProducts(prev => ({
       ...prev,
       [productId]: {
@@ -699,7 +697,7 @@ export default function ProductClassificationPage() {
                               <TableCell>
                                 <Select
                                   value={edits.gadgetCategory ?? product.gadgetCategory ?? "none"}
-                                  onValueChange={(value) => handleInlineGadgetChange(product._id, value as GadgetCategory | "none")}
+                                  onValueChange={(value) => handleInlineGadgetChange(product._id, value)}
                                   disabled={isSaving}
                                 >
                                   <SelectTrigger className="h-8 text-xs">

@@ -228,19 +228,7 @@ export default defineSchema({
       phoneModel: v.optional(v.string()), // e.g., "iPhone 14 Pro", "Realme 11", etc.
     })),
     tags: v.array(v.string()),
-    gadgetCategory: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("laptop"),
-      v.literal("tablet"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("drone"),
-      v.literal("charger"),
-      v.literal("console"),
-      v.literal("mac-mini"),
-      v.literal("cover"),
-      v.literal("accessory")
-    )), // DEPRECATED - keeping temporarily for migration
+    gadgetCategory: v.optional(v.string()), // DEPRECATED - keeping temporarily for migration, now accepts any string
     gadgetTypeId: v.optional(v.id("gadgetTypes")), // Reference to gadgetTypes table
     finishType: v.optional(v.union(
       v.literal("matte"),
