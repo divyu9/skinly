@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { 
   ArrowLeftIcon, 
@@ -69,8 +69,10 @@ const skinUSPs = [
 export default function ProductDetailPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const params = useParams();
   const productId = searchParams.get('id');
-  const productSlug = searchParams.get('slug');
+  // Prioritize slug from URL params over query params
+  const productSlug = params.slug || searchParams.get('slug');
   const phoneModel = searchParams.get('model');
   const phoneBrand = searchParams.get('brand');
   
