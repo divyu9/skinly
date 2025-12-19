@@ -105,15 +105,63 @@ export const recalculateProductCounts = mutation({
     const gadgetTypes = await ctx.db.query("gadgetTypes").collect();
     
     for (const gadgetType of gadgetTypes) {
-      const count = await ctx.db
-        .query("products")
-        .filter((q) => q.eq(q.field("gadgetTypeId"), gadgetType._id))
-        .collect();
+      // Count by gadgetTypeId (new field) OR gadgetCategory (legacy field matching by name)
+      const allProducts = await ctx.db.query("products").collect();
+      const count = allProducts.filter(p => 
+        p.gadgetTypeId === gadgetType._id || p.gadgetCategory === gadgetType.name
+      ).length;
       
-      await ctx.db.patch(gadgetType._id, { productCount: count.length });
+      await ctx.db.patch(gadgetType._id, { productCount: count });
     }
     
     return gadgetTypes.length;
+  },
+});
+
+// Migrate products from gadgetCategory (string) to gadgetTypeId (ID reference)
+export const migrateProductGadgetTypes = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Get all gadget types and create a map from name to ID
+    const gadgetTypes = await ctx.db.query("gadgetTypes").collect();
+    const nameToIdMap = new Map(gadgetTypes.map(gt => [gt.name, gt._id]));
+    
+    // Get all products
+    const products = await ctx.db.query("products").collect();
+    
+    let migrated = 0;
+    let skipped = 0;
+    
+    for (const product of products) {
+      // Skip if already has gadgetTypeId
+      if (product.gadgetTypeId) {
+        skipped++;
+        continue;
+      }
+      
+      // Skip if no gadgetCategory
+      if (!product.gadgetCategory) {
+        skipped++;
+        continue;
+      }
+      
+      // Find matching gadget type ID
+      const gadgetTypeId = nameToIdMap.get(product.gadgetCategory);
+      
+      if (gadgetTypeId) {
+        await ctx.db.patch(product._id, { gadgetTypeId });
+        migrated++;
+      } else {
+        skipped++;
+      }
+    }
+    
+    return { 
+      success: true,
+      migrated, 
+      skipped,
+      message: `Migrated ${migrated} products, skipped ${skipped}` 
+    };
   },
 });
 

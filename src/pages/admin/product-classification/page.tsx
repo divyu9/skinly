@@ -81,6 +81,7 @@ export default function ProductClassificationPage() {
   const updateGadgetType = useMutation(api.gadgetTypes.update);
   const deleteGadgetType = useMutation(api.gadgetTypes.remove);
   const recalculateGadgetCounts = useMutation(api.gadgetTypes.recalculateProductCounts);
+  const migrateGadgetTypes = useMutation(api.gadgetTypes.migrateProductGadgetTypes);
 
   const gadgetCategories = [
     "Phone",
@@ -285,6 +286,18 @@ export default function ProductClassificationPage() {
       toast.success("Gadget type product counts synced successfully");
     } catch (error) {
       toast.error("Failed to sync gadget type product counts");
+      console.error(error);
+    }
+  };
+
+  const handleMigrateGadgetTypes = async () => {
+    try {
+      const result = await migrateGadgetTypes({});
+      toast.success(result.message);
+      // Refresh counts after migration
+      await recalculateGadgetCounts({});
+    } catch (error) {
+      toast.error("Failed to migrate gadget types");
       console.error(error);
     }
   };
@@ -959,6 +972,14 @@ export default function ProductClassificationPage() {
                     </CardDescription>
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleMigrateGadgetTypes}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Migrate Products
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
