@@ -1,4 +1,4 @@
-import { usePaginatedQuery, useAction, useQuery, useQueries } from "convex/react";
+import { usePaginatedQuery, useAction, useQuery, useQueries, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
+import { HeaderSearch } from "@/components/header-search.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -20,6 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
 import { trackSearch, trackCollectionView } from "@/lib/analytics.ts";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -112,6 +121,14 @@ export default function ProductsPage() {
   
   // Get OOS sorting setting
   const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
+  
+  // Model request dialog state
+  const [isModelRequestOpen, setIsModelRequestOpen] = useState(false);
+  const [modelRequestBrand, setModelRequestBrand] = useState("");
+  const [modelRequestModel, setModelRequestModel] = useState("");
+  const [modelRequestCategory, setModelRequestCategory] = useState("");
+  const [modelRequestPhone, setModelRequestPhone] = useState("");
+  const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
   // Get URL parameters (must be before queries that depend on them)
   const urlParams = new URLSearchParams(window.location.search);
@@ -347,6 +364,32 @@ export default function ProductsPage() {
       const errorMsg = err instanceof Error ? err.message : "Connection failed";
       toast.error(`Connection Error: ${errorMsg}`);
       console.error("Shopify connection error:", err);
+    }
+  };
+  
+  // Handle model request submission
+  const handleModelRequestSubmit = async () => {
+    if (!modelRequestBrand.trim() || !modelRequestModel.trim() || !modelRequestCategory || !modelRequestPhone.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    
+    try {
+      await createModelRequest({
+        brandName: modelRequestBrand.trim(),
+        modelName: modelRequestModel.trim(),
+        category: modelRequestCategory,
+        whatsappPhone: modelRequestPhone.trim(),
+      });
+      toast.success("Model request submitted! We'll notify you when it's added.");
+      setIsModelRequestOpen(false);
+      setModelRequestBrand("");
+      setModelRequestModel("");
+      setModelRequestCategory("");
+      setModelRequestPhone("");
+    } catch (error) {
+      toast.error("Failed to submit request. Please try again.");
+      console.error("Model request error:", error);
     }
   };
 
@@ -678,14 +721,20 @@ export default function ProductsPage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
               className="h-8 sm:h-10"
             />
           </Link>
+          
+          {/* Header Search - Hidden on mobile, shown on tablet+ */}
+          <div className="hidden md:flex flex-1 max-w-lg">
+            <HeaderSearch onRequestModelClick={() => setIsModelRequestOpen(true)} />
+          </div>
+          
           <div className="flex items-center gap-2 sm:gap-6">
             <a href="/#products" className="text-[10px] sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
               Shop
@@ -738,14 +787,14 @@ export default function ProductsPage() {
           </div>
 
           {/* Gadget Selector Welcome Banner */}
-          {fromGadgetSelector && modelFilter && modelInfo && (
+          {fromGadgetSelector && brandFilter && modelFilter && modelInfo && (
             <div className="mb-6 max-w-4xl mx-auto">
-              <GadgetSelectorBanner modelName={modelFilter} />
+              <GadgetSelectorBanner brandName={brandFilter} modelName={modelFilter} />
             </div>
           )}
 
           {/* Product Type Tabs - First level navigation */}
-          {!brandFilter && !modelFilter && productCategories && (
+          {productCategories && (
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 {productCategories.map((category) => {
@@ -782,7 +831,7 @@ export default function ProductsPage() {
           )}
 
           {/* Gadget Category Tabs - Only show when Skins product type is selected */}
-          {!brandFilter && !modelFilter && productCategory === 'skin' && gadgetTypes && (
+          {productCategory === 'skin' && gadgetTypes && (
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
@@ -1106,6 +1155,83 @@ export default function ProductsPage() {
           )}
         </div>
       </section>
+      
+      {/* Model Request Dialog */}
+      <Dialog open={isModelRequestOpen} onOpenChange={setIsModelRequestOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Your Model</DialogTitle>
+            <DialogDescription>
+              Can't find your device? Let us know and we'll add it!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="brand">Brand *</Label>
+              <Input
+                id="brand"
+                placeholder="e.g., Apple, Samsung, OnePlus"
+                value={modelRequestBrand}
+                onChange={(e) => setModelRequestBrand(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="model">Model Name *</Label>
+              <Input
+                id="model"
+                placeholder="e.g., iPhone 15 Pro Max"
+                value={modelRequestModel}
+                onChange={(e) => setModelRequestModel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Device Type *</Label>
+              <Select value={modelRequestCategory} onValueChange={setModelRequestCategory}>
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select device type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="tablet">Tablet</SelectItem>
+                  <SelectItem value="camera">Camera</SelectItem>
+                  <SelectItem value="lens">Lens</SelectItem>
+                  <SelectItem value="console">Gaming Console</SelectItem>
+                  <SelectItem value="drone">Drone</SelectItem>
+                  <SelectItem value="charger">Charger</SelectItem>
+                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">WhatsApp Number *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="e.g., +919876543210"
+                value={modelRequestPhone}
+                onChange={(e) => setModelRequestPhone(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsModelRequestOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleModelRequestSubmit}
+                disabled={!modelRequestBrand.trim() || !modelRequestModel.trim() || !modelRequestCategory || !modelRequestPhone.trim()}
+              >
+                Submit Request
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

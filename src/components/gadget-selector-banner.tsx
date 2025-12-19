@@ -1,28 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { CheckCircle2Icon, XIcon } from "lucide-react";
 
 interface GadgetSelectorBannerProps {
+  brandName: string;
   modelName: string;
 }
 
-export function GadgetSelectorBanner({ modelName }: GadgetSelectorBannerProps) {
+export function GadgetSelectorBanner({ brandName, modelName }: GadgetSelectorBannerProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [shouldRender, setShouldRender] = useState(true);
 
-  // Check if banner was dismissed in this session
-  useEffect(() => {
-    const dismissed = sessionStorage.getItem('gadgetSelectorBannerDismissed');
-    if (dismissed === 'true') {
-      setIsVisible(false);
-      setShouldRender(false);
-    }
-  }, []);
-
   const handleDismiss = () => {
     setIsVisible(false);
-    sessionStorage.setItem('gadgetSelectorBannerDismissed', 'true');
     // Remove from DOM after animation
     setTimeout(() => setShouldRender(false), 300);
   };
@@ -47,7 +38,7 @@ export function GadgetSelectorBanner({ modelName }: GadgetSelectorBannerProps) {
                   Yay – we got you covered!
                 </h3>
                 <AlertDescription className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                  Your model <span className="font-semibold text-foreground">{modelName}</span> is available with us. 
+                  Your model <span className="font-semibold text-foreground">{brandName} - {modelName}</span> is available with us. 
                   All pics are reference designs – choose your design and we'll send it for your exact model only.
                 </AlertDescription>
               </div>
