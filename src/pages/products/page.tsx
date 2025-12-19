@@ -93,7 +93,8 @@ interface ConvexProduct {
   status: "active" | "draft" | "archived";
   images: Array<{ url: string; alt?: string }>;
   tags: string[];
-  gadgetCategory?: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
+  productCategory?: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
+  gadgetCategory?: string;
   finishType?: "matte" | "embossed" | "transparent";
   variants: Array<{
     _id: Id<"variants">;
@@ -121,12 +122,30 @@ export default function ProductsPage() {
   const urlSearchQuery = urlParams.get('search') || '';
   const collectionParam = urlParams.get('collection') || '';
   
+  // Get finish types and gadget types for filtering
+  const finishTypes = useQuery(api.finishTypes.listAllActive, {});
+  const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
+  
+  // Determine productCategory from URL or state
+  const urlProductType = urlParams.get('productType');
+  const productCategory = urlProductType as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null;
+  
+  // Find gadgetTypeId from gadgetFilter
+  const selectedGadgetType = gadgetTypes?.find(gt => gt.name === gadgetFilter);
+  const gadgetTypeId = selectedGadgetType?._id;
+  
+  // Find finishTypeId from finishFilter
+  const selectedFinishType = finishTypes?.find(ft => ft.name === finishFilter);
+  const finishTypeId = selectedFinishType?._id;
+  
   // Use paginated query - load 100 products at a time
-  // When coming from phone selector (brand + model), only load phone products
   const { results: productsData, status, loadMore } = usePaginatedQuery(
     api.products.getAllProductsPaginated,
     { 
       status: "active",
+      productCategory: productCategory || undefined,
+      gadgetTypeId: gadgetTypeId || undefined,
+      finishTypeId: finishTypeId || undefined,
       ...(brandFilter && modelFilter ? { gadgetCategory: "phone" } : {})
     },
     { initialNumItems: 100 }
@@ -162,7 +181,8 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
-  const [gadgetFilter, setGadgetFilter] = useState<string | null>(null);
+  const gadgetParam = urlParams.get('gadget');
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(gadgetParam);
   const [productTypeFilter, setProductTypeFilter] = useState<string | null>(null);
   
   // Get collection if collection parameter is present
@@ -284,95 +304,9 @@ export default function ProductsPage() {
     }));
   }, [productsData, accumulatedCollectionProducts, collectionParam]);
 
-  // Apply filters
+  // Apply search filter (backend handles productCategory, gadgetTypeId, finishTypeId filtering)
   const filteredProducts = useMemo(() => {
     let filtered = [...allProducts];
-    
-    // Filter to only phones when coming from phone selector
-    if (brandFilter && modelFilter) {
-      filtered = filtered.filter(p => p.gadgetCategory === "phone");
-    }
-    
-    // Filter by gadget category (new tab-based filter)
-    if (gadgetFilter && !brandFilter) {
-      filtered = filtered.filter(p => p.gadgetCategory === gadgetFilter);
-    }
-    
-    // Filter by product type
-    if (productTypeFilter) {
-      if (productTypeFilter === 'skins') {
-        // Show products with gadgetCategory (phone, laptop, tablet, etc.)
-        filtered = filtered.filter(p => p.gadgetCategory !== undefined && p.gadgetCategory !== null);
-      } else if (productTypeFilter === 'cover-and-case') {
-        const filteredByType = filtered.filter(p => {
-          const title = p.title.toLowerCase();
-          const tags = p.tags.toLowerCase();
-          return title.includes('cover') || title.includes('case') || tags.includes('cover') || tags.includes('case');
-        });
-        filtered = filteredByType;
-      } else if (productTypeFilter === 'camera-rings') {
-        const filteredByType = filtered.filter(p => {
-          const title = p.title.toLowerCase();
-          const tags = p.tags.toLowerCase();
-          return title.includes('camera ring') || title.includes('camera protector') || tags.includes('camera ring') || tags.includes('camera protector');
-        });
-        filtered = filteredByType;
-      } else if (productTypeFilter === 'magneto-x') {
-        const filteredByType = filtered.filter(p => {
-          const title = p.title.toLowerCase();
-          const tags = p.tags.toLowerCase();
-          return title.includes('magneto') || tags.includes('magneto');
-        });
-        filtered = filteredByType;
-      } else if (productTypeFilter === 'autoapply-glasses') {
-        const filteredByType = filtered.filter(p => {
-          const title = p.title.toLowerCase();
-          const tags = p.tags.toLowerCase();
-          return title.includes('autoapply') || title.includes('tempered glass') || title.includes('screen protector') || tags.includes('autoapply') || tags.includes('tempered glass');
-        });
-        filtered = filteredByType;
-      }
-    }
-    
-    // Filter by device (when not coming from phone selector)
-    if (deviceFilter && !brandFilter) {
-      filtered = filtered.filter(p => {
-        const title = p.title.toLowerCase();
-        if (deviceFilter === 'phone') return title.includes('phone') || title.includes('iphone') || title.includes('samsung') || title.includes('oneplus');
-        if (deviceFilter === 'laptop') return title.includes('laptop') || title.includes('macbook');
-        if (deviceFilter === 'mac mini') return title.includes('mac mini');
-        if (deviceFilter === 'drone') return title.includes('drone');
-        if (deviceFilter === 'camera') return title.includes('camera');
-        if (deviceFilter === 'lens') return title.includes('lens');
-        if (deviceFilter === 'charger') return title.includes('charger');
-        if (deviceFilter === 'ipad') return title.includes('ipad') || title.includes('tablet');
-        if (deviceFilter === 'console') return title.includes('console') || title.includes('playstation') || title.includes('xbox') || title.includes('nintendo');
-        return false;
-      });
-    }
-    
-    // Filter by finish
-    if (finishFilter) {
-      filtered = filtered.filter(p => {
-        const title = p.title.toLowerCase();
-        
-        // Special handling for membranes - match products with "gloss membrane" or "matte membrane"
-        if (finishFilter === 'membrane') {
-          const titleNoSpaces = title.replace(/\s+/g, '');
-          return titleNoSpaces.includes('glossmembrane') || titleNoSpaces.includes('mattemembrane');
-        }
-        
-        // Use finishType field if available
-        if (p.finishType) {
-          return p.finishType === finishFilter;
-        }
-        // Fallback to title matching if finishType not set
-        if (finishFilter === 'matte') return title.includes('matte');
-        if (finishFilter === 'embossed') return title.includes('3d textured') || title.includes('3d embossed');
-        if (finishFilter === 'transparent') return title.includes('tranzy');
-        return false;
-      });
-    }
     
     // Filter by search query
     if (searchQuery.trim()) {
@@ -385,7 +319,7 @@ export default function ProductsPage() {
     }
     
     return filtered;
-  }, [allProducts, deviceFilter, finishFilter, searchQuery, brandFilter, modelFilter, gadgetFilter, productTypeFilter]);
+  }, [allProducts, searchQuery]);
   
   // Apply sorting and stock filtering
   const sortedAndFilteredProducts = useMemo(() => {
@@ -733,9 +667,9 @@ export default function ProductsPage() {
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
-                  onClick={() => setProductTypeFilter('skins')}
+                  onClick={() => window.location.href = '/products?productType=skin'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productTypeFilter === 'skins'
+                    productCategory === 'skin'
                       ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg scale-105'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
@@ -744,9 +678,9 @@ export default function ProductsPage() {
                   Skins
                 </button>
                 <button
-                  onClick={() => setProductTypeFilter('cover-and-case')}
+                  onClick={() => window.location.href = '/products?productType=case-cover'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productTypeFilter === 'cover-and-case'
+                    productCategory === 'case-cover'
                       ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg scale-105'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
@@ -754,9 +688,9 @@ export default function ProductsPage() {
                   Cases And Covers
                 </button>
                 <button
-                  onClick={() => setProductTypeFilter('camera-rings')}
+                  onClick={() => window.location.href = '/products?productType=camera-ring'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productTypeFilter === 'camera-rings'
+                    productCategory === 'camera-ring'
                       ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-lg scale-105'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
@@ -764,9 +698,9 @@ export default function ProductsPage() {
                   Camera Rings
                 </button>
                 <button
-                  onClick={() => setProductTypeFilter('magneto-x')}
+                  onClick={() => window.location.href = '/products?productType=magneto-x'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productTypeFilter === 'magneto-x'
+                    productCategory === 'magneto-x'
                       ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg scale-105'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
@@ -774,9 +708,9 @@ export default function ProductsPage() {
                   Magneto X
                 </button>
                 <button
-                  onClick={() => setProductTypeFilter('autoapply-glasses')}
+                  onClick={() => window.location.href = '/products?productType=glass'}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productTypeFilter === 'autoapply-glasses'
+                    productCategory === 'glass'
                       ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-lg scale-105'
                       : 'bg-muted text-muted-foreground hover:bg-muted/80'
                   }`}
@@ -788,11 +722,15 @@ export default function ProductsPage() {
           )}
 
           {/* Gadget Category Tabs - Only show when Skins product type is selected */}
-          {!brandFilter && !modelFilter && productTypeFilter === 'skins' && (
+          {!brandFilter && !modelFilter && productCategory === 'skin' && gadgetTypes && (
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
-                  onClick={() => setGadgetFilter(null)}
+                  onClick={() => {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('productType', 'skin');
+                    window.location.href = `/products?${params.toString()}`;
+                  }}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
                     !gadgetFilter
                       ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
@@ -802,83 +740,35 @@ export default function ProductsPage() {
                   <Package2 className="size-4" />
                   All Gadgets
                 </button>
-                <button
-                  onClick={() => setGadgetFilter('phone')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'phone'
-                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Smartphone className="size-4" />
-                  Phones
-                </button>
-                <button
-                  onClick={() => setGadgetFilter('laptop')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'laptop'
-                      ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Laptop className="size-4" />
-                  Laptops
-                </button>
-                <button
-                  onClick={() => setGadgetFilter('tablet')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'tablet'
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Tablet className="size-4" />
-                  Tablets
-                </button>
-                <button
-                  onClick={() => setGadgetFilter('camera')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'camera'
-                      ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Camera className="size-4" />
-                  Cameras
-                </button>
-                <button
-                  onClick={() => setGadgetFilter('charger')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'charger'
-                      ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Zap className="size-4" />
-                  Chargers
-                </button>
-                <button
-                  onClick={() => setGadgetFilter('console')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'console'
-                      ? 'bg-gradient-to-r from-indigo-500 to-violet-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Gamepad2 className="size-4" />
-                  Consoles
-                </button>
-                <button
-                  onClick={() => setGadgetFilter('drone')}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    gadgetFilter === 'drone'
-                      ? 'bg-gradient-to-r from-teal-500 to-green-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4"><path d="M12 2v3"/><path d="M12 19v3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="m5 7 14 10"/><path d="m5 17 14-10"/><circle cx="12" cy="12" r="2"/></svg>
-                  Drones
-                </button>
+                {gadgetTypes.map((gadgetType) => {
+                  const IconComponent = gadgetType.name === 'phone' ? Smartphone :
+                    gadgetType.name === 'laptop' ? Laptop :
+                    gadgetType.name === 'tablet' ? Tablet :
+                    gadgetType.name === 'camera' ? Camera :
+                    gadgetType.name === 'charger' ? Zap :
+                    gadgetType.name === 'console' ? Gamepad2 :
+                    Package2;
+                  
+                  return (
+                    <button
+                      key={gadgetType._id}
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('productType', 'skin');
+                        params.set('gadget', gadgetType.name);
+                        window.location.href = `/products?${params.toString()}`;
+                      }}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                        gadgetFilter === gadgetType.name
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      <IconComponent className="size-4" />
+                      {gadgetType.displayName}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -941,13 +831,13 @@ export default function ProductsPage() {
                   <button
                     onClick={() => {
                       if (brandFilter && modelFilter) {
-                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=membrane`;
+                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=protectors`;
                       } else {
-                        window.location.href = `/products?finish=membrane`;
+                        window.location.href = `/products?finish=protectors`;
                       }
                     }}
                     className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
-                      finishFilter === 'membrane' 
+                      finishFilter === 'protectors' 
                         ? 'border-primary text-primary' 
                         : 'border-transparent text-muted-foreground hover:text-foreground'
                     }`}

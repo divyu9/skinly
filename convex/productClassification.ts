@@ -374,6 +374,14 @@ export const bulkUpdateClassification = mutation({
 export const updateSingleProductClassification = mutation({
   args: {
     productId: v.id("products"),
+    productCategory: v.optional(v.union(
+      v.literal("skin"),
+      v.literal("case-cover"),
+      v.literal("camera-ring"),
+      v.literal("magneto-x"),
+      v.literal("glass"),
+      v.literal("accessory")
+    )),
     gadgetCategory: v.optional(v.string()), // Accept any string for dynamic gadget types
     gadgetTypeId: v.optional(v.id("gadgetTypes")), // Support new gadgetTypeId field
     finishTypeId: v.optional(v.union(v.id("finishTypes"), v.null())),
@@ -389,10 +397,16 @@ export const updateSingleProductClassification = mutation({
     }
     
     const updates: Partial<{
+      productCategory: typeof args.productCategory;
       gadgetCategory: string;
       gadgetTypeId: Id<"gadgetTypes">;
       finishTypeId: Id<"finishTypes"> | undefined;
     }> = {};
+    
+    // Update productCategory
+    if (args.productCategory !== undefined) {
+      updates.productCategory = args.productCategory;
+    }
     
     // Update gadgetCategory (legacy field)
     if (args.gadgetCategory !== undefined) {

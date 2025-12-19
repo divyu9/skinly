@@ -228,6 +228,14 @@ export default defineSchema({
       phoneModel: v.optional(v.string()), // e.g., "iPhone 14 Pro", "Realme 11", etc.
     })),
     tags: v.array(v.string()),
+    productCategory: v.optional(v.union(
+      v.literal("skin"),
+      v.literal("case-cover"),
+      v.literal("camera-ring"),
+      v.literal("magneto-x"),
+      v.literal("glass"),
+      v.literal("accessory")
+    )), // Product type category (skins vs accessories vs protectors)
     gadgetCategory: v.optional(v.string()), // DEPRECATED - keeping temporarily for migration, now accepts any string
     gadgetTypeId: v.optional(v.id("gadgetTypes")), // Reference to gadgetTypes table
     finishType: v.optional(v.union(
@@ -251,7 +259,10 @@ export default defineSchema({
     .index("by_gadget_type", ["gadgetTypeId"])
     .index("by_finish_type", ["finishTypeId"])
     .index("by_category_and_finish", ["gadgetCategory", "finishTypeId"])
-    .index("by_gadget_type_and_finish", ["gadgetTypeId", "finishTypeId"]),
+    .index("by_gadget_type_and_finish", ["gadgetTypeId", "finishTypeId"])
+    .index("by_product_category", ["productCategory"])
+    .index("by_product_category_and_gadget", ["productCategory", "gadgetTypeId"])
+    .index("by_product_category_and_finish", ["productCategory", "finishTypeId"]),
 
   variants: defineTable({
     productId: v.id("products"),

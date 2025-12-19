@@ -58,7 +58,7 @@ export default function ProductClassificationPage() {
     selectedGadget === "all" && selectedFinish === "all"
       ? "skip"
       : {
-          gadgetCategory: selectedGadget === "all" ? undefined : (selectedGadget as GadgetCategory),
+          gadgetCategory: selectedGadget === "all" ? undefined : selectedGadget,
           finishTypeId: selectedFinish === "all" ? undefined : (selectedFinish as Id<"finishTypes">),
         }
   );
@@ -102,7 +102,7 @@ export default function ProductClassificationPage() {
     }
   };
 
-  const handleBulkUpdateGadget = async (productIds: Id<"products">[], gadgetCategory: GadgetCategory) => {
+  const handleBulkUpdateGadget = async (productIds: Id<"products">[], gadgetCategory: string) => {
     try {
       await bulkUpdate({ productIds, gadgetCategory, finishTypeId: undefined });
       toast.success(`Updated ${productIds.length} products`);
