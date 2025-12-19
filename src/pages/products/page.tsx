@@ -761,7 +761,9 @@ export default function ProductsPage() {
                   <Package2 className="size-4" />
                   All Gadgets
                 </button>
-                {gadgetTypes.map((gadgetType) => {
+                {gadgetTypes
+                  .filter((gadgetType) => gadgetType.name !== 'accessory' && gadgetType.name !== 'cover')
+                  .map((gadgetType) => {
                   // Map gadget type names to icons
                   const gadgetIconMap: Record<string, typeof Package2> = {
                     'phone': Smartphone,
@@ -773,8 +775,6 @@ export default function ProductsPage() {
                     'charger': Zap,
                     'console': Gamepad2,
                     'mac-mini': Box,
-                    'cover': Shield,
-                    'accessory': ShoppingBag,
                   };
                   const IconComponent = gadgetIconMap[gadgetType.name] || Package2;
                   
