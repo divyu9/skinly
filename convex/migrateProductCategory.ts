@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 
 // Migration to classify products into productCategory field
 export const migrateProductsToProductCategory = mutation({
@@ -82,7 +82,7 @@ export const migrateProductsToProductCategory = mutation({
 });
 
 // Get migration preview
-export const previewProductCategoryMigration = mutation({
+export const previewProductCategoryMigration = query({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const limit = args.limit || 50;
