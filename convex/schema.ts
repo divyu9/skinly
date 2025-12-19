@@ -165,6 +165,15 @@ export default defineSchema({
     .index("by_is_active", ["isActive"])
     .index("by_name", ["name"]),
 
+  gadgetTypes: defineTable({
+    name: v.string(), // Internal name (e.g., "phone")
+    displayName: v.string(), // Display name (e.g., "Phone")
+    isActive: v.boolean(),
+    productCount: v.number(), // Auto-updated count of products using this gadget type
+  })
+    .index("by_is_active", ["isActive"])
+    .index("by_name", ["name"]),
+
   collections: defineTable({
     name: v.string(),
     slug: v.string(),
@@ -231,7 +240,8 @@ export default defineSchema({
       v.literal("mac-mini"),
       v.literal("cover"),
       v.literal("accessory")
-    )),
+    )), // DEPRECATED - keeping temporarily for migration
+    gadgetTypeId: v.optional(v.id("gadgetTypes")), // Reference to gadgetTypes table
     finishType: v.optional(v.union(
       v.literal("matte"),
       v.literal("embossed"),
@@ -250,8 +260,10 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_status_and_category", ["status", "gadgetCategory"])
     .index("by_gadget_category", ["gadgetCategory"])
+    .index("by_gadget_type", ["gadgetTypeId"])
     .index("by_finish_type", ["finishTypeId"])
-    .index("by_category_and_finish", ["gadgetCategory", "finishTypeId"]),
+    .index("by_category_and_finish", ["gadgetCategory", "finishTypeId"])
+    .index("by_gadget_type_and_finish", ["gadgetTypeId", "finishTypeId"]),
 
   variants: defineTable({
     productId: v.id("products"),

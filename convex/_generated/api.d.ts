@@ -36,6 +36,7 @@ import type * as exports from "../exports.js";
 import type * as finishTypes from "../finishTypes.js";
 import type * as fixCoupon from "../fixCoupon.js";
 import type * as fixOrderReceivedMapping from "../fixOrderReceivedMapping.js";
+import type * as gadgetTypes from "../gadgetTypes.js";
 import type * as googleDriveImport from "../googleDriveImport.js";
 import type * as googleDriveImportPublic from "../googleDriveImportPublic.js";
 import type * as gst from "../gst.js";
@@ -128,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   finishTypes: typeof finishTypes;
   fixCoupon: typeof fixCoupon;
   fixOrderReceivedMapping: typeof fixOrderReceivedMapping;
+  gadgetTypes: typeof gadgetTypes;
   googleDriveImport: typeof googleDriveImport;
   googleDriveImportPublic: typeof googleDriveImportPublic;
   gst: typeof gst;

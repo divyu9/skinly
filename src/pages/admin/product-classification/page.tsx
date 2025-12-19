@@ -31,6 +31,13 @@ export default function ProductClassificationPage() {
   const [isDeleteFinishTypeOpen, setIsDeleteFinishTypeOpen] = useState(false);
   const [selectedFinishType, setSelectedFinishType] = useState<Id<"finishTypes"> | null>(null);
   const [finishTypeForm, setFinishTypeForm] = useState({ name: "", displayName: "" });
+
+  // Gadget type management state
+  const [isCreateGadgetTypeOpen, setIsCreateGadgetTypeOpen] = useState(false);
+  const [isEditGadgetTypeOpen, setIsEditGadgetTypeOpen] = useState(false);
+  const [isDeleteGadgetTypeOpen, setIsDeleteGadgetTypeOpen] = useState(false);
+  const [selectedGadgetType, setSelectedGadgetType] = useState<Id<"gadgetTypes"> | null>(null);
+  const [gadgetTypeForm, setGadgetTypeForm] = useState({ name: "", displayName: "" });
   
   // Inline editing state for unclassified products
   const [editingProducts, setEditingProducts] = useState<Record<string, {
@@ -44,6 +51,8 @@ export default function ProductClassificationPage() {
   const stats = useQuery(api.productClassification.getClassificationStats, {});
   const finishTypes = useQuery(api.finishTypes.listAllActive, {}); // Use listAllActive for dropdowns
   const allFinishTypes = useQuery(api.finishTypes.list, {}); // For management tab
+  const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {}); // Use listAllActive for dropdowns
+  const allGadgetTypes = useQuery(api.gadgetTypes.list, {}); // For management tab
   const preview = useQuery(api.productClassification.previewAutoClassification, {});
   const unclassified = useQuery(api.productClassification.getUnclassifiedProducts, {});
   const filtered = useQuery(
@@ -65,6 +74,13 @@ export default function ProductClassificationPage() {
   const updateFinishType = useMutation(api.finishTypes.update);
   const deleteFinishType = useMutation(api.finishTypes.remove);
   const recalculateCounts = useMutation(api.finishTypes.recalculateAllCounts);
+  
+  // Gadget type mutations
+  const seedGadgetTypes = useMutation(api.gadgetTypes.seed);
+  const createGadgetType = useMutation(api.gadgetTypes.create);
+  const updateGadgetType = useMutation(api.gadgetTypes.update);
+  const deleteGadgetType = useMutation(api.gadgetTypes.remove);
+  const recalculateGadgetCounts = useMutation(api.gadgetTypes.recalculateProductCounts);
 
   const gadgetCategories = [
     "Phone",
@@ -195,6 +211,93 @@ export default function ProductClassificationPage() {
   const openDeleteDialog = (finishTypeId: Id<"finishTypes">) => {
     setSelectedFinishType(finishTypeId);
     setIsDeleteFinishTypeOpen(true);
+  };
+
+  // Gadget type management handlers
+  const handleSeedGadgetTypes = async () => {
+    try {
+      await seedGadgetTypes({});
+      toast.success("Gadget types seeded successfully");
+    } catch (error) {
+      toast.error("Failed to seed gadget types");
+      console.error(error);
+    }
+  };
+
+  const handleCreateGadgetType = async () => {
+    try {
+      if (!gadgetTypeForm.displayName) {
+        toast.error("Display name is required");
+        return;
+      }
+      
+      // Auto-generate name from display name if not provided
+      const name = gadgetTypeForm.name || gadgetTypeForm.displayName.toLowerCase().replace(/\s+/g, "-");
+      
+      await createGadgetType({ name, displayName: gadgetTypeForm.displayName, isActive: true });
+      toast.success("Gadget type created successfully");
+      setIsCreateGadgetTypeOpen(false);
+      setGadgetTypeForm({ name: "", displayName: "" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create gadget type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleEditGadgetType = async () => {
+    if (!selectedGadgetType) return;
+    
+    try {
+      await updateGadgetType({
+        id: selectedGadgetType,
+        displayName: gadgetTypeForm.displayName || undefined,
+      });
+      toast.success("Gadget type updated successfully");
+      setIsEditGadgetTypeOpen(false);
+      setGadgetTypeForm({ name: "", displayName: "" });
+      setSelectedGadgetType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update gadget type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleDeleteGadgetType = async () => {
+    if (!selectedGadgetType) return;
+    
+    try {
+      await deleteGadgetType({ id: selectedGadgetType });
+      toast.success("Gadget type deleted successfully");
+      setIsDeleteGadgetTypeOpen(false);
+      setSelectedGadgetType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete gadget type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleSyncGadgetCounts = async () => {
+    try {
+      await recalculateGadgetCounts({});
+      toast.success("Gadget type product counts synced successfully");
+    } catch (error) {
+      toast.error("Failed to sync gadget type product counts");
+      console.error(error);
+    }
+  };
+
+  const openEditGadgetDialog = (gadgetType: { _id: Id<"gadgetTypes">; name: string; displayName: string }) => {
+    setSelectedGadgetType(gadgetType._id);
+    setGadgetTypeForm({ name: gadgetType.name, displayName: gadgetType.displayName });
+    setIsEditGadgetTypeOpen(true);
+  };
+
+  const openDeleteGadgetDialog = (gadgetTypeId: Id<"gadgetTypes">) => {
+    setSelectedGadgetType(gadgetTypeId);
+    setIsDeleteGadgetTypeOpen(true);
   };
 
   // Inline editing handlers
@@ -408,6 +511,7 @@ export default function ProductClassificationPage() {
             </TabsTrigger>
             <TabsTrigger value="stats">Statistics</TabsTrigger>
             <TabsTrigger value="manage">Manage Finish Types</TabsTrigger>
+            <TabsTrigger value="manage-gadgets">Manage Gadget Types</TabsTrigger>
           </TabsList>
 
           <TabsContent value="browse" className="space-y-4">
@@ -843,6 +947,113 @@ export default function ProductClassificationPage() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="manage-gadgets" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gadget Types Management</CardTitle>
+                    <CardDescription>
+                      Create and manage gadget types for product classification
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncGadgetCounts}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync Product Counts
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setGadgetTypeForm({ name: "", displayName: "" });
+                        setIsCreateGadgetTypeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Gadget Type
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {allGadgetTypes === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : allGadgetTypes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Package className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">No Gadget Types</h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Seed gadget types to get started
+                    </p>
+                    <Button size="sm" onClick={handleSeedGadgetTypes}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Seed Gadget Types
+                    </Button>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Display Name</TableHead>
+                        <TableHead>Internal Name</TableHead>
+                        <TableHead>Product Count</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allGadgetTypes.map((gadgetType) => (
+                        <TableRow key={gadgetType._id}>
+                          <TableCell className="font-medium">
+                            {gadgetType.displayName}
+                          </TableCell>
+                          <TableCell>
+                            <code className="rounded bg-muted px-2 py-1 text-sm">
+                              {gadgetType.name}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{gadgetType.productCount}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {gadgetType.isActive ? (
+                              <Badge variant="default">Active</Badge>
+                            ) : (
+                              <Badge variant="outline">Inactive</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditGadgetDialog(gadgetType)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteGadgetDialog(gadgetType._id)}
+                                disabled={gadgetType.productCount > 0}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Preview Dialog */}
@@ -1023,6 +1234,115 @@ export default function ProductClassificationPage() {
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleDeleteFinishType}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Gadget Type Dialog */}
+        <Dialog open={isCreateGadgetTypeOpen} onOpenChange={setIsCreateGadgetTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Gadget Type</DialogTitle>
+              <DialogDescription>
+                Add a new gadget type for product classification
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="gadget-displayName">Display Name</Label>
+                <Input
+                  id="gadget-displayName"
+                  placeholder="e.g., Phone, Laptop, etc."
+                  value={gadgetTypeForm.displayName}
+                  onChange={(e) =>
+                    setGadgetTypeForm({ ...gadgetTypeForm, displayName: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  This is the name that will be shown to users
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gadget-name">Internal Name (Optional)</Label>
+                <Input
+                  id="gadget-name"
+                  placeholder="Auto-generated from display name"
+                  value={gadgetTypeForm.name}
+                  onChange={(e) =>
+                    setGadgetTypeForm({ ...gadgetTypeForm, name: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-generate. Use lowercase with hyphens (e.g., phone, laptop)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateGadgetTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateGadgetType}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Gadget Type Dialog */}
+        <Dialog open={isEditGadgetTypeOpen} onOpenChange={setIsEditGadgetTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Gadget Type</DialogTitle>
+              <DialogDescription>
+                Update the gadget type details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-gadget-displayName">Display Name</Label>
+                <Input
+                  id="edit-gadget-displayName"
+                  value={gadgetTypeForm.displayName}
+                  onChange={(e) =>
+                    setGadgetTypeForm({ ...gadgetTypeForm, displayName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-gadget-name">Internal Name</Label>
+                <Input
+                  id="edit-gadget-name"
+                  value={gadgetTypeForm.name}
+                  disabled
+                />
+                <p className="text-xs text-muted-foreground">
+                  Internal name cannot be changed
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditGadgetTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditGadgetType}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Gadget Type Dialog */}
+        <Dialog open={isDeleteGadgetTypeOpen} onOpenChange={setIsDeleteGadgetTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Gadget Type</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this gadget type? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteGadgetTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteGadgetType}>
                 Delete
               </Button>
             </DialogFooter>
