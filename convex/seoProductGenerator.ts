@@ -53,7 +53,15 @@ export const generateProductSEO = action({
 
     // Determine product category/type for better context
     const categoryName = product.gadgetCategory ? product.gadgetCategory.replace(/-/g, " ") : "product";
-    const finishType = product.finishType ? ` (${product.finishType} finish)` : "";
+    
+    // Get finish type display name if available
+    let finishType = "";
+    if (product.finishTypeId) {
+      const finishTypeData = await ctx.runQuery(api.finishTypes.get, { id: product.finishTypeId });
+      if (finishTypeData) {
+        finishType = ` (${finishTypeData.displayName} finish)`;
+      }
+    }
 
     // Create the system prompt with user's rules
     const systemPrompt = `You are Skinly's SEO Product Content Generator AI.

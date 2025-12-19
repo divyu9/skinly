@@ -143,16 +143,8 @@ export const migrateProductFields = mutation({
         alreadyHadCategory++;
       }
       
-      // Only assign finish if not already set
-      if (!product.finishType) {
-        const finish = determineFinishType(product.title);
-        if (finish) {
-          updates.finishType = finish;
-          finishesAssigned++;
-        }
-      } else {
-        alreadyHadFinish++;
-      }
+      // Finish type assignment deprecated - use productClassification.applyAutoClassification instead
+      // Skip finish type assignment in this old migration
       
       // Update if we have any changes
       if (Object.keys(updates).length > 0) {
@@ -219,13 +211,8 @@ export const forceRecategorizeAllProducts = mutation({
       }
       
       // Assign finish if not already set
-      if (!product.finishType) {
-        const finish = determineFinishType(product.title);
-        if (finish) {
-          updates.finishType = finish;
-          finishesAssigned++;
-        }
-      }
+      // Finish type assignment deprecated - use productClassification.applyAutoClassification instead
+      // Skip finish type assignment in this old migration
       
       // Update if we have any changes
       if (Object.keys(updates).length > 0) {

@@ -156,6 +156,15 @@ export default defineSchema({
     .index("by_payment_status", ["paymentStatus"])
     .index("by_is_deleted", ["isDeleted"]),
 
+  finishTypes: defineTable({
+    name: v.string(), // Internal name (e.g., "embossed")
+    displayName: v.string(), // Display name (e.g., "3D (Embossed)")
+    isActive: v.boolean(),
+    productCount: v.number(), // Auto-updated count of products using this finish
+  })
+    .index("by_is_active", ["isActive"])
+    .index("by_name", ["name"]),
+
   collections: defineTable({
     name: v.string(),
     slug: v.string(),
@@ -227,7 +236,8 @@ export default defineSchema({
       v.literal("matte"),
       v.literal("embossed"),
       v.literal("transparent")
-    )),
+    )), // DEPRECATED - keeping temporarily for migration
+    finishTypeId: v.optional(v.id("finishTypes")), // Reference to finishTypes table
     // Shipping dimensions and weight
     length: v.optional(v.number()), // Length in cm
     breadth: v.optional(v.number()), // Breadth in cm
@@ -238,7 +248,10 @@ export default defineSchema({
     .index("by_slug", ["slug"])
     .index("by_collection", ["collectionId"])
     .index("by_status", ["status"])
-    .index("by_status_and_category", ["status", "gadgetCategory"]),
+    .index("by_status_and_category", ["status", "gadgetCategory"])
+    .index("by_gadget_category", ["gadgetCategory"])
+    .index("by_finish_type", ["finishTypeId"])
+    .index("by_category_and_finish", ["gadgetCategory", "finishTypeId"]),
 
   variants: defineTable({
     productId: v.id("products"),

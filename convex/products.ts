@@ -21,27 +21,100 @@ export const getAllProductsPaginated = query({
       v.literal("cover"),
       v.literal("accessory")
     )),
+    finishTypeId: v.optional(v.id("finishTypes")),
+    collectionId: v.optional(v.id("collections")),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
     let productsQuery;
 
-    // Use compound index when both status and gadgetCategory are specified
-    if (args.status && args.gadgetCategory) {
+    // Use indexes when possible for better performance
+    if (args.gadgetCategory && args.finishTypeId) {
+      // Both gadget and finish filters - use compound index
+      productsQuery = ctx.db
+        .query("products")
+        .withIndex("by_category_and_finish", (q) => 
+          q.eq("gadgetCategory", args.gadgetCategory!).eq("finishTypeId", args.finishTypeId!)
+        );
+      // Apply status filter in memory if needed
+      if (args.status) {
+        productsQuery = productsQuery.filter((q) => q.eq(q.field("status"), args.status!));
+      }
+    } else if (args.status && args.gadgetCategory) {
       productsQuery = ctx.db
         .query("products")
         .withIndex("by_status_and_category", (q) => 
           q.eq("status", args.status!).eq("gadgetCategory", args.gadgetCategory!)
         );
+      // Apply finish filter in memory if needed
+      if (args.finishTypeId) {
+        productsQuery = productsQuery.filter((q) => q.eq(q.field("finishTypeId"), args.finishTypeId!));
+      }
+    } else if (args.gadgetCategory) {
+      productsQuery = ctx.db
+        .query("products")
+        .withIndex("by_gadget_category", (q) => q.eq("gadgetCategory", args.gadgetCategory!));
+      // Apply other filters in memory
+      if (args.status) {
+        productsQuery = productsQuery.filter((q) => q.eq(q.field("status"), args.status!));
+      }
+      if (args.finishTypeId) {
+        productsQuery = productsQuery.filter((q) => q.eq(q.field("finishTypeId"), args.finishTypeId!));
+      }
+    } else if (args.finishTypeId) {
+      productsQuery = ctx.db
+        .query("products")
+        .withIndex("by_finish_type", (q) => q.eq("finishTypeId", args.finishTypeId!));
+      // Apply other filters in memory
+      if (args.status) {
+        productsQuery = productsQuery.filter((q) => q.eq(q.field("status"), args.status!));
+      }
     } else if (args.status) {
       productsQuery = ctx.db
         .query("products")
         .withIndex("by_status", (q) => q.eq("status", args.status!));
     } else {
       productsQuery = ctx.db.query("products");
+      if (args.status) {
+        productsQuery = productsQuery.filter((q) => q.eq(q.field("status"), args.status!));
+      }
+    }
+
+    // Apply collection filter in memory (can't use index easily with pagination)
+    if (args.collectionId) {
+      // Get all products in this collection
+      const collectionProducts = await ctx.db
+        .query("collectionProducts")
+        .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId!))
+        .collect();
+      
+      const productIdsInCollection = new Set(collectionProducts.map(cp => cp.productId));
+      
+      productsQuery = productsQuery.filter((q) => {
+        // Check if product ID is in the collection
+        const productIdField = q.field("_id");
+        // We need to use a workaround since we can't directly check Set membership in Convex
+        // Instead, filter in memory after pagination
+        return q.neq(productIdField, null as any); // This is a placeholder - we'll filter after
+      });
     }
 
     const result = await productsQuery.paginate(args.paginationOpts);
+    
+    // Filter by collection in memory if specified
+    let pageProducts = result.page;
+    if (args.collectionId) {
+      const collectionProducts = await ctx.db
+        .query("collectionProducts")
+        .withIndex("by_collection", (q) => q.eq("collectionId", args.collectionId!))
+        .collect();
+      
+      const productIdsInCollection = new Set(
+        collectionProducts.map(cp => cp.productId)
+      );
+      
+      pageProducts = pageProducts.filter(p => productIdsInCollection.has(p._id));
+    }
     
     // Fetch ALL variants in one query and group by productId
     const allVariants = await ctx.db.query("variants").collect();
@@ -56,7 +129,7 @@ export const getAllProductsPaginated = query({
     }
 
     // Build products with their variants
-    const productsWithVariants = result.page.map((product) => {
+    const productsWithVariants = pageProducts.map((product) => {
       const variants = variantsByProduct.get(product._id) || [];
       return {
         ...product,
