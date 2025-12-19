@@ -83,19 +83,6 @@ export default function ProductClassificationPage() {
   const recalculateGadgetCounts = useMutation(api.gadgetTypes.recalculateProductCounts);
   const migrateGadgetTypes = useMutation(api.gadgetTypes.migrateProductGadgetTypes);
 
-  const gadgetCategories = [
-    "Phone",
-    "Laptop",
-    "Tablet",
-    "iPad",
-    "Smartwatch",
-    "Earbuds",
-    "Camera",
-    "Gaming Console",
-    "Speaker",
-    "Other",
-  ];
-
   const handleSeedFinishTypes = async () => {
     try {
       await seedInitialFinishTypes({});
@@ -554,9 +541,9 @@ export default function ProductClassificationPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Gadgets</SelectItem>
-                        {gadgetCategories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
+                        {gadgetTypes?.map((gadget) => (
+                          <SelectItem key={gadget._id} value={gadget.name}>
+                            {gadget.displayName}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -720,17 +707,11 @@ export default function ProductClassificationPage() {
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">-- Select --</SelectItem>
-                                    <SelectItem value="phone">Phone</SelectItem>
-                                    <SelectItem value="laptop">Laptop</SelectItem>
-                                    <SelectItem value="tablet">Tablet</SelectItem>
-                                    <SelectItem value="camera">Camera</SelectItem>
-                                    <SelectItem value="lens">Lens</SelectItem>
-                                    <SelectItem value="drone">Drone</SelectItem>
-                                    <SelectItem value="charger">Charger</SelectItem>
-                                    <SelectItem value="console">Console</SelectItem>
-                                    <SelectItem value="mac-mini">Mac Mini</SelectItem>
-                                    <SelectItem value="cover">Cover</SelectItem>
-                                    <SelectItem value="accessory">Accessory</SelectItem>
+                                    {gadgetTypes?.map((gadget) => (
+                                      <SelectItem key={gadget._id} value={gadget.name}>
+                                        {gadget.displayName}
+                                      </SelectItem>
+                                    ))}
                                   </SelectContent>
                                 </Select>
                               </TableCell>
