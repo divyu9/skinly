@@ -576,45 +576,7 @@ export default function ProductsPage() {
   }
 
   const isInitialLoading = status === "LoadingFirstPage" || (collectionParam && collection === undefined);
-  
-  if (isInitialLoading) {
-    return (
-      <div className="min-h-screen">
-        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img 
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                alt="Skinly" 
-                className="h-16"
-              />
-            </Link>
-          </div>
-        </nav>
-
-        <div className="pt-16 sm:pt-24 pb-6 sm:pb-20 px-2 sm:px-4">
-          <div className="container mx-auto">
-            <div className="mb-3 sm:mb-12">
-              <Skeleton className="h-6 sm:h-12 w-32 sm:w-64 mx-auto mb-2 sm:mb-4" />
-              <Skeleton className="h-4 sm:h-6 w-48 sm:w-96 mx-auto hidden sm:block" />
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Card key={i} className="p-0">
-                  <Skeleton className="aspect-square w-full rounded-t-xl" />
-                  <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5">
-                    <Skeleton className="h-3 sm:h-6 w-full" />
-                    <Skeleton className="h-3 sm:h-4 w-12 sm:w-24" />
-                    <Skeleton className="h-5 sm:h-10 w-full" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isProductsLoading = isInitialLoading || isFilterTransitioning;
 
   if (filteredProducts.length === 0 && status === "Exhausted") {
     return (
@@ -973,120 +935,139 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Filter transition indicator */}
-          {(isFilterTransitioning || status === "LoadingFirstPage") && (
-            <div className="flex items-center justify-center gap-3 py-8 mb-4 bg-muted/30 rounded-lg">
-              <Loader2Icon className="size-6 animate-spin text-primary" />
-              <p className="text-sm font-medium text-muted-foreground">
-                {productCategory && gadgetFilter && finishFilter 
-                  ? `Loading ${finishFilter} ${gadgetFilter} skins...`
-                  : productCategory && gadgetFilter
-                  ? `Loading ${gadgetFilter} products...`
-                  : productCategory
-                  ? `Loading ${productCategory} products...`
-                  : "Loading products..."}
-              </p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
-            {sortedAndFilteredProducts.map((product) => {
-              const mainImage = product.images[0];
-              const minPrice = Math.min(...product.variants.map(v => v.price));
-              const maxPrice = Math.max(...product.variants.map(v => v.price));
+          {/* Products Grid - Show loading state or actual products */}
+          {isProductsLoading ? (
+            <>
+              {/* Loading indicator */}
+              <div className="flex items-center justify-center gap-3 py-8 mb-4 bg-muted/30 rounded-lg">
+                <Loader2Icon className="size-6 animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  {productCategory && gadgetFilter && finishFilter 
+                    ? `Loading ${finishFilter} ${gadgetFilter} skins...`
+                    : productCategory && gadgetFilter
+                    ? `Loading ${gadgetFilter} products...`
+                    : productCategory
+                    ? `Loading ${productCategory} products...`
+                    : "Loading products..."}
+                </p>
+              </div>
               
-              const priceDisplay = minPrice === maxPrice 
-                ? `₹${minPrice.toFixed(0)}`
-                : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
-              
-              // Check if all variants are out of stock
-              const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
-
-              const productUrl = `/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`;
-              
-              return (
-                <Link key={product._id} to={productUrl}>
-                  <Card className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0 cursor-pointer">
-                    <div className="relative aspect-square overflow-hidden bg-muted">
-                      <ProductImage 
-                        product={product} 
-                        brandFilter={brandFilter} 
-                        modelFilter={modelFilter}
-                      />
-                      {isOutOfStock && autoSortOOS && (
-                        <div className="absolute top-2 left-2 right-2">
-                          <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">
-                            Sold Out
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                    <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
-                      <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-lg sm:leading-normal line-clamp-2">{product.title}</h3>
-                      <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
-                      {isOutOfStock && autoSortOOS ? (
-                        <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground">
-                          <BellIcon className="size-3 sm:size-4 mr-1" />
-                          <span className="hidden sm:inline">Request Restock</span>
-                          <span className="sm:hidden">Restock</span>
-                        </div>
-                      ) : (
-                        <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-md text-primary-foreground font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary hover:bg-primary/90">
-                          <span className="hidden sm:inline">Select Your Device</span>
-                          <span className="sm:hidden">Select</span>
-                        </div>
-                      )}
+              {/* Skeleton cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Card key={i} className="p-0">
+                    <Skeleton className="aspect-square w-full rounded-t-xl" />
+                    <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5">
+                      <Skeleton className="h-3 sm:h-6 w-full" />
+                      <Skeleton className="h-3 sm:h-4 w-12 sm:w-24" />
+                      <Skeleton className="h-5 sm:h-10 w-full" />
                     </div>
                   </Card>
-                </Link>
-              );
-            })}
-          </div>
-          
-          {/* Infinite scroll trigger */}
-          {collectionParam ? (
-            // Collection pagination
-            <div className="py-8 flex justify-center">
-              {hasMoreCollectionProducts && (
-                <Button 
-                  onClick={() => setCollectionOffset(prev => prev + collectionPageSize)} 
-                  variant="outline" 
-                  size="lg"
-                  disabled={!collectionProducts}
-                >
-                  {collectionProducts ? "Load More Products" : "Loading..."}
-                </Button>
-              )}
-              {!hasMoreCollectionProducts && allProducts.length > 30 && (
-                <p className="text-muted-foreground text-sm">
-                  You've reached the end! 🎉
-                </p>
-              )}
-            </div>
+                ))}
+              </div>
+            </>
           ) : (
-            // Regular product pagination
-            <div ref={observerTarget} className="py-8 flex justify-center">
-              {status === "LoadingMore" && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2Icon className="size-5 animate-spin" />
-                  <span>Loading more products...</span>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
+                  {sortedAndFilteredProducts.map((product) => {
+                  const mainImage = product.images[0];
+                  const minPrice = Math.min(...product.variants.map(v => v.price));
+                  const maxPrice = Math.max(...product.variants.map(v => v.price));
+                  
+                  const priceDisplay = minPrice === maxPrice 
+                    ? `₹${minPrice.toFixed(0)}`
+                    : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
+                  
+                  // Check if all variants are out of stock
+                  const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
+
+                  const productUrl = `/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`;
+                  
+                  return (
+                    <Link key={product._id} to={productUrl}>
+                      <Card className="group overflow-hidden border hover:border-primary transition-all hover:shadow-xl p-0 cursor-pointer">
+                        <div className="relative aspect-square overflow-hidden bg-muted">
+                          <ProductImage 
+                            product={product} 
+                            brandFilter={brandFilter} 
+                            modelFilter={modelFilter}
+                          />
+                          {isOutOfStock && autoSortOOS && (
+                            <div className="absolute top-2 left-2 right-2">
+                              <Badge className="w-full justify-center bg-orange-500/90 hover:bg-orange-500 text-white text-[8px] sm:text-xs font-semibold py-0.5 sm:py-1">
+                                Sold Out
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                        <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                          <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-lg sm:leading-normal line-clamp-2">{product.title}</h3>
+                          <span className="text-[11px] sm:text-lg font-bold text-primary block">{priceDisplay}</span>
+                          {isOutOfStock && autoSortOOS ? (
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground">
+                              <BellIcon className="size-3 sm:size-4 mr-1" />
+                              <span className="hidden sm:inline">Request Restock</span>
+                              <span className="sm:hidden">Restock</span>
+                            </div>
+                          ) : (
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-md text-primary-foreground font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary hover:bg-primary/90">
+                              <span className="hidden sm:inline">Select Your Device</span>
+                              <span className="sm:hidden">Select</span>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+              
+              {/* Infinite scroll trigger */}
+              {collectionParam ? (
+                // Collection pagination
+                <div className="py-8 flex justify-center">
+                  {hasMoreCollectionProducts && (
+                    <Button 
+                      onClick={() => setCollectionOffset(prev => prev + collectionPageSize)} 
+                      variant="outline" 
+                      size="lg"
+                      disabled={!collectionProducts}
+                    >
+                      {collectionProducts ? "Load More Products" : "Loading..."}
+                    </Button>
+                  )}
+                  {!hasMoreCollectionProducts && allProducts.length > 30 && (
+                    <p className="text-muted-foreground text-sm">
+                      You've reached the end! 🎉
+                    </p>
+                  )}
+                </div>
+              ) : (
+                // Regular product pagination
+                <div ref={observerTarget} className="py-8 flex justify-center">
+                  {status === "LoadingMore" && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2Icon className="size-5 animate-spin" />
+                      <span>Loading more products...</span>
+                    </div>
+                  )}
+                  {status === "CanLoadMore" && (
+                    <Button 
+                      onClick={handleLoadMore} 
+                      variant="outline" 
+                      size="lg"
+                    >
+                      Load More Products
+                    </Button>
+                  )}
+                  {status === "Exhausted" && allProducts.length > 30 && (
+                    <p className="text-muted-foreground text-sm">
+                      You've reached the end! 🎉
+                    </p>
+                  )}
                 </div>
               )}
-              {status === "CanLoadMore" && (
-                <Button 
-                  onClick={handleLoadMore} 
-                  variant="outline" 
-                  size="lg"
-                >
-                  Load More Products
-                </Button>
-              )}
-              {status === "Exhausted" && allProducts.length > 30 && (
-                <p className="text-muted-foreground text-sm">
-                  You've reached the end! 🎉
-                </p>
-              )}
-            </div>
+            </>
           )}
         </div>
       </section>
