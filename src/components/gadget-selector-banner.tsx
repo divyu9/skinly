@@ -27,15 +27,15 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
       }`}
     >
-      <div className="bg-gradient-to-r from-cyan-500 to-blue-600 text-white rounded-lg shadow-lg">
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="bg-black dark:bg-white text-white dark:text-black rounded-xl shadow-lg border-2 border-black dark:border-white">
+        <div className="flex items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <CheckCircle2Icon className="size-5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold leading-tight">
                 {brandName} - {modelName} is available!
               </p>
-              <p className="text-xs font-medium leading-tight mt-0.5 opacity-90">
+              <p className="text-xs font-medium leading-tight mt-1 opacity-80">
                 All designs shown are reference – we'll send it for your exact model.
               </p>
             </div>
@@ -45,7 +45,7 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
               <Button
                 size="sm"
                 variant="secondary"
-                className="font-semibold whitespace-nowrap h-8 text-xs"
+                className="font-semibold whitespace-nowrap h-9 text-xs shadow-sm hover:shadow-md"
                 onClick={onChangeDevice}
               >
                 <RefreshCwIcon className="size-3.5 mr-1.5" />
@@ -54,7 +54,7 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
             )}
             <button
               onClick={handleDismiss}
-              className="size-8 flex items-center justify-center rounded-md hover:bg-white/20 transition-colors flex-shrink-0"
+              className="size-9 flex items-center justify-center rounded-lg hover:bg-white/10 dark:hover:bg-black/10 transition-colors flex-shrink-0"
               aria-label="Dismiss"
             >
               <XIcon className="size-4" />
