@@ -1,5 +1,3 @@
-import { useEffect, useCallback } from "react";
-import { useLocation } from "react-router-dom";
 import { Package2, Shield, Video, Zap, Glasses, ShoppingBag, Box } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -22,28 +20,10 @@ export function ProductCategoryHeader({
   finishFilter,
   onUpdateFilters,
 }: ProductCategoryHeaderProps) {
-  const location = useLocation();
-  
   // Get product categories, gadget types, and finish types
   const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
-
-  // Initialize from URL on mount
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const urlProductType = params.get('productType');
-    const urlGadget = params.get('gadget');
-    const urlFinish = params.get('finish');
-    
-    if (urlProductType !== productCategory || urlGadget !== gadgetFilter || urlFinish !== finishFilter) {
-      onUpdateFilters({
-        productType: urlProductType,
-        gadget: urlGadget,
-        finish: urlFinish,
-      });
-    }
-  }, [location.search]);
 
   const categoryConfig = {
     'skin': { icon: Package2 },

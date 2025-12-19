@@ -185,6 +185,13 @@ export default function ProductsPage() {
       // Set gadget filter to the model's gadget type name (lowercase, e.g., "laptop")
       setGadgetFilter(modelGadgetType.name);
       setSmartFiltersApplied(true);
+      
+      // Update URL to reflect the smart filters
+      const params = new URLSearchParams(window.location.search);
+      params.set('productType', 'skin');
+      params.set('gadget', modelGadgetType.name);
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, '', newUrl);
     }
   }, [brandFilter, modelFilter, modelGadgetType, smartFiltersApplied]);
   
