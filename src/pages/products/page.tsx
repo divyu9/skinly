@@ -768,34 +768,39 @@ export default function ProductsPage() {
         
         {/* Product Category Extension Bar */}
         {productCategories && (
-          <div className="border-t border-border bg-background/95 backdrop-blur-sm">
+          <div className="border-t border-border bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 dark:from-blue-950/30 dark:via-purple-950/30 dark:to-pink-950/30">
             <div className="container mx-auto px-2 sm:px-4 py-3">
-              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
                 {productCategories.map((category) => {
                   const categoryConfig = {
-                    'skin': { icon: Package2, gradient: 'from-blue-500 to-purple-500' },
-                    'case-cover': { icon: Shield, gradient: 'from-teal-500 to-cyan-500' },
-                    'camera-ring': { icon: Video, gradient: 'from-violet-500 to-purple-500' },
-                    'magneto-x': { icon: Zap, gradient: 'from-red-500 to-pink-500' },
-                    'glass': { icon: Glasses, gradient: 'from-sky-500 to-blue-500' },
-                    'accessory': { icon: ShoppingBag, gradient: 'from-orange-500 to-amber-500' },
+                    'skin': { icon: Package2, gradient: 'from-blue-500 to-purple-600', shadow: 'shadow-blue-500/50' },
+                    'case-cover': { icon: Shield, gradient: 'from-teal-500 to-cyan-600', shadow: 'shadow-teal-500/50' },
+                    'camera-ring': { icon: Video, gradient: 'from-violet-500 to-purple-600', shadow: 'shadow-violet-500/50' },
+                    'magneto-x': { icon: Zap, gradient: 'from-red-500 to-pink-600', shadow: 'shadow-red-500/50' },
+                    'glass': { icon: Glasses, gradient: 'from-sky-500 to-blue-600', shadow: 'shadow-sky-500/50' },
+                    'accessory': { icon: ShoppingBag, gradient: 'from-orange-500 to-amber-600', shadow: 'shadow-orange-500/50' },
                   };
                   
-                  const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box, gradient: 'from-gray-500 to-slate-500' };
+                  const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box, gradient: 'from-gray-500 to-slate-600', shadow: 'shadow-gray-500/50' };
                   const IconComponent = config.icon;
                   
                   return (
                     <button
                       key={category.id}
                       onClick={() => updateFilters({ productType: category.id })}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium whitespace-nowrap transition-all ${
+                      className={`group relative flex items-center gap-2 px-5 py-2.5 font-semibold whitespace-nowrap transition-all duration-300 ${
                         productCategory === category.id
-                          ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg`
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          ? `bg-gradient-to-br ${config.gradient} text-white shadow-lg ${config.shadow} scale-105 rounded-xl`
+                          : 'bg-white/80 dark:bg-gray-800/80 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 hover:shadow-md rounded-lg border border-gray-200/50 dark:border-gray-700/50'
                       }`}
                     >
-                      <IconComponent className="size-4" />
-                      {category.displayName}
+                      <IconComponent className={`size-4 transition-transform group-hover:scale-110 ${
+                        productCategory === category.id ? '' : 'opacity-70'
+                      }`} />
+                      <span className="text-sm">{category.displayName}</span>
+                      {productCategory === category.id && (
+                        <div className="absolute inset-0 bg-white/20 rounded-xl animate-pulse" />
+                      )}
                     </button>
                   );
                 })}
@@ -806,31 +811,27 @@ export default function ProductsPage() {
         
         {/* Animated Filter Bar - Shows when category is selected */}
         {productCategory && (
-          <div className="border-t border-border bg-background backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
-            <div className="container mx-auto px-2 sm:px-4 py-2.5">
+          <div className="border-t border-border bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
+            <div className="container mx-auto px-2 sm:px-4 py-3">
               {/* Show full gadget selector when no gadget is selected */}
               {productCategory === 'skin' && !gadgetFilter && gadgetTypes && (
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  <Button
-                    size="sm"
-                    variant="default"
+                <div className="flex gap-2.5 overflow-x-auto no-scrollbar">
+                  <button
                     onClick={() => updateFilters({ gadget: null })}
-                    className="h-8 whitespace-nowrap"
+                    className="px-4 py-2 rounded-lg bg-gradient-to-br from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 text-white dark:text-gray-900 font-semibold text-sm whitespace-nowrap shadow-lg shadow-gray-900/30 hover:shadow-xl transition-all duration-300"
                   >
                     All Gadgets
-                  </Button>
+                  </button>
                   {gadgetTypes
                     .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
                     .map((gadgetType) => (
-                      <Button
+                      <button
                         key={gadgetType._id}
-                        size="sm"
-                        variant="outline"
                         onClick={() => updateFilters({ gadget: gadgetType.name })}
-                        className="h-8 whitespace-nowrap"
+                        className="px-4 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-750 transition-all duration-300"
                       >
                         {gadgetType.displayName}
-                      </Button>
+                      </button>
                     ))}
                 </div>
               )}
@@ -839,43 +840,45 @@ export default function ProductsPage() {
               {productCategory === 'skin' && gadgetFilter && finishTypes && (
                 <div className="flex items-center gap-3">
                   {/* Left 20% - Selected Gadget */}
-                  <div className="flex items-center gap-2 min-w-fit">
-                    <Badge variant="secondary" className="h-8 px-3 text-sm font-medium">
+                  <div className="flex items-center gap-2.5 min-w-fit">
+                    <div className="px-4 py-2 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-semibold text-sm shadow-lg shadow-indigo-500/40">
                       {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    </div>
+                    <button
                       onClick={() => updateFilters({ gadget: null })}
-                      className="h-8 whitespace-nowrap"
+                      className="px-3.5 py-2 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md transition-all duration-300"
                     >
                       Change
-                    </Button>
+                    </button>
                   </div>
 
                   {/* Separator */}
-                  <div className="h-6 w-px bg-border hidden sm:block" />
+                  <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 dark:via-gray-600 to-transparent hidden sm:block" />
 
                   {/* Right 80% - Finish Selector */}
-                  <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
-                    <Button
-                      size="sm"
-                      variant={!finishFilter ? "default" : "outline"}
+                  <div className="flex-1 flex gap-2.5 overflow-x-auto no-scrollbar">
+                    <button
                       onClick={() => updateFilters({ finish: null })}
-                      className="h-8 whitespace-nowrap"
+                      className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all duration-300 ${
+                        !finishFilter
+                          ? 'bg-gradient-to-br from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 text-white dark:text-gray-900 shadow-lg shadow-gray-900/30'
+                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md'
+                      }`}
                     >
                       All Finishes
-                    </Button>
+                    </button>
                     {finishTypes.map((finishType) => (
-                      <Button
+                      <button
                         key={finishType._id}
-                        size="sm"
-                        variant={finishFilter === finishType.name ? "default" : "outline"}
                         onClick={() => updateFilters({ finish: finishType.name })}
-                        className="h-8 whitespace-nowrap"
+                        className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all duration-300 ${
+                          finishFilter === finishType.name
+                            ? 'bg-gradient-to-br from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 text-white dark:text-gray-900 shadow-lg shadow-gray-900/30'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md'
+                        }`}
                       >
                         {finishType.displayName}
-                      </Button>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -918,25 +921,29 @@ export default function ProductsPage() {
           {/* Collection Pills - Only when device is selected */}
           {allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
             <div className="mb-6">
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                <Button
-                  size="sm"
-                  variant={!collectionParam ? "default" : "outline"}
+              <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
+                <button
                   onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
-                  className="h-8 whitespace-nowrap"
+                  className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all duration-300 ${
+                    !collectionParam
+                      ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/40 hover:shadow-xl'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-600 hover:shadow-md'
+                  }`}
                 >
                   All Collections
-                </Button>
+                </button>
                 {allCollections.map((col) => (
-                  <Button
+                  <button
                     key={col._id}
-                    size="sm"
-                    variant={collectionParam === col.name ? "default" : "outline"}
                     onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
-                    className="h-8 whitespace-nowrap"
+                    className={`px-4 py-2 rounded-lg font-semibold text-sm whitespace-nowrap transition-all duration-300 ${
+                      collectionParam === col.name
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/40 hover:shadow-xl'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-600 hover:shadow-md'
+                    }`}
                   >
                     {col.name}
-                  </Button>
+                  </button>
                 ))}
               </div>
             </div>
