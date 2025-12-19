@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { usePaginatedQuery, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { Input } from "@/components/ui/input.tsx";
@@ -59,6 +59,7 @@ import {
   droneModels
 } from "@/lib/device-models.ts";
 import { DeviceSelectorDialog } from "./_components/device-selector-dialog.tsx";
+import { ProductCategoryHeader } from "@/components/product-category-header.tsx";
 
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
@@ -170,6 +171,11 @@ export default function Index() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [confirmedNotMatch, setConfirmedNotMatch] = useState(false); // Confirmation checkbox
   
+  // Product category filters for universal header
+  const [productCategory, setProductCategory] = useState<string | null>(null);
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(null);
+  const [finishFilter, setFinishFilter] = useState<string | null>(null);
+  
   // Refs for scrolling
   const phoneBrandSelectorRef = useRef<HTMLElement>(null);
   
@@ -225,6 +231,50 @@ export default function Index() {
     if (!selectedPhoneBrand) return;
     navigate(`/products?brand=${encodeURIComponent(selectedPhoneBrand)}&model=${encodeURIComponent(model)}&fromGadgetSelector=true`);
   };
+  
+  // Update filters for universal header
+  const updateFilters = useCallback((updates: {
+    productType?: string | null;
+    gadget?: string | null;
+    finish?: string | null;
+  }) => {
+    if (updates.productType !== undefined) {
+      setProductCategory(updates.productType);
+    }
+    if (updates.gadget !== undefined) {
+      setGadgetFilter(updates.gadget);
+    }
+    if (updates.finish !== undefined) {
+      setFinishFilter(updates.finish);
+    }
+    
+    // Update URL
+    const params = new URLSearchParams(window.location.search);
+    if (updates.productType !== undefined) {
+      if (updates.productType) {
+        params.set('productType', updates.productType);
+      } else {
+        params.delete('productType');
+      }
+    }
+    if (updates.gadget !== undefined) {
+      if (updates.gadget) {
+        params.set('gadget', updates.gadget);
+      } else {
+        params.delete('gadget');
+      }
+    }
+    if (updates.finish !== undefined) {
+      if (updates.finish) {
+        params.set('finish', updates.finish);
+      } else {
+        params.delete('finish');
+      }
+    }
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+  }, []);
 
   // Product category filters - reduced to 3 per category for horizontal layout
   const matteProducts = useMemo(() => 
@@ -493,8 +543,16 @@ export default function Index() {
         )}
       </div>
 
+      {/* Product Category Header */}
+      <ProductCategoryHeader
+        productCategory={productCategory}
+        gadgetFilter={gadgetFilter}
+        finishFilter={finishFilter}
+        onUpdateFilters={updateFilters}
+      />
+
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 bg-gradient-to-br from-cyan-50 via-purple-50 to-pink-50">
+      <section className="pt-56 pb-20 px-4 bg-gradient-to-br from-cyan-50 via-purple-50 to-pink-50">
         <div className="container mx-auto">
           {/* Hero Content */}
           <div className="text-center max-w-4xl mx-auto mb-16">

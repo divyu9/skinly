@@ -14,6 +14,7 @@ import { CartButton } from "@/components/cart.tsx";
 import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
 import { HeaderSearch } from "@/components/header-search.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
+import { ProductCategoryHeader } from "@/components/product-category-header.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -86,12 +87,6 @@ function ProductImage({
         alt={imageAlt}
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
       />
-      {/* Show "Generic Image" badge when no mockup exists but device is selected */}
-      {brandFilter && modelFilter && mockupUrl === null && (
-        <div className="absolute top-1 right-1 sm:top-2 sm:right-2 bg-black/80 text-white rounded px-2 py-1 text-[8px] md:text-[10px] leading-tight text-center">
-          Generic Image<br />Exact Design Available
-        </div>
-      )}
     </div>
   );
 }
@@ -771,125 +766,17 @@ export default function ProductsPage() {
           </div>
         </div>
         
-        {/* Product Category Extension Bar */}
-        {productCategories && (
-          <div className="border-t border-gray-100 bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800">
-            <div className="container mx-auto px-2 sm:px-4 py-4">
-              <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                {productCategories.map((category) => {
-                  const categoryConfig = {
-                    'skin': { icon: Package2 },
-                    'case-cover': { icon: Shield },
-                    'camera-ring': { icon: Video },
-                    'magneto-x': { icon: Zap },
-                    'glass': { icon: Glasses },
-                    'accessory': { icon: ShoppingBag },
-                  };
-                  
-                  const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box };
-                  const IconComponent = config.icon;
-                  
-                  return (
-                    <button
-                      key={category.id}
-                      onClick={() => updateFilters({ productType: category.id })}
-                      className={`group relative flex items-center gap-2 px-5 py-2.5 font-semibold whitespace-nowrap transition-all duration-200 ${
-                        productCategory === category.id
-                          ? 'bg-black text-white shadow-lg hover:shadow-xl rounded-xl dark:bg-white dark:text-black'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 hover:shadow-md rounded-xl border-2 border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-750 dark:hover:border-gray-600'
-                      }`}
-                    >
-                      <IconComponent className="size-4.5" />
-                      <span className="text-sm">{category.displayName}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Animated Filter Bar - Shows when category is selected */}
-        {productCategory && (
-          <div className="border-t border-gray-100 bg-white dark:bg-gray-900 dark:border-gray-800 animate-in slide-in-from-top-2 duration-300">
-            <div className="container mx-auto px-2 sm:px-4 py-4">
-              {/* Show full gadget selector when no gadget is selected */}
-              {productCategory === 'skin' && !gadgetFilter && gadgetTypes && (
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  <button
-                    onClick={() => updateFilters({ gadget: null })}
-                    className="px-5 py-2.5 rounded-xl bg-black dark:bg-white text-white dark:text-black font-semibold text-sm whitespace-nowrap shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    All Gadgets
-                  </button>
-                  {gadgetTypes
-                    .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
-                    .map((gadgetType) => (
-                      <button
-                        key={gadgetType._id}
-                        onClick={() => updateFilters({ gadget: gadgetType.name })}
-                        className="px-5 py-2.5 rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md transition-all duration-200"
-                      >
-                        {gadgetType.displayName}
-                      </button>
-                    ))}
-                </div>
-              )}
-
-              {/* Compact horizontal layout when gadget is selected */}
-              {productCategory === 'skin' && gadgetFilter && finishTypes && (
-                <div className="flex items-center gap-3">
-                  {/* Left side - Selected Gadget */}
-                  <div className="flex items-center gap-2 min-w-fit px-4 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700">
-                    <div className="px-3 py-1.5 rounded-lg bg-black dark:bg-white text-white dark:text-black font-semibold text-sm">
-                      {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
-                    </div>
-                    <button
-                      onClick={() => updateFilters({ gadget: null })}
-                      className="px-3 py-1.5 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 font-medium text-sm whitespace-nowrap border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all duration-200"
-                    >
-                      Change
-                    </button>
-                  </div>
-
-                  {/* Visual Separator */}
-                  <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" />
-
-                  {/* Right side - Finish Selector */}
-                  <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
-                    <button
-                      onClick={() => updateFilters({ finish: null })}
-                      className={`px-5 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
-                        !finishFilter
-                          ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
-                          : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
-                      }`}
-                    >
-                      All Finishes
-                    </button>
-                    {finishTypes.map((finishType) => (
-                      <button
-                        key={finishType._id}
-                        onClick={() => updateFilters({ finish: finishType.name })}
-                        className={`px-5 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
-                          finishFilter === finishType.name
-                            ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
-                        }`}
-                      >
-                        {finishType.displayName}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Product Category Header */}
+        <ProductCategoryHeader
+          productCategory={productCategory}
+          gadgetFilter={gadgetFilter}
+          finishFilter={finishFilter}
+          onUpdateFilters={updateFilters}
+        />
       </nav>
 
       {/* Products Section */}
-      <section className="pt-44 sm:pt-52 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
+      <section className="pt-56 sm:pt-64 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
         <div className="container mx-auto">
           <div className="text-center mb-6 space-y-2">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
@@ -1054,25 +941,18 @@ export default function ProductsPage() {
                   return (
                     <Link key={product._id} to={productUrl}>
                       <Card className="group overflow-hidden border-2 border-gray-200 hover:border-black transition-all duration-200 hover:shadow-xl p-0 cursor-pointer dark:border-gray-700 dark:hover:border-white">
-                        <div className="relative aspect-square overflow-hidden bg-gray-50 dark:bg-gray-800">
+                        <div className={`relative aspect-square overflow-hidden bg-gray-50 dark:bg-gray-800 ${isOutOfStock && autoSortOOS ? 'opacity-30' : ''}`}>
                           <ProductImage 
                             product={product} 
                             brandFilter={brandFilter} 
                             modelFilter={modelFilter}
                           />
-                          {isOutOfStock && autoSortOOS && (
-                            <div className="absolute top-2 left-2 right-2">
-                              <Badge className="w-full justify-center bg-red-500 hover:bg-red-600 text-white text-[8px] sm:text-xs font-bold py-0.5 sm:py-1 shadow-lg">
-                                Sold Out
-                              </Badge>
-                            </div>
-                          )}
                         </div>
                         <div className="px-1 pt-0.5 pb-1 sm:p-5 space-y-0.5 sm:space-y-3">
                           <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-base sm:leading-snug line-clamp-2">{product.title}</h3>
                           <span className="text-[11px] sm:text-lg font-bold text-black dark:text-white block">{priceDisplay}</span>
                           {isOutOfStock && autoSortOOS ? (
-                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-11 px-0.5 sm:px-5 inline-flex items-center justify-center whitespace-nowrap rounded-lg font-semibold transition-all duration-200 border-2 border-gray-200 dark:border-gray-700 bg-background hover:bg-accent hover:border-gray-300 dark:hover:border-gray-600">
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-11 px-0.5 sm:px-5 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white shadow-lg hover:shadow-xl active:scale-[0.98]">
                               <BellIcon className="size-3 sm:size-4 mr-1" />
                               <span className="hidden sm:inline">Request Restock</span>
                               <span className="sm:hidden">Restock</span>
