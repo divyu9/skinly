@@ -36,17 +36,7 @@ export const findSimilarModels = query({
   args: {
     brandName: v.optional(v.string()),
     modelName: v.string(),
-    category: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    )),
+    category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Only search if model name has at least 2 characters
@@ -107,17 +97,7 @@ export const createModelRequest = mutation({
   args: {
     brandName: v.string(),
     modelName: v.string(),
-    category: v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    ),
+    category: v.string(),
     whatsappPhone: v.string(),
   },
   handler: async (ctx, args): Promise<{ requestId: string; requestNumber: string }> => {
@@ -403,19 +383,7 @@ export const updateModelRequest = mutation({
     requestId: v.id("modelRequests"),
     brandName: v.optional(v.string()),
     modelName: v.optional(v.string()),
-    category: v.optional(
-      v.union(
-        v.literal("phone"),
-        v.literal("tablet"),
-        v.literal("laptop"),
-        v.literal("console"),
-        v.literal("charger"),
-        v.literal("drone"),
-        v.literal("camera"),
-        v.literal("lens"),
-        v.literal("mac-mini")
-      )
-    ),
+    category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Optional: Add auth check for admin users here

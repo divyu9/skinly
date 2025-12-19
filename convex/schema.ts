@@ -504,17 +504,7 @@ export default defineSchema({
   supportedModels: defineTable({
     brandName: v.string(), // e.g., "Apple", "Samsung", "OnePlus"
     modelName: v.string(), // e.g., "iPhone 15 Pro Max", "Galaxy S24 Ultra"
-    category: v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    ),
+    category: v.string(), // Device category (phone, tablet, laptop, console, etc.)
     isActive: v.boolean(), // Control visibility
   })
     .index("by_brand", ["brandName"])
@@ -653,17 +643,7 @@ export default defineSchema({
     requestNumber: v.optional(v.string()), // Request ID (e.g., MR-01, MR-02)
     brandName: v.string(), // Brand name requested
     modelName: v.string(), // Model name requested
-    category: v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    ),
+    category: v.string(), // Device category (phone, tablet, laptop, console, etc.)
     whatsappPhone: v.string(), // User's WhatsApp number for notification
     userId: v.optional(v.id("users")), // User who requested (if authenticated)
     userEmail: v.optional(v.string()), // Email if available

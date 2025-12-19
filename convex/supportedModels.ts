@@ -5,17 +5,7 @@ import { internal } from "./_generated/api";
 // Get all supported models with filters
 export const listAll = query({
   args: {
-    category: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    )),
+    category: v.optional(v.string()),
     brandName: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
   },
@@ -89,17 +79,7 @@ export const create = mutation({
   args: {
     brandName: v.string(),
     modelName: v.string(),
-    category: v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    ),
+    category: v.string(),
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -123,17 +103,7 @@ export const update = mutation({
     id: v.id("supportedModels"),
     brandName: v.optional(v.string()),
     modelName: v.optional(v.string()),
-    category: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    )),
+    category: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -159,17 +129,7 @@ export const bulkCreate = mutation({
     models: v.array(v.object({
       brandName: v.string(),
       modelName: v.string(),
-      category: v.union(
-        v.literal("phone"),
-        v.literal("tablet"),
-        v.literal("laptop"),
-        v.literal("console"),
-        v.literal("charger"),
-        v.literal("drone"),
-        v.literal("camera"),
-        v.literal("lens"),
-        v.literal("mac-mini")
-      ),
+      category: v.string(),
       isActive: v.boolean(),
     })),
   },
@@ -355,17 +315,7 @@ export const getMetadata = query({
 export const getBrandModels = query({
   args: {
     brand: v.string(),
-    category: v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    ),
+    category: v.string(),
   },
   handler: async (ctx, args) => {
     const models = await ctx.db
@@ -392,17 +342,7 @@ export const getBrandModels = query({
 export const searchModels = query({
   args: {
     query: v.string(),
-    category: v.optional(v.union(
-      v.literal("phone"),
-      v.literal("tablet"),
-      v.literal("laptop"),
-      v.literal("console"),
-      v.literal("charger"),
-      v.literal("drone"),
-      v.literal("camera"),
-      v.literal("lens"),
-      v.literal("mac-mini")
-    )),
+    category: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
