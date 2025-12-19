@@ -31,6 +31,7 @@ function EditProductPageInner() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
   const collections = useQuery(api.collections.getAllCollections, {});
+  const finishTypes = useQuery(api.finishTypes.listActive, {});
   const product = useQuery(api.products.getProduct, { productId: productId as Id<"products"> });
   const updateProduct = useMutation(api.products.updateProduct);
   const createVariant = useMutation(api.products.createVariant);
@@ -52,6 +53,8 @@ function EditProductPageInner() {
     height: string;
     weight: string;
     productType: "physical" | "digital";
+    gadgetCategory: string;
+    finishTypeId: Id<"finishTypes"> | "";
   }>({
     title: "",
     slug: "",
@@ -67,6 +70,8 @@ function EditProductPageInner() {
     height: "2",
     weight: "100",
     productType: "physical",
+    gadgetCategory: "",
+    finishTypeId: "",
   });
 
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -101,6 +106,8 @@ function EditProductPageInner() {
         height: (product.height ?? 2).toString(),
         weight: (product.weight ?? 100).toString(),
         productType: product.productType ?? "physical",
+        gadgetCategory: product.gadgetCategory || "",
+        finishTypeId: product.finishTypeId || "",
       });
 
       setVariants(
@@ -240,6 +247,8 @@ function EditProductPageInner() {
         height: parseFloat(formData.height),
         weight: parseFloat(formData.weight),
         productType: formData.productType,
+        gadgetCategory: formData.gadgetCategory || undefined,
+        finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
       });
 
       // Update or create variants
@@ -580,6 +589,57 @@ function EditProductPageInner() {
                       {collections.map((collection) => (
                         <SelectItem key={collection._id} value={collection._id}>
                           {collection.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="gadgetCategory">Gadget Category (Optional)</Label>
+                <Select
+                  value={formData.gadgetCategory || undefined}
+                  onValueChange={(value) => setFormData({ ...formData, gadgetCategory: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select gadget type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Phone">Phone</SelectItem>
+                    <SelectItem value="Laptop">Laptop</SelectItem>
+                    <SelectItem value="Tablet">Tablet</SelectItem>
+                    <SelectItem value="iPad">iPad</SelectItem>
+                    <SelectItem value="Smartwatch">Smartwatch</SelectItem>
+                    <SelectItem value="Earbuds">Earbuds</SelectItem>
+                    <SelectItem value="Camera">Camera</SelectItem>
+                    <SelectItem value="Gaming Console">Gaming Console</SelectItem>
+                    <SelectItem value="Speaker">Speaker</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="finishType">Finish Type (Optional)</Label>
+                {finishTypes === undefined ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : finishTypes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No finish types available
+                  </p>
+                ) : (
+                  <Select
+                    value={formData.finishTypeId || undefined}
+                    onValueChange={(value) => setFormData({ ...formData, finishTypeId: value as Id<"finishTypes"> })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select finish type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {finishTypes.map((finish) => (
+                        <SelectItem key={finish._id} value={finish._id}>
+                          {finish.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>

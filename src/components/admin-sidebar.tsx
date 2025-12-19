@@ -42,6 +42,7 @@ export function AdminSidebar() {
 
   const navItems = [
     { path: "/backend-skinly/products", label: "Products", icon: Package },
+    { path: "/backend-skinly/product-classification", label: "Classification", icon: Layers },
     { path: "/backend-skinly/collections", label: "Collections", icon: Layers },
     { path: "/backend-skinly/phone-collections", label: "Phone Collections", icon: Smartphone },
     { path: "/backend-skinly/product-fields-migration", label: "Fields Migration", icon: FileCode },

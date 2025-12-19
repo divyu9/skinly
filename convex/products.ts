@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import type { Doc } from "./_generated/dataModel.d.ts";
+import type { Doc, Id } from "./_generated/dataModel.d.ts";
 
 // Get all products with pagination
 export const getAllProductsPaginated = query({
@@ -95,7 +95,7 @@ export const getAllProductsPaginated = query({
         const productIdField = q.field("_id");
         // We need to use a workaround since we can't directly check Set membership in Convex
         // Instead, filter in memory after pagination
-        return q.neq(productIdField, null as any); // This is a placeholder - we'll filter after
+        return q.neq(productIdField, "placeholder" as unknown as null); // This is a placeholder - we'll filter after
       });
     }
 
@@ -521,6 +521,8 @@ export const updateProduct = mutation({
     height: v.optional(v.number()),
     weight: v.optional(v.number()),
     productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
+    gadgetCategory: v.optional(v.string()),
+    finishTypeId: v.optional(v.id("finishTypes")),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -531,7 +533,30 @@ export const updateProduct = mutation({
       });
     }
 
-    const { productId, ...updates } = args;
+    const { productId, ...rawUpdates } = args;
+
+    // Type the updates properly for patch
+    const updates: Partial<{
+      title?: string;
+      slug?: string;
+      description?: string;
+      metaDescription?: string;
+      metaTitle?: string;
+      collectionId?: Id<"collections">;
+      status?: "active" | "draft" | "archived";
+      images?: Array<{ url: string; alt?: string }>;
+      tags?: string[];
+      length?: number;
+      breadth?: number;
+      height?: number;
+      weight?: number;
+      productType?: "physical" | "digital";
+      gadgetCategory?: "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
+      finishTypeId?: Id<"finishTypes">;
+    }> = {
+      ...rawUpdates,
+      gadgetCategory: rawUpdates.gadgetCategory as "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | undefined,
+    };
 
     // Validate shipping dimensions
     if (updates.length !== undefined && updates.length < 0) {

@@ -49,6 +49,7 @@ import AdminMigrationPage from "./pages/admin/migration.tsx";
 import AdminSitemapGeneratorPage from "./pages/admin/sitemap-generator.tsx";
 import AdminSEOGeneratorPage from "./pages/admin/seo-generator/page.tsx";
 import AdminShippingPage from "./pages/admin/shipping.tsx";
+import AdminProductClassificationPage from "./pages/admin/product-classification/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import GstMigrationPage from "./pages/admin/gst-migration.tsx";
 import TaxExportPage from "./pages/admin/tax-export.tsx";
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/backend-skinly/migration" element={<AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/sitemap" element={<AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper>} />
           <Route path="/backend-skinly/seo-generator" element={<AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper>} />
+          <Route path="/backend-skinly/product-classification" element={<AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper>} />
           <Route path="/devices" element={<DevicesPage />} />
           <Route path="/payment/callback" element={<PaymentCallback />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
