@@ -262,6 +262,10 @@ export default function ProductsPage() {
       if (updates.finish === undefined) {
         params.delete('finish');
       }
+      // Clear collection when switching to non-phone gadget
+      if (updates.gadget !== 'phone') {
+        params.delete('collection');
+      }
     }
     if (updates.finish !== undefined) {
       if (updates.finish) {
@@ -842,8 +846,8 @@ export default function ProductsPage() {
             </div>
           )}
 
-          {/* Collection Pills - Only show for Skins category when device is selected */}
-          {productCategory === 'skin' && allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
+          {/* Collection Pills - Only show for phone skins */}
+          {productCategory === 'skin' && gadgetFilter === 'phone' && allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
             <div className="mb-6">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
