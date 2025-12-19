@@ -37,6 +37,10 @@ export default function ProductClassificationPage() {
   const [selectedGadgetType, setSelectedGadgetType] = useState<Id<"gadgetTypes"> | null>(null);
   const [gadgetTypeForm, setGadgetTypeForm] = useState({ name: "", displayName: "" });
   
+  // Product category migration state
+  const [isProductCategoryPreviewOpen, setIsProductCategoryPreviewOpen] = useState(false);
+  const [isProductCategoryMigrateOpen, setIsProductCategoryMigrateOpen] = useState(false);
+  
   // Inline editing state for unclassified products
   const [editingProducts, setEditingProducts] = useState<Record<string, {
     gadgetCategory?: string;
@@ -62,6 +66,10 @@ export default function ProductClassificationPage() {
           finishTypeId: selectedFinish === "all" ? undefined : (selectedFinish as Id<"finishTypes">),
         }
   );
+  const productCategoryPreview = useQuery(
+    api.migrateProductCategory.previewProductCategoryMigration,
+    isProductCategoryPreviewOpen ? { limit: 100 } : "skip"
+  );
 
   // Mutations
   const applyAutoClassification = useMutation(api.productClassification.applyAutoClassification);
@@ -80,6 +88,9 @@ export default function ProductClassificationPage() {
   const deleteGadgetType = useMutation(api.gadgetTypes.remove);
   const recalculateGadgetCounts = useMutation(api.gadgetTypes.recalculateProductCounts);
   const migrateGadgetTypes = useMutation(api.gadgetTypes.migrateProductGadgetTypes);
+  
+  // Product category migration mutations
+  const migrateProductCategories = useMutation(api.migrateProductCategory.migrateProductsToProductCategory);
 
   const handleSeedFinishTypes = async () => {
     try {
@@ -364,6 +375,19 @@ export default function ProductClassificationPage() {
     }
   };
 
+  // Product category migration handlers
+  const handleMigrateProductCategories = async () => {
+    try {
+      const result = await migrateProductCategories({});
+      toast.success(result.message);
+      setIsProductCategoryMigrateOpen(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to migrate product categories";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="container mx-auto space-y-6 py-8">
@@ -382,6 +406,14 @@ export default function ProductClassificationPage() {
             <Button onClick={handleSeedFinishTypes} variant="outline" size="sm">
               <Layers className="mr-2 h-4 w-4" />
               Seed Finish Types
+            </Button>
+            <Button 
+              onClick={() => setIsProductCategoryPreviewOpen(true)} 
+              variant="default" 
+              size="sm"
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Migrate Product Categories
             </Button>
           </div>
         </div>
@@ -1351,6 +1383,159 @@ export default function ProductClassificationPage() {
               </Button>
               <Button variant="destructive" onClick={handleDeleteGadgetType}>
                 Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Product Category Migration Preview Dialog */}
+        <Dialog open={isProductCategoryPreviewOpen} onOpenChange={setIsProductCategoryPreviewOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Product Category Migration Preview</DialogTitle>
+              <DialogDescription>
+                Review the changes before migrating products to their new category classifications
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {productCategoryPreview === undefined ? (
+                <div className="flex items-center justify-center py-12">
+                  <Spinner className="h-8 w-8" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Total Products Analyzed:</span>
+                      <Badge variant="secondary">{productCategoryPreview.stats.total}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Products to Update:</span>
+                      <Badge variant="default">{productCategoryPreview.stats.willChange}</Badge>
+                    </div>
+                  </div>
+
+                  {productCategoryPreview.preview.length > 0 && (
+                    <div className="rounded-lg border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[40%]">Product</TableHead>
+                            <TableHead>Current Category</TableHead>
+                            <TableHead>→</TableHead>
+                            <TableHead>New Category</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productCategoryPreview.preview.slice(0, 50).map((item) => (
+                            <TableRow key={item._id}>
+                              <TableCell className="font-medium text-sm">
+                                <div className="break-words line-clamp-2">
+                                  {item.title}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {item.currentCategory ? (
+                                  <Badge variant="outline" className="text-xs">
+                                    {item.currentCategory}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">None</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {item.willChange && "→"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={item.willChange ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {item.suggestedCategory || "N/A"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {item.willChange ? (
+                                  <Badge variant="default" className="text-xs">
+                                    Will Update
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    No Change
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {productCategoryPreview.preview.length > 50 && (
+                        <div className="border-t p-3 text-center text-sm text-muted-foreground">
+                          Showing first 50 of {productCategoryPreview.preview.length} products
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsProductCategoryPreviewOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsProductCategoryPreviewOpen(false);
+                  setIsProductCategoryMigrateOpen(true);
+                }}
+                disabled={!productCategoryPreview || productCategoryPreview.stats.willChange === 0}
+              >
+                Proceed to Migrate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Product Category Migration Confirmation Dialog */}
+        <Dialog open={isProductCategoryMigrateOpen} onOpenChange={setIsProductCategoryMigrateOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Product Category Migration</DialogTitle>
+              <DialogDescription>
+                This will update the productCategory field for all products. Are you sure you want to proceed?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-lg border border-yellow-500 bg-yellow-50 p-4 dark:bg-yellow-950">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    Important Notes:
+                  </p>
+                  <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
+                    <li>Products with existing categories will be skipped</li>
+                    <li>This will classify products as: skin, case-cover, camera-ring, magneto-x, glass, or accessory</li>
+                    <li>You can re-classify products manually later if needed</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsProductCategoryMigrateOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleMigrateProductCategories}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Confirm Migration
               </Button>
             </DialogFooter>
           </DialogContent>
