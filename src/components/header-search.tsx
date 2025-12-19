@@ -142,7 +142,7 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="Search models, designs, SKUs..."
+          placeholder="Search models, designs, magneto x, products..."
           value={searchQuery}
           onChange={(e) => {
             const query = e.target.value;

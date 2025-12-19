@@ -144,10 +144,10 @@ export default function ProductsPage() {
   const collectionParam = urlParams.get('collection') || '';
   const fromGadgetSelector = urlParams.get('fromGadgetSelector') === 'true';
   
-  // Get model info if coming from gadget selector
+  // Get model info if brand and model are present
   const modelInfo = useQuery(
     api.supportedModels.getModelInfo,
-    fromGadgetSelector && brandFilter && modelFilter
+    brandFilter && modelFilter
       ? { brand: brandFilter, model: modelFilter }
       : "skip"
   );
@@ -163,6 +163,7 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
+  const [prevBrandModel, setPrevBrandModel] = useState<string>("");
   const [smartFiltersApplied, setSmartFiltersApplied] = useState(false);
   const [productCategory, setProductCategory] = useState<"skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null>(
     urlParams.get('productType') as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null
@@ -171,16 +172,25 @@ export default function ProductsPage() {
   const [finishFilter, setFinishFilter] = useState<string | null>(urlParams.get('finish'));
   const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
   
-  // Apply smart filters when coming from gadget selector
+  // Reset smart filters when brand/model changes
   useEffect(() => {
-    if (fromGadgetSelector && modelGadgetType && !smartFiltersApplied) {
+    const currentBrandModel = `${brandFilter}-${modelFilter}`;
+    if (currentBrandModel !== prevBrandModel) {
+      setPrevBrandModel(currentBrandModel);
+      setSmartFiltersApplied(false);
+    }
+  }, [brandFilter, modelFilter, prevBrandModel]);
+  
+  // Apply smart filters when model info is available
+  useEffect(() => {
+    if (brandFilter && modelFilter && modelGadgetType && !smartFiltersApplied) {
       // Set product category to "skin"
       setProductCategory("skin");
       // Set gadget filter to the model's gadget type name (lowercase, e.g., "laptop")
       setGadgetFilter(modelGadgetType.name);
       setSmartFiltersApplied(true);
     }
-  }, [fromGadgetSelector, modelGadgetType, smartFiltersApplied]);
+  }, [brandFilter, modelFilter, modelGadgetType, smartFiltersApplied]);
   
   // Get finish types, gadget types, and product categories for filtering
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
@@ -790,8 +800,8 @@ export default function ProductsPage() {
             </div>
           </div>
 
-          {/* Gadget Selector Welcome Banner */}
-          {fromGadgetSelector && brandFilter && modelFilter && modelInfo && (
+          {/* Gadget Selector Welcome Banner - Show when brand and model are selected */}
+          {brandFilter && modelFilter && modelInfo && (
             <div className="mb-6 max-w-4xl mx-auto">
               <GadgetSelectorBanner 
                 brandName={brandFilter} 
