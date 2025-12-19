@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2, Shield, Glasses, ShoppingBag, Video, Box } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
@@ -113,6 +113,7 @@ interface ConvexProduct {
 }
 
 export default function ProductsPage() {
+  const navigate = useNavigate();
   const verifyConnection = useAction(api.shopify.verifyConnection);
   
   // Get OOS sorting setting
@@ -275,6 +276,25 @@ export default function ProductsPage() {
     
     // Reset transitioning state after brief delay
     setTimeout(() => setIsFilterTransitioning(false), 300);
+  }, []);
+  
+  // Helper function to update URL params without reloading
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(window.location.search);
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+    
+    // Force re-render by updating the URL params in state
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }, []);
   
   // Handle browser back/forward
@@ -596,7 +616,7 @@ export default function ProductsPage() {
             <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=matte${collectionParam ? `&collection=${encodeURIComponent(collectionParam)}` : ''}`}
+                onClick={() => updateUrlParams({ finish: 'matte' })}
               >
                 <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   CLASSIC
@@ -616,7 +636,7 @@ export default function ProductsPage() {
 
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=embossed${collectionParam ? `&collection=${encodeURIComponent(collectionParam)}` : ''}`}
+                onClick={() => updateUrlParams({ finish: 'embossed' })}
               >
                 <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   PREMIUM
@@ -636,7 +656,7 @@ export default function ProductsPage() {
 
               <Card 
                 className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl"
-                onClick={() => window.location.href = `/products?brand=${brandFilter}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}&finish=transparent${collectionParam ? `&collection=${encodeURIComponent(collectionParam)}` : ''}`}
+                onClick={() => updateUrlParams({ finish: 'transparent' })}
               >
                 <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
                   SLEEK
@@ -697,7 +717,7 @@ export default function ProductsPage() {
                   <Button onClick={() => {
                     setSortBy("default");
                     setStockFilter("all");
-                    window.location.href = '/products';
+                    navigate('/products');
                   }}>Clear All Filters</Button>
                 </EmptyContent>
               )}
@@ -810,7 +830,7 @@ export default function ProductsPage() {
             <div className="mb-6">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
-                  onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
+                  onClick={() => updateUrlParams({ collection: null })}
                   className={`px-5 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
                     !collectionParam
                       ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
@@ -822,7 +842,7 @@ export default function ProductsPage() {
                 {allCollections.map((col) => (
                   <button
                     key={col._id}
-                    onClick={() => window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&collection=${encodeURIComponent(col.name)}${finishFilter ? `&finish=${finishFilter}` : ''}`}
+                    onClick={() => updateUrlParams({ collection: col.name })}
                     className={`px-5 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
                       collectionParam === col.name
                         ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
@@ -878,9 +898,7 @@ export default function ProductsPage() {
                     setSortBy("default");
                     setStockFilter("all");
                     updateFilters({ gadget: null, finish: null });
-                    if (brandFilter && modelFilter) {
-                      window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}`;
-                    }
+                    updateUrlParams({ collection: null });
                   }} 
                   className="h-9 text-xs"
                 >
