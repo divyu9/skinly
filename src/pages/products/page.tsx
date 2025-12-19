@@ -121,6 +121,14 @@ export default function ProductsPage() {
   const showFinish = urlParams.get('showFinish') === 'true';
   const urlSearchQuery = urlParams.get('search') || '';
   const collectionParam = urlParams.get('collection') || '';
+  const gadgetParam = urlParams.get('gadget');
+  
+  // State declarations
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
+  const [sortBy, setSortBy] = useState<string>("default");
+  const [stockFilter, setStockFilter] = useState<string>("all");
+  const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(gadgetParam);
   
   // Get finish types and gadget types for filtering
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
@@ -176,13 +184,6 @@ export default function ProductsPage() {
     
     return () => observer.disconnect();
   }, [handleLoadMore]);
-  
-  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
-  const [sortBy, setSortBy] = useState<string>("default");
-  const [stockFilter, setStockFilter] = useState<string>("all");
-  const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
-  const gadgetParam = urlParams.get('gadget');
-  const [gadgetFilter, setGadgetFilter] = useState<string | null>(gadgetParam);
   
   // Get collection if collection parameter is present
   const collection = useQuery(
