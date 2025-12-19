@@ -115,29 +115,28 @@ export default function ProductsPage() {
   // Get URL parameters (must be before queries that depend on them)
   const urlParams = new URLSearchParams(window.location.search);
   const deviceFilter = urlParams.get('device');
-  const finishFilter = urlParams.get('finish');
   const brandFilter = urlParams.get('brand');
   const modelFilter = urlParams.get('model');
   const showFinish = urlParams.get('showFinish') === 'true';
   const urlSearchQuery = urlParams.get('search') || '';
   const collectionParam = urlParams.get('collection') || '';
-  const gadgetParam = urlParams.get('gadget');
   
-  // State declarations
+  // State declarations for filters (initialized from URL)
   const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
   const [sortBy, setSortBy] = useState<string>("default");
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
-  const [gadgetFilter, setGadgetFilter] = useState<string | null>(gadgetParam);
+  const [productCategory, setProductCategory] = useState<"skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null>(
+    urlParams.get('productType') as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null
+  );
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(urlParams.get('gadget'));
+  const [finishFilter, setFinishFilter] = useState<string | null>(urlParams.get('finish'));
+  const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
   
   // Get finish types, gadget types, and product categories for filtering
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
   const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
-  
-  // Determine productCategory from URL or state
-  const urlProductType = urlParams.get('productType');
-  const productCategory = urlProductType as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null;
   
   // Find gadgetTypeId from gadgetFilter
   const selectedGadgetType = gadgetTypes?.find(gt => gt.name === gadgetFilter);
@@ -146,6 +145,91 @@ export default function ProductsPage() {
   // Find finishTypeId from finishFilter
   const selectedFinishType = finishTypes?.find(ft => ft.name === finishFilter);
   const finishTypeId = selectedFinishType?._id;
+  
+  // Function to update filters without reload
+  const updateFilters = useCallback((updates: {
+    productType?: string | null;
+    gadget?: string | null;
+    finish?: string | null;
+  }) => {
+    setIsFilterTransitioning(true);
+    
+    // Update state
+    if (updates.productType !== undefined) {
+      setProductCategory(updates.productType as typeof productCategory);
+      // Clear dependent filters when category changes
+      if (updates.gadget === undefined) {
+        setGadgetFilter(null);
+      }
+      if (updates.finish === undefined) {
+        setFinishFilter(null);
+      }
+    }
+    if (updates.gadget !== undefined) {
+      setGadgetFilter(updates.gadget);
+      // Clear finish when gadget changes
+      if (updates.finish === undefined) {
+        setFinishFilter(null);
+      }
+    }
+    if (updates.finish !== undefined) {
+      setFinishFilter(updates.finish);
+    }
+    
+    // Update URL without reload
+    const params = new URLSearchParams(window.location.search);
+    if (updates.productType !== undefined) {
+      if (updates.productType) {
+        params.set('productType', updates.productType);
+      } else {
+        params.delete('productType');
+      }
+      // Clear dependent params
+      if (updates.gadget === undefined) {
+        params.delete('gadget');
+      }
+      if (updates.finish === undefined) {
+        params.delete('finish');
+      }
+    }
+    if (updates.gadget !== undefined) {
+      if (updates.gadget) {
+        params.set('gadget', updates.gadget);
+      } else {
+        params.delete('gadget');
+      }
+      // Clear finish param
+      if (updates.finish === undefined) {
+        params.delete('finish');
+      }
+    }
+    if (updates.finish !== undefined) {
+      if (updates.finish) {
+        params.set('finish', updates.finish);
+      } else {
+        params.delete('finish');
+      }
+    }
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+    
+    // Reset transitioning state after brief delay
+    setTimeout(() => setIsFilterTransitioning(false), 300);
+  }, []);
+  
+  // Handle browser back/forward
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setProductCategory(params.get('productType') as typeof productCategory);
+      setGadgetFilter(params.get('gadget'));
+      setFinishFilter(params.get('finish'));
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   
   // Use paginated query - load 100 products at a time
   const { results: productsData, status, loadMore } = usePaginatedQuery(
@@ -684,7 +768,7 @@ export default function ProductsPage() {
                   return (
                     <button
                       key={category.id}
-                      onClick={() => window.location.href = `/products?productType=${category.id}`}
+                      onClick={() => updateFilters({ productType: category.id })}
                       className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
                         productCategory === category.id
                           ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg scale-105`
@@ -705,11 +789,7 @@ export default function ProductsPage() {
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <button
-                  onClick={() => {
-                    const params = new URLSearchParams(window.location.search);
-                    params.set('productType', 'skin');
-                    window.location.href = `/products?${params.toString()}`;
-                  }}
+                  onClick={() => updateFilters({ productType: 'skin', gadget: null })}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
                     !gadgetFilter
                       ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
@@ -739,12 +819,7 @@ export default function ProductsPage() {
                   return (
                     <button
                       key={gadgetType._id}
-                      onClick={() => {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('productType', 'skin');
-                        params.set('gadget', gadgetType.name);
-                        window.location.href = `/products?${params.toString()}`;
-                      }}
+                      onClick={() => updateFilters({ productType: 'skin', gadget: gadgetType.name })}
                       className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
                         gadgetFilter === gadgetType.name
                           ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg scale-105'
@@ -770,11 +845,7 @@ export default function ProductsPage() {
                   {finishTypes.map((finishType) => (
                     <button
                       key={finishType._id}
-                      onClick={() => {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('finish', finishType.name);
-                        window.location.href = `/products?${params.toString()}`;
-                      }}
+                      onClick={() => updateFilters({ finish: finishType.name })}
                       className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
                         finishFilter === finishType.name
                           ? 'border-primary text-primary' 
@@ -785,11 +856,7 @@ export default function ProductsPage() {
                     </button>
                   ))}
                   <button
-                    onClick={() => {
-                      const params = new URLSearchParams(window.location.search);
-                      params.delete('finish');
-                      window.location.href = `/products?${params.toString()}`;
-                    }}
+                    onClick={() => updateFilters({ finish: null })}
                     className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
                       !finishFilter 
                         ? 'border-primary text-primary' 
@@ -894,18 +961,33 @@ export default function ProductsPage() {
                 </SelectContent>
               </Select>
 
-              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter) && (
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter || productCategory) && (
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
-                  setGadgetFilter(null);
-                  window.location.href = '/products';
+                  updateFilters({ productType: null, gadget: null, finish: null });
                 }} className="h-8 sm:h-10 text-xs sm:text-sm">
                   Clear All
                 </Button>
               )}
             </div>
           </div>
+
+          {/* Filter transition indicator */}
+          {(isFilterTransitioning || status === "LoadingFirstPage") && (
+            <div className="flex items-center justify-center gap-3 py-8 mb-4 bg-muted/30 rounded-lg">
+              <Loader2Icon className="size-6 animate-spin text-primary" />
+              <p className="text-sm font-medium text-muted-foreground">
+                {productCategory && gadgetFilter && finishFilter 
+                  ? `Loading ${finishFilter} ${gadgetFilter} skins...`
+                  : productCategory && gadgetFilter
+                  ? `Loading ${gadgetFilter} products...`
+                  : productCategory
+                  ? `Loading ${productCategory} products...`
+                  : "Loading products..."}
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
             {sortedAndFilteredProducts.map((product) => {
