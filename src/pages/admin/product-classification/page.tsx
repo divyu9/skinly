@@ -42,7 +42,7 @@ export default function ProductClassificationPage() {
 
   // Queries
   const stats = useQuery(api.productClassification.getClassificationStats, {});
-  const finishTypes = useQuery(api.finishTypes.listActive, {});
+  const finishTypes = useQuery(api.finishTypes.listAllActive, {}); // Use listAllActive for dropdowns
   const allFinishTypes = useQuery(api.finishTypes.list, {}); // For management tab
   const preview = useQuery(api.productClassification.previewAutoClassification, {});
   const unclassified = useQuery(api.productClassification.getUnclassifiedProducts, {});

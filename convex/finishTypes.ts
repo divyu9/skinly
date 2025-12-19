@@ -10,6 +10,17 @@ export const list = query({
   },
 });
 
+// Get ALL active finish types (regardless of product count)
+export const listAllActive = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("finishTypes")
+      .withIndex("by_is_active", (q) => q.eq("isActive", true))
+      .collect();
+  },
+});
+
 // Get active finish types only (with product count > 0)
 export const listActive = query({
   args: {},
