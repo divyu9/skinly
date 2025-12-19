@@ -33,6 +33,7 @@ export const migrateProductsToProductCategory = mutation({
           "3d textured",
           "3d skin",
           "tranzy skin",
+          "embossed",
           // Gadget-specific patterns
           "phone skin",
           "laptop skin",
@@ -41,9 +42,13 @@ export const migrateProductsToProductCategory = mutation({
           "console skin",
           "camera skin",
           "drone skin",
-          "charger skin"
+          "charger skin",
+          "lens skin"
         ];
         const hasSkinKeyword = skinKeywords.some(keyword => combined.includes(keyword));
+        
+        // Also check if title ends with "skin" (common pattern)
+        const endsWithSkin = title.trim().endsWith("skin");
         
         // Rule 2: Camera Rings
         const hasCameraRing = combined.includes("camera ring");
@@ -64,12 +69,12 @@ export const migrateProductsToProductCategory = mutation({
           productCategory = "magneto-x";
         } else if (hasCameraRing) {
           productCategory = "camera-ring";
+        } else if (hasSkinKeyword || endsWithSkin || product.gadgetTypeId || product.gadgetCategory) {
+          productCategory = "skin";
         } else if (hasCover) {
           productCategory = "case-cover";
         } else if (hasProtector) {
           productCategory = "glass";
-        } else if (hasSkinKeyword || product.gadgetTypeId || product.gadgetCategory) {
-          productCategory = "skin";
         } else {
           productCategory = "accessory";
         }
@@ -118,6 +123,7 @@ export const previewProductCategoryMigration = query({
         "3d textured",
         "3d skin",
         "tranzy skin",
+        "embossed",
         // Gadget-specific patterns
         "phone skin",
         "laptop skin",
@@ -126,9 +132,13 @@ export const previewProductCategoryMigration = query({
         "console skin",
         "camera skin",
         "drone skin",
-        "charger skin"
+        "charger skin",
+        "lens skin"
       ];
       const hasSkinKeyword = skinKeywords.some(keyword => combined.includes(keyword));
+      
+      // Also check if title ends with "skin" (common pattern)
+      const endsWithSkin = title.trim().endsWith("skin");
       
       // Rule 2: Camera Rings
       const hasCameraRing = combined.includes("camera ring");
@@ -149,12 +159,12 @@ export const previewProductCategoryMigration = query({
         suggestedCategory = "magneto-x";
       } else if (hasCameraRing) {
         suggestedCategory = "camera-ring";
+      } else if (hasSkinKeyword || endsWithSkin || product.gadgetTypeId || product.gadgetCategory) {
+        suggestedCategory = "skin";
       } else if (hasCover) {
         suggestedCategory = "case-cover";
       } else if (hasProtector) {
         suggestedCategory = "glass";
-      } else if (hasSkinKeyword || product.gadgetTypeId || product.gadgetCategory) {
-        suggestedCategory = "skin";
       } else {
         suggestedCategory = "accessory";
       }
