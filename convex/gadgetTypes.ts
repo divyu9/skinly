@@ -122,15 +122,17 @@ export const recalculateProductCounts = mutation({
 export const migrateProductGadgetTypes = mutation({
   args: {},
   handler: async (ctx) => {
-    // Get all gadget types and create a map from name to ID
+    // Get all gadget types and create a case-insensitive map from name to ID
     const gadgetTypes = await ctx.db.query("gadgetTypes").collect();
-    const nameToIdMap = new Map(gadgetTypes.map(gt => [gt.name, gt._id]));
+    const nameToIdMap = new Map(gadgetTypes.map(gt => [gt.name.toLowerCase(), gt._id]));
     
     // Get all products
     const products = await ctx.db.query("products").collect();
     
     let migrated = 0;
     let skipped = 0;
+    let failed = 0;
+    const failedCategories = new Set<string>();
     
     for (const product of products) {
       // Skip if already has gadgetTypeId
@@ -145,22 +147,26 @@ export const migrateProductGadgetTypes = mutation({
         continue;
       }
       
-      // Find matching gadget type ID
-      const gadgetTypeId = nameToIdMap.get(product.gadgetCategory);
+      // Find matching gadget type ID (case-insensitive)
+      const gadgetTypeId = nameToIdMap.get(product.gadgetCategory.toLowerCase());
       
       if (gadgetTypeId) {
         await ctx.db.patch(product._id, { gadgetTypeId });
         migrated++;
       } else {
-        skipped++;
+        failed++;
+        failedCategories.add(product.gadgetCategory);
       }
     }
+    
+    const failedList = Array.from(failedCategories).join(", ");
     
     return { 
       success: true,
       migrated, 
       skipped,
-      message: `Migrated ${migrated} products, skipped ${skipped}` 
+      failed,
+      message: `Migrated ${migrated} products, skipped ${skipped}, failed ${failed}${failed > 0 ? ` (categories not found: ${failedList})` : ''}` 
     };
   },
 });
