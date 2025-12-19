@@ -678,7 +678,7 @@ export default function ProductsPage() {
           </div>
         </nav>
 
-        <div className="pt-16 sm:pt-24 pb-6 sm:pb-20 px-2 sm:px-4">
+        <div className="pt-36 sm:pt-44 pb-6 sm:pb-20 px-2 sm:px-4">
           <div className="container mx-auto max-w-2xl">
             <Empty>
               <EmptyHeader>
@@ -806,80 +806,87 @@ export default function ProductsPage() {
         
         {/* Animated Filter Bar - Shows when category is selected */}
         {productCategory && (
-          <div className="border-t border-border bg-background/90 backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
-            <div className="container mx-auto px-2 sm:px-4 py-3">
-              <div className="space-y-3">
-                {/* Gadget Type Selector - Only for Skins */}
-                {productCategory === 'skin' && gadgetTypes && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Smartphone className="size-4 text-muted-foreground" />
-                      <Label className="text-xs font-semibold text-muted-foreground">GADGET TYPE</Label>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          <div className="border-t border-border bg-background backdrop-blur-sm animate-in slide-in-from-top-2 duration-300">
+            <div className="container mx-auto px-2 sm:px-4 py-2.5">
+              {/* Show full gadget selector when no gadget is selected */}
+              {productCategory === 'skin' && !gadgetFilter && gadgetTypes && (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={() => updateFilters({ gadget: null })}
+                    className="h-8 whitespace-nowrap"
+                  >
+                    All Gadgets
+                  </Button>
+                  {gadgetTypes
+                    .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
+                    .map((gadgetType) => (
                       <Button
+                        key={gadgetType._id}
                         size="sm"
-                        variant={!gadgetFilter ? "default" : "outline"}
-                        onClick={() => updateFilters({ gadget: null })}
+                        variant="outline"
+                        onClick={() => updateFilters({ gadget: gadgetType.name })}
                         className="h-8 whitespace-nowrap"
                       >
-                        All Gadgets
+                        {gadgetType.displayName}
                       </Button>
-                      {gadgetTypes
-                        .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
-                        .map((gadgetType) => (
-                          <Button
-                            key={gadgetType._id}
-                            size="sm"
-                            variant={gadgetFilter === gadgetType.name ? "default" : "outline"}
-                            onClick={() => updateFilters({ gadget: gadgetType.name })}
-                            className="h-8 whitespace-nowrap"
-                          >
-                            {gadgetType.displayName}
-                          </Button>
-                        ))}
-                    </div>
-                  </div>
-                )}
+                    ))}
+                </div>
+              )}
 
-                {/* Finish Type Selector - Only for Skins with Gadget selected */}
-                {productCategory === 'skin' && gadgetFilter && finishTypes && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Box className="size-4 text-muted-foreground" />
-                      <Label className="text-xs font-semibold text-muted-foreground">FINISH TYPE</Label>
-                    </div>
-                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {/* Compact horizontal layout when gadget is selected */}
+              {productCategory === 'skin' && gadgetFilter && finishTypes && (
+                <div className="flex items-center gap-3">
+                  {/* Left 20% - Selected Gadget */}
+                  <div className="flex items-center gap-2 min-w-fit">
+                    <Badge variant="secondary" className="h-8 px-3 text-sm font-medium">
+                      {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
+                    </Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateFilters({ gadget: null })}
+                      className="h-8 whitespace-nowrap"
+                    >
+                      Change
+                    </Button>
+                  </div>
+
+                  {/* Separator */}
+                  <div className="h-6 w-px bg-border hidden sm:block" />
+
+                  {/* Right 80% - Finish Selector */}
+                  <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
+                    <Button
+                      size="sm"
+                      variant={!finishFilter ? "default" : "outline"}
+                      onClick={() => updateFilters({ finish: null })}
+                      className="h-8 whitespace-nowrap"
+                    >
+                      All Finishes
+                    </Button>
+                    {finishTypes.map((finishType) => (
                       <Button
+                        key={finishType._id}
                         size="sm"
-                        variant={!finishFilter ? "default" : "outline"}
-                        onClick={() => updateFilters({ finish: null })}
+                        variant={finishFilter === finishType.name ? "default" : "outline"}
+                        onClick={() => updateFilters({ finish: finishType.name })}
                         className="h-8 whitespace-nowrap"
                       >
-                        All Finishes
+                        {finishType.displayName}
                       </Button>
-                      {finishTypes.map((finishType) => (
-                        <Button
-                          key={finishType._id}
-                          size="sm"
-                          variant={finishFilter === finishType.name ? "default" : "outline"}
-                          onClick={() => updateFilters({ finish: finishType.name })}
-                          className="h-8 whitespace-nowrap"
-                        >
-                          {finishType.displayName}
-                        </Button>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )}
       </nav>
 
       {/* Products Section */}
-      <section className="pt-32 sm:pt-40 pb-6 sm:pb-20 px-2 sm:px-4">
+      <section className="pt-36 sm:pt-44 pb-6 sm:pb-20 px-2 sm:px-4">
         <div className="container mx-auto">
           <div className="text-center mb-6 space-y-2">
             <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-balance">
