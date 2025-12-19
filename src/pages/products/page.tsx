@@ -183,7 +183,6 @@ export default function ProductsPage() {
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
   const gadgetParam = urlParams.get('gadget');
   const [gadgetFilter, setGadgetFilter] = useState<string | null>(gadgetParam);
-  const [productTypeFilter, setProductTypeFilter] = useState<string | null>(null);
   
   // Get collection if collection parameter is present
   const collection = useQuery(
@@ -776,7 +775,7 @@ export default function ProductsPage() {
 
 
           {/* Finish Tabs - Only show when Skins product type is selected OR brand+model selected */}
-          {((!brandFilter && !modelFilter && productTypeFilter === 'skins') || (brandFilter && modelFilter)) && (
+          {((!brandFilter && !modelFilter && productCategory === 'skin') || (brandFilter && modelFilter)) && (
             <div className="mb-4 sm:mb-6">
               <div className="border-b">
                 <div className="flex gap-1 overflow-x-auto no-scrollbar">
@@ -954,12 +953,11 @@ export default function ProductsPage() {
                 </SelectContent>
               </Select>
 
-              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter || productTypeFilter) && (
+              {(deviceFilter || finishFilter || searchQuery || collectionParam || sortBy !== "default" || stockFilter !== "all" || gadgetFilter) && (
                 <Button variant="ghost" size="sm" onClick={() => {
                   setSortBy("default");
                   setStockFilter("all");
                   setGadgetFilter(null);
-                  setProductTypeFilter(null);
                   window.location.href = '/products';
                 }} className="h-8 sm:h-10 text-xs sm:text-sm">
                   Clear All
