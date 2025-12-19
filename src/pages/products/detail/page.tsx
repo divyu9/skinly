@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -34,6 +34,8 @@ import {
   CoinsIcon
 } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
+import { HeaderSearch } from "@/components/header-search.tsx";
+import { ProductCategoryHeader } from "@/components/product-category-header.tsx";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
@@ -75,6 +77,62 @@ export default function ProductDetailPage() {
   const productSlug = params.slug || searchParams.get('slug');
   const phoneModel = searchParams.get('model');
   const phoneBrand = searchParams.get('brand');
+  
+  // Extended header filter state
+  const [productCategory, setProductCategory] = useState<string | null>(
+    searchParams.get('productType')
+  );
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(
+    searchParams.get('gadget')
+  );
+  const [finishFilter, setFinishFilter] = useState<string | null>(
+    searchParams.get('finish')
+  );
+  
+  // Update filters callback
+  const updateFilters = useCallback((updates: {
+    productType?: string | null;
+    gadget?: string | null;
+    finish?: string | null;
+  }) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    if (updates.productType !== undefined) {
+      setProductCategory(updates.productType);
+      if (updates.productType) {
+        newParams.set('productType', updates.productType);
+      } else {
+        newParams.delete('productType');
+      }
+      // Clear gadget and finish when changing category
+      if (updates.gadget === undefined && updates.finish === undefined) {
+        newParams.delete('gadget');
+        newParams.delete('finish');
+        setGadgetFilter(null);
+        setFinishFilter(null);
+      }
+    }
+    
+    if (updates.gadget !== undefined) {
+      setGadgetFilter(updates.gadget);
+      if (updates.gadget) {
+        newParams.set('gadget', updates.gadget);
+      } else {
+        newParams.delete('gadget');
+      }
+    }
+    
+    if (updates.finish !== undefined) {
+      setFinishFilter(updates.finish);
+      if (updates.finish) {
+        newParams.set('finish', updates.finish);
+      } else {
+        newParams.delete('finish');
+      }
+    }
+    
+    navigate(`/products?${newParams.toString()}`, { replace: true });
+  }, [searchParams, navigate]);
   
   // Model selector state
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
@@ -675,18 +733,40 @@ export default function ProductDetailPage() {
     return (
       <div className="min-h-screen bg-background">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+            <Link to="/" className="flex items-center gap-2 flex-shrink-0">
               <img 
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                 alt="Skinly" 
-                className="h-16"
+                className="h-12 md:h-16"
               />
             </Link>
+            
+            {/* Header Search - Hidden on mobile, shown on tablet+ */}
+            <div className="hidden md:flex flex-1 max-w-lg">
+              <HeaderSearch onRequestModelClick={() => {}} />
+            </div>
+            
+            <div className="flex items-center gap-6">
+              <Link to="/products" className="hidden sm:block text-sm font-medium hover:text-primary transition-colors">
+                All Products
+              </Link>
+              <CartButton />
+            </div>
           </div>
         </nav>
 
-        <div className="pt-24 pb-20 px-4">
+        {/* Extended Product Category Header */}
+        <div className="fixed top-[72px] md:top-[88px] w-full z-40">
+          <ProductCategoryHeader
+            productCategory={productCategory}
+            gadgetFilter={gadgetFilter}
+            finishFilter={finishFilter}
+            onUpdateFilters={updateFilters}
+          />
+        </div>
+
+        <div className="pt-56 sm:pt-64 pb-20 px-4">
           <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-8 w-32 mb-8" />
             <div className="grid lg:grid-cols-2 gap-8">
@@ -709,18 +789,40 @@ export default function ProductDetailPage() {
       return (
         <div className="min-h-screen bg-background">
           <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-              <Link to="/" className="flex items-center gap-2">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+              <Link to="/" className="flex items-center gap-2 flex-shrink-0">
                 <img 
                   src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                   alt="Skinly" 
-                  className="h-16"
+                  className="h-12 md:h-16"
                 />
               </Link>
+              
+              {/* Header Search - Hidden on mobile, shown on tablet+ */}
+              <div className="hidden md:flex flex-1 max-w-lg">
+                <HeaderSearch onRequestModelClick={() => {}} />
+              </div>
+              
+              <div className="flex items-center gap-6">
+                <Link to="/products" className="hidden sm:block text-sm font-medium hover:text-primary transition-colors">
+                  All Products
+                </Link>
+                <CartButton />
+              </div>
             </div>
           </nav>
 
-          <div className="pt-24 pb-20 px-4">
+          {/* Extended Product Category Header */}
+          <div className="fixed top-[72px] md:top-[88px] w-full z-40">
+            <ProductCategoryHeader
+              productCategory={productCategory}
+              gadgetFilter={gadgetFilter}
+              finishFilter={finishFilter}
+              onUpdateFilters={updateFilters}
+            />
+          </div>
+
+          <div className="pt-56 sm:pt-64 pb-20 px-4">
             <div className="container mx-auto max-w-2xl text-center space-y-6">
               <div className="flex justify-center">
                 <div className="size-20 rounded-full bg-muted flex items-center justify-center">
@@ -806,16 +908,22 @@ export default function ProductDetailPage() {
 
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
-              className="h-16"
+              className="h-12 md:h-16"
             />
           </Link>
+          
+          {/* Header Search - Hidden on mobile, shown on tablet+ */}
+          <div className="hidden md:flex flex-1 max-w-lg">
+            <HeaderSearch onRequestModelClick={() => setRequestDialogOpen(true)} />
+          </div>
+          
           <div className="flex items-center gap-6">
-            <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link to="/products" className="hidden sm:block text-sm font-medium hover:text-primary transition-colors">
               All Products
             </Link>
             <CartButton />
@@ -823,8 +931,18 @@ export default function ProductDetailPage() {
         </div>
       </nav>
 
+      {/* Extended Product Category Header */}
+      <div className="fixed top-[72px] md:top-[88px] w-full z-40">
+        <ProductCategoryHeader
+          productCategory={productCategory}
+          gadgetFilter={gadgetFilter}
+          finishFilter={finishFilter}
+          onUpdateFilters={updateFilters}
+        />
+      </div>
+
       {/* Product Detail Section */}
-      <section className="pt-28 pb-12 px-4">
+      <section className="pt-56 sm:pt-64 pb-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <Button variant="ghost" size="sm" asChild className="mb-6">
             <Link to="/products">
