@@ -31,9 +31,14 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <CheckCircle2Icon className="size-5 flex-shrink-0" />
-            <p className="text-sm font-medium leading-tight truncate">
-              <span className="font-bold">{brandName} - {modelName}</span> is available! All designs shown are reference – we'll send it for your exact model.
-            </p>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold leading-tight">
+                {brandName} - {modelName} is available!
+              </p>
+              <p className="text-xs font-medium leading-tight mt-0.5 opacity-90">
+                All designs shown are reference – we'll send it for your exact model.
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {onChangeDevice && (
