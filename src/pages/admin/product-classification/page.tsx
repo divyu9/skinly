@@ -388,10 +388,16 @@ export default function ProductClassificationPage() {
               Auto-classify products by gadget type and finish
             </p>
           </div>
-          <Button onClick={handleSeedFinishTypes} variant="outline" size="sm">
-            <Layers className="mr-2 h-4 w-4" />
-            Seed Finish Types
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleSeedGadgetTypes} variant="outline" size="sm">
+              <Tag className="mr-2 h-4 w-4" />
+              Seed Gadget Types
+            </Button>
+            <Button onClick={handleSeedFinishTypes} variant="outline" size="sm">
+              <Layers className="mr-2 h-4 w-4" />
+              Seed Finish Types
+            </Button>
+          </div>
         </div>
 
         {/* Stats Overview */}
