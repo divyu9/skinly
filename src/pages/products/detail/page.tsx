@@ -759,6 +759,15 @@ export default function ProductDetailPage() {
     ? `₹${minPrice.toFixed(0)}`
     : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
 
+  // Get product URL
+  const productUrl = `https://goskinly.com/products/${product?.slug || 'detail'}`;
+  
+  // Get product image for OG tags
+  const productImage = displayImages[0]?.url || product?.images[0]?.url || 'https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv';
+  
+  // Get product price for OG tags
+  const productPrice = product?.variants[selectedVariant]?.price || minPrice;
+
   return (
     <div className="min-h-screen bg-background">
       {/* SEO Meta Tags */}
@@ -767,6 +776,30 @@ export default function ProductDetailPage() {
         {productData?.metaDescription && (
           <meta name="description" content={productData.metaDescription} />
         )}
+        
+        {/* Open Graph Tags */}
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={`${productData?.metaTitle || productData?.title || "Product"} | Skinly`} />
+        <meta property="og:description" content={productData?.metaDescription || `Shop ${productData?.title} at Skinly. Premium quality phone skins and accessories.`} />
+        <meta property="og:url" content={productUrl} />
+        <meta property="og:image" content={productImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:site_name" content="Skinly" />
+        
+        {/* Product-specific OG tags */}
+        <meta property="product:price:amount" content={productPrice.toString()} />
+        <meta property="product:price:currency" content="INR" />
+        {product?.status === "active" && (
+          <meta property="product:availability" content="in stock" />
+        )}
+        
+        {/* Twitter Card Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`${productData?.metaTitle || productData?.title || "Product"} | Skinly`} />
+        <meta name="twitter:description" content={productData?.metaDescription || `Shop ${productData?.title} at Skinly. Premium quality phone skins and accessories.`} />
+        <meta name="twitter:image" content={productImage} />
+        <meta name="twitter:site" content="@goskinly" />
       </Helmet>
 
       {/* Navigation */}

@@ -11,6 +11,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { CartButton } from "@/components/cart.tsx";
+import { Helmet } from "react-helmet-async";
 import {
   Select,
   SelectContent,
@@ -643,6 +644,29 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen">
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>Shop Premium Phone Skins & Gadget Accessories | Skinly</title>
+        <meta name="description" content="Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application." />
+        
+        {/* Open Graph Tags */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Shop Premium Phone Skins & Gadget Accessories | Skinly" />
+        <meta property="og:description" content="Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application." />
+        <meta property="og:url" content="https://goskinly.com/products" />
+        <meta property="og:image" content="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:site_name" content="Skinly" />
+        
+        {/* Twitter Card Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Shop Premium Phone Skins & Gadget Accessories | Skinly" />
+        <meta name="twitter:description" content="Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application." />
+        <meta name="twitter:image" content="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" />
+        <meta name="twitter:site" content="@goskinly" />
+      </Helmet>
+
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-4 flex items-center justify-between">

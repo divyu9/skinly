@@ -70,12 +70,24 @@ export default function SEOPage() {
         <meta property="og:description" content={page.metaDescription} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={currentUrl} />
-        <meta property="og:site_name" content="GoSkinly" />
+        <meta property="og:site_name" content="Skinly" />
+        {page.heroImageUrl && (
+          <>
+            <meta property="og:image" content={page.heroImageUrl} />
+            <meta property="og:image:width" content="1200" />
+            <meta property="og:image:height" content="630" />
+            <meta property="og:image:alt" content={page.h1Heading} />
+          </>
+        )}
         
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={page.metaTitle} />
         <meta name="twitter:description" content={page.metaDescription} />
+        <meta name="twitter:site" content="@goskinly" />
+        {page.heroImageUrl && (
+          <meta name="twitter:image" content={page.heroImageUrl} />
+        )}
         
         {/* Organization Structured Data */}
         <script type="application/ld+json">
