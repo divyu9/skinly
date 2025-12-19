@@ -34,6 +34,39 @@ export const listAllCategories = query({
   },
 });
 
+// List all product categories with counts (for shop page)
+export const listAllWithCounts = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get all active products
+    const products = await ctx.db
+      .query("products")
+      .filter((q) => q.eq(q.field("status"), "active"))
+      .collect();
+    
+    // Count products by category
+    const categoryCounts: Record<string, number> = {};
+    products.forEach(product => {
+      const category = product.productCategory;
+      if (category) {
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      }
+    });
+    
+    // Define all available categories with display names
+    const allCategories = [
+      { id: "skin", displayName: "Skins", count: categoryCounts["skin"] || 0 },
+      { id: "case-cover", displayName: "Cases And Covers", count: categoryCounts["case-cover"] || 0 },
+      { id: "camera-ring", displayName: "Camera Rings", count: categoryCounts["camera-ring"] || 0 },
+      { id: "magneto-x", displayName: "Magneto X", count: categoryCounts["magneto-x"] || 0 },
+      { id: "glass", displayName: "AutoApply HQ Glasses", count: categoryCounts["glass"] || 0 },
+      { id: "accessory", displayName: "Accessories", count: categoryCounts["accessory"] || 0 },
+    ];
+    
+    return allCategories;
+  },
+});
+
 // Get products by category (paginated)
 export const getProductsByCategory = query({
   args: {

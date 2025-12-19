@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2 } from "lucide-react";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2, Shield, Glasses, ShoppingBag, Video, Box } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
@@ -130,9 +130,10 @@ export default function ProductsPage() {
   const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
   const [gadgetFilter, setGadgetFilter] = useState<string | null>(gadgetParam);
   
-  // Get finish types and gadget types for filtering
+  // Get finish types, gadget types, and product categories for filtering
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
+  const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
   
   // Determine productCategory from URL or state
   const urlProductType = urlParams.get('productType');
@@ -663,60 +664,38 @@ export default function ProductsPage() {
           </div>
 
           {/* Product Type Tabs - First level navigation */}
-          {!brandFilter && !modelFilter && (
+          {!brandFilter && !modelFilter && productCategories && (
             <div className="mb-4">
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                <button
-                  onClick={() => window.location.href = '/products?productType=skin'}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productCategory === 'skin'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <Package2 className="size-4" />
-                  Skins
-                </button>
-                <button
-                  onClick={() => window.location.href = '/products?productType=case-cover'}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productCategory === 'case-cover'
-                      ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  Cases And Covers
-                </button>
-                <button
-                  onClick={() => window.location.href = '/products?productType=camera-ring'}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productCategory === 'camera-ring'
-                      ? 'bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  Camera Rings
-                </button>
-                <button
-                  onClick={() => window.location.href = '/products?productType=magneto-x'}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productCategory === 'magneto-x'
-                      ? 'bg-gradient-to-r from-red-500 to-pink-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  Magneto X
-                </button>
-                <button
-                  onClick={() => window.location.href = '/products?productType=glass'}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    productCategory === 'glass'
-                      ? 'bg-gradient-to-r from-sky-500 to-blue-500 text-white shadow-lg scale-105'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  AutoApply HQ Glasses
-                </button>
+                {productCategories.map((category) => {
+                  // Map category IDs to icons and gradient colors
+                  const categoryConfig = {
+                    'skin': { icon: Package2, gradient: 'from-blue-500 to-purple-500' },
+                    'case-cover': { icon: Shield, gradient: 'from-teal-500 to-cyan-500' },
+                    'camera-ring': { icon: Video, gradient: 'from-violet-500 to-purple-500' },
+                    'magneto-x': { icon: Zap, gradient: 'from-red-500 to-pink-500' },
+                    'glass': { icon: Glasses, gradient: 'from-sky-500 to-blue-500' },
+                    'accessory': { icon: ShoppingBag, gradient: 'from-orange-500 to-amber-500' },
+                  };
+                  
+                  const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box, gradient: 'from-gray-500 to-slate-500' };
+                  const IconComponent = config.icon;
+                  
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => window.location.href = `/products?productType=${category.id}`}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium whitespace-nowrap transition-all ${
+                        productCategory === category.id
+                          ? `bg-gradient-to-r ${config.gradient} text-white shadow-lg scale-105`
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      <IconComponent className="size-4" />
+                      {category.displayName}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -741,13 +720,21 @@ export default function ProductsPage() {
                   All Gadgets
                 </button>
                 {gadgetTypes.map((gadgetType) => {
-                  const IconComponent = gadgetType.name === 'phone' ? Smartphone :
-                    gadgetType.name === 'laptop' ? Laptop :
-                    gadgetType.name === 'tablet' ? Tablet :
-                    gadgetType.name === 'camera' ? Camera :
-                    gadgetType.name === 'charger' ? Zap :
-                    gadgetType.name === 'console' ? Gamepad2 :
-                    Package2;
+                  // Map gadget type names to icons
+                  const gadgetIconMap: Record<string, typeof Package2> = {
+                    'phone': Smartphone,
+                    'laptop': Laptop,
+                    'tablet': Tablet,
+                    'camera': Camera,
+                    'lens': Camera,
+                    'drone': Video,
+                    'charger': Zap,
+                    'console': Gamepad2,
+                    'mac-mini': Box,
+                    'cover': Shield,
+                    'accessory': ShoppingBag,
+                  };
+                  const IconComponent = gadgetIconMap[gadgetType.name] || Package2;
                   
                   return (
                     <button
@@ -775,75 +762,28 @@ export default function ProductsPage() {
 
 
 
-          {/* Finish Tabs - Only show when Skins product type is selected OR brand+model selected */}
-          {((!brandFilter && !modelFilter && productCategory === 'skin') || (brandFilter && modelFilter)) && (
+          {/* Finish Tabs - Only show when Skins product type is selected AND gadget is selected */}
+          {productCategory === 'skin' && gadgetFilter && finishTypes && (
             <div className="mb-4 sm:mb-6">
               <div className="border-b">
                 <div className="flex gap-1 overflow-x-auto no-scrollbar">
-                  <button
-                    onClick={() => {
-                      if (brandFilter && modelFilter) {
-                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=matte`;
-                      } else {
-                        window.location.href = `/products?finish=matte`;
-                      }
-                    }}
-                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
-                      finishFilter === 'matte' 
-                        ? 'border-primary text-primary' 
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Matte
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (brandFilter && modelFilter) {
-                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=embossed`;
-                      } else {
-                        window.location.href = `/products?finish=embossed`;
-                      }
-                    }}
-                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
-                      finishFilter === 'embossed' 
-                        ? 'border-primary text-primary' 
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    3D Embossed
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (brandFilter && modelFilter) {
-                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=transparent`;
-                      } else {
-                        window.location.href = `/products?finish=transparent`;
-                      }
-                    }}
-                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
-                      finishFilter === 'transparent' 
-                        ? 'border-primary text-primary' 
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Transparent
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (brandFilter && modelFilter) {
-                        window.location.href = `/products?brand=${encodeURIComponent(brandFilter)}&model=${encodeURIComponent(modelFilter)}&finish=protectors`;
-                      } else {
-                        window.location.href = `/products?finish=protectors`;
-                      }
-                    }}
-                    className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
-                      finishFilter === 'protectors' 
-                        ? 'border-primary text-primary' 
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    Membranes
-                  </button>
+                  {finishTypes.map((finishType) => (
+                    <button
+                      key={finishType._id}
+                      onClick={() => {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('finish', finishType.name);
+                        window.location.href = `/products?${params.toString()}`;
+                      }}
+                      className={`px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base font-semibold whitespace-nowrap transition-colors border-b-2 ${
+                        finishFilter === finishType.name
+                          ? 'border-primary text-primary' 
+                          : 'border-transparent text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {finishType.displayName}
+                    </button>
+                  ))}
                   <button
                     onClick={() => {
                       const params = new URLSearchParams(window.location.search);
