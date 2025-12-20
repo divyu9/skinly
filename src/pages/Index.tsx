@@ -100,9 +100,7 @@ export default function Index() {
       {/* Main Content */}
       <main className="min-h-screen">
         {/* Hero Slider */}
-        <section className="container mx-auto px-4 py-6">
-          <HeroSlider />
-        </section>
+        <HeroSlider />
 
         {/* Explore Models */}
         <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />

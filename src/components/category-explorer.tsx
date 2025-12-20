@@ -14,9 +14,9 @@ export function CategoryExplorer() {
           <div className="px-4 space-y-2">
             <Skeleton className="h-8 w-48" />
           </div>
-          <div className="flex gap-3 px-4 overflow-x-hidden">
+          <div className="flex gap-4 px-4 overflow-x-hidden">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="flex-shrink-0 w-[42vw] h-[52vw] rounded-xl" />
+              <Skeleton key={i} className="flex-shrink-0 w-[70vw] h-[calc(87.5vw+30px)] rounded-2xl" />
             ))}
           </div>
         </div>
@@ -71,7 +71,7 @@ export function CategoryExplorer() {
 
         {/* Horizontal Scrolling Cards */}
         <div 
-          className="flex gap-3 px-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+          className="flex gap-4 px-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}
@@ -80,7 +80,7 @@ export function CategoryExplorer() {
             <Link
               key={category._id}
               to={getCategoryLink(category.categoryName, category.linkUrl)}
-              className="group relative flex-shrink-0 w-[42vw] h-[52vw] rounded-xl overflow-hidden shadow-md snap-start"
+              className="group relative flex-shrink-0 w-[70vw] h-[calc(87.5vw+30px)] rounded-2xl overflow-hidden shadow-lg snap-start"
             >
               {/* Background Image */}
               <img
