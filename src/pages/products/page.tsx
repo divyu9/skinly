@@ -811,6 +811,7 @@ export default function ProductsPage() {
           gadgetFilter={gadgetFilter}
           finishFilter={finishFilter}
           onUpdateFilters={updateFilters}
+          onDeviceSelectorClick={() => setIsDeviceSelectorOpen(true)}
         />
       </div>
 

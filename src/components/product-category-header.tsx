@@ -12,6 +12,7 @@ interface ProductCategoryHeaderProps {
     gadget?: string | null;
     finish?: string | null;
   }) => void;
+  onDeviceSelectorClick?: () => void;
 }
 
 export function ProductCategoryHeader({
@@ -19,6 +20,7 @@ export function ProductCategoryHeader({
   gadgetFilter,
   finishFilter,
   onUpdateFilters,
+  onDeviceSelectorClick,
 }: ProductCategoryHeaderProps) {
   // Get product categories, gadget types, and finish types
   const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
@@ -118,7 +120,7 @@ export function ProductCategoryHeader({
                 {gadgetTypes === undefined || finishTypes === undefined ? (
                   // Loading skeleton for compact layout
                   <>
-                    <Skeleton className="h-8 sm:h-10 w-20 sm:w-32 rounded-lg flex-shrink-0" />
+                    <Skeleton className="h-8 sm:h-10 w-[30%] sm:w-32 rounded-lg flex-shrink-0" />
                     <div className="flex-1 flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
                       {Array.from({ length: 4 }).map((_, i) => (
                         <Skeleton key={i} className="h-8 sm:h-10 w-20 sm:w-28 rounded-lg flex-shrink-0" />
@@ -128,23 +130,15 @@ export function ProductCategoryHeader({
                 ) : (
                   // Loaded gadget and finish types
                   <>
-                    {/* Left side - Selected Gadget (20% width on mobile) */}
-                    <div className="w-[20%] sm:w-auto flex items-center gap-1 sm:gap-1.5 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex-shrink-0">
-                      <div className="px-2 py-1 sm:px-2.5 sm:py-1 rounded bg-black dark:bg-white text-white dark:text-black font-semibold text-[10px] sm:text-xs truncate">
-                        {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
-                      </div>
-                      <button
-                        onClick={() => onUpdateFilters({ gadget: null })}
-                        className="p-1 sm:p-1.5 rounded bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-sm transition-all duration-200 flex-shrink-0"
-                        aria-label="Change gadget"
-                      >
-                        <svg className="size-3 sm:size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                      </button>
-                    </div>
+                    {/* Left side - Selected Gadget (30% width on mobile) */}
+                    <button
+                      onClick={onDeviceSelectorClick}
+                      className="w-[30%] sm:w-auto px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-black dark:bg-white text-white dark:text-black font-semibold text-[10px] sm:text-xs truncate flex-shrink-0 hover:shadow-md transition-all duration-200 border border-black dark:border-white"
+                    >
+                      {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
+                    </button>
 
-                    {/* Right side - Finish Selector (80% width on mobile) */}
+                    {/* Right side - Finish Selector (70% width on mobile) */}
                     <div className="flex-1 flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
                       <button
                         onClick={() => onUpdateFilters({ finish: null })}
