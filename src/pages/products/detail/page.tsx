@@ -56,6 +56,11 @@ import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView, trackAddToCart } from "@/lib/analytics.ts";
 import { StockNotification } from "./_components/stock-notification.tsx";
+import { ProductShareButton } from "./_components/product-share.tsx";
+import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
+import { FormattedDescription } from "./_components/formatted-description.tsx";
+import { MobileHeader } from "@/components/mobile-header.tsx";
+import { MobileNav } from "@/components/mobile-nav.tsx";
 
 // USP bullet points
 const skinUSPs = [
@@ -142,6 +147,9 @@ export default function ProductDetailPage() {
   // UI state
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showStickyBar, setShowStickyBar] = useState(false);
+  const [showOffersCollapsed, setShowOffersCollapsed] = useState(true);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewComment, setReviewComment] = useState("");
@@ -465,6 +473,18 @@ export default function ProductDetailPage() {
     }
   }, [phoneModel, mockupFileUrl, isPhoneSkin]);
 
+  // Scroll listener for sticky bottom bar
+  useEffect(() => {
+    const handleScroll = () => {
+      // Show sticky bar when scrolled past the buy now buttons
+      const scrollPosition = window.scrollY;
+      setShowStickyBar(scrollPosition > 600);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   const handleAddToCart = async () => {
     if (!product) return;
     // Require model selection only for skin products
@@ -731,42 +751,20 @@ export default function ProductDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-            <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-              <img 
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                alt="Skinly" 
-                className="h-12 md:h-16"
-              />
-            </Link>
-            
-            {/* Header Search - Hidden on mobile, shown on tablet+ */}
-            <div className="hidden md:flex flex-1 max-w-lg">
-              <HeaderSearch onRequestModelClick={() => {}} />
-            </div>
-            
-            <div className="flex items-center gap-6">
-              <Link to="/products" className="hidden sm:block text-sm font-medium hover:text-primary transition-colors">
-                All Products
-              </Link>
-              <CartButton />
-            </div>
-          </div>
-        </nav>
+      <div className="min-h-screen bg-background pb-20">
+        {/* Mobile-First Header */}
+        <MobileHeader 
+          onMenuClick={() => setIsMobileMenuOpen(true)}
+          onRequestModelClick={() => setRequestDialogOpen(true)}
+        />
 
-        {/* Extended Product Category Header */}
-        <div className="fixed top-[72px] md:top-[88px] w-full z-40">
-          <ProductCategoryHeader
-            productCategory={productCategory}
-            gadgetFilter={gadgetFilter}
-            finishFilter={finishFilter}
-            onUpdateFilters={updateFilters}
-          />
-        </div>
+        {/* Mobile Navigation Sheet */}
+        <MobileNav 
+          open={isMobileMenuOpen}
+          onOpenChange={setIsMobileMenuOpen}
+        />
 
-        <div className="pt-56 sm:pt-64 pb-20 px-4">
+        <div className="pt-32 px-4">
           <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-8 w-32 mb-8" />
             <div className="grid lg:grid-cols-2 gap-8">
@@ -787,42 +785,20 @@ export default function ProductDetailPage() {
   if (!product) {
     if (!isLoading) {
       return (
-        <div className="min-h-screen bg-background">
-          <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-            <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-              <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-                <img 
-                  src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                  alt="Skinly" 
-                  className="h-12 md:h-16"
-                />
-              </Link>
-              
-              {/* Header Search - Hidden on mobile, shown on tablet+ */}
-              <div className="hidden md:flex flex-1 max-w-lg">
-                <HeaderSearch onRequestModelClick={() => {}} />
-              </div>
-              
-              <div className="flex items-center gap-6">
-                <Link to="/products" className="hidden sm:block text-sm font-medium hover:text-primary transition-colors">
-                  All Products
-                </Link>
-                <CartButton />
-              </div>
-            </div>
-          </nav>
+        <div className="min-h-screen bg-background pb-20">
+          {/* Mobile-First Header */}
+          <MobileHeader 
+            onMenuClick={() => setIsMobileMenuOpen(true)}
+            onRequestModelClick={() => setRequestDialogOpen(true)}
+          />
 
-          {/* Extended Product Category Header */}
-          <div className="fixed top-[72px] md:top-[88px] w-full z-40">
-            <ProductCategoryHeader
-              productCategory={productCategory}
-              gadgetFilter={gadgetFilter}
-              finishFilter={finishFilter}
-              onUpdateFilters={updateFilters}
-            />
-          </div>
+          {/* Mobile Navigation Sheet */}
+          <MobileNav 
+            open={isMobileMenuOpen}
+            onOpenChange={setIsMobileMenuOpen}
+          />
 
-          <div className="pt-56 sm:pt-64 pb-20 px-4">
+          <div className="pt-32 px-4">
             <div className="container mx-auto max-w-2xl text-center space-y-6">
               <div className="flex justify-center">
                 <div className="size-20 rounded-full bg-muted flex items-center justify-center">
@@ -873,7 +849,7 @@ export default function ProductDetailPage() {
   const productPrice = product?.variants[selectedVariant]?.price || minPrice;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       {/* SEO Meta Tags */}
       <Helmet>
         <title>{productData?.metaTitle || productData?.title || "Product"} | Skinly</title>
@@ -906,52 +882,41 @@ export default function ProductDetailPage() {
         <meta name="twitter:site" content="@goskinly" />
       </Helmet>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <img 
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-              alt="Skinly" 
-              className="h-12 md:h-16"
-            />
-          </Link>
-          
-          {/* Header Search - Hidden on mobile, shown on tablet+ */}
-          <div className="hidden md:flex flex-1 max-w-lg">
-            <HeaderSearch onRequestModelClick={() => setRequestDialogOpen(true)} />
-          </div>
-          
-          <div className="flex items-center gap-6">
-            <Link to="/products" className="hidden sm:block text-sm font-medium hover:text-primary transition-colors">
-              All Products
-            </Link>
-            <CartButton />
-          </div>
-        </div>
-      </nav>
+      {/* Mobile-First Header */}
+      <MobileHeader 
+        onMenuClick={() => setIsMobileMenuOpen(true)}
+        onRequestModelClick={() => setRequestDialogOpen(true)}
+      />
 
-      {/* Extended Product Category Header */}
-      <div className="fixed top-[72px] md:top-[88px] w-full z-40">
-        <ProductCategoryHeader
-          productCategory={productCategory}
-          gadgetFilter={gadgetFilter}
-          finishFilter={finishFilter}
-          onUpdateFilters={updateFilters}
-        />
-      </div>
+      {/* Mobile Navigation Sheet */}
+      <MobileNav 
+        open={isMobileMenuOpen}
+        onOpenChange={setIsMobileMenuOpen}
+      />
 
       {/* Product Detail Section */}
-      <section className="pt-56 sm:pt-64 pb-12 px-4">
+      <section className="pt-24 pb-12 px-4">
         <div className="container mx-auto max-w-6xl">
-          <Button variant="ghost" size="sm" asChild className="mb-6">
+          <Button variant="ghost" size="sm" asChild className="mb-4">
             <Link to="/products">
               <ArrowLeftIcon className="size-4 mr-2" />
-              Back to Products
+              Back
             </Link>
           </Button>
 
-          <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-8 mb-12">
+          {/* Reference Message Banner - Above Images */}
+          {isSkinProduct && (
+            <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <div className="flex items-start gap-2 text-sm">
+                <InfoIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                <span className="text-foreground">
+                  Model images are for reference only - You will receive the skin for your selected model
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-6 md:gap-8 mb-12">
             {/* Image Gallery */}
             <div className="space-y-3 md:sticky md:top-24 md:self-start">
               <div className="aspect-square overflow-hidden rounded-xl bg-muted border border-border relative">
@@ -1013,8 +978,15 @@ export default function ProductDetailPage() {
 
             {/* Product Info */}
             <div className="space-y-6">
+              {/* Title and Share */}
               <div>
-                <h1 className="text-3xl font-bold mb-2">{product.title}</h1>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <h1 className="text-2xl md:text-3xl font-bold flex-1">{product.title}</h1>
+                  <ProductShareButton
+                    productTitle={product.title}
+                    productUrl={productUrl}
+                  />
+                </div>
                 <div className="flex items-center gap-4 mb-4">
                   <div className="text-2xl font-bold text-primary">{priceDisplay}</div>
                   {reviewStats && reviewStats.totalReviews > 0 && (
@@ -1041,22 +1013,14 @@ export default function ProductDetailPage() {
 
               {/* USPs - Only for skin products */}
               {isSkinProduct && (
-                <div className="space-y-3">
-                  {skinUSPs.map((usp, idx) => (
+                <div className="space-y-2">
+                  {skinUSPs.slice(1).map((usp, idx) => (
                     <div 
                       key={idx} 
-                      className={`flex items-start gap-2 text-sm ${
-                        usp.highlighted 
-                          ? "bg-amber-500/10 border border-amber-500/30 rounded-lg p-3" 
-                          : ""
-                      }`}
+                      className="flex items-start gap-2 text-sm"
                     >
-                      <usp.icon className={`size-4 shrink-0 mt-0.5 ${
-                        usp.highlighted ? "text-amber-600" : "text-primary"
-                      }`} />
-                      <span className={usp.highlighted ? "text-foreground font-medium" : "text-muted-foreground"}>
-                        {usp.text}
-                      </span>
+                      <usp.icon className="size-4 shrink-0 mt-0.5 text-primary" />
+                      <span className="text-muted-foreground">{usp.text}</span>
                     </div>
                   ))}
                 </div>
@@ -1077,10 +1041,9 @@ export default function ProductDetailPage() {
                     )}
                   </button>
                   {showFullDescription && (
-                    <div 
-                      className="mt-3 text-sm text-muted-foreground prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: product.description }}
-                    />
+                    <div className="mt-3">
+                      <FormattedDescription description={product.description} />
+                    </div>
                   )}
                 </div>
               )}
@@ -1288,62 +1251,58 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {/* Shipping & Delivery Info */}
-              <div className="border-t border-border pt-6">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {/* Shipping & Delivery Info - Compact Icon-Based */}
+              <div className="border border-border rounded-lg p-4">
+                <h3 className="font-semibold text-sm mb-3">Delivery & Policy</h3>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 text-sm">
                     <ZapIcon className="size-4 text-primary shrink-0" />
-                    <span className="text-muted-foreground">Fast Shipping</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <XCircleIcon className="size-4 text-red-500 shrink-0" />
-                    <span className="text-muted-foreground">Non Returnable</span>
+                    <span className="text-muted-foreground text-xs">Fast Shipping</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <MapPinIcon className="size-4 text-primary shrink-0" />
-                    <span className="text-muted-foreground">Pan India Delivery</span>
+                    <span className="text-muted-foreground text-xs">Pan India</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <XCircleIcon className="size-4 text-red-500 shrink-0" />
+                    <span className="text-muted-foreground text-xs">Non Returnable</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <BanknoteIcon className="size-4 text-red-500 shrink-0" />
-                    <span className="text-muted-foreground">COD Not Available</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm col-span-2">
-                    <PackageCheckIcon className="size-4 text-primary shrink-0" />
-                    <span className="text-muted-foreground">Safe Packaging</span>
+                    <span className="text-muted-foreground text-xs">COD Not Available</span>
                   </div>
                 </div>
                 
                 {isSkinProduct && (
-                  <div className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-4">
+                  <div className="flex items-start gap-2 text-sm bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mt-3">
                     <AlertTriangleIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
-                    <span className="text-foreground">
-                      <strong>Custom Cut Product:</strong> No order cancellation or changes allowed after order confirmation. Your product is custom-cut upon order placement.
+                    <span className="text-foreground text-xs">
+                      <strong>Custom Cut:</strong> No cancellation or changes after confirmation.
                     </span>
                   </div>
                 )}
-                
-                {/* WhatsApp Support Button */}
-                <Button
-                  className="w-full mt-4 bg-[#25D366] hover:bg-[#20BA5A] text-white"
-                  size="lg"
-                  onClick={() => {
-                    const phoneNumber = "917505273504";
-                    const message = encodeURIComponent("Hey Skinly Team , I have a query regarding my purchase");
-                    window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
-                  }}
-                >
-                  <MessageCircleIcon className="size-5 mr-2" />
-                  Message on WhatsApp for Product Queries
-                </Button>
-                
-                {/* Active Offers Section */}
-                {applicableCoupons && applicableCoupons.length > 0 && (
-                  <div className="mt-4 space-y-2">
+              </div>
+              
+              {/* Active Offers Section - Collapsible */}
+              {applicableCoupons && applicableCoupons.length > 0 && (
+                <div className="border border-border rounded-lg">
+                  <button
+                    onClick={() => setShowOffersCollapsed(!showOffersCollapsed)}
+                    className="w-full flex items-center justify-between p-4"
+                  >
                     <div className="flex items-center gap-2 text-sm font-semibold">
                       <TagIcon className="size-4 text-primary" />
-                      <span>Active Offers</span>
+                      <span>Offers ({applicableCoupons.length})</span>
                     </div>
-                    <div className="space-y-2">
+                    {showOffersCollapsed ? (
+                      <ChevronDownIcon className="size-4" />
+                    ) : (
+                      <ChevronUpIcon className="size-4" />
+                    )}
+                  </button>
+                  
+                  {!showOffersCollapsed && (
+                    <div className="px-4 pb-4 space-y-2">
                       {applicableCoupons.map((coupon: { _id: string; code: string; discountType: string; discountValue: number; maxDiscount?: number; description: string; minPurchase?: number }) => {
                         const discountText = coupon.discountType === "percentage" 
                           ? `${coupon.discountValue}% OFF${coupon.maxDiscount ? ` (max ₹${coupon.maxDiscount})` : ''}`
@@ -1387,33 +1346,46 @@ export default function ProductDetailPage() {
                         );
                       })}
                     </div>
-                  </div>
-                )}
-                
-                {/* Cashback Section */}
-                {cashbackInfo && cashbackInfo.hasCashback && (
-                  <div className="mt-4">
-                    <div className="border border-amber-500/50 rounded-lg p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center justify-center size-10 rounded-full bg-amber-500/20 shrink-0">
-                          <CoinsIcon className="size-5 text-amber-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                              Earn {cashbackInfo.displayText} Skinly Coins
-                            </span>
-                          </div>
-                          <p className="text-xs text-amber-800 dark:text-amber-200">
-                            Get cashback on this purchase! Redeem on your next order.
-                          </p>
-                        </div>
-                        <SparklesIcon className="size-5 text-amber-500 shrink-0" />
-                      </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Cashback Section */}
+              {cashbackInfo && cashbackInfo.hasCashback && (
+                <div className="border border-amber-500/50 rounded-lg p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center size-10 rounded-full bg-amber-500/20 shrink-0">
+                      <CoinsIcon className="size-5 text-amber-600" />
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
+                          Earn {cashbackInfo.displayText} Skinly Coins
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-800 dark:text-amber-200">
+                        Get cashback on this purchase! Redeem on your next order.
+                      </p>
+                    </div>
+                    <SparklesIcon className="size-5 text-amber-500 shrink-0" />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+              
+              {/* WhatsApp Support Button - Secondary */}
+              <Button
+                variant="outline"
+                className="w-full border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10"
+                size="lg"
+                onClick={() => {
+                  const phoneNumber = "917505273504";
+                  const message = encodeURIComponent("Hey Skinly Team , I have a query regarding my purchase");
+                  window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+                }}
+              >
+                <MessageCircleIcon className="size-5 mr-2" />
+                WhatsApp Support
+              </Button>
             </div>
           </div>
 
@@ -1563,26 +1535,25 @@ export default function ProductDetailPage() {
                 </div>
               </div>
             ) : (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <StarIcon className="size-12 text-muted-foreground mx-auto mb-3" />
-                  <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Be the first to review this product
-                  </p>
-                  <Button 
-                    onClick={() => {
-                      if (user) {
-                        setReviewDialogOpen(true);
-                      } else {
-                        toast.error("Please sign in to post a review");
-                      }
-                    }}
-                  >
-                    Post A Review
-                  </Button>
-                </CardContent>
-              </Card>
+              <div className="bg-muted/30 rounded-lg p-8 text-center">
+                <StarIcon className="size-10 text-muted-foreground mx-auto mb-3" />
+                <h3 className="text-base font-semibold mb-2">No reviews yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Be the first to review this product
+                </p>
+                <Button 
+                  size="sm"
+                  onClick={() => {
+                    if (user) {
+                      setReviewDialogOpen(true);
+                    } else {
+                      toast.error("Please sign in to post a review");
+                    }
+                  }}
+                >
+                  Post A Review
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -1990,6 +1961,15 @@ export default function ProductDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Sticky Bottom Bar */}
+      <StickyBottomBar
+        price={priceDisplay}
+        onBuyNow={handleBuyNow}
+        disabled={isSkinProduct && needsDeviceSelector && !phoneModel}
+        isLoading={isBuyingNow}
+        show={showStickyBar}
+      />
     </div>
   );
 }
