@@ -39,30 +39,30 @@ export function WhySkinly({
   items = defaultItems
 }: WhySkinlyProps) {
   return (
-    <section className="container mx-auto px-4 py-12 bg-muted/30 rounded-3xl">
-      <div className="space-y-8">
+    <section className="container mx-auto px-4 py-8 bg-muted/30 rounded-3xl">
+      <div className="space-y-4">
         {/* Title */}
         <div className="text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">{title}</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">{title}</h2>
         </div>
 
-        {/* Items Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Items Grid - 2x2 on mobile, 4x1 on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {items.map((item, index) => (
             <div
               key={index}
-              className="flex flex-col items-center text-center space-y-3 p-6 rounded-2xl bg-background hover:shadow-lg transition-shadow"
+              className="flex flex-col items-center text-center space-y-2 p-3 md:p-4 rounded-xl bg-background hover:shadow-lg transition-shadow"
             >
               {/* Icon */}
-              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-                {item.icon}
+              <div className="size-10 md:size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <div className="scale-75 md:scale-100">{item.icon}</div>
               </div>
 
               {/* Title */}
-              <h3 className="text-lg font-semibold">{item.title}</h3>
+              <h3 className="text-xs md:text-sm font-semibold leading-tight">{item.title}</h3>
 
               {/* Description */}
-              <p className="text-sm text-muted-foreground">{item.description}</p>
+              <p className="text-[10px] md:text-xs text-muted-foreground leading-snug">{item.description}</p>
             </div>
           ))}
         </div>
