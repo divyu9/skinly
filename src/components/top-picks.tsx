@@ -32,9 +32,9 @@ export function TopPicks({
   
   // Fetch products based on current tab
   const products = useQuery(
-    api.products.searchProducts,
+    api.products.getProductsByTag,
     currentTab.tag 
-      ? { query: currentTab.tag, limit: 12 }
+      ? { tag: currentTab.tag, limit: 12 }
       : "skip"
   );
 

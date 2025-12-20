@@ -485,6 +485,57 @@ export const searchProducts = query({
   },
 });
 
+// Get products by tag (for Top Picks section)
+export const getProductsByTag = query({
+  args: { 
+    tag: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 20;
+    const searchTag = args.tag.toLowerCase().trim();
+    
+    // Get all active products with the specified tag
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    
+    // Filter products that have the tag
+    const matchingProducts = products.filter(product => 
+      product.tags.some(tag => tag.toLowerCase() === searchTag)
+    );
+    
+    // Get variants for matching products
+    const allVariants = await ctx.db.query("variants").collect();
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+    
+    // Build results with variants
+    const results = matchingProducts
+      .slice(0, limit)
+      .map(product => ({
+        _id: product._id,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        status: product.status,
+        images: product.images,
+        tags: product.tags,
+        variants: variantsByProduct.get(product._id) || [],
+      }));
+    
+    return results;
+  },
+});
+
 // Create product
 export const createProduct = mutation({
   args: {
