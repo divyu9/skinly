@@ -28,8 +28,8 @@ export function HeroSlider() {
   // Loading state
   if (heroSlides === undefined) {
     return (
-      <div className="px-4 py-6">
-        <div className="flex gap-3 overflow-x-hidden">
+      <div className="py-6">
+        <div className="flex gap-3 overflow-x-hidden px-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="flex-shrink-0 w-[90vw] h-[110vw] rounded-2xl" />
           ))}
@@ -44,25 +44,31 @@ export function HeroSlider() {
   }
 
   return (
-    <div className="px-4 py-6 space-y-4">
+    <div className="py-6 space-y-4">
       {/* Horizontal Scrolling Cards */}
       <div 
         ref={scrollContainerRef}
         className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
         style={{
           WebkitOverflowScrolling: 'touch',
+          paddingLeft: '16px',
+          paddingRight: '16px',
         }}
       >
         {heroSlides.map((slide) => (
           <div
             key={slide._id}
             className="flex-shrink-0 w-[90vw] h-[110vw] snap-start"
+            style={{
+              contain: 'layout style paint',
+            }}
           >
             <Link
               to={slide.ctaLink || "/"}
               className="group block relative w-full h-full rounded-2xl overflow-hidden shadow-lg bg-muted"
               style={{
                 isolation: 'isolate',
+                willChange: 'transform',
               }}
             >
               {/* Background Image */}
