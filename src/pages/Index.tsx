@@ -99,7 +99,7 @@ export default function Index() {
       />
 
       {/* Models Marquee - below header */}
-      <div className="mt-[100px]">
+      <div className="mt-[92px]">
         <ModelsMarquee />
       </div>
 

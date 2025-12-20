@@ -360,7 +360,7 @@ export default function DevicesPage() {
       <AnnouncementBar />
       
       {/* Navigation */}
-      <nav className="fixed top-[36px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-40">
+      <nav className="fixed top-[28px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img

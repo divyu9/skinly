@@ -11,8 +11,8 @@ export function AnnouncementBar() {
   // Show loading skeleton while fetching
   if (homepageSettings === undefined) {
     return (
-      <div className="w-full bg-primary text-primary-foreground border-b border-primary-foreground/20 fixed top-0 left-0 right-0 z-50">
-        <div className="container mx-auto px-4 py-2 flex items-center justify-center">
+      <div className="w-full bg-primary text-primary-foreground fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4 py-1.5 flex items-center justify-center">
           <div className="h-5 w-48 bg-primary-foreground/20 rounded animate-pulse" />
         </div>
       </div>
@@ -42,7 +42,7 @@ export function AnnouncementBar() {
   );
 
   return (
-    <div className="w-full bg-primary text-primary-foreground border-b border-primary-foreground/20 fixed top-0 left-0 right-0 z-50">
+    <div className="w-full bg-primary text-primary-foreground fixed top-0 left-0 right-0 z-50">
       <div className="container mx-auto px-4 py-1.5 flex items-center justify-between gap-2">
         {/* Empty space for balance */}
         <div className="w-5" />

@@ -768,7 +768,7 @@ export default function ProductDetailPage() {
           onOpenChange={setIsMobileMenuOpen}
         />
 
-        <div className="pt-32 px-4">
+        <div className="pt-28 px-4">
           <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-8 w-32 mb-8" />
             <div className="grid lg:grid-cols-2 gap-8">
@@ -805,7 +805,7 @@ export default function ProductDetailPage() {
             onOpenChange={setIsMobileMenuOpen}
           />
 
-          <div className="pt-32 px-4">
+          <div className="pt-28 px-4">
             <div className="container mx-auto max-w-2xl text-center space-y-6">
               <div className="flex justify-center">
                 <div className="size-20 rounded-full bg-muted flex items-center justify-center">
