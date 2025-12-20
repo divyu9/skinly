@@ -10,11 +10,9 @@ export function CategoryExplorer() {
   if (categories === undefined) {
     return (
       <section className="py-8">
-        <div className="space-y-4">
-          <div className="px-4 space-y-2">
-            <Skeleton className="h-8 w-48" />
-          </div>
-          <div className="flex gap-4 px-4 overflow-x-hidden">
+        <div className="px-4 space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <div className="flex gap-4 overflow-x-hidden">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="flex-shrink-0 w-[70vw] h-[calc(87.5vw+30px)] rounded-2xl" />
             ))}
@@ -61,17 +59,15 @@ export function CategoryExplorer() {
 
   return (
     <section className="py-8 bg-background">
-      <div className="space-y-4">
+      <div className="px-4 space-y-4">
         {/* Title */}
-        <div className="px-4">
-          <h2 className="text-2xl font-bold">
-            Explore by Category
-          </h2>
-        </div>
+        <h2 className="text-2xl font-bold">
+          Explore by Category
+        </h2>
 
-        {/* Horizontal Scrolling Cards */}
+        {/* Horizontal Scrolling Cards - matches hero slider structure */}
         <div 
-          className="flex gap-4 px-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}
