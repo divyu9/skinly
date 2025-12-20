@@ -37,14 +37,18 @@ export function HeroSlider() {
           <Link
             key={slide._id}
             to={slide.ctaLink || "/"}
-            className="group relative flex-shrink-0 w-[90vw] h-[110vw] rounded-2xl overflow-hidden shadow-lg snap-start isolate"
-            style={{ WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
+            className="group relative flex-shrink-0 w-[90vw] h-[110vw] rounded-2xl shadow-lg snap-start bg-muted overflow-hidden"
+            style={{ 
+              transform: 'translateZ(0)',
+              WebkitTransform: 'translateZ(0)',
+            }}
           >
             {/* Background Image */}
             <img
               src={slide.imageUrl}
               alt={slide.heading || "Hero slide"}
-              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95 rounded-2xl"
+              className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
+              style={{ display: 'block' }}
             />
 
             {/* Overlay gradient for text readability - only if text exists */}
