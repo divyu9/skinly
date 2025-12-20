@@ -21,19 +21,19 @@ interface CategoryConfig {
 
 export function CategoriesTab() {
   const categories = useQuery(api.homepage.getAllCategoryDisplaySettings);
-  const gadgetTypes = useQuery(api.gadgetTypes.list);
+  const productCategories = useQuery(api.productCategories.listAllWithCounts);
   const bulkUpdate = useMutation(api.homepage.bulkUpdateCategoryDisplaySettings);
 
   const [configs, setConfigs] = useState<CategoryConfig[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Initialize with gadget types or loaded data
+  // Initialize with product categories or loaded data
   useEffect(() => {
-    if (categories && gadgetTypes) {
+    if (categories && productCategories) {
       const existingMap = new Map(categories.map((cat) => [cat.categoryName, cat]));
       
-      const initialConfigs = gadgetTypes.map((gadgetType: { name: string; displayName: string }, index: number) => {
-        const existing = existingMap.get(gadgetType.name);
+      const initialConfigs = productCategories.map((productCategory: { id: string; displayName: string; count: number }, index: number) => {
+        const existing = existingMap.get(productCategory.id);
         if (existing) {
           return {
             categoryName: existing.categoryName,
@@ -44,8 +44,8 @@ export function CategoriesTab() {
           };
         } else {
           return {
-            categoryName: gadgetType.name,
-            displayName: gadgetType.displayName,
+            categoryName: productCategory.id,
+            displayName: productCategory.displayName,
             imageUrl: "",
             isActive: true,
             order: index,
@@ -55,7 +55,7 @@ export function CategoriesTab() {
       
       setConfigs(initialConfigs);
     }
-  }, [categories, gadgetTypes]);
+  }, [categories, productCategories]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -86,7 +86,7 @@ export function CategoriesTab() {
     );
   };
 
-  if (categories === undefined || gadgetTypes === undefined) {
+  if (categories === undefined || productCategories === undefined) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-48 w-full" />
@@ -192,7 +192,7 @@ export function CategoriesTab() {
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Categories are automatically synced from your Product Classification Gadget Types. 
+            <strong>Note:</strong> Categories are automatically synced from your Product Categories (Skins, Cases And Covers, Magneto X, etc.). 
             These settings only control how categories appear on the homepage "Category Explorer" section.
           </p>
         </CardContent>
