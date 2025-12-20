@@ -36,7 +36,10 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
                 {brandName} - {modelName} is available!
               </p>
               <p className="text-[8px] sm:text-[10px] font-normal leading-tight mt-0.5 opacity-70">
-                All designs shown are reference – we'll send it for your exact model.
+                All designs shown are reference.
+              </p>
+              <p className="text-[8px] sm:text-[10px] font-normal leading-tight opacity-70">
+                We'll send it for your exact model.
               </p>
             </div>
           </div>
