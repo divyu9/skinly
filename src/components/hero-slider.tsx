@@ -12,7 +12,7 @@ export function HeroSlider() {
       <div className="px-4 py-6">
         <div className="flex gap-3 overflow-x-hidden">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="flex-shrink-0 w-[90vw] h-[55vw] rounded-2xl" />
+            <Skeleton key={i} className="flex-shrink-0 w-[90vw] h-[110vw] rounded-2xl" />
           ))}
         </div>
       </div>
@@ -37,7 +37,7 @@ export function HeroSlider() {
           <Link
             key={slide._id}
             to={slide.ctaLink || "/"}
-            className="group relative flex-shrink-0 w-[90vw] h-[55vw] rounded-2xl overflow-hidden shadow-lg snap-start"
+            className="group relative flex-shrink-0 w-[90vw] h-[110vw] rounded-2xl overflow-hidden shadow-lg snap-start"
           >
             {/* Background Image */}
             <img

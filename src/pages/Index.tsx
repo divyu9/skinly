@@ -102,11 +102,11 @@ export default function Index() {
         {/* Hero Slider */}
         <HeroSlider />
 
-        {/* Explore Models */}
-        <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />
-
         {/* Category Explorer */}
         <CategoryExplorer />
+
+        {/* Explore Models */}
+        <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />
 
         {/* Top Picks */}
         <TopPicks />
