@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { toast } from "sonner";
 
@@ -40,6 +40,11 @@ export default function Index() {
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  
+  // Get homepage settings to determine header height
+  const homepageSettings = useQuery(api.homepage.getHomepageSettings);
+  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
+  const headerOffset = showAnnouncement ? 92 : 64; // 28px announcement + 64px header OR just 64px header
 
   const handleRequestModelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,7 +104,7 @@ export default function Index() {
       />
 
       {/* Models Marquee - below header */}
-      <div className="mt-[92px]">
+      <div style={{ marginTop: `${headerOffset}px` }}>
         <ModelsMarquee />
       </div>
 

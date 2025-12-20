@@ -162,15 +162,15 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   const logoUrl = homepageSettings?.logoImageUrl || "https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv";
   const logoLink = homepageSettings?.logoRedirectLink || "/";
   const showSearch = homepageSettings?.showSearchIcon ?? true;
+  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
+  const announcementHeight = showAnnouncement ? 28 : 0;
 
   return (
     <>
       {/* Main Header */}
       <header 
-        className={cn(
-          "fixed top-[28px] left-0 right-0 z-40 bg-background border-b border-border transition-all duration-300",
-          isSearchExpanded ? "h-16" : "h-16"
-        )}
+        className="fixed left-0 right-0 z-40 bg-background border-b border-border transition-all duration-300 h-16"
+        style={{ top: `${announcementHeight}px` }}
       >
         <div className="h-full px-4 flex items-center justify-between gap-3">
           {isSearchExpanded ? (
@@ -271,7 +271,10 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
 
       {/* Search Results Overlay */}
       {isSearchExpanded && showResults && searchQuery.trim().length > 0 && (
-        <div className="fixed inset-x-0 top-[92px] bottom-0 z-40 bg-background overflow-y-auto">
+        <div 
+          className="fixed inset-x-0 bottom-0 z-40 bg-background overflow-y-auto"
+          style={{ top: `${announcementHeight + 64}px` }}
+        >
           <div className="container mx-auto px-4 py-4">
             {debouncedQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
               // Loading state
