@@ -12,13 +12,11 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 
-type DeviceType = "laptop" | "phone" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
-
 interface DeviceSelectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialDeviceType?: DeviceType;
-  onRequestModel?: (category: DeviceType, brand: string) => void;
+  initialDeviceType?: string;
+  onRequestModel?: (category: string, brand: string) => void;
 }
 
 // Brand logo mapping - updated with new brand logos
@@ -54,18 +52,30 @@ const brandLogos: Record<string, string> = {
   "iQOO": "https://cdn.hercules.app/file_m1bBgRqmZsG4VorENlmoX7w0",
 };
 
+// Emoji mapping for gadget types
+const gadgetEmojis: Record<string, string> = {
+  "laptop": "💻",
+  "phone": "📱",
+  "camera": "📷",
+  "lens": "🔍",
+  "tablet": "📱",
+  "mac-mini": "💻",
+  "console": "🎮",
+  "drone": "🚁",
+  "charger": "🔌",
+  "cover": "📦",
+  "accessory": "🎁",
+};
+
 export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, onRequestModel }: DeviceSelectorDialogProps) {
   const navigate = useNavigate();
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedDeviceType, setSelectedDeviceType] = useState<DeviceType | null>(null);
+  const [selectedDeviceType, setSelectedDeviceType] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Map UI device types to database categories
-  const getDbCategory = (deviceType: DeviceType): "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini" => {
-    if (deviceType === "macmini") return "mac-mini";
-    return deviceType as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens";
-  };
+  // Fetch active gadget types from database
+  const gadgetTypes = useQuery(api.gadgetTypes.listAllActive);
 
   // Fetch metadata from cache (super fast!)
   const metadata = useQuery(api.supportedModels.getMetadata);
@@ -74,7 +84,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   const brandModels = useQuery(
     api.supportedModels.getBrandModels,
     selectedBrand && selectedDeviceType
-      ? { brand: selectedBrand, category: getDbCategory(selectedDeviceType) }
+      ? { brand: selectedBrand, category: selectedDeviceType }
       : "skip"
   );
 
@@ -96,7 +106,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   const availableBrands = useMemo(() => {
     if (!metadata || !selectedDeviceType) return [];
     
-    const categoryKey = selectedDeviceType === "macmini" ? "macMini" : selectedDeviceType;
+    const categoryKey = selectedDeviceType === "mac-mini" ? "macMini" : selectedDeviceType;
     const categoryData = metadata.byCategory[categoryKey as keyof typeof metadata.byCategory];
     
     return categoryData?.brands || [];
@@ -113,7 +123,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
     return models.filter(model => model.toLowerCase().includes(query));
   }, [brandModels, searchQuery]);
 
-  const handleDeviceTypeSelect = (type: DeviceType) => {
+  const handleDeviceTypeSelect = (type: string) => {
     setSelectedDeviceType(type);
     setStep(2);
   };
@@ -149,19 +159,16 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
     }
   };
 
-  const getDeviceTypeLabel = (type: DeviceType): string => {
-    switch (type) {
-      case "laptop": return "Laptop";
-      case "phone": return "Phone";
-      case "camera": return "Camera";
-      case "lens": return "Lens";
-      case "tablet": return "Tablet";
-      case "macmini": return "Mac Mini";
-      case "console": return "Gaming Console";
-      case "drone": return "Drone";
-      case "charger": return "Charger";
-    }
+  const getGadgetEmoji = (name: string): string => {
+    return gadgetEmojis[name] || "📦"; // Default emoji
   };
+
+  // Get selected gadget display name
+  const selectedGadgetDisplayName = useMemo(() => {
+    if (!selectedDeviceType || !gadgetTypes) return "";
+    const gadget = gadgetTypes.find(g => g.name === selectedDeviceType);
+    return gadget?.displayName || selectedDeviceType;
+  }, [selectedDeviceType, gadgetTypes]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -169,14 +176,14 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
         <DialogHeader>
           <DialogTitle className="text-3xl">
             {step === 1 && "What Needs a Makeover?"}
-            {step === 2 && `Select Your ${getDeviceTypeLabel(selectedDeviceType!)} Brand`}
+            {step === 2 && `Select Your ${selectedGadgetDisplayName} Brand`}
             {step === 3 && `Select Your ${selectedBrand} Model`}
           </DialogTitle>
           <div className="flex items-center justify-between">
             <p className="text-muted-foreground">
               {step === 1 && "Choose your device type to continue"}
               {step === 2 && "Choose your device brand to continue"}
-              {step === 3 && "Choose your phone model to see compatible skins"}
+              {step === 3 && "Choose your device model to see compatible skins"}
             </p>
             {step !== 1 && (
               <Button variant="ghost" size="sm" onClick={handleBack}>
@@ -189,97 +196,35 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
         <div className="py-6">
           {/* Step 1: Device Type Selection */}
           {step === 1 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <button
-                onClick={() => handleDeviceTypeSelect("laptop")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  💻
+            <>
+              {gadgetTypes === undefined ? (
+                // Loading state
+                <div className="flex flex-col items-center justify-center py-12 gap-3">
+                  <div className="size-8 rounded-full border-4 border-primary/30 border-t-primary animate-spin" />
+                  <p className="text-sm text-muted-foreground">Loading device types...</p>
                 </div>
-                <span className="font-semibold">Laptop</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("phone")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  📱
+              ) : gadgetTypes.length === 0 ? (
+                // Empty state
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No device types available</p>
                 </div>
-                <span className="font-semibold">Phones</span>
-              </button>
-              
-              <button
-                onClick={() => handleDeviceTypeSelect("camera")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  📷
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {gadgetTypes.map((gadget) => (
+                    <button
+                      key={gadget._id}
+                      onClick={() => handleDeviceTypeSelect(gadget.name)}
+                      className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+                    >
+                      <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
+                        {getGadgetEmoji(gadget.name)}
+                      </div>
+                      <span className="font-semibold">{gadget.displayName}</span>
+                    </button>
+                  ))}
                 </div>
-                <span className="font-semibold">Camera</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("lens")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  🔍
-                </div>
-                <span className="font-semibold">Lenses</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("tablet")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  📱
-                </div>
-                <span className="font-semibold">iPad/Tablet</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("macmini")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  💻
-                </div>
-                <span className="font-semibold">Mac Mini</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("drone")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  🚁
-                </div>
-                <span className="font-semibold">Drones</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("charger")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  🔌
-                </div>
-                <span className="font-semibold">Chargers</span>
-              </button>
-
-              <button
-                onClick={() => handleDeviceTypeSelect("console")}
-                className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-              >
-                <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                  🎮
-                </div>
-                <span className="font-semibold">Gaming Console</span>
-              </button>
-            </div>
+              )}
+            </>
           )}
 
           {/* Step 2: Brand Selection */}
