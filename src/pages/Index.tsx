@@ -76,6 +76,12 @@ export default function Index() {
     setIsMobileMenuOpen(true);
   };
 
+  const handleRequestModel = (category: string, brand: string) => {
+    setRequestCategory(category);
+    setRequestBrand(brand);
+    setIsRequestModelOpen(true);
+  };
+
   return (
     <>
       <Helmet>
@@ -103,7 +109,7 @@ export default function Index() {
         <HeroSlider />
 
         {/* Category Explorer */}
-        <CategoryExplorer />
+        <CategoryExplorer onRequestModel={handleRequestModel} />
 
         {/* Explore Models */}
         <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />

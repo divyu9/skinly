@@ -5,7 +5,11 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { useState } from "react";
 
-export function CategoryExplorer() {
+interface CategoryExplorerProps {
+  onRequestModel?: (category: string, brand: string) => void;
+}
+
+export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
   const categories = useQuery(api.homepage.getActiveCategoryDisplaySettings);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
@@ -116,6 +120,7 @@ export function CategoryExplorer() {
         <DeviceSelectorDialog
           open={isSelectorOpen}
           onOpenChange={setIsSelectorOpen}
+          onRequestModel={onRequestModel}
         />
       </div>
     </section>
