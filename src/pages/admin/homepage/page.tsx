@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { SettingsTab } from "./_components/settings-tab.tsx";
 import { HeroSlidesTab } from "./_components/hero-slides-tab.tsx";
@@ -16,7 +16,7 @@ export default function HomepageManagement() {
   const [activeTab, setActiveTab] = useState("settings");
 
   return (
-    <AdminPageWrapper>
+    <AdminLayout>
       <div className="space-y-6">
         {/* Page Header */}
         <div>
@@ -70,6 +70,6 @@ export default function HomepageManagement() {
           </TabsContent>
         </Tabs>
       </div>
-    </AdminPageWrapper>
+    </AdminLayout>
   );
 }
