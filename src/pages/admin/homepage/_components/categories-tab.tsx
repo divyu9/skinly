@@ -15,6 +15,8 @@ interface CategoryConfig {
   categoryName: string;
   displayName: string;
   imageUrl: string;
+  linkUrl: string;
+  buttonText: string;
   isActive: boolean;
   order: number;
 }
@@ -39,6 +41,8 @@ export function CategoriesTab() {
             categoryName: existing.categoryName,
             displayName: existing.displayName,
             imageUrl: existing.imageUrl || "",
+            linkUrl: existing.linkUrl || "",
+            buttonText: existing.buttonText || "",
             isActive: existing.isActive,
             order: existing.order,
           };
@@ -47,6 +51,8 @@ export function CategoriesTab() {
             categoryName: productCategory.id,
             displayName: productCategory.displayName,
             imageUrl: "",
+            linkUrl: "",
+            buttonText: "",
             isActive: true,
             order: index,
           };
@@ -65,6 +71,8 @@ export function CategoriesTab() {
           categoryName: config.categoryName,
           displayName: config.displayName,
           imageUrl: config.imageUrl || undefined,
+          linkUrl: config.linkUrl || undefined,
+          buttonText: config.buttonText || undefined,
           isActive: config.isActive,
           order: config.order,
         })),
@@ -162,6 +170,30 @@ export function CategoriesTab() {
                 />
               </div>
 
+              {/* Link URL */}
+              <div className="space-y-2">
+                <Label className="text-xs">Link URL</Label>
+                <Input
+                  value={config.linkUrl}
+                  onChange={(e) =>
+                    updateConfig(config.categoryName, { linkUrl: e.target.value })
+                  }
+                  placeholder="Leave empty for auto-generated link"
+                />
+              </div>
+
+              {/* Button Text */}
+              <div className="space-y-2">
+                <Label className="text-xs">Button Text (leave empty to hide button)</Label>
+                <Input
+                  value={config.buttonText}
+                  onChange={(e) =>
+                    updateConfig(config.categoryName, { buttonText: e.target.value })
+                  }
+                  placeholder="e.g., Shop Now"
+                />
+              </div>
+
               {/* Display Order */}
               <div className="space-y-2">
                 <Label className="text-xs">Display Order</Label>
@@ -195,6 +227,10 @@ export function CategoriesTab() {
             <strong>Note:</strong> Categories are automatically synced from your Product Categories (Skins, Cases And Covers, Magneto X, etc.). 
             These settings only control how categories appear on the homepage "Category Explorer" section.
           </p>
+          <ul className="text-sm text-muted-foreground mt-2 space-y-1 list-disc list-inside">
+            <li><strong>Button Text:</strong> Leave empty to hide the button overlay (useful if text is already on the image)</li>
+            <li><strong>Link URL:</strong> Leave empty to use the auto-generated category link</li>
+          </ul>
         </CardContent>
       </Card>
     </div>

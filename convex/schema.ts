@@ -1339,6 +1339,8 @@ export default defineSchema({
     categoryName: v.string(), // Category name (must match product categories)
     displayName: v.string(), // Display name on homepage
     imageUrl: v.optional(v.string()), // Category card image URL
+    linkUrl: v.optional(v.string()), // Custom link URL (if empty, auto-generated)
+    buttonText: v.optional(v.string()), // Button text (if empty, button is hidden)
     isActive: v.boolean(), // Whether category is visible
     order: v.number(), // Display order (lower = earlier)
     

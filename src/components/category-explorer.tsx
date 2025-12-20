@@ -16,7 +16,7 @@ export function CategoryExplorer() {
           </div>
           <div className="flex gap-4 px-4 overflow-x-hidden">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="flex-shrink-0 w-[65vw] aspect-[3/4] rounded-2xl" />
+              <Skeleton key={i} className="flex-shrink-0 w-[65vw] aspect-[5/6] rounded-2xl" />
             ))}
           </div>
         </div>
@@ -46,7 +46,10 @@ export function CategoryExplorer() {
     return placeholders[categoryName] || placeholders["skin"];
   };
 
-  const getCategoryLink = (categoryName: string) => {
+  const getCategoryLink = (categoryName: string, customLinkUrl?: string) => {
+    // Use custom URL if provided
+    if (customLinkUrl) return customLinkUrl;
+    
     // Special handling for skins - opens gadget selector
     if (categoryName === "skin") {
       return "/products?productCategory=skin";
@@ -76,8 +79,8 @@ export function CategoryExplorer() {
           {categories.map((category) => (
             <Link
               key={category._id}
-              to={getCategoryLink(category.categoryName)}
-              className="group relative flex-shrink-0 w-[65vw] aspect-[3/4] rounded-2xl overflow-hidden shadow-lg snap-start"
+              to={getCategoryLink(category.categoryName, category.linkUrl)}
+              className="group relative flex-shrink-0 w-[65vw] aspect-[5/6] rounded-2xl overflow-hidden shadow-lg snap-start"
             >
               {/* Background Image */}
               <img
@@ -86,18 +89,21 @@ export function CategoryExplorer() {
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-active:scale-95"
               />
               
-              {/* Gradient Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              {/* Gradient Overlay - only show if button text exists */}
+              {category.buttonText && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              )}
               
-              {/* Content */}
-              <div className="absolute inset-0 flex flex-col items-center justify-end p-6 text-center">
-                <div className="bg-white/95 backdrop-blur-sm rounded-full px-6 py-2.5">
-                  <p className="text-sm font-semibold text-foreground">SHOP</p>
-                  <h3 className="text-base font-bold text-foreground">
-                    {category.displayName}
-                  </h3>
+              {/* Content - only show if button text exists */}
+              {category.buttonText && (
+                <div className="absolute inset-0 flex flex-col items-center justify-end p-6 text-center">
+                  <div className="bg-white/95 backdrop-blur-sm rounded-full px-6 py-2.5">
+                    <h3 className="text-base font-bold text-foreground">
+                      {category.buttonText}
+                    </h3>
+                  </div>
                 </div>
-              </div>
+              )}
             </Link>
           ))}
         </div>
