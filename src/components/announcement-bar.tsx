@@ -34,18 +34,18 @@ export function AnnouncementBar() {
 
   const content = (
     <div className="flex items-center justify-center gap-2 flex-1 min-w-0">
-      <span className="text-sm font-medium truncate">{text}</span>
+      <span className="text-xs font-normal truncate">{text}</span>
       {link && (
-        <span className="text-sm font-bold">→</span>
+        <span className="text-xs font-semibold">→</span>
       )}
     </div>
   );
 
   return (
     <div className="w-full bg-primary text-primary-foreground border-b border-primary-foreground/20 fixed top-0 left-0 right-0 z-50">
-      <div className="container mx-auto px-4 py-2 flex items-center justify-between gap-2">
+      <div className="container mx-auto px-4 py-1.5 flex items-center justify-between gap-2">
         {/* Empty space for balance */}
-        <div className="w-6" />
+        <div className="w-5" />
 
         {/* Content - clickable if link provided */}
         {link ? (
@@ -62,10 +62,10 @@ export function AnnouncementBar() {
         {/* Dismiss button */}
         <button
           onClick={() => setIsDismissed(true)}
-          className="p-1 hover:bg-primary-foreground/10 rounded transition-colors"
+          className="p-0.5 hover:bg-primary-foreground/10 rounded transition-colors"
           aria-label="Dismiss announcement"
         >
-          <XIcon className="size-4" />
+          <XIcon className="size-3.5" />
         </button>
       </div>
     </div>

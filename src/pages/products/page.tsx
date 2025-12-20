@@ -15,6 +15,7 @@ import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog
 import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+import { ProductCategoryHeader } from "@/components/product-category-header.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -614,12 +615,12 @@ export default function ProductsPage() {
     return (
       <div className="min-h-screen">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
               <img 
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                 alt="Skinly" 
-                className="h-16"
+                className="h-12 sm:h-16"
               />
             </Link>
             <Button size="sm" asChild>
@@ -628,19 +629,19 @@ export default function ProductsPage() {
           </div>
         </nav>
 
-        <section className="pt-32 pb-20 px-4">
+        <section className="pt-28 pb-16 px-4">
           <div className="container mx-auto max-w-4xl">
             {/* Confirmation Message */}
-            <div className="text-center mb-16 space-y-6">
+            <div className="text-center mb-12 space-y-4">
               <div className="inline-block animate-bounce">
-                <div className="size-20 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-4xl">
+                <div className="size-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-3xl">
                   ✓
                 </div>
               </div>
-              <h1 className="text-4xl lg:text-5xl font-bold text-balance">
+              <h1 className="text-3xl lg:text-4xl font-bold text-balance">
                 We Got You Covered!
               </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-balance">
                 Perfect! Now pick the finish type for your {modelFilter || `${brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} device`}
               </p>
             </div>
@@ -720,18 +721,18 @@ export default function ProductsPage() {
     return (
       <div className="min-h-screen">
         <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-2">
               <img 
                 src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
                 alt="Skinly" 
-                className="h-10"
+                className="h-10 sm:h-12"
               />
             </Link>
           </div>
         </nav>
 
-        <div className="pt-44 sm:pt-52 pb-6 sm:pb-20 px-2 sm:px-4">
+        <div className="pt-32 sm:pt-40 pb-6 sm:pb-20 px-2 sm:px-4">
           <div className="container mx-auto max-w-2xl">
             <Empty>
               <EmptyHeader>
@@ -803,10 +804,20 @@ export default function ProductsPage() {
         onPhoneSelectorClick={() => setIsDeviceSelectorOpen(true)}
       />
 
+      {/* Product Category Header - Sticky */}
+      <div className="fixed top-16 left-0 right-0 z-40 bg-white dark:bg-gray-950">
+        <ProductCategoryHeader
+          productCategory={productCategory}
+          gadgetFilter={gadgetFilter}
+          finishFilter={finishFilter}
+          onUpdateFilters={updateFilters}
+        />
+      </div>
+
       {/* Products Section */}
-      <section className="pt-28 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
-        <div className="container mx-auto">
-          <div className="text-center mb-3 sm:mb-6 space-y-1 sm:space-y-2">
+      <section className="pt-32 sm:pt-36 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
+        <div className="container mx-auto max-w-7xl">
+          <div className="text-center mb-2 sm:mb-4 space-y-1 sm:space-y-2">
             <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
               {searchQuery ? `Search Results` :
                collectionParam && collection ? collection.name :
@@ -822,9 +833,33 @@ export default function ProductsPage() {
             </p>
           </div>
 
+          {/* Device Selection CTA - Only show for Skins category with gadget but NO device selected */}
+          {productCategory === 'skin' && gadgetFilter && !brandFilter && !modelFilter && (
+            <div className="mb-2 sm:mb-4">
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 sm:p-6 text-center">
+                <div className="max-w-2xl mx-auto space-y-3">
+                  <div className="inline-block p-3 bg-primary/10 rounded-full">
+                    <Smartphone className="size-6 sm:size-8 text-primary" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold">Select Your Device Model</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Choose your exact device to see perfectly fitted skins
+                  </p>
+                  <Button 
+                    size="lg"
+                    onClick={() => setIsDeviceSelectorOpen(true)}
+                    className="font-semibold"
+                  >
+                    Choose Device Model
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Gadget Selector Welcome Banner - Only show for Skins category with selected device */}
           {productCategory === 'skin' && brandFilter && modelFilter && (
-            <div className="mb-3 sm:mb-6 max-w-4xl mx-auto">
+            <div className="mb-2 sm:mb-4">
               <GadgetSelectorBanner 
                 brandName={brandFilter} 
                 modelName={modelFilter}
@@ -835,11 +870,11 @@ export default function ProductsPage() {
 
           {/* Collection Pills - Only show for phone skins */}
           {productCategory === 'skin' && gadgetFilter === 'phone' && allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
-            <div className="mb-3 sm:mb-6">
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+            <div className="mb-2 sm:mb-4">
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2">
                 <button
                   onClick={() => updateUrlParams({ collection: null })}
-                  className={`px-5 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
                     !collectionParam
                       ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
                       : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
@@ -851,7 +886,7 @@ export default function ProductsPage() {
                   <button
                     key={col._id}
                     onClick={() => updateUrlParams({ collection: col.name })}
-                    className={`px-5 py-2.5 rounded-xl font-semibold text-sm whitespace-nowrap transition-all duration-200 ${
+                    className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
                       collectionParam === col.name
                         ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
                         : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
@@ -865,7 +900,7 @@ export default function ProductsPage() {
           )}
 
           {/* Sort and Actions Bar */}
-          <div className="mb-3 sm:mb-6">
+          <div className="mb-2 sm:mb-4">
             <div className="flex flex-wrap items-center gap-2">
               {/* Spacer */}
               <div className="flex-1" />
@@ -934,13 +969,14 @@ export default function ProductsPage() {
               </div>
               
               {/* Skeleton cards */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
                 {Array.from({ length: 8 }).map((_, i) => (
                   <Card key={i} className="p-0">
                     <Skeleton className="aspect-square w-full rounded-t-xl" />
-                    <div className="px-1 pt-0.5 pb-1 sm:p-4 space-y-0.5">
-                      <Skeleton className="h-3 sm:h-6 w-full" />
-                      <Skeleton className="h-3 sm:h-4 w-12 sm:w-24" />
+                    <div className="px-1.5 pt-1 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                      <Skeleton className="h-3 sm:h-5 w-12 sm:w-16" />
+                      <Skeleton className="h-3 sm:h-5 w-full" />
+                      <Skeleton className="h-3 sm:h-4 w-12 sm:w-20" />
                       <Skeleton className="h-5 sm:h-10 w-full" />
                     </div>
                   </Card>
@@ -949,7 +985,7 @@ export default function ProductsPage() {
             </>
           ) : (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1.5 sm:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
                   {sortedAndFilteredProducts.map((product) => {
                   const mainImage = product.images[0];
                   const minPrice = Math.min(...product.variants.map(v => v.price));
@@ -961,6 +997,17 @@ export default function ProductsPage() {
                   
                   // Check if all variants are out of stock
                   const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
+
+                  // Get finish type display name
+                  const finishTypeDisplay = product.finishType 
+                    ? product.finishType === 'matte' 
+                      ? 'Matte' 
+                      : product.finishType === 'embossed' 
+                        ? '3D' 
+                        : product.finishType === 'transparent' 
+                          ? 'Transparent' 
+                          : 'Sparkling'
+                    : null;
 
                   const productUrl = `/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`;
                   
@@ -974,17 +1021,25 @@ export default function ProductsPage() {
                             modelFilter={modelFilter}
                           />
                         </div>
-                        <div className="px-1 pt-0.5 pb-1 sm:p-5 space-y-0.5 sm:space-y-3">
-                          <h3 className="font-semibold text-[10px] leading-[1.2] sm:text-base sm:leading-snug line-clamp-2">{product.title}</h3>
-                          <span className="text-[11px] sm:text-lg font-bold text-black dark:text-white block">{priceDisplay}</span>
+                        <div className="px-1.5 pt-1 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                          {/* Finish Badge - Below image */}
+                          {finishTypeDisplay && (
+                            <div className="flex items-center">
+                              <span className="inline-block px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-xs font-medium bg-muted/50 text-muted-foreground border border-border">
+                                {finishTypeDisplay}
+                              </span>
+                            </div>
+                          )}
+                          <h3 className="font-semibold text-[9px] leading-[1.2] sm:text-sm sm:leading-snug line-clamp-2">{product.title}</h3>
+                          <span className="text-[11px] sm:text-lg font-bold sm:font-extrabold text-black dark:text-white block">{priceDisplay}</span>
                           {isOutOfStock && autoSortOOS ? (
-                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-11 px-0.5 sm:px-5 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white shadow-lg hover:shadow-xl active:scale-[0.98]">
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white shadow-lg hover:shadow-xl active:scale-[0.98]">
                               <BellIcon className="size-3 sm:size-4 mr-1" />
                               <span className="hidden sm:inline">Request Restock</span>
                               <span className="sm:hidden">Restock</span>
                             </div>
                           ) : (
-                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-11 px-0.5 sm:px-5 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white hover:shadow-lg active:scale-[0.98]">
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white hover:shadow-lg active:scale-[0.98]">
                               <span className="hidden sm:inline">Select Your Device</span>
                               <span className="sm:hidden">Select</span>
                             </div>
