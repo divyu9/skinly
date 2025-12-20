@@ -4,6 +4,11 @@ import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
 import { ModelsMarquee } from "@/components/models-marquee.tsx";
 import { HeroSlider } from "@/components/hero-slider.tsx";
+import { ExploreModels } from "@/components/explore-models.tsx";
+import { CategoryExplorer } from "@/components/category-explorer.tsx";
+import { TopPicks } from "@/components/top-picks.tsx";
+import { WhySkinly } from "@/components/why-skinly.tsx";
+import { FeatureBanner } from "@/components/feature-banner.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { BugReportModal } from "@/components/bug-report-modal.tsx";
 import {
@@ -97,15 +102,26 @@ export default function Index() {
           <HeroSlider />
         </section>
 
-        {/* Temporary placeholder sections */}
-        <section className="container mx-auto px-4 py-12">
-          <div className="text-center space-y-4">
-            <h2 className="text-3xl font-bold">More sections coming soon!</h2>
-            <p className="text-muted-foreground">
-              Explore by Models, Categories, Top Picks, Why Skinly, and UGC Videos sections are being built.
-            </p>
-          </div>
-        </section>
+        {/* Explore Models */}
+        <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />
+
+        {/* Category Explorer */}
+        <CategoryExplorer />
+
+        {/* Top Picks */}
+        <TopPicks />
+
+        {/* Feature Banner */}
+        <FeatureBanner
+          backgroundImage="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1920&h=800&fit=crop"
+          heading="Premium Protection"
+          subheading="Protect your device in style with our premium skins"
+          ctaText="Shop Now"
+          ctaLink="/products"
+        />
+
+        {/* Why Skinly */}
+        <WhySkinly />
       </main>
 
       {/* Footer */}
