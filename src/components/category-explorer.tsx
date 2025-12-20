@@ -16,7 +16,7 @@ export function CategoryExplorer() {
           </div>
           <div className="flex gap-4 px-4 overflow-x-hidden">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="flex-shrink-0 w-[65vw] aspect-[5/6] rounded-2xl" />
+              <Skeleton key={i} className="flex-shrink-0 w-[70vw] aspect-[4/5] rounded-2xl" />
             ))}
           </div>
         </div>
@@ -80,13 +80,13 @@ export function CategoryExplorer() {
             <Link
               key={category._id}
               to={getCategoryLink(category.categoryName, category.linkUrl)}
-              className="group relative flex-shrink-0 w-[65vw] aspect-[5/6] rounded-2xl overflow-hidden shadow-lg snap-start"
+              className="group relative flex-shrink-0 w-[70vw] aspect-[4/5] rounded-2xl overflow-hidden shadow-lg snap-start"
             >
               {/* Background Image */}
               <img
                 src={getCategoryImage(category.categoryName, category.imageUrl)}
                 alt={category.displayName}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-active:scale-95"
+                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
               />
               
               {/* Gradient Overlay - only show if button text exists */}
