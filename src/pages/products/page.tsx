@@ -346,7 +346,9 @@ export default function ProductsPage() {
       gadgetTypeId: gadgetTypeId || undefined,
       finishTypeId: finishTypeId || undefined,
       // Use the actual model's category if available, not hardcoded "phone"
-      ...(brandFilter && modelFilter && modelInfo?.category ? { gadgetCategory: modelInfo.category } : {})
+      ...(brandFilter && modelFilter && modelInfo?.category ? { 
+        gadgetCategory: modelInfo.category as "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover"
+      } : {})
     },
     { initialNumItems: 100 }
   );
