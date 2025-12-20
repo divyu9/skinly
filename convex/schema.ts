@@ -1196,4 +1196,158 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_priority", ["priority"])
     .index("by_active_and_priority", ["isActive", "priority"]),
+
+  // Homepage Settings (general homepage configuration)
+  homepageSettings: defineTable({
+    // Header
+    logoImageUrl: v.optional(v.string()), // Logo image URL
+    logoRedirectLink: v.optional(v.string()), // Logo redirect link (default: "/")
+    showSearchIcon: v.boolean(), // Toggle search icon ON/OFF
+    
+    // Marquee
+    marqueeEnabled: v.boolean(), // Toggle marquee ON/OFF
+    marqueeMaxModels: v.number(), // Max models to show in marquee (default: 20)
+    
+    // Announcement Bar
+    announcementEnabled: v.boolean(),
+    announcementText: v.optional(v.string()),
+    announcementLink: v.optional(v.string()),
+    
+    // Metadata
+    updatedBy: v.optional(v.string()), // Admin email
+    updatedAt: v.optional(v.number()),
+  }),
+
+  // Hero Slides (hero slider content)
+  heroSlides: defineTable({
+    imageUrl: v.string(), // Slide image URL (mandatory)
+    heading: v.optional(v.string()), // Heading text (optional)
+    subheading: v.optional(v.string()), // Subheading text (optional)
+    ctaText: v.optional(v.string()), // CTA button text (optional)
+    ctaLink: v.optional(v.string()), // CTA button link (optional)
+    isActive: v.boolean(), // Whether slide is visible
+    order: v.number(), // Display order (lower = earlier)
+    
+    // Metadata
+    createdBy: v.optional(v.string()), // Admin email
+    createdAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_active", ["isActive"])
+    .index("by_order", ["order"])
+    .index("by_active_and_order", ["isActive", "order"]),
+
+  // Homepage Sections (flexible sections for different types)
+  homepageSections: defineTable({
+    sectionType: v.union(
+      v.literal("top_picks"), // Top Picks with tabs
+      v.literal("why_skinly"), // Trust section with icon cards
+      v.literal("feature_banner"), // Full-width feature banner
+      v.literal("explore_models"), // Device model search section
+      v.literal("category_explorer") // Auto-linked category section
+    ),
+    sectionName: v.string(), // Admin-friendly name
+    isActive: v.boolean(), // Whether section is visible
+    order: v.number(), // Display order on homepage (lower = earlier)
+    
+    // Section-specific configuration (stored as JSON)
+    config: v.optional(v.union(
+      // Top Picks config
+      v.object({
+        title: v.string(),
+        tabs: v.array(v.object({
+          tabName: v.string(), // Tab label
+          sourceType: v.union(v.literal("collection"), v.literal("tag")),
+          sourceValue: v.string(), // Collection ID or tag name
+        })),
+      }),
+      // Why Skinly config
+      v.object({
+        title: v.string(),
+        items: v.array(v.object({
+          iconUrl: v.string(), // Icon image URL
+          title: v.string(),
+          description: v.string(),
+        })),
+      }),
+      // Feature Banner config
+      v.object({
+        backgroundImageUrl: v.string(),
+        heading: v.string(),
+        subheading: v.optional(v.string()),
+        ctaText: v.optional(v.string()),
+        ctaLink: v.optional(v.string()),
+      }),
+      // Explore Models config
+      v.object({
+        title: v.string(),
+        placeholderText: v.string(),
+        showRequestButton: v.boolean(),
+      }),
+      // Category Explorer config
+      v.object({
+        title: v.string(),
+        subtitle: v.optional(v.string()),
+      })
+    )),
+    
+    // Metadata
+    createdBy: v.optional(v.string()), // Admin email
+    createdAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_active", ["isActive"])
+    .index("by_order", ["order"])
+    .index("by_active_and_order", ["isActive", "order"])
+    .index("by_section_type", ["sectionType"]),
+
+  // UGC Videos (user-generated content videos)
+  ugcVideos: defineTable({
+    videoUrl: v.string(), // Video file URL or social media URL
+    thumbnailUrl: v.optional(v.string()), // Video thumbnail image
+    sourceType: v.union(
+      v.literal("instagram"), // Auto-fetched from Instagram
+      v.literal("manual") // Manually uploaded
+    ),
+    socialMediaId: v.optional(v.string()), // Original post ID from social media
+    
+    // Product linking
+    productId: v.optional(v.id("products")), // Tagged product
+    ctaText: v.optional(v.string()), // CTA button text (default: "Shop Now")
+    
+    // Moderation
+    isApproved: v.boolean(), // Admin approval
+    isActive: v.boolean(), // Visibility toggle
+    order: v.number(), // Display order (lower = earlier)
+    
+    // Metadata
+    createdBy: v.optional(v.string()), // Admin email
+    createdAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_approved", ["isApproved"])
+    .index("by_active", ["isActive"])
+    .index("by_approved_and_active", ["isApproved", "isActive"])
+    .index("by_order", ["order"])
+    .index("by_product", ["productId"]),
+
+  // Category Display Settings (control category card appearance)
+  categoryDisplaySettings: defineTable({
+    categoryName: v.string(), // Category name (must match product categories)
+    displayName: v.string(), // Display name on homepage
+    imageUrl: v.optional(v.string()), // Category card image URL
+    isActive: v.boolean(), // Whether category is visible
+    order: v.number(), // Display order (lower = earlier)
+    
+    // Metadata
+    updatedBy: v.optional(v.string()), // Admin email
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_category_name", ["categoryName"])
+    .index("by_active", ["isActive"])
+    .index("by_order", ["order"])
+    .index("by_active_and_order", ["isActive", "order"]),
 });
