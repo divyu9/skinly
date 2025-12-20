@@ -78,30 +78,34 @@ export function FeatureBanner() {
           {/* Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
           
-          {/* Content */}
-          <div className="absolute inset-0 flex flex-col items-start justify-center p-8 md:p-16 max-w-2xl">
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-4">
-              {banner.heading}
-            </h2>
-            
-            {banner.subheading && (
-              <p className="text-lg md:text-xl text-white/90 mb-6">
-                {banner.subheading}
-              </p>
-            )}
-            
-            {banner.ctaText && banner.ctaLink && (
-              <Button
-                asChild
-                size="lg"
-                className="rounded-full px-8 text-base shadow-2xl hover:scale-105 transition-transform"
-              >
-                <Link to={banner.ctaLink}>
-                  {banner.ctaText}
-                </Link>
-              </Button>
-            )}
-          </div>
+          {/* Content - only show if any text exists */}
+          {(banner.heading || banner.subheading || banner.ctaText) && (
+            <div className="absolute inset-0 flex flex-col items-start justify-center p-8 md:p-16 max-w-2xl">
+              {banner.heading && (
+                <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-4">
+                  {banner.heading}
+                </h2>
+              )}
+              
+              {banner.subheading && (
+                <p className="text-lg md:text-xl text-white/90 mb-6">
+                  {banner.subheading}
+                </p>
+              )}
+              
+              {banner.ctaText && banner.ctaLink && (
+                <Button
+                  asChild
+                  size="lg"
+                  className="rounded-full px-8 text-base shadow-2xl hover:scale-105 transition-transform"
+                >
+                  <Link to={banner.ctaLink}>
+                    {banner.ctaText}
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </section>
     );
@@ -135,30 +139,34 @@ export function FeatureBanner() {
                 {/* Gradient Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
                 
-                {/* Content */}
-                <div className="absolute inset-0 flex flex-col items-start justify-center p-8 md:p-16 max-w-2xl">
-                  <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-4">
-                    {banner.heading}
-                  </h2>
-                  
-                  {banner.subheading && (
-                    <p className="text-lg md:text-xl text-white/90 mb-6">
-                      {banner.subheading}
-                    </p>
-                  )}
-                  
-                  {banner.ctaText && banner.ctaLink && (
-                    <Button
-                      asChild
-                      size="lg"
-                      className="rounded-full px-8 text-base shadow-2xl hover:scale-105 transition-transform"
-                    >
-                      <Link to={banner.ctaLink}>
-                        {banner.ctaText}
-                      </Link>
-                    </Button>
-                  )}
-                </div>
+                {/* Content - only show if any text exists */}
+                {(banner.heading || banner.subheading || banner.ctaText) && (
+                  <div className="absolute inset-0 flex flex-col items-start justify-center p-8 md:p-16 max-w-2xl">
+                    {banner.heading && (
+                      <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-4">
+                        {banner.heading}
+                      </h2>
+                    )}
+                    
+                    {banner.subheading && (
+                      <p className="text-lg md:text-xl text-white/90 mb-6">
+                        {banner.subheading}
+                      </p>
+                    )}
+                    
+                    {banner.ctaText && banner.ctaLink && (
+                      <Button
+                        asChild
+                        size="lg"
+                        className="rounded-full px-8 text-base shadow-2xl hover:scale-105 transition-transform"
+                      >
+                        <Link to={banner.ctaLink}>
+                          {banner.ctaText}
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

@@ -56,7 +56,7 @@ export function FeatureBannersTab() {
         setEditingBanner(bannerId);
         setFormData({
           backgroundImage: banner.backgroundImage,
-          heading: banner.heading,
+          heading: banner.heading || "",
           subheading: banner.subheading || "",
           ctaText: banner.ctaText || "",
           ctaLink: banner.ctaLink || "",
@@ -89,10 +89,6 @@ export function FeatureBannersTab() {
       toast.error("Background image URL is required");
       return;
     }
-    if (!formData.heading) {
-      toast.error("Heading is required");
-      return;
-    }
 
     setIsSaving(true);
     try {
@@ -100,7 +96,7 @@ export function FeatureBannersTab() {
         await updateBanner({
           bannerId: editingBanner,
           backgroundImage: formData.backgroundImage,
-          heading: formData.heading,
+          heading: formData.heading || undefined,
           subheading: formData.subheading || undefined,
           ctaText: formData.ctaText || undefined,
           ctaLink: formData.ctaLink || undefined,
@@ -111,7 +107,7 @@ export function FeatureBannersTab() {
       } else {
         await createBanner({
           backgroundImage: formData.backgroundImage,
-          heading: formData.heading,
+          heading: formData.heading || undefined,
           subheading: formData.subheading || undefined,
           ctaText: formData.ctaText || undefined,
           ctaLink: formData.ctaLink || undefined,
@@ -204,7 +200,7 @@ export function FeatureBannersTab() {
                   </div>
                   <div className="absolute bottom-2 left-2 right-2">
                     <h4 className="text-white font-semibold text-sm line-clamp-1">
-                      {banner.heading}
+                      {banner.heading || "No heading"}
                     </h4>
                     <p className="text-white/80 text-xs line-clamp-1">
                       {banner.subheading || "No subheading"}
@@ -261,7 +257,7 @@ export function FeatureBannersTab() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="heading">Heading *</Label>
+              <Label htmlFor="heading">Heading</Label>
               <Input
                 id="heading"
                 value={formData.heading}

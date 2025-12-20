@@ -1356,7 +1356,7 @@ export default defineSchema({
   // Feature Banners (full-width promotional banners with auto-scroll)
   featureBanners: defineTable({
     backgroundImage: v.string(), // Background image URL (mandatory)
-    heading: v.string(), // Heading text (mandatory)
+    heading: v.optional(v.string()), // Heading text (optional)
     subheading: v.optional(v.string()), // Subheading text (optional)
     ctaText: v.optional(v.string()), // CTA button text (optional)
     ctaLink: v.optional(v.string()), // CTA button link (optional)

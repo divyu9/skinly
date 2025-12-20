@@ -528,7 +528,7 @@ export const deleteUgcVideo = mutation({
 export const createFeatureBanner = mutation({
   args: {
     backgroundImage: v.string(),
-    heading: v.string(),
+    heading: v.optional(v.string()),
     subheading: v.optional(v.string()),
     ctaText: v.optional(v.string()),
     ctaLink: v.optional(v.string()),
