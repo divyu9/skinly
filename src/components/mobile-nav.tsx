@@ -4,7 +4,6 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { CartButton } from "@/components/cart.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import {
   Sheet,
@@ -186,13 +185,10 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        
-        <CartButton />
       </div>
 
       {/* Mobile Navigation */}
       <div className="flex md:hidden items-center gap-3">
-        <CartButton />
         <Button
           variant="ghost"
           size="icon"
