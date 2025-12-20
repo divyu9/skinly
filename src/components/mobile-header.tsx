@@ -39,8 +39,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   
   // Fetch cart count
-  const cartItems = useQuery(api.cart.getCart);
-  const cartCount = cartItems?.reduce((acc, item) => acc + item.quantity, 0) || 0;
+  const cartCount = useQuery(api.cart.getCartCount) ?? 0;
 
   // Server-side device search
   const deviceSearchResults = useQuery(
