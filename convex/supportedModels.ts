@@ -62,6 +62,18 @@ export const getBrandsList = query({
   },
 });
 
+// Count models by gadget type ID
+export const getModelCountByGadgetType = query({
+  args: { gadgetTypeId: v.id("gadgetTypes") },
+  handler: async (ctx, args) => {
+    const models = await ctx.db
+      .query("supportedModels")
+      .withIndex("by_gadget_type", (q) => q.eq("gadgetTypeId", args.gadgetTypeId))
+      .collect();
+    return models.length;
+  },
+});
+
 // Get models by brand (for devices page)
 export const getByBrand = query({
   args: { brandName: v.string() },
@@ -97,7 +109,8 @@ export const create = mutation({
   args: {
     brandName: v.string(),
     modelName: v.string(),
-    category: v.string(),
+    category: v.string(), // Keep for backwards compatibility
+    gadgetTypeId: v.optional(v.id("gadgetTypes")), // New field - references gadgetTypes
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -105,6 +118,7 @@ export const create = mutation({
       brandName: args.brandName,
       modelName: args.modelName,
       category: args.category,
+      gadgetTypeId: args.gadgetTypeId,
       isActive: args.isActive,
     });
     
@@ -122,6 +136,7 @@ export const update = mutation({
     brandName: v.optional(v.string()),
     modelName: v.optional(v.string()),
     category: v.optional(v.string()),
+    gadgetTypeId: v.optional(v.id("gadgetTypes")),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {

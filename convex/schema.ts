@@ -504,11 +504,13 @@ export default defineSchema({
   supportedModels: defineTable({
     brandName: v.string(), // e.g., "Apple", "Samsung", "OnePlus"
     modelName: v.string(), // e.g., "iPhone 15 Pro Max", "Galaxy S24 Ultra"
-    category: v.string(), // Device category (phone, tablet, laptop, console, etc.)
+    category: v.string(), // Device category (phone, tablet, laptop, console, etc.) - DEPRECATED: use gadgetTypeId
+    gadgetTypeId: v.optional(v.id("gadgetTypes")), // Reference to gadgetTypes (new single source of truth)
     isActive: v.boolean(), // Control visibility
   })
     .index("by_brand", ["brandName"])
-    .index("by_category", ["category"]),
+    .index("by_category", ["category"])
+    .index("by_gadget_type", ["gadgetTypeId"]),
 
   // Cached model metadata (for fast queries - updated when models change)
   modelMetadata: defineTable({

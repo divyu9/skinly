@@ -17,6 +17,27 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 
+// Helper component to display model count
+function ModelCountCell({ gadgetTypeId }: { gadgetTypeId: Id<"gadgetTypes"> }) {
+  const modelCount = useQuery(api.supportedModels.getModelCountByGadgetType, { gadgetTypeId });
+  return (
+    <div className="flex items-center gap-2">
+      <Badge variant="outline">
+        {modelCount === undefined ? "..." : modelCount}
+      </Badge>
+      {modelCount !== undefined && modelCount > 0 && (
+        <a 
+          href="/backend-skinly/models" 
+          className="text-xs text-primary hover:underline"
+          title="View models in Models page"
+        >
+          View
+        </a>
+      )}
+    </div>
+  );
+}
+
 export default function ProductClassificationPage() {
   const [selectedGadget, setSelectedGadget] = useState<string>("all");
   const [selectedFinish, setSelectedFinish] = useState<string>("all");
@@ -1122,6 +1143,7 @@ export default function ProductClassificationPage() {
                         <TableHead>Display Name</TableHead>
                         <TableHead>Internal Name</TableHead>
                         <TableHead>Product Count</TableHead>
+                        <TableHead>Model Count</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
@@ -1139,6 +1161,9 @@ export default function ProductClassificationPage() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary">{gadgetType.productCount}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <ModelCountCell gadgetTypeId={gadgetType._id} />
                           </TableCell>
                           <TableCell>
                             {gadgetType.isActive ? (

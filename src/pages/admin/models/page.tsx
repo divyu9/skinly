@@ -52,26 +52,14 @@ import {
   CheckIcon,
   XIcon,
   InboxIcon,
+  RefreshCwIcon,
 } from "lucide-react";
-
-const CATEGORIES = [
-  { value: "phone", label: "Phone", icon: SmartphoneIcon },
-  { value: "tablet", label: "Tablet", icon: TabletIcon },
-  { value: "laptop", label: "Laptop", icon: LaptopIcon },
-  { value: "console", label: "Console", icon: GamepadIcon },
-  { value: "charger", label: "Charger", icon: BatteryChargingIcon },
-  { value: "drone", label: "Drone", icon: PlaneIcon },
-  { value: "camera", label: "Camera", icon: CameraIcon },
-  { value: "lens", label: "Lens", icon: CameraIcon },
-  { value: "mac-mini", label: "Mac Mini", icon: PackageIcon },
-] as const;
-
-type Category = typeof CATEGORIES[number]["value"];
 
 interface ModelFormData {
   brandName: string;
   modelName: string;
-  category: string;
+  gadgetTypeId: Id<"gadgetTypes"> | "";
+  category: string; // Keep for backwards compatibility during migration
   isActive: boolean;
 }
 
@@ -81,12 +69,17 @@ export default function AdminModelsPage() {
   const brands = useQuery(api.supportedModels.getBrands, {});
   const allBrands = useQuery(api.supportedModels.getBrands, {}); // For edit dialog dropdown
   const brandsWithCounts = useQuery(api.supportedModels.getBrandsWithCounts, {});
+  
+  // Gadget Types (single source of truth)
+  const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
+  
   const createModel = useMutation(api.supportedModels.create);
   const updateModel = useMutation(api.supportedModels.update);
   const deleteModel = useMutation(api.supportedModels.remove);
   const renameBrand = useMutation(api.supportedModels.renameBrand);
   const mergeBrands = useMutation(api.supportedModels.mergeBrands);
   const deleteBrand = useMutation(api.supportedModels.deleteBrand);
+  const migrateModels = useMutation(api.migrateModelsToGadgetTypes.migrateModelsToGadgetTypes);
   
   // Model requests
   const allModelRequests = useQuery(api.modelRequests.getAllModelRequests, {});
@@ -95,13 +88,14 @@ export default function AdminModelsPage() {
   const updateRequest = useMutation(api.modelRequests.updateModelRequest);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<{ id: Id<"supportedModels">; data: ModelFormData } | null>(null);
   const [formData, setFormData] = useState<ModelFormData>({
     brandName: "",
     modelName: "",
-    category: "phone",
+    gadgetTypeId: "",
+    category: "", // Will be auto-filled from gadgetType selection
     isActive: true,
   });
 
@@ -124,7 +118,7 @@ export default function AdminModelsPage() {
   const [editNewBrand, setEditNewBrand] = useState("");
   const [isEditNewBrand, setIsEditNewBrand] = useState(false);
   const [editModel, setEditModel] = useState("");
-  const [editCategory, setEditCategory] = useState<Category | "">("");
+  const [editGadgetTypeId, setEditGadgetTypeId] = useState<Id<"gadgetTypes"> | "">("");
 
   // Filter models
   const filteredModels = models
@@ -142,16 +136,27 @@ export default function AdminModelsPage() {
     .sort((a, b) => b._creationTime - a._creationTime);
 
   const handleCreate = async () => {
-    if (!formData.brandName.trim() || !formData.modelName.trim()) {
+    if (!formData.brandName.trim() || !formData.modelName.trim() || !formData.gadgetTypeId) {
       toast.error("Please fill in all required fields");
       return;
     }
 
+    // Find the gadget type to get category name
+    const gadgetType = gadgetTypes?.find(gt => gt._id === formData.gadgetTypeId);
+    if (!gadgetType) {
+      toast.error("Invalid gadget type selected");
+      return;
+    }
+
     try {
-      await createModel(formData);
+      await createModel({
+        ...formData,
+        gadgetTypeId: formData.gadgetTypeId as Id<"gadgetTypes">,
+        category: gadgetType.name, // Use gadgetType name as category
+      });
       toast.success("Model created successfully");
       setIsCreateDialogOpen(false);
-      setFormData({ brandName: "", modelName: "", category: "phone", isActive: true });
+      setFormData({ brandName: "", modelName: "", gadgetTypeId: "", category: "", isActive: true });
     } catch (error) {
       toast.error("Failed to create model");
       console.error(error);
@@ -160,8 +165,15 @@ export default function AdminModelsPage() {
 
   const handleUpdate = async () => {
     if (!editingModel) return;
-    if (!formData.brandName.trim() || !formData.modelName.trim()) {
+    if (!formData.brandName.trim() || !formData.modelName.trim() || !formData.gadgetTypeId) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Find the gadget type to get category name
+    const gadgetType = gadgetTypes?.find(gt => gt._id === formData.gadgetTypeId);
+    if (!gadgetType) {
+      toast.error("Invalid gadget type selected");
       return;
     }
 
@@ -169,10 +181,12 @@ export default function AdminModelsPage() {
       await updateModel({
         id: editingModel.id,
         ...formData,
+        gadgetTypeId: formData.gadgetTypeId as Id<"gadgetTypes">,
+        category: gadgetType.name, // Use gadgetType name as category
       });
       toast.success("Model updated successfully");
       setEditingModel(null);
-      setFormData({ brandName: "", modelName: "", category: "phone", isActive: true });
+      setFormData({ brandName: "", modelName: "", gadgetTypeId: "", category: "", isActive: true });
     } catch (error) {
       toast.error("Failed to update model");
       console.error(error);
@@ -196,12 +210,14 @@ export default function AdminModelsPage() {
     brandName: string;
     modelName: string;
     category: string;
+    gadgetTypeId?: Id<"gadgetTypes">;
     isActive: boolean;
   }) => {
     if (!model) return;
     setFormData({
       brandName: model.brandName,
       modelName: model.modelName,
+      gadgetTypeId: model.gadgetTypeId || "",
       category: model.category,
       isActive: model.isActive,
     });
@@ -209,8 +225,19 @@ export default function AdminModelsPage() {
   };
 
   const getCategoryIcon = (category: string) => {
-    const cat = CATEGORIES.find((c) => c.value === category);
-    const Icon = cat?.icon || PackageIcon;
+    // Map category names to icons
+    const iconMap: Record<string, typeof SmartphoneIcon> = {
+      phone: SmartphoneIcon,
+      tablet: TabletIcon,
+      laptop: LaptopIcon,
+      console: GamepadIcon,
+      charger: BatteryChargingIcon,
+      drone: PlaneIcon,
+      camera: CameraIcon,
+      lens: CameraIcon,
+      "mac-mini": PackageIcon,
+    };
+    const Icon = iconMap[category.toLowerCase()] || PackageIcon;
     return <Icon className="size-4" />;
   };
 
@@ -342,7 +369,11 @@ export default function AdminModelsPage() {
     }
     
     setEditModel(request.modelName);
-    setEditCategory(request.category as Category);
+    
+    // Find matching gadget type by category name
+    const matchingGadgetType = gadgetTypes?.find(gt => gt.name === request.category);
+    setEditGadgetTypeId(matchingGadgetType?._id || "");
+    
     setEditRequestDialog(true);
   };
   
@@ -351,8 +382,15 @@ export default function AdminModelsPage() {
     
     const finalBrandName = isEditNewBrand ? editNewBrand.trim() : editBrand;
     
-    if (!finalBrandName || !editModel.trim() || !editCategory) {
+    if (!finalBrandName || !editModel.trim() || !editGadgetTypeId) {
       toast.error("Please fill in all fields");
+      return;
+    }
+    
+    // Find the gadget type to get category name
+    const gadgetType = gadgetTypes?.find(gt => gt._id === editGadgetTypeId);
+    if (!gadgetType) {
+      toast.error("Invalid gadget type selected");
       return;
     }
     
@@ -361,7 +399,7 @@ export default function AdminModelsPage() {
         requestId: editingRequest,
         brandName: finalBrandName,
         modelName: editModel.trim(),
-        category: editCategory,
+        category: gadgetType.name,
       });
       
       toast.success("Request updated successfully");
@@ -371,7 +409,7 @@ export default function AdminModelsPage() {
       setEditNewBrand("");
       setIsEditNewBrand(false);
       setEditModel("");
-      setEditCategory("");
+      setEditGadgetTypeId("");
     } catch (error) {
       toast.error("Failed to update request");
       console.error(error);
@@ -451,16 +489,16 @@ export default function AdminModelsPage() {
               <div className="flex gap-2 w-full md:w-auto">
                 <Select
                   value={categoryFilter}
-                  onValueChange={(value) => setCategoryFilter(value as Category | "all")}
+                  onValueChange={(value) => setCategoryFilter(value)}
                 >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by category" />
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by gadget type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
+                    <SelectItem value="all">All Gadget Types</SelectItem>
+                    {gadgetTypes?.map((gt) => (
+                      <SelectItem key={gt._id} value={gt.name}>
+                        {gt.displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -468,6 +506,22 @@ export default function AdminModelsPage() {
                 <Button onClick={() => setIsCreateDialogOpen(true)}>
                   <PlusIcon className="size-4 mr-2" />
                   Add Model
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const result = await migrateModels();
+                      toast.success(result.message);
+                    } catch (error) {
+                      toast.error("Migration failed");
+                      console.error(error);
+                    }
+                  }}
+                  title="Migrate models to use gadgetTypes"
+                >
+                  <RefreshCwIcon className="size-4 mr-2" />
+                  Migrate
                 </Button>
               </div>
             </div>
@@ -835,7 +889,7 @@ export default function AdminModelsPage() {
                         <TableCell>{request.modelName}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            {getCategoryIcon(request.category as Category)}
+                            {getCategoryIcon(request.category)}
                             <span className="capitalize">{request.category}</span>
                           </div>
                         </TableCell>
@@ -923,7 +977,7 @@ export default function AdminModelsPage() {
           if (!open) {
             setIsCreateDialogOpen(false);
             setEditingModel(null);
-            setFormData({ brandName: "", modelName: "", category: "phone", isActive: true });
+            setFormData({ brandName: "", modelName: "", gadgetTypeId: "", category: "", isActive: true });
           }
         }}
       >
@@ -967,24 +1021,35 @@ export default function AdminModelsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
+              <Label htmlFor="gadgetType">Gadget Type *</Label>
               <Select
-                value={formData.category}
-                onValueChange={(value) =>
-                  setFormData({ ...formData, category: value as Category })
-                }
+                value={formData.gadgetTypeId || ""}
+                onValueChange={(value) => {
+                  const selectedGadgetType = gadgetTypes?.find(gt => gt._id === value);
+                  setFormData({ 
+                    ...formData, 
+                    gadgetTypeId: value as Id<"gadgetTypes">,
+                    category: selectedGadgetType?.name || ""
+                  });
+                }}
               >
-                <SelectTrigger id="category">
-                  <SelectValue />
+                <SelectTrigger id="gadgetType">
+                  <SelectValue placeholder="Select gadget type..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
+                  {gadgetTypes?.map((gt) => (
+                    <SelectItem key={gt._id} value={gt._id}>
+                      {gt.displayName}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Gadget types are managed in{" "}
+                <a href="/backend-skinly/product-classification" className="underline hover:text-primary">
+                  Product Classification
+                </a>
+              </p>
             </div>
 
             <div className="flex items-center justify-between">
@@ -1005,7 +1070,7 @@ export default function AdminModelsPage() {
               onClick={() => {
                 setIsCreateDialogOpen(false);
                 setEditingModel(null);
-                setFormData({ brandName: "", modelName: "", category: "phone", isActive: true });
+                setFormData({ brandName: "", modelName: "", gadgetTypeId: "", category: "", isActive: true });
               }}
             >
               Cancel
@@ -1181,21 +1246,20 @@ export default function AdminModelsPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="edit-category">Device Category *</Label>
-              <Select value={editCategory} onValueChange={(val) => setEditCategory(val as Category)}>
-                <SelectTrigger id="edit-category">
-                  <SelectValue placeholder="Select category" />
+              <Label htmlFor="edit-gadget-type">Gadget Type *</Label>
+              <Select 
+                value={editGadgetTypeId || ""} 
+                onValueChange={(val) => setEditGadgetTypeId(val as Id<"gadgetTypes">)}
+              >
+                <SelectTrigger id="edit-gadget-type">
+                  <SelectValue placeholder="Select gadget type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="tablet">Tablet</SelectItem>
-                  <SelectItem value="laptop">Laptop</SelectItem>
-                  <SelectItem value="console">Console</SelectItem>
-                  <SelectItem value="charger">Charger</SelectItem>
-                  <SelectItem value="drone">Drone</SelectItem>
-                  <SelectItem value="camera">Camera</SelectItem>
-                  <SelectItem value="lens">Lens</SelectItem>
-                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                  {gadgetTypes?.map((gt) => (
+                    <SelectItem key={gt._id} value={gt._id}>
+                      {gt.displayName}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
