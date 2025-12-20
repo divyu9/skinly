@@ -9,6 +9,7 @@ import { CategoryExplorer } from "@/components/category-explorer.tsx";
 import { TopPicks } from "@/components/top-picks.tsx";
 import { WhySkinly } from "@/components/why-skinly.tsx";
 import { FeatureBanner } from "@/components/feature-banner.tsx";
+import { UgcVideos } from "@/components/ugc-videos.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { BugReportModal } from "@/components/bug-report-modal.tsx";
 import {
@@ -122,6 +123,9 @@ export default function Index() {
 
         {/* Why Skinly */}
         <WhySkinly />
+
+        {/* UGC Videos */}
+        <UgcVideos />
       </main>
 
       {/* Footer */}

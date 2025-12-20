@@ -128,6 +128,7 @@ export function AdminSidebar() {
       label: "SEO & Content",
       icon: FileText,
       items: [
+        { path: "/backend-skinly/homepage", label: "Homepage", icon: Home },
         { path: "/backend-skinly/seo-templates", label: "SEO Templates", icon: Layout },
         { path: "/backend-skinly/seo-pages", label: "SEO Pages", icon: FileText },
         { path: "/backend-skinly/seo-generator", label: "SEO Generator", icon: Sparkles },
