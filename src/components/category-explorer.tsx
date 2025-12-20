@@ -52,7 +52,7 @@ export function CategoryExplorer() {
     if (customLinkUrl) return customLinkUrl;
     
     // For other categories (not skins), link directly to products page with filter
-    return `/products?productCategory=${categoryName}`;
+    return `/products?productType=${categoryName}`;
   };
 
   const handleCategoryClick = (categoryName: string, e: React.MouseEvent, customLinkUrl?: string) => {
@@ -116,7 +116,6 @@ export function CategoryExplorer() {
         <DeviceSelectorDialog
           open={isSelectorOpen}
           onOpenChange={setIsSelectorOpen}
-          initialDeviceType="phone"
         />
       </div>
     </section>
