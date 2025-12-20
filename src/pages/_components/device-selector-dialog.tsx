@@ -7,10 +7,25 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { SearchIcon } from "lucide-react";
+import { 
+  SearchIcon, 
+  SmartphoneIcon,
+  LaptopIcon,
+  TabletIcon,
+  CameraIcon,
+  ScanIcon,
+  PlaneIcon,
+  CableIcon,
+  BoxIcon,
+  PackageIcon,
+  MonitorIcon,
+  GamepadIcon,
+  ChevronRightIcon
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
+import type { LucideIcon } from "lucide-react";
 
 interface DeviceSelectorDialogProps {
   open: boolean;
@@ -52,19 +67,19 @@ const brandLogos: Record<string, string> = {
   "iQOO": "https://cdn.hercules.app/file_m1bBgRqmZsG4VorENlmoX7w0",
 };
 
-// Emoji mapping for gadget types
-const gadgetEmojis: Record<string, string> = {
-  "laptop": "💻",
-  "phone": "📱",
-  "camera": "📷",
-  "lens": "🔍",
-  "tablet": "📱",
-  "mac-mini": "💻",
-  "console": "🎮",
-  "drone": "🚁",
-  "charger": "🔌",
-  "cover": "📦",
-  "accessory": "🎁",
+// Icon mapping for gadget types
+const gadgetIcons: Record<string, LucideIcon> = {
+  "laptop": LaptopIcon,
+  "phone": SmartphoneIcon,
+  "camera": CameraIcon,
+  "lens": ScanIcon,
+  "tablet": TabletIcon,
+  "mac-mini": MonitorIcon,
+  "console": GamepadIcon,
+  "drone": PlaneIcon,
+  "charger": CableIcon,
+  "cover": BoxIcon,
+  "accessory": PackageIcon,
 };
 
 export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, onRequestModel }: DeviceSelectorDialogProps) {
@@ -159,8 +174,8 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
     }
   };
 
-  const getGadgetEmoji = (name: string): string => {
-    return gadgetEmojis[name] || "📦"; // Default emoji
+  const getGadgetIcon = (name: string): LucideIcon => {
+    return gadgetIcons[name] || PackageIcon; // Default icon
   };
 
   // Get selected gadget display name
@@ -172,28 +187,28 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-3xl">
-            {step === 1 && "What Needs a Makeover?"}
-            {step === 2 && `Select Your ${selectedGadgetDisplayName} Brand`}
-            {step === 3 && `Select Your ${selectedBrand} Model`}
-          </DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-muted-foreground">
-              {step === 1 && "Choose your device type to continue"}
-              {step === 2 && "Choose your device brand to continue"}
-              {step === 3 && "Choose your device model to see compatible skins"}
-            </p>
+            <DialogTitle className="text-2xl font-bold">
+              {step === 1 && "Choose Device Type"}
+              {step === 2 && `Select ${selectedGadgetDisplayName} Brand`}
+              {step === 3 && `Select ${selectedBrand} Model`}
+            </DialogTitle>
             {step !== 1 && (
               <Button variant="ghost" size="sm" onClick={handleBack}>
                 ← Back
               </Button>
             )}
           </div>
+          <p className="text-sm text-muted-foreground">
+            {step === 1 && "What needs a skin? Pick your gadget category"}
+            {step === 2 && "Select the brand of your device"}
+            {step === 3 && "Find your exact model to browse skins"}
+          </p>
         </DialogHeader>
 
-        <div className="py-6">
+        <div className="flex-1 overflow-y-auto py-4 px-1">
           {/* Step 1: Device Type Selection */}
           {step === 1 && (
             <>
@@ -209,19 +224,23 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                   <p className="text-muted-foreground">No device types available</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {gadgetTypes.map((gadget) => (
-                    <button
-                      key={gadget._id}
-                      onClick={() => handleDeviceTypeSelect(gadget.name)}
-                      className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
-                    >
-                      <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-3xl">
-                        {getGadgetEmoji(gadget.name)}
-                      </div>
-                      <span className="font-semibold">{gadget.displayName}</span>
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {gadgetTypes.map((gadget) => {
+                    const Icon = getGadgetIcon(gadget.name);
+                    return (
+                      <button
+                        key={gadget._id}
+                        onClick={() => handleDeviceTypeSelect(gadget.name)}
+                        className="group relative p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 flex flex-col items-center gap-2"
+                      >
+                        <div className="size-12 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                          <Icon className="size-6 text-muted-foreground group-hover:text-primary transition-colors" />
+                        </div>
+                        <span className="text-sm font-medium text-center leading-tight">{gadget.displayName}</span>
+                        <ChevronRightIcon className="absolute top-2 right-2 size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -238,34 +257,37 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                 </div>
               ) : availableBrands.length === 0 ? (
                 // Empty state
-                <div className="text-center py-12">
-                  <p className="text-muted-foreground mb-4">No brands available for this device type</p>
+                <div className="text-center py-12 space-y-4">
+                  <p className="text-muted-foreground">No brands available for this device type</p>
                   <Button variant="outline" onClick={handleBack}>
                     Choose Another Device
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {availableBrands.map(brand => (
                     <button
                       key={brand}
                       onClick={() => handleBrandSelect(brand)}
-                      className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all flex flex-col items-center gap-3"
+                      className="group relative p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 flex flex-col items-center gap-2"
                     >
                       {brandLogos[brand] ? (
-                        <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                        <div className="size-12 rounded-full bg-background border border-border flex items-center justify-center overflow-hidden group-hover:border-primary transition-colors">
                           <img 
                             src={brandLogos[brand]} 
                             alt={brand}
-                            className="w-full h-full object-cover"
+                            className="w-10 h-10 object-contain"
                           />
                         </div>
                       ) : (
-                        <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold">
-                          {brand[0]}
+                        <div className="size-12 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                          <span className="text-xl font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                            {brand[0]}
+                          </span>
                         </div>
                       )}
-                      <span className="font-semibold text-center">{brand}</span>
+                      <span className="text-sm font-medium text-center leading-tight">{brand}</span>
+                      <ChevronRightIcon className="absolute top-2 right-2 size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   ))}
                 </div>
@@ -275,21 +297,22 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
 
           {/* Step 3: Model Selection */}
           {step === 3 && (
-            <div>
+            <div className="space-y-4">
               {/* Search Input */}
-              <div className="relative mb-6">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+              <div className="relative sticky top-0 bg-background z-10 pb-2">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Search models..."
+                  placeholder="Search your model..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-9 h-10"
+                  autoFocus
                 />
               </div>
 
               {/* Model List */}
-              <div className="space-y-2 max-h-96 overflow-y-auto">
+              <div className="space-y-2">
                 {brandModels === undefined ? (
                   // Loading state
                   <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -297,27 +320,25 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                     <p className="text-sm text-muted-foreground">Loading models...</p>
                   </div>
                 ) : availableModels.length === 0 ? (
-                  <div className="text-center py-8 space-y-4">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                        <span>❓</span>
-                        <span>Can't Find Your Device ?</span>
-                      </div>
+                  <div className="text-center py-8 space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {searchQuery ? "No models match your search" : "No models available"}
+                    </p>
+                    <div className="flex flex-col items-center gap-2 pt-2">
+                      <p className="text-xs text-muted-foreground">Can't find your device?</p>
                       <Button
+                        size="sm"
                         onClick={() => {
                           onOpenChange(false);
                           if (onRequestModel && selectedDeviceType && selectedBrand) {
                             onRequestModel(selectedDeviceType, selectedBrand);
                           }
                         }}
-                        className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                        className="gap-2"
                       >
-                        <span className="mr-2">⚡</span>
                         Request Your Model
                       </Button>
-                      <p className="text-xs text-muted-foreground">
-                        we'll add it with high priority
-                      </p>
+                      <p className="text-xs text-muted-foreground">We'll add it with priority</p>
                     </div>
                   </div>
                 ) : (
@@ -326,34 +347,30 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                       <button
                         key={idx}
                         onClick={() => handleModelSelect(model)}
-                        className="w-full flex items-center justify-between p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-muted/50 transition-all text-left"
+                        className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 text-left group"
                       >
-                        <span className="font-medium">{model}</span>
-                        <span className="text-primary">Select →</span>
+                        <span className="text-sm font-medium">{model}</span>
+                        <ChevronRightIcon className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                       </button>
                     ))}
-                    {/* Request Your Model button at the bottom of the list */}
-                    <div className="mt-6 pt-4 border-t border-border">
+                    {/* Request Your Model button at the bottom */}
+                    <div className="mt-4 pt-4 border-t border-border">
                       <div className="flex flex-col items-center gap-2">
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                          <span>❓</span>
-                          <span>Can't Find Your Device ?</span>
-                        </div>
+                        <p className="text-xs text-muted-foreground">Can't find your device?</p>
                         <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => {
                             onOpenChange(false);
                             if (onRequestModel && selectedDeviceType && selectedBrand) {
                               onRequestModel(selectedDeviceType, selectedBrand);
                             }
                           }}
-                          className="bg-primary/5 hover:bg-primary/10 text-primary border-2 border-primary/40 hover:border-primary/60"
+                          className="gap-2"
                         >
-                          <span className="mr-2">⚡</span>
                           Request Your Model
                         </Button>
-                        <p className="text-xs text-muted-foreground">
-                          we'll add it with high priority
-                        </p>
+                        <p className="text-xs text-muted-foreground">We'll add it with priority</p>
                       </div>
                     </div>
                   </>
