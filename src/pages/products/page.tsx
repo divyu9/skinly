@@ -805,7 +805,7 @@ export default function ProductsPage() {
       />
 
       {/* Product Category Header - Sticky */}
-      <div className="fixed top-16 left-0 right-0 z-40 bg-white dark:bg-gray-950">
+      <div className="fixed top-[100px] left-0 right-0 z-30 bg-white dark:bg-gray-950">
         <ProductCategoryHeader
           productCategory={productCategory}
           gadgetFilter={gadgetFilter}
@@ -815,7 +815,7 @@ export default function ProductsPage() {
       </div>
 
       {/* Products Section */}
-      <section className="pt-32 sm:pt-36 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
+      <section className="pt-40 sm:pt-44 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
         <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-2 sm:mb-4 space-y-1 sm:space-y-2">
             <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
