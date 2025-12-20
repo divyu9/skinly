@@ -10,11 +10,9 @@ import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
-import { CartButton } from "@/components/cart.tsx";
 import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
-import { HeaderSearch } from "@/components/header-search.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
-import { ProductCategoryHeader } from "@/components/product-category-header.tsx";
+import { MobileHeader } from "@/components/mobile-header.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -783,50 +781,11 @@ export default function ProductsPage() {
         <meta name="twitter:site" content="@goskinly" />
       </Helmet>
 
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-xl border-b border-gray-100 z-50 shadow-sm dark:bg-gray-900/95 dark:border-gray-800">
-        <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 flex items-center justify-between gap-4">
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <img 
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-              alt="Skinly" 
-              className="h-8 sm:h-10"
-            />
-          </Link>
-          
-          {/* Header Search - Hidden on mobile, shown on tablet+ */}
-          <div className="hidden md:flex flex-1 max-w-lg">
-            <HeaderSearch onRequestModelClick={() => setIsModelRequestOpen(true)} />
-          </div>
-          
-          <div className="flex items-center gap-2 sm:gap-6">
-            <a href="/#products" className="text-[10px] sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
-              Shop
-            </a>
-            <Link to="/products" className="text-[10px] sm:text-sm font-medium text-primary hidden sm:inline">
-              All Products
-            </Link>
-            <Link to="/devices" className="text-[10px] sm:text-sm font-medium hover:text-primary transition-colors hidden sm:inline">
-              Devices
-            </Link>
-            <Link to="/orders" className="text-[10px] sm:text-sm font-medium hover:text-primary transition-colors">
-              Orders
-            </Link>
-            <CartButton />
-          </div>
-        </div>
-        
-        {/* Product Category Header */}
-        <ProductCategoryHeader
-          productCategory={productCategory}
-          gadgetFilter={gadgetFilter}
-          finishFilter={finishFilter}
-          onUpdateFilters={updateFilters}
-        />
-      </nav>
+      {/* Mobile Header */}
+      <MobileHeader onRequestModelClick={() => setIsModelRequestOpen(true)} />
 
       {/* Products Section */}
-      <section className="pt-56 sm:pt-64 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
+      <section className="pt-28 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
         <div className="container mx-auto">
           <div className="text-center mb-3 sm:mb-6 space-y-1 sm:space-y-2">
             <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
