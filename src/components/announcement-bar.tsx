@@ -8,6 +8,17 @@ export function AnnouncementBar() {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const [isDismissed, setIsDismissed] = useState(false);
 
+  // Show loading skeleton while fetching
+  if (homepageSettings === undefined) {
+    return (
+      <div className="w-full bg-primary text-primary-foreground border-b border-primary-foreground/20 fixed top-0 left-0 right-0 z-50">
+        <div className="container mx-auto px-4 py-2 flex items-center justify-center">
+          <div className="h-5 w-48 bg-primary-foreground/20 rounded animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   // Don't render if announcement is disabled or dismissed
   if (!homepageSettings?.announcementEnabled || isDismissed) {
     return null;
@@ -31,7 +42,7 @@ export function AnnouncementBar() {
   );
 
   return (
-    <div className="w-full bg-primary text-primary-foreground border-b border-primary-foreground/20">
+    <div className="w-full bg-primary text-primary-foreground border-b border-primary-foreground/20 fixed top-0 left-0 right-0 z-50">
       <div className="container mx-auto px-4 py-2 flex items-center justify-between gap-2">
         {/* Empty space for balance */}
         <div className="w-6" />

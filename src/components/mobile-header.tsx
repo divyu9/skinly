@@ -168,7 +168,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
       {/* Main Header */}
       <header 
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 bg-background border-b border-border transition-all duration-300",
+          "fixed top-[36px] left-0 right-0 z-40 bg-background border-b border-border transition-all duration-300",
           isSearchExpanded ? "h-16" : "h-16"
         )}
       >
@@ -271,7 +271,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
 
       {/* Search Results Overlay */}
       {isSearchExpanded && showResults && searchQuery.trim().length > 0 && (
-        <div className="fixed inset-x-0 top-16 bottom-0 z-40 bg-background overflow-y-auto">
+        <div className="fixed inset-x-0 top-[100px] bottom-0 z-40 bg-background overflow-y-auto">
           <div className="container mx-auto px-4 py-4">
             {debouncedQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
               // Loading state

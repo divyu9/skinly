@@ -2,9 +2,12 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
+import { useState } from "react";
 
 export function CategoryExplorer() {
   const categories = useQuery(api.homepage.getActiveCategoryDisplaySettings);
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
 
   // Loading state
   if (categories === undefined) {
@@ -48,13 +51,17 @@ export function CategoryExplorer() {
     // Use custom URL if provided
     if (customLinkUrl) return customLinkUrl;
     
-    // Special handling for skins - opens gadget selector
-    if (categoryName === "skin") {
-      return "/products?productCategory=skin";
-    }
-    
-    // For other categories, link directly to products page with filter
+    // For other categories (not skins), link directly to products page with filter
     return `/products?productCategory=${categoryName}`;
+  };
+
+  const handleCategoryClick = (categoryName: string, e: React.MouseEvent, customLinkUrl?: string) => {
+    // Special handling for skins - open device selector dialog
+    if (categoryName === "skin" && !customLinkUrl) {
+      e.preventDefault();
+      setIsSelectorOpen(true);
+    }
+    // For other categories or custom URLs, the Link component will handle navigation
   };
 
   return (
@@ -76,6 +83,7 @@ export function CategoryExplorer() {
             <Link
               key={category._id}
               to={getCategoryLink(category.categoryName, category.linkUrl)}
+              onClick={(e) => handleCategoryClick(category.categoryName, e, category.linkUrl)}
               className="group relative flex-shrink-0 w-[70vw] h-[calc(87.5vw+30px)] rounded-2xl overflow-hidden shadow-lg snap-start"
             >
               {/* Background Image */}
@@ -103,6 +111,13 @@ export function CategoryExplorer() {
             </Link>
           ))}
         </div>
+
+        {/* Device Selector Dialog for Skins */}
+        <DeviceSelectorDialog
+          open={isSelectorOpen}
+          onOpenChange={setIsSelectorOpen}
+          initialDeviceType="phone"
+        />
       </div>
     </section>
   );
