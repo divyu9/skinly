@@ -1282,3 +1282,91 @@ export const bulkUpdateVariantPrices = mutation({
     };
   },
 });
+
+// Update product tags
+export const updateProductTags = mutation({
+  args: {
+    productId: v.id("products"),
+    tags: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const product = await ctx.db.get(args.productId);
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    await ctx.db.patch(args.productId, { tags: args.tags });
+    return { success: true };
+  },
+});
+
+// Bulk add tag to products
+export const bulkAddTag = mutation({
+  args: {
+    productIds: v.array(v.id("products")),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    let successCount = 0;
+    for (const productId of args.productIds) {
+      const product = await ctx.db.get(productId);
+      if (product) {
+        const newTags = product.tags.includes(args.tag)
+          ? product.tags
+          : [...product.tags, args.tag];
+        await ctx.db.patch(productId, { tags: newTags });
+        successCount++;
+      }
+    }
+
+    return { successCount };
+  },
+});
+
+// Bulk remove tag from products
+export const bulkRemoveTag = mutation({
+  args: {
+    productIds: v.array(v.id("products")),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    let successCount = 0;
+    for (const productId of args.productIds) {
+      const product = await ctx.db.get(productId);
+      if (product) {
+        const newTags = product.tags.filter(t => t !== args.tag);
+        await ctx.db.patch(productId, { tags: newTags });
+        successCount++;
+      }
+    }
+
+    return { successCount };
+  },
+});

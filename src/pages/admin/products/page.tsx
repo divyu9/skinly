@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { BulkPriceEditDialog } from "./_components/bulk-price-edit-dialog.tsx";
 import { RollsManagement } from "./_components/rolls-management.tsx";
+import { TagManagerDialog } from "./_components/tag-manager-dialog.tsx";
 
 // Inline editable cell component
 function EditableCell({
@@ -163,6 +164,13 @@ function AdminProductsPageInner() {
     failedProducts: Array<{ title: string; reason: string }>;
   } | null>(null);
   const [showReportDialog, setShowReportDialog] = useState(false);
+
+  // Tag manager state
+  const [managingTagsProduct, setManagingTagsProduct] = useState<{
+    id: Id<"products">;
+    title: string;
+    tags: string[];
+  } | null>(null);
 
   // State for active tab
   const [activeTab, setActiveTab] = useState<"products" | "rolls">("products");
@@ -1130,8 +1138,9 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                     <th className="p-3 text-left text-sm font-medium w-24">Inventory</th>
                     <th className="p-3 text-left text-sm font-medium w-28">Material Stock</th>
                     <th className="p-3 text-left text-sm font-medium w-32">Collection</th>
+                    <th className="p-3 text-left text-sm font-medium w-32">Tags</th>
                     <th className="p-3 text-left text-sm font-medium w-28">Status</th>
-                    <th className="p-3 text-left text-sm font-medium w-32">Actions</th>
+                    <th className="p-3 text-left text-sm font-medium w-40">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1319,6 +1328,39 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                           <span className="text-sm">
                             {collection ? collection.name : "-"}
                           </span>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            {product.tags.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {product.tags.slice(0, 2).map((tag) => (
+                                  <Badge key={tag} variant="secondary" className="text-xs">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                                {product.tags.length > 2 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{product.tags.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No tags</span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setManagingTagsProduct({
+                                id: product._id,
+                                title: product.title,
+                                tags: product.tags,
+                              })}
+                              title="Manage Tags"
+                              className="h-6 w-6 p-0"
+                            >
+                              <TagIcon className="size-3" />
+                            </Button>
+                          </div>
                         </td>
                         <td className="p-3">
                           <Select
@@ -1631,6 +1673,17 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         products={[]}
         selectedProductIds={selectedProducts}
       /> */}
+
+      {/* Tag Manager Dialog */}
+      {managingTagsProduct && (
+        <TagManagerDialog
+          open={!!managingTagsProduct}
+          onOpenChange={(open) => !open && setManagingTagsProduct(null)}
+          productId={managingTagsProduct.id}
+          productTitle={managingTagsProduct.title}
+          currentTags={managingTagsProduct.tags}
+        />
+      )}
     </div>
   );
 }
