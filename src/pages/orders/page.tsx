@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { Calendar } from "@/components/ui/calendar.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 
 type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
@@ -402,6 +403,9 @@ function OrdersPageInner() {
 export default function OrdersPage() {
   return (
     <>
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
       <Unauthenticated>
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <Empty>

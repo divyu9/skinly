@@ -14,6 +14,7 @@ import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { CartButton } from "@/components/cart.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -30,8 +31,11 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-[36px] z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-4">
             <Button

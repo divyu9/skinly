@@ -61,6 +61,7 @@ import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 
 // USP bullet points
 const skinUSPs = [
@@ -752,6 +753,9 @@ export default function ProductDetailPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
+        {/* Announcement Bar */}
+        <AnnouncementBar />
+        
         {/* Mobile-First Header */}
         <MobileHeader 
           onMenuClick={() => setIsMobileMenuOpen(true)}
@@ -786,6 +790,9 @@ export default function ProductDetailPage() {
     if (!isLoading) {
       return (
         <div className="min-h-screen bg-background pb-20">
+          {/* Announcement Bar */}
+          <AnnouncementBar />
+          
           {/* Mobile-First Header */}
           <MobileHeader 
             onMenuClick={() => setIsMobileMenuOpen(true)}
@@ -882,6 +889,9 @@ export default function ProductDetailPage() {
         <meta name="twitter:site" content="@goskinly" />
       </Helmet>
 
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
       {/* Mobile-First Header */}
       <MobileHeader 
         onMenuClick={() => setIsMobileMenuOpen(true)}

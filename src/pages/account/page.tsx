@@ -11,6 +11,7 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import type { Doc } from "@/convex/_generated/dataModel.d.ts";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -589,8 +590,11 @@ function AccountPageInner() {
 export default function AccountPage() {
   return (
     <div className="min-h-screen bg-background">
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
+      <nav className="fixed top-[36px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 

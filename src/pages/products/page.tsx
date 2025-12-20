@@ -14,6 +14,7 @@ import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -785,6 +786,9 @@ export default function ProductsPage() {
         <meta name="twitter:site" content="@goskinly" />
       </Helmet>
 
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
       {/* Mobile Header */}
       <MobileHeader 
         onMenuClick={() => setIsMobileNavOpen(true)}
