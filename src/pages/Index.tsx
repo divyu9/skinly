@@ -118,13 +118,7 @@ export default function Index() {
         <TopPicks />
 
         {/* Feature Banner */}
-        <FeatureBanner
-          backgroundImage="https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=1920&h=800&fit=crop"
-          heading="Premium Protection"
-          subheading="Protect your device in style with our premium skins"
-          ctaText="Shop Now"
-          ctaLink="/products"
-        />
+        <FeatureBanner />
 
         {/* Why Skinly */}
         <WhySkinly />

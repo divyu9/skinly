@@ -3,13 +3,15 @@ import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { SettingsTab } from "./_components/settings-tab.tsx";
 import { HeroSlidesTab } from "./_components/hero-slides-tab.tsx";
+import { FeatureBannersTab } from "./_components/feature-banners-tab.tsx";
 import { UgcVideosTab } from "./_components/ugc-videos-tab.tsx";
 import { CategoriesTab } from "./_components/categories-tab.tsx";
 import { 
   SettingsIcon, 
   ImageIcon, 
   VideoIcon, 
-  LayoutGridIcon 
+  LayoutGridIcon,
+  RectangleHorizontalIcon
 } from "lucide-react";
 
 export default function HomepageManagement() {
@@ -24,13 +26,13 @@ export default function HomepageManagement() {
             Homepage Management
           </h1>
           <p className="text-muted-foreground mt-2">
-            Manage homepage content, hero slides, UGC videos, and category display
+            Manage homepage content, hero slides, feature banners, UGC videos, and category display
           </p>
         </div>
 
         {/* Tabs Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto">
             <TabsTrigger value="settings" className="gap-2">
               <SettingsIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Settings</span>
@@ -38,6 +40,10 @@ export default function HomepageManagement() {
             <TabsTrigger value="slides" className="gap-2">
               <ImageIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Hero Slides</span>
+            </TabsTrigger>
+            <TabsTrigger value="banners" className="gap-2">
+              <RectangleHorizontalIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Banners</span>
             </TabsTrigger>
             <TabsTrigger value="videos" className="gap-2">
               <VideoIcon className="h-4 w-4" />
@@ -57,6 +63,11 @@ export default function HomepageManagement() {
           {/* Hero Slides Tab */}
           <TabsContent value="slides" className="space-y-6">
             <HeroSlidesTab />
+          </TabsContent>
+
+          {/* Feature Banners Tab */}
+          <TabsContent value="banners" className="space-y-6">
+            <FeatureBannersTab />
           </TabsContent>
 
           {/* UGC Videos Tab */}

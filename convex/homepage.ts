@@ -172,6 +172,36 @@ export const getMarqueeModels = query({
   },
 });
 
+/**
+ * Get feature banners (active only, sorted by order)
+ */
+export const getActiveFeatureBanners = query({
+  args: {},
+  handler: async (ctx) => {
+    const banners = await ctx.db
+      .query("featureBanners")
+      .withIndex("by_active_and_order", (q) => q.eq("isActive", true))
+      .collect();
+    
+    return banners.sort((a, b) => a.order - b.order);
+  },
+});
+
+/**
+ * Get all feature banners (for admin)
+ */
+export const getAllFeatureBanners = query({
+  args: {},
+  handler: async (ctx) => {
+    const banners = await ctx.db
+      .query("featureBanners")
+      .order("desc")
+      .collect();
+    
+    return banners.sort((a, b) => a.order - b.order);
+  },
+});
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
@@ -488,6 +518,83 @@ export const deleteUgcVideo = mutation({
     }
 
     await ctx.db.delete(args.videoId);
+    return { success: true };
+  },
+});
+
+/**
+ * Create feature banner
+ */
+export const createFeatureBanner = mutation({
+  args: {
+    backgroundImage: v.string(),
+    heading: v.string(),
+    subheading: v.optional(v.string()),
+    ctaText: v.optional(v.string()),
+    ctaLink: v.optional(v.string()),
+    isActive: v.boolean(),
+    order: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const now = Date.now();
+    return await ctx.db.insert("featureBanners", {
+      ...args,
+      createdBy: identity.email,
+      createdAt: now,
+    });
+  },
+});
+
+/**
+ * Update feature banner
+ */
+export const updateFeatureBanner = mutation({
+  args: {
+    bannerId: v.id("featureBanners"),
+    backgroundImage: v.optional(v.string()),
+    heading: v.optional(v.string()),
+    subheading: v.optional(v.string()),
+    ctaText: v.optional(v.string()),
+    ctaLink: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
+    order: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const { bannerId, ...updates } = args;
+    const now = Date.now();
+    
+    await ctx.db.patch(bannerId, {
+      ...updates,
+      updatedBy: identity.email,
+      updatedAt: now,
+    });
+    
+    return bannerId;
+  },
+});
+
+/**
+ * Delete feature banner
+ */
+export const deleteFeatureBanner = mutation({
+  args: { bannerId: v.id("featureBanners") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    await ctx.db.delete(args.bannerId);
     return { success: true };
   },
 });

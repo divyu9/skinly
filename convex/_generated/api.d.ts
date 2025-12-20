@@ -71,6 +71,7 @@ import type * as rapidshypWebhook from "../rapidshypWebhook.js";
 import type * as reviews from "../reviews.js";
 import type * as rollsManagement from "../rollsManagement.js";
 import type * as runMigration from "../runMigration.js";
+import type * as seedFeatureBanners from "../seedFeatureBanners.js";
 import type * as seedHomepage from "../seedHomepage.js";
 import type * as seedModels from "../seedModels.js";
 import type * as seoContentGenerator from "../seoContentGenerator.js";
@@ -169,6 +170,7 @@ declare const fullApi: ApiFromModules<{
   reviews: typeof reviews;
   rollsManagement: typeof rollsManagement;
   runMigration: typeof runMigration;
+  seedFeatureBanners: typeof seedFeatureBanners;
   seedHomepage: typeof seedHomepage;
   seedModels: typeof seedModels;
   seoContentGenerator: typeof seoContentGenerator;

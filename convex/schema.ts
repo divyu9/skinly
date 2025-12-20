@@ -1352,4 +1352,24 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_order", ["order"])
     .index("by_active_and_order", ["isActive", "order"]),
+
+  // Feature Banners (full-width promotional banners with auto-scroll)
+  featureBanners: defineTable({
+    backgroundImage: v.string(), // Background image URL (mandatory)
+    heading: v.string(), // Heading text (mandatory)
+    subheading: v.optional(v.string()), // Subheading text (optional)
+    ctaText: v.optional(v.string()), // CTA button text (optional)
+    ctaLink: v.optional(v.string()), // CTA button link (optional)
+    isActive: v.boolean(), // Whether banner is visible
+    order: v.number(), // Display order (lower = earlier)
+    
+    // Metadata
+    createdBy: v.optional(v.string()), // Admin email
+    createdAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_active", ["isActive"])
+    .index("by_order", ["order"])
+    .index("by_active_and_order", ["isActive", "order"]),
 });
