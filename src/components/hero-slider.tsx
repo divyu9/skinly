@@ -54,13 +54,17 @@ export function HeroSlider() {
         }}
       >
         {heroSlides.map((slide) => (
-          <Link
+          <div
             key={slide._id}
-            to={slide.ctaLink || "/"}
-            className="group relative flex-shrink-0 w-[90vw] h-[110vw] snap-start"
+            className="flex-shrink-0 w-[90vw] h-[110vw] snap-start"
           >
-            {/* Card Container with rounded corners */}
-            <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-lg bg-muted">
+            <Link
+              to={slide.ctaLink || "/"}
+              className="group block relative w-full h-full rounded-2xl overflow-hidden shadow-lg bg-muted"
+              style={{
+                isolation: 'isolate',
+              }}
+            >
               {/* Background Image */}
               <img
                 src={slide.imageUrl}
@@ -97,8 +101,8 @@ export function HeroSlider() {
                   )}
                 </div>
               )}
-            </div>
-          </Link>
+            </Link>
+          </div>
         ))}
       </div>
 
