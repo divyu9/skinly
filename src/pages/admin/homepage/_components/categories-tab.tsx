@@ -19,29 +19,21 @@ interface CategoryConfig {
   order: number;
 }
 
-const DEFAULT_CATEGORIES = [
-  { name: "skin", displayName: "Skins", order: 0 },
-  { name: "cover", displayName: "Covers", order: 1 },
-  { name: "gadget_wrap", displayName: "Gadget Wraps", order: 2 },
-  { name: "screen_guard", displayName: "Screen Guards", order: 3 },
-  { name: "standing", displayName: "Standing Accessories", order: 4 },
-  { name: "film", displayName: "Films", order: 5 },
-];
-
 export function CategoriesTab() {
   const categories = useQuery(api.homepage.getAllCategoryDisplaySettings);
+  const gadgetTypes = useQuery(api.gadgetTypes.list);
   const bulkUpdate = useMutation(api.homepage.bulkUpdateCategoryDisplaySettings);
 
   const [configs, setConfigs] = useState<CategoryConfig[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Initialize with defaults or loaded data
+  // Initialize with gadget types or loaded data
   useEffect(() => {
-    if (categories) {
+    if (categories && gadgetTypes) {
       const existingMap = new Map(categories.map((cat) => [cat.categoryName, cat]));
       
-      const initialConfigs = DEFAULT_CATEGORIES.map((defaultCat) => {
-        const existing = existingMap.get(defaultCat.name);
+      const initialConfigs = gadgetTypes.map((gadgetType: { name: string; displayName: string }, index: number) => {
+        const existing = existingMap.get(gadgetType.name);
         if (existing) {
           return {
             categoryName: existing.categoryName,
@@ -52,18 +44,18 @@ export function CategoriesTab() {
           };
         } else {
           return {
-            categoryName: defaultCat.name,
-            displayName: defaultCat.displayName,
+            categoryName: gadgetType.name,
+            displayName: gadgetType.displayName,
             imageUrl: "",
             isActive: true,
-            order: defaultCat.order,
+            order: index,
           };
         }
       });
       
       setConfigs(initialConfigs);
     }
-  }, [categories]);
+  }, [categories, gadgetTypes]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -94,7 +86,7 @@ export function CategoriesTab() {
     );
   };
 
-  if (categories === undefined) {
+  if (categories === undefined || gadgetTypes === undefined) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-48 w-full" />
@@ -200,7 +192,7 @@ export function CategoriesTab() {
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="pt-6">
           <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Category names must match product categories in your database. 
+            <strong>Note:</strong> Categories are automatically synced from your Product Classification Gadget Types. 
             These settings only control how categories appear on the homepage "Category Explorer" section.
           </p>
         </CardContent>

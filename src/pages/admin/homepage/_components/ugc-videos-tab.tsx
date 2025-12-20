@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command.tsx";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { toast } from "sonner";
 import { 
   PlusIcon, 
@@ -18,7 +20,9 @@ import {
   VideoIcon, 
   CheckCircleIcon, 
   XCircleIcon,
-  PlayCircleIcon 
+  PlayCircleIcon,
+  CheckIcon,
+  ChevronsUpDownIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 
@@ -28,6 +32,7 @@ interface VideoFormData {
   sourceType: "instagram" | "manual";
   socialMediaId: string;
   productId: string;
+  productTitle: string;
   ctaText: string;
   isApproved: boolean;
   isActive: boolean;
@@ -36,18 +41,22 @@ interface VideoFormData {
 
 export function UgcVideosTab() {
   const videos = useQuery(api.homepage.getAllUgcVideos);
+  const products = useQuery(api.products.getAllProducts, {});
   const createVideo = useMutation(api.homepage.createUgcVideo);
   const updateVideo = useMutation(api.homepage.updateUgcVideo);
   const deleteVideo = useMutation(api.homepage.deleteUgcVideo);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVideo, setEditingVideo] = useState<Id<"ugcVideos"> | null>(null);
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState("");
   const [formData, setFormData] = useState<VideoFormData>({
     videoUrl: "",
     thumbnailUrl: "",
     sourceType: "manual",
     socialMediaId: "",
     productId: "",
+    productTitle: "",
     ctaText: "Shop Now",
     isApproved: true,
     isActive: true,
@@ -55,10 +64,18 @@ export function UgcVideosTab() {
   });
   const [isSaving, setIsSaving] = useState(false);
 
+  // Filter products based on search
+  const filteredProducts = (products || []).filter((product) =>
+    product.title.toLowerCase().includes(productSearch.toLowerCase()) ||
+    product.slug?.toLowerCase().includes(productSearch.toLowerCase())
+  ).slice(0, 50);
+
   const handleOpenDialog = (videoId?: Id<"ugcVideos">) => {
-    if (videoId && videos) {
+    if (videoId && videos && products) {
       const video = videos.find((v) => v._id === videoId);
       if (video) {
+        // Find product title
+        const product = products.find((p) => p._id === video.productId);
         setEditingVideo(videoId);
         setFormData({
           videoUrl: video.videoUrl,
@@ -66,6 +83,7 @@ export function UgcVideosTab() {
           sourceType: video.sourceType,
           socialMediaId: video.socialMediaId || "",
           productId: video.productId || "",
+          productTitle: product?.title || "",
           ctaText: video.ctaText || "Shop Now",
           isApproved: video.isApproved,
           isActive: video.isActive,
@@ -80,12 +98,14 @@ export function UgcVideosTab() {
         sourceType: "manual",
         socialMediaId: "",
         productId: "",
+        productTitle: "",
         ctaText: "Shop Now",
         isApproved: true,
         isActive: true,
         order: videos ? videos.length : 0,
       });
     }
+    setProductSearch("");
     setIsDialogOpen(true);
   };
 
@@ -338,15 +358,71 @@ export function UgcVideosTab() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="product-id">Product ID (Optional)</Label>
-              <Input
-                id="product-id"
-                value={formData.productId}
-                onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
-                placeholder="Product ID to link"
-              />
+              <Label htmlFor="product-search">Link to Product (Optional)</Label>
+              <Popover open={productSearchOpen} onOpenChange={setProductSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={productSearchOpen}
+                    className="w-full justify-between"
+                  >
+                    {formData.productTitle || "Select product..."}
+                    <ChevronsUpDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search products..." 
+                      value={productSearch}
+                      onValueChange={setProductSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>No products found.</CommandEmpty>
+                      <CommandGroup>
+                        {/* Clear selection option */}
+                        {formData.productId && (
+                          <CommandItem
+                            onSelect={() => {
+                              setFormData({ ...formData, productId: "", productTitle: "" });
+                              setProductSearchOpen(false);
+                            }}
+                          >
+                            <XCircleIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                            Clear selection
+                          </CommandItem>
+                        )}
+                        {filteredProducts.map((product) => (
+                          <CommandItem
+                            key={product._id}
+                            onSelect={() => {
+                              setFormData({ 
+                                ...formData, 
+                                productId: product._id,
+                                productTitle: product.title
+                              });
+                              setProductSearchOpen(false);
+                            }}
+                          >
+                            <CheckIcon
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.productId === product._id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                            {product.title}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               <p className="text-xs text-muted-foreground">
-                Find product ID in Products admin page
+                Search and select a product to link with this video
               </p>
             </div>
 

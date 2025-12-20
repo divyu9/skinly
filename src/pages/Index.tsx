@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
+import { MobileNav } from "@/components/mobile-nav.tsx";
 import { ModelsMarquee } from "@/components/models-marquee.tsx";
 import { HeroSlider } from "@/components/hero-slider.tsx";
 import { ExploreModels } from "@/components/explore-models.tsx";
@@ -29,6 +30,7 @@ import { toast } from "sonner";
 export default function Index() {
   const [isRequestModelOpen, setIsRequestModelOpen] = useState(false);
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Request model form state
   const [requestBrand, setRequestBrand] = useState("");
@@ -71,8 +73,7 @@ export default function Index() {
   };
 
   const handleMenuClick = () => {
-    // TODO: Open mobile sidebar menu
-    toast.info("Mobile menu coming soon!");
+    setIsMobileMenuOpen(true);
   };
 
   return (
@@ -130,6 +131,12 @@ export default function Index() {
 
       {/* Footer */}
       <SiteFooter />
+
+      {/* Mobile Navigation Sheet */}
+      <MobileNav 
+        open={isMobileMenuOpen}
+        onOpenChange={setIsMobileMenuOpen}
+      />
 
       {/* Request Model Dialog */}
       <Dialog open={isRequestModelOpen} onOpenChange={setIsRequestModelOpen}>

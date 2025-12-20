@@ -1,15 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 
 export function HeroSlider() {
   const heroSlides = useQuery(api.homepage.getActiveHeroSlides);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Minimum swipe distance (in px)
+  const minSwipeDistance = 50;
 
   // Auto-rotate slides every 5 seconds
   useEffect(() => {
@@ -53,8 +58,37 @@ export function HeroSlider() {
     goToSlide((currentSlide + 1) % heroSlides.length);
   };
 
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(0); // Reset touchEnd
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) {
+      goToNext();
+    } else if (isRightSwipe) {
+      goToPrevious();
+    }
+  };
+
   return (
-    <div className="relative w-full aspect-[16/9] md:aspect-[21/9] rounded-2xl overflow-hidden group">
+    <div 
+      ref={containerRef}
+      className="relative w-full aspect-[16/9] md:aspect-[21/9] rounded-2xl overflow-hidden group touch-pan-y"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Slides */}
       <div className="relative w-full h-full">
         {heroSlides.map((slide, index) => (
@@ -113,27 +147,6 @@ export function HeroSlider() {
         ))}
       </div>
 
-      {/* Navigation Arrows (show on hover, hide on mobile) */}
-      {heroSlides.length > 1 && (
-        <>
-          <button
-            onClick={goToPrevious}
-            className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 size-12 items-center justify-center rounded-full bg-white/80 hover:bg-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Previous slide"
-          >
-            <ChevronLeftIcon className="size-6 text-foreground" />
-          </button>
-
-          <button
-            onClick={goToNext}
-            className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 size-12 items-center justify-center rounded-full bg-white/80 hover:bg-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-            aria-label="Next slide"
-          >
-            <ChevronRightIcon className="size-6 text-foreground" />
-          </button>
-        </>
-      )}
-
       {/* Indicator Dots */}
       {heroSlides.length > 1 && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
@@ -150,18 +163,6 @@ export function HeroSlider() {
               aria-label={`Go to slide ${index + 1}`}
             />
           ))}
-        </div>
-      )}
-
-      {/* Swipe indicators for mobile */}
-      {heroSlides.length > 1 && (
-        <div className="md:hidden absolute left-4 right-4 top-1/2 -translate-y-1/2 z-20 flex items-center justify-between pointer-events-none">
-          <div className="size-8 rounded-full bg-white/30 flex items-center justify-center">
-            <ChevronLeftIcon className="size-5 text-white" />
-          </div>
-          <div className="size-8 rounded-full bg-white/30 flex items-center justify-center">
-            <ChevronRightIcon className="size-5 text-white" />
-          </div>
         </div>
       )}
     </div>

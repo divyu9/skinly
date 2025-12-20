@@ -42,15 +42,21 @@ import {
 } from "lucide-react";
 
 interface MobileNavProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   onGadgetSelectorClick?: () => void;
   onPhoneSelectorClick?: () => void;
 }
 
-export function MobileNav({ onGadgetSelectorClick, onPhoneSelectorClick }: MobileNavProps) {
-  const [open, setOpen] = useState(false);
+export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelectorClick, onPhoneSelectorClick }: MobileNavProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
+  
+  // Use controlled state if provided, otherwise use internal state
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   
   const { user, signoutRedirect } = useAuth();
   const profileData = useQuery(api.users.getProfileData, user ? {} : "skip");
