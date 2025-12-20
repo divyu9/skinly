@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
+import { MobileNav } from "@/components/mobile-nav.tsx";
 import { Helmet } from "react-helmet-async";
 import {
   Select,
@@ -116,6 +117,9 @@ export default function ProductsPage() {
   
   // Get OOS sorting setting
   const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
+  
+  // Mobile nav state
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   
   // Model request dialog state
   const [isModelRequestOpen, setIsModelRequestOpen] = useState(false);
@@ -782,7 +786,18 @@ export default function ProductsPage() {
       </Helmet>
 
       {/* Mobile Header */}
-      <MobileHeader onRequestModelClick={() => setIsModelRequestOpen(true)} />
+      <MobileHeader 
+        onMenuClick={() => setIsMobileNavOpen(true)}
+        onRequestModelClick={() => setIsModelRequestOpen(true)} 
+      />
+      
+      {/* Mobile Nav */}
+      <MobileNav 
+        open={isMobileNavOpen}
+        onOpenChange={setIsMobileNavOpen}
+        onGadgetSelectorClick={() => setIsDeviceSelectorOpen(true)}
+        onPhoneSelectorClick={() => setIsDeviceSelectorOpen(true)}
+      />
 
       {/* Products Section */}
       <section className="pt-28 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">

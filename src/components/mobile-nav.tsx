@@ -135,5 +135,117 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
     },
   ];
 
-  return null;
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetContent side="left" className="w-[300px] p-0">
+        <SheetHeader className="p-6 pb-4">
+          <SheetTitle className="text-left">Menu</SheetTitle>
+        </SheetHeader>
+        
+        <div className="flex flex-col h-[calc(100vh-80px)]">
+          {/* Menu Items */}
+          <nav className="flex-1 px-4 space-y-1">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              if (item.onClick) {
+                return (
+                  <button
+                    key={item.label}
+                    onClick={item.onClick}
+                    className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left"
+                  >
+                    <Icon className="size-5 text-muted-foreground" />
+                    <span className="font-medium">{item.label}</span>
+                  </button>
+                );
+              }
+              return (
+                <Link
+                  key={item.label}
+                  to={item.href!}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <Icon className="size-5 text-muted-foreground" />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          <Separator />
+
+          {/* Account Section */}
+          <div className="p-4">
+            {user ? (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold">
+                        {profileData?.name?.[0]?.toUpperCase() || "U"}
+                      </div>
+                      <div className="flex-1">
+                        {editingName ? (
+                          <div className="space-y-2">
+                            <Input
+                              value={newName}
+                              onChange={(e) => setNewName(e.target.value)}
+                              placeholder="Enter your name"
+                              className="h-8"
+                            />
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={handleSaveName} className="h-7 px-2">
+                                <CheckIcon className="size-3" />
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={handleCancelEdit} className="h-7 px-2">
+                                <XIcon className="size-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-sm">{profileData?.name || "User"}</p>
+                            <p className="text-xs text-muted-foreground">{profileData?.email}</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    {!editingName && (
+                      <Button size="sm" variant="ghost" onClick={handleEditName} className="h-7 w-7 p-0">
+                        <PencilIcon className="size-3" />
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* Wallet Balance */}
+                  {profileData && (
+                    <div className="mb-3 p-3 bg-muted rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <WalletIcon className="size-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Wallet Balance</span>
+                        </div>
+                        <span className="font-bold">₹{profileData.walletBalance?.toFixed(2) || "0.00"}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Button onClick={handleLogout} variant="outline" size="sm" className="w-full">
+                    <LogOutIcon className="size-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <SignInButton className="w-full">
+                <LogInIcon className="size-4 mr-2" />
+                Sign In
+              </SignInButton>
+            )}
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
 }
