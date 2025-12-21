@@ -243,10 +243,29 @@ export default function ProductDetailPage() {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('model', model);
     newSearchParams.set('brand', brand);
-    navigate({
-      pathname: '/products/detail',
-      search: newSearchParams.toString(),
-    });
+    
+    // Preserve product identifier
+    if (productId) {
+      newSearchParams.set('id', productId);
+    }
+    if (productSlug && !params.slug) {
+      // Only set slug in query params if not in route params
+      newSearchParams.set('slug', productSlug);
+    }
+    
+    // Navigate based on whether we're using slug in route or query params
+    if (params.slug) {
+      navigate({
+        pathname: `/products/${params.slug}`,
+        search: newSearchParams.toString(),
+      });
+    } else {
+      navigate({
+        pathname: '/products/detail',
+        search: newSearchParams.toString(),
+      });
+    }
+    
     setModelDialogOpen(false);
     setSelectedBrand("");
     setModelSearch("");
