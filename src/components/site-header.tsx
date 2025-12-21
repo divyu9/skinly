@@ -19,7 +19,7 @@ export function SiteHeader({ onGadgetSelectorClick, onPhoneSelectorClick, onRequ
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <img 
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas" 
               alt="Skinly" 
               width="348"
               height="140"

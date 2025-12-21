@@ -158,7 +158,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
     // Handle search submit if needed
   };
 
-  const logoUrl = homepageSettings?.logoImageUrl || "https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv";
+  const logoUrl = homepageSettings?.logoImageUrl || "https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV";
   const logoLink = homepageSettings?.logoRedirectLink || "/";
   const showSearch = homepageSettings?.showSearchIcon ?? true;
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;

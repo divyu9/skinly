@@ -13,7 +13,7 @@ export function SiteFooter() {
         <div className="container mx-auto">
           <div className="flex flex-col items-center mb-8">
             <img 
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              src="https://cdn.hercules.app/file_IX0G7mps5mMQV7xehsd9EhUv" 
               alt="Skinly" 
               width="279"
               height="112"

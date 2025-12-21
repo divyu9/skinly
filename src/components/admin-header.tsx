@@ -33,7 +33,7 @@ export function AdminHeader() {
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
+              src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas"
               alt="Skinly"
               width="300"
               height="120"
