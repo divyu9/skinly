@@ -475,6 +475,10 @@ export default function ProductDetailPage() {
   const [isAdding, setIsAdding] = useState(false);
   const [isBuyingNow, setIsBuyingNow] = useState(false);
   
+  // Swipe state
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  
   const isLoading = productData === undefined;
   const product = productData;
   
@@ -492,6 +496,39 @@ export default function ProductDetailPage() {
       setSelectedCoverage("full_body_wrap");
     }
   }, [phoneModel, mockupFileUrl, isPhoneSkin]);
+  
+  // Swipe handlers for image navigation
+  const minSwipeDistance = 50;
+  
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe || isRightSwipe) {
+      const currentIndex = displayImages.findIndex(img => img.url === selectedImage);
+      if (currentIndex === -1) return;
+      
+      if (isLeftSwipe && currentIndex < displayImages.length - 1) {
+        // Swipe left - next image
+        setSelectedImage(displayImages[currentIndex + 1].url);
+      } else if (isRightSwipe && currentIndex > 0) {
+        // Swipe right - previous image
+        setSelectedImage(displayImages[currentIndex - 1].url);
+      }
+    }
+  };
 
   // Scroll listener for sticky bottom bar
   useEffect(() => {
@@ -948,13 +985,19 @@ export default function ProductDetailPage() {
           <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-6 md:gap-8 mb-12">
             {/* Image Gallery */}
             <div className="space-y-3 md:sticky md:top-24 md:self-start">
-              <div className="aspect-square overflow-hidden rounded-xl bg-muted border border-border relative">
+              <div 
+                className="aspect-square overflow-hidden rounded-xl bg-muted border border-border relative select-none"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+              >
                 {selectedImage ? (
                   <>
                     <img
                       src={selectedImage}
                       alt={product.title}
                       className="w-full h-full object-cover"
+                      draggable={false}
                       onError={(e) => {
                         // If mockup image fails to load, show next available image
                         const nextImage = displayImages.find(img => img.url !== selectedImage);
@@ -964,9 +1007,26 @@ export default function ProductDetailPage() {
                       }}
                     />
                     {phoneModel && mockupUrl && selectedImage === mockupUrl && (
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 md:bottom-auto md:top-3 md:left-auto md:right-3 md:translate-x-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg text-center leading-tight">
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 md:bottom-auto md:top-3 md:left-auto md:right-3 md:translate-x-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg text-center leading-tight pointer-events-none">
                         <div>Preview on {phoneModel}</div>
                         <div className="text-[10px] mt-0.5 opacity-90">Full Body Wrap</div>
+                      </div>
+                    )}
+                    {/* Swipe indicator dots */}
+                    {displayImages.length > 1 && (
+                      <div className={`absolute left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none ${
+                        phoneModel && mockupUrl && selectedImage === mockupUrl ? "bottom-14 md:bottom-3" : "bottom-3"
+                      }`}>
+                        {displayImages.map((img, idx) => (
+                          <div
+                            key={idx}
+                            className={`h-1.5 rounded-full transition-all ${
+                              selectedImage === img.url
+                                ? "w-6 bg-white"
+                                : "w-1.5 bg-white/50"
+                            }`}
+                          />
+                        ))}
                       </div>
                     )}
                   </>
