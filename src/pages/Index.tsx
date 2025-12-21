@@ -58,16 +58,87 @@ export default function Index() {
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
   // Get homepage sections to render dynamically
-  const homepageSections = useQuery(api.homepage.getAllHomepageSections);
+  const homepageSections = useQuery(api.homepage.getActiveHomepageSections);
   
   // Get homepage settings to determine header height
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
   const headerOffset = showAnnouncement ? 92 : 64; // 28px announcement + 64px header OR just 64px header
   
-  // Helper to get section by type
-  const getSection = (type: string) => {
-    return homepageSections?.find((s) => s.sectionType === type && s.isActive);
+  // Sort sections by order for dynamic rendering
+  const sortedActiveSections = homepageSections?.sort((a, b) => a.order - b.order) || [];
+  
+  // Helper to render section by type
+  const renderSection = (section: typeof sortedActiveSections[0]) => {
+    const key = section._id;
+    
+    switch (section.sectionType) {
+      case "hero_slides":
+        return <HeroSlider key={key} />;
+      
+      case "models_marquee":
+        return null; // Already rendered above header
+      
+      case "explore_models":
+        return <ExploreModels key={key} onRequestModelClick={() => setIsRequestModelOpen(true)} />;
+      
+      case "category_explorer":
+        return <CategoryExplorer key={key} onRequestModel={handleRequestModel} />;
+      
+      case "top_picks":
+        return <TopPicks key={key} />;
+      
+      case "most_trendy":
+        return (
+          <MostTrendy
+            key={key}
+            sectionId={section._id}
+            config={section.config as never}
+          />
+        );
+      
+      case "explore_by_brand":
+        return (
+          <ExploreByBrand
+            key={key}
+            sectionId={section._id}
+            config={section.config as never}
+          />
+        );
+      
+      case "explore_by_gadget":
+        return (
+          <ExploreByGadget
+            key={key}
+            sectionId={section._id}
+            config={section.config as never}
+          />
+        );
+      
+      case "why_skinly":
+        return (
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <WhySkinly />
+          </Suspense>
+        );
+      
+      case "feature_banner":
+        return (
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <FeatureBanner />
+          </Suspense>
+        );
+      
+      case "ugc_videos":
+        return (
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <UgcVideos />
+          </Suspense>
+        );
+      
+      default:
+        return null;
+    }
   };
 
   const handleRequestModelSubmit = async (e: React.FormEvent) => {
@@ -134,56 +205,8 @@ export default function Index() {
 
       {/* Main Content */}
       <main className="min-h-screen">
-        {/* Hero Slider */}
-        <HeroSlider />
-
-        {/* Category Explorer */}
-        <CategoryExplorer onRequestModel={handleRequestModel} />
-
-        {/* Explore Models */}
-        <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />
-
-        {/* Top Picks */}
-        <TopPicks />
-
-        {/* Most Trendy */}
-        {getSection("most_trendy") && (
-          <MostTrendy
-            sectionId={getSection("most_trendy")!._id}
-            config={getSection("most_trendy")!.config as never}
-          />
-        )}
-
-        {/* Explore by Brand */}
-        {getSection("explore_by_brand") && (
-          <ExploreByBrand
-            sectionId={getSection("explore_by_brand")!._id}
-            config={getSection("explore_by_brand")!.config as never}
-          />
-        )}
-
-        {/* Explore by Gadget */}
-        {getSection("explore_by_gadget") && (
-          <ExploreByGadget
-            sectionId={getSection("explore_by_gadget")!._id}
-            config={getSection("explore_by_gadget")!.config as never}
-          />
-        )}
-
-        {/* Feature Banner - Lazy loaded */}
-        <Suspense fallback={<SectionSkeleton />}>
-          <FeatureBanner />
-        </Suspense>
-
-        {/* Why Skinly - Lazy loaded */}
-        <Suspense fallback={<SectionSkeleton />}>
-          <WhySkinly />
-        </Suspense>
-
-        {/* UGC Videos - Lazy loaded */}
-        <Suspense fallback={<SectionSkeleton />}>
-          <UgcVideos />
-        </Suspense>
+        {/* Dynamically render sections based on layout manager order */}
+        {sortedActiveSections.map((section) => renderSection(section))}
       </main>
 
       {/* Footer */}

@@ -428,11 +428,17 @@ export const deleteHeroSlide = mutation({
 export const createHomepageSection = mutation({
   args: {
     sectionType: v.union(
+      v.literal("hero_slides"),
+      v.literal("models_marquee"),
       v.literal("top_picks"),
       v.literal("why_skinly"),
       v.literal("feature_banner"),
       v.literal("explore_models"),
-      v.literal("category_explorer")
+      v.literal("category_explorer"),
+      v.literal("most_trendy"),
+      v.literal("explore_by_brand"),
+      v.literal("explore_by_gadget"),
+      v.literal("ugc_videos")
     ),
     sectionName: v.string(),
     isActive: v.boolean(),

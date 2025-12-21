@@ -1241,6 +1241,8 @@ export default defineSchema({
   // Homepage Sections (flexible sections for different types)
   homepageSections: defineTable({
     sectionType: v.union(
+      v.literal("hero_slides"), // Hero slider at top
+      v.literal("models_marquee"), // Scrolling models marquee
       v.literal("top_picks"), // Top Picks with tabs
       v.literal("why_skinly"), // Trust section with icon cards
       v.literal("feature_banner"), // Full-width feature banner
@@ -1248,7 +1250,8 @@ export default defineSchema({
       v.literal("category_explorer"), // Auto-linked category section
       v.literal("most_trendy"), // Products filtered by tags
       v.literal("explore_by_brand"), // Brand logo cards
-      v.literal("explore_by_gadget") // Gadget type cards
+      v.literal("explore_by_gadget"), // Gadget type cards
+      v.literal("ugc_videos") // User-generated content videos
     ),
     sectionName: v.string(), // Admin-friendly name
     isActive: v.boolean(), // Whether section is visible
