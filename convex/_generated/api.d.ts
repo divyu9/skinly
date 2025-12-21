@@ -41,6 +41,7 @@ import type * as googleDriveImport from "../googleDriveImport.js";
 import type * as googleDriveImportPublic from "../googleDriveImportPublic.js";
 import type * as gst from "../gst.js";
 import type * as homepage from "../homepage.js";
+import type * as homepageSectionCards from "../homepageSectionCards.js";
 import type * as http from "../http.js";
 import type * as loginOtp from "../loginOtp.js";
 import type * as migrateFinishTypeField from "../migrateFinishTypeField.js";
@@ -140,6 +141,7 @@ declare const fullApi: ApiFromModules<{
   googleDriveImportPublic: typeof googleDriveImportPublic;
   gst: typeof gst;
   homepage: typeof homepage;
+  homepageSectionCards: typeof homepageSectionCards;
   http: typeof http;
   loginOtp: typeof loginOtp;
   migrateFinishTypeField: typeof migrateFinishTypeField;

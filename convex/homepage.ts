@@ -173,6 +173,93 @@ export const getMarqueeModels = query({
 });
 
 /**
+ * Get products by tags (for Most Trendy section)
+ */
+export const getProductsByTags = query({
+  args: { 
+    tags: v.array(v.string()),
+    maxProducts: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.maxProducts || 10;
+    
+    // Fetch all active products
+    const allProducts = await ctx.db
+      .query("products")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
+    
+    // Filter products that have any of the specified tags
+    const matchingProducts = allProducts.filter((product) => {
+      if (!product.tags || product.tags.length === 0) return false;
+      return product.tags.some((tag) => 
+        args.tags.some((searchTag) => 
+          tag.toLowerCase() === searchTag.toLowerCase()
+        )
+      );
+    });
+    
+    // Get variants for matching products
+    const allVariants = await ctx.db.query("variants").collect();
+    const variantsByProduct = new Map<string, typeof allVariants>();
+    
+    for (const variant of allVariants) {
+      const productId = variant.productId;
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
+      }
+      variantsByProduct.get(productId)!.push(variant);
+    }
+    
+    // Sort by creation time (newest first), limit, and add variants
+    const sortedProducts = matchingProducts
+      .sort((a, b) => b._creationTime - a._creationTime)
+      .slice(0, limit)
+      .map(product => ({
+        _id: product._id,
+        title: product.title,
+        slug: product.slug,
+        description: product.description,
+        status: product.status,
+        images: product.images,
+        tags: product.tags,
+        variants: variantsByProduct.get(product._id) || [],
+      }));
+    
+    return sortedProducts;
+  },
+});
+
+/**
+ * Get all homepage sections with their cards (for admin)
+ */
+export const getAllHomepageSectionsWithCards = query({
+  args: {},
+  handler: async (ctx) => {
+    const sections = await ctx.db
+      .query("homepageSections")
+      .order("desc")
+      .collect();
+    
+    const sectionsWithCards = await Promise.all(
+      sections.map(async (section) => {
+        const cards = await ctx.db
+          .query("homepageSectionCards")
+          .withIndex("by_section", (q) => q.eq("sectionId", section._id))
+          .collect();
+        
+        return {
+          ...section,
+          cards: cards.sort((a, b) => a.order - b.order),
+        };
+      })
+    );
+    
+    return sectionsWithCards.sort((a, b) => a.order - b.order);
+  },
+});
+
+/**
  * Get feature banners (active only, sorted by order)
  */
 export const getActiveFeatureBanners = query({
@@ -689,5 +776,35 @@ export const bulkUpdateCategoryDisplaySettings = mutation({
     }
     
     return { success: true, count: results.length };
+  },
+});
+
+/**
+ * Bulk reorder homepage sections
+ */
+export const bulkReorderSections = mutation({
+  args: {
+    sectionOrders: v.array(v.object({
+      sectionId: v.id("homepageSections"),
+      order: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const now = Date.now();
+    
+    for (const item of args.sectionOrders) {
+      await ctx.db.patch(item.sectionId, {
+        order: item.order,
+        updatedBy: identity.email,
+        updatedAt: now,
+      });
+    }
+    
+    return { success: true, count: args.sectionOrders.length };
   },
 });

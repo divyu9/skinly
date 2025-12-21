@@ -1245,7 +1245,10 @@ export default defineSchema({
       v.literal("why_skinly"), // Trust section with icon cards
       v.literal("feature_banner"), // Full-width feature banner
       v.literal("explore_models"), // Device model search section
-      v.literal("category_explorer") // Auto-linked category section
+      v.literal("category_explorer"), // Auto-linked category section
+      v.literal("most_trendy"), // Products filtered by tags
+      v.literal("explore_by_brand"), // Brand logo cards
+      v.literal("explore_by_gadget") // Gadget type cards
     ),
     sectionName: v.string(), // Admin-friendly name
     isActive: v.boolean(), // Whether section is visible
@@ -1289,6 +1292,31 @@ export default defineSchema({
       v.object({
         title: v.string(),
         subtitle: v.optional(v.string()),
+      }),
+      // Most Trendy config
+      v.object({
+        title: v.string(),
+        subtitle: v.optional(v.string()),
+        tags: v.array(v.string()), // Product tags to filter by
+        maxProducts: v.number(), // Max products to show (default: 10)
+        cardWidth: v.number(), // Card width in pixels (default: 280)
+        cardHeight: v.number(), // Card height in pixels (default: 380)
+      }),
+      // Explore by Brand config
+      v.object({
+        title: v.string(),
+        subtitle: v.optional(v.string()),
+        autoGenerate: v.boolean(), // Auto-generate from supportedModels
+        cardWidth: v.number(), // Card width in pixels (default: 200)
+        cardHeight: v.number(), // Card height in pixels (default: 200)
+      }),
+      // Explore by Gadget config
+      v.object({
+        title: v.string(),
+        subtitle: v.optional(v.string()),
+        autoGenerate: v.boolean(), // Auto-generate from product categories
+        cardWidth: v.number(), // Card width in pixels (default: 280)
+        cardHeight: v.number(), // Card height in pixels (default: 320)
       })
     )),
     
@@ -1302,6 +1330,36 @@ export default defineSchema({
     .index("by_order", ["order"])
     .index("by_active_and_order", ["isActive", "order"])
     .index("by_section_type", ["sectionType"]),
+
+  // Homepage Section Cards (cards for brand/gadget sections)
+  homepageSectionCards: defineTable({
+    sectionId: v.id("homepageSections"), // Parent section
+    cardType: v.union(
+      v.literal("brand"), // Brand card
+      v.literal("gadget") // Gadget category card
+    ),
+    
+    // Card content
+    imageUrl: v.string(), // Card image URL (brand logo or gadget image)
+    title: v.string(), // Card title (brand name or gadget type)
+    subtitle: v.optional(v.string()), // Optional subtitle
+    linkUrl: v.string(), // Link when card is clicked
+    
+    // Display settings
+    isActive: v.boolean(), // Whether card is visible
+    order: v.number(), // Display order (lower = earlier)
+    
+    // Metadata
+    createdBy: v.optional(v.string()), // Admin email
+    createdAt: v.number(),
+    updatedBy: v.optional(v.string()),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_section", ["sectionId"])
+    .index("by_active", ["isActive"])
+    .index("by_order", ["order"])
+    .index("by_section_and_active", ["sectionId", "isActive"])
+    .index("by_section_active_and_order", ["sectionId", "isActive", "order"]),
 
   // UGC Videos (user-generated content videos)
   ugcVideos: defineTable({
