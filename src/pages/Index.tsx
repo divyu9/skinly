@@ -8,6 +8,9 @@ import { HeroSlider } from "@/components/hero-slider.tsx";
 import { ExploreModels } from "@/components/explore-models.tsx";
 import { CategoryExplorer } from "@/components/category-explorer.tsx";
 import { TopPicks } from "@/components/top-picks.tsx";
+import { MostTrendy } from "@/components/most-trendy.tsx";
+import { ExploreByBrand } from "@/components/explore-by-brand.tsx";
+import { ExploreByGadget } from "@/components/explore-by-gadget.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { BugReportModal } from "@/components/bug-report-modal.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -54,10 +57,18 @@ export default function Index() {
 
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
+  // Get homepage sections to render dynamically
+  const homepageSections = useQuery(api.homepage.getAllHomepageSections);
+  
   // Get homepage settings to determine header height
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
   const headerOffset = showAnnouncement ? 92 : 64; // 28px announcement + 64px header OR just 64px header
+  
+  // Helper to get section by type
+  const getSection = (type: string) => {
+    return homepageSections?.find((s) => s.sectionType === type && s.isActive);
+  };
 
   const handleRequestModelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +145,30 @@ export default function Index() {
 
         {/* Top Picks */}
         <TopPicks />
+
+        {/* Most Trendy */}
+        {getSection("most_trendy") && (
+          <MostTrendy
+            sectionId={getSection("most_trendy")!._id}
+            config={getSection("most_trendy")!.config as never}
+          />
+        )}
+
+        {/* Explore by Brand */}
+        {getSection("explore_by_brand") && (
+          <ExploreByBrand
+            sectionId={getSection("explore_by_brand")!._id}
+            config={getSection("explore_by_brand")!.config as never}
+          />
+        )}
+
+        {/* Explore by Gadget */}
+        {getSection("explore_by_gadget") && (
+          <ExploreByGadget
+            sectionId={getSection("explore_by_gadget")!._id}
+            config={getSection("explore_by_gadget")!.config as never}
+          />
+        )}
 
         {/* Feature Banner - Lazy loaded */}
         <Suspense fallback={<SectionSkeleton />}>
