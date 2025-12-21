@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -8,11 +8,24 @@ import { HeroSlider } from "@/components/hero-slider.tsx";
 import { ExploreModels } from "@/components/explore-models.tsx";
 import { CategoryExplorer } from "@/components/category-explorer.tsx";
 import { TopPicks } from "@/components/top-picks.tsx";
-import { WhySkinly } from "@/components/why-skinly.tsx";
-import { FeatureBanner } from "@/components/feature-banner.tsx";
-import { UgcVideos } from "@/components/ugc-videos.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { BugReportModal } from "@/components/bug-report-modal.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+
+// Lazy load below-the-fold components for better initial load
+const WhySkinly = lazy(() => import("@/components/why-skinly.tsx").then(m => ({ default: m.WhySkinly })));
+const FeatureBanner = lazy(() => import("@/components/feature-banner.tsx").then(m => ({ default: m.FeatureBanner })));
+const UgcVideos = lazy(() => import("@/components/ugc-videos.tsx").then(m => ({ default: m.UgcVideos })));
+
+// Loading fallback for lazy components
+function SectionSkeleton() {
+  return (
+    <div className="container mx-auto px-4 py-12 space-y-4">
+      <Skeleton className="h-10 w-64 mx-auto" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  );
+}
 import {
   Dialog,
   DialogContent,
@@ -45,6 +58,10 @@ export default function Index() {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
   const headerOffset = showAnnouncement ? 92 : 64; // 28px announcement + 64px header OR just 64px header
+
+  // Get first hero slide for preloading LCP image
+  const heroSlides = useQuery(api.homepage.getActiveHeroSlides);
+  const firstHeroImage = heroSlides?.[0]?.imageUrl;
 
   const handleRequestModelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +109,14 @@ export default function Index() {
       <Helmet>
         <title>Skinly - Premium Device Skins & Accessories</title>
         <meta name="description" content="Shop premium skins and accessories for your devices. High-quality materials, precise fit, and stunning designs." />
+        
+        {/* Preload LCP image (first hero slide) for faster rendering */}
+        {firstHeroImage && (
+          <>
+            <link rel="preload" as="image" href={`${firstHeroImage}?format=webp&w=800`} type="image/webp" fetchPriority="high" />
+            <link rel="preload" as="image" href={`${firstHeroImage}?w=800`} fetchPriority="high" />
+          </>
+        )}
       </Helmet>
 
       {/* Announcement Bar */}
@@ -122,14 +147,20 @@ export default function Index() {
         {/* Top Picks */}
         <TopPicks />
 
-        {/* Feature Banner */}
-        <FeatureBanner />
+        {/* Feature Banner - Lazy loaded */}
+        <Suspense fallback={<SectionSkeleton />}>
+          <FeatureBanner />
+        </Suspense>
 
-        {/* Why Skinly */}
-        <WhySkinly />
+        {/* Why Skinly - Lazy loaded */}
+        <Suspense fallback={<SectionSkeleton />}>
+          <WhySkinly />
+        </Suspense>
 
-        {/* UGC Videos */}
-        <UgcVideos />
+        {/* UGC Videos - Lazy loaded */}
+        <Suspense fallback={<SectionSkeleton />}>
+          <UgcVideos />
+        </Suspense>
       </main>
 
       {/* Footer */}

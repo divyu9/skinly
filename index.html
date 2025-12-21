@@ -36,43 +36,87 @@
     <link rel="preconnect" href="https://cdn.hercules.app" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://www.googletagmanager.com" />
-    <link rel="preconnect" href="https://connect.facebook.net" />
-    <link rel="preconnect" href="https://mercury.phonepe.com" />
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
+    <link rel="dns-prefetch" href="https://mercury.phonepe.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
+    
+    <!-- Preload critical fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" /></noscript>
 
     <!-- PhonePe Checkout Script - Deferred for performance -->
     <script src="https://mercury.phonepe.com/web/bundle/checkout.js" defer></script>
 
-    <!-- Google Analytics - Deferred to improve page load -->
+    <!-- Google Analytics - Aggressively deferred (5s or user interaction) -->
     <script>
-      window.addEventListener('load', function() {
-        var script = document.createElement('script');
-        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-16S5XDYGYR';
-        script.async = true;
-        document.head.appendChild(script);
+      (function() {
+        var loaded = false;
+        var loadAnalytics = function() {
+          if (loaded) return;
+          loaded = true;
+          
+          var script = document.createElement('script');
+          script.src = 'https://www.googletagmanager.com/gtag/js?id=G-16S5XDYGYR';
+          script.async = true;
+          document.head.appendChild(script);
+          
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-16S5XDYGYR');
+        };
         
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-16S5XDYGYR');
-      });
+        // Load after 5 seconds
+        setTimeout(loadAnalytics, 5000);
+        
+        // OR load on first user interaction
+        var events = ['scroll', 'click', 'touchstart', 'mousemove', 'keydown'];
+        events.forEach(function(event) {
+          window.addEventListener(event, function() {
+            loadAnalytics();
+            events.forEach(function(e) {
+              window.removeEventListener(e, loadAnalytics);
+            });
+          }, { once: true, passive: true });
+        });
+      })();
     </script>
 
-    <!-- Meta Pixel - Deferred to improve page load -->
+    <!-- Meta Pixel - Aggressively deferred (5s or user interaction) -->
     <script>
-      window.addEventListener('load', function() {
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        fbq('init', '%VITE_META_PIXEL_ID%');
-        fbq('track', 'PageView');
-      });
+      (function() {
+        var loaded = false;
+        var loadPixel = function() {
+          if (loaded) return;
+          loaded = true;
+          
+          !function(f,b,e,v,n,t,s)
+          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+          n.queue=[];t=b.createElement(e);t.async=!0;
+          t.src=v;s=b.getElementsByTagName(e)[0];
+          s.parentNode.insertBefore(t,s)}(window, document,'script',
+          'https://connect.facebook.net/en_US/fbevents.js');
+          fbq('init', '%VITE_META_PIXEL_ID%');
+          fbq('track', 'PageView');
+        };
+        
+        // Load after 5 seconds
+        setTimeout(loadPixel, 5000);
+        
+        // OR load on first user interaction
+        var events = ['scroll', 'click', 'touchstart', 'mousemove', 'keydown'];
+        events.forEach(function(event) {
+          window.addEventListener(event, function() {
+            loadPixel();
+            events.forEach(function(e) {
+              window.removeEventListener(e, loadPixel);
+            });
+          }, { once: true, passive: true });
+        });
+      })();
     </script>
     <noscript>
       <img height="1" width="1" style="display:none"
@@ -170,7 +214,32 @@
         } catch (e) {}
       })();
     </script>
-    <link href="/src/index.css" rel="stylesheet" />
+    
+    <!-- Critical CSS - Inlined for above-the-fold content -->
+    <style>
+      /* Critical layout and base styles */
+      *,::before,::after{box-sizing:border-box;border:0 solid}html{-webkit-text-size-adjust:100%;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif}body{margin:0;line-height:inherit}
+      
+      /* Color variables for critical rendering */
+      :root{--radius:0.75rem;--background:oklch(1 0 0);--foreground:oklch(0.09 0 0);--card:oklch(1 0 0);--card-foreground:oklch(0.09 0 0);--primary:oklch(0.09 0 0);--primary-foreground:oklch(0.98 0 0);--muted:oklch(0.96 0 0);--border:oklch(0.90 0 0)}
+      .dark{--background:oklch(0.09 0 0);--foreground:oklch(0.98 0 0);--card:oklch(0.14 0 0);--card-foreground:oklch(0.98 0 0);--primary:oklch(0.98 0 0);--primary-foreground:oklch(0.09 0 0);--muted:oklch(0.20 0 0);--border:oklch(0.27 0 0)}
+      
+      body{background:var(--background);color:var(--foreground);font-family:Geist,ui-sans-serif,system-ui,sans-serif}
+      
+      /* Critical header styles */
+      .fixed{position:fixed}.top-0{top:0}.left-0{left:0}.right-0{right:0}.z-50{z-index:50}
+      .flex{display:flex}.items-center{align-items:center}.justify-between{justify-content:space-between}
+      .h-16{height:4rem}.px-4{padding-left:1rem;padding-right:1rem}
+      .bg-background{background-color:var(--background)}.border-b{border-bottom-width:1px}
+      .border-border{border-color:var(--border)}
+      
+      /* Hide content during load to prevent FOUC */
+      #root{min-height:100vh}
+    </style>
+    
+    <!-- Load full CSS asynchronously -->
+    <link rel="preload" href="/src/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link href="/src/index.css" rel="stylesheet" /></noscript>
   </head>
   <body>
     <div id="root"></div>
