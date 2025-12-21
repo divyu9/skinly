@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { Card, CardContent } from "@/components/ui/card.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -14,9 +14,29 @@ import {
   PlusIcon, 
   EditIcon, 
   TrashIcon, 
-  SmartphoneIcon
+  SmartphoneIcon,
+  SparklesIcon,
+  GripVerticalIcon,
+  SaveIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface CardFormData {
   title: string;
@@ -27,6 +47,52 @@ interface CardFormData {
   order: number;
 }
 
+interface SectionConfig {
+  title: string;
+  subtitle: string;
+  cardWidth: number;
+  cardHeight: number;
+}
+
+function SortableCard({ card, onEdit, onDelete }: { 
+  card: { _id: Id<"homepageSectionCards">; title: string; imageUrl: string; linkUrl: string; isActive: boolean; order: number };
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: card._id });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className={cn("flex items-center gap-3 p-3 bg-background border rounded-lg", !card.isActive && "opacity-60")}>
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
+        <GripVerticalIcon className="h-5 w-5 text-muted-foreground" />
+      </div>
+      
+      <div className="h-12 w-12 rounded overflow-hidden flex-shrink-0">
+        <img src={card.imageUrl} alt={card.title} className="h-full w-full object-cover" />
+      </div>
+      
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate">{card.title}</p>
+        <p className="text-xs text-muted-foreground truncate">{card.linkUrl}</p>
+      </div>
+      
+      <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={onEdit}>
+          <EditIcon className="h-3 w-3" />
+        </Button>
+        <Button size="sm" variant="outline" onClick={onDelete}>
+          <TrashIcon className="h-3 w-3" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function ExploreByGadgetTab() {
   const sections = useQuery(api.homepage.getAllHomepageSections);
   const section = sections?.find((s) => s.sectionType === "explore_by_gadget");
@@ -34,9 +100,13 @@ export function ExploreByGadgetTab() {
     api.homepageSectionCards.getAllSectionCards,
     section ? { sectionId: section._id } : "skip"
   );
+  
   const createCard = useMutation(api.homepageSectionCards.createSectionCard);
   const updateCard = useMutation(api.homepageSectionCards.updateSectionCard);
   const deleteCard = useMutation(api.homepageSectionCards.deleteSectionCard);
+  const autoGenerateCards = useMutation(api.homepageSectionCards.autoGenerateGadgetCards);
+  const bulkReorder = useMutation(api.homepageSectionCards.bulkReorderSectionCards);
+  const updateSection = useMutation(api.homepage.updateHomepageSection);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCard, setEditingCard] = useState<Id<"homepageSectionCards"> | null>(null);
@@ -49,10 +119,105 @@ export function ExploreByGadgetTab() {
     order: 0,
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [localCards, setLocalCards] = useState<typeof cards>([]);
+  
+  // Section config state
+  const sectionConfig = section?.config as SectionConfig | undefined;
+  const [configTitle, setConfigTitle] = useState(sectionConfig?.title || "Explore by Gadget");
+  const [configSubtitle, setConfigSubtitle] = useState(sectionConfig?.subtitle || "");
+  const [cardWidth, setCardWidth] = useState(sectionConfig?.cardWidth || 280);
+  const [cardHeight, setCardHeight] = useState(sectionConfig?.cardHeight || 320);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
+
+  // Sync local cards with fetched cards
+  useState(() => {
+    if (cards) {
+      setLocalCards(cards);
+    }
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !localCards || localCards.length === 0) return;
+
+    const oldIndex = localCards.findIndex((c) => c._id === active.id);
+    const newIndex = localCards.findIndex((c) => c._id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const reordered = arrayMove(localCards, oldIndex, newIndex);
+      setLocalCards(reordered);
+    }
+  };
+
+  const handleSaveOrder = async () => {
+    if (!localCards || localCards.length === 0) return;
+
+    try {
+      const cardOrders = localCards.map((card, index) => ({
+        cardId: card._id,
+        order: index + 1,
+      }));
+      
+      await bulkReorder({ cardOrders });
+      toast.success("Card order saved successfully");
+    } catch (error) {
+      toast.error("Failed to save card order");
+      console.error(error);
+    }
+  };
+
+  const handleAutoGenerate = async () => {
+    if (!section || !confirm("This will replace all existing gadget cards with auto-generated ones from your Product Classification (Gadget Types). Continue?")) {
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await autoGenerateCards({ sectionId: section._id });
+      toast.success(`Generated ${result.count} gadget cards! Update images to customize.`);
+    } catch (error) {
+      toast.error("Failed to auto-generate cards");
+      console.error(error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    if (!section) return;
+
+    setIsSavingConfig(true);
+    try {
+      await updateSection({
+        sectionId: section._id,
+        config: JSON.stringify({
+          title: configTitle,
+          subtitle: configSubtitle || undefined,
+          autoGenerate: false,
+          cardWidth,
+          cardHeight,
+        }),
+      });
+      toast.success("Section settings saved");
+    } catch (error) {
+      toast.error("Failed to save settings");
+      console.error(error);
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
 
   const handleOpenDialog = (cardId?: Id<"homepageSectionCards">) => {
     if (cardId && cards) {
-      const card = cards.find((c: typeof cards[0]) => c._id === cardId);
+      const card = cards.find((c) => c._id === cardId);
       if (card) {
         setEditingCard(cardId);
         setFormData({
@@ -72,7 +237,7 @@ export function ExploreByGadgetTab() {
         linkUrl: "",
         subtitle: "",
         isActive: true,
-        order: cards ? cards.length : 0,
+        order: cards ? cards.length + 1 : 1,
       });
     }
     setIsDialogOpen(true);
@@ -153,7 +318,7 @@ export function ExploreByGadgetTab() {
         <CardContent className="flex flex-col items-center justify-center py-12">
           <SmartphoneIcon className="w-12 h-12 text-muted-foreground mb-4" />
           <p className="text-muted-foreground text-center">
-            Explore by Gadget section not found in database.
+            Explore by Gadget section not found. Please run seedHomepage mutation.
           </p>
         </CardContent>
       </Card>
@@ -162,89 +327,128 @@ export function ExploreByGadgetTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold">Explore by Gadget Cards</h3>
-          <p className="text-sm text-muted-foreground">
-            Display products organized by gadget type
-          </p>
-        </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <PlusIcon className="w-4 h-4 mr-2" />
-          Add Card
-        </Button>
-      </div>
+      {/* Section Config */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Section Settings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="section-title">Section Title</Label>
+              <Input
+                id="section-title"
+                value={configTitle}
+                onChange={(e) => setConfigTitle(e.target.value)}
+                placeholder="Explore by Gadget"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="section-subtitle">Subtitle (Optional)</Label>
+              <Input
+                id="section-subtitle"
+                value={configSubtitle}
+                onChange={(e) => setConfigSubtitle(e.target.value)}
+                placeholder="Find skins for all your devices"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="card-width">Card Width (px)</Label>
+              <Input
+                id="card-width"
+                type="number"
+                value={cardWidth}
+                onChange={(e) => setCardWidth(parseInt(e.target.value) || 280)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="card-height">Card Height (px)</Label>
+              <Input
+                id="card-height"
+                type="number"
+                value={cardHeight}
+                onChange={(e) => setCardHeight(parseInt(e.target.value) || 320)}
+              />
+            </div>
+          </div>
+          <Button onClick={handleSaveConfig} disabled={isSavingConfig}>
+            <SaveIcon className="w-4 h-4 mr-2" />
+            {isSavingConfig ? "Saving..." : "Save Settings"}
+          </Button>
+        </CardContent>
+      </Card>
 
-      {cards.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <SmartphoneIcon className="w-12 h-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground text-center">
-              No cards yet. Click "Add Card" to create one.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card: typeof cards[0]) => (
-            <Card key={card._id} className={cn(!card.isActive && "opacity-60")}>
-              <CardContent className="p-0">
-                <div
-                  className="relative h-56 bg-cover bg-center rounded-t-lg"
-                  style={{
-                    backgroundImage: card.imageUrl
-                      ? `url(${card.imageUrl})`
-                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  }}
-                >
-                  <div className="absolute inset-0 bg-black/30 rounded-t-lg" />
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <div className="bg-white text-black px-3 py-1.5 rounded text-sm font-semibold text-center">
-                      {card.title}
-                    </div>
+      {/* Gadget Cards Management */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Gadget Cards</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manage gadget type cards displayed on homepage
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleAutoGenerate} disabled={isGenerating} variant="outline">
+                <SparklesIcon className="w-4 h-4 mr-2" />
+                {isGenerating ? "Generating..." : "Auto-Generate"}
+              </Button>
+              <Button onClick={() => handleOpenDialog()}>
+                <PlusIcon className="w-4 h-4 mr-2" />
+                Add Card
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!localCards || localCards.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <SmartphoneIcon className="w-12 h-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground text-center mb-4">
+                No gadget cards yet
+              </p>
+              <p className="text-sm text-muted-foreground text-center mb-4">
+                Click "Auto-Generate" to create cards from your Product Classification,<br />
+                or click "Add Card" to create one manually
+              </p>
+            </div>
+          ) : (
+            <>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={localCards.map((c) => c._id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {localCards.map((card) => (
+                      <SortableCard
+                        key={card._id}
+                        card={card}
+                        onEdit={() => handleOpenDialog(card._id)}
+                        onDelete={() => handleDelete(card._id)}
+                      />
+                    ))}
                   </div>
-                </div>
+                </SortableContext>
+              </DndContext>
+              <Button onClick={handleSaveOrder} variant="outline" className="w-full">
+                <SaveIcon className="w-4 h-4 mr-2" />
+                Save Order
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-                <div className="p-4 space-y-2">
-                  <div className="text-xs text-muted-foreground">
-                    Order: {card.order}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenDialog(card._id)}
-                      className="flex-1"
-                    >
-                      <EditIcon className="w-3 h-3 mr-2" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDelete(card._id)}
-                    >
-                      <TrashIcon className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-
+      {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingCard ? "Edit Card" : "Add Card"}
+              {editingCard ? "Edit Gadget Card" : "Add Gadget Card"}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="card-title">Title *</Label>
+              <Label htmlFor="card-title">Gadget Type *</Label>
               <Input
                 id="card-title"
                 value={formData.title}
@@ -254,7 +458,7 @@ export function ExploreByGadgetTab() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="card-subtitle">Subtitle</Label>
+              <Label htmlFor="card-subtitle">Subtitle (Optional)</Label>
               <Input
                 id="card-subtitle"
                 value={formData.subtitle}
@@ -271,6 +475,11 @@ export function ExploreByGadgetTab() {
                 onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                 placeholder="https://cdn.hercules.app/file_..."
               />
+              {formData.imageUrl && (
+                <div className="mt-2">
+                  <img src={formData.imageUrl} alt="Preview" className="h-32 w-32 object-cover rounded border" />
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

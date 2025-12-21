@@ -160,6 +160,62 @@ export const deleteSectionCard = mutation({
 });
 
 /**
+ * Auto-generate brand cards from supportedModels table
+ */
+export const autoGenerateBrandCards = mutation({
+  args: { sectionId: v.id("homepageSections") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Get all unique brands from supportedModels
+    const models = await ctx.db.query("supportedModels").collect();
+    const brandSet = new Set<string>();
+    models.forEach((model) => {
+      if (model.brandName) {
+        brandSet.add(model.brandName);
+      }
+    });
+    const brands = Array.from(brandSet).sort();
+
+    // Delete existing brand cards for this section
+    const existingCards = await ctx.db
+      .query("homepageSectionCards")
+      .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
+      .filter((q) => q.eq(q.field("cardType"), "brand"))
+      .collect();
+    
+    for (const card of existingCards) {
+      await ctx.db.delete(card._id);
+    }
+
+    // Create new brand cards with placeholder images
+    const now = Date.now();
+    const results: Id<"homepageSectionCards">[] = [];
+    
+    for (let i = 0; i < brands.length; i++) {
+      const brandName = brands[i];
+      const cardId = await ctx.db.insert("homepageSectionCards", {
+        sectionId: args.sectionId,
+        cardType: "brand",
+        imageUrl: `https://via.placeholder.com/200x200?text=${encodeURIComponent(brandName)}`,
+        title: brandName,
+        linkUrl: `/products?brand=${encodeURIComponent(brandName.toLowerCase())}`,
+        isActive: true,
+        order: i + 1,
+        createdBy: identity.email,
+        createdAt: now,
+      });
+      results.push(cardId);
+    }
+    
+    return { success: true, count: results.length, brands };
+  },
+});
+
+/**
  * Bulk generate brand cards for a section
  */
 export const bulkGenerateBrandCards = mutation({
@@ -209,6 +265,62 @@ export const bulkGenerateBrandCards = mutation({
     }
     
     return { success: true, count: results.length };
+  },
+});
+
+/**
+ * Auto-generate gadget cards from gadgetTypes table
+ */
+export const autoGenerateGadgetCards = mutation({
+  args: { sectionId: v.id("homepageSections") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Get all active gadget types
+    const gadgetTypes = await ctx.db
+      .query("gadgetTypes")
+      .withIndex("by_is_active", (q) => q.eq("isActive", true))
+      .collect();
+
+    // Delete existing gadget cards for this section
+    const existingCards = await ctx.db
+      .query("homepageSectionCards")
+      .withIndex("by_section", (q) => q.eq("sectionId", args.sectionId))
+      .filter((q) => q.eq(q.field("cardType"), "gadget"))
+      .collect();
+    
+    for (const card of existingCards) {
+      await ctx.db.delete(card._id);
+    }
+
+    // Create new gadget cards with placeholder images
+    const now = Date.now();
+    const results: Id<"homepageSectionCards">[] = [];
+    
+    for (let i = 0; i < gadgetTypes.length; i++) {
+      const gadgetType = gadgetTypes[i];
+      const cardId = await ctx.db.insert("homepageSectionCards", {
+        sectionId: args.sectionId,
+        cardType: "gadget",
+        imageUrl: `https://via.placeholder.com/280x320?text=${encodeURIComponent(gadgetType.displayName)}`,
+        title: gadgetType.displayName,
+        linkUrl: `/products?gadgetType=${encodeURIComponent(gadgetType.name)}`,
+        isActive: true,
+        order: i + 1,
+        createdBy: identity.email,
+        createdAt: now,
+      });
+      results.push(cardId);
+    }
+    
+    return { 
+      success: true, 
+      count: results.length, 
+      gadgets: gadgetTypes.map((gt) => gt.displayName) 
+    };
   },
 });
 
