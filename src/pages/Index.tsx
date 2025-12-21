@@ -16,9 +16,9 @@ import { BugReportModal } from "@/components/bug-report-modal.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 
 // Lazy load below-the-fold components for better initial load
-const WhySkinly = lazy(() => import("@/components/why-skinly.tsx").then(m => ({ default: m.WhySkinly })));
-const FeatureBanner = lazy(() => import("@/components/feature-banner.tsx").then(m => ({ default: m.FeatureBanner })));
-const UgcVideos = lazy(() => import("@/components/ugc-videos.tsx").then(m => ({ default: m.UgcVideos })));
+const WhySkinly = lazy(() => import("@/components/why-skinly").then(m => ({ default: m.WhySkinly })));
+const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m => ({ default: m.FeatureBanner })));
+const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
 
 // Loading fallback for lazy components
 function SectionSkeleton() {
