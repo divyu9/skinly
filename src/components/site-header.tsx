@@ -21,6 +21,8 @@ export function SiteHeader({ onGadgetSelectorClick, onPhoneSelectorClick, onRequ
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
+              width="348"
+              height="140"
               className="h-12 md:h-16"
             />
           </Link>

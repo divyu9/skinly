@@ -254,6 +254,8 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
+                              width="40"
+                              height="40"
                               className="size-10 object-cover rounded"
                             />
                           )}
@@ -285,6 +287,8 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
+                              width="40"
+                              height="40"
                               className="size-10 object-cover rounded"
                             />
                           )}

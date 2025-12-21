@@ -176,6 +176,8 @@ export function AdminSidebar() {
             <img
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
               alt="Skinly"
+              width="200"
+              height="80"
               className="h-8"
             />
           </Link>

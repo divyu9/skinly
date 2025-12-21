@@ -237,6 +237,8 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 <img 
                   src={logoUrl}
                   alt="Skinly" 
+                  width="174"
+                  height="70"
                   className="h-10 w-auto object-contain"
                 />
               </Link>
@@ -368,6 +370,8 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
+                              width="48"
+                              height="48"
                               className="size-12 object-cover rounded-lg flex-shrink-0"
                             />
                           )}
@@ -403,6 +407,8 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
+                              width="48"
+                              height="48"
                               className="size-12 object-cover rounded-lg flex-shrink-0"
                             />
                           )}

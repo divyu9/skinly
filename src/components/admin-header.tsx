@@ -35,6 +35,8 @@ export function AdminHeader() {
             <img
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
               alt="Skinly"
+              width="300"
+              height="120"
               className="h-12"
             />
           </Link>
