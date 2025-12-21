@@ -120,6 +120,13 @@ export default function ProductsPage() {
   // Get OOS sorting setting
   const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
   
+  // Get homepage settings for announcement bar height
+  const homepageSettings = useQuery(api.homepage.getHomepageSettings);
+  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
+  const announcementHeight = showAnnouncement ? 28 : 0;
+  const headerHeight = 64; // Mobile header height
+  const categoryHeaderTop = announcementHeight + headerHeight;
+  
   // Mobile nav state
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   
@@ -805,7 +812,10 @@ export default function ProductsPage() {
       />
 
       {/* Product Category Header - Sticky */}
-      <div className="fixed top-[100px] left-0 right-0 z-30 bg-white dark:bg-gray-950">
+      <div 
+        className="fixed left-0 right-0 z-30 bg-white dark:bg-gray-950"
+        style={{ top: `${categoryHeaderTop}px` }}
+      >
         <ProductCategoryHeader
           productCategory={productCategory}
           gadgetFilter={gadgetFilter}
@@ -816,7 +826,10 @@ export default function ProductsPage() {
       </div>
 
       {/* Products Section */}
-      <section className="pt-44 pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950">
+      <section 
+        className="pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950"
+        style={{ paddingTop: `${categoryHeaderTop + 120}px` }}
+      >
         <div className="container mx-auto max-w-7xl">
           <div className="text-center mb-2 sm:mb-4 space-y-1 sm:space-y-2">
             <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
