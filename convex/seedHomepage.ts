@@ -98,24 +98,24 @@ export const seedHomepage = mutation({
           config: undefined,
         },
         {
-          sectionType: "category_explorer" as const,
-          sectionName: "Category Explorer",
-          isActive: true,
-          order: 2,
-          config: {
-            title: "Shop by Category",
-            subtitle: undefined,
-          },
-        },
-        {
           sectionType: "explore_models" as const,
           sectionName: "Explore by Models",
           isActive: true,
-          order: 3,
+          order: 2,
           config: {
             title: "Select Your Device",
             placeholderText: "Search for your device",
             showRequestButton: true,
+          },
+        },
+        {
+          sectionType: "category_explorer" as const,
+          sectionName: "Category Explorer",
+          isActive: true,
+          order: 3,
+          config: {
+            title: "Shop by Category",
+            subtitle: undefined,
           },
         },
         {
@@ -175,23 +175,10 @@ export const seedHomepage = mutation({
           },
         },
         {
-          sectionType: "feature_banner" as const,
-          sectionName: "Feature Banner",
-          isActive: false,
-          order: 8,
-          config: {
-            backgroundImageUrl: "https://images.unsplash.com/photo-example",
-            heading: "Special Offer",
-            subheading: "Limited time only",
-            ctaText: "Shop Now",
-            ctaLink: "/products",
-          },
-        },
-        {
           sectionType: "why_skinly" as const,
           sectionName: "Why Skinly",
           isActive: true,
-          order: 9,
+          order: 8,
           config: {
             title: "Why Choose Skinly",
             items: [
@@ -201,6 +188,19 @@ export const seedHomepage = mutation({
                 description: "3M vinyl material for durability",
               },
             ],
+          },
+        },
+        {
+          sectionType: "feature_banner" as const,
+          sectionName: "Feature Banner",
+          isActive: false,
+          order: 9,
+          config: {
+            backgroundImageUrl: "https://images.unsplash.com/photo-example",
+            heading: "Special Offer",
+            subheading: "Limited time only",
+            ctaText: "Shop Now",
+            ctaLink: "/products",
           },
         },
         {

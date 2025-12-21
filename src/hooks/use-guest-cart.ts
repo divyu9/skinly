@@ -19,20 +19,46 @@ export function useGuestCart() {
 
   // Load guest cart from localStorage on mount
   useEffect(() => {
-    const stored = localStorage.getItem(GUEST_CART_KEY);
-    if (stored) {
-      try {
-        setGuestCart(JSON.parse(stored));
-      } catch (err) {
-        console.error("Failed to parse guest cart:", err);
-        localStorage.removeItem(GUEST_CART_KEY);
+    const loadCart = () => {
+      const stored = localStorage.getItem(GUEST_CART_KEY);
+      if (stored) {
+        try {
+          setGuestCart(JSON.parse(stored));
+        } catch (err) {
+          console.error("Failed to parse guest cart:", err);
+          localStorage.removeItem(GUEST_CART_KEY);
+        }
       }
-    }
+    };
+    
+    loadCart();
+
+    // Listen for storage events to sync cart across components
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === GUEST_CART_KEY) {
+        loadCart();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    
+    // Also listen for custom event for same-page updates
+    const handleCustomEvent = () => {
+      loadCart();
+    };
+    window.addEventListener("guestCartUpdated", handleCustomEvent);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("guestCartUpdated", handleCustomEvent);
+    };
   }, []);
 
   // Save to localStorage whenever cart changes
   useEffect(() => {
     localStorage.setItem(GUEST_CART_KEY, JSON.stringify(guestCart));
+    // Dispatch custom event for same-page updates
+    window.dispatchEvent(new Event("guestCartUpdated"));
   }, [guestCart]);
 
   const addToGuestCart = (item: Omit<GuestCartItem, "quantity"> & { quantity?: number }) => {

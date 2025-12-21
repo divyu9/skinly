@@ -88,7 +88,7 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
               key={category._id}
               to={getCategoryLink(category.categoryName, category.linkUrl)}
               onClick={(e) => handleCategoryClick(category.categoryName, e, category.linkUrl)}
-              className="group relative flex-shrink-0 w-[70vw] h-[calc(87.5vw+30px)] rounded-2xl overflow-hidden shadow-lg snap-start"
+              className="group relative flex-shrink-0 w-[70vw] md:w-[45vw] lg:w-[30vw] xl:w-[23vw] max-w-md h-[calc(87.5vw+30px)] md:h-[calc(56.25vw+30px)] lg:h-[calc(37.5vw+30px)] xl:h-96 rounded-2xl overflow-hidden shadow-lg snap-start"
             >
               {/* Background Image - Simplified */}
               <img
