@@ -109,6 +109,7 @@ export function TopPicks({
                             <img
                               src={product.images[0].url}
                               alt={product.title}
+                              loading="lazy"
                               className={cn(
                                 "w-full h-full object-cover transition-transform group-hover:scale-110",
                                 isOutOfStock && "opacity-30"

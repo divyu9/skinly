@@ -15,7 +15,10 @@ export function SiteFooter() {
             <img 
               src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
               alt="Skinly" 
+              width="279"
+              height="112"
               className="h-16 mb-4"
+              loading="lazy"
             />
             <p className="text-muted-foreground text-center">
               Quirky wear for your gadgets

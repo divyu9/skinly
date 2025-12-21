@@ -94,6 +94,7 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
               <img
                 src={getCategoryImage(category.categoryName, category.imageUrl)}
                 alt={category.displayName}
+                loading="lazy"
                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
               />
               

@@ -75,6 +75,7 @@ export function HeroSlider() {
               <img
                 src={slide.imageUrl}
                 alt={slide.heading || "Hero slide"}
+                loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
                 className="w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
               />
 

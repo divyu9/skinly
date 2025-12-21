@@ -33,33 +33,46 @@
     <meta name="twitter:site" content="@goskinly" />
 
     <!-- Resource Hints for Performance -->
-    <link rel="preconnect" href="https://images.unsplash.com" />
+    <link rel="preconnect" href="https://cdn.hercules.app" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://connect.facebook.net" />
+    <link rel="preconnect" href="https://mercury.phonepe.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
 
-    <!-- PhonePe Checkout Script -->
-    <script src="https://mercury.phonepe.com/web/bundle/checkout.js"></script>
+    <!-- PhonePe Checkout Script - Deferred for performance -->
+    <script src="https://mercury.phonepe.com/web/bundle/checkout.js" defer></script>
 
-    <!-- Google Analytics -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-16S5XDYGYR"></script>
+    <!-- Google Analytics - Deferred to improve page load -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-16S5XDYGYR');
+      window.addEventListener('load', function() {
+        var script = document.createElement('script');
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-16S5XDYGYR';
+        script.async = true;
+        document.head.appendChild(script);
+        
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-16S5XDYGYR');
+      });
     </script>
 
-    <!-- Meta Pixel -->
+    <!-- Meta Pixel - Deferred to improve page load -->
     <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('init', '%VITE_META_PIXEL_ID%');
-      fbq('track', 'PageView');
+      window.addEventListener('load', function() {
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '%VITE_META_PIXEL_ID%');
+        fbq('track', 'PageView');
+      });
     </script>
     <noscript>
       <img height="1" width="1" style="display:none"
