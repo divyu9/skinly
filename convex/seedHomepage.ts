@@ -99,7 +99,10 @@ export const seedHomepage = mutation({
           sectionName: "Category Explorer",
           isActive: true,
           order: 2,
-          config: { title: "Shop by Category" },
+          config: {
+            title: "Shop by Category",
+            subtitle: undefined,
+          },
         },
         {
           sectionType: "most_trendy" as const,
@@ -108,7 +111,11 @@ export const seedHomepage = mutation({
           order: 3,
           config: {
             title: "Most Trendy",
+            subtitle: undefined,
             tags: ["trending", "new", "popular"],
+            maxProducts: 10,
+            cardWidth: 280,
+            cardHeight: 380,
           },
         },
         {
@@ -116,14 +123,26 @@ export const seedHomepage = mutation({
           sectionName: "Explore by Brand",
           isActive: true,
           order: 4,
-          config: { title: "Explore by Brand" },
+          config: {
+            title: "Explore by Brand",
+            subtitle: undefined,
+            autoGenerate: false,
+            cardWidth: 200,
+            cardHeight: 200,
+          },
         },
         {
           sectionType: "explore_by_gadget" as const,
           sectionName: "Explore by Gadget",
           isActive: true,
           order: 5,
-          config: { title: "Explore by Gadget" },
+          config: {
+            title: "Explore by Gadget",
+            subtitle: undefined,
+            autoGenerate: false,
+            cardWidth: 280,
+            cardHeight: 320,
+          },
         },
         {
           sectionType: "top_picks" as const,
