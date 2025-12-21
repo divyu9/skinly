@@ -114,7 +114,8 @@ export function SiteFooter() {
                   </a>
                   <div className="text-xs leading-relaxed pt-1">
                     <p className="font-medium text-foreground">Mad House Media</p>
-                    <p>Sector 117, Noida</p>
+                    <p>GT-06, 2nd Floor</p>
+                    <p>Sector 117, Noida 201301</p>
                   </div>
                 </div>
               </div>
