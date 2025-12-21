@@ -71,13 +71,26 @@ export function HeroSlider() {
                 willChange: 'transform',
               }}
             >
-              {/* Background Image */}
-              <img
-                src={slide.imageUrl}
-                alt={slide.heading || "Hero slide"}
-                loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
-                className="w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
-              />
+              {/* Background Image - Optimized for performance */}
+              <picture>
+                {/* WebP format for modern browsers */}
+                <source 
+                  type="image/webp"
+                  srcSet={`${slide.imageUrl}?format=webp&w=400 400w, ${slide.imageUrl}?format=webp&w=800 800w, ${slide.imageUrl}?format=webp&w=1200 1200w`}
+                  sizes="90vw"
+                />
+                {/* Fallback for browsers that don't support WebP */}
+                <img
+                  src={slide.imageUrl}
+                  srcSet={`${slide.imageUrl}?w=400 400w, ${slide.imageUrl}?w=800 800w, ${slide.imageUrl}?w=1200 1200w`}
+                  sizes="90vw"
+                  alt={slide.heading || "Hero slide"}
+                  loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
+                  fetchPriority={slide._id === heroSlides[0]._id ? "high" : "auto"}
+                  decoding={slide._id === heroSlides[0]._id ? "sync" : "async"}
+                  className="w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
+                />
+              </picture>
 
               {/* Overlay gradient for text readability - only if text exists */}
               {(slide.heading || slide.subheading || slide.ctaText) && (
