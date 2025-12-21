@@ -106,25 +106,18 @@ export function TopPicks({
                         {/* Image */}
                         <div className="relative aspect-square overflow-hidden bg-muted">
                           {product.images[0] && (
-                            <picture>
-                              <source 
-                                type="image/webp"
-                                srcSet={`${product.images[0].url}?format=webp&w=280 280w, ${product.images[0].url}?format=webp&w=560 560w`}
-                                sizes="280px"
-                              />
-                              <img
-                                src={product.images[0].url}
-                                srcSet={`${product.images[0].url}?w=280 280w, ${product.images[0].url}?w=560 560w`}
-                                sizes="280px"
-                                alt={product.title}
-                                loading="lazy"
-                                decoding="async"
-                                className={cn(
-                                  "w-full h-full object-cover transition-transform group-hover:scale-110",
-                                  isOutOfStock && "opacity-30"
-                                )}
-                              />
-                            </picture>
+                            <img
+                              src={product.images[0].url}
+                              alt={product.title}
+                              loading="lazy"
+                              decoding="async"
+                              width="280"
+                              height="280"
+                              className={cn(
+                                "w-full h-full object-cover transition-transform group-hover:scale-110",
+                                isOutOfStock && "opacity-30"
+                              )}
+                            />
                           )}
                           
                           {/* Badges */}

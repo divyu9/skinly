@@ -59,10 +59,6 @@ export default function Index() {
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
   const headerOffset = showAnnouncement ? 92 : 64; // 28px announcement + 64px header OR just 64px header
 
-  // Get first hero slide for preloading LCP image
-  const heroSlides = useQuery(api.homepage.getActiveHeroSlides);
-  const firstHeroImage = heroSlides?.[0]?.imageUrl;
-
   const handleRequestModelSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -109,14 +105,6 @@ export default function Index() {
       <Helmet>
         <title>Skinly - Premium Device Skins & Accessories</title>
         <meta name="description" content="Shop premium skins and accessories for your devices. High-quality materials, precise fit, and stunning designs." />
-        
-        {/* Preload LCP image (first hero slide) for faster rendering */}
-        {firstHeroImage && (
-          <>
-            <link rel="preload" as="image" href={`${firstHeroImage}?format=webp&w=800`} type="image/webp" fetchPriority="high" />
-            <link rel="preload" as="image" href={`${firstHeroImage}?w=800`} fetchPriority="high" />
-          </>
-        )}
       </Helmet>
 
       {/* Announcement Bar */}

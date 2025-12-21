@@ -34,16 +34,12 @@
 
     <!-- Resource Hints for Performance -->
     <link rel="preconnect" href="https://cdn.hercules.app" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://connect.facebook.net" />
     <link rel="dns-prefetch" href="https://mercury.phonepe.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
-    
-    <!-- Preload critical fonts -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap" /></noscript>
 
     <!-- PhonePe Checkout Script - Deferred for performance -->
     <script src="https://mercury.phonepe.com/web/bundle/checkout.js" defer></script>
@@ -224,7 +220,7 @@
       :root{--radius:0.75rem;--background:oklch(1 0 0);--foreground:oklch(0.09 0 0);--card:oklch(1 0 0);--card-foreground:oklch(0.09 0 0);--primary:oklch(0.09 0 0);--primary-foreground:oklch(0.98 0 0);--muted:oklch(0.96 0 0);--border:oklch(0.90 0 0)}
       .dark{--background:oklch(0.09 0 0);--foreground:oklch(0.98 0 0);--card:oklch(0.14 0 0);--card-foreground:oklch(0.98 0 0);--primary:oklch(0.98 0 0);--primary-foreground:oklch(0.09 0 0);--muted:oklch(0.20 0 0);--border:oklch(0.27 0 0)}
       
-      body{background:var(--background);color:var(--foreground);font-family:Geist,ui-sans-serif,system-ui,sans-serif}
+      body{background:var(--background);color:var(--foreground);font-family:ui-sans-serif,system-ui,sans-serif}
       
       /* Critical header styles */
       .fixed{position:fixed}.top-0{top:0}.left-0{left:0}.right-0{right:0}.z-50{z-index:50}
@@ -233,11 +229,14 @@
       .bg-background{background-color:var(--background)}.border-b{border-bottom-width:1px}
       .border-border{border-color:var(--border)}
       
+      /* Critical image loading optimization */
+      img{content-visibility:auto;contain-intrinsic-size:1200px}
+      
       /* Hide content during load to prevent FOUC */
       #root{min-height:100vh}
     </style>
     
-    <!-- Load full CSS asynchronously -->
+    <!-- Load full CSS and fonts asynchronously -->
     <link rel="preload" href="/src/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
     <noscript><link href="/src/index.css" rel="stylesheet" /></noscript>
   </head>

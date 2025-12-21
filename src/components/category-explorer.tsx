@@ -90,23 +90,16 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
               onClick={(e) => handleCategoryClick(category.categoryName, e, category.linkUrl)}
               className="group relative flex-shrink-0 w-[70vw] h-[calc(87.5vw+30px)] rounded-2xl overflow-hidden shadow-lg snap-start"
             >
-              {/* Background Image - Optimized */}
-              <picture>
-                <source 
-                  type="image/webp"
-                  srcSet={`${getCategoryImage(category.categoryName, category.imageUrl)}?format=webp&w=400 400w, ${getCategoryImage(category.categoryName, category.imageUrl)}?format=webp&w=800 800w`}
-                  sizes="70vw"
-                />
-                <img
-                  src={getCategoryImage(category.categoryName, category.imageUrl)}
-                  srcSet={`${getCategoryImage(category.categoryName, category.imageUrl)}?w=400 400w, ${getCategoryImage(category.categoryName, category.imageUrl)}?w=800 800w`}
-                  sizes="70vw"
-                  alt={category.displayName}
-                  loading="lazy"
-                  decoding="async"
-                  className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
-                />
-              </picture>
+              {/* Background Image - Simplified */}
+              <img
+                src={getCategoryImage(category.categoryName, category.imageUrl)}
+                alt={category.displayName}
+                loading="lazy"
+                decoding="async"
+                width="800"
+                height="1000"
+                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
+              />
               
               {/* Gradient Overlay - only show if button text exists */}
               {category.buttonText && (
