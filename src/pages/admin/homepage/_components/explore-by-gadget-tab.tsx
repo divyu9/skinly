@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -131,11 +131,11 @@ export function ExploreByGadgetTab() {
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
   // Sync local cards with fetched cards
-  useState(() => {
+  useEffect(() => {
     if (cards) {
       setLocalCards(cards);
     }
-  });
+  }, [cards]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
