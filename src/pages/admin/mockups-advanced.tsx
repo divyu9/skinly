@@ -509,7 +509,7 @@ export default function MockupsAdvancedPage() {
   const modelsFullCoverage = useQuery(api.mockupsAdvanced.getModelsWithFullCoverage, {
     brandFilter: brandFilter === "all" ? undefined : brandFilter,
   });
-  const totalSKUs = useQuery(api.mockupsAdvanced.getTotalPhoneSkinSKUs, {});
+  const overviewStats = useQuery(api.mockupsAdvanced.getOverviewStats, {});
 
   // Mutations
   const migrateMockups = useMutation(api.mockupsAdvanced.migrateMockupsToModels);
@@ -560,11 +560,8 @@ export default function MockupsAdvancedPage() {
   const missingCount = filteredModelsMissing?.length ?? 0;
   const fullCoverageCount = filteredModelsFullCoverage?.length ?? 0;
 
-  // Calculate overview stats
+  // Calculate total models count
   const totalModels = (modelsWithMockups?.length ?? 0) + (modelsMissing?.length ?? 0) + (modelsFullCoverage?.length ?? 0);
-  const totalMockupsCount = modelsWithMockups?.reduce((sum, m) => sum + (m.mockupCount || 0), 0) ?? 0;
-  const uniqueMockupSKUs = totalMockupsCount; // Approximate, could be more accurate with a dedicated query
-  const overallCoverage = totalSKUs && totalSKUs > 0 ? Math.round((uniqueMockupSKUs / totalSKUs) * 100) : 0;
 
   return (
     <AdminLayout>
@@ -599,7 +596,7 @@ export default function MockupsAdvancedPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalMockupsCount}</div>
+              <div className="text-2xl font-bold">{overviewStats?.totalMockups ?? 0}</div>
               <p className="text-xs text-muted-foreground mt-1">Mockups uploaded</p>
             </CardContent>
           </Card>
@@ -612,8 +609,8 @@ export default function MockupsAdvancedPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{uniqueMockupSKUs}</div>
-              <p className="text-xs text-muted-foreground mt-1">of {totalSKUs} total SKUs</p>
+              <div className="text-2xl font-bold">{overviewStats?.uniqueSKUs ?? 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">of {overviewStats?.totalSKUs ?? 0} total SKUs</p>
             </CardContent>
           </Card>
 
@@ -625,7 +622,7 @@ export default function MockupsAdvancedPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{overallCoverage}%</div>
+              <div className="text-2xl font-bold">{overviewStats?.coverage ?? 0}%</div>
               <p className="text-xs text-muted-foreground mt-1">Overall SKU coverage</p>
             </CardContent>
           </Card>

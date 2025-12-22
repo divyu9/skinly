@@ -416,3 +416,52 @@ export const getUniqueBrands = query({
     return brands.sort();
   },
 });
+
+/**
+ * Get overview statistics for all mockups
+ */
+export const getOverviewStats = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get phone gadget type ID for filtering
+    const phoneGadgetType = await ctx.db
+      .query("gadgetTypes")
+      .withIndex("by_name", (q) => q.eq("name", "phone"))
+      .first();
+    
+    if (!phoneGadgetType) {
+      return {
+        totalMockups: 0,
+        uniqueSKUs: 0,
+        totalSKUs: 0,
+        coverage: 0,
+      };
+    }
+
+    // Get all mockups
+    const allMockups = await ctx.db.query("mockups").collect();
+    const totalMockups = allMockups.length;
+
+    // Get unique SKUs from mockups (filter to only valid phone skin SKUs)
+    const allUploadedSKUs = [...new Set(allMockups.map(m => m.sku.toUpperCase()))];
+    
+    // Get all valid phone skin SKUs
+    const validPhoneSKUs = await getAllPhoneSkinSKUs(ctx);
+    const validPhoneSKUsSet = new Set(validPhoneSKUs.map(s => s.toUpperCase()));
+    
+    // Filter uploaded SKUs to only include valid phone skin SKUs
+    const uniqueSKUs = allUploadedSKUs.filter(sku => validPhoneSKUsSet.has(sku)).length;
+    
+    // Calculate coverage
+    const coverage = validPhoneSKUs.length > 0 
+      ? Math.round((uniqueSKUs / validPhoneSKUs.length) * 100) 
+      : 0;
+
+    return {
+      totalMockups,
+      uniqueSKUs,
+      totalSKUs: validPhoneSKUs.length,
+      coverage,
+    };
+  },
+});
