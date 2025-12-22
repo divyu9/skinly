@@ -253,32 +253,24 @@ async function getAllPhoneSkinSKUs(ctx: QueryCtx): Promise<string[]> {
   
   if (!phoneGadgetType) return [];
 
-  // Get ALL active products using pagination to avoid limits
+  // Get ALL active products (collect should work for ~700 products)
+  const allProducts = await ctx.db
+    .query("products")
+    .withIndex("by_status", (q) => q.eq("status", "active"))
+    .collect();
+
+  const phoneSkinProducts = allProducts.filter(p => 
+    p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
+  );
+
+  // Collect all SKUs from variants
   const allSKUs: string[] = [];
-  let continueCursor: string | null = null;
-  let isDone = false;
-
-  while (!isDone) {
-    const result = await ctx.db
-      .query("products")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .paginate({ cursor: continueCursor, numItems: 100 });
-
-    const phoneSkinProducts = result.page.filter(p => 
-      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
-    );
-
-    // Get variants for these products
-    for (const product of phoneSkinProducts) {
-      const variants = await ctx.db
-        .query("variants")
-        .withIndex("by_product", (q) => q.eq("productId", product._id))
-        .collect();
-      allSKUs.push(...variants.map(v => v.sku.toUpperCase()));
-    }
-
-    isDone = result.isDone;
-    continueCursor = result.continueCursor;
+  for (const product of phoneSkinProducts) {
+    const variants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", product._id))
+      .collect();
+    allSKUs.push(...variants.map(v => v.sku.toUpperCase()));
   }
 
   return [...new Set(allSKUs)];
