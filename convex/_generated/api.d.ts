@@ -55,6 +55,7 @@ import type * as migrateShippingFields from "../migrateShippingFields.js";
 import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
 import type * as mockups from "../mockups.js";
+import type * as mockupsAdvanced from "../mockupsAdvanced.js";
 import type * as mockupsUpload from "../mockupsUpload.js";
 import type * as modelCache from "../modelCache.js";
 import type * as modelRequests from "../modelRequests.js";
@@ -155,6 +156,7 @@ declare const fullApi: ApiFromModules<{
   migration: typeof migration;
   migrationInternal: typeof migrationInternal;
   mockups: typeof mockups;
+  mockupsAdvanced: typeof mockupsAdvanced;
   mockupsUpload: typeof mockupsUpload;
   modelCache: typeof modelCache;
   modelRequests: typeof modelRequests;
