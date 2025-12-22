@@ -1308,7 +1308,7 @@ export default function ProductDetailPage() {
                   />
                   <Button
                     variant="outline"
-                    className="border-2 border-primary"
+                    className="!border-2 !border-foreground"
                     onClick={() => {
                       if (!/^\d{6}$/.test(pincode)) {
                         toast.error("Please enter a valid 6-digit pincode");
