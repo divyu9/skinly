@@ -24,6 +24,7 @@ import {
 import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+import { SiteFooter } from "@/components/site-footer.tsx";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -859,6 +860,9 @@ export default function DevicesPage() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Footer */}
+      <SiteFooter />
     </div>
   );
 }

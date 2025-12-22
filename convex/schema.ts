@@ -1344,7 +1344,7 @@ export default defineSchema({
     
     // Card content
     imageUrl: v.string(), // Card image URL (brand logo or gadget image)
-    title: v.string(), // Card title (brand name or gadget type)
+    title: v.optional(v.string()), // Card title (brand name or gadget type) - optional for brands
     subtitle: v.optional(v.string()), // Optional subtitle
     linkUrl: v.string(), // Link when card is clicked
     

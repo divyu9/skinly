@@ -39,7 +39,9 @@ export function UgcVideos() {
 
   const handleCtaClick = (productId: string | undefined) => {
     if (productId) {
-      navigate(`/products/${productId}`);
+      navigate(`/products/detail?id=${productId}`);
+    } else {
+      navigate("/products");
     }
   };
 

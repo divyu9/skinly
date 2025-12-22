@@ -59,11 +59,13 @@ export function ExploreByBrand({ sectionId, config }: ExploreByBrandProps) {
                 <div className="p-6 flex flex-col items-center justify-center gap-3">
                   <img
                     src={card.imageUrl}
-                    alt={card.title}
+                    alt={card.title || "Brand"}
                     loading="lazy"
                     className="max-w-full max-h-[120px] object-contain transition-transform group-hover:scale-110"
                   />
-                  <h3 className="font-semibold text-lg text-center">{card.title}</h3>
+                  {card.title && (
+                    <h3 className="font-semibold text-lg text-center">{card.title}</h3>
+                  )}
                   {card.subtitle && (
                     <p className="text-sm text-muted-foreground text-center">
                       {card.subtitle}

@@ -20,7 +20,7 @@ export function SiteFooter() {
                 alt="Skinly" 
                 width="279"
                 height="112"
-                className="h-12 mb-2"
+                className="h-12 md:h-16 mb-2"
                 loading="lazy"
               />
               <p className="text-sm text-muted-foreground text-center md:text-left">

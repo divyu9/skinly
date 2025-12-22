@@ -12,18 +12,16 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet.tsx";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.tsx";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { toast } from "sonner";
 import {
   MenuIcon,
-  SmartphoneIcon,
   PackageIcon,
   ShoppingBagIcon,
   UserIcon,
@@ -38,6 +36,8 @@ import {
   CheckIcon,
   XIcon,
   LogInIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from "lucide-react";
 
 interface MobileNavProps {
@@ -52,6 +52,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
+  const [shopExpanded, setShopExpanded] = useState(false);
   
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -60,6 +61,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const { user, signoutRedirect } = useAuth();
   const profileData = useQuery(api.users.getProfileData, user ? {} : "skip");
   const updateProfile = useMutation(api.users.updateProfile);
+  const categories = useQuery(api.productCategories.listAllWithCounts, {});
 
   const handleEditName = () => {
     setNewName(profileData?.name || "");
@@ -100,7 +102,11 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
     {
       label: "Shop",
       icon: PackageIcon,
-      href: "/products",
+      isCollapsible: true,
+      subItems: (categories || []).map(cat => ({
+        label: cat.displayName,
+        href: `/products?productType=${cat.id}`,
+      })),
     },
     {
       label: "Devices",
@@ -118,14 +124,6 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
       onClick: () => {
         setOpen(false);
         onGadgetSelectorClick?.();
-      },
-    },
-    {
-      label: "Phone Selector",
-      icon: SmartphoneIcon,
-      onClick: () => {
-        setOpen(false);
-        onPhoneSelectorClick?.();
       },
     },
     {
@@ -147,6 +145,50 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
           <nav className="flex-1 px-4 space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
+              
+              // Collapsible item (Shop with categories)
+              if (item.isCollapsible && item.subItems) {
+                return (
+                  <Collapsible key={item.label} open={shopExpanded} onOpenChange={setShopExpanded}>
+                    <CollapsibleTrigger asChild>
+                      <button className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left">
+                        <div className="flex items-center gap-3">
+                          <Icon className="size-5 text-muted-foreground" />
+                          <span className="font-medium">{item.label}</span>
+                        </div>
+                        {shopExpanded ? (
+                          <ChevronUpIcon className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDownIcon className="size-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-11 pr-3 space-y-1 mt-1">
+                      {/* Link to all products */}
+                      <Link
+                        to="/products"
+                        onClick={() => setOpen(false)}
+                        className="block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                      >
+                        All Products
+                      </Link>
+                      {/* Category links */}
+                      {item.subItems.map((subItem) => (
+                        <Link
+                          key={subItem.href}
+                          to={subItem.href}
+                          onClick={() => setOpen(false)}
+                          className="block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                        >
+                          {subItem.label}
+                        </Link>
+                      ))}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              }
+              
+              // Click action item
               if (item.onClick) {
                 return (
                   <button
@@ -159,6 +201,8 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
                   </button>
                 );
               }
+              
+              // Regular link item
               return (
                 <Link
                   key={item.label}

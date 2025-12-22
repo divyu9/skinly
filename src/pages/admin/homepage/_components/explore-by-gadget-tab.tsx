@@ -55,7 +55,7 @@ interface SectionConfig {
 }
 
 function SortableCard({ card, onEdit, onDelete }: { 
-  card: { _id: Id<"homepageSectionCards">; title: string; imageUrl: string; linkUrl: string; isActive: boolean; order: number };
+  card: { _id: Id<"homepageSectionCards">; title?: string; imageUrl: string; linkUrl: string; isActive: boolean; order: number };
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -73,11 +73,11 @@ function SortableCard({ card, onEdit, onDelete }: {
       </div>
       
       <div className="h-12 w-12 rounded overflow-hidden flex-shrink-0">
-        <img src={card.imageUrl} alt={card.title} className="h-full w-full object-cover" />
+        <img src={card.imageUrl} alt={card.title || "Gadget"} className="h-full w-full object-cover" />
       </div>
       
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{card.title}</p>
+        <p className="font-medium truncate">{card.title || "(No title)"}</p>
         <p className="text-xs text-muted-foreground truncate">{card.linkUrl}</p>
       </div>
       
@@ -221,7 +221,7 @@ export function ExploreByGadgetTab() {
       if (card) {
         setEditingCard(cardId);
         setFormData({
-          title: card.title,
+          title: card.title || "",
           imageUrl: card.imageUrl,
           linkUrl: card.linkUrl,
           subtitle: card.subtitle || "",

@@ -3,12 +3,17 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+import { SiteFooter } from "@/components/site-footer.tsx";
 
 export default function TermsOfService() {
   return (
     <div className="min-h-screen bg-background">
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
       {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
+      <nav className="fixed top-[28px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
@@ -125,6 +130,9 @@ export default function TermsOfService() {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Footer */}
+      <SiteFooter />
     </div>
   );
 }
