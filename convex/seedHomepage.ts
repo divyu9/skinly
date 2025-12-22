@@ -142,7 +142,7 @@ export const seedHomepage = mutation({
           config: {
             title: "Most Trendy",
             subtitle: undefined,
-            tags: ["trending", "new", "popular"],
+            tags: ["trendy"],
             maxProducts: 10,
             cardWidth: 280,
             cardHeight: 380,

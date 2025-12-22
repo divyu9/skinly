@@ -7,6 +7,7 @@ import { FeatureBannersTab } from "./_components/feature-banners-tab.tsx";
 import { UgcVideosTab } from "./_components/ugc-videos-tab.tsx";
 import { CategoriesTab } from "./_components/categories-tab.tsx";
 import { MostTrendyTab } from "./_components/most-trendy-tab.tsx";
+import { TopPicksTab } from "./_components/top-picks-tab.tsx";
 import { ExploreByBrandTab } from "./_components/explore-by-brand-tab.tsx";
 import { ExploreByGadgetTab } from "./_components/explore-by-gadget-tab.tsx";
 import { LayoutManagerTab } from "./_components/layout-manager-tab.tsx";
@@ -19,7 +20,8 @@ import {
   TrendingUpIcon,
   TagIcon,
   SmartphoneIcon,
-  LayoutListIcon
+  LayoutListIcon,
+  StarIcon
 } from "lucide-react";
 
 export default function HomepageManagement() {
@@ -57,6 +59,10 @@ export default function HomepageManagement() {
               <TabsTrigger value="trendy" className="gap-2">
                 <TrendingUpIcon className="h-4 w-4" />
                 <span className="hidden sm:inline">Most Trendy</span>
+              </TabsTrigger>
+              <TabsTrigger value="toppicks" className="gap-2">
+                <StarIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Top Picks</span>
               </TabsTrigger>
               <TabsTrigger value="brands" className="gap-2">
                 <TagIcon className="h-4 w-4" />
@@ -99,6 +105,11 @@ export default function HomepageManagement() {
           {/* Most Trendy Tab */}
           <TabsContent value="trendy" className="space-y-6">
             <MostTrendyTab />
+          </TabsContent>
+
+          {/* Top Picks Tab */}
+          <TabsContent value="toppicks" className="space-y-6">
+            <TopPicksTab />
           </TabsContent>
 
           {/* Explore by Brand Tab */}
