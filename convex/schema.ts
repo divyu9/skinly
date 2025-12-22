@@ -342,9 +342,11 @@ export default defineSchema({
     model: v.string(), // e.g., "iPhone 15 Pro", "Galaxy S24"
     sku: v.string(), // e.g., "M-174"
     fileId: v.id("_storage"), // Convex storage ID
+    supportedModelId: v.optional(v.id("supportedModels")), // Link to supported model (for advanced mockups)
   })
     .index("by_brand_model_sku", ["brand", "model", "sku"])
-    .index("by_sku", ["sku"]),
+    .index("by_sku", ["sku"])
+    .index("by_supported_model", ["supportedModelId"]),
 
   abandonedCarts: defineTable({
     userId: v.id("users"),
