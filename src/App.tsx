@@ -41,6 +41,7 @@ const AdminStockNotificationsPage = lazy(() => import("./pages/admin/stock-notif
 const AdminOOSPage = lazy(() => import("./pages/admin/oos/page.tsx"));
 const AdminMockupsPage = lazy(() => import("./pages/admin/mockups.tsx"));
 const AdminMockupsMissingPage = lazy(() => import("./pages/admin/mockups-missing.tsx"));
+const AdminMockupsAdvancedPage = lazy(() => import("./pages/admin/mockups-advanced.tsx"));
 const AdminGoogleDriveImportPage = lazy(() => import("./pages/admin/google-drive-import.tsx"));
 const AdminModelsPage = lazy(() => import("./pages/admin/models/page.tsx"));
 const AdminSeedModelsPage = lazy(() => import("./pages/admin/seed-models/page.tsx"));
@@ -135,6 +136,7 @@ export default function App() {
           <Route path="/backend-skinly/settings" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSettingsPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/mockups" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/mockups/missing" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper></Suspense>} />
+          <Route path="/backend-skinly/mockups-advanced" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsAdvancedPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/google-drive-import" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminModelsPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/seed-models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper></Suspense>} />
