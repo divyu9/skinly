@@ -21,9 +21,9 @@ import {
   HelpCircleIcon,
   AlertCircleIcon,
 } from "lucide-react";
+import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
-import { SiteHeader } from "@/components/site-header.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -64,6 +64,7 @@ export default function DevicesPage() {
   
   // Model request dialog state
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [requestBrand, setRequestBrand] = useState("");
   const [requestNewBrand, setRequestNewBrand] = useState(""); // For custom brand entry
   const [isNewBrand, setIsNewBrand] = useState(false); // Track if "Other" is selected
@@ -360,8 +361,17 @@ export default function DevicesPage() {
       {/* Announcement Bar */}
       <AnnouncementBar />
       
-      {/* Header */}
-      <SiteHeader onRequestModelClick={() => setRequestDialogOpen(true)} />
+      {/* Mobile Header */}
+      <MobileHeader 
+        onMenuClick={() => setIsMobileMenuOpen(true)}
+        onRequestModelClick={() => setRequestDialogOpen(true)}
+      />
+
+      {/* Mobile Navigation Sheet */}
+      <MobileNav 
+        open={isMobileMenuOpen}
+        onOpenChange={setIsMobileMenuOpen}
+      />
 
       {/* Hero Section */}
       <section className="pt-24 pb-12 px-4 bg-gradient-to-br from-primary/10 via-background to-accent/10">

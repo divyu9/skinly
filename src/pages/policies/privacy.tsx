@@ -1,20 +1,31 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
+import { MobileHeader } from "@/components/mobile-header.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
-import { SiteHeader } from "@/components/site-header.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 
 export default function PrivacyPolicy() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
   return (
     <div className="min-h-screen bg-background">
       {/* Announcement Bar */}
       <AnnouncementBar />
       
-      {/* Header */}
-      <SiteHeader />
+      {/* Mobile Header */}
+      <MobileHeader 
+        onMenuClick={() => setIsMobileMenuOpen(true)}
+      />
+
+      {/* Mobile Navigation Sheet */}
+      <MobileNav 
+        open={isMobileMenuOpen}
+        onOpenChange={setIsMobileMenuOpen}
+      />
 
       {/* Content */}
       <div className="container mx-auto px-4 py-32 max-w-4xl">
