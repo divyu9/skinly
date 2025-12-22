@@ -134,7 +134,7 @@ export default function SitemapGenerator() {
               <CardHeader>
                 <CardTitle>Sitemap Configuration</CardTitle>
                 <CardDescription>
-                  Your sitemap is served via Convex HTTP Actions
+                  Your sitemap is automatically generated from your database
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -144,7 +144,7 @@ export default function SitemapGenerator() {
                     <div className="space-y-2">
                       <div className="font-medium text-blue-900 dark:text-blue-100">Sitemap is Live!</div>
                       <div className="text-sm text-blue-800 dark:text-blue-200">
-                        Your sitemap is automatically generated and served through Convex HTTP Actions.
+                        Your sitemap is automatically generated from your database and available at your domain.
                       </div>
                       <div className="text-sm text-blue-800 dark:text-blue-200">
                         <strong>Published Site URL:</strong>{" "}
@@ -159,7 +159,7 @@ export default function SitemapGenerator() {
                         </a>
                       </div>
                       <div className="text-sm text-blue-800 dark:text-blue-200 mt-2">
-                        <strong>Note:</strong> The sitemap will only work on your published domain (goskinly.com) after you click the "Publish" button. It updates automatically when you add/edit products.
+                        <strong>Note:</strong> The sitemap will only work on your published domain (goskinly.com) after you click the "Publish" button. It updates in real-time when you add/edit products.
                       </div>
                     </div>
                   </div>
@@ -179,8 +179,8 @@ export default function SitemapGenerator() {
                 <div className="space-y-3 text-sm">
                   <div className="font-medium">How It Works:</div>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                    <li>Sitemap is served via Convex HTTP Actions (not static file)</li>
-                    <li>Updates automatically when you add/edit products, collections, or SEO pages</li>
+                    <li>Sitemap generates automatically from your database</li>
+                    <li>Updates in real-time when you add/edit products, collections, or SEO pages</li>
                     <li>No manual upload required - just publish your app</li>
                     <li>Download button above is for backup/reference only</li>
                   </ul>
