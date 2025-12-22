@@ -134,14 +134,38 @@ export default function SitemapGenerator() {
               <CardHeader>
                 <CardTitle>Generate & Download Sitemap</CardTitle>
                 <CardDescription>
-                  Create an updated sitemap.xml with all current pages and upload it to Files & Media
+                  Your sitemap is automatically generated at https://goskinly.com/sitemap.xml
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium text-green-900 dark:text-green-100">Sitemap is Live!</div>
+                      <div className="text-sm text-green-800 dark:text-green-200 mt-1">
+                        Your sitemap is automatically generated and served at{" "}
+                        <a 
+                          href="https://goskinly.com/sitemap.xml" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="underline font-medium"
+                        >
+                          https://goskinly.com/sitemap.xml
+                          <ExternalLink className="inline h-3 w-3 ml-1" />
+                        </a>
+                      </div>
+                      <div className="text-sm text-green-800 dark:text-green-200 mt-2">
+                        The sitemap automatically updates when you add/edit products, collections, or SEO pages.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
-                  <Button onClick={downloadSitemap} className="flex-1">
+                  <Button onClick={downloadSitemap} variant="outline" className="flex-1">
                     <Download className="h-4 w-4 mr-2" />
-                    Generate & Download Updated Sitemap
+                    Download Sitemap (Optional)
                   </Button>
                   <Button onClick={copySitemap} variant="outline">
                     {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : null}
@@ -150,32 +174,12 @@ export default function SitemapGenerator() {
                 </div>
 
                 <div className="space-y-3 text-sm">
-                  <div className="font-medium">Instructions:</div>
-                  <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-                    <li>Click "Generate & Download Updated Sitemap" button above</li>
-                    <li>
-                      Go to the{" "}
-                      <Button
-                        variant="link"
-                        className="h-auto p-0 text-muted-foreground underline"
-                        onClick={() => window.open("/backend-skinly/mockups", "_blank")}
-                      >
-                        Files & Media tab
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </Button>
-                    </li>
-                    <li>Upload the sitemap.xml file (delete old one if exists)</li>
-                    <li>Your sitemap will be live at: https://goskinly.com/sitemap.xml</li>
-                  </ol>
-                </div>
-
-                <div className="p-4 bg-muted rounded-lg space-y-2">
-                  <div className="text-sm font-medium">📝 When to regenerate:</div>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li>• After adding new products</li>
-                    <li>• After adding new collections</li>
-                    <li>• After creating/publishing new SEO pages</li>
-                    <li>• Monthly (recommended for best SEO)</li>
+                  <div className="font-medium">About the Sitemap:</div>
+                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                    <li>Automatically generated from your live product catalog</li>
+                    <li>Updates instantly when you make changes</li>
+                    <li>No manual upload required</li>
+                    <li>Download button above is for backup/reference only</li>
                   </ul>
                 </div>
               </CardContent>
@@ -209,6 +213,7 @@ export default function SitemapGenerator() {
                     <li>
                       Go to Sitemaps section and submit: <code className="bg-muted px-1 py-0.5 rounded">sitemap.xml</code>
                     </li>
+                    <li>Google will automatically crawl and index your sitemap</li>
                   </ol>
                 </div>
               </CardContent>
