@@ -59,7 +59,7 @@ function ModelCard({
   modelName: string;
   initialCount?: number;
   onUploadClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
-  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
+  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string, missingSKUs?: string[]) => void;
 }) {
   const [showStats, setShowStats] = useState(false);
   const stats = useQuery(
@@ -74,7 +74,7 @@ function ModelCard({
           <div>
             <CardTitle className="text-lg">{brandName} {modelName}</CardTitle>
             <CardDescription className="mt-1">
-              {initialCount !== undefined && `${initialCount} mockups uploaded`}
+              {initialCount !== undefined && `${initialCount} unique SKUs uploaded`}
             </CardDescription>
           </div>
           <Button
@@ -131,7 +131,7 @@ function ModelCard({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onViewClick(modelId, brandName, modelName)}
+                  onClick={() => onViewClick(modelId, brandName, modelName, stats.missingSKUs)}
                   className="w-full"
                 >
                   <AlertCircle className="h-3 w-3 mr-1" />
@@ -427,10 +427,12 @@ function UploadMockupsDialog({
 export default function MockupsAdvancedPage() {
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [missingSKUsDialogOpen, setMissingSKUsDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
     id: Id<"supportedModels">;
     brand: string;
     name: string;
+    missingSKUs?: string[];
   } | null>(null);
 
   // Queries
@@ -468,8 +470,13 @@ export default function MockupsAdvancedPage() {
     setUploadDialogOpen(true);
   };
 
-  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string) => {
-    toast.info("View mockups feature coming soon");
+  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string, missingSKUs?: string[]) => {
+    if (missingSKUs && missingSKUs.length > 0) {
+      setSelectedModel({ id: modelId, brand, name, missingSKUs });
+      setMissingSKUsDialogOpen(true);
+    } else {
+      toast.info("View mockups feature coming soon");
+    }
   };
 
   const partialCoverageCount = modelsWithMockups?.length ?? 0;
@@ -634,13 +641,23 @@ export default function MockupsAdvancedPage() {
       </Tabs>
 
       {selectedModel && (
-        <UploadMockupsDialog
-          open={uploadDialogOpen}
-          onOpenChange={setUploadDialogOpen}
-          modelId={selectedModel.id}
-          brandName={selectedModel.brand}
-          modelName={selectedModel.name}
-        />
+        <>
+          <UploadMockupsDialog
+            open={uploadDialogOpen}
+            onOpenChange={setUploadDialogOpen}
+            modelId={selectedModel.id}
+            brandName={selectedModel.brand}
+            modelName={selectedModel.name}
+          />
+          {selectedModel.missingSKUs && (
+            <MissingSKUsDialog
+              open={missingSKUsDialogOpen}
+              onOpenChange={setMissingSKUsDialogOpen}
+              missingSKUs={selectedModel.missingSKUs}
+              modelName={`${selectedModel.brand} ${selectedModel.name}`}
+            />
+          )}
+        </>
       )}
     </div>
   );

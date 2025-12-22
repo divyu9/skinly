@@ -160,11 +160,11 @@ export const getModelsWithFullCoverage = query({
           .take(200)
       : await ctx.db.query("supportedModels").take(200);
 
-    // Calculate total SKUs once (limit to first 100 products to avoid read limits)
+    // Calculate total SKUs once (get ALL products)
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(100);
+      .collect();
     const skinProducts = allProducts.filter(p => p.productCategory === "skin");
     
     const totalSKUs: string[] = [];
@@ -220,11 +220,11 @@ export const getModelMockupStats = query({
     modelId: v.id("supportedModels"),
   },
   handler: async (ctx, args) => {
-    // Get total SKUs for this model by fetching all phone skin variants (limit to 100 products)
+    // Get ALL phone skin products and variants
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(100);
+      .collect();
     
     const skinProducts = allProducts.filter(p => p.productCategory === "skin");
     
@@ -276,11 +276,11 @@ export const getModelMockupStats = query({
 export const getTotalPhoneSkinSKUs = query({
   args: {},
   handler: async (ctx) => {
-    // Limit to 100 products to avoid read limits
+    // Get ALL products
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .take(100);
+      .collect();
 
     const skinProducts = allProducts.filter(p => p.productCategory === "skin");
 

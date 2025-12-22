@@ -471,7 +471,7 @@ export default function ProductDetailPage() {
   const { addToGuestCart } = useGuestCart();
   const [selectedImage, setSelectedImage] = useState<string>("");
   const [selectedVariant, setSelectedVariant] = useState<number>(0);
-  const [selectedCoverage, setSelectedCoverage] = useState<"only_back" | "full_body_wrap">("only_back");
+  const [selectedCoverage, setSelectedCoverage] = useState<"only_back" | "full_body_wrap">("full_body_wrap");
   const [isAdding, setIsAdding] = useState(false);
   const [isBuyingNow, setIsBuyingNow] = useState(false);
   
