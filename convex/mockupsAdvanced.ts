@@ -56,26 +56,34 @@ export const getModelsWithMockups = query({
     brandFilter: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get all supported models
-    let modelsQuery = ctx.db.query("supportedModels");
-    const allModels = await modelsQuery.collect();
+    // Get models based on brand filter
+    const brandFilter = args.brandFilter;
+    const models = brandFilter
+      ? await ctx.db
+          .query("supportedModels")
+          .withIndex("by_brand", (q) => q.eq("brandName", brandFilter))
+          .take(200)
+      : await ctx.db.query("supportedModels").take(200);
 
-    // Filter by brand if specified
-    const models = args.brandFilter
-      ? allModels.filter(m => m.brandName === args.brandFilter)
-      : allModels;
-
-    // Get all mockups
-    const allMockups = await ctx.db.query("mockups").collect();
-
-    // Filter models that have mockups
+    // For each model, check if it has mockups using the index
     const modelsWithMockups = [];
     for (const model of models) {
-      const modelMockups = allMockups.filter(
-        m => m.supportedModelId === model._id
-      );
+      const firstMockup = await ctx.db
+        .query("mockups")
+        .withIndex("by_supported_model", (q) => 
+          q.eq("supportedModelId", model._id)
+        )
+        .first();
 
-      if (modelMockups.length > 0) {
+      if (firstMockup) {
+        // Count mockups for this model
+        const modelMockups = await ctx.db
+          .query("mockups")
+          .withIndex("by_supported_model", (q) => 
+            q.eq("supportedModelId", model._id)
+          )
+          .collect();
+
         modelsWithMockups.push({
           _id: model._id,
           brandName: model.brandName,
@@ -100,25 +108,26 @@ export const getModelsMissingMockups = query({
     brandFilter: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get all supported models
-    const allModels = await ctx.db.query("supportedModels").collect();
+    // Get models based on brand filter
+    const brandFilter = args.brandFilter;
+    const models = brandFilter
+      ? await ctx.db
+          .query("supportedModels")
+          .withIndex("by_brand", (q) => q.eq("brandName", brandFilter))
+          .take(200)
+      : await ctx.db.query("supportedModels").take(200);
 
-    // Filter by brand if specified
-    const models = args.brandFilter
-      ? allModels.filter(m => m.brandName === args.brandFilter)
-      : allModels;
-
-    // Get all mockups
-    const allMockups = await ctx.db.query("mockups").collect();
-
-    // Filter models with zero mockups
+    // For each model, check if it has any mockups using the index
     const missingModels = [];
     for (const model of models) {
-      const modelMockups = allMockups.filter(
-        m => m.supportedModelId === model._id
-      );
+      const firstMockup = await ctx.db
+        .query("mockups")
+        .withIndex("by_supported_model", (q) => 
+          q.eq("supportedModelId", model._id)
+        )
+        .first();
 
-      if (modelMockups.length === 0) {
+      if (!firstMockup) {
         missingModels.push({
           _id: model._id,
           brandName: model.brandName,
@@ -142,39 +151,45 @@ export const getModelsWithFullCoverage = query({
     brandFilter: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Get all supported models
-    const allModels = await ctx.db.query("supportedModels").collect();
+    // Get models based on brand filter
+    const brandFilter = args.brandFilter;
+    const models = brandFilter
+      ? await ctx.db
+          .query("supportedModels")
+          .withIndex("by_brand", (q) => q.eq("brandName", brandFilter))
+          .take(200)
+      : await ctx.db.query("supportedModels").take(200);
 
-    // Filter by brand if specified
-    const models = args.brandFilter
-      ? allModels.filter(m => m.brandName === args.brandFilter)
-      : allModels;
-
-    // Get all mockups and variants
-    const allMockups = await ctx.db.query("mockups").collect();
+    // Calculate total SKUs once (limit to first 100 products to avoid read limits)
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
+      .take(100);
     const skinProducts = allProducts.filter(p => p.productCategory === "skin");
-    const allVariants = await ctx.db.query("variants").collect();
-
-    // Calculate total SKUs once
+    
     const totalSKUs: string[] = [];
     for (const product of skinProducts) {
-      const productVariants = allVariants.filter(v => v.productId === product._id);
+      const productVariants = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", product._id))
+        .collect();
       totalSKUs.push(...productVariants.map(v => v.sku));
     }
     const uniqueTotalSKUs = [...new Set(totalSKUs)];
     
     if (uniqueTotalSKUs.length === 0) return [];
 
-    // Filter models with 100% coverage
+    // For each model, check mockup coverage using the index
     const fullCoverageModels = [];
     for (const model of models) {
-      const modelMockups = allMockups.filter(
-        m => m.supportedModelId === model._id
-      );
+      const modelMockups = await ctx.db
+        .query("mockups")
+        .withIndex("by_supported_model", (q) => 
+          q.eq("supportedModelId", model._id)
+        )
+        .collect();
+
+      if (modelMockups.length === 0) continue;
 
       const uploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
       const coverage = (uploadedSKUs.length / uniqueTotalSKUs.length) * 100;
@@ -205,27 +220,31 @@ export const getModelMockupStats = query({
     modelId: v.id("supportedModels"),
   },
   handler: async (ctx, args) => {
-    // Get total SKUs for this model by fetching all phone skin variants
+    // Get total SKUs for this model by fetching all phone skin variants (limit to 100 products)
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
+      .take(100);
     
     const skinProducts = allProducts.filter(p => p.productCategory === "skin");
-    const allVariants = await ctx.db.query("variants").collect();
     
     const totalSKUs: string[] = [];
     for (const product of skinProducts) {
-      const productVariants = allVariants.filter(v => v.productId === product._id);
+      const productVariants = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", product._id))
+        .collect();
       totalSKUs.push(...productVariants.map(v => v.sku));
     }
     const uniqueTotalSKUs = [...new Set(totalSKUs)];
 
-    // Get uploaded mockups for this model
-    const allMockups = await ctx.db.query("mockups").collect();
-    const modelMockups = allMockups.filter(
-      m => m.supportedModelId === args.modelId
-    );
+    // Get uploaded mockups for this model using the index
+    const modelMockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_supported_model", (q) => 
+        q.eq("supportedModelId", args.modelId)
+      )
+      .collect();
 
     const uploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
     const coverage = uniqueTotalSKUs.length > 0 
@@ -257,17 +276,20 @@ export const getModelMockupStats = query({
 export const getTotalPhoneSkinSKUs = query({
   args: {},
   handler: async (ctx) => {
+    // Limit to 100 products to avoid read limits
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
+      .take(100);
 
     const skinProducts = allProducts.filter(p => p.productCategory === "skin");
-    const allVariants = await ctx.db.query("variants").collect();
 
     let totalSKUs = 0;
     for (const product of skinProducts) {
-      const productVariants = allVariants.filter(v => v.productId === product._id);
+      const productVariants = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", product._id))
+        .collect();
       totalSKUs += productVariants.length;
     }
 
@@ -306,10 +328,13 @@ export const deleteAllMockupsForModel = mutation({
     modelId: v.id("supportedModels"),
   },
   handler: async (ctx, args) => {
-    const allMockups = await ctx.db.query("mockups").collect();
-    const modelMockups = allMockups.filter(
-      m => m.supportedModelId === args.modelId
-    );
+    // Use the index to get only this model's mockups
+    const modelMockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_supported_model", (q) => 
+        q.eq("supportedModelId", args.modelId)
+      )
+      .collect();
 
     for (const mockup of modelMockups) {
       await ctx.storage.delete(mockup.fileId);
@@ -326,8 +351,14 @@ export const deleteAllMockupsForModel = mutation({
 export const migrateMockupsToModels = mutation({
   args: {},
   handler: async (ctx) => {
-    const allMockups = await ctx.db.query("mockups").collect();
-    const allModels = await ctx.db.query("supportedModels").collect();
+    // Get mockups without supportedModelId (limit to 1000 to avoid read limits)
+    const allMockups = await ctx.db
+      .query("mockups")
+      .filter((q) => q.eq(q.field("supportedModelId"), undefined))
+      .take(1000);
+    
+    // Get models (limit to 200)
+    const allModels = await ctx.db.query("supportedModels").take(200);
 
     let updated = 0;
     let noMatch = 0;
