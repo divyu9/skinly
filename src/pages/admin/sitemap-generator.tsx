@@ -42,7 +42,7 @@ export default function SitemapGenerator() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success("Updated sitemap downloaded! Upload it to the Files & Media tab as 'sitemap.xml'");
+    toast.success("Sitemap downloaded! Now tell the AI to update public/sitemap.xml");
   };
 
   const copySitemap = () => {
@@ -69,9 +69,9 @@ export default function SitemapGenerator() {
       <AdminLayout>
         <div className="container mx-auto p-6 max-w-4xl">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2">Sitemap Generator</h1>
+            <h1 className="text-3xl font-bold mb-2">Static Sitemap Manager</h1>
             <p className="text-muted-foreground">
-              Generate and download your updated sitemap.xml with all current pages and products
+              Generate and download your static sitemap.xml with all current pages, products, and SEO content
             </p>
           </div>
 
@@ -132,9 +132,9 @@ export default function SitemapGenerator() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Sitemap Configuration</CardTitle>
+                <CardTitle>Static Sitemap Configuration</CardTitle>
                 <CardDescription>
-                  Your sitemap is automatically generated from your database
+                  Your sitemap is a static file served from public/sitemap.xml
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -142,9 +142,9 @@ export default function SitemapGenerator() {
                   <div className="flex items-start gap-2">
                     <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                     <div className="space-y-2">
-                      <div className="font-medium text-blue-900 dark:text-blue-100">Sitemap is Live!</div>
+                      <div className="font-medium text-blue-900 dark:text-blue-100">Static Sitemap Active</div>
                       <div className="text-sm text-blue-800 dark:text-blue-200">
-                        Your sitemap is automatically generated from your database and available at your domain.
+                        Your sitemap is served as a static file from <code className="bg-blue-100 dark:bg-blue-900 px-1 py-0.5 rounded">public/sitemap.xml</code>
                       </div>
                       <div className="text-sm text-blue-800 dark:text-blue-200">
                         <strong>Published Site URL:</strong>{" "}
@@ -159,16 +159,16 @@ export default function SitemapGenerator() {
                         </a>
                       </div>
                       <div className="text-sm text-blue-800 dark:text-blue-200 mt-2">
-                        <strong>Note:</strong> The sitemap will only work on your published domain (goskinly.com) after you click the "Publish" button. It updates in real-time when you add/edit products.
+                        <strong>Note:</strong> To update the sitemap after adding new products or pages, download the latest version below and update the file through your codebase or via chat with AI.
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex gap-2">
-                  <Button onClick={downloadSitemap} variant="outline" className="flex-1">
+                  <Button onClick={downloadSitemap} className="flex-1">
                     <Download className="h-4 w-4 mr-2" />
-                    Download Sitemap (Backup)
+                    Download Updated Sitemap
                   </Button>
                   <Button onClick={copySitemap} variant="outline">
                     {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : null}
@@ -176,13 +176,25 @@ export default function SitemapGenerator() {
                   </Button>
                 </div>
 
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                  <div className="text-sm text-amber-900 dark:text-amber-100">
+                    <strong>To Update Your Sitemap:</strong>
+                    <ol className="list-decimal list-inside mt-2 space-y-1 text-amber-800 dark:text-amber-200">
+                      <li>Click "Download Updated Sitemap" above</li>
+                      <li>Tell the AI: "Update public/sitemap.xml with the downloaded file"</li>
+                      <li>Publish your app to make the changes live</li>
+                    </ol>
+                  </div>
+                </div>
+
                 <div className="space-y-3 text-sm">
-                  <div className="font-medium">How It Works:</div>
+                  <div className="font-medium">How Static Sitemaps Work:</div>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                    <li>Sitemap generates automatically from your database</li>
-                    <li>Updates in real-time when you add/edit products, collections, or SEO pages</li>
-                    <li>No manual upload required - just publish your app</li>
-                    <li>Download button above is for backup/reference only</li>
+                    <li>Sitemap is a static XML file in your public/ directory</li>
+                    <li>Faster loading - served directly without database queries</li>
+                    <li>Better for SEO - search engines can cache it efficiently</li>
+                    <li>Manual updates needed when you add/change products or pages</li>
+                    <li>Use the download button above to get the latest version with all current URLs</li>
                   </ul>
                 </div>
               </CardContent>
