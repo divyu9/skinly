@@ -1258,7 +1258,7 @@ export default function ProductDetailPage() {
               {productData.variants[selectedVariant].inventoryQuantity > 0 ? (
                 <div className="flex gap-3">
                   <Button
-                    className="flex-1 border-2"
+                    className="flex-1 border-2 border-primary"
                     size="lg"
                     variant="outline"
                     onClick={() => {
@@ -1275,7 +1275,7 @@ export default function ProductDetailPage() {
                     {isAdding ? "Adding..." : "Add to Cart"}
                   </Button>
                   <Button
-                    className="flex-1 animate-shake border-2"
+                    className="flex-1 animate-shake border-2 border-primary"
                     size="lg"
                     onClick={handleBuyNow}
                     disabled={isAdding || isBuyingNow || (isSkinProduct && needsDeviceSelector && !phoneModel)}
@@ -1297,7 +1297,7 @@ export default function ProductDetailPage() {
                   <Input
                     type="text"
                     placeholder="Enter Pincode"
-                    className="flex-1 border-2"
+                    className="flex-1 border-2 border-border"
                     value={pincode}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 6);
@@ -1308,7 +1308,7 @@ export default function ProductDetailPage() {
                   />
                   <Button
                     variant="outline"
-                    className="border-2"
+                    className="border-2 border-primary"
                     onClick={() => {
                       if (!/^\d{6}$/.test(pincode)) {
                         toast.error("Please enter a valid 6-digit pincode");

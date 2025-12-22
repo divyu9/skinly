@@ -21,9 +21,9 @@ import {
   HelpCircleIcon,
   AlertCircleIcon,
 } from "lucide-react";
-import { CartButton } from "@/components/cart.tsx";
 import { MobileNav } from "@/components/mobile-nav.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+import { SiteHeader } from "@/components/site-header.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -360,19 +360,8 @@ export default function DevicesPage() {
       {/* Announcement Bar */}
       <AnnouncementBar />
       
-      {/* Navigation */}
-      <nav className="fixed top-[28px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-40">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
-              alt="Skinly"
-              className="h-12 md:h-16"
-            />
-          </Link>
-          <MobileNav />
-        </div>
-      </nav>
+      {/* Header */}
+      <SiteHeader onRequestModelClick={() => setRequestDialogOpen(true)} />
 
       {/* Hero Section */}
       <section className="pt-24 pb-12 px-4 bg-gradient-to-br from-primary/10 via-background to-accent/10">
