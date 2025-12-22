@@ -99,6 +99,7 @@ export function AdminSidebar() {
         { path: "/backend-skinly/product-fields-migration", label: "Fields Migration", icon: FileCode },
         { path: "/backend-skinly/models", label: "Models", icon: Database },
         { path: "/backend-skinly/mockups", label: "Mockups", icon: Image },
+        { path: "/backend-skinly/mockups-advanced", label: "Advanced Mockups", icon: Image },
       ],
     },
     {

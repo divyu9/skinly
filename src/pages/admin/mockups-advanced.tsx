@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
 import { 
   Upload, 
@@ -23,7 +24,11 @@ import {
   Download,
   ChevronRight,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Database,
+  Images,
+  BarChart3,
+  X
 } from "lucide-react";
 import {
   Dialog,
@@ -482,6 +487,7 @@ function UploadMockupsDialog({
 
 export default function MockupsAdvancedPage() {
   const [brandFilter, setBrandFilter] = useState<string>("all");
+  const [modelSearch, setModelSearch] = useState<string>("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [missingSKUsDialogOpen, setMissingSKUsDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<{
@@ -536,51 +542,138 @@ export default function MockupsAdvancedPage() {
     }
   };
 
-  const partialCoverageCount = modelsWithMockups?.length ?? 0;
-  const missingCount = modelsMissing?.length ?? 0;
-  const fullCoverageCount = modelsFullCoverage?.length ?? 0;
+  // Filter models by search term
+  const filterModelsBySearch = <T extends { modelName: string; brandName: string }>(models: T[] | undefined): T[] | undefined => {
+    if (!models || !modelSearch.trim()) return models;
+    const searchLower = modelSearch.toLowerCase().trim();
+    return models.filter(m => 
+      m.modelName.toLowerCase().includes(searchLower) ||
+      m.brandName.toLowerCase().includes(searchLower)
+    );
+  };
+
+  const filteredModelsWithMockups = useMemo(() => filterModelsBySearch(modelsWithMockups), [modelsWithMockups, modelSearch]);
+  const filteredModelsMissing = useMemo(() => filterModelsBySearch(modelsMissing), [modelsMissing, modelSearch]);
+  const filteredModelsFullCoverage = useMemo(() => filterModelsBySearch(modelsFullCoverage), [modelsFullCoverage, modelSearch]);
+
+  const partialCoverageCount = filteredModelsWithMockups?.length ?? 0;
+  const missingCount = filteredModelsMissing?.length ?? 0;
+  const fullCoverageCount = filteredModelsFullCoverage?.length ?? 0;
+
+  // Calculate overview stats
+  const totalModels = (modelsWithMockups?.length ?? 0) + (modelsMissing?.length ?? 0) + (modelsFullCoverage?.length ?? 0);
+  const totalMockupsCount = modelsWithMockups?.reduce((sum, m) => sum + (m.mockupCount || 0), 0) ?? 0;
+  const uniqueMockupSKUs = totalMockupsCount; // Approximate, could be more accurate with a dedicated query
+  const overallCoverage = totalSKUs && totalSKUs > 0 ? Math.round((uniqueMockupSKUs / totalSKUs) * 100) : 0;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Advanced Mockup Management</h1>
-        <p className="text-muted-foreground mt-2">
-          Upload and manage phone mockups by model with intelligent SKU detection
-        </p>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="flex-1">
-          <Select value={brandFilter} onValueChange={setBrandFilter}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Brands</SelectItem>
-              {brands?.map((brand) => (
-                <SelectItem key={brand} value={brand}>
-                  {brand}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Advanced Mockup Management</h1>
+          <p className="text-muted-foreground mt-2">
+            Upload and manage phone mockups by model with intelligent SKU detection
+          </p>
         </div>
 
-        <Button variant="outline" onClick={handleMigration} disabled={migrating}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${migrating ? 'animate-spin' : ''}`} />
-          {migrating ? 'Migrating...' : 'Sync Existing Mockups'}
-        </Button>
-      </div>
+        {/* Overview Statistics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Database className="h-4 w-4 text-muted-foreground" />
+                Total Models
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalModels}</div>
+              <p className="text-xs text-muted-foreground mt-1">Phone models in database</p>
+            </CardContent>
+          </Card>
 
-      {totalSKUs !== undefined && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Total Phone Skin SKUs</AlertTitle>
-          <AlertDescription>
-            There are {totalSKUs} total SKUs across all phone skin products
-          </AlertDescription>
-        </Alert>
-      )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Images className="h-4 w-4 text-muted-foreground" />
+                Total Mockups
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalMockupsCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Mockups uploaded</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                Unique SKUs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{uniqueMockupSKUs}</div>
+              <p className="text-xs text-muted-foreground mt-1">of {totalSKUs} total SKUs</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                Coverage
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{overallCoverage}%</div>
+              <p className="text-xs text-muted-foreground mt-1">Overall SKU coverage</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters and Actions */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1 flex gap-4">
+            <Select value={brandFilter} onValueChange={setBrandFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Brands</SelectItem>
+                {brands?.map((brand) => (
+                  <SelectItem key={brand} value={brand}>
+                    {brand}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search models..."
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                className="pl-9 pr-9"
+              />
+              {modelSearch && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                  onClick={() => setModelSearch("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <Button variant="outline" onClick={handleMigration} disabled={migrating}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${migrating ? 'animate-spin' : ''}`} />
+            {migrating ? 'Migrating...' : 'Sync Existing Mockups'}
+          </Button>
+        </div>
 
       <Tabs defaultValue="partial" className="space-y-4">
         <TabsList>
@@ -611,16 +704,18 @@ export default function MockupsAdvancedPage() {
                 <Skeleton key={i} className="h-32" />
               ))}
             </div>
-          ) : modelsWithMockups.length === 0 ? (
+          ) : !filteredModelsWithMockups || filteredModelsWithMockups.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No models with partial mockup coverage</p>
+                <p className="text-muted-foreground">
+                  {modelSearch ? "No models match your search" : "No models with partial mockup coverage"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modelsWithMockups.map((model) => (
+              {filteredModelsWithMockups.map((model) => (
                 <ModelCard
                   key={model._id}
                   modelId={model._id}
@@ -642,16 +737,18 @@ export default function MockupsAdvancedPage() {
                 <Skeleton key={i} className="h-32" />
               ))}
             </div>
-          ) : modelsMissing.length === 0 ? (
+          ) : !filteredModelsMissing || filteredModelsMissing.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
-                <p className="text-muted-foreground">All models have at least one mockup!</p>
+                <p className="text-muted-foreground">
+                  {modelSearch ? "No models match your search" : "All models have at least one mockup!"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modelsMissing.map((model) => (
+              {filteredModelsMissing.map((model) => (
                 <ModelCard
                   key={model._id}
                   modelId={model._id}
@@ -672,16 +769,18 @@ export default function MockupsAdvancedPage() {
                 <Skeleton key={i} className="h-32" />
               ))}
             </div>
-          ) : modelsFullCoverage.length === 0 ? (
+          ) : !filteredModelsFullCoverage || filteredModelsFullCoverage.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No models have complete mockup coverage yet</p>
+                <p className="text-muted-foreground">
+                  {modelSearch ? "No models match your search" : "No models have complete mockup coverage yet"}
+                </p>
               </CardContent>
             </Card>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {modelsFullCoverage.map((model) => (
+              {filteredModelsFullCoverage.map((model) => (
                 <ModelCard
                   key={model._id}
                   modelId={model._id}
@@ -718,5 +817,6 @@ export default function MockupsAdvancedPage() {
         </>
       )}
     </div>
+    </AdminLayout>
   );
 }
