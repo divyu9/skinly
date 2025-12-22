@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel.d.ts";
 
 // Helper: Parse SKU from filename (e.g., "iphone11_L-01.jpg" -> "L-01")
@@ -160,32 +160,8 @@ export const getModelsWithFullCoverage = query({
           .take(200)
       : await ctx.db.query("supportedModels").take(200);
 
-    // Get phone gadget type ID
-    const phoneGadgetType = await ctx.db
-      .query("gadgetTypes")
-      .withIndex("by_name", (q) => q.eq("name", "phone"))
-      .first();
-    
-    if (!phoneGadgetType) return [];
-
-    // Calculate total SKUs once (get ALL phone products)
-    const allProducts = await ctx.db
-      .query("products")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
-    const skinProducts = allProducts.filter(p => 
-      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
-    );
-    
-    const totalSKUs: string[] = [];
-    for (const product of skinProducts) {
-      const productVariants = await ctx.db
-        .query("variants")
-        .withIndex("by_product", (q) => q.eq("productId", product._id))
-        .collect();
-      totalSKUs.push(...productVariants.map(v => v.sku));
-    }
-    const uniqueTotalSKUs = [...new Set(totalSKUs)];
+    // Get ALL unique phone skin SKUs using helper
+    const uniqueTotalSKUs = await getAllPhoneSkinSKUs(ctx);
     
     if (uniqueTotalSKUs.length === 0) return [];
 
@@ -230,41 +206,8 @@ export const getModelMockupStats = query({
     modelId: v.id("supportedModels"),
   },
   handler: async (ctx, args) => {
-    // Get phone gadget type ID
-    const phoneGadgetType = await ctx.db
-      .query("gadgetTypes")
-      .withIndex("by_name", (q) => q.eq("name", "phone"))
-      .first();
-    
-    if (!phoneGadgetType) {
-      return {
-        totalSKUs: 0,
-        uploadedSKUs: 0,
-        missingSKUs: [],
-        coverage: 0,
-        mockups: [],
-      };
-    }
-
-    // Get ALL phone skin products and variants
-    const allProducts = await ctx.db
-      .query("products")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
-    
-    const skinProducts = allProducts.filter(p => 
-      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
-    );
-    
-    const totalSKUs: string[] = [];
-    for (const product of skinProducts) {
-      const productVariants = await ctx.db
-        .query("variants")
-        .withIndex("by_product", (q) => q.eq("productId", product._id))
-        .collect();
-      totalSKUs.push(...productVariants.map(v => v.sku));
-    }
-    const uniqueTotalSKUs = [...new Set(totalSKUs)];
+    // Get ALL unique phone skin SKUs using helper
+    const uniqueTotalSKUs = await getAllPhoneSkinSKUs(ctx);
 
     // Get uploaded mockups for this model using the index
     const modelMockups = await ctx.db
@@ -299,39 +242,56 @@ export const getModelMockupStats = query({
 });
 
 /**
+ * Get ALL unique phone skin SKUs (helper for queries)
+ */
+async function getAllPhoneSkinSKUs(ctx: QueryCtx): Promise<string[]> {
+  // Get phone gadget type ID
+  const phoneGadgetType = await ctx.db
+    .query("gadgetTypes")
+    .withIndex("by_name", (q) => q.eq("name", "phone"))
+    .first();
+  
+  if (!phoneGadgetType) return [];
+
+  // Get ALL active products using pagination to avoid limits
+  const allSKUs: string[] = [];
+  let continueCursor: string | null = null;
+  let isDone = false;
+
+  while (!isDone) {
+    const result = await ctx.db
+      .query("products")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .paginate({ cursor: continueCursor, numItems: 100 });
+
+    const phoneSkinProducts = result.page.filter(p => 
+      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
+    );
+
+    // Get variants for these products
+    for (const product of phoneSkinProducts) {
+      const variants = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", product._id))
+        .collect();
+      allSKUs.push(...variants.map(v => v.sku.toUpperCase()));
+    }
+
+    isDone = result.isDone;
+    continueCursor = result.continueCursor;
+  }
+
+  return [...new Set(allSKUs)];
+}
+
+/**
  * Get total phone skin SKU count across all products
  */
 export const getTotalPhoneSkinSKUs = query({
   args: {},
   handler: async (ctx) => {
-    // Get phone gadget type ID
-    const phoneGadgetType = await ctx.db
-      .query("gadgetTypes")
-      .withIndex("by_name", (q) => q.eq("name", "phone"))
-      .first();
-    
-    if (!phoneGadgetType) return 0;
-
-    // Get ALL phone products only
-    const allProducts = await ctx.db
-      .query("products")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
-
-    const skinProducts = allProducts.filter(p => 
-      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
-    );
-
-    let totalSKUs = 0;
-    for (const product of skinProducts) {
-      const productVariants = await ctx.db
-        .query("variants")
-        .withIndex("by_product", (q) => q.eq("productId", product._id))
-        .collect();
-      totalSKUs += productVariants.length;
-    }
-
-    return totalSKUs;
+    const allSKUs = await getAllPhoneSkinSKUs(ctx);
+    return allSKUs.length;
   },
 });
 
