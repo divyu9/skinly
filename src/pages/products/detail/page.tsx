@@ -1465,7 +1465,7 @@ export default function ProductDetailPage() {
               {/* WhatsApp Support Button - Secondary */}
               <Button
                 variant="outline"
-                className="w-full border-2 border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10"
+                className="w-full !border-2 !border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10"
                 size="lg"
                 onClick={() => {
                   const phoneNumber = "917505273504";
