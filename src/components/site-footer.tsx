@@ -16,10 +16,10 @@ export function SiteFooter() {
             {/* Logo & Tagline */}
             <div className="flex flex-col items-center md:items-start md:max-w-xs">
               <img 
-                src="https://cdn.hercules.app/file_IX0G7mps5mMQV7xehsd9EhUv" 
+                src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas" 
                 alt="Skinly" 
-                width="279"
-                height="112"
+                width="348"
+                height="140"
                 className="h-12 md:h-16 mb-2"
                 loading="lazy"
               />
