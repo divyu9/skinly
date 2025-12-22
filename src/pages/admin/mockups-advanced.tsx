@@ -59,7 +59,7 @@ function ModelCard({
   modelName: string;
   initialCount?: number;
   onUploadClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
-  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string, missingSKUs?: string[]) => void;
+  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[]) => void;
 }) {
   const [showStats, setShowStats] = useState(false);
   const stats = useQuery(
@@ -131,7 +131,7 @@ function ModelCard({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => onViewClick(modelId, brandName, modelName, stats.missingSKUs)}
+                  onClick={() => onViewClick(modelId, brandName, modelName, stats.missingSKUsInStock, stats.missingSKUsOutOfStock)}
                   className="w-full"
                 >
                   <AlertCircle className="h-3 w-3 mr-1" />
@@ -146,28 +146,35 @@ function ModelCard({
   );
 }
 
-// Missing SKUs dialog
+// Missing SKUs dialog with inventory tabs
 function MissingSKUsDialog({
   open,
   onOpenChange,
-  missingSKUs,
+  missingSKUsInStock,
+  missingSKUsOutOfStock,
   modelName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  missingSKUs: string[];
+  missingSKUsInStock: string[];
+  missingSKUsOutOfStock: string[];
   modelName: string;
 }) {
-  const handleDownloadCSV = () => {
-    const csv = `SKU\n${missingSKUs.join('\n')}`;
+  const [activeTab, setActiveTab] = useState<"instock" | "outofstock">("instock");
+
+  const handleDownloadCSV = (skus: string[], type: string) => {
+    const csv = `SKU\n${skus.join('\n')}`;
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `missing-skus-${modelName.replace(/\s+/g, '-')}.csv`;
+    a.download = `missing-skus-${type}-${modelName.replace(/\s+/g, '-')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const currentSKUs = activeTab === "instock" ? missingSKUsInStock : missingSKUsOutOfStock;
+  const totalCount = missingSKUsInStock.length + missingSKUsOutOfStock.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -175,22 +182,71 @@ function MissingSKUsDialog({
         <DialogHeader>
           <DialogTitle>Missing SKUs for {modelName}</DialogTitle>
           <DialogDescription>
-            {missingSKUs.length} SKU{missingSKUs.length !== 1 ? 's' : ''} without mockups
+            {totalCount} total SKU{totalCount !== 1 ? 's' : ''} without mockups
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="grid grid-cols-4 gap-2">
-            {missingSKUs.map((sku) => (
-              <Badge key={sku} variant="outline">
-                {sku}
-              </Badge>
-            ))}
-          </div>
-        </ScrollArea>
+
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "instock" | "outofstock")}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="instock">
+              In Stock
+              {missingSKUsInStock.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{missingSKUsInStock.length}</Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="outofstock">
+              Out of Stock
+              {missingSKUsOutOfStock.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{missingSKUsOutOfStock.length}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="instock" className="mt-4">
+            {missingSKUsInStock.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No in-stock SKUs missing mockups
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px] pr-4">
+                <div className="grid grid-cols-4 gap-2">
+                  {missingSKUsInStock.map((sku) => (
+                    <Badge key={sku} variant="outline" className="justify-center">
+                      {sku}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          <TabsContent value="outofstock" className="mt-4">
+            {missingSKUsOutOfStock.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No out-of-stock SKUs missing mockups
+              </div>
+            ) : (
+              <ScrollArea className="h-[300px] pr-4">
+                <div className="grid grid-cols-4 gap-2">
+                  {missingSKUsOutOfStock.map((sku) => (
+                    <Badge key={sku} variant="outline" className="justify-center">
+                      {sku}
+                    </Badge>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+        </Tabs>
+
         <DialogFooter>
-          <Button variant="outline" onClick={handleDownloadCSV}>
+          <Button 
+            variant="outline" 
+            onClick={() => handleDownloadCSV(currentSKUs, activeTab)}
+            disabled={currentSKUs.length === 0}
+          >
             <Download className="h-4 w-4 mr-2" />
-            Download CSV
+            Download {activeTab === "instock" ? "In Stock" : "Out of Stock"} CSV
           </Button>
           <Button onClick={() => onOpenChange(false)}>Close</Button>
         </DialogFooter>
@@ -432,7 +488,8 @@ export default function MockupsAdvancedPage() {
     id: Id<"supportedModels">;
     brand: string;
     name: string;
-    missingSKUs?: string[];
+    missingSKUsInStock?: string[];
+    missingSKUsOutOfStock?: string[];
   } | null>(null);
 
   // Queries
@@ -470,9 +527,9 @@ export default function MockupsAdvancedPage() {
     setUploadDialogOpen(true);
   };
 
-  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string, missingSKUs?: string[]) => {
-    if (missingSKUs && missingSKUs.length > 0) {
-      setSelectedModel({ id: modelId, brand, name, missingSKUs });
+  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[]) => {
+    if (missingSKUsInStock || missingSKUsOutOfStock) {
+      setSelectedModel({ id: modelId, brand, name, missingSKUsInStock, missingSKUsOutOfStock });
       setMissingSKUsDialogOpen(true);
     } else {
       toast.info("View mockups feature coming soon");
@@ -649,11 +706,12 @@ export default function MockupsAdvancedPage() {
             brandName={selectedModel.brand}
             modelName={selectedModel.name}
           />
-          {selectedModel.missingSKUs && (
+          {(selectedModel.missingSKUsInStock || selectedModel.missingSKUsOutOfStock) && (
             <MissingSKUsDialog
               open={missingSKUsDialogOpen}
               onOpenChange={setMissingSKUsDialogOpen}
-              missingSKUs={selectedModel.missingSKUs}
+              missingSKUsInStock={selectedModel.missingSKUsInStock || []}
+              missingSKUsOutOfStock={selectedModel.missingSKUsOutOfStock || []}
               modelName={`${selectedModel.brand} ${selectedModel.name}`}
             />
           )}

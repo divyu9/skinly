@@ -208,6 +208,7 @@ export const getModelMockupStats = query({
   handler: async (ctx, args) => {
     // Get ALL unique phone skin SKUs using helper
     const uniqueTotalSKUs = await getAllPhoneSkinSKUs(ctx);
+    const uniqueTotalSKUsSet = new Set(uniqueTotalSKUs.map(s => s.toUpperCase()));
 
     // Get uploaded mockups for this model using the index
     const modelMockups = await ctx.db
@@ -217,20 +218,46 @@ export const getModelMockupStats = query({
       )
       .collect();
 
-    const uploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
+    // Filter uploaded SKUs to only include valid phone skin SKUs
+    const allUploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
+    const validUploadedSKUs = allUploadedSKUs.filter(sku => uniqueTotalSKUsSet.has(sku));
+    
     const coverage = uniqueTotalSKUs.length > 0 
-      ? (uploadedSKUs.length / uniqueTotalSKUs.length) * 100 
+      ? (validUploadedSKUs.length / uniqueTotalSKUs.length) * 100 
       : 0;
 
     // Find missing SKUs
     const missingSKUs = uniqueTotalSKUs.filter(
-      sku => !uploadedSKUs.includes(sku.toUpperCase())
+      sku => !validUploadedSKUs.includes(sku.toUpperCase())
     );
+
+    // Get inventory data for missing SKUs
+    const missingSKUsInStock: string[] = [];
+    const missingSKUsOutOfStock: string[] = [];
+
+    for (const sku of missingSKUs) {
+      // Get all variants with this SKU
+      const variants = await ctx.db
+        .query("variants")
+        .withIndex("by_sku", (q) => q.eq("sku", sku))
+        .collect();
+      
+      // Check if any variant has inventory > 0
+      const hasStock = variants.some(v => v.inventoryQuantity > 0);
+      
+      if (hasStock) {
+        missingSKUsInStock.push(sku);
+      } else {
+        missingSKUsOutOfStock.push(sku);
+      }
+    }
 
     return {
       totalSKUs: uniqueTotalSKUs.length,
-      uploadedSKUs: uploadedSKUs.length,
+      uploadedSKUs: validUploadedSKUs.length,
       missingSKUs,
+      missingSKUsInStock,
+      missingSKUsOutOfStock,
       coverage: Math.round(coverage),
       mockups: modelMockups.map(m => ({
         _id: m._id,
