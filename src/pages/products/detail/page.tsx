@@ -1258,7 +1258,7 @@ export default function ProductDetailPage() {
               {productData.variants[selectedVariant].inventoryQuantity > 0 ? (
                 <div className="flex gap-3">
                   <Button
-                    className="flex-1 border-2 border-primary"
+                    className="flex-1 !border-2 !border-foreground"
                     size="lg"
                     variant="outline"
                     onClick={() => {
