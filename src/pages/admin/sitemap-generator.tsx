@@ -132,19 +132,22 @@ export default function SitemapGenerator() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Generate & Download Sitemap</CardTitle>
+                <CardTitle>Sitemap Configuration</CardTitle>
                 <CardDescription>
-                  Your sitemap is automatically generated at https://goskinly.com/sitemap.xml
+                  Your sitemap is served via Convex HTTP Actions
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-2">
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
                   <div className="flex items-start gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <div className="font-medium text-green-900 dark:text-green-100">Sitemap is Live!</div>
-                      <div className="text-sm text-green-800 dark:text-green-200 mt-1">
-                        Your sitemap is automatically generated and served at{" "}
+                    <CheckCircle2 className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-2">
+                      <div className="font-medium text-blue-900 dark:text-blue-100">Sitemap is Live!</div>
+                      <div className="text-sm text-blue-800 dark:text-blue-200">
+                        Your sitemap is automatically generated and served through Convex HTTP Actions.
+                      </div>
+                      <div className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Published Site URL:</strong>{" "}
                         <a 
                           href="https://goskinly.com/sitemap.xml" 
                           target="_blank" 
@@ -155,8 +158,8 @@ export default function SitemapGenerator() {
                           <ExternalLink className="inline h-3 w-3 ml-1" />
                         </a>
                       </div>
-                      <div className="text-sm text-green-800 dark:text-green-200 mt-2">
-                        The sitemap automatically updates when you add/edit products, collections, or SEO pages.
+                      <div className="text-sm text-blue-800 dark:text-blue-200 mt-2">
+                        <strong>Note:</strong> The sitemap will only work on your published domain (goskinly.com) after you click the "Publish" button. It updates automatically when you add/edit products.
                       </div>
                     </div>
                   </div>
@@ -165,7 +168,7 @@ export default function SitemapGenerator() {
                 <div className="flex gap-2">
                   <Button onClick={downloadSitemap} variant="outline" className="flex-1">
                     <Download className="h-4 w-4 mr-2" />
-                    Download Sitemap (Optional)
+                    Download Sitemap (Backup)
                   </Button>
                   <Button onClick={copySitemap} variant="outline">
                     {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : null}
@@ -174,11 +177,11 @@ export default function SitemapGenerator() {
                 </div>
 
                 <div className="space-y-3 text-sm">
-                  <div className="font-medium">About the Sitemap:</div>
+                  <div className="font-medium">How It Works:</div>
                   <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                    <li>Automatically generated from your live product catalog</li>
-                    <li>Updates instantly when you make changes</li>
-                    <li>No manual upload required</li>
+                    <li>Sitemap is served via Convex HTTP Actions (not static file)</li>
+                    <li>Updates automatically when you add/edit products, collections, or SEO pages</li>
+                    <li>No manual upload required - just publish your app</li>
                     <li>Download button above is for backup/reference only</li>
                   </ul>
                 </div>
