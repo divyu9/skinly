@@ -18,9 +18,7 @@ export function SiteFooter() {
               <img 
                 src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas" 
                 alt="Skinly" 
-                width="348"
-                height="140"
-                className="h-12 md:h-16 mb-2"
+                className="h-10 md:h-12 w-auto mb-2"
                 loading="lazy"
               />
               <p className="text-sm text-muted-foreground text-center md:text-left">
