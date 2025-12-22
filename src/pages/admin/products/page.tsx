@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -178,6 +178,10 @@ function AdminProductsPageInner() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 100;
+
+  // Inventory sorting state
+  const [inventorySortOrder, setInventorySortOrder] = useState<"asc" | "desc">("desc");
+  const [activeSortColumn, setActiveSortColumn] = useState<"sku" | "inventory" | null>(null);
 
   // Queries and mutations
   const products = useQuery(api.products.getAllProductsBasic, {});
@@ -565,6 +569,21 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
     return null;
   };
 
+  // Handle column sort toggle
+  const handleSortColumn = (column: "sku" | "inventory") => {
+    if (activeSortColumn === column) {
+      // Toggle order if same column
+      if (column === "sku") {
+        setSkuSortOrder(skuSortOrder === "asc" ? "desc" : "asc");
+      } else {
+        setInventorySortOrder(inventorySortOrder === "asc" ? "desc" : "asc");
+      }
+    } else {
+      // Switch to new column
+      setActiveSortColumn(column);
+    }
+  };
+
   // Filter products based on search query, SKU letter filter, and sort order
   const filteredProducts = useMemo(() => {
     if (!products) return [];
@@ -636,23 +655,33 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       filtered = filtered.filter((product) => product.status === statusFilter);
     }
 
-    // Sort by SKU numeric value
+    // Sort based on active column
     const sorted = [...filtered].sort((a, b) => {
-      const aFirstSku = a.variantSkus[0];
-      const bFirstSku = b.variantSkus[0];
+      if (activeSortColumn === "inventory") {
+        // Sort by total inventory
+        const diff = a.totalInventory - b.totalInventory;
+        return inventorySortOrder === "asc" ? diff : -diff;
+      } else if (activeSortColumn === "sku") {
+        // Sort by SKU numeric value
+        const aFirstSku = a.variantSkus[0];
+        const bFirstSku = b.variantSkus[0];
+        
+        if (!aFirstSku || !bFirstSku) return 0;
+        
+        const aParsed = parseSku(aFirstSku);
+        const bParsed = parseSku(bFirstSku);
+        
+        // Sort by number
+        const diff = aParsed.number - bParsed.number;
+        return skuSortOrder === "asc" ? diff : -diff;
+      }
       
-      if (!aFirstSku || !bFirstSku) return 0;
-      
-      const aParsed = parseSku(aFirstSku);
-      const bParsed = parseSku(bFirstSku);
-      
-      // Sort by number
-      const diff = aParsed.number - bParsed.number;
-      return skuSortOrder === "asc" ? diff : -diff;
+      // Default: no sorting if no active column
+      return 0;
     });
 
     return sorted;
-  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter]);
+  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, activeSortColumn, inventorySortOrder]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -1058,7 +1087,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               )}
 
               {/* Reset Button */}
-              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all") && (
+              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all" || activeSortColumn !== null) && (
                 <div className="flex justify-end">
                   <Button
                     size="sm"
@@ -1071,6 +1100,8 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       setProductNameValue("");
                       setStatusFilter("all");
                       setShowAdvancedFilters(false);
+                      setActiveSortColumn(null);
+                      setInventorySortOrder("desc");
                     }}
                     className="text-muted-foreground hover:text-foreground"
                   >
@@ -1133,9 +1164,47 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                     </th>
                     <th className="p-3 text-left text-sm font-medium w-16">Image</th>
                     <th className="p-3 text-left text-sm font-medium">Product Name</th>
-                    <th className="p-3 text-left text-sm font-medium w-32">SKU</th>
+                    <th className="p-3 text-left text-sm font-medium w-32">
+                      <button
+                        onClick={() => handleSortColumn("sku")}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors"
+                      >
+                        <span>SKU</span>
+                        {activeSortColumn === "sku" ? (
+                          skuSortOrder === "asc" ? (
+                            <ArrowUpIcon className="size-4" />
+                          ) : (
+                            <ArrowDownIcon className="size-4" />
+                          )
+                        ) : (
+                          <div className="size-4 flex flex-col items-center justify-center opacity-40">
+                            <ChevronUpIcon className="size-3 -mb-1" />
+                            <ChevronDownIcon className="size-3 -mt-1" />
+                          </div>
+                        )}
+                      </button>
+                    </th>
                     <th className="p-3 text-left text-sm font-medium w-28">Price</th>
-                    <th className="p-3 text-left text-sm font-medium w-24">Inventory</th>
+                    <th className="p-3 text-left text-sm font-medium w-24">
+                      <button
+                        onClick={() => handleSortColumn("inventory")}
+                        className="flex items-center gap-1 hover:text-foreground transition-colors"
+                      >
+                        <span>Inventory</span>
+                        {activeSortColumn === "inventory" ? (
+                          inventorySortOrder === "asc" ? (
+                            <ArrowUpIcon className="size-4" />
+                          ) : (
+                            <ArrowDownIcon className="size-4" />
+                          )
+                        ) : (
+                          <div className="size-4 flex flex-col items-center justify-center opacity-40">
+                            <ChevronUpIcon className="size-3 -mb-1" />
+                            <ChevronDownIcon className="size-3 -mt-1" />
+                          </div>
+                        )}
+                      </button>
+                    </th>
                     <th className="p-3 text-left text-sm font-medium w-28">Material Stock</th>
                     <th className="p-3 text-left text-sm font-medium w-32">Collection</th>
                     <th className="p-3 text-left text-sm font-medium w-32">Tags</th>
