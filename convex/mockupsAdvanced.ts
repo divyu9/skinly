@@ -160,12 +160,22 @@ export const getModelsWithFullCoverage = query({
           .take(200)
       : await ctx.db.query("supportedModels").take(200);
 
-    // Calculate total SKUs once (get ALL products)
+    // Get phone gadget type ID
+    const phoneGadgetType = await ctx.db
+      .query("gadgetTypes")
+      .withIndex("by_name", (q) => q.eq("name", "phone"))
+      .first();
+    
+    if (!phoneGadgetType) return [];
+
+    // Calculate total SKUs once (get ALL phone products)
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
-    const skinProducts = allProducts.filter(p => p.productCategory === "skin");
+    const skinProducts = allProducts.filter(p => 
+      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
+    );
     
     const totalSKUs: string[] = [];
     for (const product of skinProducts) {
@@ -220,13 +230,31 @@ export const getModelMockupStats = query({
     modelId: v.id("supportedModels"),
   },
   handler: async (ctx, args) => {
+    // Get phone gadget type ID
+    const phoneGadgetType = await ctx.db
+      .query("gadgetTypes")
+      .withIndex("by_name", (q) => q.eq("name", "phone"))
+      .first();
+    
+    if (!phoneGadgetType) {
+      return {
+        totalSKUs: 0,
+        uploadedSKUs: 0,
+        missingSKUs: [],
+        coverage: 0,
+        mockups: [],
+      };
+    }
+
     // Get ALL phone skin products and variants
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
     
-    const skinProducts = allProducts.filter(p => p.productCategory === "skin");
+    const skinProducts = allProducts.filter(p => 
+      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
+    );
     
     const totalSKUs: string[] = [];
     for (const product of skinProducts) {
@@ -276,13 +304,23 @@ export const getModelMockupStats = query({
 export const getTotalPhoneSkinSKUs = query({
   args: {},
   handler: async (ctx) => {
-    // Get ALL products
+    // Get phone gadget type ID
+    const phoneGadgetType = await ctx.db
+      .query("gadgetTypes")
+      .withIndex("by_name", (q) => q.eq("name", "phone"))
+      .first();
+    
+    if (!phoneGadgetType) return 0;
+
+    // Get ALL phone products only
     const allProducts = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
 
-    const skinProducts = allProducts.filter(p => p.productCategory === "skin");
+    const skinProducts = allProducts.filter(p => 
+      p.productCategory === "skin" && p.gadgetTypeId === phoneGadgetType._id
+    );
 
     let totalSKUs = 0;
     for (const product of skinProducts) {
