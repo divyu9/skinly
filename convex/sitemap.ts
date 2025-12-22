@@ -2,6 +2,18 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
+ * Escape special XML characters
+ */
+function escapeXml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
  * Generate sitemap entries for all public pages
  * Returns array of URLs with priority and change frequency
  */
@@ -39,12 +51,15 @@ export const getSitemapUrls = query({
       });
     });
 
-    // Get all products
-    const products = await ctx.db.query("products").collect();
+    // Get all active products
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_status", (q) => q.eq("status", "active"))
+      .collect();
     
     products.forEach((product) => {
       urls.push({
-        url: `${baseUrl}/${product.slug}`,
+        url: escapeXml(`${baseUrl}/products/${product.slug}`),
         lastmod: new Date(product._creationTime).toISOString(),
         changefreq: "weekly",
         priority: 0.8,
@@ -56,7 +71,7 @@ export const getSitemapUrls = query({
     
     collections.forEach((collection) => {
       urls.push({
-        url: `${baseUrl}/shop?collection=${collection.slug}`,
+        url: escapeXml(`${baseUrl}/shop?collection=${collection.slug}`),
         lastmod: new Date(collection._creationTime).toISOString(),
         changefreq: "daily",
         priority: 0.7,
@@ -72,7 +87,7 @@ export const getSitemapUrls = query({
     seoPages.forEach((page) => {
       // All SEO pages use root-level URLs
       urls.push({
-        url: `${baseUrl}/${page.slug}`,
+        url: escapeXml(`${baseUrl}/${page.slug}`),
         lastmod: new Date(page.updatedAt || page.createdAt).toISOString(),
         changefreq: "weekly",
         priority: 0.85, // High priority for SEO landing pages

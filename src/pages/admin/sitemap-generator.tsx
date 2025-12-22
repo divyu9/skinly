@@ -91,7 +91,7 @@ export default function SitemapGenerator() {
                   </div>
                   <div className="space-y-1">
                     <div className="text-2xl font-bold">
-                      {urls.filter((u) => u.url.includes("/products/detail")).length}
+                      {urls.filter((u) => u.url.includes("/products/") && !u.url.endsWith("/products")).length}
                     </div>
                     <div className="text-xs text-muted-foreground">Products</div>
                   </div>
