@@ -1297,7 +1297,7 @@ export default function ProductDetailPage() {
                   <Input
                     type="text"
                     placeholder="Enter Pincode"
-                    className="flex-1 border-2 border-border"
+                    className="flex-1 !border-2 !border-foreground"
                     value={pincode}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/g, '').slice(0, 6);
