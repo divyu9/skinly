@@ -39,9 +39,9 @@ export function ProductCategoryHeader({
   return (
     <>
       {/* Product Category Extension Bar */}
-      <div className="relative border-t border-gray-100 bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800 overflow-hidden">
+      <div className="relative border-t border-gray-200/50 bg-gradient-to-r from-purple-50 via-blue-50 to-pink-50 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-pink-950/30 dark:border-gray-700/50 overflow-hidden">
         {/* Animated gradient shimmer */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent dark:via-white/5 animate-shimmer" style={{
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent dark:via-white/10 animate-shimmer" style={{
           backgroundSize: '200% 100%',
           animation: 'shimmer 3s ease-in-out infinite'
         }} />
@@ -65,18 +65,23 @@ export function ProductCategoryHeader({
                   <button
                     key={category.id}
                     onClick={() => onUpdateFilters({ productType: category.id })}
-                    className={`group relative flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 font-semibold whitespace-nowrap transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                    className={`group relative flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 font-semibold whitespace-nowrap transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-lg sm:rounded-xl ${
                       productCategory === category.id
-                        ? 'bg-black text-white shadow-lg hover:shadow-2xl rounded-lg sm:rounded-xl dark:bg-white dark:text-black animate-pulse-subtle'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-xl rounded-lg sm:rounded-xl border-2 border-gray-200 hover:border-black dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 dark:hover:border-white'
+                        ? 'bg-black text-white shadow-2xl hover:shadow-3xl dark:bg-white dark:text-black animate-pulse-strong border-4 border-yellow-400 dark:border-yellow-300'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-xl border-3 border-purple-300 hover:border-purple-500 dark:bg-gray-800 dark:text-gray-200 dark:border-purple-600 dark:hover:bg-gray-700 dark:hover:border-purple-400'
                     }`}
                   >
-                    <IconComponent className={`size-3.5 sm:size-4.5 transition-transform duration-300 ${productCategory === category.id ? '' : 'group-hover:rotate-12'}`} />
+                    <IconComponent className={`size-3.5 sm:size-4.5 transition-transform duration-300 ${productCategory === category.id ? 'animate-bounce-subtle' : 'group-hover:rotate-12'}`} />
                     <span className="text-xs sm:text-sm">{category.displayName}</span>
                     
                     {/* Hover glow effect */}
                     {productCategory !== category.id && (
                       <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/10 group-hover:via-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300 pointer-events-none" />
+                    )}
+                    
+                    {/* Active glow ring */}
+                    {productCategory === category.id && (
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 rounded-lg sm:rounded-xl opacity-75 blur-sm animate-pulse-strong -z-10" />
                     )}
                   </button>
                 );
