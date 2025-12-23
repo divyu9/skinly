@@ -50,6 +50,7 @@ const AdminPhoneCollectionsPage = lazy(() => import("./pages/admin/phone-collect
 const AdminProductFieldsMigrationPage = lazy(() => import("./pages/admin/product-fields-migration.tsx"));
 const AdminVariantModeMigrationPage = lazy(() => import("./pages/admin/variant-mode-migration.tsx"));
 const AdminGadgetConsumptionMigrationPage = lazy(() => import("./pages/admin/gadget-consumption-migration.tsx"));
+const AdminVariantPresetsMigrationPage = lazy(() => import("./pages/admin/variant-presets-migration.tsx"));
 const AdminCODPage = lazy(() => import("./pages/admin/cod.tsx"));
 const AdminWhatsAppPage = lazy(() => import("./pages/admin/whatsapp/page.tsx"));
 const AdminWhatsAppMessagesPage = lazy(() => import("./pages/admin/whatsapp/messages.tsx"));
@@ -148,6 +149,7 @@ export default function App() {
           <Route path="/backend-skinly/product-fields-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/variant-mode-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantModeMigrationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/gadget-consumption-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGadgetConsumptionMigrationPage /></AdminPageWrapper></Suspense>} />
+          <Route path="/backend-skinly/variant-presets-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsMigrationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/gst-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><GstMigrationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/fix-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper></Suspense>} />

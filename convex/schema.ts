@@ -276,12 +276,15 @@ export default defineSchema({
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
     rNumber: v.optional(v.string()), // Manual override for R-number (e.g., "R-1", "R-59")
-    materialMultiplier: v.optional(v.number()), // Material usage multiplier (1x, 2x, 3x, etc.) - defaults to 1
+    materialMultiplier: v.optional(v.number()), // DEPRECATED - Material usage multiplier (1x, 2x, 3x, etc.) - defaults to 1
+    consumptionPresetId: v.optional(v.id("variantConsumptionPresets")), // Link to consumption preset
+    customMultiplier: v.optional(v.number()), // Custom multiplier override (takes precedence over preset)
     isDefaultVariant: v.optional(v.boolean()), // True for single-product default variants (no variant title required)
   })
     .index("by_product", ["productId"])
     .index("by_sku", ["sku"])
-    .index("by_r_number", ["rNumber"]),
+    .index("by_r_number", ["rNumber"])
+    .index("by_preset", ["consumptionPresetId"]),
 
   reviews: defineTable({
     productId: v.id("products"),
@@ -573,6 +576,19 @@ export default defineSchema({
   })
     .index("by_category", ["categoryName"])
     .index("by_gadget_type", ["gadgetTypeId"]),
+
+  // Variant Consumption Presets (reusable multiplier templates per gadget type)
+  variantConsumptionPresets: defineTable({
+    gadgetTypeId: v.id("gadgetTypes"), // Gadget type this preset belongs to
+    name: v.string(), // e.g., "Lid Only", "Lid + Keyboard", "Drone + Controller"
+    multiplier: v.number(), // Material usage multiplier (e.g., 0.5, 1.0, 1.5)
+    description: v.optional(v.string()), // Optional notes (e.g., "Covers only the laptop lid")
+    isActive: v.boolean(), // Whether this preset is currently active
+    createdAt: v.number(), // When preset was created
+    createdBy: v.optional(v.string()), // Admin email who created
+  })
+    .index("by_gadget_type", ["gadgetTypeId"])
+    .index("by_gadget_type_and_active", ["gadgetTypeId", "isActive"]),
 
   rollInventory: defineTable({
     rNumber: v.string(), // e.g., "R-1", "R-59"

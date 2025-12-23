@@ -56,6 +56,8 @@ import type * as migrateProductFields from "../migrateProductFields.js";
 import type * as migrateShippingFields from "../migrateShippingFields.js";
 import type * as migrateVariantModes from "../migrateVariantModes.js";
 import type * as migrateVariantModesInternal from "../migrateVariantModesInternal.js";
+import type * as migrateVariantPresets from "../migrateVariantPresets.js";
+import type * as migrateVariantPresetsInternal from "../migrateVariantPresetsInternal.js";
 import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
 import type * as mockups from "../mockups.js";
@@ -161,6 +163,8 @@ declare const fullApi: ApiFromModules<{
   migrateShippingFields: typeof migrateShippingFields;
   migrateVariantModes: typeof migrateVariantModes;
   migrateVariantModesInternal: typeof migrateVariantModesInternal;
+  migrateVariantPresets: typeof migrateVariantPresets;
+  migrateVariantPresetsInternal: typeof migrateVariantPresetsInternal;
   migration: typeof migration;
   migrationInternal: typeof migrationInternal;
   mockups: typeof mockups;
