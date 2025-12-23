@@ -147,7 +147,6 @@ export default function ProductsPage() {
   const deviceFilter = urlParams.get('device');
   const brandFilter = urlParams.get('brand');
   const modelFilter = urlParams.get('model');
-  const showFinish = urlParams.get('showFinish') === 'true';
   const urlSearchQuery = urlParams.get('search') || '';
   const collectionParam = urlParams.get('collection') || '';
   const fromGadgetSelector = urlParams.get('fromGadgetSelector') === 'true';
@@ -628,110 +627,6 @@ export default function ProductsPage() {
       trackCollectionView(collection.name, collectionProducts?.length);
     }
   }, [collectionParam, collection, collectionProducts]);
-
-  // Show finish selector when brand is selected and showFinish is true
-  if (showFinish && brandFilter) {
-    return (
-      <div className="min-h-screen">
-        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2">
-              <img 
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
-                alt="Skinly" 
-                className="h-12 sm:h-16"
-              />
-            </Link>
-            <Button size="sm" asChild>
-              <Link to="/">Back to Home</Link>
-            </Button>
-          </div>
-        </nav>
-
-        <section className="pt-28 pb-16 px-4">
-          <div className="container mx-auto max-w-4xl">
-            {/* Confirmation Message */}
-            <div className="text-center mb-12 space-y-4">
-              <div className="inline-block animate-bounce">
-                <div className="size-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center text-3xl">
-                  ✓
-                </div>
-              </div>
-              <h1 className="text-3xl lg:text-4xl font-bold text-balance">
-                We Got You Covered!
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto text-balance">
-                Perfect! Now pick the finish type for your {modelFilter || `${brandFilter.charAt(0).toUpperCase() + brandFilter.slice(1)} device`}
-              </p>
-            </div>
-
-            {/* Finish Selection */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6">
-              <Card 
-                className="group cursor-pointer relative overflow-hidden border-2 hover:border-primary transition-all hover:shadow-xl"
-                onClick={() => updateUrlParams({ finish: 'matte' })}
-              >
-                <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
-                  CLASSIC
-                </div>
-                <CardContent className="pt-4 sm:pt-6 md:pt-8 space-y-2 sm:space-y-4 md:space-y-6 text-center px-2 sm:px-4 md:px-6">
-                  <div className="text-3xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 md:mb-4">🎨</div>
-                  <h3 className="text-xs sm:text-lg md:text-2xl font-bold leading-tight">Matte Finish</h3>
-                  <p className="text-muted-foreground text-[9px] sm:text-sm md:text-base leading-tight hidden sm:block">
-                    Smooth, velvety texture with zero glare. Perfect for grip and that premium feel.
-                  </p>
-                  <Button className="w-full text-[9px] sm:text-sm h-6 sm:h-9 md:h-10" variant="outline">
-                    <span className="hidden sm:inline">Choose Matte</span>
-                    <span className="sm:hidden">Matte</span>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className="group cursor-pointer relative overflow-hidden border-2 hover:border-secondary transition-all hover:shadow-xl"
-                onClick={() => updateUrlParams({ finish: 'embossed' })}
-              >
-                <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
-                  PREMIUM
-                </div>
-                <CardContent className="pt-4 sm:pt-6 md:pt-8 space-y-2 sm:space-y-4 md:space-y-6 text-center px-2 sm:px-4 md:px-6">
-                  <div className="text-3xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 md:mb-4">✨</div>
-                  <h3 className="text-xs sm:text-lg md:text-2xl font-bold leading-tight">3D Embossed</h3>
-                  <p className="text-muted-foreground text-[9px] sm:text-sm md:text-base leading-tight hidden sm:block">
-                    Raised textures you can feel. Touch meets art in the most satisfying way.
-                  </p>
-                  <Button className="w-full text-[9px] sm:text-sm h-6 sm:h-9 md:h-10" variant="outline">
-                    <span className="hidden sm:inline">Choose 3D Embossed</span>
-                    <span className="sm:hidden">3D</span>
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card 
-                className="group cursor-pointer relative overflow-hidden border-2 hover:border-accent transition-all hover:shadow-xl"
-                onClick={() => updateUrlParams({ finish: 'transparent' })}
-              >
-                <div className="absolute top-0 right-0 bg-accent text-accent-foreground px-1.5 py-0.5 sm:px-3 sm:py-1 text-[8px] sm:text-xs font-semibold rounded-bl-lg">
-                  SLEEK
-                </div>
-                <CardContent className="pt-4 sm:pt-6 md:pt-8 space-y-2 sm:space-y-4 md:space-y-6 text-center px-2 sm:px-4 md:px-6">
-                  <div className="text-3xl sm:text-5xl md:text-6xl mb-1 sm:mb-2 md:mb-4">💎</div>
-                  <h3 className="text-xs sm:text-lg md:text-2xl font-bold leading-tight">Transparent</h3>
-                  <p className="text-muted-foreground text-[9px] sm:text-sm md:text-base leading-tight hidden sm:block">
-                    Show off your phone's original color with our crystal-clear protective layer.
-                  </p>
-                  <Button className="w-full text-[9px] sm:text-sm h-6 sm:h-9 md:h-10" variant="outline">
-                    <span className="hidden sm:inline">Choose Transparent</span>
-                    <span className="sm:hidden">Clear</span>
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
-  }
 
   const isInitialLoading = status === "LoadingFirstPage" || (collectionParam && collection === undefined);
   const isProductsLoading = isInitialLoading || isFilterTransitioning;

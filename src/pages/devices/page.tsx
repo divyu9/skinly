@@ -594,7 +594,7 @@ export default function DevicesPage() {
                                       <Link
                                         key={model._id}
                                         id={`model-${model._id}`}
-                                        to={`/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model.modelName)}&showFinish=true`}
+                                        to={`/products?brand=${brand.toLowerCase()}&model=${encodeURIComponent(model.modelName)}`}
                                         className="p-3 rounded-lg border hover:border-primary hover:bg-primary/5 transition-all group scroll-mt-24"
                                       >
                                         <div className="flex items-center justify-between">
