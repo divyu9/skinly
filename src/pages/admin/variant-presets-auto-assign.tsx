@@ -14,29 +14,38 @@ import {
   TableRow,
 } from "@/components/ui/table.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Label } from "@/components/ui/label.tsx";
 
 type MigrationResult = {
   success: boolean;
   matched: number;
   unmatched: number;
   skipped: number;
+  statusBreakdown: {
+    active: number;
+    draft: number;
+    archived: number;
+  };
   unmatchedVariants: Array<{
     productId: string;
     variantTitle: string;
     gadgetType: string;
+    productStatus: string;
   }>;
 };
 
 export default function VariantPresetsAutoAssignPage() {
   const [result, setResult] = useState<MigrationResult | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
   const runAutoAssign = useAction(api.migrateVariantPresetsAutoAssign.autoAssignPresets);
 
   const handleRun = async () => {
     setIsRunning(true);
     setResult(null);
     try {
-      const res = await runAutoAssign({});
+      const res = await runAutoAssign({ statusFilter });
       setResult(res);
     } catch (error) {
       setResult({
@@ -44,6 +53,7 @@ export default function VariantPresetsAutoAssignPage() {
         matched: 0,
         unmatched: 0,
         skipped: 0,
+        statusBreakdown: { active: 0, draft: 0, archived: 0 },
         unmatchedVariants: [],
       });
     } finally {
@@ -79,7 +89,28 @@ export default function VariantPresetsAutoAssignPage() {
                   <li>Matches variant title to preset name (exact match, case-insensitive)</li>
                   <li>Skips variants that already have a preset or custom multiplier</li>
                   <li>Example: Variant "Lid Only" matches preset "Lid Only" for laptops</li>
+                  <li><strong>Includes all product statuses (active, draft, archived)</strong></li>
                 </ul>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="statusFilter">Product Status Filter</Label>
+                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+                  <SelectTrigger id="statusFilter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active Only</SelectItem>
+                    <SelectItem value="draft">Draft Only</SelectItem>
+                    <SelectItem value="archived">Archived Only</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Choose which product statuses to process
+                </p>
               </div>
             </div>
 
@@ -118,6 +149,11 @@ export default function VariantPresetsAutoAssignPage() {
                         ? "Auto-assignment completed successfully"
                         : "Auto-assignment failed"}
                     </p>
+                    {result.success && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Processed {result.statusBreakdown.active} active, {result.statusBreakdown.draft} draft, and {result.statusBreakdown.archived} archived products
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -171,6 +207,7 @@ export default function VariantPresetsAutoAssignPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead>Status</TableHead>
                             <TableHead>Gadget Type</TableHead>
                             <TableHead>Variant Title</TableHead>
                             <TableHead>Product ID</TableHead>
@@ -179,6 +216,19 @@ export default function VariantPresetsAutoAssignPage() {
                         <TableBody>
                           {result.unmatchedVariants.slice(0, 50).map((v, i) => (
                             <TableRow key={i}>
+                              <TableCell>
+                                <Badge 
+                                  variant={
+                                    v.productStatus === "active" 
+                                      ? "default" 
+                                      : v.productStatus === "draft"
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                >
+                                  {v.productStatus}
+                                </Badge>
+                              </TableCell>
                               <TableCell>
                                 <Badge variant="secondary">{v.gadgetType}</Badge>
                               </TableCell>

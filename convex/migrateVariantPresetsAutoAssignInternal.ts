@@ -1,4 +1,5 @@
 import { internalMutation } from "./_generated/server";
+import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel.d.ts";
 
 /**
@@ -6,35 +7,62 @@ import type { Id } from "./_generated/dataModel.d.ts";
  * Matches variant titles to preset names (case-insensitive, exact match).
  */
 export const autoAssignPresets = internalMutation({
-  args: {},
-  handler: async (ctx): Promise<{
+  args: {
+    statusFilter: v.optional(v.union(v.literal("all"), v.literal("active"), v.literal("draft"), v.literal("archived"))),
+  },
+  handler: async (ctx, args): Promise<{
     success: boolean;
     matched: number;
     unmatched: number;
     skipped: number;
+    statusBreakdown: {
+      active: number;
+      draft: number;
+      archived: number;
+    };
     unmatchedVariants: Array<{
       productId: string;
       variantTitle: string;
       gadgetType: string;
+      productStatus: string;
     }>;
   }> => {
     let matched = 0;
     let unmatched = 0;
     let skipped = 0;
+    const statusBreakdown = {
+      active: 0,
+      draft: 0,
+      archived: 0,
+    };
     const unmatchedVariants: Array<{
       productId: string;
       variantTitle: string;
       gadgetType: string;
+      productStatus: string;
     }> = [];
 
     // Get all products with gadgetTypeId (eligible for roll management)
-    const products = await ctx.db.query("products").collect();
+    const allProducts = await ctx.db.query("products").collect();
+    
+    // Filter by status if specified
+    const statusFilter = args.statusFilter || "all";
+    const products = statusFilter === "all" 
+      ? allProducts
+      : allProducts.filter((p) => p.status === statusFilter);
+    
     const productsWithGadgetType = products.filter((p) => p.gadgetTypeId);
 
-    console.log(`Found ${productsWithGadgetType.length} products with gadget types`);
+    console.log(`Status filter: ${statusFilter}`);
+    console.log(`Found ${productsWithGadgetType.length} products with gadget types (from ${products.length} total products)`);
 
     for (const product of productsWithGadgetType) {
       if (!product.gadgetTypeId) continue;
+
+      // Track status breakdown
+      if (product.status === "active") statusBreakdown.active++;
+      else if (product.status === "draft") statusBreakdown.draft++;
+      else if (product.status === "archived") statusBreakdown.archived++;
 
       // Get gadget type details
       const gadgetType = await ctx.db.get(product.gadgetTypeId);
@@ -92,19 +120,24 @@ export const autoAssignPresets = internalMutation({
             productId: product._id,
             variantTitle: variant.title,
             gadgetType: gadgetType.displayName,
+            productStatus: product.status,
           });
           console.log(
-            `No match: ${gadgetType.displayName} - "${variant.title}"`
+            `No match: ${gadgetType.displayName} - "${variant.title}" (${product.status})`
           );
         }
       }
     }
+
+    console.log(`Status breakdown: ${statusBreakdown.active} active, ${statusBreakdown.draft} draft, ${statusBreakdown.archived} archived`);
+    console.log(`Results: ${matched} matched, ${unmatched} unmatched, ${skipped} skipped`);
 
     return {
       success: true,
       matched,
       unmatched,
       skipped,
+      statusBreakdown,
       unmatchedVariants,
     };
   },
