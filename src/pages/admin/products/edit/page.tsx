@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SaveIcon, SparklesIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -57,6 +58,7 @@ function EditProductPageInner() {
     gadgetTypeId: Id<"gadgetTypes"> | "";
     finishTypeId: Id<"finishTypes"> | "";
     productCategory: string;
+    hasMultipleVariants: boolean;
   }>({
     title: "",
     slug: "",
@@ -75,6 +77,7 @@ function EditProductPageInner() {
     gadgetTypeId: "",
     finishTypeId: "",
     productCategory: "",
+    hasMultipleVariants: false,
   });
 
   const [variants, setVariants] = useState<Variant[]>([]);
@@ -112,6 +115,7 @@ function EditProductPageInner() {
         gadgetTypeId: product.gadgetTypeId || "",
         finishTypeId: product.finishTypeId || "",
         productCategory: product.productCategory || "",
+        hasMultipleVariants: product.hasMultipleVariants ?? false,
       });
 
       setVariants(
@@ -254,10 +258,12 @@ function EditProductPageInner() {
         gadgetTypeId: formData.gadgetTypeId ? (formData.gadgetTypeId as Id<"gadgetTypes">) : undefined,
         finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
         productCategory: formData.productCategory ? (formData.productCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory") : undefined,
+        hasMultipleVariants: formData.hasMultipleVariants,
       });
 
       // Update or create variants
-      for (const variant of variants) {
+      for (let i = 0; i < variants.length; i++) {
+        const variant = variants[i];
         const compareAtPriceNum = variant.compareAtPrice ? parseFloat(variant.compareAtPrice) : undefined;
         
         if (variant._id) {
@@ -269,6 +275,7 @@ function EditProductPageInner() {
             price: parseFloat(variant.price),
             compareAtPrice: compareAtPriceNum,
             inventoryQuantity: parseInt(variant.inventoryQuantity),
+            isDefaultVariant: !formData.hasMultipleVariants && i === 0,
           });
         } else {
           // Create new variant
@@ -279,6 +286,7 @@ function EditProductPageInner() {
             price: parseFloat(variant.price),
             compareAtPrice: compareAtPriceNum,
             inventoryQuantity: parseInt(variant.inventoryQuantity),
+            isDefaultVariant: !formData.hasMultipleVariants && i === 0,
           });
         }
       }
@@ -470,13 +478,43 @@ function EditProductPageInner() {
               <CardTitle>Variants & Inventory</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Multiple Variants Toggle */}
+              <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
+                <Checkbox
+                  id="hasMultipleVariants"
+                  checked={formData.hasMultipleVariants}
+                  onCheckedChange={(checked) => {
+                    setFormData({ ...formData, hasMultipleVariants: checked === true });
+                    // Reset variants when toggling to single variant
+                    if (checked === false && variants.length > 1) {
+                      if (confirm("Switching to single variant mode will keep only the first variant. Continue?")) {
+                        setVariants([variants[0]]);
+                      }
+                    }
+                  }}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label
+                    htmlFor="hasMultipleVariants"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    This product has multiple variants
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.hasMultipleVariants
+                      ? "Multiple variants will be displayed with their variant titles (e.g., 'Red', 'Blue', 'Large')."
+                      : "Only one variant with no variant title selection on product page."}
+                  </p>
+                </div>
+              </div>
+
               {variants.map((variant, index) => (
                 <div key={index} className="p-4 border rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">
                       {variant._id ? "Existing Variant" : "New Variant"} {index + 1}
                     </h4>
-                    {variants.length > 1 && (
+                    {formData.hasMultipleVariants && variants.length > 1 && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -497,14 +535,17 @@ function EditProductPageInner() {
                         onChange={(e) => updateVariantLocal(index, "sku", e.target.value)}
                       />
                     </div>
-                    <div>
-                      <Label>Title</Label>
-                      <Input
-                        placeholder="Default"
-                        value={variant.title}
-                        onChange={(e) => updateVariantLocal(index, "title", e.target.value)}
-                      />
-                    </div>
+                    {formData.hasMultipleVariants && (
+                      <div>
+                        <Label>Variant Title</Label>
+                        <Input
+                          required={formData.hasMultipleVariants}
+                          placeholder="e.g., Red, Blue, Large"
+                          value={variant.title}
+                          onChange={(e) => updateVariantLocal(index, "title", e.target.value)}
+                        />
+                      </div>
+                    )}
                     <div>
                       <Label>Price (₹)</Label>
                       <Input
@@ -539,10 +580,12 @@ function EditProductPageInner() {
                   </div>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={addVariant}>
-                <PlusIcon className="size-4 mr-2" />
-                Add Variant
-              </Button>
+              {formData.hasMultipleVariants && (
+                <Button type="button" variant="outline" size="sm" onClick={addVariant}>
+                  <PlusIcon className="size-4 mr-2" />
+                  Add Variant
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>

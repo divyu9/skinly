@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Link, useNavigate } from "react-router-dom";
 import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -41,6 +42,7 @@ function NewProductPageInner() {
     images: Array<{ url: string; alt: string }>;
     tags: string;
     gadgetCategory: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
+    hasMultipleVariants: boolean;
   }>({
     title: "",
     slug: "",
@@ -52,6 +54,7 @@ function NewProductPageInner() {
     images: [{ url: "", alt: "" }],
     tags: "",
     gadgetCategory: "phone", // Default to phone
+    hasMultipleVariants: false, // Default to single variant
   });
 
   const [variants, setVariants] = useState<Variant[]>([
@@ -124,16 +127,19 @@ function NewProductPageInner() {
         images: formData.images.filter((img) => img.url),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
         gadgetCategory: formData.gadgetCategory,
+        hasMultipleVariants: formData.hasMultipleVariants,
       });
 
       // Create variants
-      for (const variant of variants) {
+      for (let i = 0; i < variants.length; i++) {
+        const variant = variants[i];
         await createVariant({
           productId,
           sku: variant.sku,
           title: variant.title,
           price: parseFloat(variant.price),
           inventoryQuantity: parseInt(variant.inventoryQuantity),
+          isDefaultVariant: !formData.hasMultipleVariants && i === 0,
         });
       }
 
@@ -299,11 +305,39 @@ function NewProductPageInner() {
               <CardTitle>Variants & Inventory</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Multiple Variants Toggle */}
+              <div className="flex items-start space-x-3 p-4 bg-muted/50 rounded-lg">
+                <Checkbox
+                  id="hasMultipleVariants"
+                  checked={formData.hasMultipleVariants}
+                  onCheckedChange={(checked) => {
+                    setFormData({ ...formData, hasMultipleVariants: checked === true });
+                    // Reset variants when toggling
+                    if (checked === false && variants.length > 1) {
+                      setVariants([variants[0]]);
+                    }
+                  }}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label
+                    htmlFor="hasMultipleVariants"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    This product has multiple variants
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.hasMultipleVariants
+                      ? "Multiple variants will be displayed with their variant titles (e.g., 'Red', 'Blue', 'Large')."
+                      : "Only one variant with no variant title selection on product page."}
+                  </p>
+                </div>
+              </div>
+
               {variants.map((variant, index) => (
                 <div key={index} className="p-4 border rounded-lg space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-medium">Variant {index + 1}</h4>
-                    {variants.length > 1 && (
+                    {formData.hasMultipleVariants && variants.length > 1 && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -324,14 +358,17 @@ function NewProductPageInner() {
                         onChange={(e) => updateVariant(index, "sku", e.target.value)}
                       />
                     </div>
-                    <div>
-                      <Label>Title</Label>
-                      <Input
-                        placeholder="Default"
-                        value={variant.title}
-                        onChange={(e) => updateVariant(index, "title", e.target.value)}
-                      />
-                    </div>
+                    {formData.hasMultipleVariants && (
+                      <div>
+                        <Label>Variant Title</Label>
+                        <Input
+                          required={formData.hasMultipleVariants}
+                          placeholder="e.g., Red, Blue, Large"
+                          value={variant.title}
+                          onChange={(e) => updateVariant(index, "title", e.target.value)}
+                        />
+                      </div>
+                    )}
                     <div>
                       <Label>Price (₹)</Label>
                       <Input
@@ -356,10 +393,12 @@ function NewProductPageInner() {
                   </div>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={addVariant}>
-                <PlusIcon className="size-4 mr-2" />
-                Add Variant
-              </Button>
+              {formData.hasMultipleVariants && (
+                <Button type="button" variant="outline" size="sm" onClick={addVariant}>
+                  <PlusIcon className="size-4 mr-2" />
+                  Add Variant
+                </Button>
+              )}
             </CardContent>
           </Card>
         </div>
