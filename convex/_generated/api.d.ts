@@ -57,6 +57,8 @@ import type * as migrateShippingFields from "../migrateShippingFields.js";
 import type * as migrateVariantModes from "../migrateVariantModes.js";
 import type * as migrateVariantModesInternal from "../migrateVariantModesInternal.js";
 import type * as migrateVariantPresets from "../migrateVariantPresets.js";
+import type * as migrateVariantPresetsAutoAssign from "../migrateVariantPresetsAutoAssign.js";
+import type * as migrateVariantPresetsAutoAssignInternal from "../migrateVariantPresetsAutoAssignInternal.js";
 import type * as migrateVariantPresetsInternal from "../migrateVariantPresetsInternal.js";
 import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
@@ -165,6 +167,8 @@ declare const fullApi: ApiFromModules<{
   migrateVariantModes: typeof migrateVariantModes;
   migrateVariantModesInternal: typeof migrateVariantModesInternal;
   migrateVariantPresets: typeof migrateVariantPresets;
+  migrateVariantPresetsAutoAssign: typeof migrateVariantPresetsAutoAssign;
+  migrateVariantPresetsAutoAssignInternal: typeof migrateVariantPresetsAutoAssignInternal;
   migrateVariantPresetsInternal: typeof migrateVariantPresetsInternal;
   migration: typeof migration;
   migrationInternal: typeof migrationInternal;
