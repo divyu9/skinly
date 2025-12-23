@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { useAuth } from "@/hooks/use-auth.ts";
@@ -58,6 +58,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   
+  const navigate = useNavigate();
   const { user, signoutRedirect } = useAuth();
   const profileData = useQuery(api.users.getProfileData, user ? {} : "skip");
   const updateProfile = useMutation(api.users.updateProfile);
@@ -91,6 +92,11 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const handleLogout = async () => {
     setAccountPanelOpen(false);
     await signoutRedirect();
+  };
+
+  const handleCategoryClick = (href: string) => {
+    setOpen(false);
+    navigate(href);
   };
 
   const menuItems = [
@@ -165,23 +171,21 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
                     </CollapsibleTrigger>
                     <CollapsibleContent className="pl-11 pr-3 space-y-1 mt-1">
                       {/* Link to all products */}
-                      <Link
-                        to="/products"
-                        onClick={() => setOpen(false)}
-                        className="block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                      <button
+                        onClick={() => handleCategoryClick("/products")}
+                        className="w-full text-left block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
                       >
                         All Products
-                      </Link>
+                      </button>
                       {/* Category links */}
                       {item.subItems.map((subItem) => (
-                        <Link
+                        <button
                           key={subItem.href}
-                          to={subItem.href}
-                          onClick={() => setOpen(false)}
-                          className="block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                          onClick={() => handleCategoryClick(subItem.href)}
+                          className="w-full text-left block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
                         >
                           {subItem.label}
-                        </Link>
+                        </button>
                       ))}
                     </CollapsibleContent>
                   </Collapsible>
