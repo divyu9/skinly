@@ -39,9 +39,15 @@ export function ProductCategoryHeader({
   return (
     <>
       {/* Product Category Extension Bar */}
-      <div className="border-t border-gray-100 bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800">
-        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+      <div className="relative border-t border-gray-100 bg-gray-50/50 dark:bg-gray-900/50 dark:border-gray-800 overflow-hidden">
+        {/* Animated gradient shimmer */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent dark:via-white/5 animate-shimmer" style={{
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 3s ease-in-out infinite'
+        }} />
+        
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3 relative z-10">
+          <div className="flex gap-2 justify-center overflow-x-auto no-scrollbar">
             {productCategories === undefined ? (
               // Loading skeleton
               <>
@@ -59,14 +65,19 @@ export function ProductCategoryHeader({
                   <button
                     key={category.id}
                     onClick={() => onUpdateFilters({ productType: category.id })}
-                    className={`group relative flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 font-semibold whitespace-nowrap transition-all duration-200 ${
+                    className={`group relative flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 font-semibold whitespace-nowrap transition-all duration-300 transform hover:scale-105 active:scale-95 ${
                       productCategory === category.id
-                        ? 'bg-black text-white shadow-lg hover:shadow-xl rounded-lg sm:rounded-xl dark:bg-white dark:text-black'
-                        : 'bg-white text-gray-700 hover:bg-gray-50 hover:shadow-md rounded-lg sm:rounded-xl border-2 border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-750 dark:hover:border-gray-600'
+                        ? 'bg-black text-white shadow-lg hover:shadow-2xl rounded-lg sm:rounded-xl dark:bg-white dark:text-black animate-pulse-subtle'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-xl rounded-lg sm:rounded-xl border-2 border-gray-200 hover:border-black dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 dark:hover:bg-gray-700 dark:hover:border-white'
                     }`}
                   >
-                    <IconComponent className="size-3.5 sm:size-4.5" />
+                    <IconComponent className={`size-3.5 sm:size-4.5 transition-transform duration-300 ${productCategory === category.id ? '' : 'group-hover:rotate-12'}`} />
                     <span className="text-xs sm:text-sm">{category.displayName}</span>
+                    
+                    {/* Hover glow effect */}
+                    {productCategory !== category.id && (
+                      <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/10 group-hover:via-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300 pointer-events-none" />
+                    )}
                   </button>
                 );
               })
