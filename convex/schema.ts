@@ -250,6 +250,8 @@ export default defineSchema({
     height: v.optional(v.number()), // Height in cm
     weight: v.optional(v.number()), // Weight in grams
     productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
+    // Variant mode (single product vs multiple variants)
+    hasMultipleVariants: v.optional(v.boolean()), // Default: true for backward compatibility
   })
     .index("by_slug", ["slug"])
     .index("by_collection", ["collectionId"])
@@ -275,6 +277,7 @@ export default defineSchema({
     weightUnit: v.optional(v.string()),
     rNumber: v.optional(v.string()), // Manual override for R-number (e.g., "R-1", "R-59")
     materialMultiplier: v.optional(v.number()), // Material usage multiplier (1x, 2x, 3x, etc.) - defaults to 1
+    isDefaultVariant: v.optional(v.boolean()), // True for single-product default variants (no variant title required)
   })
     .index("by_product", ["productId"])
     .index("by_sku", ["sku"])
