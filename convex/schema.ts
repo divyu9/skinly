@@ -566,10 +566,13 @@ export default defineSchema({
 
   gadgetConsumption: defineTable({
     categoryName: v.string(), // e.g., "Phone", "Laptop Top", "Mac Mini"
+    gadgetTypeId: v.optional(v.id("gadgetTypes")), // Link to gadgetTypes table (new field)
     lengthCm: v.number(), // Length in cm
     widthCm: v.number(), // Width in cm
     notes: v.optional(v.string()), // Optional notes (e.g., "Standard iPhone size")
-  }).index("by_category", ["categoryName"]),
+  })
+    .index("by_category", ["categoryName"])
+    .index("by_gadget_type", ["gadgetTypeId"]),
 
   rollInventory: defineTable({
     rNumber: v.string(), // e.g., "R-1", "R-59"
