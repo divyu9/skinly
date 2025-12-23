@@ -16,7 +16,13 @@ export const migrateProductVariantModes = action({
   args: {
     batchSize: v.optional(v.number()), // Process in batches to avoid timeouts
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    totalProcessed: number;
+    singleVariantProducts: number;
+    multiVariantProducts: number;
+    alreadyMigrated: number;
+    skipped: number;
+  }> => {
     const result = await ctx.runMutation(
       internal.migrateVariantModesInternal.runMigration,
       { batchSize: args.batchSize ?? 500 }

@@ -569,6 +569,7 @@ export const createProduct = mutation({
     height: v.optional(v.number()),
     weight: v.optional(v.number()),
     productType: v.optional(v.union(v.literal("physical"), v.literal("digital"))),
+    hasMultipleVariants: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -608,6 +609,7 @@ export const createProduct = mutation({
       height: args.height ?? 2,
       weight: args.weight ?? 100,
       productType: args.productType ?? "physical",
+      hasMultipleVariants: args.hasMultipleVariants ?? false,
     });
 
     return productId;
@@ -646,6 +648,7 @@ export const updateProduct = mutation({
       v.literal("glass"),
       v.literal("accessory")
     )),
+    hasMultipleVariants: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -678,6 +681,7 @@ export const updateProduct = mutation({
       gadgetTypeId?: Id<"gadgetTypes">;
       finishTypeId?: Id<"finishTypes">;
       productCategory?: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
+      hasMultipleVariants?: boolean;
     }> = {
       ...rawUpdates,
       gadgetCategory: rawUpdates.gadgetCategory as "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | undefined,
@@ -765,6 +769,7 @@ export const createVariant = mutation({
     inventoryQuantity: v.number(),
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
+    isDefaultVariant: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -785,6 +790,7 @@ export const createVariant = mutation({
       inventoryQuantity: args.inventoryQuantity,
       weight: args.weight,
       weightUnit: args.weightUnit,
+      isDefaultVariant: args.isDefaultVariant,
     });
 
     return variantId;
@@ -802,6 +808,7 @@ export const updateVariant = mutation({
     inventoryQuantity: v.optional(v.number()),
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
+    isDefaultVariant: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
