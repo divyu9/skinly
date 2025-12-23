@@ -4,6 +4,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { DefaultProviders } from "./components/providers/default.tsx";
 import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
 import { Skeleton } from "./components/ui/skeleton.tsx";
+import { FacebookPixelInitializer } from "./components/facebook-pixel-initializer.tsx";
 
 // Critical pages - loaded immediately
 import AuthCallback from "./pages/auth/Callback.tsx";
@@ -88,6 +89,7 @@ export default function App() {
   return (
     <HelmetProvider>
       <DefaultProviders>
+        <FacebookPixelInitializer />
         <BrowserRouter>
           <Routes>
           {/* Critical paths - eagerly loaded */}

@@ -7,16 +7,19 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
-import { Loader2, Key } from "lucide-react";
+import { Loader2, Key, BarChart3 } from "lucide-react";
 
 export default function SettingsPage() {
   const openAIKeySetting = useQuery(api.settings.getSetting, { key: "OPENAI_API_KEY" });
   const oldKeySetting = useQuery(api.settings.getSetting, { key: "openaiApiKey" });
+  const metaPixelSetting = useQuery(api.settings.getSetting, { key: "META_PIXEL_ID" });
   const updateSetting = useMutation(api.settings.updateSetting);
   const migrateKey = useMutation(api.migrateOpenAIKey.migrateOpenAIKey);
   
   const [apiKey, setApiKey] = useState("");
+  const [metaPixelId, setMetaPixelId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPixel, setIsSavingPixel] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
   const handleSave = async () => {
@@ -58,8 +61,31 @@ export default function SettingsPage() {
     }
   };
 
-  const isLoading = openAIKeySetting === undefined;
+  const handleSavePixel = async () => {
+    if (!metaPixelId.trim()) {
+      toast.error("Please enter a Facebook Pixel ID");
+      return;
+    }
+
+    setIsSavingPixel(true);
+    try {
+      await updateSetting({
+        key: "META_PIXEL_ID",
+        value: metaPixelId.trim(),
+      });
+      toast.success("Facebook Pixel ID saved successfully!");
+      setMetaPixelId("");
+    } catch (error) {
+      toast.error("Failed to save Pixel ID");
+      console.error(error);
+    } finally {
+      setIsSavingPixel(false);
+    }
+  };
+
+  const isLoading = openAIKeySetting === undefined || metaPixelSetting === undefined;
   const hasKey = openAIKeySetting?.value;
+  const hasPixel = metaPixelSetting?.value;
 
   return (
     <AdminLayout>
@@ -140,6 +166,63 @@ export default function SettingsPage() {
                 <Button onClick={handleSave} disabled={isSaving || !apiKey.trim()}>
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {hasKey ? "Update Key" : "Save Key"}
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Facebook Pixel ID
+            </CardTitle>
+            <CardDescription>
+              Track and measure your website traffic and conversions. Get your Pixel ID from{" "}
+              <a
+                href="https://business.facebook.com/events_manager2/list/pixel"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Facebook Events Manager
+              </a>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading...
+              </div>
+            ) : (
+              <>
+                {hasPixel && (
+                  <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3">
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      ✓ Facebook Pixel is configured (ID: {String(hasPixel)})
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="metaPixelId">
+                    {hasPixel ? "Update Pixel ID" : "Enter Pixel ID"}
+                  </Label>
+                  <Input
+                    id="metaPixelId"
+                    type="text"
+                    placeholder="1234567890123456"
+                    value={metaPixelId}
+                    onChange={(e) => setMetaPixelId(e.target.value)}
+                    disabled={isSavingPixel}
+                  />
+                </div>
+
+                <Button onClick={handleSavePixel} disabled={isSavingPixel || !metaPixelId.trim()}>
+                  {isSavingPixel && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {hasPixel ? "Update Pixel ID" : "Save Pixel ID"}
                 </Button>
               </>
             )}

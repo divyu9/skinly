@@ -79,13 +79,18 @@
       })();
     </script>
 
-    <!-- Meta Pixel - Aggressively deferred (5s or user interaction) -->
+    <!-- Meta Pixel - Initialized dynamically from Convex settings -->
     <script>
-      (function() {
-        var loaded = false;
+      window.__fbPixelId = null;
+      window.__fbPixelLoaded = false;
+      
+      window.initFacebookPixel = function(pixelId) {
+        if (!pixelId || window.__fbPixelLoaded) return;
+        window.__fbPixelId = pixelId;
+        
         var loadPixel = function() {
-          if (loaded) return;
-          loaded = true;
+          if (window.__fbPixelLoaded) return;
+          window.__fbPixelLoaded = true;
           
           !function(f,b,e,v,n,t,s)
           {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -95,7 +100,7 @@
           t.src=v;s=b.getElementsByTagName(e)[0];
           s.parentNode.insertBefore(t,s)}(window, document,'script',
           'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '%VITE_META_PIXEL_ID%');
+          fbq('init', window.__fbPixelId);
           fbq('track', 'PageView');
         };
         
@@ -112,11 +117,10 @@
             });
           }, { once: true, passive: true });
         });
-      })();
+      };
     </script>
     <noscript>
-      <img height="1" width="1" style="display:none"
-      src="https://www.facebook.com/tr?id=%VITE_META_PIXEL_ID%&ev=PageView&noscript=1"/>
+      <div id="fb-pixel-noscript"></div>
     </noscript>
 
     <!-- Structured Data for SEO -->
