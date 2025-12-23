@@ -668,3 +668,214 @@ export const getLowStockAlerts = query({
     return alerts.sort((a, b) => a.estimatedUnits - b.estimatedUnits);
   },
 });
+
+/**
+ * Sync variant inventory from roll calculations
+ * Updates inventoryQuantity for variants based on available roll material
+ * Only updates variants that have R-numbers assigned (roll-managed products)
+ */
+export const syncInventoryFromRolls = mutation({
+  args: {
+    variantIds: v.optional(v.array(v.id("variants"))), // Specific variants to sync
+    rNumber: v.optional(v.string()), // Sync all variants for this R-number
+    syncAll: v.optional(v.boolean()), // Sync all roll-managed variants
+  },
+  handler: async (ctx, args) => {
+    const variants = await ctx.db.query("variants").collect();
+    const products = await ctx.db.query("products").collect();
+    const rolls = await ctx.db.query("rollInventory").collect();
+    const gadgets = await ctx.db.query("gadgetConsumption").collect();
+    const variantPresets = await ctx.db.query("variantConsumptionPresets").collect();
+    
+    // Build maps for quick lookup
+    const productsMap = new Map<string, typeof products[0]>();
+    for (const product of products) {
+      productsMap.set(product._id, product);
+    }
+    
+    const rollsMap = new Map<string, typeof rolls[0]>();
+    for (const roll of rolls) {
+      rollsMap.set(roll.rNumber, roll);
+    }
+    
+    const gadgetsMap = new Map<string, typeof gadgets[0]>();
+    for (const gadget of gadgets) {
+      gadgetsMap.set(gadget.categoryName.toLowerCase(), gadget);
+    }
+    
+    // Map by gadgetTypeId for quick lookup
+    const gadgetsByTypeMap = new Map<string, typeof gadgets[0]>();
+    for (const gadget of gadgets) {
+      if (gadget.gadgetTypeId) {
+        gadgetsByTypeMap.set(gadget.gadgetTypeId, gadget);
+      }
+    }
+    
+    const presetsMap = new Map<string, typeof variantPresets[0]>();
+    for (const preset of variantPresets) {
+      presetsMap.set(preset._id, preset);
+    }
+    
+    // Determine which variants to sync
+    let variantsToSync = variants;
+    
+    if (args.variantIds && args.variantIds.length > 0) {
+      variantsToSync = variants.filter(v => args.variantIds!.includes(v._id));
+    } else if (args.rNumber) {
+      variantsToSync = variants.filter(v => v.rNumber === args.rNumber);
+    } else if (!args.syncAll) {
+      // Default: don't sync anything if no filter specified
+      return { syncedCount: 0, skippedCount: 0 };
+    }
+    
+    let syncedCount = 0;
+    let skippedCount = 0;
+    
+    for (const variant of variantsToSync) {
+      const product = productsMap.get(variant.productId);
+      if (!product) {
+        skippedCount++;
+        continue;
+      }
+      
+      // Only sync variants with R-numbers (roll-managed products)
+      const rNumber = variant.rNumber;
+      if (!rNumber) {
+        skippedCount++;
+        continue;
+      }
+      
+      // Get roll inventory
+      const roll = rollsMap.get(rNumber);
+      if (!roll) {
+        // No roll exists, set inventory to 0
+        await ctx.db.patch(variant._id, {
+          inventoryQuantity: 0,
+        });
+        syncedCount++;
+        continue;
+      }
+      
+      if (roll.metersAvailable <= 0) {
+        // Roll out of stock
+        await ctx.db.patch(variant._id, {
+          inventoryQuantity: 0,
+        });
+        syncedCount++;
+        continue;
+      }
+      
+      // Get consumption multiplier from preset or custom
+      let materialMultiplier = 1;
+      
+      if (variant.customMultiplier && variant.customMultiplier > 0) {
+        // Custom multiplier takes precedence
+        materialMultiplier = variant.customMultiplier;
+      } else if (variant.consumptionPresetId) {
+        // Use preset multiplier
+        const preset = presetsMap.get(variant.consumptionPresetId);
+        if (preset) {
+          materialMultiplier = preset.multiplier;
+        }
+      } else if (variant.materialMultiplier && variant.materialMultiplier > 0) {
+        // Fallback to deprecated materialMultiplier field
+        materialMultiplier = variant.materialMultiplier;
+      }
+      
+      // Get consumption dimensions from gadgetConsumption via gadgetTypeId or fallback to old logic
+      let gadgetLengthCm: number | null = null;
+      let gadgetWidthCm: number | null = null;
+      
+      if (product.gadgetTypeId) {
+        const gadgetConsumption = gadgetsByTypeMap.get(product.gadgetTypeId);
+        if (gadgetConsumption) {
+          gadgetLengthCm = gadgetConsumption.lengthCm;
+          gadgetWidthCm = gadgetConsumption.widthCm;
+        }
+      }
+      
+      // Fallback to old category detection if no gadgetTypeId or no match
+      if (!gadgetLengthCm || !gadgetWidthCm) {
+        let gadgetCategory: string | null = null;
+        const titleLower = product.title.toLowerCase();
+        
+        if (titleLower.includes("phone skin") || titleLower.includes("mobile skin")) {
+          gadgetCategory = "phone skin";
+        } else if (titleLower.includes("laptop")) {
+          gadgetCategory = "laptop skin";
+        } else if (titleLower.includes("tablet") || titleLower.includes("ipad")) {
+          gadgetCategory = "tablet skin";
+        } else if (titleLower.includes("camera")) {
+          gadgetCategory = "camera skin";
+        } else if (titleLower.includes("mac mini")) {
+          gadgetCategory = "mac mini skin";
+        } else if (titleLower.includes("console") || titleLower.includes("playstation") || titleLower.includes("ps5") || titleLower.includes("xbox")) {
+          gadgetCategory = "console skin";
+        } else if (titleLower.includes("lens")) {
+          gadgetCategory = "camera lens skin";
+        } else if (titleLower.includes("drone")) {
+          gadgetCategory = "drone skin";
+        } else if (titleLower.includes("charger")) {
+          gadgetCategory = "charger skin";
+        }
+        
+        if (gadgetCategory) {
+          const gadget = gadgetsMap.get(gadgetCategory);
+          if (gadget) {
+            gadgetLengthCm = gadget.lengthCm;
+            gadgetWidthCm = gadget.widthCm;
+          }
+        }
+      }
+      
+      if (!gadgetLengthCm || !gadgetWidthCm) {
+        // No dimensions available, skip
+        skippedCount++;
+        continue;
+      }
+      
+      // Calculate available units
+      const ROLL_WIDTH_CM = 29.5;
+      const rollLengthCm = roll.metersAvailable * 100;
+      const totalAreaCm2 = ROLL_WIDTH_CM * rollLengthCm;
+      const gadgetAreaCm2 = gadgetLengthCm * gadgetWidthCm * materialMultiplier;
+      
+      let availableUnits = 0;
+      
+      if (roll.isContinuous) {
+        // Continuous design: area-based calculation
+        availableUnits = Math.floor(totalAreaCm2 / gadgetAreaCm2);
+      } else {
+        // Non-continuous: orientation-based calculation
+        const effectiveLength = gadgetLengthCm * Math.sqrt(materialMultiplier);
+        const effectiveWidth = gadgetWidthCm * Math.sqrt(materialMultiplier);
+        
+        const units1Width = Math.floor(ROLL_WIDTH_CM / effectiveWidth);
+        const units1Length = Math.floor(rollLengthCm / effectiveLength);
+        const totalUnits1 = units1Width * units1Length;
+        
+        let totalUnits2 = 0;
+        if (effectiveLength <= ROLL_WIDTH_CM) {
+          const units2Width = Math.floor(ROLL_WIDTH_CM / effectiveLength);
+          const units2Length = Math.floor(rollLengthCm / effectiveWidth);
+          totalUnits2 = units2Width * units2Length;
+        }
+        
+        availableUnits = Math.max(totalUnits1, totalUnits2);
+      }
+      
+      // Update variant inventory
+      await ctx.db.patch(variant._id, {
+        inventoryQuantity: availableUnits,
+      });
+      
+      syncedCount++;
+    }
+    
+    return {
+      syncedCount,
+      skippedCount,
+      totalProcessed: variantsToSync.length,
+    };
+  },
+});
