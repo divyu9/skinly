@@ -28,6 +28,10 @@ interface SlideFormData {
   ctaLink: string;
   isActive: boolean;
   order: number;
+  mobileWidth: string;
+  mobileHeight: string;
+  desktopWidth: string;
+  desktopHeight: string;
 }
 
 export function HeroSlidesTab() {
@@ -46,6 +50,10 @@ export function HeroSlidesTab() {
     ctaLink: "",
     isActive: true,
     order: 0,
+    mobileWidth: "90vw",
+    mobileHeight: "110vw",
+    desktopWidth: "600px",
+    desktopHeight: "400px",
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -62,6 +70,10 @@ export function HeroSlidesTab() {
           ctaLink: slide.ctaLink || "",
           isActive: slide.isActive,
           order: slide.order,
+          mobileWidth: slide.mobileWidth || "90vw",
+          mobileHeight: slide.mobileHeight || "110vw",
+          desktopWidth: slide.desktopWidth || "600px",
+          desktopHeight: slide.desktopHeight || "400px",
         });
       }
     } else {
@@ -74,6 +86,10 @@ export function HeroSlidesTab() {
         ctaLink: "",
         isActive: true,
         order: slides ? slides.length : 0,
+        mobileWidth: "90vw",
+        mobileHeight: "110vw",
+        desktopWidth: "600px",
+        desktopHeight: "400px",
       });
     }
     setIsDialogOpen(true);
@@ -102,6 +118,10 @@ export function HeroSlidesTab() {
           ctaLink: formData.ctaLink || undefined,
           isActive: formData.isActive,
           order: formData.order,
+          mobileWidth: formData.mobileWidth || undefined,
+          mobileHeight: formData.mobileHeight || undefined,
+          desktopWidth: formData.desktopWidth || undefined,
+          desktopHeight: formData.desktopHeight || undefined,
         });
         toast.success("Slide updated successfully");
       } else {
@@ -113,6 +133,10 @@ export function HeroSlidesTab() {
           ctaLink: formData.ctaLink || undefined,
           isActive: formData.isActive,
           order: formData.order,
+          mobileWidth: formData.mobileWidth || undefined,
+          mobileHeight: formData.mobileHeight || undefined,
+          desktopWidth: formData.desktopWidth || undefined,
+          desktopHeight: formData.desktopHeight || undefined,
         });
         toast.success("Slide created successfully");
       }
@@ -304,6 +328,70 @@ export function HeroSlidesTab() {
                 value={formData.order}
                 onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
               />
+            </div>
+
+            {/* Dimensions Section */}
+            <div className="space-y-3 pt-2 border-t">
+              <div>
+                <h4 className="text-sm font-semibold mb-1">Slide Dimensions</h4>
+                <p className="text-xs text-muted-foreground">
+                  Configure custom dimensions for mobile and desktop views
+                </p>
+              </div>
+
+              {/* Mobile Dimensions */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground">Mobile View</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="mobile-width" className="text-xs">Width</Label>
+                    <Input
+                      id="mobile-width"
+                      value={formData.mobileWidth}
+                      onChange={(e) => setFormData({ ...formData, mobileWidth: e.target.value })}
+                      placeholder="90vw"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="mobile-height" className="text-xs">Height</Label>
+                    <Input
+                      id="mobile-height"
+                      value={formData.mobileHeight}
+                      onChange={(e) => setFormData({ ...formData, mobileHeight: e.target.value })}
+                      placeholder="110vw"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Dimensions */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground">Desktop View</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="desktop-width" className="text-xs">Width</Label>
+                    <Input
+                      id="desktop-width"
+                      value={formData.desktopWidth}
+                      onChange={(e) => setFormData({ ...formData, desktopWidth: e.target.value })}
+                      placeholder="600px"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="desktop-height" className="text-xs">Height</Label>
+                    <Input
+                      id="desktop-height"
+                      value={formData.desktopHeight}
+                      onChange={(e) => setFormData({ ...formData, desktopHeight: e.target.value })}
+                      placeholder="400px"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
