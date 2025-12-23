@@ -1230,6 +1230,12 @@ export default defineSchema({
     isActive: v.boolean(), // Whether slide is visible
     order: v.number(), // Display order (lower = earlier)
     
+    // Dimension fields (optional, defaults applied in frontend)
+    mobileWidth: v.optional(v.string()), // e.g. "90vw"
+    mobileHeight: v.optional(v.string()), // e.g. "110vw"
+    desktopWidth: v.optional(v.string()), // e.g. "600px"
+    desktopHeight: v.optional(v.string()), // e.g. "400px"
+    
     // Metadata
     createdBy: v.optional(v.string()), // Admin email
     createdAt: v.number(),

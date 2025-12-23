@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2, Shield, Glasses, ShoppingBag, Video, Box } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input.tsx";
 import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
@@ -115,6 +115,7 @@ interface ConvexProduct {
 
 export default function ProductsPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const verifyConnection = useAction(api.shopify.verifyConnection);
   
   // Get OOS sorting setting
@@ -141,8 +142,8 @@ export default function ProductsPage() {
   // Device selector dialog state
   const [isDeviceSelectorOpen, setIsDeviceSelectorOpen] = useState(false);
   
-  // Get URL parameters (must be before queries that depend on them)
-  const urlParams = new URLSearchParams(window.location.search);
+  // Parse URL parameters from location
+  const urlParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const deviceFilter = urlParams.get('device');
   const brandFilter = urlParams.get('brand');
   const modelFilter = urlParams.get('model');
@@ -178,6 +179,17 @@ export default function ProductsPage() {
   const [gadgetFilter, setGadgetFilter] = useState<string | null>(urlParams.get('gadget'));
   const [finishFilter, setFinishFilter] = useState<string | null>(urlParams.get('finish'));
   const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
+  
+  // Sync URL parameters to state when location changes (handles mobile nav navigation)
+  useEffect(() => {
+    const newProductCategory = urlParams.get('productType') as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null;
+    const newGadgetFilter = urlParams.get('gadget');
+    const newFinishFilter = urlParams.get('finish');
+    
+    setProductCategory(newProductCategory);
+    setGadgetFilter(newGadgetFilter);
+    setFinishFilter(newFinishFilter);
+  }, [location.search, urlParams]);
   
   // Reset smart filters when brand/model changes
   useEffect(() => {

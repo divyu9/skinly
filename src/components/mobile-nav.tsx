@@ -52,7 +52,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
-  const [shopExpanded, setShopExpanded] = useState(false);
+  const [shopExpanded, setShopExpanded] = useState(true); // Default to expanded
   
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -96,8 +96,8 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
 
   const handleCategoryClick = (href: string) => {
     setOpen(false);
-    // Force a full navigation to ensure products page re-reads URL params
-    window.location.href = href;
+    // Use navigate instead of window.location.href to avoid full page reload
+    navigate(href);
   };
 
   const menuItems = [

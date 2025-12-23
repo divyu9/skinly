@@ -78,11 +78,6 @@ export function ProductCategoryHeader({
                     {productCategory !== category.id && (
                       <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/10 group-hover:via-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300 pointer-events-none" />
                     )}
-                    
-                    {/* Active glow ring */}
-                    {productCategory === category.id && (
-                      <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 rounded-lg sm:rounded-xl opacity-75 blur-sm animate-pulse-strong -z-10" />
-                    )}
                   </button>
                 );
               })
