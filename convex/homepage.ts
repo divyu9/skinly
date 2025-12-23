@@ -357,6 +357,10 @@ export const createHeroSlide = mutation({
     ctaLink: v.optional(v.string()),
     isActive: v.boolean(),
     order: v.number(),
+    mobileWidth: v.optional(v.string()),
+    mobileHeight: v.optional(v.string()),
+    desktopWidth: v.optional(v.string()),
+    desktopHeight: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -386,6 +390,10 @@ export const updateHeroSlide = mutation({
     ctaLink: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     order: v.optional(v.number()),
+    mobileWidth: v.optional(v.string()),
+    mobileHeight: v.optional(v.string()),
+    desktopWidth: v.optional(v.string()),
+    desktopHeight: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
