@@ -48,6 +48,7 @@ const AdminModelsPage = lazy(() => import("./pages/admin/models/page.tsx"));
 const AdminSeedModelsPage = lazy(() => import("./pages/admin/seed-models/page.tsx"));
 const AdminPhoneCollectionsPage = lazy(() => import("./pages/admin/phone-collections.tsx"));
 const AdminProductFieldsMigrationPage = lazy(() => import("./pages/admin/product-fields-migration.tsx"));
+const AdminVariantModeMigrationPage = lazy(() => import("./pages/admin/variant-mode-migration.tsx"));
 const AdminCODPage = lazy(() => import("./pages/admin/cod.tsx"));
 const AdminWhatsAppPage = lazy(() => import("./pages/admin/whatsapp/page.tsx"));
 const AdminWhatsAppMessagesPage = lazy(() => import("./pages/admin/whatsapp/messages.tsx"));
@@ -144,6 +145,7 @@ export default function App() {
           <Route path="/backend-skinly/seed-models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/phone-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/product-fields-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper></Suspense>} />
+          <Route path="/backend-skinly/variant-mode-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantModeMigrationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/gst-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><GstMigrationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/fix-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper></Suspense>} />

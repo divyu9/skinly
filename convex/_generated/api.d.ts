@@ -52,6 +52,8 @@ import type * as migrateOrderStatuses from "../migrateOrderStatuses.js";
 import type * as migrateProductCategory from "../migrateProductCategory.js";
 import type * as migrateProductFields from "../migrateProductFields.js";
 import type * as migrateShippingFields from "../migrateShippingFields.js";
+import type * as migrateVariantModes from "../migrateVariantModes.js";
+import type * as migrateVariantModesInternal from "../migrateVariantModesInternal.js";
 import type * as migration from "../migration.js";
 import type * as migrationInternal from "../migrationInternal.js";
 import type * as mockups from "../mockups.js";
@@ -153,6 +155,8 @@ declare const fullApi: ApiFromModules<{
   migrateProductCategory: typeof migrateProductCategory;
   migrateProductFields: typeof migrateProductFields;
   migrateShippingFields: typeof migrateShippingFields;
+  migrateVariantModes: typeof migrateVariantModes;
+  migrateVariantModesInternal: typeof migrateVariantModesInternal;
   migration: typeof migration;
   migrationInternal: typeof migrationInternal;
   mockups: typeof mockups;
