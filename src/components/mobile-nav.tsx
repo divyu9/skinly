@@ -96,7 +96,8 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
 
   const handleCategoryClick = (href: string) => {
     setOpen(false);
-    navigate(href);
+    // Force a full navigation to ensure products page re-reads URL params
+    window.location.href = href;
   };
 
   const menuItems = [
