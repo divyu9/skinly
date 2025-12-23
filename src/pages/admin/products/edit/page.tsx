@@ -26,6 +26,8 @@ interface Variant {
   price: string;
   compareAtPrice?: string;
   inventoryQuantity: string;
+  consumptionPresetId?: string;
+  customMultiplier?: string;
 }
 
 function EditProductPageInner() {
@@ -83,6 +85,12 @@ function EditProductPageInner() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Get presets for selected gadget type
+  const variantPresets = useQuery(
+    api.variantConsumptionPresets.listByGadgetType,
+    formData.gadgetTypeId ? { gadgetTypeId: formData.gadgetTypeId as Id<"gadgetTypes"> } : "skip"
+  );
+  
   // SEO generation state
   const generateSEO = useAction(api.seoProductGenerator.generateProductSEO);
   const [isGeneratingSEO, setIsGeneratingSEO] = useState(false);
@@ -126,6 +134,8 @@ function EditProductPageInner() {
           price: v.price.toString(),
           compareAtPrice: v.compareAtPrice?.toString() || "",
           inventoryQuantity: v.inventoryQuantity.toString(),
+          consumptionPresetId: v.consumptionPresetId || "",
+          customMultiplier: v.customMultiplier?.toString() || "",
         }))
       );
     }
@@ -152,7 +162,7 @@ function EditProductPageInner() {
   };
 
   const addVariant = () => {
-    setVariants([...variants, { sku: "", title: "", price: "", compareAtPrice: "", inventoryQuantity: "0" }]);
+    setVariants([...variants, { sku: "", title: "", price: "", compareAtPrice: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" }]);
   };
 
   const removeVariant = async (index: number) => {
@@ -276,6 +286,8 @@ function EditProductPageInner() {
             compareAtPrice: compareAtPriceNum,
             inventoryQuantity: parseInt(variant.inventoryQuantity),
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
+            consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
+            customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
           });
         } else {
           // Create new variant
@@ -287,6 +299,8 @@ function EditProductPageInner() {
             compareAtPrice: compareAtPriceNum,
             inventoryQuantity: parseInt(variant.inventoryQuantity),
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
+            consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
+            customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
           });
         }
       }
@@ -578,6 +592,50 @@ function EditProductPageInner() {
                       />
                     </div>
                   </div>
+                  {/* Roll consumption settings */}
+                  {formData.gadgetTypeId && (
+                    <div className="pt-3 border-t space-y-3">
+                      <h5 className="text-sm font-medium text-muted-foreground">Roll Consumption (Optional)</h5>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Consumption Preset</Label>
+                          <Select
+                            value={variant.consumptionPresetId || "none"}
+                            onValueChange={(value) => updateVariantLocal(index, "consumptionPresetId", value === "none" ? "" : value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {variantPresets?.map((preset) => (
+                                <SelectItem key={preset._id} value={preset._id}>
+                                  {preset.name} ({preset.multiplier}x)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Preset multipliers for roll material
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Custom Multiplier</Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            placeholder="e.g., 1.5"
+                            value={variant.customMultiplier}
+                            onChange={(e) => updateVariantLocal(index, "customMultiplier", e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Overrides preset if set
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {formData.hasMultipleVariants && (

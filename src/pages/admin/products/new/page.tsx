@@ -23,11 +23,14 @@ interface Variant {
   title: string;
   price: string;
   inventoryQuantity: string;
+  consumptionPresetId?: string;
+  customMultiplier?: string;
 }
 
 function NewProductPageInner() {
   const navigate = useNavigate();
   const collections = useQuery(api.collections.getAllCollections, {});
+  const gadgetTypes = useQuery(api.gadgetTypes.listActive, {});
   const createProduct = useMutation(api.products.createProduct);
   const createVariant = useMutation(api.products.createVariant);
 
@@ -42,6 +45,7 @@ function NewProductPageInner() {
     images: Array<{ url: string; alt: string }>;
     tags: string;
     gadgetCategory: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
+    gadgetTypeId: Id<"gadgetTypes"> | "";
     hasMultipleVariants: boolean;
   }>({
     title: "",
@@ -54,12 +58,19 @@ function NewProductPageInner() {
     images: [{ url: "", alt: "" }],
     tags: "",
     gadgetCategory: "phone", // Default to phone
+    gadgetTypeId: "",
     hasMultipleVariants: false, // Default to single variant
   });
 
   const [variants, setVariants] = useState<Variant[]>([
-    { sku: "", title: "Default", price: "", inventoryQuantity: "0" },
+    { sku: "", title: "Default", price: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" },
   ]);
+
+  // Get presets for selected gadget type
+  const variantPresets = useQuery(
+    api.variantConsumptionPresets.listByGadgetType,
+    formData.gadgetTypeId ? { gadgetTypeId: formData.gadgetTypeId as Id<"gadgetTypes"> } : "skip"
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -84,7 +95,7 @@ function NewProductPageInner() {
   };
 
   const addVariant = () => {
-    setVariants([...variants, { sku: "", title: "", price: "", inventoryQuantity: "0" }]);
+    setVariants([...variants, { sku: "", title: "", price: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" }]);
   };
 
   const removeVariant = (index: number) => {
@@ -140,6 +151,8 @@ function NewProductPageInner() {
           price: parseFloat(variant.price),
           inventoryQuantity: parseInt(variant.inventoryQuantity),
           isDefaultVariant: !formData.hasMultipleVariants && i === 0,
+          consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
+          customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
         });
       }
 
@@ -152,7 +165,7 @@ function NewProductPageInner() {
     }
   };
 
-  if (collections === undefined) {
+  if (collections === undefined || gadgetTypes === undefined) {
     return <Skeleton className="h-screen w-full" />;
   }
 
@@ -391,6 +404,50 @@ function NewProductPageInner() {
                       />
                     </div>
                   </div>
+                  {/* Roll consumption settings */}
+                  {formData.gadgetTypeId && (
+                    <div className="pt-3 border-t space-y-3">
+                      <h5 className="text-sm font-medium text-muted-foreground">Roll Consumption (Optional)</h5>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Consumption Preset</Label>
+                          <Select
+                            value={variant.consumptionPresetId || "none"}
+                            onValueChange={(value) => updateVariant(index, "consumptionPresetId", value === "none" ? "" : value)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              {variantPresets?.map((preset) => (
+                                <SelectItem key={preset._id} value={preset._id}>
+                                  {preset.name} ({preset.multiplier}x)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Preset multipliers for roll material
+                          </p>
+                        </div>
+                        <div>
+                          <Label>Custom Multiplier</Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            placeholder="e.g., 1.5"
+                            value={variant.customMultiplier}
+                            onChange={(e) => updateVariant(index, "customMultiplier", e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Overrides preset if set
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
               {formData.hasMultipleVariants && (
@@ -482,6 +539,36 @@ function NewProductPageInner() {
                     <SelectItem value="accessory">Accessory</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="gadgetType">Gadget Type (Optional)</Label>
+                {gadgetTypes === undefined ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : gadgetTypes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No gadget types available
+                  </p>
+                ) : (
+                  <Select
+                    value={formData.gadgetTypeId || undefined}
+                    onValueChange={(value) => setFormData({ ...formData, gadgetTypeId: value as Id<"gadgetTypes"> })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gadget type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {gadgetTypes.map((gadgetType) => (
+                        <SelectItem key={gadgetType._id} value={gadgetType._id}>
+                          {gadgetType.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Required for variant consumption presets
+                </p>
               </div>
             </CardContent>
           </Card>

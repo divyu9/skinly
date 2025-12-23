@@ -770,6 +770,8 @@ export const createVariant = mutation({
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
     isDefaultVariant: v.optional(v.boolean()),
+    consumptionPresetId: v.optional(v.id("variantConsumptionPresets")),
+    customMultiplier: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -791,6 +793,8 @@ export const createVariant = mutation({
       weight: args.weight,
       weightUnit: args.weightUnit,
       isDefaultVariant: args.isDefaultVariant,
+      consumptionPresetId: args.consumptionPresetId,
+      customMultiplier: args.customMultiplier,
     });
 
     return variantId;
@@ -809,6 +813,8 @@ export const updateVariant = mutation({
     weight: v.optional(v.number()),
     weightUnit: v.optional(v.string()),
     isDefaultVariant: v.optional(v.boolean()),
+    consumptionPresetId: v.optional(v.id("variantConsumptionPresets")),
+    customMultiplier: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
