@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { ConvexError } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel.d.ts";
@@ -796,6 +797,14 @@ export const createVariant = mutation({
       consumptionPresetId: args.consumptionPresetId,
       customMultiplier: args.customMultiplier,
     });
+    
+    // Auto-sync if preset or custom multiplier is set and variant will have R-number
+    if ((args.consumptionPresetId || args.customMultiplier) && args.productId) {
+      // Schedule sync for this variant after 2 seconds
+      await ctx.scheduler.runAfter(2000, internal.rollsManagement.syncInventoryFromRollsInternal, {
+        variantIds: [variantId],
+      });
+    }
 
     return variantId;
   },
@@ -829,6 +838,14 @@ export const updateVariant = mutation({
 
     // Duplicate SKUs are allowed
     await ctx.db.patch(variantId, updates);
+    
+    // Auto-sync if preset or custom multiplier was updated
+    if (args.consumptionPresetId !== undefined || args.customMultiplier !== undefined) {
+      // Schedule sync for this variant after 2 seconds
+      await ctx.scheduler.runAfter(2000, internal.rollsManagement.syncInventoryFromRollsInternal, {
+        variantIds: [variantId],
+      });
+    }
   },
 });
 

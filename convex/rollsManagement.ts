@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel.d.ts";
 
 // Gadget Consumption Queries and Mutations
@@ -81,6 +82,12 @@ export const addRollInventory = mutation({
       metersAvailable: args.metersAvailable,
       notes: args.notes,
     });
+    
+    // Auto-sync variants for this R-number after 2 seconds
+    await ctx.scheduler.runAfter(2000, internal.rollsManagement.syncInventoryFromRollsInternal, {
+      rNumber: args.rNumber,
+    });
+    
     return id;
   },
 });
@@ -95,6 +102,10 @@ export const updateRollInventory = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Get the old R-number before updating
+    const oldRoll = await ctx.db.get(args.id);
+    const oldRNumber = oldRoll?.rNumber;
+    
     await ctx.db.patch(args.id, {
       rNumber: args.rNumber,
       designName: args.designName,
@@ -102,13 +113,35 @@ export const updateRollInventory = mutation({
       metersAvailable: args.metersAvailable,
       notes: args.notes,
     });
+    
+    // Auto-sync variants for both old and new R-numbers after 2 seconds
+    if (oldRNumber && oldRNumber !== args.rNumber) {
+      // R-number changed, sync both
+      await ctx.scheduler.runAfter(2000, internal.rollsManagement.syncInventoryFromRollsInternal, {
+        rNumber: oldRNumber,
+      });
+    }
+    await ctx.scheduler.runAfter(2000, internal.rollsManagement.syncInventoryFromRollsInternal, {
+      rNumber: args.rNumber,
+    });
   },
 });
 
 export const deleteRollInventory = mutation({
   args: { id: v.id("rollInventory") },
   handler: async (ctx, args) => {
+    // Get R-number before deleting
+    const roll = await ctx.db.get(args.id);
+    const rNumber = roll?.rNumber;
+    
     await ctx.db.delete(args.id);
+    
+    // Auto-sync variants for this R-number after 2 seconds (will set to 0)
+    if (rNumber) {
+      await ctx.scheduler.runAfter(2000, internal.rollsManagement.syncInventoryFromRollsInternal, {
+        rNumber,
+      });
+    }
   },
 });
 
@@ -674,11 +707,12 @@ export const getLowStockAlerts = query({
  * Updates inventoryQuantity for variants based on available roll material
  * Only updates variants that have R-numbers assigned (roll-managed products)
  */
-export const syncInventoryFromRolls = mutation({
+// Internal version for scheduled auto-sync
+export const syncInventoryFromRollsInternal = internalMutation({
   args: {
-    variantIds: v.optional(v.array(v.id("variants"))), // Specific variants to sync
-    rNumber: v.optional(v.string()), // Sync all variants for this R-number
-    syncAll: v.optional(v.boolean()), // Sync all roll-managed variants
+    variantIds: v.optional(v.array(v.id("variants"))),
+    rNumber: v.optional(v.string()),
+    syncAll: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const variants = await ctx.db.query("variants").collect();
@@ -725,7 +759,7 @@ export const syncInventoryFromRolls = mutation({
       variantsToSync = variants.filter(v => v.rNumber === args.rNumber);
     } else if (!args.syncAll) {
       // Default: don't sync anything if no filter specified
-      return { syncedCount: 0, skippedCount: 0 };
+      return { syncedCount: 0, skippedCount: 0, totalProcessed: 0 };
     }
     
     let syncedCount = 0;
@@ -877,5 +911,22 @@ export const syncInventoryFromRolls = mutation({
       skippedCount,
       totalProcessed: variantsToSync.length,
     };
+  },
+});
+
+// Public mutation wrapper - for manual sync from admin UI
+export const syncInventoryFromRolls = mutation({
+  args: {
+    variantIds: v.optional(v.array(v.id("variants"))),
+    rNumber: v.optional(v.string()),
+    syncAll: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<{
+    syncedCount: number;
+    skippedCount: number;
+    totalProcessed: number;
+  }> => {
+    // Call internal mutation directly for immediate results
+    return await ctx.runMutation(internal.rollsManagement.syncInventoryFromRollsInternal, args);
   },
 });

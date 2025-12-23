@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog.tsx";
-import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, XIcon, SearchIcon } from "lucide-react";
+import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, XIcon, SearchIcon, RefreshCwIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -36,6 +36,9 @@ export function RollsManagement() {
   const rolls = useQuery(api.rollsManagement.getRollInventory);
   const productsByRNumber = useQuery(api.rollsManagement.getProductsByRNumber);
   const lowStockAlerts = useQuery(api.rollsManagement.getLowStockAlerts);
+  
+  const syncInventory = useMutation(api.rollsManagement.syncInventoryFromRolls);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [showGadgetDialog, setShowGadgetDialog] = useState(false);
   const [showRollDialog, setShowRollDialog] = useState(false);
@@ -301,6 +304,22 @@ export function RollsManagement() {
     if (!rolls) return [];
     return rolls.map((roll) => roll.rNumber).sort();
   }, [rolls]);
+  
+  // Handler for manual sync
+  const handleSync = async (syncType: "all" | "rNumber", rNumber?: string) => {
+    setIsSyncing(true);
+    try {
+      const result = await syncInventory({
+        syncAll: syncType === "all",
+        rNumber: syncType === "rNumber" ? rNumber : undefined,
+      });
+      toast.success(`Synced ${result.syncedCount} variants successfully`);
+    } catch (error) {
+      toast.error("Failed to sync inventory");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   if (!gadgets || !rolls || !productsByRNumber || !lowStockAlerts) {
     return <div className="text-center py-8">Loading...</div>;
@@ -344,6 +363,59 @@ export function RollsManagement() {
           </CardContent>
         </Card>
       )}
+
+      {/* Auto-Sync Controls */}
+      <Card className="border-blue-200 bg-blue-50/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCwIcon className="size-5" />
+            Inventory Auto-Sync
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            Product inventory automatically syncs from roll quantities when rolls are added, updated, or deleted. 
+            Sync also happens when variant presets are assigned or changed.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-blue-100/50 border border-blue-200">
+            <AlertCircleIcon className="size-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm text-blue-900">
+              <p className="font-medium mb-1">How Auto-Sync Works:</p>
+              <ul className="list-disc list-inside space-y-1 text-blue-800">
+                <li>When you add, edit, or delete rolls, variants sync automatically in 2 seconds</li>
+                <li>When you assign presets or custom multipliers to variants, they sync automatically</li>
+                <li>Inventory quantity updates based on roll meters, gadget consumption, and material multipliers</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <h4 className="font-medium text-sm">Manual Sync (if needed)</h4>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => handleSync("all")}
+                disabled={isSyncing}
+                variant="outline"
+              >
+                {isSyncing ? (
+                  <>
+                    <RefreshCwIcon className="size-4 mr-2 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCwIcon className="size-4 mr-2" />
+                    Sync All Roll-Managed Products
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Updates all variants that have R-numbers assigned
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gadget Consumption Section */}
       <Card>
