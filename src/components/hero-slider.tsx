@@ -2,12 +2,38 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 
 export function HeroSlider() {
   const heroSlides = useQuery(api.homepage.getActiveHeroSlides);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Detect screen size changes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Get dimensions for a slide
+  const getSlideDimensions = useCallback((slide: NonNullable<typeof heroSlides>[0]) => {
+    if (isMobile) {
+      return {
+        width: slide.mobileWidth || "90vw",
+        height: slide.mobileHeight || "110vw",
+      };
+    } else {
+      return {
+        width: slide.desktopWidth || "600px",
+        height: slide.desktopHeight || "400px",
+      };
+    }
+  }, [isMobile]);
 
   // Track scroll position to update active dot
   useEffect(() => {
@@ -16,7 +42,10 @@ export function HeroSlider() {
 
     const handleScroll = () => {
       const scrollLeft = container.scrollLeft;
-      const cardWidth = container.clientWidth * 0.9 + 12; // 90vw + gap
+      // Get first slide dimensions to calculate card width
+      const slideWidth = container.querySelector('.hero-slide')?.clientWidth || 0;
+      const gap = 12; // gap-3 = 12px
+      const cardWidth = slideWidth + gap;
       const index = Math.round(scrollLeft / cardWidth);
       setActiveIndex(Math.max(0, Math.min(index, heroSlides.length - 1)));
     };
@@ -31,7 +60,14 @@ export function HeroSlider() {
       <div className="py-6">
         <div className="flex gap-3 overflow-x-hidden px-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="flex-shrink-0 w-[90vw] h-[110vw] rounded-2xl" />
+            <Skeleton 
+              key={i} 
+              className="flex-shrink-0 rounded-2xl" 
+              style={{ 
+                width: isMobile ? "90vw" : "600px",
+                height: isMobile ? "110vw" : "400px"
+              }}
+            />
           ))}
         </div>
       </div>
@@ -55,14 +91,19 @@ export function HeroSlider() {
           paddingRight: '16px',
         }}
       >
-        {heroSlides.map((slide) => (
-          <div
-            key={slide._id}
-            className="flex-shrink-0 w-[90vw] h-[110vw] snap-start"
-            style={{
-              contain: 'layout style paint',
-            }}
-          >
+        {heroSlides.map((slide) => {
+          const dimensions = getSlideDimensions(slide);
+          
+          return (
+            <div
+              key={slide._id}
+              className="hero-slide flex-shrink-0 snap-start"
+              style={{
+                width: dimensions.width,
+                height: dimensions.height,
+                contain: 'layout style paint',
+              }}
+            >
             <Link
               to={slide.ctaLink || "/"}
               className="group block relative w-full h-full rounded-2xl overflow-hidden shadow-lg bg-muted"
@@ -114,7 +155,8 @@ export function HeroSlider() {
               )}
             </Link>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pagination Dots - only show if multiple slides */}
@@ -126,7 +168,9 @@ export function HeroSlider() {
               onClick={() => {
                 const container = scrollContainerRef.current;
                 if (!container) return;
-                const cardWidth = container.clientWidth * 0.9 + 12; // 90vw + gap
+                const slideWidth = container.querySelector('.hero-slide')?.clientWidth || 0;
+                const gap = 12; // gap-3 = 12px
+                const cardWidth = slideWidth + gap;
                 container.scrollTo({
                   left: cardWidth * index,
                   behavior: 'smooth',
