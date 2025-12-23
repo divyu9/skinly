@@ -45,6 +45,8 @@ import type * as homepageSectionCards from "../homepageSectionCards.js";
 import type * as http from "../http.js";
 import type * as loginOtp from "../loginOtp.js";
 import type * as migrateFinishTypeField from "../migrateFinishTypeField.js";
+import type * as migrateGadgetConsumption from "../migrateGadgetConsumption.js";
+import type * as migrateGadgetConsumptionInternal from "../migrateGadgetConsumptionInternal.js";
 import type * as migrateGst from "../migrateGst.js";
 import type * as migrateModelsToGadgetTypes from "../migrateModelsToGadgetTypes.js";
 import type * as migrateOpenAIKey from "../migrateOpenAIKey.js";
@@ -148,6 +150,8 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   loginOtp: typeof loginOtp;
   migrateFinishTypeField: typeof migrateFinishTypeField;
+  migrateGadgetConsumption: typeof migrateGadgetConsumption;
+  migrateGadgetConsumptionInternal: typeof migrateGadgetConsumptionInternal;
   migrateGst: typeof migrateGst;
   migrateModelsToGadgetTypes: typeof migrateModelsToGadgetTypes;
   migrateOpenAIKey: typeof migrateOpenAIKey;
