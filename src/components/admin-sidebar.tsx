@@ -96,6 +96,7 @@ export function AdminSidebar() {
         { path: "/backend-skinly/product-classification", label: "Classification", icon: Layers },
         { path: "/backend-skinly/collections", label: "Collections", icon: Layers },
         { path: "/backend-skinly/phone-collections", label: "Phone Collections", icon: Smartphone },
+        { path: "/backend-skinly/variant-presets", label: "Variant Presets", icon: Layers },
         { path: "/backend-skinly/product-fields-migration", label: "Fields Migration", icon: FileCode },
         { path: "/backend-skinly/models", label: "Models", icon: Database },
         { path: "/backend-skinly/mockups", label: "Mockups", icon: Image },
