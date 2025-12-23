@@ -28,7 +28,7 @@ export function generateProductStructuredData(data: ProductWithVariant) {
     },
     "offers": {
       "@type": "Offer",
-      "url": `https://goskinly.com/products/${product._id}`,
+      "url": `https://www.goskinly.com/products/${product._id}`,
       "priceCurrency": "INR",
       "price": variant?.price || 0,
       "availability": variant && variant.inventoryQuantity > 0 
@@ -59,7 +59,7 @@ export function generateProductListStructuredData(
       "item": {
         "@type": "Product",
         "name": product.title,
-        "url": `https://goskinly.com/products/${product._id}`,
+        "url": `https://www.goskinly.com/products/${product._id}`,
         "image": product.images?.[0]?.url || "",
         "offers": {
           "@type": "Offer",
@@ -97,8 +97,8 @@ export function generateOrganizationStructuredData() {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "GoSkinly",
-    "url": "https://goskinly.com",
-    "logo": "https://goskinly.com/logo.png",
+    "url": "https://www.goskinly.com",
+    "logo": "https://www.goskinly.com/logo.png",
     "description": "Premium phone skins and protection accessories for all devices",
     "contactPoint": {
       "@type": "ContactPoint",
@@ -117,12 +117,12 @@ export function generateWebsiteStructuredData() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "GoSkinly",
-    "url": "https://goskinly.com",
+    "url": "https://www.goskinly.com",
     "potentialAction": {
       "@type": "SearchAction",
       "target": {
         "@type": "EntryPoint",
-        "urlTemplate": "https://goskinly.com/shop?search={search_term_string}"
+        "urlTemplate": "https://www.goskinly.com/shop?search={search_term_string}"
       },
       "query-input": "required name=search_term_string"
     }

@@ -348,7 +348,7 @@ http.route({
     const robotsTxt = `User-agent: *
 Allow: /
 
-Sitemap: https://goskinly.com/sitemap.xml`;
+Sitemap: https://www.goskinly.com/sitemap.xml`;
 
     return new Response(robotsTxt, {
       status: 200,

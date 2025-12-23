@@ -106,7 +106,7 @@ export function generateOrderConfirmedEmail(data: OrderData): { subject: string;
       </div>
       
       <center>
-        <a href="https://skinly.onhercules.app/orders" class="button">Track Your Order</a>
+        <a href="https://www.goskinly.com/orders" class="button">Track Your Order</a>
       </center>
     </div>
     
@@ -221,7 +221,7 @@ export function generateOrderDeliveredEmail(data: OrderData): { subject: string;
       <p>Your order has been successfully delivered! We hope you love your new products.</p>
       
       <center>
-        <a href="https://skinly.onhercules.app/orders" class="button">View Order</a>
+        <a href="https://www.goskinly.com/orders" class="button">View Order</a>
       </center>
       
       <p style="margin-top: 30px;">We'd love to hear your feedback! Please take a moment to review your purchase.</p>
@@ -275,7 +275,7 @@ export function generateOrderCancelledEmail(data: OrderData): { subject: string;
       <p>If this was your decision, you can always place a new order when you're ready!</p>
       
       <center>
-        <a href="https://skinly.onhercules.app/products" class="button">Browse Products</a>
+        <a href="https://www.goskinly.com/products" class="button">Browse Products</a>
       </center>
     </div>
     
@@ -332,7 +332,7 @@ export function generatePaymentFailedEmail(data: OrderData): { subject: string; 
       </ul>
       
       <center>
-        <a href="https://skinly.onhercules.app/orders/${data.orderNumber}" class="button">Retry Payment</a>
+        <a href="https://www.goskinly.com/orders/${data.orderNumber}" class="button">Retry Payment</a>
       </center>
     </div>
     

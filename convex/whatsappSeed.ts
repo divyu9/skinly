@@ -318,7 +318,7 @@ const SAMPLE_TEMPLATES = [
     providerTemplateId: "MODEL_ADDED_V1",
     templateType: "transactional" as const,
     templateBody:
-      "Great news! {brand_name} {model_name} is now available on Skinly. Shop now: https://skinly.onhercules.app/",
+      "Great news! {brand_name} {model_name} is now available on Skinly. Shop now: https://www.goskinly.com/",
     variables: ["brand_name", "model_name"],
     language: "en",
     status: "active" as const,

@@ -20,7 +20,7 @@ function escapeXml(unsafe: string): string {
 export const getSitemapUrls = query({
   args: {},
   handler: async (ctx) => {
-    const baseUrl = "https://goskinly.com";
+    const baseUrl = "https://www.goskinly.com";
     
     const urls: Array<{
       url: string;

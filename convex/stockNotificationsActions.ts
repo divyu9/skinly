@@ -53,7 +53,7 @@ export const sendRestockNotifications = mutation({
             recipientPhone: notification.phoneNumber,
             variables: {
               product_name: `${product.title} - ${variant.title}`,
-              product_url: `${process.env.VITE_SITE_URL || "https://skinly.onhercules.app"}/products/${product.slug}`,
+              product_url: `${process.env.VITE_SITE_URL || "https://www.goskinly.com"}/products/${product.slug}`,
               variant_name: variant.title,
             },
             priority: 6,

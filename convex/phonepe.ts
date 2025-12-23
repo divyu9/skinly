@@ -93,7 +93,7 @@ export const initiatePayment = action({
       const amountInPaise = Math.max(Math.round(args.amount * 100), 100);
 
       // Get site URL from environment variable
-      const siteUrl = process.env.SITE_URL || "https://skinly.onhercules.app";
+      const siteUrl = process.env.SITE_URL || "https://www.goskinly.com";
 
       // Build the payment request payload
       const paymentPayload: {

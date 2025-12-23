@@ -17,7 +17,7 @@ Allow: /product/
 Allow: /skin-type/
 
 # Sitemap location
-Sitemap: https://skinly.onhercules.app/sitemap.xml
+Sitemap: https://www.goskinly.com/sitemap.xml
 
 # Crawl delay (optional - remove if you want faster crawling)
 Crawl-delay: 1
