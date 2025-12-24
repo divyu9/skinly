@@ -11,8 +11,9 @@ import {
 export const processWebhookUpdate = internalMutation({
   args: {
     awbNumber: v.string(),
-    status: v.optional(v.string()),
-    trackingUpdate: v.optional(v.string()),
+    shipmentStatus: v.optional(v.string()),
+    statusCode: v.optional(v.string()),
+    statusDesc: v.optional(v.string()),
     rawPayload: v.string(),
   },
   handler: async (ctx, args) => {
@@ -32,77 +33,90 @@ export const processWebhookUpdate = internalMutation({
     console.log("=== RapidShyp Webhook Processing ===");
     console.log("Order:", order.orderNumber);
     console.log("AWB:", args.awbNumber);
-    console.log("Status from webhook:", args.status);
+    console.log("Shipment Status:", args.shipmentStatus);
+    console.log("Status Code:", args.statusCode);
+    console.log("Status Desc:", args.statusDesc);
     console.log("Current order status:", order.status);
 
     // Update shipping status if provided
-    if (args.status || args.trackingUpdate) {
+    if (args.statusDesc || args.shipmentStatus) {
       await ctx.db.patch(order._id, {
-        shippingStatus: args.status || args.trackingUpdate || order.shippingStatus,
+        shippingStatus: args.statusDesc || args.shipmentStatus || order.shippingStatus,
       });
     }
 
-    // Map RapidShyp status to order status
-    if (args.status) {
-      const statusLower = args.status.toLowerCase();
+    // Map RapidShyp status code to order status
+    // Using official RapidShyp status codes from their API
+    if (args.statusCode || args.shipmentStatus) {
+      const statusCode = args.statusCode || "";
+      const shipmentStatus = (args.shipmentStatus || "").toUpperCase();
       let newOrderStatus = order.status;
       let shouldUpdateStatus = false;
 
-      // RapidShyp status mapping based on their webhook documentation
-      // Common statuses: "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery", 
-      // "Delivered", "RTO Initiated", "RTO In Transit", "RTO Delivered", "Cancelled"
+      // RapidShyp Status Code Mapping
+      // Status codes: PSH (Pickup Scheduled), PUC (Picked Up), SPD (Booked), INT (In Transit),
+      // RAD (Reached Destination), OFD (Out For Delivery), DEL (Delivered),
+      // UND (Undelivered/NDR), RTO (RTO Initiated), RTO_INT (RTO In Transit),
+      // RTO_OFD (RTO Out For Delivery), RTO_DEL (RTO Delivered)
       
       if (
-        statusLower.includes("pickup scheduled") ||
-        statusLower.includes("pickup pending") ||
-        statusLower.includes("manifest")
+        statusCode === "PSH" ||
+        statusCode === "NA" ||
+        shipmentStatus.includes("PICKUP")
       ) {
         // Pickup scheduled - keep as processing
         newOrderStatus = "processing";
         shouldUpdateStatus = order.status !== "processing";
       } else if (
-        statusLower.includes("picked") ||
-        statusLower.includes("pickup") ||
-        statusLower.includes("forward")
+        statusCode === "PUC" ||
+        statusCode === "SPD" ||
+        statusCode === "INT" ||
+        statusCode === "RAD" ||
+        shipmentStatus.includes("TRANSIT") ||
+        shipmentStatus.includes("BOOKED")
       ) {
-        // Picked up - move to shipped
+        // Picked up / In Transit - move to shipped
         newOrderStatus = "shipped";
         shouldUpdateStatus = order.status === "processing";
       } else if (
-        statusLower.includes("in transit") ||
-        statusLower.includes("shipped") ||
-        statusLower.includes("intransit")
-      ) {
-        // In transit - ensure shipped
-        newOrderStatus = "shipped";
-        shouldUpdateStatus = order.status === "processing";
-      } else if (
-        statusLower.includes("out for delivery") ||
-        statusLower.includes("reached destination") ||
-        statusLower.includes("delivery")
+        statusCode === "OFD" ||
+        shipmentStatus.includes("OUT_FOR_DELIVERY")
       ) {
         // Out for delivery - keep as shipped
         newOrderStatus = "shipped";
         shouldUpdateStatus = order.status === "processing";
       } else if (
-        statusLower.includes("delivered") ||
-        statusLower.includes("complete")
+        statusCode === "DEL" ||
+        shipmentStatus === "DELIVERED"
       ) {
         // Delivered successfully
         newOrderStatus = "delivered";
         shouldUpdateStatus = order.status !== "delivered";
       } else if (
-        statusLower.includes("rto") ||
-        statusLower.includes("return") ||
-        statusLower.includes("return to origin") ||
-        statusLower.includes("undelivered")
+        statusCode === "RTO" ||
+        statusCode === "RTO_INT" ||
+        statusCode === "RTO_OFD" ||
+        shipmentStatus.includes("RTO") && !shipmentStatus.includes("RTO_DELIVERED")
       ) {
-        // RTO - return to origin
+        // RTO in progress - return to origin
         newOrderStatus = "rto";
         shouldUpdateStatus = order.status !== "rto" && order.status !== "cancelled";
       } else if (
-        statusLower.includes("cancelled") ||
-        statusLower.includes("cancel")
+        statusCode === "RTO_DEL" ||
+        shipmentStatus === "RTO_DELIVERED"
+      ) {
+        // RTO Delivered - update to rto
+        newOrderStatus = "rto";
+        shouldUpdateStatus = order.status !== "rto";
+      } else if (
+        statusCode === "UND" ||
+        shipmentStatus.includes("UNDELIVERED")
+      ) {
+        // Undelivered/NDR - keep current status, just log
+        console.log("Undelivered/NDR event - keeping current status");
+      } else if (
+        shipmentStatus.includes("CANCELLED") ||
+        shipmentStatus.includes("CANCEL")
       ) {
         // Shipment cancelled
         newOrderStatus = "cancelled";

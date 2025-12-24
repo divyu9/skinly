@@ -118,34 +118,81 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     try {
+      // Verify Bearer token
+      const authHeader = request.headers.get("Authorization");
+      if (authHeader) {
+        const token = authHeader.replace("Bearer ", "");
+        // Get expected token from settings
+        const webhookToken = await ctx.runQuery(api.settings.getSetting, {
+          key: "rapidshyp_webhook_token",
+        });
+        
+        if (webhookToken && webhookToken.value !== token) {
+          console.error("Invalid webhook token");
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              message: "Unauthorized - Invalid token" 
+            }),
+            {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }
+          );
+        }
+      }
+
       const body = await request.text();
       const data = JSON.parse(body);
 
       console.log("=== RapidShyp Webhook Received ===");
       console.log("Raw payload:", body);
 
-      // Extract tracking information
-      // RapidShyp sends various field names depending on the webhook type
-      const awbNumber = 
-        data.awb_number || 
-        data.awb || 
-        data.tracking_number || 
-        data.trackingNumber ||
-        data.waybill;
+      // Parse RapidShyp's nested payload structure
+      // Format: { records: [{ seller_order_id, shipment_details: [{ awb, shipment_status, ... }] }] }
+      const records = data.records || [];
+      if (!records || records.length === 0) {
+        console.error("No records found in webhook payload");
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "No records found in webhook payload" 
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
 
-      const status = 
-        data.status || 
-        data.shipment_status || 
-        data.current_status ||
-        data.shipmentStatus;
+      const record = records[0];
+      const shipmentDetails = record.shipment_details || [];
+      if (!shipmentDetails || shipmentDetails.length === 0) {
+        console.error("No shipment details found in webhook payload");
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "No shipment details found in webhook payload" 
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
 
-      const trackingUpdate = 
-        data.tracking_update || 
-        data.scan_details || 
-        data.statusDescription ||
-        data.scan_detail;
+      const shipment = shipmentDetails[0];
+      const awbNumber = shipment.awb;
+      const shipmentStatus = shipment.shipment_status;
+      const statusCode = shipment.current_tracking_status_code;
+      const statusDesc = shipment.current_tracking_status_desc;
 
-      console.log("Parsed fields:", { awbNumber, status, trackingUpdate });
+      console.log("Parsed fields:", { 
+        awbNumber, 
+        shipmentStatus, 
+        statusCode, 
+        statusDesc 
+      });
 
       // Validate required fields
       if (!awbNumber) {
@@ -165,8 +212,9 @@ http.route({
       // Process webhook update using internal mutation
       const result = await ctx.runMutation(internal.rapidshypWebhook.processWebhookUpdate, {
         awbNumber,
-        status,
-        trackingUpdate,
+        shipmentStatus,
+        statusCode,
+        statusDesc,
         rawPayload: body,
       });
 
