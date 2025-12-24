@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
+import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
 
@@ -27,7 +28,7 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderProps) {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,8 +39,19 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   // Fetch homepage settings
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   
-  // Fetch cart count
-  const cartCount = useQuery(api.cart.getCartCount) ?? 0;
+  // Fetch cart count for authenticated users
+  const dbCartCount = useQuery(api.cart.getCartCount, user ? {} : "skip");
+  const { getGuestCartCount, guestCart } = useGuestCart();
+  const [displayCount, setDisplayCount] = useState(0);
+
+  // Update display count whenever cart data changes
+  useEffect(() => {
+    if (user && dbCartCount !== undefined) {
+      setDisplayCount(dbCartCount);
+    } else if (!user && !authLoading) {
+      setDisplayCount(getGuestCartCount());
+    }
+  }, [user, dbCartCount, guestCart, authLoading, getGuestCartCount]);
 
   // Server-side device search
   const deviceSearchResults = useQuery(
@@ -259,9 +271,9 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 aria-label="Cart"
               >
                 <ShoppingCartIcon className="size-5 text-foreground" />
-                {cartCount > 0 && (
+                {displayCount > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 size-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {cartCount > 9 ? "9+" : cartCount}
+                    {displayCount > 9 ? "9+" : displayCount}
                   </span>
                 )}
               </button>

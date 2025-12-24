@@ -954,19 +954,6 @@ export default function ProductDetailPage() {
         onRequestModelClick={() => setRequestDialogOpen(true)}
       />
 
-      {/* Desktop Header with Cart - Hidden on mobile */}
-      <div className="hidden md:flex fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-40 pt-16">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/products">
-              <ArrowLeftIcon className="size-4 mr-2" />
-              Back to Products
-            </Link>
-          </Button>
-          <CartButton />
-        </div>
-      </div>
-
       {/* Mobile Navigation Sheet */}
       <MobileNav 
         open={isMobileMenuOpen}
@@ -974,7 +961,7 @@ export default function ProductDetailPage() {
       />
 
       {/* Product Detail Section */}
-      <section className="pt-24 md:pt-36 pb-12 px-4">
+      <section className="pt-24 pb-12 px-4">
         <div className="container mx-auto max-w-6xl">
           <Button variant="ghost" size="sm" asChild className="mb-4">
             <Link to="/products">
