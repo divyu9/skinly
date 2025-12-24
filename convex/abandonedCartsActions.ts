@@ -4,7 +4,6 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel.d.ts";
-import { Resend } from "resend";
 import twilio from "twilio";
 
 /**
@@ -40,49 +39,17 @@ export const sendAbandonedCartReminder = action({
       allowedCustomerEmails: [cart.userEmail],
     });
 
-    // Send email
+    // Send email via MSG91-based email system
     let emailSent = false;
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-
-      const itemsList = cart.items
-        .map(
-          (item: { quantity: number; productTitle: string; variant: string; price: number }) =>
-            `<li>${item.quantity}x ${item.productTitle} - ${item.variant} (₹${item.price})</li>`
-        )
-        .join("");
-
-      await resend.emails.send({
-        from: "Skinly <onboarding@resend.dev>",
-        to: [cart.userEmail],
-        subject: "You left something in your cart! 🎁",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #16a34a;">Don't Miss Out!</h1>
-            <p>Hi there! 👋</p>
-            <p>We noticed you left some awesome items in your cart:</p>
-            <ul style="list-style: none; padding: 0;">
-              ${itemsList}
-            </ul>
-            <p style="font-size: 18px; font-weight: bold;">
-              Cart Total: ₹${cart.cartTotal.toFixed(2)}
-            </p>
-            <div style="background-color: #f0fdf4; border: 2px solid #16a34a; border-radius: 8px; padding: 20px; margin: 20px 0;">
-              <h2 style="color: #16a34a; margin-top: 0;">Special Offer Just for You! 🎉</h2>
-              <p style="font-size: 16px;">Use code <strong style="font-size: 20px; color: #16a34a;">${couponCode}</strong> to get <strong>15% OFF</strong> your order!</p>
-              <p style="font-size: 14px; color: #666;">Valid for 7 days</p>
-            </div>
-            <a href="${process.env.VITE_SITE_URL || "https://yourdomain.onhercules.app"}/checkout" 
-               style="display: inline-block; background-color: #16a34a; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0;">
-              Complete Your Order
-            </a>
-            <p style="color: #666; font-size: 14px;">Questions? Reply to this email or contact our support.</p>
-          </div>
-        `,
+      await ctx.runMutation(internal.abandonedCarts.triggerEmailReminder, {
+        cartId: args.cartId,
+        couponCode,
       });
       emailSent = true;
+      console.log(`Email queued for abandoned cart ${args.cartId}`);
     } catch (error) {
-      console.error("Error sending email:", error);
+      console.error("Error queuing email:", error);
     }
 
     // Send WhatsApp message

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { triggerAbandonedCartEmail } from "./emailAbandonedCartTriggers";
 
 /**
  * Track when a user abandons their cart (has items but didn't checkout)
@@ -204,5 +205,28 @@ export const getAbandonedCartStats = query({
     };
 
     return stats;
+  },
+});
+
+/**
+ * Trigger email reminder for abandoned cart (internal)
+ */
+export const triggerEmailReminder = internalMutation({
+  args: {
+    cartId: v.id("abandonedCarts"),
+    couponCode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const cart = await ctx.db.get(args.cartId);
+    
+    if (!cart) {
+      throw new ConvexError({
+        message: "Cart not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Trigger email via the email system
+    await triggerAbandonedCartEmail(ctx, cart, args.couponCode);
   },
 });

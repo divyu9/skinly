@@ -24,6 +24,7 @@ import type * as codDisplayRules from "../codDisplayRules.js";
 import type * as codOtp from "../codOtp.js";
 import type * as collections from "../collections.js";
 import type * as coupons from "../coupons.js";
+import type * as emailAbandonedCartTriggers from "../emailAbandonedCartTriggers.js";
 import type * as emailManagement from "../emailManagement.js";
 import type * as emailMessaging from "../emailMessaging.js";
 import type * as emailOrderTriggers from "../emailOrderTriggers.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   codOtp: typeof codOtp;
   collections: typeof collections;
   coupons: typeof coupons;
+  emailAbandonedCartTriggers: typeof emailAbandonedCartTriggers;
   emailManagement: typeof emailManagement;
   emailMessaging: typeof emailMessaging;
   emailOrderTriggers: typeof emailOrderTriggers;
