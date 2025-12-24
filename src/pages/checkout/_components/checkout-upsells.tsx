@@ -8,7 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
-import { useGuestCart } from "@/hooks/use-guest-ts";
+import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import {
   Dialog,
   DialogContent,
