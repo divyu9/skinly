@@ -170,7 +170,74 @@ export const getUpsellsForCart = query({
       }
     }
 
-    // Get upsell products from matching rules (up to 3 total)
+    // Get upsell products from matching rules (up to 3 unique products)
+    // Group by productId to avoid duplicates and collect all variant-specific pricing
+    const productMap = new Map<string, {
+      productId: Id<"products">;
+      productTitle: string;
+      productImage: string | undefined;
+      variantId: Id<"variants">;
+      variantTitle: string;
+      originalPrice: number;
+      discountedPrice: number | undefined;
+      sku: string;
+      variantDiscounts: Map<string, number>; // Track variant-specific discounted prices
+    }>();
+
+    // First pass: collect all upsell variants and their discounts
+    for (const rule of matchingRules) {
+      for (const upsell of rule.upsellProducts) {
+        // Skip if already in cart
+        if (cartVariantIds.has(upsell.variantId)) {
+          continue;
+        }
+
+        const product = await ctx.db.get(upsell.productId);
+        const variant = await ctx.db.get(upsell.variantId);
+
+        if (product && variant && variant.inventoryQuantity > 0) {
+          const productIdStr = upsell.productId;
+          
+          if (!productMap.has(productIdStr)) {
+            // First time seeing this product, add it
+            const discountMap = new Map<string, number>();
+            if (upsell.discountedPrice !== undefined) {
+              discountMap.set(upsell.variantId, upsell.discountedPrice);
+            }
+
+            productMap.set(productIdStr, {
+              productId: upsell.productId,
+              productTitle: product.title,
+              productImage: product.images[0]?.url,
+              variantId: upsell.variantId,
+              variantTitle: variant.title,
+              originalPrice: variant.price,
+              discountedPrice: upsell.discountedPrice,
+              sku: variant.sku,
+              variantDiscounts: discountMap,
+            });
+          } else {
+            // Product already exists, add this variant's discount
+            const existing = productMap.get(productIdStr)!;
+            if (upsell.discountedPrice !== undefined) {
+              existing.variantDiscounts.set(upsell.variantId, upsell.discountedPrice);
+            }
+          }
+        }
+
+        // Stop at 3 unique products
+        if (productMap.size >= 3) {
+          break;
+        }
+      }
+
+      // Stop at 3 unique products
+      if (productMap.size >= 3) {
+        break;
+      }
+    }
+
+    // Second pass: build final results with all variants and their pricing
     const upsellProducts: Array<{
       productId: Id<"products">;
       productTitle: string;
@@ -190,60 +257,37 @@ export const getUpsellsForCart = query({
       }>;
     }> = [];
 
-    for (const rule of matchingRules) {
-      for (const upsell of rule.upsellProducts) {
-        // Skip if already in cart
-        if (cartVariantIds.has(upsell.variantId)) {
-          continue;
-        }
+    for (const [, productData] of productMap) {
+      // Get all in-stock variants for this product
+      const allVariants = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", productData.productId))
+        .filter((q) => q.gt(q.field("inventoryQuantity"), 0))
+        .collect();
 
-        // Get product and variant details
-        const product = await ctx.db.get(upsell.productId);
-        const variant = await ctx.db.get(upsell.variantId);
+      const hasMultipleVariants = allVariants.length > 1;
 
-        if (product && variant && variant.inventoryQuantity > 0) {
-          // Get all variants for this product
-          const allVariants = await ctx.db
-            .query("variants")
-            .withIndex("by_product", (q) => q.eq("productId", upsell.productId))
-            .filter((q) => q.gt(q.field("inventoryQuantity"), 0))
-            .collect();
+      // Map all variants with their custom discounted prices (from upsell config)
+      const variantsWithPrices = allVariants.map(v => ({
+        variantId: v._id,
+        variantTitle: v.title,
+        price: v.price,
+        discountedPrice: productData.variantDiscounts.get(v._id),
+        inventoryQuantity: v.inventoryQuantity,
+      }));
 
-          const hasMultipleVariants = allVariants.length > 1;
-
-          // Map all variants with their discounted prices (if applicable)
-          const variantsWithPrices = allVariants.map(v => ({
-            variantId: v._id,
-            variantTitle: v.title,
-            price: v.price,
-            discountedPrice: v._id === upsell.variantId ? upsell.discountedPrice : undefined,
-            inventoryQuantity: v.inventoryQuantity,
-          }));
-
-          upsellProducts.push({
-            productId: upsell.productId,
-            productTitle: product.title,
-            productImage: product.images[0]?.url,
-            variantId: upsell.variantId,
-            variantTitle: variant.title,
-            originalPrice: variant.price,
-            discountedPrice: upsell.discountedPrice,
-            sku: variant.sku,
-            hasMultipleVariants,
-            allVariants: hasMultipleVariants ? variantsWithPrices : undefined,
-          });
-
-          // Stop at 3 products
-          if (upsellProducts.length >= 3) {
-            break;
-          }
-        }
-      }
-
-      // Stop at 3 products
-      if (upsellProducts.length >= 3) {
-        break;
-      }
+      upsellProducts.push({
+        productId: productData.productId,
+        productTitle: productData.productTitle,
+        productImage: productData.productImage,
+        variantId: productData.variantId,
+        variantTitle: productData.variantTitle,
+        originalPrice: productData.originalPrice,
+        discountedPrice: productData.discountedPrice,
+        sku: productData.sku,
+        hasMultipleVariants,
+        allVariants: hasMultipleVariants ? variantsWithPrices : undefined,
+      });
     }
 
     return upsellProducts;
