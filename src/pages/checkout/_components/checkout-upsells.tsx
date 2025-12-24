@@ -7,30 +7,23 @@ import { PlusIcon, SparklesIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 
-interface CheckoutUpsellsProps {
-  cartItems: Array<{
-    productId: string;
-    variant: string;
-    price: number;
-    quantity: number;
-    phoneModel?: string;
-    phoneBrand?: string;
-    coverage?: "only_back" | "full_body_wrap";
-  }>;
-}
-
-export function CheckoutUpsells({ cartItems }: CheckoutUpsellsProps) {
-  const { user } = useAuth();
-  const { addToGuestCart } = useGuestCart();
+export function CheckoutUpsells() {
+  const { user, isLoading: authLoading } = useAuth();
+  const { addToGuestCart, guestCart } = useGuestCart();
   const [addingProduct, setAddingProduct] = useState<string | null>(null);
+
+  // Query cart data directly for reactivity
+  const dbCartItems = useQuery(api.cart.getCart, user ? {} : "skip");
+  
+  // Determine which cart to use
+  const cartItems = user ? dbCartItems : guestCart;
 
   const upsells = useQuery(
     api.checkoutUpsells.getUpsellsForCart,
-    { cartItems }
+    cartItems && cartItems.length > 0 ? { cartItems } : "skip"
   );
 
   const addToCart = useMutation(api.cart.addToCart);
@@ -77,7 +70,26 @@ export function CheckoutUpsells({ cartItems }: CheckoutUpsellsProps) {
     }
   };
 
-  if (upsells === undefined) {
+  // Show loading state while auth or cart is loading
+  if (authLoading || (user && dbCartItems === undefined)) {
+    return (
+      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show loading while upsells are being fetched
+  if (upsells === undefined && cartItems && cartItems.length > 0) {
     return (
       <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
         <CardHeader>

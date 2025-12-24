@@ -9,7 +9,8 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon, SparklesIcon, CheckCircleIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, CreditCardIcon, BanknoteIcon, AlertCircleIcon, ShieldCheckIcon, WalletIcon, TagIcon, XIcon, SparklesIcon, CheckCircleIcon, ArrowLeftIcon } from "lucide-react";
+import { CartButton } from "@/components/cart.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -929,15 +930,27 @@ function CheckoutPageInner() {
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Link to="/">
-              <img
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
-                alt="Skinly"
-                className="h-12"
-              />
-            </Link>
-            <h1 className="text-2xl font-bold">Checkout</h1>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(-1)}
+                className="shrink-0"
+              >
+                <ArrowLeftIcon className="size-4 mr-2" />
+                Back
+              </Button>
+              <Link to="/">
+                <img
+                  src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
+                  alt="Skinly"
+                  className="h-10"
+                />
+              </Link>
+              <h1 className="text-xl font-bold hidden sm:block">Checkout</h1>
+            </div>
+            <CartButton />
           </div>
         </div>
       </header>
@@ -1215,19 +1228,7 @@ function CheckoutPageInner() {
               </Card>
 
               {/* Checkout Upsells - show recommended products */}
-              {cartItems && cartItems.length > 0 && (
-                <CheckoutUpsells 
-                  cartItems={cartItems.map(item => ({
-                    productId: item.productId,
-                    variant: item.variant,
-                    price: item.price,
-                    quantity: item.quantity,
-                    phoneModel: item.phoneModel,
-                    phoneBrand: item.phoneBrand,
-                    coverage: item.coverage,
-                  }))}
-                />
-              )}
+              <CheckoutUpsells />
 
               {/* Shipping Information */}
               <Card>
