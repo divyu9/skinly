@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useEffect, useState } from "react";
@@ -64,6 +64,8 @@ export function CartButton() {
 }
 
 function CartContent() {
+  const location = useLocation();
+  const isOnCheckout = location.pathname === "/checkout";
   const { user, isLoading: authLoading } = useAuth();
   const cartItems = useQuery(api.cart.getCart, user ? {} : "skip");
   const updateQuantity = useMutation(api.cart.updateQuantity);
@@ -290,11 +292,13 @@ function CartContent() {
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <Link to="/checkout" className="w-full max-w-[85%]">
-            <Button className="w-full" size="default">
-              Proceed to Checkout
-            </Button>
-          </Link>
+          {!isOnCheckout && (
+            <Link to="/checkout" className="w-full max-w-[85%]">
+              <Button className="w-full" size="default">
+                Proceed to Checkout
+              </Button>
+            </Link>
+          )}
 
           <Button
             variant="outline"

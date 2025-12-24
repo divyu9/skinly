@@ -3,12 +3,27 @@ import { api } from "@/convex/_generated/api.js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
-import { PlusIcon, SparklesIcon } from "lucide-react";
+import { PlusIcon, SparklesIcon, ChevronDownIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
-import { useGuestCart } from "@/hooks/use-guest-cart.ts";
+import { useGuestCart } from "@/hooks/use-guest-ts";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 export function CheckoutUpsells() {
   const { user, isLoading: authLoading } = useAuth();

@@ -180,6 +180,14 @@ export const getUpsellsForCart = query({
       originalPrice: number;
       discountedPrice: number | undefined;
       sku: string;
+      hasMultipleVariants: boolean;
+      allVariants?: Array<{
+        variantId: Id<"variants">;
+        variantTitle: string;
+        price: number;
+        discountedPrice: number | undefined;
+        inventoryQuantity: number;
+      }>;
     }> = [];
 
     for (const rule of matchingRules) {
@@ -194,6 +202,24 @@ export const getUpsellsForCart = query({
         const variant = await ctx.db.get(upsell.variantId);
 
         if (product && variant && variant.inventoryQuantity > 0) {
+          // Get all variants for this product
+          const allVariants = await ctx.db
+            .query("variants")
+            .withIndex("by_product", (q) => q.eq("productId", upsell.productId))
+            .filter((q) => q.gt(q.field("inventoryQuantity"), 0))
+            .collect();
+
+          const hasMultipleVariants = allVariants.length > 1;
+
+          // Map all variants with their discounted prices (if applicable)
+          const variantsWithPrices = allVariants.map(v => ({
+            variantId: v._id,
+            variantTitle: v.title,
+            price: v.price,
+            discountedPrice: v._id === upsell.variantId ? upsell.discountedPrice : undefined,
+            inventoryQuantity: v.inventoryQuantity,
+          }));
+
           upsellProducts.push({
             productId: upsell.productId,
             productTitle: product.title,
@@ -203,6 +229,8 @@ export const getUpsellsForCart = query({
             originalPrice: variant.price,
             discountedPrice: upsell.discountedPrice,
             sku: variant.sku,
+            hasMultipleVariants,
+            allVariants: hasMultipleVariants ? variantsWithPrices : undefined,
           });
 
           // Stop at 3 products
