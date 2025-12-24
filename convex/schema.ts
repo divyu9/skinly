@@ -110,6 +110,8 @@ export default defineSchema({
     // Coupon fields
     couponId: v.optional(v.id("coupons")), // Coupon used for this order
     couponDiscount: v.optional(v.number()), // Discount amount from coupon
+    walletCreditCouponAmount: v.optional(v.number()), // Wallet credit to be added on delivery (for wallet_credit coupons)
+    walletCreditCredited: v.optional(v.boolean()), // Whether wallet credit coupon has been credited
     // Refund tracking fields
     refundedToWallet: v.optional(v.boolean()), // Whether order was refunded to wallet
     refundAmount: v.optional(v.number()), // Amount refunded to wallet

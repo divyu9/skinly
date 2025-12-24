@@ -77,9 +77,12 @@ function ActiveCouponsSection({
       <CardContent className="space-y-3">
         {activeCoupons.slice(0, 5).map((coupon) => {
           const isApplied = appliedCouponCode === coupon.code;
+          const isWalletCredit = coupon.effectType === "wallet_credit";
           const discountText = coupon.discountType === "percentage"
             ? `${coupon.discountValue}% OFF`
-            : `₹${coupon.discountValue} OFF`;
+            : isWalletCredit 
+              ? `₹${coupon.discountValue} CREDIT`
+              : `₹${coupon.discountValue} OFF`;
 
           return (
             <div
@@ -95,9 +98,18 @@ function ActiveCouponsSection({
                   <Badge variant="secondary" className="font-mono text-xs">
                     {coupon.code}
                   </Badge>
-                  <Badge variant="outline" className="text-xs">
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${isWalletCredit ? 'bg-purple-500/10 border-purple-500/50 text-purple-700 dark:text-purple-300' : ''}`}
+                  >
                     {discountText}
                   </Badge>
+                  {isWalletCredit && (
+                    <Badge variant="outline" className="text-xs bg-purple-500/10 border-purple-500/50 text-purple-700 dark:text-purple-300">
+                      <WalletIcon className="size-3 mr-1" />
+                      On Delivery
+                    </Badge>
+                  )}
                   {isApplied && (
                     <Badge className="bg-green-600 text-white text-xs">
                       Applied
@@ -107,6 +119,11 @@ function ActiveCouponsSection({
                 <p className="text-sm text-muted-foreground mt-1">
                   {coupon.description}
                 </p>
+                {isWalletCredit && (
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-1 font-medium">
+                    Credit will be added to your wallet when order is delivered
+                  </p>
+                )}
                 {coupon.minCartValue && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Min. cart value: ₹{coupon.minCartValue}
@@ -183,9 +200,12 @@ function CheckoutPageInner() {
       _id: Id<"coupons">;
       code: string;
       description: string;
+      effectType?: "discount" | "wallet_credit";
     };
     discountAmount: number;
     eligibleItemsCount: number;
+    isWalletCredit?: boolean;
+    walletCreditAmount?: number;
   } | null>(null);
   const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
   const [couponMessage, setCouponMessage] = useState<{
@@ -407,9 +427,22 @@ function CheckoutPageInner() {
       
       setAppliedCoupon(result);
       setCouponCode(code.toUpperCase()); // Update input to match validated code
-      setCouponMessage({ type: 'success', text: `Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}` });
+      
+      // Show appropriate success message based on coupon type
+      if (result.isWalletCredit && result.walletCreditAmount) {
+        setCouponMessage({ 
+          type: 'success', 
+          text: `Coupon applied! You'll receive ₹${result.walletCreditAmount} wallet credit when your order is delivered` 
+        });
+      } else {
+        setCouponMessage({ 
+          type: 'success', 
+          text: `Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}` 
+        });
+      }
+      
       // Clear success message after showing briefly
-      setTimeout(() => setCouponMessage(null), 2000);
+      setTimeout(() => setCouponMessage(null), 3000);
     } catch (error) {
       // Extract user-friendly error message from ConvexError
       let errorMessage = "Coupon could not be applied";
@@ -872,6 +905,7 @@ function CheckoutPageInner() {
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
         couponId: appliedCoupon?.coupon._id,
         couponDiscount: appliedCoupon?.discountAmount,
+        walletCreditAmount: appliedCoupon?.walletCreditAmount,
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,
       });

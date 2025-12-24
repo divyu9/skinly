@@ -144,6 +144,38 @@ export const processWebhookUpdate = internalMutation({
             console.log(`Credited cashback: ₹${order.cashbackAmount} to user`);
           }
         }
+
+        // Handle delivered status - credit wallet credit coupon if not already done
+        if (newOrderStatus === "delivered" && !order.walletCreditCredited && order.walletCreditCouponAmount && order.userId) {
+          const user = await ctx.db.get(order.userId);
+          if (user) {
+            const currentBalance = user.walletBalance || 0;
+            const newBalance = currentBalance + order.walletCreditCouponAmount;
+
+            await ctx.db.patch(order.userId, {
+              walletBalance: newBalance,
+            });
+
+            await ctx.db.insert("walletTransactions", {
+              userId: order.userId,
+              transactionType: "credit",
+              amount: order.walletCreditCouponAmount,
+              source: "coupon_credit",
+              balanceBefore: currentBalance,
+              balanceAfter: newBalance,
+              description: `Wallet credit from coupon on order #${order.orderNumber}`,
+              relatedOrderId: order._id,
+              relatedCouponId: order.couponId,
+              createdAt: Date.now(),
+            });
+
+            await ctx.db.patch(order._id, {
+              walletCreditCredited: true,
+            });
+
+            console.log(`Credited wallet credit from coupon: ₹${order.walletCreditCouponAmount} to user`);
+          }
+        }
         
         // Send email notifications based on status change
         try {

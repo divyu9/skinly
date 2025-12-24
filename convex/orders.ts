@@ -29,6 +29,7 @@ export const createOrder = mutation({
     walletAmount: v.optional(v.number()),
     couponId: v.optional(v.id("coupons")),
     couponDiscount: v.optional(v.number()),
+    walletCreditAmount: v.optional(v.number()), // Wallet credit to be added on delivery (for wallet_credit coupons)
     sessionId: v.optional(v.string()), // For guest checkout
     guestEmail: v.optional(v.string()), // Required for guest checkout
   },
@@ -263,6 +264,7 @@ export const createOrder = mutation({
       // Coupon fields
       couponId: args.couponId,
       couponDiscount,
+      walletCreditCouponAmount: args.walletCreditAmount, // Track wallet credit to be added on delivery
       // COD fields
       codFee: args.codFee,
       prepaidAmount: args.prepaidAmount,
@@ -786,6 +788,40 @@ export const updateOrderStatus = mutation({
             });
           }
         }
+      }
+    }
+
+    // If status is now "delivered" and wallet credit coupon hasn't been credited yet, process wallet credit
+    if (args.status === "delivered" && !order.walletCreditCredited && order.walletCreditCouponAmount && order.userId) {
+      // Get the user (only for authenticated orders)
+      const user = await ctx.db.get(order.userId);
+      if (user) {
+        const currentBalance = user.walletBalance || 0;
+        const newBalance = currentBalance + order.walletCreditCouponAmount;
+
+        // Update user's wallet balance
+        await ctx.db.patch(order.userId, {
+          walletBalance: newBalance,
+        });
+
+        // Create wallet transaction record
+        await ctx.db.insert("walletTransactions", {
+          userId: order.userId,
+          transactionType: "credit",
+          amount: order.walletCreditCouponAmount,
+          source: "coupon_credit",
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+          description: `Wallet credit from coupon on order #${order.orderNumber}`,
+          relatedOrderId: order._id,
+          relatedCouponId: order.couponId,
+          createdAt: Date.now(),
+        });
+
+        // Mark order as wallet credit credited
+        await ctx.db.patch(args.orderId, {
+          walletCreditCredited: true,
+        });
       }
     }
   },

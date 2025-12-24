@@ -249,12 +249,87 @@ export const validateCoupon = query({
       });
     }
 
-    // Reject wallet-credit coupons at checkout
+    // For wallet-credit coupons, return early with special handling
     if (coupon.effectType === "wallet_credit") {
-      throw new ConvexError({
-        message: "This is a wallet credit coupon. Please redeem it from your Account page instead.",
-        code: "BAD_REQUEST",
-      });
+      const now = Date.now();
+      
+      // Check if coupon is active
+      if (!coupon.isActive) {
+        throw new ConvexError({
+          message: "This coupon is not active",
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      // Check date range
+      if (now < coupon.startDate) {
+        const startDateStr = new Date(coupon.startDate).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+        throw new ConvexError({
+          message: `This coupon is not yet active. It will be available from ${startDateStr}`,
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      if (now > coupon.endDate) {
+        const endDateStr = new Date(coupon.endDate).toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+        throw new ConvexError({
+          message: `This coupon expired on ${endDateStr}`,
+          code: "BAD_REQUEST",
+        });
+      }
+      
+      // Check usage limit
+      if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+        throw new ConvexError({
+          message: "This coupon has reached its usage limit",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Check customer email restrictions
+      if (coupon.allowedCustomerEmails && coupon.allowedCustomerEmails.length > 0) {
+        if (!args.userEmail) {
+          throw new ConvexError({
+            message: "This coupon is only available for specific customers",
+            code: "BAD_REQUEST",
+          });
+        }
+        const emailLower = args.userEmail.toLowerCase();
+        const allowed = coupon.allowedCustomerEmails.some((email) => email.toLowerCase() === emailLower);
+        if (!allowed) {
+          throw new ConvexError({
+            message: "This coupon is not available for your account",
+            code: "BAD_REQUEST",
+          });
+        }
+      }
+
+      // For wallet credit coupons, return the credit amount
+      let creditAmount = 0;
+      if (coupon.discountType === "fixed") {
+        creditAmount = coupon.discountValue;
+      } else {
+        throw new ConvexError({
+          message: "Percentage-based wallet credit coupons are not supported",
+          code: "BAD_REQUEST",
+        });
+      }
+
+      return {
+        coupon,
+        discountAmount: 0, // No immediate discount
+        eligibleItemsCount: 0,
+        isWalletCredit: true,
+        walletCreditAmount: creditAmount,
+      };
     }
     
     const now = Date.now();
@@ -853,7 +928,7 @@ export const getCouponUsageStats = query({
 });
 
 // Get all active coupons (public - no auth required)
-// Excludes wallet-credit coupons since they can't be used at checkout
+// Includes both discount and wallet-credit coupons
 export const getActiveCoupons = query({
   args: {},
   handler: async (ctx) => {
@@ -865,12 +940,11 @@ export const getActiveCoupons = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
     
-    // Filter by date range, usage limit, and exclude wallet-credit coupons
+    // Filter by date range and usage limit
     const activeCoupons = allCoupons.filter((coupon) => {
       const isInDateRange = coupon.startDate <= now && coupon.endDate >= now;
       const hasUsageAvailable = !coupon.usageLimit || coupon.usageCount < coupon.usageLimit;
-      const isNotWalletCredit = coupon.effectType !== "wallet_credit"; // Exclude wallet-credit coupons
-      return isInDateRange && hasUsageAvailable && isNotWalletCredit;
+      return isInDateRange && hasUsageAvailable;
     });
 
     // Sort by discount value (highest first)
