@@ -82,17 +82,22 @@ export const trackAbandonedCart = mutation({
 
 /**
  * Get all abandoned carts that need reminders sent
- * (abandoned > 1 hour ago, status = pending)
+ * Uses configurable delay from settings (default 1 hour)
  */
 export const getCartsNeedingReminders = query({
-  args: {},
-  handler: async (ctx) => {
-    const oneHourAgo = Date.now() - 60 * 60 * 1000; // 1 hour
+  args: {
+    delayHours: v.optional(v.number()), // Optional override for delay
+  },
+  handler: async (ctx, args) => {
+    // Default to 1 hour if not specified
+    const delayHours = args.delayHours ?? 1;
+    const delayMs = delayHours * 60 * 60 * 1000;
+    const cutoffTime = Date.now() - delayMs;
 
     const abandonedCarts = await ctx.db
       .query("abandonedCarts")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .filter((q) => q.lt(q.field("abandonedAt"), oneHourAgo))
+      .filter((q) => q.lt(q.field("abandonedAt"), cutoffTime))
       .collect();
 
     return abandonedCarts;

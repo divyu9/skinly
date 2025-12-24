@@ -12,6 +12,10 @@ import twilio from "twilio";
 export const sendAbandonedCartReminder = action({
   args: {
     cartId: v.id("abandonedCarts"),
+    couponPrefix: v.optional(v.string()),
+    discountType: v.optional(v.union(v.literal("percentage"), v.literal("fixed"))),
+    discountValue: v.optional(v.number()),
+    validityDays: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Get the abandoned cart from the database
@@ -23,17 +27,23 @@ export const sendAbandonedCartReminder = action({
       return { success: false, error: "Cart not found" };
     }
 
-    // Generate a unique coupon code for this user
-    const couponCode = `COMEBACK${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    // Use provided settings or defaults
+    const couponPrefix = args.couponPrefix || "COMEBACK";
+    const discountType = args.discountType || "percentage";
+    const discountValue = args.discountValue || 15;
+    const validityDays = args.validityDays || 7;
 
-    // Create the coupon with 15% discount
+    // Generate a unique coupon code
+    const couponCode = `${couponPrefix}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // Create the coupon with configured settings
     await ctx.runMutation(internal.coupons.createCouponInternal, {
       code: couponCode,
-      description: `Special 15% off for ${cart.userEmail}`,
-      discountType: "percentage",
-      discountValue: 15,
+      description: `Special ${discountType === "percentage" ? discountValue + "%" : "₹" + discountValue} off for ${cart.userEmail}`,
+      discountType,
+      discountValue,
       startDate: Date.now(),
-      endDate: Date.now() + 7 * 24 * 60 * 60 * 1000, // Valid for 7 days
+      endDate: Date.now() + validityDays * 24 * 60 * 60 * 1000,
       isActive: true,
       usageLimit: 1,
       allowedCustomerEmails: [cart.userEmail],
@@ -61,8 +71,12 @@ export const sendAbandonedCartReminder = action({
           process.env.TWILIO_AUTH_TOKEN
         );
 
+        const discountText = discountType === "percentage" 
+          ? `${discountValue}%` 
+          : `₹${discountValue}`;
+
         await client.messages.create({
-          body: `Hi! You left items worth ₹${cart.cartTotal.toFixed(2)} in your Skinly cart 🛒\n\nComplete your order and save 15% with code: ${couponCode}\n\n${process.env.VITE_SITE_URL || "https://yourdomain.onhercules.app"}/checkout`,
+          body: `Hi! You left items worth ₹${cart.cartTotal.toFixed(2)} in your Skinly cart 🛒\n\nComplete your order and save ${discountText} with code: ${couponCode}\n\n${process.env.VITE_SITE_URL || "https://yourdomain.onhercules.app"}/checkout`,
           from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
           to: `whatsapp:${cart.userPhone}`,
         });
@@ -93,8 +107,12 @@ export const sendAbandonedCartReminder = action({
 export const processAbandonedCarts = action({
   args: {},
   handler: async (ctx): Promise<{ processed: number; results: unknown[] }> => {
+    // Get settings first
+    const settings = await ctx.runQuery(api.abandonedCartSettings.getSettings, {});
+    
     const cartsNeedingReminders: Array<{ _id: string }> = await ctx.runQuery(
-      api.abandonedCarts.getCartsNeedingReminders
+      api.abandonedCarts.getCartsNeedingReminders,
+      { delayHours: settings.delayHours }
     );
 
     const results: unknown[] = [];
@@ -104,6 +122,10 @@ export const processAbandonedCarts = action({
         api.abandonedCartsActions.sendAbandonedCartReminder,
         {
           cartId: cart._id as Id<"abandonedCarts">,
+          couponPrefix: settings.couponPrefix,
+          discountType: settings.couponDiscountType as "percentage" | "fixed",
+          discountValue: settings.couponDiscountValue,
+          validityDays: settings.couponValidityDays,
         }
       );
       results.push(result);

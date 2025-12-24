@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as abandonedCartSettings from "../abandonedCartSettings.js";
 import type * as abandonedCarts from "../abandonedCarts.js";
 import type * as abandonedCartsActions from "../abandonedCartsActions.js";
 import type * as admin_bugReports from "../admin/bugReports.js";
@@ -119,6 +120,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  abandonedCartSettings: typeof abandonedCartSettings;
   abandonedCarts: typeof abandonedCarts;
   abandonedCartsActions: typeof abandonedCartsActions;
   "admin/bugReports": typeof admin_bugReports;
