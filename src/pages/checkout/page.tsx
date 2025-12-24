@@ -1202,7 +1202,10 @@ function CheckoutPageInner() {
                             {appliedCoupon.coupon.description}
                           </p>
                           <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                            You're saving ₹{appliedCoupon.discountAmount.toFixed(0)}
+                            {appliedCoupon.isWalletCredit 
+                              ? `₹${appliedCoupon.walletCreditAmount} wallet credit on delivery`
+                              : `You're saving ₹${appliedCoupon.discountAmount.toFixed(0)}`
+                            }
                           </p>
                         </div>
                       </div>
@@ -1895,7 +1898,10 @@ function CheckoutPageInner() {
                           {appliedCoupon.coupon.description}
                         </p>
                         <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                          You're saving ₹{appliedCoupon.discountAmount.toFixed(0)}
+                          {appliedCoupon.isWalletCredit 
+                            ? `₹${appliedCoupon.walletCreditAmount} wallet credit on delivery`
+                            : `You're saving ₹${appliedCoupon.discountAmount.toFixed(0)}`
+                          }
                         </p>
                       </div>
                     </div>
