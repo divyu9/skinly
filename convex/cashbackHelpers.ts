@@ -3,12 +3,13 @@ import { query } from "./_generated/server";
 import { api } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.d.ts";
 
-// Calculate cashback for a specific item (product + variant) considering collections
+// Calculate cashback for a specific item (product + variant) considering collections and cart value
 export const calculateItemCashback = query({
   args: {
     productId: v.id("products"),
     variantId: v.id("variants"),
     finalPrice: v.number(), // Final price after all discounts/coupons
+    cartTotal: v.optional(v.number()), // Total cart value (for cart-value filters)
   },
   handler: async (ctx, args) => {
     try {
@@ -54,8 +55,31 @@ export const calculateItemCashback = query({
         };
       }
 
+      // Filter rules by cart value constraints (if cartTotal is provided)
+      const eligibleRules = args.cartTotal !== undefined
+        ? applicableRules.filter((rule) => {
+            // Check minimum cart value
+            if (rule.minCartValue !== undefined && args.cartTotal! < rule.minCartValue) {
+              return false;
+            }
+            // Check maximum cart value
+            if (rule.maxCartValue !== undefined && args.cartTotal! > rule.maxCartValue) {
+              return false;
+            }
+            return true;
+          })
+        : applicableRules;
+
+      if (eligibleRules.length === 0) {
+        return {
+          hasCashback: false,
+          cashbackAmount: 0,
+          cashbackRule: null,
+        };
+      }
+
       // Calculate cashback for each rule
-      const calculatedRules = applicableRules.map((rule) => {
+      const calculatedRules = eligibleRules.map((rule) => {
         let amount = 0;
         
         if (rule.cashbackType === "fixed") {
@@ -105,7 +129,22 @@ export const calculateCartCashback = query({
       })
     ),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    totalCashback: number;
+    itemCashbacks: Array<{
+      productId: Id<"products">;
+      variantId: Id<"variants">;
+      cashbackPerUnit: number;
+      totalCashback: number;
+      quantity: number;
+    }>;
+  }> => {
+    // Calculate total cart value first
+    const cartTotal = args.items.reduce(
+      (sum, item) => sum + item.finalPrice * item.quantity,
+      0
+    );
+
     let totalCashback = 0;
     const itemCashbacks: Array<{
       productId: Id<"products">;
@@ -122,6 +161,7 @@ export const calculateCartCashback = query({
           productId: item.productId,
           variantId: item.variantId,
           finalPrice: item.finalPrice,
+          cartTotal, // Pass cart total for cart-value filters
         });
 
         if (cashbackResult.hasCashback) {

@@ -57,7 +57,7 @@ function ActiveCouponsSection({
   onCouponSelect, 
   appliedCouponCode 
 }: { 
-  onCouponSelect: (code: string) => void; 
+  onCouponSelect: (code: string) => Promise<void>; 
   appliedCouponCode?: string;
 }) {
   const activeCoupons = useQuery(api.coupons.getActiveCoupons);
@@ -328,11 +328,14 @@ function CheckoutPageInner() {
   }, [finalTotal, formData.state]);
 
   // Handle coupon apply
-  const handleApplyCoupon = async () => {
+  const handleApplyCoupon = async (codeToApply?: string) => {
+    // Use provided code or the input code
+    const code = codeToApply || couponCode;
+    
     // Clear previous message
     setCouponMessage(null);
     
-    if (!couponCode.trim()) {
+    if (!code.trim()) {
       setCouponMessage({ type: 'error', text: 'Please enter a coupon code' });
       return;
     }
@@ -390,7 +393,7 @@ function CheckoutPageInner() {
       }
 
       const result = await convex.query(api.coupons.validateCoupon, {
-        code: couponCode.trim(),
+        code: code.trim(),
         cartTotal: total,
         userEmail: formData.email || undefined,
         cartItems: itemsWithValidVariants.map((item) => ({
@@ -403,6 +406,7 @@ function CheckoutPageInner() {
       });
       
       setAppliedCoupon(result);
+      setCouponCode(code.toUpperCase()); // Update input to match validated code
       setCouponMessage({ type: 'success', text: `Coupon applied! You saved ₹${result.discountAmount.toFixed(0)}` });
       // Clear success message after showing briefly
       setTimeout(() => setCouponMessage(null), 2000);
@@ -1113,7 +1117,7 @@ function CheckoutPageInner() {
                           <Button
                             type="button"
                             variant="outline"
-                            onClick={handleApplyCoupon}
+                            onClick={() => handleApplyCoupon()}
                             disabled={!couponCode.trim() || isApplyingCoupon}
                           >
                             {isApplyingCoupon ? "Applying..." : "Apply"}
@@ -1319,10 +1323,7 @@ function CheckoutPageInner() {
 
               {/* Active Coupons & Offers */}
               <ActiveCouponsSection 
-                onCouponSelect={(code) => {
-                  setCouponCode(code);
-                  setTimeout(() => handleApplyCoupon(), 0);
-                }}
+                onCouponSelect={handleApplyCoupon}
                 appliedCouponCode={appliedCoupon?.coupon.code}
               />
 
@@ -1809,7 +1810,7 @@ function CheckoutPageInner() {
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={handleApplyCoupon}
+                          onClick={() => handleApplyCoupon()}
                           disabled={!couponCode.trim() || isApplyingCoupon}
                         >
                           {isApplyingCoupon ? "Applying..." : "Apply"}

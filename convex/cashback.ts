@@ -66,6 +66,8 @@ export const createCashbackRule = mutation({
     targetId: v.string(),
     cashbackType: v.union(v.literal("fixed"), v.literal("percentage")),
     cashbackValue: v.number(),
+    minCartValue: v.optional(v.number()),
+    maxCartValue: v.optional(v.number()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -93,11 +95,39 @@ export const createCashbackRule = mutation({
       });
     }
 
+    // Validate cart value filters
+    if (args.minCartValue !== undefined && args.minCartValue < 0) {
+      throw new ConvexError({
+        message: "Minimum cart value cannot be negative",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    if (args.maxCartValue !== undefined && args.maxCartValue < 0) {
+      throw new ConvexError({
+        message: "Maximum cart value cannot be negative",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    if (
+      args.minCartValue !== undefined &&
+      args.maxCartValue !== undefined &&
+      args.minCartValue > args.maxCartValue
+    ) {
+      throw new ConvexError({
+        message: "Minimum cart value cannot exceed maximum cart value",
+        code: "BAD_REQUEST",
+      });
+    }
+
     const ruleId = await ctx.db.insert("cashbackRules", {
       targetType: args.targetType,
       targetId: args.targetId,
       cashbackType: args.cashbackType,
       cashbackValue: args.cashbackValue,
+      minCartValue: args.minCartValue,
+      maxCartValue: args.maxCartValue,
       isActive: args.isActive !== undefined ? args.isActive : true,
       createdAt: Date.now(),
       createdBy: identity.email,
@@ -113,6 +143,8 @@ export const updateCashbackRule = mutation({
     ruleId: v.id("cashbackRules"),
     cashbackType: v.optional(v.union(v.literal("fixed"), v.literal("percentage"))),
     cashbackValue: v.optional(v.number()),
+    minCartValue: v.optional(v.union(v.number(), v.null())),
+    maxCartValue: v.optional(v.union(v.number(), v.null())),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -124,10 +156,18 @@ export const updateCashbackRule = mutation({
       });
     }
 
-    const { ruleId, ...updates } = args;
+    const { ruleId, ...rawUpdates } = args;
+
+    // Convert null to undefined for optional fields
+    const updates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(rawUpdates)) {
+      if (value !== undefined) {
+        updates[key] = value === null ? undefined : value;
+      }
+    }
 
     // Validate cashback value if provided
-    if (updates.cashbackValue !== undefined && updates.cashbackValue <= 0) {
+    if (updates.cashbackValue !== undefined && typeof updates.cashbackValue === "number" && updates.cashbackValue <= 0) {
       throw new ConvexError({
         message: "Cashback value must be greater than 0",
         code: "BAD_REQUEST",
@@ -135,11 +175,49 @@ export const updateCashbackRule = mutation({
     }
 
     // For percentage, validate it's not more than 100%
-    if (updates.cashbackType === "percentage" && updates.cashbackValue !== undefined && updates.cashbackValue > 100) {
+    if (updates.cashbackType === "percentage" && updates.cashbackValue !== undefined && typeof updates.cashbackValue === "number" && updates.cashbackValue > 100) {
       throw new ConvexError({
         message: "Percentage cashback cannot exceed 100%",
         code: "BAD_REQUEST",
       });
+    }
+
+    // Validate cart value filters if provided
+    if (updates.minCartValue !== undefined && typeof updates.minCartValue === "number" && updates.minCartValue < 0) {
+      throw new ConvexError({
+        message: "Minimum cart value cannot be negative",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    if (updates.maxCartValue !== undefined && typeof updates.maxCartValue === "number" && updates.maxCartValue < 0) {
+      throw new ConvexError({
+        message: "Maximum cart value cannot be negative",
+        code: "BAD_REQUEST",
+      });
+    }
+
+    // Get existing rule to validate min/max relationship
+    const existingRule = await ctx.db.get(ruleId);
+    if (existingRule) {
+      const finalMinCartValue = updates.minCartValue !== undefined 
+        ? (typeof updates.minCartValue === "number" ? updates.minCartValue : existingRule.minCartValue)
+        : existingRule.minCartValue;
+      
+      const finalMaxCartValue = updates.maxCartValue !== undefined
+        ? (typeof updates.maxCartValue === "number" ? updates.maxCartValue : existingRule.maxCartValue)
+        : existingRule.maxCartValue;
+
+      if (
+        finalMinCartValue !== undefined &&
+        finalMaxCartValue !== undefined &&
+        finalMinCartValue > finalMaxCartValue
+      ) {
+        throw new ConvexError({
+          message: "Minimum cart value cannot exceed maximum cart value",
+          code: "BAD_REQUEST",
+        });
+      }
     }
 
     await ctx.db.patch(ruleId, {

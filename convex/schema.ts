@@ -981,6 +981,8 @@ export default defineSchema({
       v.literal("percentage") // Percentage of final price (e.g., 5%)
     ),
     cashbackValue: v.number(), // Value (e.g., 50 for ₹50, or 5 for 5%)
+    minCartValue: v.optional(v.number()), // Minimum cart value for cashback to apply
+    maxCartValue: v.optional(v.number()), // Maximum cart value for cashback to apply
     isActive: v.boolean(), // Whether this rule is currently active
     createdAt: v.number(), // When rule was created
     updatedAt: v.optional(v.number()), // Last update timestamp

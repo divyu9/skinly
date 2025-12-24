@@ -248,6 +248,14 @@ export const validateCoupon = query({
         code: "NOT_FOUND",
       });
     }
+
+    // Reject wallet-credit coupons at checkout
+    if (coupon.effectType === "wallet_credit") {
+      throw new ConvexError({
+        message: "This is a wallet credit coupon. Please redeem it from your Account page instead.",
+        code: "BAD_REQUEST",
+      });
+    }
     
     const now = Date.now();
     
@@ -845,6 +853,7 @@ export const getCouponUsageStats = query({
 });
 
 // Get all active coupons (public - no auth required)
+// Excludes wallet-credit coupons since they can't be used at checkout
 export const getActiveCoupons = query({
   args: {},
   handler: async (ctx) => {
@@ -856,11 +865,12 @@ export const getActiveCoupons = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
     
-    // Filter by date range and usage limit
+    // Filter by date range, usage limit, and exclude wallet-credit coupons
     const activeCoupons = allCoupons.filter((coupon) => {
       const isInDateRange = coupon.startDate <= now && coupon.endDate >= now;
       const hasUsageAvailable = !coupon.usageLimit || coupon.usageCount < coupon.usageLimit;
-      return isInDateRange && hasUsageAvailable;
+      const isNotWalletCredit = coupon.effectType !== "wallet_credit"; // Exclude wallet-credit coupons
+      return isInDateRange && hasUsageAvailable && isNotWalletCredit;
     });
 
     // Sort by discount value (highest first)
