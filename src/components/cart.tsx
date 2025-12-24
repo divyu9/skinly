@@ -25,6 +25,7 @@ export function CartButton() {
   const cartCount = useQuery(api.cart.getCartCount, user ? {} : "skip");
   const { getGuestCartCount, guestCart } = useGuestCart();
   const [displayCount, setDisplayCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
 
   // Update display count whenever cart data changes
   useEffect(() => {
@@ -36,7 +37,7 @@ export function CartButton() {
   }, [user, cartCount, guestCart, authLoading, getGuestCartCount]);
 
   return (
-    <Sheet>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
         <Button size="sm" variant="outline" className="relative overflow-visible">
           <ShoppingCartIcon className="size-4 mr-2" />
@@ -57,13 +58,13 @@ export function CartButton() {
               : "Your cart is empty"}
           </SheetDescription>
         </SheetHeader>
-        <CartContent />
+        <CartContent onCheckoutClick={() => setIsOpen(false)} />
       </SheetContent>
     </Sheet>
   );
 }
 
-function CartContent() {
+function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   const { user, isLoading: authLoading } = useAuth();
   const cartItems = useQuery(api.cart.getCart, user ? {} : "skip");
   const updateQuantity = useMutation(api.cart.updateQuantity);
@@ -290,7 +291,7 @@ function CartContent() {
         </div>
 
         <div className="flex flex-col items-center gap-2">
-          <Link to="/checkout" className="w-full max-w-[85%]">
+          <Link to="/checkout" className="w-full max-w-[85%]" onClick={onCheckoutClick}>
             <Button className="w-full" size="default">
               Proceed to Checkout
             </Button>
