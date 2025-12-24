@@ -10,25 +10,19 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
 export function CheckoutUpsells() {
   const { user, isLoading: authLoading } = useAuth();
   const { addToGuestCart, guestCart } = useGuestCart();
   const [addingProduct, setAddingProduct] = useState<string | null>(null);
+  // Track selected variant for each multi-variant product (productId -> variantId)
+  const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   // Query cart data directly for reactivity
   const dbCartItems = useQuery(api.cart.getCart, user ? {} : "skip");
@@ -57,15 +51,33 @@ export function CheckoutUpsells() {
   const handleAddUpsell = async (upsell: NonNullable<typeof upsells>[0]) => {
     if (!upsell) return;
     
-    setAddingProduct(upsell.variantId);
+    // For multi-variant products, use the selected variant
+    let variantToAdd = upsell;
+    if (upsell.hasMultipleVariants && upsell.allVariants) {
+      const selectedVariantId = selectedVariants[upsell.productId];
+      if (selectedVariantId) {
+        const selectedVariant = upsell.allVariants.find(v => v.variantId === selectedVariantId);
+        if (selectedVariant) {
+          variantToAdd = {
+            ...upsell,
+            variantId: selectedVariant.variantId,
+            variantTitle: selectedVariant.variantTitle,
+            originalPrice: selectedVariant.price,
+            discountedPrice: selectedVariant.discountedPrice,
+          };
+        }
+      }
+    }
+    
+    setAddingProduct(variantToAdd.variantId);
     
     try {
       const cartItem = {
-        productId: upsell.productId,
-        productTitle: upsell.productTitle,
-        productImage: upsell.productImage,
-        variant: upsell.variantTitle,
-        price: upsell.discountedPrice || upsell.originalPrice,
+        productId: variantToAdd.productId,
+        productTitle: variantToAdd.productTitle,
+        productImage: variantToAdd.productImage,
+        variant: variantToAdd.variantTitle,
+        price: variantToAdd.discountedPrice || variantToAdd.originalPrice,
         quantity: 1,
       };
 
@@ -80,11 +92,11 @@ export function CheckoutUpsells() {
       // Try guest cart if auth fails
       if (user === null || user === undefined) {
         addToGuestCart({
-          productId: upsell.productId,
-          productTitle: upsell.productTitle,
-          productImage: upsell.productImage,
-          variant: upsell.variantTitle,
-          price: upsell.discountedPrice || upsell.originalPrice,
+          productId: variantToAdd.productId,
+          productTitle: variantToAdd.productTitle,
+          productImage: variantToAdd.productImage,
+          variant: variantToAdd.variantTitle,
+          price: variantToAdd.discountedPrice || variantToAdd.originalPrice,
           quantity: 1,
         });
         toast.success("Added to cart!");
@@ -158,11 +170,25 @@ export function CheckoutUpsells() {
       <CardContent>
         <div className="grid md:grid-cols-3 gap-4">
           {upsells.map((upsell) => {
-            const savings = upsell.discountedPrice
-              ? upsell.originalPrice - upsell.discountedPrice
+            // Get selected variant or default to the first variant
+            const currentSelectedVariantId = selectedVariants[upsell.productId] || upsell.variantId;
+            const currentVariant = upsell.hasMultipleVariants && upsell.allVariants
+              ? upsell.allVariants.find(v => v.variantId === currentSelectedVariantId) || upsell.allVariants[0]
+              : {
+                  variantId: upsell.variantId,
+                  variantTitle: upsell.variantTitle,
+                  price: upsell.originalPrice,
+                  discountedPrice: upsell.discountedPrice,
+                  inventoryQuantity: 1,
+                };
+
+            const displayPrice = currentVariant.price;
+            const displayDiscountedPrice = currentVariant.discountedPrice;
+            const savings = displayDiscountedPrice
+              ? displayPrice - displayDiscountedPrice
               : 0;
-            const savingsPercent = upsell.discountedPrice
-              ? Math.round((savings / upsell.originalPrice) * 100)
+            const savingsPercent = displayDiscountedPrice
+              ? Math.round((savings / displayPrice) * 100)
               : 0;
 
             return (
@@ -193,26 +219,58 @@ export function CheckoutUpsells() {
                   <h4 className="font-semibold text-sm line-clamp-2 mb-1">
                     {upsell.productTitle}
                   </h4>
-                  {upsell.variantTitle !== "Default Title" && (
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {upsell.variantTitle}
-                    </p>
+
+                  {/* Variant Selector for Multi-Variant Products */}
+                  {upsell.hasMultipleVariants && upsell.allVariants && upsell.allVariants.length > 1 ? (
+                    <div className="mb-3">
+                      <Select
+                        value={currentSelectedVariantId}
+                        onValueChange={(value) => {
+                          setSelectedVariants(prev => ({
+                            ...prev,
+                            [upsell.productId]: value,
+                          }));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {upsell.allVariants.map((variant) => (
+                            <SelectItem key={variant.variantId} value={variant.variantId}>
+                              <div className="flex items-center justify-between gap-3 w-full">
+                                <span className="text-xs">{variant.variantTitle}</span>
+                                <span className="text-xs font-semibold">
+                                  ₹{(variant.discountedPrice || variant.price).toFixed(0)}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    currentVariant.variantTitle !== "Default Title" && (
+                      <p className="text-xs text-muted-foreground mb-2">
+                        {currentVariant.variantTitle}
+                      </p>
+                    )
                   )}
 
                   {/* Pricing */}
                   <div className="mb-3 mt-auto">
-                    {upsell.discountedPrice ? (
+                    {displayDiscountedPrice ? (
                       <div className="flex items-baseline gap-2">
                         <span className="text-lg font-bold text-green-600">
-                          ₹{upsell.discountedPrice.toFixed(0)}
+                          ₹{displayDiscountedPrice.toFixed(0)}
                         </span>
                         <span className="text-sm text-muted-foreground line-through">
-                          ₹{upsell.originalPrice.toFixed(0)}
+                          ₹{displayPrice.toFixed(0)}
                         </span>
                       </div>
                     ) : (
                       <span className="text-lg font-bold text-primary">
-                        ₹{upsell.originalPrice.toFixed(0)}
+                        ₹{displayPrice.toFixed(0)}
                       </span>
                     )}
                     {savings > 0 && (
@@ -227,10 +285,10 @@ export function CheckoutUpsells() {
                     size="sm"
                     className="w-full"
                     onClick={() => handleAddUpsell(upsell)}
-                    disabled={addingProduct === upsell.variantId}
+                    disabled={addingProduct === currentSelectedVariantId}
                   >
                     <PlusIcon className="size-4 mr-2" />
-                    {addingProduct === upsell.variantId ? "Adding..." : "Add to Cart"}
+                    {addingProduct === currentSelectedVariantId ? "Adding..." : "Add to Cart"}
                   </Button>
                 </div>
               </div>
