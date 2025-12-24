@@ -843,3 +843,36 @@ export const getCouponUsageStats = query({
     };
   },
 });
+
+// Get all active coupons (public - no auth required)
+export const getActiveCoupons = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    
+    // Get all active coupons
+    const allCoupons = await ctx.db
+      .query("coupons")
+      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .collect();
+    
+    // Filter by date range and usage limit
+    const activeCoupons = allCoupons.filter((coupon) => {
+      const isInDateRange = coupon.startDate <= now && coupon.endDate >= now;
+      const hasUsageAvailable = !coupon.usageLimit || coupon.usageCount < coupon.usageLimit;
+      return isInDateRange && hasUsageAvailable;
+    });
+
+    // Sort by discount value (highest first)
+    return activeCoupons.sort((a, b) => {
+      if (a.discountType === "fixed" && b.discountType === "fixed") {
+        return b.discountValue - a.discountValue;
+      }
+      if (a.discountType === "percentage" && b.discountType === "percentage") {
+        return b.discountValue - a.discountValue;
+      }
+      // Prioritize percentage discounts
+      return a.discountType === "percentage" ? -1 : 1;
+    });
+  },
+});

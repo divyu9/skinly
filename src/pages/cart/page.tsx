@@ -203,20 +203,30 @@ function AuthenticatedCartContent() {
                 <div className="flex gap-4">
                   {/* Product Image */}
                   {item.productImage && (
-                    <div className="size-20 sm:size-24 bg-muted rounded-lg overflow-hidden shrink-0">
-                      <img
-                        src={item.productImage}
-                        alt={item.productTitle}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    <Link 
+                      to={`/products/detail?id=${item.productId}`}
+                      className="shrink-0"
+                    >
+                      <div className="size-20 sm:size-24 bg-muted rounded-lg overflow-hidden">
+                        <img
+                          src={item.productImage}
+                          alt={item.productTitle}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform"
+                        />
+                      </div>
+                    </Link>
                   )}
 
                   {/* Product Details */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-base line-clamp-2 mb-2">
-                      {item.productTitle}
-                    </h3>
+                    <Link 
+                      to={`/products/detail?id=${item.productId}`}
+                      className="hover:text-primary transition-colors"
+                    >
+                      <h3 className="font-semibold text-base line-clamp-2 mb-2">
+                        {item.productTitle}
+                      </h3>
+                    </Link>
                     {item.phoneModel && (
                       <p className="text-sm text-muted-foreground mb-1">
                         For: {item.phoneModel}
@@ -400,20 +410,30 @@ function GuestCartContent() {
                   <div className="flex gap-4">
                     {/* Product Image */}
                     {item.productImage && (
-                      <div className="size-20 sm:size-24 bg-muted rounded-lg overflow-hidden shrink-0">
-                        <img
-                          src={item.productImage}
-                          alt={item.productTitle}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
+                      <Link 
+                        to={`/products/detail?id=${item.productId}`}
+                        className="shrink-0"
+                      >
+                        <div className="size-20 sm:size-24 bg-muted rounded-lg overflow-hidden">
+                          <img
+                            src={item.productImage}
+                            alt={item.productTitle}
+                            className="w-full h-full object-cover hover:scale-105 transition-transform"
+                          />
+                        </div>
+                      </Link>
                     )}
 
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base line-clamp-2 mb-2">
-                        {item.productTitle}
-                      </h3>
+                      <Link 
+                        to={`/products/detail?id=${item.productId}`}
+                        className="hover:text-primary transition-colors"
+                      >
+                        <h3 className="font-semibold text-base line-clamp-2 mb-2">
+                          {item.productTitle}
+                        </h3>
+                      </Link>
                       {item.phoneModel && (
                         <p className="text-sm text-muted-foreground mb-1">
                           For: {item.phoneModel}

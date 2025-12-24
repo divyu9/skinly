@@ -52,6 +52,96 @@ function getGuestSessionId() {
   return sessionId;
 }
 
+// Active Coupons Section Component
+function ActiveCouponsSection({ 
+  onCouponSelect, 
+  appliedCouponCode 
+}: { 
+  onCouponSelect: (code: string) => void; 
+  appliedCouponCode?: string;
+}) {
+  const activeCoupons = useQuery(api.coupons.getActiveCoupons);
+
+  if (!activeCoupons || activeCoupons.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <SparklesIcon className="size-5 text-amber-600" />
+          Active Offers & Coupons
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {activeCoupons.slice(0, 5).map((coupon) => {
+          const isApplied = appliedCouponCode === coupon.code;
+          const discountText = coupon.discountType === "percentage"
+            ? `${coupon.discountValue}% OFF`
+            : `₹${coupon.discountValue} OFF`;
+
+          return (
+            <div
+              key={coupon._id}
+              className={`flex items-start gap-3 p-3 rounded-lg border-2 transition-all ${
+                isApplied
+                  ? "bg-green-500/10 border-green-500/50"
+                  : "bg-muted/50 border-muted hover:border-primary/30"
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {coupon.code}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {discountText}
+                  </Badge>
+                  {isApplied && (
+                    <Badge className="bg-green-600 text-white text-xs">
+                      Applied
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {coupon.description}
+                </p>
+                {coupon.minCartValue && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Min. cart value: ₹{coupon.minCartValue}
+                  </p>
+                )}
+                {coupon.maxDiscount && coupon.discountType === "percentage" && (
+                  <p className="text-xs text-muted-foreground">
+                    Max discount: ₹{coupon.maxDiscount}
+                  </p>
+                )}
+              </div>
+              {!isApplied && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onCouponSelect(coupon.code)}
+                  className="shrink-0"
+                >
+                  Apply
+                </Button>
+              )}
+            </div>
+          );
+        })}
+        {activeCoupons.length > 5 && (
+          <p className="text-xs text-center text-muted-foreground pt-2">
+            Showing top {Math.min(5, activeCoupons.length)} of {activeCoupons.length} active offers
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function CheckoutPageInner() {
   const navigate = useNavigate();
   const convex = useConvex();
@@ -1226,6 +1316,15 @@ function CheckoutPageInner() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Active Coupons & Offers */}
+              <ActiveCouponsSection 
+                onCouponSelect={(code) => {
+                  setCouponCode(code);
+                  setTimeout(() => handleApplyCoupon(), 0);
+                }}
+                appliedCouponCode={appliedCoupon?.coupon.code}
+              />
 
               {/* Checkout Upsells - show recommended products */}
               <CheckoutUpsells />
