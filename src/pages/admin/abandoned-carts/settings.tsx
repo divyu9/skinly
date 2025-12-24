@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -29,13 +29,15 @@ export function AbandonedCartSettings() {
   const [couponPrefix, setCouponPrefix] = useState<string>("COMEBACK");
 
   // Initialize form when settings load
-  if (settings && delayHours === 1 && couponPrefix === "COMEBACK") {
-    setDelayHours(settings.delayHours);
-    setCouponDiscountType(settings.couponDiscountType as "percentage" | "fixed");
-    setCouponDiscountValue(settings.couponDiscountValue);
-    setCouponValidityDays(settings.couponValidityDays);
-    setCouponPrefix(settings.couponPrefix);
-  }
+  useEffect(() => {
+    if (settings) {
+      setDelayHours(settings.delayHours);
+      setCouponDiscountType(settings.couponDiscountType as "percentage" | "fixed");
+      setCouponDiscountValue(settings.couponDiscountValue);
+      setCouponValidityDays(settings.couponValidityDays);
+      setCouponPrefix(settings.couponPrefix);
+    }
+  }, [settings]);
 
   const handleSave = async () => {
     setSaving(true);
