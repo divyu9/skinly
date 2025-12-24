@@ -168,7 +168,7 @@ export function CheckoutUpsells() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           {upsells.map((upsell) => {
             // Get selected variant or default to the first variant
             const currentSelectedVariantId = selectedVariants[upsell.productId] || upsell.variantId;
@@ -198,7 +198,7 @@ export function CheckoutUpsells() {
               >
                 {/* Savings Badge */}
                 {savings > 0 && (
-                  <Badge className="absolute top-2 right-2 z-10 bg-green-600 text-white">
+                  <Badge className="absolute top-1 right-1 md:top-2 md:right-2 z-10 bg-green-600 text-white text-[10px] md:text-xs px-1 md:px-2 py-0 md:py-1">
                     Save {savingsPercent}%
                   </Badge>
                 )}
@@ -215,14 +215,14 @@ export function CheckoutUpsells() {
                 )}
 
                 {/* Product Details */}
-                <div className="p-3 flex-1 flex flex-col">
-                  <h4 className="font-semibold text-sm line-clamp-2 mb-1">
+                <div className="p-2 md:p-3 flex-1 flex flex-col">
+                  <h4 className="font-semibold text-xs md:text-sm line-clamp-2 mb-1">
                     {upsell.productTitle}
                   </h4>
 
                   {/* Variant Selector for Multi-Variant Products */}
                   {upsell.hasMultipleVariants && upsell.allVariants && upsell.allVariants.length > 1 ? (
-                    <div className="mb-3">
+                    <div className="mb-2 md:mb-3">
                       <Select
                         value={currentSelectedVariantId}
                         onValueChange={(value) => {
@@ -232,15 +232,15 @@ export function CheckoutUpsells() {
                           }));
                         }}
                       >
-                        <SelectTrigger className="h-8 text-xs">
+                        <SelectTrigger className="h-7 md:h-8 text-[10px] md:text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {upsell.allVariants.map((variant) => (
                             <SelectItem key={variant.variantId} value={variant.variantId}>
-                              <div className="flex items-center justify-between gap-3 w-full">
-                                <span className="text-xs">{variant.variantTitle}</span>
-                                <span className="text-xs font-semibold">
+                              <div className="flex items-center justify-between gap-2 md:gap-3 w-full">
+                                <span className="text-[10px] md:text-xs">{variant.variantTitle}</span>
+                                <span className="text-[10px] md:text-xs font-semibold">
                                   ₹{(variant.discountedPrice || variant.price).toFixed(0)}
                                 </span>
                               </div>
@@ -251,30 +251,30 @@ export function CheckoutUpsells() {
                     </div>
                   ) : (
                     currentVariant.variantTitle !== "Default Title" && (
-                      <p className="text-xs text-muted-foreground mb-2">
+                      <p className="text-[10px] md:text-xs text-muted-foreground mb-2">
                         {currentVariant.variantTitle}
                       </p>
                     )
                   )}
 
                   {/* Pricing */}
-                  <div className="mb-3 mt-auto">
+                  <div className="mb-2 md:mb-3 mt-auto">
                     {displayDiscountedPrice ? (
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-lg font-bold text-green-600">
+                      <div className="flex items-baseline gap-1 md:gap-2">
+                        <span className="text-base md:text-lg font-bold text-green-600">
                           ₹{displayDiscountedPrice.toFixed(0)}
                         </span>
-                        <span className="text-sm text-muted-foreground line-through">
+                        <span className="text-xs md:text-sm text-muted-foreground line-through">
                           ₹{displayPrice.toFixed(0)}
                         </span>
                       </div>
                     ) : (
-                      <span className="text-lg font-bold text-primary">
+                      <span className="text-base md:text-lg font-bold text-primary">
                         ₹{displayPrice.toFixed(0)}
                       </span>
                     )}
                     {savings > 0 && (
-                      <p className="text-xs text-green-600 font-medium">
+                      <p className="text-[10px] md:text-xs text-green-600 font-medium">
                         Save ₹{savings.toFixed(0)}
                       </p>
                     )}
@@ -283,11 +283,11 @@ export function CheckoutUpsells() {
                   {/* Add Button */}
                   <Button
                     size="sm"
-                    className="w-full"
+                    className="w-full h-7 md:h-9 text-xs md:text-sm"
                     onClick={() => handleAddUpsell(upsell)}
                     disabled={addingProduct === currentSelectedVariantId}
                   >
-                    <PlusIcon className="size-4 mr-2" />
+                    <PlusIcon className="size-3 md:size-4 mr-1 md:mr-2" />
                     {addingProduct === currentSelectedVariantId ? "Adding..." : "Add to Cart"}
                   </Button>
                 </div>

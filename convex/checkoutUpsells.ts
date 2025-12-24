@@ -225,14 +225,14 @@ export const getUpsellsForCart = query({
           }
         }
 
-        // Stop at 3 unique products
-        if (productMap.size >= 3) {
+        // Stop at 6 unique products
+        if (productMap.size >= 6) {
           break;
         }
       }
 
-      // Stop at 3 unique products
-      if (productMap.size >= 3) {
+      // Stop at 6 unique products
+      if (productMap.size >= 6) {
         break;
       }
     }

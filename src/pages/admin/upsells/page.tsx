@@ -538,20 +538,40 @@ function CheckoutUpsellsPageInner() {
                       {filteredProducts.map((product) => (
                         <div key={product._id} className="p-3 hover:bg-muted/50 border-b last:border-0">
                           <p className="font-medium text-sm">{product.title}</p>
-                          <div className="mt-2 space-y-1">
-                            {product.variants?.slice(0, 3).map((variant) => (
+                          <div className="mt-2 space-y-2">
+                            {/* Select All Variants Button */}
+                            {product.variants && product.variants.length > 1 && (
                               <Button
-                                key={variant._id}
                                 type="button"
                                 size="sm"
-                                variant="outline"
-                                className="mr-2"
-                                onClick={() => addUpsellProduct(product._id, variant._id)}
-                                disabled={upsellProducts.some(p => p.variantId === variant._id)}
+                                variant="secondary"
+                                className="mr-2 mb-1"
+                                onClick={() => {
+                                  product.variants?.forEach((variant) => {
+                                    if (!upsellProducts.some(p => p.variantId === variant._id)) {
+                                      addUpsellProduct(product._id, variant._id);
+                                    }
+                                  });
+                                }}
                               >
-                                {variant.title} - ₹{variant.price}
+                                + Add All Variants ({product.variants.length})
                               </Button>
-                            ))}
+                            )}
+                            {/* Individual Variant Buttons */}
+                            <div className="flex flex-wrap gap-1">
+                              {product.variants?.map((variant) => (
+                                <Button
+                                  key={variant._id}
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => addUpsellProduct(product._id, variant._id)}
+                                  disabled={upsellProducts.some(p => p.variantId === variant._id)}
+                                >
+                                  {variant.title} - ₹{variant.price}
+                                </Button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -560,7 +580,7 @@ function CheckoutUpsellsPageInner() {
                 </div>
 
                 <div>
-                  <Label className="text-base font-semibold">Selected Upsell Products ({upsellProducts.length}/3)</Label>
+                  <Label className="text-base font-semibold">Selected Upsell Products ({upsellProducts.length})</Label>
                   {upsellProducts.length === 0 ? (
                     <p className="text-sm text-muted-foreground mt-2">No products selected</p>
                   ) : (
@@ -600,7 +620,7 @@ function CheckoutUpsellsPageInner() {
                     </div>
                   )}
                   <p className="text-xs text-muted-foreground mt-2">
-                    Maximum 3 products will be shown to customers. Add discount price to show special offers.
+                    Maximum 6 products will be shown to customers. Add discount price to show special offers.
                   </p>
                 </div>
               </TabsContent>
