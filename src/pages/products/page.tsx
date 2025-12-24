@@ -1,0 +1,1111 @@
+import { usePaginatedQuery, useAction, useQuery, useQueries, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
+import { AlertCircleIcon, PackageIcon, SearchIcon, InfoIcon, ArrowUpDown, Loader2Icon, BellIcon, Smartphone, Laptop, Tablet, Camera, Zap, Gamepad2, Package2, Shield, Glasses, ShoppingBag, Video, Box } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input.tsx";
+import { GadgetSelectorBanner } from "@/components/gadget-selector-banner.tsx";
+import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
+import { MobileHeader } from "@/components/mobile-header.tsx";
+import { MobileNav } from "@/components/mobile-nav.tsx";
+import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+import { ProductCategoryHeader } from "@/components/product-category-header.tsx";
+import { Helmet } from "react-helmet-async";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select.tsx";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { trackSearch, trackCollectionView } from "@/lib/analytics.ts";
+
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+
+// Component to show mockup or fallback to original image
+function ProductImage({ 
+  product, 
+  brandFilter, 
+  modelFilter 
+}: { 
+  product: { 
+    images: Array<{ url: string; alt?: string }>; 
+    title: string;
+    variants: Array<{ sku: string }>;
+  }; 
+  brandFilter: string | null; 
+  modelFilter: string | null;
+}) {
+  // Try to get mockup if brand and model are selected
+  const firstSku = product.variants[0]?.sku;
+  const mockupUrl = useQuery(
+    api.mockups.getMockupFileId,
+    brandFilter && modelFilter && firstSku
+      ? { brand: brandFilter, model: modelFilter, sku: firstSku }
+      : "skip"
+  );
+  
+  const mainImage = product.images[0];
+  
+  // Show loading spinner while mockup is being fetched
+  if (brandFilter && modelFilter && mockupUrl === undefined) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-muted">
+        <Loader2Icon className="size-8 sm:size-12 text-muted-foreground animate-spin" />
+      </div>
+    );
+  }
+  
+  const imageUrl = mockupUrl || mainImage?.url;
+  const imageAlt = mainImage?.alt || product.title;
+  
+  if (!imageUrl) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <PackageIcon className="size-8 sm:size-16 text-muted-foreground" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="relative w-full h-full">
+      <img
+        src={imageUrl}
+        alt={imageAlt}
+        loading="lazy"
+        decoding="async"
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+      />
+    </div>
+  );
+}
+
+interface ConvexProduct {
+  _id: Id<"products">;
+  title: string;
+  slug: string;
+  description: string;
+  status: "active" | "draft" | "archived";
+  images: Array<{ url: string; alt?: string }>;
+  tags: string[];
+  productCategory?: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
+  gadgetCategory?: string;
+  finishType?: "matte" | "embossed" | "transparent";
+  variants: Array<{
+    _id: Id<"variants">;
+    title: string;
+    price: number;
+    compareAtPrice?: number;
+    inventoryQuantity: number;
+    sku: string;
+  }>;
+}
+
+export default function ProductsPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const verifyConnection = useAction(api.shopify.verifyConnection);
+  
+  // Get OOS sorting setting
+  const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
+  
+  // Get homepage settings for announcement bar height
+  const homepageSettings = useQuery(api.homepage.getHomepageSettings);
+  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
+  const announcementHeight = showAnnouncement ? 28 : 0;
+  const headerHeight = 64; // Mobile header height
+  const categoryHeaderTop = announcementHeight + headerHeight;
+  
+  // Mobile nav state
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  
+  // Model request dialog state
+  const [isModelRequestOpen, setIsModelRequestOpen] = useState(false);
+  const [modelRequestBrand, setModelRequestBrand] = useState("");
+  const [modelRequestModel, setModelRequestModel] = useState("");
+  const [modelRequestCategory, setModelRequestCategory] = useState("");
+  const [modelRequestPhone, setModelRequestPhone] = useState("");
+  const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  
+  // Device selector dialog state
+  const [isDeviceSelectorOpen, setIsDeviceSelectorOpen] = useState(false);
+  
+  // Parse URL parameters from location
+  const urlParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const deviceFilter = urlParams.get('device');
+  const brandFilter = urlParams.get('brand');
+  const modelFilter = urlParams.get('model');
+  const urlSearchQuery = urlParams.get('search') || '';
+  const collectionParam = urlParams.get('collection') || '';
+  const fromGadgetSelector = urlParams.get('fromGadgetSelector') === 'true';
+  
+  // Get model info if brand and model are present
+  const modelInfo = useQuery(
+    api.supportedModels.getModelInfo,
+    brandFilter && modelFilter
+      ? { brand: brandFilter, model: modelFilter }
+      : "skip"
+  );
+  
+  // Get gadget type from model category
+  const modelGadgetType = useQuery(
+    api.gadgetTypes.getByCategory,
+    modelInfo?.category ? { category: modelInfo.category } : "skip"
+  );
+  
+  // State declarations for filters (initialized from URL or smart defaults)
+  const [searchQuery, setSearchQuery] = useState(urlSearchQuery);
+  const [sortBy, setSortBy] = useState<string>("default");
+  const [stockFilter, setStockFilter] = useState<string>("all");
+  const [lastTrackedSearch, setLastTrackedSearch] = useState<string>("");
+  const [prevBrandModel, setPrevBrandModel] = useState<string>("");
+  const [smartFiltersApplied, setSmartFiltersApplied] = useState(false);
+  const [productCategory, setProductCategory] = useState<"skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null>(
+    urlParams.get('productType') as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null
+  );
+  const [gadgetFilter, setGadgetFilter] = useState<string | null>(urlParams.get('gadget'));
+  const [finishFilter, setFinishFilter] = useState<string | null>(urlParams.get('finish'));
+  const [isFilterTransitioning, setIsFilterTransitioning] = useState(false);
+  
+  // Sync URL parameters to state when location changes (handles mobile nav navigation)
+  useEffect(() => {
+    const newProductCategory = urlParams.get('productType') as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null;
+    const newGadgetFilter = urlParams.get('gadget');
+    const newFinishFilter = urlParams.get('finish');
+    
+    setProductCategory(newProductCategory);
+    setGadgetFilter(newGadgetFilter);
+    setFinishFilter(newFinishFilter);
+  }, [location.search, urlParams]);
+  
+  // Reset smart filters when brand/model changes
+  useEffect(() => {
+    const currentBrandModel = `${brandFilter}-${modelFilter}`;
+    if (currentBrandModel !== prevBrandModel) {
+      setPrevBrandModel(currentBrandModel);
+      setSmartFiltersApplied(false);
+    }
+  }, [brandFilter, modelFilter, prevBrandModel]);
+  
+  // Apply smart filters when model info is available
+  useEffect(() => {
+    if (brandFilter && modelFilter && modelGadgetType && !smartFiltersApplied) {
+      // Set product category to "skin"
+      setProductCategory("skin");
+      // Set gadget filter to the model's gadget type name (lowercase, e.g., "laptop")
+      setGadgetFilter(modelGadgetType.name);
+      setSmartFiltersApplied(true);
+      
+      // Update URL to reflect the smart filters
+      const params = new URLSearchParams(window.location.search);
+      params.set('productType', 'skin');
+      params.set('gadget', modelGadgetType.name);
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [brandFilter, modelFilter, modelGadgetType, smartFiltersApplied]);
+  
+  // Get finish types, gadget types, and product categories for filtering
+  const finishTypes = useQuery(api.finishTypes.listAllActive, {});
+  const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
+  const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
+  
+  // Find gadgetTypeId from gadgetFilter
+  const selectedGadgetType = gadgetTypes?.find(gt => gt.name === gadgetFilter);
+  const gadgetTypeId = selectedGadgetType?._id;
+  
+  // Find finishTypeId from finishFilter
+  const selectedFinishType = finishTypes?.find(ft => ft.name === finishFilter);
+  const finishTypeId = selectedFinishType?._id;
+  
+  // Function to update filters without reload
+  const updateFilters = useCallback((updates: {
+    productType?: string | null;
+    gadget?: string | null;
+    finish?: string | null;
+  }) => {
+    setIsFilterTransitioning(true);
+    
+    // Update state
+    if (updates.productType !== undefined) {
+      setProductCategory(updates.productType as typeof productCategory);
+      // Clear dependent filters when category changes
+      if (updates.gadget === undefined) {
+        setGadgetFilter(null);
+      }
+      if (updates.finish === undefined) {
+        setFinishFilter(null);
+      }
+    }
+    if (updates.gadget !== undefined) {
+      setGadgetFilter(updates.gadget);
+      // Clear finish when gadget changes
+      if (updates.finish === undefined) {
+        setFinishFilter(null);
+      }
+    }
+    if (updates.finish !== undefined) {
+      setFinishFilter(updates.finish);
+    }
+    
+    // Update URL without reload
+    const params = new URLSearchParams(window.location.search);
+    if (updates.productType !== undefined) {
+      if (updates.productType) {
+        params.set('productType', updates.productType);
+      } else {
+        params.delete('productType');
+      }
+      // Clear dependent params when category changes
+      if (updates.gadget === undefined) {
+        params.delete('gadget');
+      }
+      if (updates.finish === undefined) {
+        params.delete('finish');
+      }
+      // Clear collection and gadget selector params when switching away from Skins
+      if (updates.productType !== 'skin') {
+        params.delete('collection');
+        params.delete('fromGadgetSelector');
+      }
+    }
+    if (updates.gadget !== undefined) {
+      if (updates.gadget) {
+        params.set('gadget', updates.gadget);
+      } else {
+        params.delete('gadget');
+      }
+      // Clear finish param
+      if (updates.finish === undefined) {
+        params.delete('finish');
+      }
+      // Clear collection when switching to non-phone gadget
+      if (updates.gadget !== 'phone') {
+        params.delete('collection');
+      }
+    }
+    if (updates.finish !== undefined) {
+      if (updates.finish) {
+        params.set('finish', updates.finish);
+      } else {
+        params.delete('finish');
+      }
+    }
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+    
+    // Reset transitioning state after brief delay
+    setTimeout(() => setIsFilterTransitioning(false), 300);
+  }, []);
+  
+  // Helper function to update URL params without reloading
+  const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(window.location.search);
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null) {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
+    
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.pushState({}, '', newUrl);
+  }, []);
+  
+  // Handle browser back/forward and URL changes
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setProductCategory(params.get('productType') as typeof productCategory);
+      setGadgetFilter(params.get('gadget'));
+      setFinishFilter(params.get('finish'));
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+  
+  // Sync URL params to state when collection changes
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlProductCategory = params.get('productType') as typeof productCategory;
+    const urlGadget = params.get('gadget');
+    const urlFinish = params.get('finish');
+    
+    // Only update if values actually changed to avoid loops
+    if (urlProductCategory !== productCategory) {
+      setProductCategory(urlProductCategory);
+    }
+    if (urlGadget !== gadgetFilter) {
+      setGadgetFilter(urlGadget);
+    }
+    if (urlFinish !== finishFilter) {
+      setFinishFilter(urlFinish);
+    }
+  }, [collectionParam, productCategory, gadgetFilter, finishFilter]); // Re-run when collection or filters change
+  
+  // Use paginated query - load 100 products at a time
+  const { results: productsData, status, loadMore } = usePaginatedQuery(
+    api.products.getAllProductsPaginated,
+    { 
+      status: "active",
+      productCategory: productCategory || undefined,
+      gadgetTypeId: gadgetTypeId || undefined,
+      finishTypeId: finishTypeId || undefined,
+      // Use the actual model's category if available, not hardcoded "phone"
+      ...(brandFilter && modelFilter && modelInfo?.category ? { 
+        gadgetCategory: modelInfo.category as "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover"
+      } : {})
+    },
+    { initialNumItems: 100 }
+  );
+  
+  // Intersection observer for infinite scroll
+  const observerTarget = useRef<HTMLDivElement>(null);
+  
+  const handleLoadMore = useCallback(() => {
+    if (status === "CanLoadMore") {
+      loadMore(100);
+    }
+  }, [status, loadMore]);
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          handleLoadMore();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [handleLoadMore]);
+  
+  // Get collection if collection parameter is present
+  const collection = useQuery(
+    api.collections.getCollectionByName,
+    collectionParam ? { name: collectionParam } : "skip"
+  );
+  
+  // State for collection pagination
+  const [collectionOffset, setCollectionOffset] = useState(0);
+  const collectionPageSize = 30;
+  
+  // Reset collection offset and accumulated products when collection changes
+  useEffect(() => {
+    setCollectionOffset(0);
+    setAccumulatedCollectionProducts([]);
+  }, [collectionParam]);
+  
+  // Get collection products if we have a collection (paginated)
+  const collectionProductsData = useQuery(
+    api.collections.getCollectionProductsPaginated,
+    collection?._id ? { 
+      collectionId: collection._id,
+      limit: collectionPageSize,
+      offset: collectionOffset 
+    } : "skip"
+  );
+  
+  // Extract products and metadata
+  const collectionProducts = collectionProductsData?.products;
+  const hasMoreCollectionProducts = collectionProductsData?.hasMore || false;
+  
+  // Get all collections - filter by phone category if brand/model selected
+  const phoneCollections = useQuery(
+    api.collections.getCollectionsByCategory,
+    brandFilter && modelFilter ? { category: "phone" } : "skip"
+  );
+  const allCollectionsGeneral = useQuery(
+    api.collections.getAllCollections,
+    !brandFilter || !modelFilter ? {} : "skip"
+  );
+  const allCollections = brandFilter && modelFilter ? phoneCollections : allCollectionsGeneral;
+
+  const testConnection = async () => {
+    try {
+      const result = await verifyConnection({});
+      toast.success(`Connected to: ${result.shop} (${result.domain})`);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Connection failed";
+      toast.error(`Connection Error: ${errorMsg}`);
+      console.error("Shopify connection error:", err);
+    }
+  };
+  
+  // Handle model request submission
+  const handleModelRequestSubmit = async () => {
+    if (!modelRequestBrand.trim() || !modelRequestModel.trim() || !modelRequestCategory || !modelRequestPhone.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    
+    try {
+      await createModelRequest({
+        brandName: modelRequestBrand.trim(),
+        modelName: modelRequestModel.trim(),
+        category: modelRequestCategory,
+        whatsappPhone: modelRequestPhone.trim(),
+      });
+      toast.success("Model request submitted! We'll notify you when it's added.");
+      setIsModelRequestOpen(false);
+      setModelRequestBrand("");
+      setModelRequestModel("");
+      setModelRequestCategory("");
+      setModelRequestPhone("");
+    } catch (error) {
+      toast.error("Failed to submit request. Please try again.");
+      console.error("Model request error:", error);
+    }
+  };
+
+  // State to accumulate collection products across pagination
+  const [accumulatedCollectionProducts, setAccumulatedCollectionProducts] = useState<ConvexProduct[]>([]);
+  
+  // Accumulate collection products as we paginate
+  useEffect(() => {
+    if (collectionProducts && Array.isArray(collectionProducts)) {
+      if (collectionOffset === 0) {
+        // First page - replace
+        setAccumulatedCollectionProducts(collectionProducts);
+      } else {
+        // Subsequent pages - append
+        setAccumulatedCollectionProducts(prev => [...prev, ...collectionProducts]);
+      }
+    }
+  }, [collectionProducts, collectionOffset]);
+  
+  // Convert Convex products to the format needed
+  const allProducts = useMemo(() => {
+    // If we have a collection, use accumulated collection products
+    if (collectionParam && accumulatedCollectionProducts.length > 0) {
+      return accumulatedCollectionProducts.map((product) => ({
+        _id: product._id,
+        slug: product.slug,
+        title: product.title,
+        description: product.description,
+        status: product.status,
+        tags: product.tags.join(", "),
+        images: product.images,
+        gadgetCategory: product.gadgetCategory,
+        finishType: product.finishType,
+        variants: product.variants.map((v) => ({
+          _id: v._id,
+          title: v.title,
+          price: v.price,
+          compareAtPrice: v.compareAtPrice,
+          sku: v.sku,
+          inventory_quantity: v.inventoryQuantity,
+          available: v.inventoryQuantity > 0,
+        })),
+      }));
+    }
+    
+    // Otherwise use regular paginated products
+    if (!productsData || productsData.length === 0) return [];
+    
+    return productsData.map((product) => ({
+      _id: product._id,
+      slug: product.slug,
+      title: product.title,
+      description: product.description,
+      status: product.status,
+      tags: product.tags.join(", "),
+      images: product.images,
+      gadgetCategory: product.gadgetCategory,
+      finishType: product.finishType,
+      variants: product.variants.map((v) => ({
+        _id: v._id,
+        title: v.title,
+        price: v.price,
+        compareAtPrice: v.compareAtPrice,
+        sku: v.sku,
+        inventory_quantity: v.inventoryQuantity,
+        available: v.inventoryQuantity > 0,
+      })),
+    }));
+  }, [productsData, accumulatedCollectionProducts, collectionParam]);
+
+  // Apply search filter (backend handles productCategory, gadgetTypeId, finishTypeId filtering)
+  const filteredProducts = useMemo(() => {
+    let filtered = [...allProducts];
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(p => 
+        p.title.toLowerCase().includes(searchLower) || 
+        p.description?.toLowerCase().includes(searchLower) ||
+        p.tags?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered;
+  }, [allProducts, searchQuery]);
+  
+  // Apply sorting and stock filtering
+  const sortedAndFilteredProducts = useMemo(() => {
+    let result = [...filteredProducts];
+    
+    // Apply stock filter
+    if (stockFilter === "in-stock") {
+      result = result.filter(p => p.variants.some(v => v.available && v.inventory_quantity > 0));
+    } else if (stockFilter === "out-of-stock") {
+      result = result.filter(p => p.variants.every(v => !v.available || v.inventory_quantity === 0));
+    }
+    
+    // Apply sorting
+    if (sortBy === "price-low-high") {
+      result.sort((a, b) => {
+        const minPriceA = Math.min(...a.variants.map(v => v.price));
+        const minPriceB = Math.min(...b.variants.map(v => v.price));
+        return minPriceA - minPriceB;
+      });
+    } else if (sortBy === "price-high-low") {
+      result.sort((a, b) => {
+        const maxPriceA = Math.max(...a.variants.map(v => v.price));
+        const maxPriceB = Math.max(...b.variants.map(v => v.price));
+        return maxPriceB - maxPriceA;
+      });
+    } else if (sortBy === "latest") {
+      // Sort by _creationTime instead
+      result.sort((a, b) => {
+        // Since we don't have _creationTime in our mapped data, reverse order by index
+        const indexA = allProducts.findIndex(p => p._id === a._id);
+        const indexB = allProducts.findIndex(p => p._id === b._id);
+        return indexB - indexA;
+      });
+    }
+    
+    // Auto-sort by stock status if enabled (in-stock first, OOS last)
+    if (autoSortOOS?.value === true) {
+      result.sort((a, b) => {
+        const aInStock = a.variants.some(v => v.available && v.inventory_quantity > 0);
+        const bInStock = b.variants.some(v => v.available && v.inventory_quantity > 0);
+        
+        // In-stock products come first
+        if (aInStock && !bInStock) return -1;
+        if (!aInStock && bInStock) return 1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [filteredProducts, sortBy, stockFilter, allProducts, autoSortOOS]);
+  
+  // Track search events
+  useEffect(() => {
+    if (searchQuery.trim() && searchQuery !== lastTrackedSearch) {
+      trackSearch(searchQuery, sortedAndFilteredProducts.length);
+      setLastTrackedSearch(searchQuery);
+    }
+  }, [searchQuery, sortedAndFilteredProducts.length, lastTrackedSearch]);
+  
+  // Track collection views
+  useEffect(() => {
+    if (collectionParam && collection) {
+      trackCollectionView(collection.name, collectionProducts?.length);
+    }
+  }, [collectionParam, collection, collectionProducts]);
+
+  const isInitialLoading = status === "LoadingFirstPage" || (collectionParam && collection === undefined);
+  const isProductsLoading = isInitialLoading || isFilterTransitioning;
+
+  if (filteredProducts.length === 0 && status === "Exhausted") {
+    return (
+      <div className="min-h-screen">
+        <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
+          <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+            <Link to="/" className="flex items-center gap-2">
+              <img 
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+                alt="Skinly" 
+                className="h-10 sm:h-12"
+              />
+            </Link>
+          </div>
+        </nav>
+
+        <div className="pt-32 sm:pt-40 pb-6 sm:pb-20 px-2 sm:px-4">
+          <div className="container mx-auto max-w-2xl">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <PackageIcon />
+                </EmptyMedia>
+                <EmptyTitle>No Products Found</EmptyTitle>
+                <EmptyDescription>
+                  {deviceFilter || finishFilter || sortBy !== "default" || stockFilter !== "all"
+                    ? `No products match your filters. Try adjusting your filters.`
+                    : `Your Shopify store doesn't have any products yet.`}
+                </EmptyDescription>
+              </EmptyHeader>
+              {(deviceFilter || finishFilter || sortBy !== "default" || stockFilter !== "all") && (
+                <EmptyContent>
+                  <Button onClick={() => {
+                    setSortBy("default");
+                    setStockFilter("all");
+                    navigate('/products');
+                  }}>Clear All Filters</Button>
+                </EmptyContent>
+              )}
+            </Empty>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      {/* SEO Meta Tags */}
+      <Helmet>
+        <title>Shop Premium Phone Skins & Gadget Accessories | Skinly</title>
+        <meta name="description" content="Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application." />
+        
+        {/* Open Graph Tags */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Shop Premium Phone Skins & Gadget Accessories | Skinly" />
+        <meta property="og:description" content="Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application." />
+        <meta property="og:url" content="https://goskinly.com/products" />
+        <meta property="og:image" content="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:site_name" content="Skinly" />
+        
+        {/* Twitter Card Tags */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Shop Premium Phone Skins & Gadget Accessories | Skinly" />
+        <meta name="twitter:description" content="Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application." />
+        <meta name="twitter:image" content="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" />
+        <meta name="twitter:site" content="@goskinly" />
+      </Helmet>
+
+      {/* Announcement Bar */}
+      <AnnouncementBar />
+      
+      {/* Mobile Header */}
+      <MobileHeader 
+        onMenuClick={() => setIsMobileNavOpen(true)}
+        onRequestModelClick={() => setIsModelRequestOpen(true)} 
+      />
+      
+      {/* Mobile Nav */}
+      <MobileNav 
+        open={isMobileNavOpen}
+        onOpenChange={setIsMobileNavOpen}
+        onGadgetSelectorClick={() => setIsDeviceSelectorOpen(true)}
+        onPhoneSelectorClick={() => setIsDeviceSelectorOpen(true)}
+      />
+
+      {/* Product Category Header - Sticky */}
+      <div 
+        className="fixed left-0 right-0 z-30 bg-white dark:bg-gray-950"
+        style={{ top: `${categoryHeaderTop}px` }}
+      >
+        <ProductCategoryHeader
+          productCategory={productCategory}
+          gadgetFilter={gadgetFilter}
+          finishFilter={finishFilter}
+          onUpdateFilters={updateFilters}
+          onDeviceSelectorClick={() => setIsDeviceSelectorOpen(true)}
+        />
+      </div>
+
+      {/* Products Section */}
+      <section 
+        className="pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950"
+        style={{ paddingTop: `${categoryHeaderTop + 120}px` }}
+      >
+        <div className="container mx-auto max-w-7xl">
+          <div className="text-center mb-2 sm:mb-4 space-y-1 sm:space-y-2">
+            <h1 className="text-xl sm:text-4xl lg:text-5xl font-bold text-balance">
+              {searchQuery ? `Search Results` :
+               collectionParam && collection ? collection.name :
+               deviceFilter ? `${deviceFilter.charAt(0).toUpperCase() + deviceFilter.slice(1)} Skins` : 
+               finishFilter ? `${finishFilter.charAt(0).toUpperCase() + finishFilter.slice(1)} Finish` : 
+               'Shop'}
+            </h1>
+            <p className="text-xs sm:text-xl text-muted-foreground max-w-2xl mx-auto text-balance">
+              {searchQuery 
+                ? `${sortedAndFilteredProducts.length} ${sortedAndFilteredProducts.length === 1 ? "result" : "results"} for "${searchQuery}"`
+                : `More than 500 Designs To Choose From Across Gadgets`
+              }
+            </p>
+          </div>
+
+          {/* Device Selection CTA - Only show for Skins category with gadget but NO device selected */}
+          {productCategory === 'skin' && gadgetFilter && !brandFilter && !modelFilter && (
+            <div className="mb-2 sm:mb-4">
+              <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border-2 border-primary/20 rounded-xl p-4 sm:p-6 text-center">
+                <div className="max-w-2xl mx-auto space-y-3">
+                  <div className="inline-block p-3 bg-primary/10 rounded-full">
+                    <Smartphone className="size-6 sm:size-8 text-primary" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold">Select Your Device Model</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Choose your exact device to see perfectly fitted skins
+                  </p>
+                  <Button 
+                    size="lg"
+                    onClick={() => setIsDeviceSelectorOpen(true)}
+                    className="font-semibold"
+                  >
+                    Choose Device Model
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Gadget Selector Welcome Banner - Only show for Skins category with selected device */}
+          {productCategory === 'skin' && brandFilter && modelFilter && (
+            <div className="mb-2 sm:mb-4">
+              <GadgetSelectorBanner 
+                brandName={brandFilter} 
+                modelName={modelFilter}
+                onChangeDevice={() => setIsDeviceSelectorOpen(true)}
+              />
+            </div>
+          )}
+
+          {/* Collection Pills - Only show for phone skins */}
+          {productCategory === 'skin' && gadgetFilter === 'phone' && allCollections && allCollections.length > 0 && brandFilter && modelFilter && (
+            <div className="mb-2 sm:mb-4">
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2">
+                <button
+                  onClick={() => updateUrlParams({ collection: null })}
+                  className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
+                    !collectionParam
+                      ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
+                  }`}
+                >
+                  All Collections
+                </button>
+                {allCollections.map((col) => (
+                  <button
+                    key={col._id}
+                    onClick={() => updateUrlParams({ collection: col.name })}
+                    className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
+                      collectionParam === col.name
+                        ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
+                    }`}
+                  >
+                    {col.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sort and Actions Bar */}
+          <div className="mb-2 sm:mb-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Spacer */}
+              <div className="flex-1" />
+
+              {/* Sort Dropdown */}
+              <Select 
+                value={`${sortBy}|${stockFilter}`}
+                onValueChange={(value) => {
+                  const [sort, stock] = value.split('|');
+                  setSortBy(sort);
+                  setStockFilter(stock);
+                }}
+              >
+                <SelectTrigger className="w-[130px] h-9 text-xs">
+                  <SelectValue placeholder="Sort" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="p-2">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">SORT BY</p>
+                    <SelectItem value="default|all">Default</SelectItem>
+                    <SelectItem value="price-low-high|all">Price: Low to High</SelectItem>
+                    <SelectItem value="price-high-low|all">Price: High to Low</SelectItem>
+                    <SelectItem value="latest|all">Latest</SelectItem>
+                    <div className="border-t my-2"></div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">STOCK</p>
+                    <SelectItem value="default|in-stock">In Stock Only</SelectItem>
+                    <SelectItem value="default|out-of-stock">Out of Stock Only</SelectItem>
+                  </div>
+                </SelectContent>
+              </Select>
+
+              {/* Clear All */}
+              {(gadgetFilter || finishFilter || collectionParam || sortBy !== "default" || stockFilter !== "all") && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setSortBy("default");
+                    setStockFilter("all");
+                    updateFilters({ gadget: null, finish: null });
+                    updateUrlParams({ collection: null });
+                  }} 
+                  className="h-9 text-xs"
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Products Grid - Show loading state or actual products */}
+          {isProductsLoading ? (
+            <>
+              {/* Loading indicator */}
+              <div className="flex items-center justify-center gap-3 py-8 mb-4 bg-muted/30 rounded-lg">
+                <Loader2Icon className="size-6 animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  {productCategory && gadgetFilter && finishFilter 
+                    ? `Loading ${finishFilter} ${gadgetFilter} skins...`
+                    : productCategory && gadgetFilter
+                    ? `Loading ${gadgetFilter} products...`
+                    : productCategory
+                    ? `Loading ${productCategory} products...`
+                    : "Loading products..."}
+                </p>
+              </div>
+              
+              {/* Skeleton cards */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Card key={i} className="p-0">
+                    <Skeleton className="aspect-square w-full rounded-t-xl" />
+                    <div className="px-1.5 pt-1 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                      <Skeleton className="h-3 sm:h-5 w-12 sm:w-16" />
+                      <Skeleton className="h-3 sm:h-5 w-full" />
+                      <Skeleton className="h-3 sm:h-4 w-12 sm:w-20" />
+                      <Skeleton className="h-5 sm:h-10 w-full" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+                  {sortedAndFilteredProducts.map((product) => {
+                  const mainImage = product.images[0];
+                  const minPrice = Math.min(...product.variants.map(v => v.price));
+                  const maxPrice = Math.max(...product.variants.map(v => v.price));
+                  
+                  const priceDisplay = minPrice === maxPrice 
+                    ? `₹${minPrice.toFixed(0)}`
+                    : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
+                  
+                  // Check if all variants are out of stock
+                  const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
+
+                  // Get finish type display name
+                  const finishTypeDisplay = product.finishType 
+                    ? product.finishType === 'matte' 
+                      ? 'Matte' 
+                      : product.finishType === 'embossed' 
+                        ? '3D' 
+                        : product.finishType === 'transparent' 
+                          ? 'Transparent' 
+                          : 'Sparkling'
+                    : null;
+
+                  const productUrl = `/products/detail?slug=${product.slug}${modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''}${brandFilter ? `&brand=${brandFilter}` : ''}`;
+                  
+                  return (
+                    <Link key={product._id} to={productUrl}>
+                      <Card className="group overflow-hidden border-2 border-gray-200 hover:border-black transition-all duration-200 hover:shadow-xl p-0 cursor-pointer dark:border-gray-700 dark:hover:border-white">
+                        <div className={`relative aspect-square overflow-hidden bg-gray-50 dark:bg-gray-800 ${isOutOfStock && autoSortOOS ? 'opacity-30' : ''}`}>
+                          <ProductImage 
+                            product={product} 
+                            brandFilter={brandFilter} 
+                            modelFilter={modelFilter}
+                          />
+                        </div>
+                        <div className="px-1.5 pt-1 pb-1 sm:p-4 space-y-0.5 sm:space-y-2">
+                          {/* Finish Badge - Below image */}
+                          {finishTypeDisplay && (
+                            <div className="flex items-center">
+                              <span className="inline-block px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[8px] sm:text-xs font-medium bg-muted/50 text-muted-foreground border border-border">
+                                {finishTypeDisplay}
+                              </span>
+                            </div>
+                          )}
+                          <h3 className="font-semibold text-[9px] leading-[1.2] sm:text-sm sm:leading-snug line-clamp-2">{product.title}</h3>
+                          <span className="text-[11px] sm:text-lg font-bold sm:font-extrabold text-black dark:text-white block">{priceDisplay}</span>
+                          {isOutOfStock && autoSortOOS ? (
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white shadow-lg hover:shadow-xl active:scale-[0.98]">
+                              <BellIcon className="size-3 sm:size-4 mr-1" />
+                              <span className="hidden sm:inline">Request Restock</span>
+                              <span className="sm:hidden">Restock</span>
+                            </div>
+                          ) : (
+                            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white hover:shadow-lg active:scale-[0.98]">
+                              <span className="hidden sm:inline">Select Your Device</span>
+                              <span className="sm:hidden">Select</span>
+                            </div>
+                          )}
+                        </div>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </div>
+              
+              {/* Infinite scroll trigger */}
+              {collectionParam ? (
+                // Collection pagination
+                <div className="py-8 flex justify-center">
+                  {hasMoreCollectionProducts && (
+                    <Button 
+                      onClick={() => setCollectionOffset(prev => prev + collectionPageSize)} 
+                      variant="outline" 
+                      size="lg"
+                      disabled={!collectionProducts}
+                    >
+                      {collectionProducts ? "Load More Products" : "Loading..."}
+                    </Button>
+                  )}
+                  {!hasMoreCollectionProducts && allProducts.length > 30 && (
+                    <p className="text-muted-foreground text-sm">
+                      You've reached the end! 🎉
+                    </p>
+                  )}
+                </div>
+              ) : (
+                // Regular product pagination
+                <div ref={observerTarget} className="py-8 flex justify-center">
+                  {status === "LoadingMore" && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2Icon className="size-5 animate-spin" />
+                      <span>Loading more products...</span>
+                    </div>
+                  )}
+                  {status === "CanLoadMore" && (
+                    <Button 
+                      onClick={handleLoadMore} 
+                      variant="outline" 
+                      size="lg"
+                    >
+                      Load More Products
+                    </Button>
+                  )}
+                  {status === "Exhausted" && allProducts.length > 30 && (
+                    <p className="text-muted-foreground text-sm">
+                      You've reached the end! 🎉
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+      
+      {/* Model Request Dialog */}
+      <Dialog open={isModelRequestOpen} onOpenChange={setIsModelRequestOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Your Model</DialogTitle>
+            <DialogDescription>
+              Can't find your device? Let us know and we'll add it!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="brand">Brand *</Label>
+              <Input
+                id="brand"
+                placeholder="e.g., Apple, Samsung, OnePlus"
+                value={modelRequestBrand}
+                onChange={(e) => setModelRequestBrand(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="model">Model Name *</Label>
+              <Input
+                id="model"
+                placeholder="e.g., iPhone 15 Pro Max"
+                value={modelRequestModel}
+                onChange={(e) => setModelRequestModel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Device Type *</Label>
+              <Select value={modelRequestCategory} onValueChange={setModelRequestCategory}>
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select device type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="phone">Phone</SelectItem>
+                  <SelectItem value="laptop">Laptop</SelectItem>
+                  <SelectItem value="tablet">Tablet</SelectItem>
+                  <SelectItem value="camera">Camera</SelectItem>
+                  <SelectItem value="lens">Lens</SelectItem>
+                  <SelectItem value="console">Gaming Console</SelectItem>
+                  <SelectItem value="drone">Drone</SelectItem>
+                  <SelectItem value="charger">Charger</SelectItem>
+                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">WhatsApp Number *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="e.g., +919876543210"
+                value={modelRequestPhone}
+                onChange={(e) => setModelRequestPhone(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setIsModelRequestOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={handleModelRequestSubmit}
+                disabled={!modelRequestBrand.trim() || !modelRequestModel.trim() || !modelRequestCategory || !modelRequestPhone.trim()}
+              >
+                Submit Request
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Device Selector Dialog */}
+      <DeviceSelectorDialog
+        open={isDeviceSelectorOpen}
+        onOpenChange={setIsDeviceSelectorOpen}
+      />
+    </div>
+  );
+}

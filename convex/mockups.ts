@@ -1,0 +1,513 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+
+/**
+ * Normalize model name for matching (removes spaces, lowercase)
+ * For Samsung: also strips "Galaxy" and network indicators like (5G), 5G, etc.
+ */
+function normalizeModelName(model: string, brand?: string): string {
+  let normalized = model;
+  
+  // Samsung-specific normalization
+  if (brand?.toLowerCase() === 'samsung') {
+    // Strip "Galaxy" prefix (case-insensitive)
+    normalized = normalized.replace(/^galaxy\s*/i, '').trim();
+    // Strip network indicators: (5G), (4G), (LTE), or standalone 5G, 4G, LTE
+    normalized = normalized.replace(/\s*\([0-9]?G\)/gi, '').trim();
+    normalized = normalized.replace(/\s*\(LTE\)/gi, '').trim();
+    normalized = normalized.replace(/\s+(5G|4G|LTE)$/gi, '').trim();
+  }
+  
+  // Standard normalization: lowercase and remove spaces
+  return normalized.toLowerCase().replace(/\s+/g, '');
+}
+
+/**
+ * Get mockup file URL for a specific brand, model, and SKU
+ * Returns the actual storage URL, not just the file ID
+ * Uses space-insensitive matching for model names
+ */
+export const getMockupFileId = query({
+  args: {
+    brand: v.string(),
+    model: v.string(),
+    sku: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Normalize the search model name with brand-aware logic
+    const normalizedSearchModel = normalizeModelName(args.model, args.brand);
+    
+    // Get all mockups for this brand and SKU
+    const mockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_brand_model_sku", (q) =>
+        q.eq("brand", args.brand)
+      )
+      .collect();
+    
+    // Find mockup with matching normalized model name and SKU
+    const mockup = mockups.find((m) => 
+      normalizeModelName(m.model, args.brand) === normalizedSearchModel && m.sku === args.sku
+    );
+
+    if (!mockup) return null;
+    
+    // Get the actual storage URL
+    const url = await ctx.storage.getUrl(mockup.fileId);
+    return url;
+  },
+});
+
+/**
+ * Get all mockups (paginated)
+ */
+export const getAllMockups = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db.query("mockups").collect();
+  },
+});
+
+/**
+ * Get mockups count (lightweight - doesn't load all data)
+ * Returns an estimate for large tables to avoid timeout
+ */
+export const getMockupsCount = query({
+  args: {},
+  handler: async (ctx) => {
+    // Take a small sample to estimate if table is large
+    const sample = await ctx.db.query("mockups").take(1000);
+    
+    // If we got less than 1000, that's the exact count
+    if (sample.length < 1000) {
+      return sample.length;
+    }
+    
+    // For large tables, return "1000+" to avoid expensive full scan
+    // This prevents timeout on huge tables
+    return 1000;
+  },
+});
+
+/**
+ * Get recent mockups (last N mockups)
+ */
+export const getRecentMockups = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 10;
+    return await ctx.db.query("mockups").order("desc").take(limit);
+  },
+});
+
+/**
+ * Bulk import mockups from CSV data
+ * Expected format: brand,model,sku,fileId
+ * Uses space-insensitive matching for model names
+ */
+export const bulkImportMockups = mutation({
+  args: {
+    mockups: v.array(
+      v.object({
+        brand: v.string(),
+        model: v.string(),
+        sku: v.string(),
+        fileId: v.id("_storage"),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    let imported = 0;
+    let updated = 0;
+    let skipped = 0;
+
+    for (const mockup of args.mockups) {
+      // Normalize model name for comparison with brand-aware logic
+      const normalizedModel = normalizeModelName(mockup.model, mockup.brand);
+      
+      // Check if mockup already exists (space-insensitive match)
+      const allMockups = await ctx.db
+        .query("mockups")
+        .withIndex("by_brand_model_sku", (q) =>
+          q.eq("brand", mockup.brand)
+        )
+        .collect();
+      
+      const existing = allMockups.find((m) => 
+        normalizeModelName(m.model, mockup.brand) === normalizedModel && m.sku === mockup.sku
+      );
+
+      if (existing) {
+        // Update if fileId changed
+        if (existing.fileId !== mockup.fileId) {
+          await ctx.db.patch(existing._id, { fileId: mockup.fileId });
+          updated++;
+        } else {
+          skipped++;
+        }
+      } else {
+        // Insert new mockup (preserve original model name formatting)
+        await ctx.db.insert("mockups", mockup);
+        imported++;
+      }
+    }
+
+    return { imported, updated, skipped };
+  },
+});
+
+/**
+ * Delete a mockup
+ */
+export const deleteMockup = mutation({
+  args: { id: v.id("mockups") },
+  handler: async (ctx, args) => {
+    await ctx.db.delete(args.id);
+  },
+});
+
+/**
+ * Clear a batch of mockups (up to 1000 at a time)
+ * Returns number deleted and whether more remain
+ */
+export const clearAllMockups = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const BATCH_SIZE = 1000;
+    const mockups = await ctx.db.query("mockups").take(BATCH_SIZE);
+    
+    for (const mockup of mockups) {
+      await ctx.db.delete(mockup._id);
+    }
+    
+    // Check if there are more mockups remaining
+    const remaining = await ctx.db.query("mockups").first();
+    
+    return { 
+      deleted: mockups.length,
+      hasMore: remaining !== null
+    };
+  },
+});
+
+/**
+ * Generate upload URL for mockup files
+ */
+export const generateUploadUrl = mutation({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+/**
+ * Keep-alive ping mutation
+ * Lightweight mutation to prevent dev machine from sleeping during uploads
+ */
+export const keepAlivePing = mutation({
+  args: {},
+  handler: async () => {
+    // Do nothing - just keep the connection alive
+    return { timestamp: Date.now() };
+  },
+});
+
+/**
+ * Get all products (SKUs) that have mockups for a specific model
+ * Returns array of { sku, imageUrl }
+ */
+export const getProductsWithMockupsForModel = query({
+  args: {
+    model: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Normalize model name for search (remove spaces, lowercase)
+    const normalizedSearch = args.model.toLowerCase().replace(/\s+/g, "");
+    
+    // Get all mockups
+    const allMockups = await ctx.db.query("mockups").collect();
+    
+    // Filter mockups that match the model (case-insensitive, flexible matching)
+    const matchingMockups = allMockups.filter((mockup) => {
+      const normalizedMockupModel = mockup.model.toLowerCase().replace(/\s+/g, "");
+      return normalizedMockupModel.includes(normalizedSearch) || 
+             normalizedSearch.includes(normalizedMockupModel);
+    });
+    
+    // Group by SKU to get unique products with their image URLs
+    const uniqueProducts = new Map<string, string>();
+    for (const mockup of matchingMockups) {
+      if (!uniqueProducts.has(mockup.sku)) {
+        const url = await ctx.storage.getUrl(mockup.fileId);
+        if (url) {
+          uniqueProducts.set(mockup.sku, url);
+        }
+      }
+    }
+    
+    return Array.from(uniqueProducts.entries()).map(([sku, imageUrl]) => ({
+      sku,
+      imageUrl,
+    }));
+  },
+});
+
+/**
+ * Verify all mockup file IDs and identify broken links
+ * Returns list of mockups with broken file links
+ */
+export const verifyMockupFiles = query({
+  args: {},
+  handler: async (ctx) => {
+    const mockups = await ctx.db.query("mockups").collect();
+    const brokenMockups = [];
+    
+    for (const mockup of mockups) {
+      try {
+        // Try to get the storage URL - if file doesn't exist, this will be null
+        const url = await ctx.storage.getUrl(mockup.fileId);
+        if (!url) {
+          brokenMockups.push({
+            id: mockup._id,
+            brand: mockup.brand,
+            model: mockup.model,
+            sku: mockup.sku,
+            fileId: mockup.fileId,
+          });
+        }
+      } catch (error) {
+        // File definitely doesn't exist
+        brokenMockups.push({
+          id: mockup._id,
+          brand: mockup.brand,
+          model: mockup.model,
+          sku: mockup.sku,
+          fileId: mockup.fileId,
+        });
+      }
+    }
+    
+    return {
+      total: mockups.length,
+      broken: brokenMockups.length,
+      brokenMockups,
+    };
+  },
+});
+
+/**
+ * Check which filenames already exist in the database
+ * Used to resume interrupted uploads by skipping already uploaded files
+ */
+export const checkExistingMockupFilenames = query({
+  args: {
+    filenames: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Get all mockups
+    const allMockups = await ctx.db.query("mockups").collect();
+    
+    // Create a set of existing filename combinations for fast lookup
+    // Normalize filenames: brand_model_sku format (case-insensitive, no extension)
+    const existingSet = new Set<string>();
+    
+    for (const mockup of allMockups) {
+      // Reconstruct the filename pattern from database records
+      // Handle both formats: Brand_Model_SKU and Model_SKU (for Apple auto-detection)
+      const normalizedModel = mockup.model.replace(/\s+/g, '_');
+      const filename1 = `${mockup.brand}_${normalizedModel}_${mockup.sku}`.toLowerCase();
+      const filename2 = `${normalizedModel}_${mockup.sku}`.toLowerCase(); // Without brand
+      existingSet.add(filename1);
+      existingSet.add(filename2);
+    }
+    
+    // Check which input filenames already exist
+    const existingFilenames: string[] = [];
+    const missingFilenames: string[] = [];
+    
+    for (const filename of args.filenames) {
+      // Remove extension and normalize
+      const normalized = filename
+        .replace(/\.(jpg|jpeg|png|webp)$/i, '')
+        .toLowerCase();
+      
+      if (existingSet.has(normalized)) {
+        existingFilenames.push(filename);
+      } else {
+        missingFilenames.push(filename);
+      }
+    }
+    
+    return {
+      total: args.filenames.length,
+      existing: existingFilenames.length,
+      missing: missingFilenames.length,
+      existingFilenames,
+      missingFilenames,
+    };
+  },
+});
+
+/**
+ * Get missing mockups statistics (lightweight - only counts, no detailed results)
+ * Used for displaying summary stats without loading full dataset
+ */
+export const getMissingMockupsStats = query({
+  args: { 
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const category = args.category || "phone";
+    
+    // Get count of supported models
+    const supportedModels = await ctx.db
+      .query("supportedModels")
+      .filter((q) => q.and(
+        q.eq(q.field("category"), category),
+        q.eq(q.field("isActive"), true)
+      ))
+      .take(500); // Limit to prevent timeout
+    
+    // Get sample of products to estimate SKU count
+    const allProducts = await ctx.db.query("products").take(100);
+    const skinProducts = allProducts.filter(p => 
+      p.title.toLowerCase().includes("phone skin")
+    );
+    const skinProductIds = new Set(skinProducts.map(p => p._id));
+    
+    // Get sample of variants
+    const variants = await ctx.db.query("variants").take(200);
+    const sampleSKUs = new Set<string>();
+    for (const variant of variants) {
+      if (skinProductIds.has(variant.productId)) {
+        sampleSKUs.add(variant.sku);
+      }
+    }
+    
+    // Estimate based on samples
+    const estimatedSKUs = sampleSKUs.size > 0 ? sampleSKUs.size : 50;
+    const estimatedModels = supportedModels.length;
+    const estimatedTotal = estimatedModels * estimatedSKUs;
+    
+    // Get unique brands
+    const uniqueBrands = new Set(supportedModels.map(m => m.brandName)).size;
+    
+    return {
+      totalMissingCombinations: estimatedTotal,
+      modelsAffected: estimatedModels,
+      brandsAffected: uniqueBrands,
+      totalSKUs: estimatedSKUs,
+    };
+  },
+});
+
+/**
+ * Get missing mockups by checking which phone model + SKU combinations lack mockup images
+ * Returns models grouped by brand with their missing SKUs
+ * Optimized with limits and brand filtering
+ */
+export const getMissingMockups = query({
+  args: { 
+    category: v.optional(v.string()),
+    brand: v.optional(v.string()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const category = args.category || "phone";
+    const limit = args.limit || 50; // Default to 50 models at a time
+    
+    // Get supported models for the category (optionally filtered by brand)
+    let modelsQuery = ctx.db
+      .query("supportedModels")
+      .filter((q) => q.and(
+        q.eq(q.field("category"), category),
+        q.eq(q.field("isActive"), true)
+      ));
+    
+    const supportedModels = await modelsQuery.take(500); // Max 500 models
+    
+    // Filter by brand if specified
+    const filteredModels = args.brand && args.brand !== "all"
+      ? supportedModels.filter(m => m.brandName === args.brand)
+      : supportedModels;
+    
+    // Take only the requested limit
+    const limitedModels = filteredModels.slice(0, limit);
+    
+    // Get all products (limit to reduce load)
+    const allProducts = await ctx.db.query("products").take(200);
+    
+    // Filter to only products with "Phone Skin" in the title
+    const skinProducts = allProducts.filter(p => 
+      p.title.toLowerCase().includes("phone skin")
+    );
+    const skinProductIds = new Set(skinProducts.map(p => p._id));
+    
+    // Get product variants (SKUs) for skin products only (limited)
+    const variants = await ctx.db.query("variants").take(500);
+    const allSKUs = new Set<string>();
+    for (const variant of variants) {
+      if (skinProductIds.has(variant.productId)) {
+        allSKUs.add(variant.sku);
+      }
+    }
+    
+    // Get existing mockups (limited sample for performance)
+    const existingMockups = await ctx.db.query("mockups").take(2000);
+    
+    // Create a set of existing mockup combinations (normalized model + SKU)
+    const existingCombos = new Set<string>();
+    for (const mockup of existingMockups) {
+      const key = `${normalizeModelName(mockup.model)}|${mockup.sku}`;
+      existingCombos.add(key);
+    }
+    
+    // Find missing combinations for limited models only
+    const results = [];
+    
+    for (const supportedModel of limitedModels) {
+      const normalizedModel = normalizeModelName(supportedModel.modelName);
+      const missingSKUs: string[] = [];
+      
+      for (const sku of allSKUs) {
+        const key = `${normalizedModel}|${sku}`;
+        if (!existingCombos.has(key)) {
+          missingSKUs.push(sku);
+        }
+      }
+      
+      if (missingSKUs.length > 0) {
+        results.push({
+          brand: supportedModel.brandName,
+          model: supportedModel.modelName,
+          missingSKUs,
+          totalMissing: missingSKUs.length,
+        });
+      }
+    }
+    
+    // Sort by brand then model
+    results.sort((a, b) => {
+      if (a.brand !== b.brand) {
+        return a.brand.localeCompare(b.brand);
+      }
+      return a.model.localeCompare(b.model);
+    });
+    
+    // Calculate stats for current page
+    const totalMissingCombinations = results.reduce((sum, r) => sum + r.totalMissing, 0);
+    const uniqueBrands = new Set(results.map(r => r.brand)).size;
+    
+    return {
+      results,
+      hasMore: filteredModels.length > limit,
+      totalAvailable: filteredModels.length,
+      stats: {
+        totalMissingCombinations,
+        modelsAffected: results.length,
+        brandsAffected: uniqueBrands,
+        totalSKUs: allSKUs.size,
+      }
+    };
+  },
+});

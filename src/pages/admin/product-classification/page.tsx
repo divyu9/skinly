@@ -1,0 +1,2021 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { AdminLayout } from "@/components/admin-layout.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { Sparkles, CheckCircle2, AlertCircle, Tag, Layers, Package, Plus, Edit, Trash2, RefreshCw, Save, ExternalLink } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Spinner } from "@/components/ui/spinner.tsx";
+
+// Helper component to display model count
+function ModelCountCell({ gadgetTypeId }: { gadgetTypeId: Id<"gadgetTypes"> }) {
+  const modelCount = useQuery(api.supportedModels.getModelCountByGadgetType, { gadgetTypeId });
+  return (
+    <div className="flex items-center gap-2">
+      <Badge variant="outline">
+        {modelCount === undefined ? "..." : modelCount}
+      </Badge>
+      {modelCount !== undefined && modelCount > 0 && (
+        <a 
+          href="/backend-skinly/models" 
+          className="text-xs text-primary hover:underline"
+          title="View models in Models page"
+        >
+          View
+        </a>
+      )}
+    </div>
+  );
+}
+
+export default function ProductClassificationPage() {
+  const [selectedGadget, setSelectedGadget] = useState<string>("all");
+  const [selectedFinish, setSelectedFinish] = useState<string>("all");
+  const [isPreviewDialogOpen, setIsPreviewDialogOpen] = useState(false);
+  const [isApplyDialogOpen, setIsApplyDialogOpen] = useState(false);
+  
+  // Finish type management state
+  const [isCreateFinishTypeOpen, setIsCreateFinishTypeOpen] = useState(false);
+  const [isEditFinishTypeOpen, setIsEditFinishTypeOpen] = useState(false);
+  const [isDeleteFinishTypeOpen, setIsDeleteFinishTypeOpen] = useState(false);
+  const [selectedFinishType, setSelectedFinishType] = useState<Id<"finishTypes"> | null>(null);
+  const [finishTypeForm, setFinishTypeForm] = useState({ name: "", displayName: "" });
+
+  // Gadget type management state
+  const [isCreateGadgetTypeOpen, setIsCreateGadgetTypeOpen] = useState(false);
+  const [isEditGadgetTypeOpen, setIsEditGadgetTypeOpen] = useState(false);
+  const [isDeleteGadgetTypeOpen, setIsDeleteGadgetTypeOpen] = useState(false);
+  const [selectedGadgetType, setSelectedGadgetType] = useState<Id<"gadgetTypes"> | null>(null);
+  const [gadgetTypeForm, setGadgetTypeForm] = useState({ name: "", displayName: "" });
+  
+  // Product category migration state
+  const [isProductCategoryPreviewOpen, setIsProductCategoryPreviewOpen] = useState(false);
+  const [isProductCategoryMigrateOpen, setIsProductCategoryMigrateOpen] = useState(false);
+  
+  // Product category management state
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedProducts, setSelectedProducts] = useState<Set<Id<"products">>>(new Set());
+  const [productCategorySearch, setProductCategorySearch] = useState("");
+  const [isBulkUpdateDialogOpen, setIsBulkUpdateDialogOpen] = useState(false);
+  const [bulkUpdateCategory, setBulkUpdateCategory] = useState<string>("");
+  
+  // Inline editing state for unclassified products
+  const [editingProducts, setEditingProducts] = useState<Record<string, {
+    gadgetCategory?: string;
+    finishTypeId?: Id<"finishTypes"> | null;
+  }>>({});
+  const [savingProductId, setSavingProductId] = useState<Id<"products"> | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Queries
+  const stats = useQuery(api.productClassification.getClassificationStats, {});
+  const finishTypes = useQuery(api.finishTypes.listAllActive, {}); // Use listAllActive for dropdowns
+  const allFinishTypes = useQuery(api.finishTypes.list, {}); // For management tab
+  const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {}); // Use listAllActive for dropdowns
+  const allGadgetTypes = useQuery(api.gadgetTypes.list, {}); // For management tab
+  const preview = useQuery(api.productClassification.previewAutoClassification, {});
+  const unclassified = useQuery(api.productClassification.getUnclassifiedProducts, {});
+  const filtered = useQuery(
+    api.productClassification.getProductsByClassification,
+    selectedGadget === "all" && selectedFinish === "all"
+      ? "skip"
+      : {
+          gadgetCategory: selectedGadget === "all" ? undefined : selectedGadget,
+          finishTypeId: selectedFinish === "all" ? undefined : (selectedFinish as Id<"finishTypes">),
+        }
+  );
+  const productCategoryPreview = useQuery(
+    api.migrateProductCategory.previewProductCategoryMigration,
+    isProductCategoryPreviewOpen ? { limit: 100 } : "skip"
+  );
+  
+  // Product category management queries
+  const categoryStats = useQuery(api.productCategories.getCategoryStats, {});
+  const categorizedProducts = useQuery(
+    api.productCategories.getProductsByCategory,
+    { category: selectedCategory === "all" ? undefined : selectedCategory, limit: 100 }
+  );
+  const uncategorizedProducts = useQuery(api.productCategories.getUncategorizedProducts, {});
+
+  // Mutations
+  const applyAutoClassification = useMutation(api.productClassification.applyAutoClassification);
+  const bulkUpdate = useMutation(api.productClassification.bulkUpdateClassification);
+  const updateSingleProduct = useMutation(api.productClassification.updateSingleProductClassification);
+  const seedInitialFinishTypes = useMutation(api.finishTypes.seedInitialFinishTypes);
+  const createFinishType = useMutation(api.finishTypes.create);
+  const updateFinishType = useMutation(api.finishTypes.update);
+  const deleteFinishType = useMutation(api.finishTypes.remove);
+  const recalculateCounts = useMutation(api.finishTypes.recalculateAllCounts);
+  
+  // Gadget type mutations
+  const seedGadgetTypes = useMutation(api.gadgetTypes.seed);
+  const createGadgetType = useMutation(api.gadgetTypes.create);
+  const updateGadgetType = useMutation(api.gadgetTypes.update);
+  const deleteGadgetType = useMutation(api.gadgetTypes.remove);
+  const recalculateGadgetCounts = useMutation(api.gadgetTypes.recalculateProductCounts);
+  const migrateGadgetTypes = useMutation(api.gadgetTypes.migrateProductGadgetTypes);
+  
+  // Product category migration mutations
+  const migrateProductCategories = useMutation(api.migrateProductCategory.migrateProductsToProductCategory);
+  
+  // Product category management mutations
+  const updateProductCategory = useMutation(api.productCategories.updateProductCategory);
+  const bulkUpdateCategories = useMutation(api.productCategories.bulkUpdateProductCategories);
+
+  const handleSeedFinishTypes = async () => {
+    try {
+      await seedInitialFinishTypes({});
+      toast.success("Finish types seeded successfully");
+    } catch (error) {
+      toast.error("Failed to seed finish types");
+      console.error(error);
+    }
+  };
+
+  const handleApplyAutoClassification = async () => {
+    try {
+      const result = await applyAutoClassification({});
+      toast.success(`Auto-classified ${result.classified} products`);
+      setIsApplyDialogOpen(false);
+    } catch (error) {
+      toast.error("Failed to apply auto-classification");
+      console.error(error);
+    }
+  };
+
+  const handleBulkUpdateGadget = async (productIds: Id<"products">[], gadgetCategory: string) => {
+    try {
+      await bulkUpdate({ productIds, gadgetCategory, finishTypeId: undefined });
+      toast.success(`Updated ${productIds.length} products`);
+    } catch (error) {
+      toast.error("Failed to update products");
+      console.error(error);
+    }
+  };
+
+  const handleBulkUpdateFinish = async (productIds: Id<"products">[], finishTypeId: Id<"finishTypes">) => {
+    try {
+      await bulkUpdate({ productIds, gadgetCategory: undefined, finishTypeId });
+      toast.success(`Updated ${productIds.length} products`);
+    } catch (error) {
+      toast.error("Failed to update products");
+      console.error(error);
+    }
+  };
+
+  // Finish type management handlers
+  const handleCreateFinishType = async () => {
+    try {
+      if (!finishTypeForm.displayName) {
+        toast.error("Display name is required");
+        return;
+      }
+      
+      // Auto-generate name from display name if not provided
+      const name = finishTypeForm.name || finishTypeForm.displayName.toLowerCase().replace(/\s+/g, "-");
+      
+      await createFinishType({ name, displayName: finishTypeForm.displayName });
+      toast.success("Finish type created successfully");
+      setIsCreateFinishTypeOpen(false);
+      setFinishTypeForm({ name: "", displayName: "" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create finish type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleEditFinishType = async () => {
+    if (!selectedFinishType) return;
+    
+    try {
+      await updateFinishType({
+        id: selectedFinishType,
+        displayName: finishTypeForm.displayName || undefined,
+      });
+      toast.success("Finish type updated successfully");
+      setIsEditFinishTypeOpen(false);
+      setFinishTypeForm({ name: "", displayName: "" });
+      setSelectedFinishType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update finish type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleDeleteFinishType = async () => {
+    if (!selectedFinishType) return;
+    
+    try {
+      await deleteFinishType({ id: selectedFinishType });
+      toast.success("Finish type deleted successfully");
+      setIsDeleteFinishTypeOpen(false);
+      setSelectedFinishType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete finish type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleSyncProductCounts = async () => {
+    try {
+      const result = await recalculateCounts({});
+      toast.success(result.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync product counts";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const openEditDialog = (finishType: { _id: Id<"finishTypes">; name: string; displayName: string }) => {
+    setSelectedFinishType(finishType._id);
+    setFinishTypeForm({ name: finishType.name, displayName: finishType.displayName });
+    setIsEditFinishTypeOpen(true);
+  };
+
+  const openDeleteDialog = (finishTypeId: Id<"finishTypes">) => {
+    setSelectedFinishType(finishTypeId);
+    setIsDeleteFinishTypeOpen(true);
+  };
+
+  // Gadget type management handlers
+  const handleSeedGadgetTypes = async () => {
+    try {
+      await seedGadgetTypes({});
+      toast.success("Gadget types seeded successfully");
+    } catch (error) {
+      toast.error("Failed to seed gadget types");
+      console.error(error);
+    }
+  };
+
+  const handleCreateGadgetType = async () => {
+    try {
+      if (!gadgetTypeForm.displayName) {
+        toast.error("Display name is required");
+        return;
+      }
+      
+      // Auto-generate name from display name if not provided
+      const name = gadgetTypeForm.name || gadgetTypeForm.displayName.toLowerCase().replace(/\s+/g, "-");
+      
+      await createGadgetType({ name, displayName: gadgetTypeForm.displayName, isActive: true });
+      toast.success("Gadget type created successfully");
+      setIsCreateGadgetTypeOpen(false);
+      setGadgetTypeForm({ name: "", displayName: "" });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create gadget type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleEditGadgetType = async () => {
+    if (!selectedGadgetType) return;
+    
+    try {
+      await updateGadgetType({
+        id: selectedGadgetType,
+        displayName: gadgetTypeForm.displayName || undefined,
+      });
+      toast.success("Gadget type updated successfully");
+      setIsEditGadgetTypeOpen(false);
+      setGadgetTypeForm({ name: "", displayName: "" });
+      setSelectedGadgetType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update gadget type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleDeleteGadgetType = async () => {
+    if (!selectedGadgetType) return;
+    
+    try {
+      await deleteGadgetType({ id: selectedGadgetType });
+      toast.success("Gadget type deleted successfully");
+      setIsDeleteGadgetTypeOpen(false);
+      setSelectedGadgetType(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete gadget type";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleSyncGadgetCounts = async () => {
+    try {
+      const result = await recalculateGadgetCounts({});
+      toast.success(result.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync gadget type product counts";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleMigrateGadgetTypes = async () => {
+    try {
+      const result = await migrateGadgetTypes({});
+      toast.success(result.message);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to migrate gadget types";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const openEditGadgetDialog = (gadgetType: { _id: Id<"gadgetTypes">; name: string; displayName: string }) => {
+    setSelectedGadgetType(gadgetType._id);
+    setGadgetTypeForm({ name: gadgetType.name, displayName: gadgetType.displayName });
+    setIsEditGadgetTypeOpen(true);
+  };
+
+  const openDeleteGadgetDialog = (gadgetTypeId: Id<"gadgetTypes">) => {
+    setSelectedGadgetType(gadgetTypeId);
+    setIsDeleteGadgetTypeOpen(true);
+  };
+
+  // Inline editing handlers
+  const handleInlineGadgetChange = (productId: Id<"products">, gadgetCategory: string) => {
+    setEditingProducts(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        gadgetCategory: gadgetCategory === "none" ? undefined : gadgetCategory,
+      },
+    }));
+  };
+
+  const handleInlineFinishChange = (productId: Id<"products">, finishTypeId: string) => {
+    setEditingProducts(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        finishTypeId: finishTypeId === "none" ? null : (finishTypeId as Id<"finishTypes">),
+      },
+    }));
+  };
+
+  const handleSaveInlineEdit = async (productId: Id<"products">) => {
+    const edits = editingProducts[productId];
+    if (!edits || (edits.gadgetCategory === undefined && edits.finishTypeId === undefined)) {
+      toast.error("Please select at least one field to update");
+      return;
+    }
+
+    setSavingProductId(productId);
+    try {
+      await updateSingleProduct({
+        productId,
+        gadgetCategory: edits.gadgetCategory,
+        finishTypeId: edits.finishTypeId,
+      });
+      toast.success("Product classification updated");
+      
+      // Clear editing state for this product
+      setEditingProducts(prev => {
+        const newState = { ...prev };
+        delete newState[productId];
+        return newState;
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update product";
+      toast.error(errorMessage);
+      console.error(error);
+    } finally {
+      setSavingProductId(null);
+    }
+  };
+
+  const handleRefreshUnclassified = async () => {
+    setIsRefreshing(true);
+    try {
+      // Force refetch by toggling between tabs or using a timeout
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success("Unclassified products refreshed");
+    } catch (error) {
+      toast.error("Failed to refresh");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Product category migration handlers
+  const handleMigrateProductCategories = async () => {
+    try {
+      const result = await migrateProductCategories({});
+      toast.success(result.message);
+      setIsProductCategoryMigrateOpen(false);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to migrate product categories";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  // Product category management handlers
+  const handleToggleProductSelection = (productId: Id<"products">) => {
+    setSelectedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (!categorizedProducts?.products) return;
+    const allIds = categorizedProducts.products.map(p => p._id);
+    setSelectedProducts(new Set(allIds));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedProducts(new Set());
+  };
+
+  const handleBulkUpdateCategories = async () => {
+    if (selectedProducts.size === 0 || !bulkUpdateCategory) {
+      toast.error("Please select products and a category");
+      return;
+    }
+
+    try {
+      const result = await bulkUpdateCategories({
+        productIds: Array.from(selectedProducts),
+        category: bulkUpdateCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory",
+      });
+      toast.success(result.message);
+      setIsBulkUpdateDialogOpen(false);
+      setSelectedProducts(new Set());
+      setBulkUpdateCategory("");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to bulk update categories";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  const handleInlineCategoryChange = async (productId: Id<"products">, category: string) => {
+    try {
+      await updateProductCategory({
+        productId,
+        category: category === "none" ? null : category as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory",
+      });
+      toast.success("Product category updated");
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to update category";
+      toast.error(errorMessage);
+      console.error(error);
+    }
+  };
+
+  return (
+    <AdminLayout>
+      <div className="container mx-auto space-y-6 py-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Product Classification</h1>
+            <p className="text-muted-foreground">
+              Auto-classify products by gadget type and finish
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={handleSeedGadgetTypes} variant="outline" size="sm">
+              <Tag className="mr-2 h-4 w-4" />
+              Seed Gadget Types
+            </Button>
+            <Button onClick={handleSeedFinishTypes} variant="outline" size="sm">
+              <Layers className="mr-2 h-4 w-4" />
+              Seed Finish Types
+            </Button>
+            <Button 
+              onClick={() => setIsProductCategoryPreviewOpen(true)} 
+              variant="default" 
+              size="sm"
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Migrate Product Categories
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Overview */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Products</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {stats === undefined ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.classified} classified
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Unclassified</CardTitle>
+              <AlertCircle className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              {stats === undefined ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold text-yellow-600">
+                    {stats.unclassified}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Need classification
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Gadget Types</CardTitle>
+              <Tag className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {stats === undefined ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {stats.byGadget ? Object.keys(stats.byGadget).length : 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Categories in use
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Finish Types</CardTitle>
+              <Layers className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {stats === undefined ? (
+                <Skeleton className="h-8 w-20" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {stats.totalFinishTypes || 0}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Finishes available
+                  </p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Auto-Classification Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-500" />
+              Auto-Classification
+            </CardTitle>
+            <CardDescription>
+              Automatically classify products based on their titles
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-4">
+              <Button
+                onClick={() => setIsPreviewDialogOpen(true)}
+                variant="outline"
+                disabled={preview === undefined}
+              >
+                Preview Changes
+              </Button>
+              <Button
+                onClick={() => setIsApplyDialogOpen(true)}
+                disabled={preview === undefined || preview.results.length === 0}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Apply Auto-Classification
+              </Button>
+            </div>
+            {preview !== undefined && preview.results.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Ready to classify {preview.results.length} products
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tabs for different views */}
+        <Tabs defaultValue="browse" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="browse">Browse by Filter</TabsTrigger>
+            <TabsTrigger value="unclassified">
+              Unclassified ({unclassified?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="stats">Statistics</TabsTrigger>
+            <TabsTrigger value="manage">Manage Finish Types</TabsTrigger>
+            <TabsTrigger value="manage-gadgets">Manage Gadget Types</TabsTrigger>
+            <TabsTrigger value="manage-categories">
+              Manage Product Categories
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="browse" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Filter Products</CardTitle>
+                <CardDescription>
+                  Browse products by gadget type and finish
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="mb-2 block text-sm font-medium">
+                      Gadget Type
+                    </label>
+                    <Select value={selectedGadget} onValueChange={setSelectedGadget}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Gadgets</SelectItem>
+                        {gadgetTypes?.map((gadget) => (
+                          <SelectItem key={gadget._id} value={gadget.name}>
+                            {gadget.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-2 block text-sm font-medium">
+                      Finish Type
+                    </label>
+                    <Select value={selectedFinish} onValueChange={setSelectedFinish}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Finishes</SelectItem>
+                        {finishTypes?.map((finish) => (
+                          <SelectItem key={finish._id} value={finish._id}>
+                            {finish.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {(selectedGadget !== "all" || selectedFinish !== "all") && (
+                  <div className="rounded-lg border">
+                    {filtered === undefined ? (
+                      <div className="p-8">
+                        <Skeleton className="h-20 w-full" />
+                      </div>
+                    ) : filtered.length === 0 ? (
+                      <div className="p-8 text-center text-muted-foreground">
+                        No products found with selected filters
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Gadget</TableHead>
+                            <TableHead>Finish</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filtered.map((product) => (
+                            <TableRow key={product._id}>
+                              <TableCell className="font-medium">
+                                {product.title}
+                              </TableCell>
+                              <TableCell>
+                                {product.gadgetCategory ? (
+                                  <Badge variant="secondary">
+                                    {product.gadgetCategory}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {product.finishTypeId ? (
+                                  <Badge variant="outline">
+                                    Finish assigned
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="unclassified" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Unclassified Products</CardTitle>
+                    <CardDescription>
+                      Products missing gadget type or finish classification
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRefreshUnclassified}
+                    disabled={isRefreshing}
+                  >
+                    {isRefreshing ? (
+                      <Spinner className="mr-2 h-4 w-4" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {unclassified === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : unclassified.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <CheckCircle2 className="mb-4 h-12 w-12 text-green-500" />
+                    <h3 className="mb-2 text-lg font-semibold">All Classified!</h3>
+                    <p className="text-sm text-muted-foreground">
+                      All products have been classified
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[300px]">Product Name</TableHead>
+                          <TableHead className="min-w-[150px]">Current Status</TableHead>
+                          <TableHead className="min-w-[180px]">Gadget Type</TableHead>
+                          <TableHead className="min-w-[180px]">Finish Type</TableHead>
+                          <TableHead className="min-w-[140px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {unclassified.map((product) => {
+                          const edits = editingProducts[product._id] || {};
+                          const isSaving = savingProductId === product._id;
+                          
+                          return (
+                            <TableRow key={product._id}>
+                              <TableCell className="font-medium">
+                                <div className="break-words">
+                                  {product.title}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-wrap gap-1">
+                                  {!product.gadgetCategory && (
+                                    <Badge variant="destructive" className="text-xs">No Gadget</Badge>
+                                  )}
+                                  {!product.finishTypeId && (
+                                    <Badge variant="destructive" className="text-xs">No Finish</Badge>
+                                  )}
+                                  {product.gadgetCategory && (
+                                    <Badge variant="secondary" className="text-xs">{product.gadgetCategory}</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={edits.gadgetCategory ?? product.gadgetCategory ?? "none"}
+                                  onValueChange={(value) => handleInlineGadgetChange(product._id, value)}
+                                  disabled={isSaving}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select gadget" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">-- Select --</SelectItem>
+                                    {gadgetTypes?.map((gadget) => (
+                                      <SelectItem key={gadget._id} value={gadget.name}>
+                                        {gadget.displayName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select
+                                  value={
+                                    edits.finishTypeId === null 
+                                      ? "none" 
+                                      : edits.finishTypeId ?? product.finishTypeId ?? "none"
+                                  }
+                                  onValueChange={(value) => handleInlineFinishChange(product._id, value)}
+                                  disabled={isSaving}
+                                >
+                                  <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="Select finish" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">-- Select --</SelectItem>
+                                    {finishTypes?.map((finish) => (
+                                      <SelectItem key={finish._id} value={finish._id}>
+                                        {finish.displayName}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => handleSaveInlineEdit(product._id)}
+                                    disabled={isSaving || (!edits.gadgetCategory && edits.finishTypeId === undefined)}
+                                  >
+                                    {isSaving ? (
+                                      <Spinner className="h-3 w-3" />
+                                    ) : (
+                                      <>
+                                        <Save className="mr-1 h-3 w-3" />
+                                        Save
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const productUrl = product.slug 
+                                        ? `/products/${product.slug}`
+                                        : `/products/detail?id=${product._id}`;
+                                      window.open(productUrl, "_blank");
+                                    }}
+                                    disabled={isSaving}
+                                    title="View on frontend"
+                                  >
+                                    <ExternalLink className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="stats" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>By Gadget Type</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {stats === undefined ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : stats.byGadget ? (
+                    <div className="space-y-2">
+                      {Object.entries(stats.byGadget).map(([gadget, count]) => (
+                        <div
+                          key={gadget}
+                          className="flex items-center justify-between rounded-lg border p-3"
+                        >
+                          <span className="font-medium">{gadget}</span>
+                          <Badge variant="secondary">{count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No data available</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>By Finish Type</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {stats === undefined ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : stats.byFinish ? (
+                    <div className="space-y-2">
+                      {Object.entries(stats.byFinish).map(([finish, count]) => (
+                        <div
+                          key={finish}
+                          className="flex items-center justify-between rounded-lg border p-3"
+                        >
+                          <span className="font-medium">{finish}</span>
+                          <Badge variant="secondary">{count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No data available</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="manage" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Finish Types Management</CardTitle>
+                    <CardDescription>
+                      Create and manage finish types for product classification
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncProductCounts}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync Product Counts
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setFinishTypeForm({ name: "", displayName: "" });
+                        setIsCreateFinishTypeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Finish Type
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {allFinishTypes === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : allFinishTypes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Layers className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">No Finish Types</h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Create your first finish type to get started
+                    </p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setFinishTypeForm({ name: "", displayName: "" });
+                        setIsCreateFinishTypeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Finish Type
+                    </Button>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Display Name</TableHead>
+                        <TableHead>Internal Name</TableHead>
+                        <TableHead>Product Count</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allFinishTypes.map((finishType) => (
+                        <TableRow key={finishType._id}>
+                          <TableCell className="font-medium">
+                            {finishType.displayName}
+                          </TableCell>
+                          <TableCell>
+                            <code className="rounded bg-muted px-2 py-1 text-sm">
+                              {finishType.name}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{finishType.productCount}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {finishType.isActive ? (
+                              <Badge variant="default">Active</Badge>
+                            ) : (
+                              <Badge variant="outline">Inactive</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(finishType)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteDialog(finishType._id)}
+                                disabled={finishType.productCount > 0}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="manage-gadgets" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Gadget Types Management</CardTitle>
+                    <CardDescription>
+                      Create and manage gadget types for product classification
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleMigrateGadgetTypes}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Migrate Products
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncGadgetCounts}
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Sync Product Counts
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setGadgetTypeForm({ name: "", displayName: "" });
+                        setIsCreateGadgetTypeOpen(true);
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Gadget Type
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {allGadgetTypes === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : allGadgetTypes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Package className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">No Gadget Types</h3>
+                    <p className="mb-4 text-sm text-muted-foreground">
+                      Seed gadget types to get started
+                    </p>
+                    <Button size="sm" onClick={handleSeedGadgetTypes}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Seed Gadget Types
+                    </Button>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Display Name</TableHead>
+                        <TableHead>Internal Name</TableHead>
+                        <TableHead>Product Count</TableHead>
+                        <TableHead>Model Count</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {allGadgetTypes.map((gadgetType) => (
+                        <TableRow key={gadgetType._id}>
+                          <TableCell className="font-medium">
+                            {gadgetType.displayName}
+                          </TableCell>
+                          <TableCell>
+                            <code className="rounded bg-muted px-2 py-1 text-sm">
+                              {gadgetType.name}
+                            </code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{gadgetType.productCount}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <ModelCountCell gadgetTypeId={gadgetType._id} />
+                          </TableCell>
+                          <TableCell>
+                            {gadgetType.isActive ? (
+                              <Badge variant="default">Active</Badge>
+                            ) : (
+                              <Badge variant="outline">Inactive</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditGadgetDialog(gadgetType)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openDeleteGadgetDialog(gadgetType._id)}
+                                disabled={gadgetType.productCount > 0}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="manage-categories" className="space-y-4">
+            {/* Category Overview Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Category Overview</CardTitle>
+                <CardDescription>
+                  View all product categories used for shop page organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {categoryStats === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Category Name</TableHead>
+                            <TableHead>Internal ID</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Product Count</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="font-medium">Skin</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">skin</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Device skins and wraps
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats.skin}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Cover & Case</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">case-cover</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Phone cases and protective covers
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats["case-cover"]}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Camera Rings</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">camera-ring</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Camera lens protection rings
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats["camera-ring"]}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Magneto & More</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">magneto-x</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Magnetic accessories and gadgets
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats["magneto-x"]}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Membrane / Protectors</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">glass</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Screen protectors and membranes
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats.glass}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Accessory</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">accessory</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              General accessories and add-ons
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="secondary">{categoryStats.accessory}</Badge>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="font-medium">Uncategorized</TableCell>
+                            <TableCell>
+                              <code className="rounded bg-muted px-2 py-1 text-xs">—</code>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              Products without a category
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="destructive">{categoryStats.uncategorized}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950">
+                      <h4 className="mb-2 font-semibold text-blue-900 dark:text-blue-100">
+                        About Product Categories
+                      </h4>
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        Product categories are core to your shop page organization and are defined at the system level. 
+                        These categories determine which tab products appear under on the <strong>/products</strong> page. 
+                        To assign products to categories, use the management section below or edit individual products.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Product Category Management */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Product Category Management</CardTitle>
+                    <CardDescription>
+                      Bulk manage and assign product categories
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    {selectedProducts.size > 0 && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDeselectAll}
+                        >
+                          Deselect All ({selectedProducts.size})
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => setIsBulkUpdateDialogOpen(true)}
+                        >
+                          Bulk Update Category
+                        </Button>
+                      </>
+                    )}
+                    {selectedProducts.size === 0 && categorizedProducts?.products && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAll}
+                      >
+                        Select All
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="mb-2 block text-sm font-medium">
+                      Filter by Category
+                    </label>
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Products</SelectItem>
+                        <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                        <SelectItem value="skin">Skin</SelectItem>
+                        <SelectItem value="case-cover">Cover & Case</SelectItem>
+                        <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                        <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                        <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                        <SelectItem value="accessory">Accessory</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {categorizedProducts === undefined ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : categorizedProducts.products.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Package className="mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-lg font-semibold">No Products</h3>
+                    <p className="text-sm text-muted-foreground">
+                      No products found in this category
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">
+                            <input
+                              type="checkbox"
+                              checked={selectedProducts.size === categorizedProducts.products.length && categorizedProducts.products.length > 0}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  handleSelectAll();
+                                } else {
+                                  handleDeselectAll();
+                                }
+                              }}
+                              className="h-4 w-4"
+                            />
+                          </TableHead>
+                          <TableHead className="min-w-[300px]">Product Name</TableHead>
+                          <TableHead className="min-w-[180px]">Current Category</TableHead>
+                          <TableHead className="min-w-[180px]">Change Category</TableHead>
+                          <TableHead className="min-w-[100px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categorizedProducts.products.map((product) => (
+                          <TableRow key={product._id}>
+                            <TableCell>
+                              <input
+                                type="checkbox"
+                                checked={selectedProducts.has(product._id)}
+                                onChange={() => handleToggleProductSelection(product._id)}
+                                className="h-4 w-4"
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="break-words">
+                                {product.title}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {product.productCategory ? (
+                                <Badge variant="default" className="text-xs">
+                                  {product.productCategory === "case-cover" ? "Cover & Case" :
+                                   product.productCategory === "camera-ring" ? "Camera Rings" :
+                                   product.productCategory === "magneto-x" ? "Magneto & More" :
+                                   product.productCategory === "glass" ? "Membrane / Protectors" :
+                                   product.productCategory.charAt(0).toUpperCase() + product.productCategory.slice(1)}
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs">Uncategorized</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={product.productCategory || "none"}
+                                onValueChange={(value) => handleInlineCategoryChange(product._id, value)}
+                              >
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">-- None --</SelectItem>
+                                  <SelectItem value="skin">Skin</SelectItem>
+                                  <SelectItem value="case-cover">Cover & Case</SelectItem>
+                                  <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                                  <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                                  <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                                  <SelectItem value="accessory">Accessory</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const productUrl = product.slug 
+                                    ? `/products/${product.slug}`
+                                    : `/products/detail?id=${product._id}`;
+                                  window.open(productUrl, "_blank");
+                                }}
+                                title="View on frontend"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+                
+                {categorizedProducts && categorizedProducts.hasMore && (
+                  <div className="text-center text-sm text-muted-foreground pt-2">
+                    Showing {categorizedProducts.products.length} of {categorizedProducts.total} products. 
+                    <br />
+                    Adjust filters to see more.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Uncategorized Products Section */}
+            {selectedCategory === "uncategorized" && uncategorizedProducts && uncategorizedProducts.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Uncategorized Products</CardTitle>
+                  <CardDescription>
+                    Products without a category assignment ({uncategorizedProducts.length} products)
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Preview Dialog */}
+        <Dialog open={isPreviewDialogOpen} onOpenChange={setIsPreviewDialogOpen}>
+          <DialogContent className="max-h-[80vh] max-w-4xl overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Preview Auto-Classification</DialogTitle>
+              <DialogDescription>
+                Review the changes before applying auto-classification
+              </DialogDescription>
+            </DialogHeader>
+            {preview && preview.results.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Product</TableHead>
+                    <TableHead>Gadget</TableHead>
+                    <TableHead>Finish</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.results.map((item) => (
+                    <TableRow key={item.productId}>
+                      <TableCell className="font-medium">{item.title}</TableCell>
+                      <TableCell>
+                        {item.detectedGadget ? (
+                          <Badge variant="secondary">{item.detectedGadget}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {item.detectedFinishDisplayName ? (
+                          <Badge variant="outline">{item.detectedFinishDisplayName}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="py-8 text-center text-muted-foreground">
+                No products to auto-classify
+              </p>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPreviewDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Apply Confirmation Dialog */}
+        <Dialog open={isApplyDialogOpen} onOpenChange={setIsApplyDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Apply Auto-Classification?</DialogTitle>
+              <DialogDescription>
+                This will automatically classify {preview?.results.length ?? 0} products based
+                on their titles. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsApplyDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleApplyAutoClassification}>
+                Apply Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Finish Type Dialog */}
+        <Dialog open={isCreateFinishTypeOpen} onOpenChange={setIsCreateFinishTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Finish Type</DialogTitle>
+              <DialogDescription>
+                Add a new finish type for product classification
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="displayName">Display Name</Label>
+                <Input
+                  id="displayName"
+                  placeholder="e.g., Glossy, Metallic, etc."
+                  value={finishTypeForm.displayName}
+                  onChange={(e) =>
+                    setFinishTypeForm({ ...finishTypeForm, displayName: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  This is the name that will be shown to users
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Internal Name (Optional)</Label>
+                <Input
+                  id="name"
+                  placeholder="Auto-generated from display name"
+                  value={finishTypeForm.name}
+                  onChange={(e) =>
+                    setFinishTypeForm({ ...finishTypeForm, name: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-generate. Use lowercase with hyphens (e.g., glossy, metallic)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateFinishTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateFinishType}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Finish Type Dialog */}
+        <Dialog open={isEditFinishTypeOpen} onOpenChange={setIsEditFinishTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Finish Type</DialogTitle>
+              <DialogDescription>
+                Update the finish type details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-displayName">Display Name</Label>
+                <Input
+                  id="edit-displayName"
+                  value={finishTypeForm.displayName}
+                  onChange={(e) =>
+                    setFinishTypeForm({ ...finishTypeForm, displayName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Internal Name</Label>
+                <Input
+                  id="edit-name"
+                  value={finishTypeForm.name}
+                  disabled
+                  className="bg-muted"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Internal name cannot be changed
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditFinishTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditFinishType}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Finish Type Dialog */}
+        <Dialog open={isDeleteFinishTypeOpen} onOpenChange={setIsDeleteFinishTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Finish Type</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this finish type? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteFinishTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteFinishType}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Gadget Type Dialog */}
+        <Dialog open={isCreateGadgetTypeOpen} onOpenChange={setIsCreateGadgetTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create Gadget Type</DialogTitle>
+              <DialogDescription>
+                Add a new gadget type for product classification
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="gadget-displayName">Display Name</Label>
+                <Input
+                  id="gadget-displayName"
+                  placeholder="e.g., Phone, Laptop, etc."
+                  value={gadgetTypeForm.displayName}
+                  onChange={(e) =>
+                    setGadgetTypeForm({ ...gadgetTypeForm, displayName: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  This is the name that will be shown to users
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gadget-name">Internal Name (Optional)</Label>
+                <Input
+                  id="gadget-name"
+                  placeholder="Auto-generated from display name"
+                  value={gadgetTypeForm.name}
+                  onChange={(e) =>
+                    setGadgetTypeForm({ ...gadgetTypeForm, name: e.target.value })
+                  }
+                />
+                <p className="text-xs text-muted-foreground">
+                  Leave empty to auto-generate. Use lowercase with hyphens (e.g., phone, laptop)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateGadgetTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateGadgetType}>Create</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Gadget Type Dialog */}
+        <Dialog open={isEditGadgetTypeOpen} onOpenChange={setIsEditGadgetTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Gadget Type</DialogTitle>
+              <DialogDescription>
+                Update the gadget type details
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-gadget-displayName">Display Name</Label>
+                <Input
+                  id="edit-gadget-displayName"
+                  value={gadgetTypeForm.displayName}
+                  onChange={(e) =>
+                    setGadgetTypeForm({ ...gadgetTypeForm, displayName: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-gadget-name">Internal Name</Label>
+                <Input
+                  id="edit-gadget-name"
+                  value={gadgetTypeForm.name}
+                  disabled
+                />
+                <p className="text-xs text-muted-foreground">
+                  Internal name cannot be changed
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditGadgetTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditGadgetType}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Gadget Type Dialog */}
+        <Dialog open={isDeleteGadgetTypeOpen} onOpenChange={setIsDeleteGadgetTypeOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Gadget Type</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this gadget type? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDeleteGadgetTypeOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteGadgetType}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Product Category Migration Preview Dialog */}
+        <Dialog open={isProductCategoryPreviewOpen} onOpenChange={setIsProductCategoryPreviewOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Product Category Migration Preview</DialogTitle>
+              <DialogDescription>
+                Review the changes before migrating products to their new category classifications
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {productCategoryPreview === undefined ? (
+                <div className="flex items-center justify-center py-12">
+                  <Spinner className="h-8 w-8" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2 rounded-lg border p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Total Products Analyzed:</span>
+                      <Badge variant="secondary">{productCategoryPreview.stats.total}</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Products to Update:</span>
+                      <Badge variant="default">{productCategoryPreview.stats.willChange}</Badge>
+                    </div>
+                  </div>
+
+                  {productCategoryPreview.preview.length > 0 && (
+                    <div className="rounded-lg border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[40%]">Product</TableHead>
+                            <TableHead>Current Category</TableHead>
+                            <TableHead>→</TableHead>
+                            <TableHead>New Category</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {productCategoryPreview.preview.slice(0, 50).map((item) => (
+                            <TableRow key={item._id}>
+                              <TableCell className="font-medium text-sm">
+                                <div className="break-words line-clamp-2">
+                                  {item.title}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {item.currentCategory ? (
+                                  <Badge variant="outline" className="text-xs">
+                                    {item.currentCategory}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">None</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {item.willChange && "→"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={item.willChange ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {item.suggestedCategory || "N/A"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {item.willChange ? (
+                                  <Badge variant="default" className="text-xs">
+                                    Will Update
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs">
+                                    No Change
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {productCategoryPreview.preview.length > 50 && (
+                        <div className="border-t p-3 text-center text-sm text-muted-foreground">
+                          Showing first 50 of {productCategoryPreview.preview.length} products
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsProductCategoryPreviewOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  setIsProductCategoryPreviewOpen(false);
+                  setIsProductCategoryMigrateOpen(true);
+                }}
+                disabled={!productCategoryPreview || productCategoryPreview.stats.willChange === 0}
+              >
+                Proceed to Migrate
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Product Category Migration Confirmation Dialog */}
+        <Dialog open={isProductCategoryMigrateOpen} onOpenChange={setIsProductCategoryMigrateOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Product Category Migration</DialogTitle>
+              <DialogDescription>
+                This will update the productCategory field for all products. Are you sure you want to proceed?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-lg border border-yellow-500 bg-yellow-50 p-4 dark:bg-yellow-950">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                    Important Notes:
+                  </p>
+                  <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
+                    <li>Products with existing categories will be skipped</li>
+                    <li>This will classify products as: skin, case-cover, camera-ring, magneto-x, glass, or accessory</li>
+                    <li>You can re-classify products manually later if needed</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsProductCategoryMigrateOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleMigrateProductCategories}
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Confirm Migration
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk Update Category Dialog */}
+        <Dialog open={isBulkUpdateDialogOpen} onOpenChange={setIsBulkUpdateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Bulk Update Product Categories</DialogTitle>
+              <DialogDescription>
+                Update {selectedProducts.size} selected products to a new category
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="bulk-category">Select Category</Label>
+                <Select value={bulkUpdateCategory} onValueChange={setBulkUpdateCategory}>
+                  <SelectTrigger id="bulk-category">
+                    <SelectValue placeholder="Choose a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="skin">Skin</SelectItem>
+                    <SelectItem value="case-cover">Cover & Case</SelectItem>
+                    <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                    <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                    <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                    <SelectItem value="accessory">Accessory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-lg border bg-muted p-3">
+                <p className="text-sm text-muted-foreground">
+                  This will update {selectedProducts.size} products to the selected category.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsBulkUpdateDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleBulkUpdateCategories}
+                disabled={!bulkUpdateCategory}
+              >
+                Update {selectedProducts.size} Products
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </AdminLayout>
+  );
+}

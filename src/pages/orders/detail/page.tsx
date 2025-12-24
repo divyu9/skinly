@@ -1,0 +1,643 @@
+import { useQuery, useMutation, useAction } from "convex/react";
+import { api } from "@/convex/_generated/api.js";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, RefreshCwIcon, AlertTriangleIcon } from "lucide-react";
+import { Separator } from "@/components/ui/separator.tsx";
+import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { toast } from "sonner";
+import { useState } from "react";
+
+// PhonePe TypeScript declarations
+declare global {
+  interface Window {
+    PhonePeCheckout?: {
+      transact: (config: {
+        tokenUrl: string;
+        callback: (response: 'USER_CANCEL' | 'CONCLUDED') => void;
+        type: 'IFRAME';
+      }) => void;
+      closePage: () => void;
+    };
+  }
+}
+
+function OrderDetailPageInner() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const order = useQuery(
+    api.orders.getOrderPublic,
+    orderId ? { orderId: orderId as Id<"orders"> } : "skip"
+  );
+  const inventoryCheck = useQuery(
+    api.orders.checkOrderInventory,
+    orderId && order?.paymentStatus === "failed" ? { orderId: orderId as Id<"orders"> } : "skip"
+  );
+  
+  const retryPayment = useMutation(api.orders.retryPayment);
+  const initiatePayment = useAction(api.phonepe.initiatePayment);
+  const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
+  const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
+  
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [currentMerchantTxnId, setCurrentMerchantTxnId] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 5;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+      case "confirmed":
+        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+      case "processing":
+        return "bg-purple-500/10 text-purple-500 border-purple-500/20";
+      case "shipped":
+        return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
+      case "delivered":
+        return "bg-green-500/10 text-green-500 border-green-500/20";
+      case "cancelled":
+        return "bg-red-500/10 text-red-500 border-red-500/20";
+      default:
+        return "";
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString("en-IN", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // PhonePe payment callback handler
+  const handlePhonePeCallback = async (response: 'USER_CANCEL' | 'CONCLUDED') => {
+    console.log("PhonePe callback received:", response);
+    
+    if (response === 'USER_CANCEL') {
+      // User cancelled payment
+      if (currentMerchantTxnId) {
+        try {
+          await updatePaymentStatus({
+            merchantTransactionId: currentMerchantTxnId,
+            paymentStatus: "failed",
+          });
+        } catch (error) {
+          console.error("Failed to update payment status:", error);
+        }
+      }
+      setIsRetrying(false);
+      setRetryCount(0);
+      toast.error("Payment cancelled");
+      return;
+    }
+    
+    if (response === 'CONCLUDED') {
+      if (!currentMerchantTxnId) {
+        toast.error("Unable to verify payment");
+        setIsRetrying(false);
+        return;
+      }
+      
+      try {
+        const currentRetry = retryCount + 1;
+        setRetryCount(currentRetry);
+        
+        const phonepeStatus = await checkPaymentStatus({
+          merchantTransactionId: currentMerchantTxnId,
+        });
+        
+        if (phonepeStatus.paymentStatus === "success") {
+          setRetryCount(0);
+          setIsRetrying(false);
+          toast.success("Payment successful!");
+          // Reload the page to show updated order
+          window.location.reload();
+          return;
+        } else if (phonepeStatus.paymentStatus === "failed") {
+          setRetryCount(0);
+          setIsRetrying(false);
+          toast.error("Payment failed");
+          return;
+        }
+        
+        // Still pending - retry
+        if (currentRetry >= maxRetries) {
+          setIsRetrying(false);
+          toast.error("Unable to verify payment. Please check your order status.");
+        } else {
+          setTimeout(() => handlePhonePeCallback('CONCLUDED'), 2000);
+        }
+      } catch (error) {
+        console.error("Error verifying payment:", error);
+        setIsRetrying(false);
+        toast.error("Failed to verify payment");
+      }
+    }
+  };
+
+  // Handle retry payment button click
+  const handleRetryPayment = async () => {
+    if (!orderId) return;
+    
+    setIsRetrying(true);
+    setRetryCount(0);
+    
+    try {
+      // First retry the payment (this validates inventory)
+      const retryResult = await retryPayment({
+        orderId: orderId as Id<"orders">,
+      });
+      
+      // Initiate PhonePe payment
+      const paymentResult = await initiatePayment({
+        orderId: retryResult.orderId,
+        orderNumber: retryResult.orderNumber,
+        amount: retryResult.remainingAmount,
+        customerPhone: retryResult.shippingPhone,
+      });
+      
+      if (paymentResult.success && paymentResult.paymentUrl) {
+        setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
+        
+        if (!window.PhonePeCheckout) {
+          toast.error("Payment service not available. Please refresh and try again.");
+          setIsRetrying(false);
+          return;
+        }
+        
+        // Open PhonePe payment in iframe
+        window.PhonePeCheckout.transact({
+          tokenUrl: paymentResult.paymentUrl,
+          callback: handlePhonePeCallback,
+          type: "IFRAME"
+        });
+      } else {
+        throw new Error("Failed to initiate payment");
+      }
+    } catch (error) {
+      setIsRetrying(false);
+      if (error && typeof error === 'object' && 'data' in error) {
+        const convexError = error as { data?: { message?: string } };
+        toast.error(convexError.data?.message || "Failed to retry payment");
+      } else {
+        toast.error("Failed to retry payment. Please try again.");
+      }
+    }
+  };
+
+  if (order === undefined) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading order details...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b bg-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Link to="/orders">
+              <Button variant="ghost" size="sm">
+                <ChevronLeftIcon className="size-4 mr-2" />
+                Back to Orders
+              </Button>
+            </Link>
+            <Link to="/">
+              <img
+                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
+                alt="Skinly"
+                className="h-12"
+              />
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
+        {/* Order Header */}
+        <div className="mb-8">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Order Details</h1>
+              <p className="text-lg text-muted-foreground">
+                {order.orderNumber || order.failedOrderNumber || "Pending"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Placed on {formatDate(order._creationTime)}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+              <Badge className={`${getStatusColor(order.status)} text-base px-4 py-2`}>
+                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              </Badge>
+              {order.paymentStatus === "failed" && (
+                <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
+                  Payment Failed
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          {order.paymentStatus === "failed" && (
+            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangleIcon className="size-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                    Payment was not completed
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mb-3 md:mb-0">
+                    You can retry payment for this order. We'll check inventory availability before processing.
+                  </p>
+                  {/* Mobile: Show retry button below text */}
+                  <Button
+                    className="w-full md:hidden mt-2"
+                    onClick={handleRetryPayment}
+                    disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
+                  >
+                    <RefreshCwIcon className={`size-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                    {isRetrying ? 'Processing...' : 'Retry Payment'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Order Items */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PackageIcon className="size-5" />
+                  Order Items
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.items.map((item, idx) => (
+                  <div key={idx}>
+                    {idx > 0 && <Separator className="my-4" />}
+                    <div className="flex gap-4">
+                      {item.productImage && (
+                        <div className="size-20 bg-muted rounded-lg overflow-hidden shrink-0">
+                          <img
+                            src={item.productImage}
+                            alt={item.productTitle}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm line-clamp-2 mb-1">
+                          {item.productTitle}
+                        </h4>
+                        {item.phoneModel && (
+                          <p className="text-sm text-muted-foreground mb-1">
+                            For: {item.phoneModel}
+                          </p>
+                        )}
+                        {item.variant !== "Default Title" && (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Variant: {item.variant}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 text-sm">
+                          <span className="text-muted-foreground">
+                            Qty: {item.quantity}
+                          </span>
+                          <span className="font-semibold text-primary">
+                            ₹{item.price.toFixed(0)} each
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">
+                          ₹{(item.price * item.quantity).toFixed(0)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Tracking Information */}
+            {(order.awbNumber || order.trackingUrl || order.manualTrackingNumber) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TruckIcon className="size-5" />
+                    Tracking Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {/* RapidShyp Tracking */}
+                    {(order.awbNumber || order.trackingUrl) && (
+                      <div className="space-y-3">
+                        {order.awbNumber && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Tracking Number
+                            </p>
+                            <p className="text-sm font-mono font-semibold">{order.awbNumber}</p>
+                          </div>
+                        )}
+                        {order.courierName && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Courier Partner
+                            </p>
+                            <p className="text-sm font-semibold">{order.courierName}</p>
+                          </div>
+                        )}
+                        {order.shippingStatus && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Status
+                            </p>
+                            <p className="text-sm">{order.shippingStatus}</p>
+                          </div>
+                        )}
+                        {order.trackingUrl && (
+                          <a
+                            href={order.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <Button className="w-full" size="sm">
+                              <TruckIcon className="size-4 mr-2" />
+                              Track Your Shipment
+                            </Button>
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Manual Tracking */}
+                    {order.manualTrackingNumber && (
+                      <div className={`space-y-3 ${order.awbNumber ? "pt-4 border-t" : ""}`}>
+                        {order.awbNumber && (
+                          <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
+                            Additional Tracking
+                          </p>
+                        )}
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                            Tracking Number
+                          </p>
+                          <p className="text-sm font-mono font-semibold">{order.manualTrackingNumber}</p>
+                        </div>
+                        {order.manualCourierCompany && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase mb-1">
+                              Courier Company
+                            </p>
+                            <p className="text-sm font-semibold">{order.manualCourierCompany}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Shipping Address */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPinIcon className="size-5" />
+                  Shipping Address
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm">
+                  <p className="font-semibold">{order.shippingAddress.fullName}</p>
+                  <p className="text-muted-foreground">{order.shippingAddress.phone}</p>
+                  <p className="text-muted-foreground">
+                    {order.shippingAddress.addressLine1}
+                  </p>
+                  {order.shippingAddress.addressLine2 && (
+                    <p className="text-muted-foreground">
+                      {order.shippingAddress.addressLine2}
+                    </p>
+                  )}
+                  <p className="text-muted-foreground">
+                    {order.shippingAddress.city}, {order.shippingAddress.state} -{" "}
+                    {order.shippingAddress.pincode}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Payment Method */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCardIcon className="size-5" />
+                  Payment Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase mb-1">Payment Method</p>
+                  <div className="flex items-center gap-2">
+                    {order.paymentMethod === "cod" ? (
+                      <>
+                        <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-500/20">
+                          COD
+                        </Badge>
+                        <span className="text-sm">Cash on Delivery</span>
+                      </>
+                    ) : (
+                      <span className="text-sm">{order.paymentMethod}</span>
+                    )}
+                  </div>
+                </div>
+
+                {order.paymentMethod === "cod" && (
+                  <div className="pt-2 border-t space-y-2">
+                    {order.prepaidAmount && order.prepaidAmount > 0 ? (
+                      <>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase mb-1">Prepaid (PhonePe)</p>
+                          <p className="text-sm font-semibold text-blue-600">₹{order.prepaidAmount.toFixed(0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase mb-1">Balance on Delivery</p>
+                          <p className="text-sm font-semibold text-amber-600">₹{(order.codAmount ?? 0).toFixed(0)}</p>
+                        </div>
+                        <div className="bg-blue-500/10 p-3 rounded-lg text-sm">
+                          <p className="text-blue-900 dark:text-blue-100">
+                            You paid ₹{order.prepaidAmount.toFixed(0)} upfront. Pay ₹{(order.codAmount ?? 0).toFixed(0)} when the order is delivered.
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="bg-amber-500/10 p-3 rounded-lg text-sm">
+                        <p className="text-amber-900 dark:text-amber-100">
+                          Pay ₹{order.total.toFixed(0)} cash when your order is delivered.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <Card className="sticky top-24">
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal</span>
+                    <span>₹{order.subtotal.toFixed(0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-1">
+                      <TruckIcon className="size-3" />
+                      Shipping
+                    </span>
+                    <span>
+                      {order.shippingFee === 0 ? (
+                        <span className="text-green-600 font-medium">FREE</span>
+                      ) : (
+                        `₹${order.shippingFee.toFixed(0)}`
+                      )}
+                    </span>
+                  </div>
+                  {order.codFee !== undefined && order.codFee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>COD Fee</span>
+                      <span>₹{order.codFee.toFixed(0)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold">Total</span>
+                  <span className="text-2xl font-bold text-primary">
+                    ₹{order.total.toFixed(0)}
+                  </span>
+                </div>
+
+                {/* GST Breakdown */}
+                {order.totalGstAmount !== undefined && order.taxableAmount !== undefined && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2 bg-muted/50 p-3 rounded-lg">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        GST Breakdown (Tax Included)
+                      </p>
+                      <div className="flex justify-between text-xs">
+                        <span>Taxable Amount</span>
+                        <span>₹{order.taxableAmount.toFixed(2)}</span>
+                      </div>
+                      {order.cgstAmount !== undefined && order.sgstAmount !== undefined ? (
+                        <>
+                          <div className="flex justify-between text-xs">
+                            <span>CGST (9%)</span>
+                            <span>₹{order.cgstAmount.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span>SGST (9%)</span>
+                            <span>₹{order.sgstAmount.toFixed(2)}</span>
+                          </div>
+                        </>
+                      ) : order.igstAmount !== undefined ? (
+                        <div className="flex justify-between text-xs">
+                          <span>IGST (18%)</span>
+                          <span>₹{order.igstAmount.toFixed(2)}</span>
+                        </div>
+                      ) : null}
+                      <div className="flex justify-between text-xs font-medium pt-1 border-t">
+                        <span>Total GST</span>
+                        <span>₹{order.totalGstAmount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <Separator />
+
+                {/* Retry Payment Section */}
+                {order.paymentStatus === "failed" && (
+                  <>
+                    {inventoryCheck && !inventoryCheck.available && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangleIcon className="size-4 text-red-600 mt-0.5 shrink-0" />
+                          <div className="text-sm">
+                            <p className="font-medium text-red-900 dark:text-red-100 mb-1">
+                              Items Out of Stock
+                            </p>
+                            <p className="text-xs text-red-700 dark:text-red-300">
+                              {inventoryCheck.unavailableItems.map((item) => (
+                                <span key={item.variant} className="block">
+                                  {item.productTitle}: Need {item.requested}, only {item.available} available
+                                </span>
+                              ))}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Desktop/Tablet: Show retry button in sidebar */}
+                    <Button
+                      className="w-full hidden md:block"
+                      onClick={handleRetryPayment}
+                      disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
+                    >
+                      <RefreshCwIcon className={`size-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+                      {isRetrying ? 'Processing...' : 'Retry Payment'}
+                    </Button>
+
+                    <Separator />
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Link to="/orders" className="block">
+                    <Button variant="outline" className="w-full">
+                      View All Orders
+                    </Button>
+                  </Link>
+                  <Link to="/products" className="block">
+                    <Button className="w-full">Continue Shopping</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function OrderDetailPage() {
+  // Allow both authenticated and guest users to view orders
+  // Auth checks are handled by the getOrderPublic query
+  return <OrderDetailPageInner />;
+}
