@@ -21,9 +21,20 @@ export function CheckoutUpsells() {
   // Determine which cart to use
   const cartItems = user ? dbCartItems : guestCart;
 
+  // Map cart items to the format expected by the backend
+  const mappedCartItems = cartItems ? cartItems.map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    price: item.price,
+    quantity: item.quantity,
+    phoneModel: item.phoneModel,
+    phoneBrand: item.phoneBrand,
+    coverage: item.coverage,
+  })) : [];
+
   const upsells = useQuery(
     api.checkoutUpsells.getUpsellsForCart,
-    cartItems && cartItems.length > 0 ? { cartItems } : "skip"
+    mappedCartItems.length > 0 ? { cartItems: mappedCartItems } : "skip"
   );
 
   const addToCart = useMutation(api.cart.addToCart);
