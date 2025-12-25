@@ -154,6 +154,14 @@ function NewProductPageInner() {
         images: formData.images.filter((img) => img.url),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
         gadgetCategory: formData.gadgetCategory,
+        gadgetTypeId: formData.gadgetTypeId ? (formData.gadgetTypeId as Id<"gadgetTypes">) : undefined,
+        finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
+        productCategory: formData.productCategory ? (formData.productCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory") : undefined,
+        length: formData.length ? parseFloat(formData.length) : undefined,
+        breadth: formData.breadth ? parseFloat(formData.breadth) : undefined,
+        height: formData.height ? parseFloat(formData.height) : undefined,
+        weight: formData.weight ? parseFloat(formData.weight) : undefined,
+        productType: formData.productType,
         hasMultipleVariants: formData.hasMultipleVariants,
       });
 

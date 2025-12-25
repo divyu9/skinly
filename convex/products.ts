@@ -565,6 +565,16 @@ export const createProduct = mutation({
       v.literal("cover"),
       v.literal("accessory")
     ),
+    gadgetTypeId: v.optional(v.id("gadgetTypes")),
+    finishTypeId: v.optional(v.id("finishTypes")),
+    productCategory: v.optional(v.union(
+      v.literal("skin"),
+      v.literal("case-cover"),
+      v.literal("camera-ring"),
+      v.literal("magneto-x"),
+      v.literal("glass"),
+      v.literal("accessory")
+    )),
     length: v.optional(v.number()),
     breadth: v.optional(v.number()),
     height: v.optional(v.number()),
@@ -605,6 +615,9 @@ export const createProduct = mutation({
       images: args.images,
       tags: args.tags,
       gadgetCategory: args.gadgetCategory,
+      gadgetTypeId: args.gadgetTypeId,
+      finishTypeId: args.finishTypeId,
+      productCategory: args.productCategory,
       length: args.length ?? 10,
       breadth: args.breadth ?? 10,
       height: args.height ?? 2,
@@ -756,6 +769,99 @@ export const deleteProduct = mutation({
     }
 
     await ctx.db.delete(args.productId);
+  },
+});
+
+// Clone product (create a duplicate with all variants)
+export const cloneProduct = mutation({
+  args: { productId: v.id("products") },
+  handler: async (ctx, args): Promise<Id<"products">> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // Get the original product
+    const originalProduct = await ctx.db.get(args.productId);
+    if (!originalProduct) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Get all variants of the original product
+    const originalVariants = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", args.productId))
+      .collect();
+
+    // Generate a unique slug by appending "-copy" (or "-copy-2", "-copy-3", etc.)
+    let newSlug = `${originalProduct.slug}-copy`;
+    let counter = 2;
+    
+    // Keep checking until we find an available slug
+    while (true) {
+      const existingProduct = await ctx.db
+        .query("products")
+        .withIndex("by_slug", (q) => q.eq("slug", newSlug))
+        .first();
+      
+      if (!existingProduct) {
+        break;
+      }
+      
+      newSlug = `${originalProduct.slug}-copy-${counter}`;
+      counter++;
+    }
+
+    // Create the cloned product (set status to draft)
+    const clonedProductId = await ctx.db.insert("products", {
+      title: `${originalProduct.title} (Copy)`,
+      slug: newSlug,
+      description: originalProduct.description,
+      metaDescription: originalProduct.metaDescription,
+      metaTitle: originalProduct.metaTitle,
+      collectionId: originalProduct.collectionId,
+      status: "draft", // Set to draft so admin can review before publishing
+      images: originalProduct.images,
+      tags: originalProduct.tags,
+      gadgetCategory: originalProduct.gadgetCategory,
+      gadgetTypeId: originalProduct.gadgetTypeId,
+      finishTypeId: originalProduct.finishTypeId,
+      productCategory: originalProduct.productCategory,
+      finishType: originalProduct.finishType,
+      length: originalProduct.length ?? 10,
+      breadth: originalProduct.breadth ?? 10,
+      height: originalProduct.height ?? 2,
+      weight: originalProduct.weight ?? 100,
+      productType: originalProduct.productType ?? "physical",
+      hasMultipleVariants: originalProduct.hasMultipleVariants ?? false,
+    });
+
+    // Clone all variants
+    for (const originalVariant of originalVariants) {
+      await ctx.db.insert("variants", {
+        productId: clonedProductId,
+        sku: originalVariant.sku, // Keep same SKU (admin can change later if needed)
+        title: originalVariant.title,
+        price: originalVariant.price,
+        compareAtPrice: originalVariant.compareAtPrice,
+        inventoryQuantity: originalVariant.inventoryQuantity,
+        weight: originalVariant.weight,
+        weightUnit: originalVariant.weightUnit,
+        rNumber: originalVariant.rNumber,
+        materialMultiplier: originalVariant.materialMultiplier,
+        consumptionPresetId: originalVariant.consumptionPresetId,
+        customMultiplier: originalVariant.customMultiplier,
+        isDefaultVariant: originalVariant.isDefaultVariant,
+      });
+    }
+
+    return clonedProductId;
   },
 });
 

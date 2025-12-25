@@ -209,6 +209,7 @@ function AdminProductsPageInner() {
   const updateProduct = useMutation(api.products.updateProduct);
   const deleteAllProducts = useMutation(api.products.deleteAllProducts);
   const bulkUpdateVariants = useMutation(api.products.bulkUpdateVariants);
+  const cloneProduct = useMutation(api.products.cloneProduct);
   const migrateFromShopify = useAction(api.migration.migrateFromShopify);
   const checkProductCount = useAction(api.migration.checkShopifyProductCount);
 
@@ -324,6 +325,17 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
       toast.success("Product deleted successfully");
     } catch (error) {
       toast.error("Failed to delete product");
+    }
+  };
+
+  const handleClone = async (productId: Id<"products">) => {
+    try {
+      const clonedProductId = await cloneProduct({ productId });
+      toast.success("Product cloned successfully! Redirecting to edit page...");
+      // Use window.location to navigate to the cloned product
+      window.location.href = `/backend-skinly/products/${clonedProductId}`;
+    } catch (error) {
+      toast.error("Failed to clone product");
     }
   };
 
@@ -1478,15 +1490,28 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                                 <EditIcon className="size-3" />
                               </Button>
                             </Link>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleDelete(product._id)}
-                              className="text-destructive hover:text-destructive"
-                              title="Delete Product"
-                            >
-                              <TrashIcon className="size-3" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" title="More Actions">
+                                  <MoreVerticalIcon className="size-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => handleClone(product._id)}
+                                >
+                                  <SaveIcon className="size-4 mr-2" />
+                                  Clone Product
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(product._id)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <TrashIcon className="size-4 mr-2" />
+                                  Delete Product
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </td>
                       </tr>
