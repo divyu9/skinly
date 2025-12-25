@@ -303,16 +303,25 @@ export const isCodAvailable = query({
       conditions.push(totalProductCount <= settings.maxProductCount);
     }
 
+    // Check if any item-level conditions are enabled
+    const hasItemLevelConditions = 
+      (settings.productIdsEnabled && settings.productIds.length > 0) ||
+      (settings.collectionIdsEnabled && settings.collectionIds.length > 0) ||
+      (settings.variantIdsEnabled && settings.variantIds.length > 0);
+
     // Check if conditions pass based on match mode
     let conditionsPassed = false;
-    if (conditions.length === 0 && eligibleCount === 0) {
+    if (conditions.length === 0 && eligibleCount === 0 && !hasItemLevelConditions) {
       // No conditions set at all, COD is available
       conditionsPassed = true;
+    } else if (hasItemLevelConditions && eligibleCount === 0) {
+      // Item-level conditions are set but no items match - COD not available
+      conditionsPassed = false;
     } else if (eligibleCount === 0) {
       // Only order-level conditions, check those
       conditionsPassed = conditions.every((c) => c);
     } else {
-      // Have item-level conditions, check if any items are eligible
+      // Have item-level conditions with eligible items
       const hasEligibleItems = eligibleCount > 0;
       if (conditions.length === 0) {
         conditionsPassed = hasEligibleItems;
@@ -323,7 +332,9 @@ export const isCodAvailable = query({
 
     if (!conditionsPassed) {
       let reason = "Order does not meet COD eligibility criteria";
-      if (settings.minOrderAmountEnabled && args.totalAmount < settings.minOrderAmount) {
+      if (hasItemLevelConditions && eligibleCount === 0) {
+        reason = "COD not available for the selected products";
+      } else if (settings.minOrderAmountEnabled && args.totalAmount < settings.minOrderAmount) {
         reason = `Minimum order amount ₹${settings.minOrderAmount} required for COD`;
       } else if (settings.maxOrderAmountEnabled && args.totalAmount > settings.maxOrderAmount) {
         reason = `Maximum order amount ₹${settings.maxOrderAmount} exceeded for COD`;
