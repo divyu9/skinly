@@ -338,3 +338,26 @@ export const syncGuestCartToDb = mutation({
     }
   },
 });
+
+// Get cart items for a specific user (for admin / abandoned cart tracking)
+export const getCartForUser = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    const cartItems = await ctx.db
+      .query("cart")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    return cartItems;
+  },
+});

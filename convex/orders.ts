@@ -1236,3 +1236,29 @@ export const retryPayment = mutation({
     };
   },
 });
+
+// Get orders for a specific user (for admin / abandoned cart tracking)
+export const getOrdersForUser = query({
+  args: {
+    userId: v.id("users"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    let ordersQuery = ctx.db
+      .query("orders")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order("desc");
+    
+    const orders = args.limit ? await ordersQuery.take(args.limit) : await ordersQuery.collect();
+
+    return orders;
+  },
+});

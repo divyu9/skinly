@@ -190,3 +190,27 @@ export const isCurrentUserAdmin = query({
     return { isAuthenticated: true, isAdmin: user.isAdmin === true };
   },
 });
+
+/**
+ * Get all users (for admin / abandoned cart tracking)
+ */
+export const getAllUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        code: "UNAUTHENTICATED",
+        message: "User not logged in",
+      });
+    }
+
+    // Get all users with email
+    const users = await ctx.db.query("users").collect();
+    return users.map(user => ({
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+    }));
+  },
+});

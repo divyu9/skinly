@@ -102,6 +102,58 @@ export const sendAbandonedCartReminder = action({
 });
 
 /**
+ * Scan all active carts and track them as abandoned if they meet criteria
+ * This should be run periodically (e.g., every hour) to detect new abandoned carts
+ */
+export const scanAndTrackAbandonedCarts = action({
+  args: {},
+  handler: async (ctx): Promise<{ tracked: number; carts: Array<{ email: string; total: number }> }> => {
+    // Get all users with items in their cart
+    const allUsers = await ctx.runQuery(api.users.getAllUsers, {});
+    
+    const trackedCarts: Array<{ email: string; total: number }> = [];
+    
+    for (const user of allUsers) {
+      // Get user's cart
+      const cartItems = await ctx.runQuery(api.cart.getCartForUser, { userId: user._id });
+      
+      // Skip if cart is empty
+      if (!cartItems || cartItems.length === 0) {
+        continue;
+      }
+      
+      // Get user's phone from most recent order
+      const recentOrders = await ctx.runQuery(api.orders.getOrdersForUser, { userId: user._id, limit: 1 });
+      const userPhone = recentOrders && recentOrders.length > 0 
+        ? recentOrders[0].shippingAddress?.phone 
+        : undefined;
+      
+      // Track this cart as abandoned
+      try {
+        await ctx.runMutation(api.abandonedCarts.trackAbandonedCart, {
+          userId: user._id,
+          userEmail: user.email || "",
+          userPhone,
+        });
+        
+        const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        trackedCarts.push({
+          email: user.email || "Unknown",
+          total: cartTotal,
+        });
+      } catch (error) {
+        console.error(`Failed to track abandoned cart for user ${user._id}:`, error);
+      }
+    }
+    
+    return {
+      tracked: trackedCarts.length,
+      carts: trackedCarts,
+    };
+  },
+});
+
+/**
  * Process all abandoned carts that need reminders
  */
 export const processAbandonedCarts = action({

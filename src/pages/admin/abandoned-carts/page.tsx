@@ -33,13 +33,27 @@ import { AbandonedCartSettings } from "./settings.tsx";
 function AbandonedCartsPageInner() {
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const processAllCarts = useAction(api.abandonedCartsActions.processAbandonedCarts);
+  const scanCarts = useAction(api.abandonedCartsActions.scanAndTrackAbandonedCarts);
   const sendReminder = useAction(api.abandonedCartsActions.sendAbandonedCartReminder);
   const [processing, setProcessing] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   const stats = useQuery(api.abandonedCarts.getAbandonedCartStats);
   const abandonedCarts = useQuery(api.abandonedCarts.getAllAbandonedCarts, {
     status: statusFilter as "pending" | "reminded" | "recovered" | "expired" | undefined,
   });
+
+  const handleScanCarts = async () => {
+    setScanning(true);
+    try {
+      const result = await scanCarts({});
+      toast.success(`Found ${result.tracked} abandoned carts`);
+    } catch (error) {
+      toast.error("Failed to scan for abandoned carts");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const handleProcessAll = async () => {
     setProcessing(true);
@@ -187,9 +201,18 @@ function AbandonedCartsPageInner() {
                 <SelectItem value="expired">Expired</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={handleProcessAll} disabled={processing}>
-              {processing ? "Processing..." : "Send All Reminders"}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleScanCarts} 
+                disabled={scanning}
+                variant="outline"
+              >
+                {scanning ? "Scanning..." : "Scan for Abandoned Carts"}
+              </Button>
+              <Button onClick={handleProcessAll} disabled={processing}>
+                {processing ? "Processing..." : "Send All Reminders"}
+              </Button>
+            </div>
           </div>
 
           {/* Abandoned Carts Table */}
