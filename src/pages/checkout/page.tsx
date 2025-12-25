@@ -414,7 +414,7 @@ function CheckoutPageInner() {
 
       const result = await convex.query(api.coupons.validateCoupon, {
         code: code.trim(),
-        cartTotal: total,
+        cartTotal: subtotal, // Use subtotal (excluding shipping) for coupon validation
         userEmail: formData.email || undefined,
         cartItems: itemsWithValidVariants.map((item) => ({
           variantId: item.variantId!,

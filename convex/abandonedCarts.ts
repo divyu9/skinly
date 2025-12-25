@@ -172,6 +172,14 @@ export const getAllAbandonedCarts = query({
     ),
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
     if (args.status) {
       const carts = await ctx.db
         .query("abandonedCarts")
@@ -195,6 +203,14 @@ export const getAllAbandonedCarts = query({
 export const getAbandonedCartStats = query({
   args: {},
   handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
     const allCarts = await ctx.db.query("abandonedCarts").collect();
 
     const stats = {
