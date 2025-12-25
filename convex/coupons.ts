@@ -312,6 +312,22 @@ export const validateCoupon = query({
         }
       }
 
+      // Check minimum cart value
+      if (coupon.minCartValue && args.cartTotal < coupon.minCartValue) {
+        throw new ConvexError({
+          message: `Requires ₹${coupon.minCartValue} minimum cart value (your cart: ₹${Math.round(args.cartTotal)})`,
+          code: "BAD_REQUEST",
+        });
+      }
+
+      // Check minimum purchase requirement
+      if (coupon.minPurchase && args.cartTotal < coupon.minPurchase) {
+        throw new ConvexError({
+          message: `Requires ₹${coupon.minPurchase} minimum purchase (your cart: ₹${Math.round(args.cartTotal)})`,
+          code: "BAD_REQUEST",
+        });
+      }
+
       // For wallet credit coupons, return the credit amount
       let creditAmount = 0;
       if (coupon.discountType === "fixed") {
