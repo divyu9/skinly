@@ -22,6 +22,7 @@ interface Variant {
   sku: string;
   title: string;
   price: string;
+  compareAtPrice?: string;
   inventoryQuantity: string;
   consumptionPresetId?: string;
   customMultiplier?: string;
@@ -30,6 +31,7 @@ interface Variant {
 function NewProductPageInner() {
   const navigate = useNavigate();
   const collections = useQuery(api.collections.getAllCollections, {});
+  const finishTypes = useQuery(api.finishTypes.listActive, {});
   const gadgetTypes = useQuery(api.gadgetTypes.listActive, {});
   const createProduct = useMutation(api.products.createProduct);
   const createVariant = useMutation(api.products.createVariant);
@@ -46,6 +48,13 @@ function NewProductPageInner() {
     tags: string;
     gadgetCategory: "phone" | "laptop" | "tablet" | "camera" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover" | "accessory";
     gadgetTypeId: Id<"gadgetTypes"> | "";
+    finishTypeId: Id<"finishTypes"> | "";
+    productCategory: string;
+    length: string;
+    breadth: string;
+    height: string;
+    weight: string;
+    productType: "physical" | "digital";
     hasMultipleVariants: boolean;
   }>({
     title: "",
@@ -59,11 +68,18 @@ function NewProductPageInner() {
     tags: "",
     gadgetCategory: "phone", // Default to phone
     gadgetTypeId: "",
+    finishTypeId: "",
+    productCategory: "",
+    length: "10",
+    breadth: "10",
+    height: "2",
+    weight: "100",
+    productType: "physical",
     hasMultipleVariants: false, // Default to single variant
   });
 
   const [variants, setVariants] = useState<Variant[]>([
-    { sku: "", title: "Default", price: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" },
+    { sku: "", title: "Default", price: "", compareAtPrice: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" },
   ]);
 
   // Get presets for selected gadget type
@@ -95,7 +111,7 @@ function NewProductPageInner() {
   };
 
   const addVariant = () => {
-    setVariants([...variants, { sku: "", title: "", price: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" }]);
+    setVariants([...variants, { sku: "", title: "", price: "", compareAtPrice: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" }]);
   };
 
   const removeVariant = (index: number) => {
@@ -149,6 +165,7 @@ function NewProductPageInner() {
           sku: variant.sku,
           title: variant.title,
           price: parseFloat(variant.price),
+          compareAtPrice: variant.compareAtPrice ? parseFloat(variant.compareAtPrice) : undefined,
           inventoryQuantity: parseInt(variant.inventoryQuantity),
           isDefaultVariant: !formData.hasMultipleVariants && i === 0,
           consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
@@ -165,7 +182,7 @@ function NewProductPageInner() {
     }
   };
 
-  if (collections === undefined || gadgetTypes === undefined) {
+  if (collections === undefined || gadgetTypes === undefined || finishTypes === undefined) {
     return <Skeleton className="h-screen w-full" />;
   }
 
@@ -394,6 +411,16 @@ function NewProductPageInner() {
                       />
                     </div>
                     <div>
+                      <Label>Compare At Price (₹)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="399 (optional)"
+                        value={variant.compareAtPrice}
+                        onChange={(e) => updateVariant(index, "compareAtPrice", e.target.value)}
+                      />
+                    </div>
+                    <div>
                       <Label>Inventory</Label>
                       <Input
                         required
@@ -515,6 +542,26 @@ function NewProductPageInner() {
               </div>
 
               <div>
+                <Label htmlFor="productCategory">Product Category (Optional)</Label>
+                <Select
+                  value={formData.productCategory || undefined}
+                  onValueChange={(value) => setFormData({ ...formData, productCategory: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select product category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="skin">Skin</SelectItem>
+                    <SelectItem value="case-cover">Cover & Case</SelectItem>
+                    <SelectItem value="camera-ring">Camera Rings</SelectItem>
+                    <SelectItem value="magneto-x">Magneto & More</SelectItem>
+                    <SelectItem value="glass">Membrane / Protectors</SelectItem>
+                    <SelectItem value="accessory">Accessory</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
                 <Label htmlFor="gadgetCategory">Gadget Category</Label>
                 <Select
                   value={formData.gadgetCategory}
@@ -568,6 +615,128 @@ function NewProductPageInner() {
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   Required for variant consumption presets
+                </p>
+              </div>
+
+              <div>
+                <Label htmlFor="finishType">Finish Type (Optional)</Label>
+                {finishTypes === undefined ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : finishTypes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No finish types available
+                  </p>
+                ) : (
+                  <Select
+                    value={formData.finishTypeId || undefined}
+                    onValueChange={(value) => setFormData({ ...formData, finishTypeId: value as Id<"finishTypes"> })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select finish type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {finishTypes.map((finish) => (
+                        <SelectItem key={finish._id} value={finish._id}>
+                          {finish.displayName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Shipping Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="productType">Product Type</Label>
+                <Select
+                  value={formData.productType}
+                  onValueChange={(value: "physical" | "digital") =>
+                    setFormData({ ...formData, productType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="physical">Physical</SelectItem>
+                    <SelectItem value="digital">Digital</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label htmlFor="length">Length</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="length"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formData.length}
+                      onChange={(e) => setFormData({ ...formData, length: e.target.value })}
+                      className="text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="breadth">Breadth</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="breadth"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formData.breadth}
+                      onChange={(e) => setFormData({ ...formData, breadth: e.target.value })}
+                      className="text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="height">Height</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="height"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      value={formData.height}
+                      onChange={(e) => setFormData({ ...formData, height: e.target.value })}
+                      className="text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">cm</span>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="weight">Weight</Label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    id="weight"
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">grams</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Used for calculating shipping costs
                 </p>
               </div>
             </CardContent>
