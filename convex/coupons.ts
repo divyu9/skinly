@@ -945,6 +945,7 @@ export const getCouponUsageStats = query({
 
 // Get all active coupons (public - no auth required)
 // Includes both discount and wallet-credit coupons
+// Excludes user-specific coupons (like abandoned cart coupons)
 export const getActiveCoupons = query({
   args: {},
   handler: async (ctx) => {
@@ -956,11 +957,13 @@ export const getActiveCoupons = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .collect();
     
-    // Filter by date range and usage limit
+    // Filter by date range, usage limit, and exclude user-specific coupons
     const activeCoupons = allCoupons.filter((coupon) => {
       const isInDateRange = coupon.startDate <= now && coupon.endDate >= now;
       const hasUsageAvailable = !coupon.usageLimit || coupon.usageCount < coupon.usageLimit;
-      return isInDateRange && hasUsageAvailable;
+      // Exclude coupons that are restricted to specific customer emails
+      const isNotUserSpecific = !coupon.allowedCustomerEmails || coupon.allowedCustomerEmails.length === 0;
+      return isInDateRange && hasUsageAvailable && isNotUserSpecific;
     });
 
     // Sort by discount value (highest first)
