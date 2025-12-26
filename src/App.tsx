@@ -1,3 +1,4 @@
+// Main application entry point for the React app, setting up routes and lazy loading components
 import { lazy, Suspense } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
@@ -164,7 +165,7 @@ export default function App() {
           <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/product-classification" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper></Suspense>} />
           <Route path="/backend-skinly/homepage" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminHomepagePage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/unauthorized" element={<Suspense fallback={<PageSkeleton />}><AdminUnauthorizedPage /></Suspense>} />
+          <Route path="/backend-skinly/unauthorized" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminUnauthorizedPage /></AdminPageWrapper></Suspense>} />
 
           {/* Policy pages - lazy loaded */}
           <Route path="/policies/returns" element={<Suspense fallback={<PageSkeleton />}><ReturnsPolicy /></Suspense>} />
