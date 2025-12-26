@@ -36,7 +36,7 @@ import { BulkPriceEditDialog } from "./_components/bulk-price-edit-dialog.tsx";
 import { RollsManagement } from "./_components/rolls-management.tsx";
 import { TagManagerDialog } from "./_components/tag-manager-dialog.tsx";
 
-// Module refresh
+// Module refresh - Force recompilation v788
 // Inline editable cell component
 function EditableCell({
   variantId,
