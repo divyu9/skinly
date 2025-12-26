@@ -1,180 +1,86 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
 /**
- * =========================
- * MUTATIONS (AUTH REQUIRED)
- * =========================
+ * Shared helper: get user by identity
  */
+async function getUserByIdentity(ctx: any) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+
+  return await ctx.db
+    .query("users")
+    .withIndex("by_token", (q: any) =>
+      q.eq("tokenIdentifier", identity.tokenIdentifier)
+    )
+    .unique();
+}
 
 /**
- * Create or update the current user after login
+ * Create or update current user (only when logged in)
  */
 export const updateCurrentUser = mutation({
   args: {},
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
-      throw new ConvexError({
-        code: "UNAUTHENTICATED",
-        message: "User not logged in",
-      });
+      throw new ConvexError("UNAUTHENTICATED");
     }
 
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-
-    if (existingUser) {
-      return existingUser._id;
-    }
+    const existing = await getUserByIdentity(ctx);
+    if (existing) return existing._id;
 
     return await ctx.db.insert("users", {
-      name: identity.name || "",
-      email: identity.email || "",
+      name: identity.name,
+      email: identity.email,
       tokenIdentifier: identity.tokenIdentifier,
-      isAdmin: false,
-      walletBalance: 0,
     });
   },
 });
 
 /**
- * Update user profile (name only)
- */
-export const updateProfile = mutation({
-  args: {
-    name: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new ConvexError({
-        code: "UNAUTHENTICATED",
-        message: "User not logged in",
-      });
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-
-    if (!user) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "User not found",
-      });
-    }
-
-    const name = args.name.trim();
-    if (!name) {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Name cannot be empty",
-      });
-    }
-
-    if (name.length > 100) {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Name is too long",
-      });
-    }
-
-    await ctx.db.patch(user._id, { name });
-
-    return { success: true };
-  },
-});
-
-/**
- * =========================
- * QUERIES (GUEST SAFE)
- * =========================
- */
-
-/**
- * Primary current user query
- * (frontend-safe, guest-safe)
- */
-export const currentUser = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
-
-    return await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-  },
-});
-
-/**
- * Alias for newer code paths
+ * Get current user (guest-safe)
  */
 export const getCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    return await currentUser.handler(ctx);
+    return await getUserByIdentity(ctx);
   },
 });
 
 /**
- * Profile data for My Account page
+ * My Account / Profile data (guest-safe)
  */
 export const getProfileData = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return null;
-    }
+    const user = await getUserByIdentity(ctx);
+    if (!user) return null;
 
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
+    const walletBalance = user.walletBalance ?? 0;
 
-    if (!user) {
-      return null;
-    }
-
-    const walletBalance = user.walletBalance || 0;
-
-    const walletTransactions = await ctx.db
+    const cashbackTxns = await ctx.db
       .query("walletTransactions")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .filter((q) => q.eq(q.field("source"), "cashback"))
+      .withIndex("by_user", (q: any) => q.eq("userId", user._id))
+      .filter((q: any) => q.eq(q.field("source"), "cashback"))
       .collect();
 
-    const totalCashbackEarned = walletTransactions.reduce(
-      (sum, txn) => sum + (txn.amount || 0),
+    const totalCashbackEarned = cashbackTxns.reduce(
+      (sum: number, t: any) => sum + t.amount,
       0
     );
 
     const recentOrder = await ctx.db
       .query("orders")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .withIndex("by_user", (q: any) => q.eq("userId", user._id))
       .order("desc")
       .first();
 
     return {
-      name: user.name || "",
-      email: user.email || "",
-      phone: recentOrder?.shippingAddress?.phone || "",
+      name: user.name ?? "",
+      email: user.email ?? "",
+      phone: recentOrder?.shippingAddress?.phone ?? "",
       walletBalance,
       totalCashbackEarned,
     };
@@ -182,25 +88,39 @@ export const getProfileData = query({
 });
 
 /**
- * Check admin status
+ * Update profile (name only)
+ */
+export const updateProfile = mutation({
+  args: {
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await getUserByIdentity(ctx);
+    if (!user) {
+      throw new ConvexError("UNAUTHENTICATED");
+    }
+
+    if (!args.name.trim()) {
+      throw new ConvexError("INVALID_NAME");
+    }
+
+    await ctx.db.patch(user._id, {
+      name: args.name.trim(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Admin check (guest-safe)
  */
 export const isCurrentUserAdmin = query({
   args: {},
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      return { isAuthenticated: false, isAdmin: false };
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_token", (q) =>
-        q.eq("tokenIdentifier", identity.tokenIdentifier)
-      )
-      .unique();
-
+    const user = await getUserByIdentity(ctx);
     return {
-      isAuthenticated: true,
+      isAuthenticated: !!user,
       isAdmin: user?.isAdmin === true,
     };
   },
