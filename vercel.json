@@ -8,7 +8,7 @@
           "value": "ALLOWALL"
         },
         {
-          "key": "Content-Security-Policy",
+          "key": "Content-Security-Policy", 
           "value": "frame-ancestors *"
         }
       ]
