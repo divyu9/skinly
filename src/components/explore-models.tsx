@@ -132,7 +132,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
 
         {/* Search Input */}
         <div className="relative">
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
+          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-primary" />
           <Input
             type="text"
             placeholder="Search devices, skins, cases, products..."
@@ -150,8 +150,20 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
               // Delay to allow clicks on results
               setTimeout(() => setShowResults(false), 200);
             }}
-            className="h-14 pl-12 pr-4 text-base rounded-full border-2 focus-visible:ring-2"
+            className="h-14 pl-12 pr-32 text-base rounded-full border-[3px] border-primary/60 bg-background focus-visible:ring-4 focus-visible:ring-primary/20 focus-visible:border-primary shadow-lg"
           />
+          <Button
+            size="lg"
+            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-12 px-6 shadow-md"
+            onClick={() => {
+              if (searchQuery.trim().length > 0) {
+                setShowResults(true);
+              }
+            }}
+          >
+            <SearchIcon className="size-4 mr-2" />
+            Search
+          </Button>
         </div>
 
         {/* Search Results */}
