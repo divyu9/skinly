@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { StarIcon, ShoppingCartIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
 interface TopPicksProps {
   title?: string;
@@ -41,9 +42,14 @@ export function TopPicks({
   return (
     <section className="container mx-auto px-4 py-12">
       <div className="space-y-6">
-        {/* Title */}
-        <div className="text-center">
-          <h2 className="text-3xl md:text-4xl font-bold">{title}</h2>
+        {/* Title and Nav Buttons */}
+        <div className="flex items-center justify-center gap-6">
+          <div className="text-center flex-1">
+            <h2 className="text-3xl md:text-4xl font-bold">{title}</h2>
+          </div>
+          {products && products.length > 0 && (
+            <ScrollNavButtons containerId="top-picks-scroll" />
+          )}
         </div>
 
         {/* Tabs */}
@@ -84,7 +90,7 @@ export function TopPicks({
             </div>
           ) : (
             // Products
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
+            <div id="top-picks-scroll" className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
               {products.map((product) => {
                 const firstVariant = product.variants[0];
                 const isOutOfStock = firstVariant?.inventoryQuantity === 0;

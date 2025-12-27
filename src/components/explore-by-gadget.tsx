@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
 interface ExploreByGadgetProps {
   sectionId: Id<"homepageSections">;
@@ -26,16 +27,20 @@ export function ExploreByGadget({ sectionId, config }: ExploreByGadgetProps) {
   return (
     <section className="py-12 px-4">
       <div className="container mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-3xl md:text-4xl font-bold mb-2">{config.title}</h2>
-          {config.subtitle && (
-            <p className="text-muted-foreground">{config.subtitle}</p>
-          )}
+        {/* Header with Nav Buttons */}
+        <div className="flex items-center justify-center gap-6 mb-8">
+          <div className="text-center flex-1">
+            <h2 className="text-3xl md:text-4xl font-bold mb-2">{config.title}</h2>
+            {config.subtitle && (
+              <p className="text-muted-foreground">{config.subtitle}</p>
+            )}
+          </div>
+          <ScrollNavButtons containerId="explore-gadget-scroll" />
         </div>
 
         {/* Horizontal Scroll Container */}
         <div 
+          id="explore-gadget-scroll"
           className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
           style={{
             WebkitOverflowScrolling: 'touch',

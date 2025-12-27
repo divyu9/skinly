@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
 interface MostTrendyProps {
   sectionId: Id<"homepageSections">;
@@ -31,16 +32,20 @@ export function MostTrendy({ config }: MostTrendyProps) {
   return (
     <section className="py-12 px-4">
       <div className="container mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-3xl md:text-4xl font-bold mb-2">{config.title}</h2>
-          {config.subtitle && (
-            <p className="text-muted-foreground">{config.subtitle}</p>
-          )}
+        {/* Header with Nav Buttons */}
+        <div className="flex items-center justify-center gap-6 mb-8">
+          <div className="text-center flex-1">
+            <h2 className="text-3xl md:text-4xl font-bold mb-2">{config.title}</h2>
+            {config.subtitle && (
+              <p className="text-muted-foreground">{config.subtitle}</p>
+            )}
+          </div>
+          <ScrollNavButtons containerId="most-trendy-scroll" />
         </div>
 
         {/* Horizontal Scroll Container */}
         <div 
+          id="most-trendy-scroll"
           className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
           style={{
             WebkitOverflowScrolling: 'touch',
