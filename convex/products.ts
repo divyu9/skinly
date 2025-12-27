@@ -443,11 +443,17 @@ export const searchProducts = query({
       variantsByProduct.get(productId)!.push(variant);
     }
     
-    // Search products by title
+    // Search products by title, description, and tags
     const matchingProducts = products.filter(product => {
       const normalizedTitle = normalizeText(product.title);
-      // Check if ALL search terms are present in the title
-      return normalizedSearchTerms.every(term => normalizedTitle.includes(term));
+      const normalizedDescription = normalizeText(product.description || '');
+      const normalizedTags = product.tags.map(tag => normalizeText(tag)).join(' ');
+      const combinedText = `${normalizedTitle} ${normalizedDescription} ${normalizedTags}`;
+      
+      // Check if ALL search terms are present anywhere in the combined text
+      // This allows "magneto" to match products with "magneto-x" in tags
+      // and "nothing 2" to match "nothing phone 2 pro" in title
+      return normalizedSearchTerms.every(term => combinedText.includes(term));
     });
     
     // Also search by SKU

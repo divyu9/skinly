@@ -401,19 +401,38 @@ export const searchModels = query({
         .collect();
     }
 
-    // Filter by search query (brand or model name)
+    // Normalize text for better matching (remove spaces, hyphens, underscores)
+    const normalizeText = (text: string): string => {
+      return text.toLowerCase().replace(/[\s\-_]/g, '');
+    };
+
+    // Split search query into individual words
+    const searchTerms = searchQuery.split(/\s+/).filter(term => term.length > 0);
+    const normalizedSearchTerms = searchTerms.map(normalizeText);
+
+    // Filter by search query with fuzzy word matching
     const filtered = allModels.filter((model) => {
-      const brandMatch = model.brandName.toLowerCase().includes(searchQuery);
-      const modelMatch = model.modelName.toLowerCase().includes(searchQuery);
-      return brandMatch || modelMatch;
+      const normalizedBrand = normalizeText(model.brandName);
+      const normalizedModel = normalizeText(model.modelName);
+      const fullText = `${normalizedBrand} ${normalizedModel}`;
+      
+      // Check if ALL search terms appear somewhere in the combined text
+      // This allows "nothing 2" to match "nothing phone 2 pro"
+      return normalizedSearchTerms.every(term => fullText.includes(term));
     });
 
-    // Sort by relevance (brand exact match first, then model match)
+    // Sort by relevance (exact matches first, then partial matches)
     const sorted = filtered.sort((a, b) => {
       const aBrandExact = a.brandName.toLowerCase() === searchQuery;
       const bBrandExact = b.brandName.toLowerCase() === searchQuery;
       if (aBrandExact && !bBrandExact) return -1;
       if (!aBrandExact && bBrandExact) return 1;
+      
+      const aModelExact = a.modelName.toLowerCase() === searchQuery;
+      const bModelExact = b.modelName.toLowerCase() === searchQuery;
+      if (aModelExact && !bModelExact) return -1;
+      if (!aModelExact && bModelExact) return 1;
+      
       return a.modelName.localeCompare(b.modelName);
     });
 
