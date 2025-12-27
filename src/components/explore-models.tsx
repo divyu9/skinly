@@ -88,6 +88,25 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
                      searchResults.designs.length > 0 || 
                      searchResults.skus.length > 0;
 
+  // Count total results
+  const totalResults = (() => {
+    let count = 0;
+    // Count all device models
+    Object.values(groupedResults).forEach(models => {
+      count += models.length;
+    });
+    // Count products (designs + skus, but avoid double counting)
+    count += searchResults.designs.length;
+    // SKUs might overlap with designs, so only count unique SKUs
+    const uniqueSkuProducts = new Set(searchResults.skus.map(s => s.product._id));
+    searchResults.designs.forEach(d => uniqueSkuProducts.delete(d._id));
+    count += uniqueSkuProducts.size;
+    return count;
+  })();
+
+  // Show "Request Your Model" inside search results when <= 2 results or no results
+  const showRequestInside = totalResults <= 2;
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case "phone": return "📱";
@@ -117,8 +136,9 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
   };
 
   return (
-    <section className="container mx-auto px-4 py-12">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <section className="bg-muted/30 py-12">
+      <div className="container mx-auto px-4">
+        <div className="max-w-2xl mx-auto space-y-6">
         {/* Title */}
         <div className="text-center space-y-2">
           <h2 className="text-3xl md:text-4xl font-bold">
@@ -279,25 +299,49 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Request Model Button - shown inside when few/no results */}
+                  {showRequestInside && (
+                    <div className="flex flex-col items-center gap-3 pt-4 mt-6 border-t border-border">
+                      <p className="text-sm text-muted-foreground">
+                        Can't find your device?
+                      </p>
+                      <Button
+                        size="lg"
+                        onClick={() => {
+                          onRequestModelClick();
+                          setShowResults(false);
+                          setSearchQuery("");
+                        }}
+                        className="rounded-full px-8 shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                      >
+                        <ZapIcon className="size-4 mr-2" />
+                        Request Your Model
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
         )}
 
-        {/* Request Model Button */}
-        <div className="flex flex-col items-center gap-3 pt-4">
-          <p className="text-sm text-muted-foreground">
-            Can't find your device?
-          </p>
-          <Button
-            size="lg"
-            onClick={onRequestModelClick}
-            className="rounded-full px-8 shadow-lg hover:shadow-xl transition-all hover:scale-105"
-          >
-            <ZapIcon className="size-4 mr-2" />
-            Request Your Model
-          </Button>
+        {/* Request Model Button - shown outside when not searching or many results */}
+        {(!showResults || !showRequestInside) && (
+          <div className="flex flex-col items-center gap-3 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Can't find your device?
+            </p>
+            <Button
+              size="lg"
+              onClick={onRequestModelClick}
+              className="rounded-full px-8 shadow-lg hover:shadow-xl transition-all hover:scale-105"
+            >
+              <ZapIcon className="size-4 mr-2" />
+              Request Your Model
+            </Button>
+          </div>
+        )}
         </div>
       </div>
     </section>
