@@ -150,7 +150,7 @@ export default function ProductDetailPage() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showStickyBar, setShowStickyBar] = useState(false);
-  const [showOffersCollapsed, setShowOffersCollapsed] = useState(true);
+  const [showOffersCollapsed, setShowOffersCollapsed] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState("");
   const [reviewComment, setReviewComment] = useState("");
