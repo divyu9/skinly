@@ -25,7 +25,20 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
       : "skip"
   );
 
-  // Group results by category
+  // Server-side product search
+  const productSearchResults = useQuery(
+    api.products.searchProducts,
+    debouncedQuery.trim().length >= 2 
+      ? { query: debouncedQuery, limit: 15 }
+      : "skip"
+  );
+
+  // Helper to normalize text for search
+  const normalizeForSearch = (text: string): string => {
+    return text.toLowerCase().replace(/[\s\-_]/g, '');
+  };
+
+  // Group device results by category
   const groupedResults = (() => {
     if (!deviceSearchResults) return {};
     
@@ -40,6 +53,40 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
     
     return grouped;
   })();
+
+  // Process product search results
+  const searchResults = (() => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return { designs: [], skus: [] };
+    
+    const productsFromSearch = productSearchResults || [];
+    const designMatches = productsFromSearch.map(product => ({
+      _id: product._id,
+      title: product.title,
+      slug: product.slug,
+      images: product.images,
+      variants: product.variants,
+    }));
+
+    // SKU matches
+    const skuMatches: Array<{ product: typeof designMatches[0]; variant: typeof designMatches[0]['variants'][0] }> = [];
+    productsFromSearch.forEach(product => {
+      product.variants.forEach(variant => {
+        if (variant.sku && normalizeForSearch(variant.sku).includes(normalizeForSearch(query))) {
+          skuMatches.push({ product: product as typeof designMatches[0], variant });
+        }
+      });
+    });
+
+    return {
+      designs: designMatches,
+      skus: skuMatches.slice(0, 10)
+    };
+  })();
+
+  const hasResults = Object.keys(groupedResults).length > 0 || 
+                     searchResults.designs.length > 0 || 
+                     searchResults.skus.length > 0;
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -87,7 +134,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
           <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search your device or model"
+            placeholder="Search devices, skins, cases, products..."
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -110,48 +157,128 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
         {showResults && searchQuery.trim().length > 0 && (
           <Card className="border-2 shadow-xl max-h-[60vh] overflow-y-auto">
             <CardContent className="p-4">
-              {debouncedQuery.trim().length >= 2 && deviceSearchResults === undefined ? (
+              {debouncedQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
                 // Loading
                 <div className="text-center py-8">
                   <div className="size-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Searching...</p>
                 </div>
-              ) : Object.keys(groupedResults).length === 0 ? (
+              ) : !hasResults ? (
                 // No results
                 <div className="text-center py-8">
-                  <p className="text-foreground mb-2">No devices found</p>
+                  <p className="text-foreground mb-2">No results found</p>
                   <p className="text-sm text-muted-foreground mb-4">
                     Try different search terms
                   </p>
                 </div>
               ) : (
-                // Results by category
-                <div className="space-y-4">
-                  {Object.entries(groupedResults).map(([category, models]) => (
-                    <div key={category}>
-                      <h3 className="text-xs font-semibold text-muted-foreground mb-2 px-2">
-                        {getCategoryIcon(category)} {getCategoryName(category).toUpperCase()} ({models.length})
-                      </h3>
-                      <div className="space-y-1">
-                        {models.map((model, idx) => (
+                // Results
+                <div className="space-y-6">
+                  {/* Device Models Section */}
+                  {Object.keys(groupedResults).length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-semibold text-muted-foreground px-2">DEVICES</h3>
+                      {Object.entries(groupedResults).map(([category, models]) => (
+                        <div key={category}>
+                          <h4 className="text-xs font-medium text-muted-foreground mb-2 px-2">
+                            {getCategoryIcon(category)} {getCategoryName(category)} ({models.length})
+                          </h4>
+                          <div className="space-y-1">
+                            {models.map((model, idx) => (
+                              <Link
+                                key={idx}
+                                to={`/products?brand=${encodeURIComponent(model.brandName)}&model=${encodeURIComponent(model.modelName)}&fromGadgetSelector=true`}
+                                className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors group"
+                                onClick={() => {
+                                  setShowResults(false);
+                                  setSearchQuery("");
+                                }}
+                              >
+                                <span className="font-medium">
+                                  {model.brandName} {model.modelName}
+                                </span>
+                                <ChevronRightIcon className="size-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Product Designs Section */}
+                  {searchResults.designs.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold text-muted-foreground mb-3 px-2">DESIGNS</h3>
+                      <div className="space-y-2">
+                        {searchResults.designs.map(product => (
                           <Link
-                            key={idx}
-                            to={`/products?brand=${encodeURIComponent(model.brandName)}&model=${encodeURIComponent(model.modelName)}&fromGadgetSelector=true`}
-                            className="flex items-center justify-between p-3 hover:bg-muted rounded-lg transition-colors group"
+                            key={product._id}
+                            to={`/products/${product.slug}`}
+                            className="flex items-center gap-3 p-3 hover:bg-muted rounded-lg transition-colors"
                             onClick={() => {
                               setShowResults(false);
                               setSearchQuery("");
                             }}
                           >
-                            <span className="font-medium">
-                              {model.brandName} {model.modelName}
-                            </span>
-                            <ChevronRightIcon className="size-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-1 transition-all" />
+                            {product.images[0] && (
+                              <img 
+                                src={product.images[0].url} 
+                                alt={product.title}
+                                width="56"
+                                height="56"
+                                className="size-14 object-cover rounded-lg flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-base">{product.title}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                            <ChevronRightIcon className="size-5 text-muted-foreground flex-shrink-0" />
                           </Link>
                         ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* SKUs Section */}
+                  {searchResults.skus.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-semibold text-muted-foreground mb-3 px-2">SKUs</h3>
+                      <div className="space-y-2">
+                        {searchResults.skus.map(({ product, variant }) => (
+                          <Link
+                            key={variant._id}
+                            to={`/products/${product.slug}`}
+                            className="flex items-center gap-3 p-3 hover:bg-muted rounded-lg transition-colors"
+                            onClick={() => {
+                              setShowResults(false);
+                              setSearchQuery("");
+                            }}
+                          >
+                            {product.images[0] && (
+                              <img 
+                                src={product.images[0].url} 
+                                alt={product.title}
+                                width="56"
+                                height="56"
+                                className="size-14 object-cover rounded-lg flex-shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-base">{product.title}</p>
+                              <p className="text-sm text-muted-foreground">
+                                SKU: {variant.sku} • {variant.title}
+                              </p>
+                            </div>
+                            <ChevronRightIcon className="size-5 text-muted-foreground flex-shrink-0" />
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
