@@ -150,7 +150,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
               // Delay to allow clicks on results
               setTimeout(() => setShowResults(false), 200);
             }}
-            className="h-14 pl-12 pr-32 text-base rounded-full border-[3px] border-foreground/30 bg-background focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/20 shadow-lg"
+            className="h-14 pl-12 pr-32 text-base rounded-full border-[3px] border-muted-foreground/40 bg-background focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/20 shadow-lg"
           />
           <Button
             size="lg"
