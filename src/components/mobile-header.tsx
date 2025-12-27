@@ -200,7 +200,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                   <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="Search your device or model"
+                    placeholder="Search devices, skins, cases, products..."
                     value={searchQuery}
                     onChange={(e) => {
                       const query = e.target.value;

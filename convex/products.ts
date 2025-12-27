@@ -443,15 +443,18 @@ export const searchProducts = query({
       variantsByProduct.get(productId)!.push(variant);
     }
     
-    // Search products by title, description, and tags
+    // Search products by title, description, tags, and product category
     const matchingProducts = products.filter(product => {
       const normalizedTitle = normalizeText(product.title);
       const normalizedDescription = normalizeText(product.description || '');
       const normalizedTags = product.tags.map(tag => normalizeText(tag)).join(' ');
-      const combinedText = `${normalizedTitle} ${normalizedDescription} ${normalizedTags}`;
+      const normalizedCategory = normalizeText(product.productCategory || '');
+      const combinedText = `${normalizedTitle} ${normalizedDescription} ${normalizedTags} ${normalizedCategory}`;
       
       // Check if ALL search terms are present anywhere in the combined text
-      // This allows "magneto" to match products with "magneto-x" in tags
+      // This allows "magneto" to match products with "magneto-x" in category
+      // "case" to match products with "case-cover" in category
+      // "black" to match products with "black" in title/description
       // and "nothing 2" to match "nothing phone 2 pro" in title
       return normalizedSearchTerms.every(term => combinedText.includes(term));
     });
