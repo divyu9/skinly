@@ -40,7 +40,7 @@ export function ProductShareButton({ productTitle, productUrl }: ProductShareBut
       variant="ghost"
       size="sm"
       onClick={handleShare}
-      className="shrink-0"
+      className="shrink-0 bg-gradient-to-r from-green-400 to-green-600 hover:animate-pulse"
       aria-label="Share product"
     >
       <ShareIcon className="size-4" />
