@@ -25,7 +25,7 @@ export function CartButton() {
   const cartCount = useQuery(api.cart.getCartCount, user ? {} : "skip");
   const { getGuestCartCount, guestCart } = useGuestCart();
   const [displayCount, setDisplayCount] = useState(0);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   // Update display count whenever cart data changes
   useEffect(() => {
@@ -221,7 +221,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                   {/* Price and Controls */}
                   <div className="flex items-center justify-between mt-2">
                     <span className="text-sm font-bold text-primary">
-                      ₹{item.price.toFixed(0)}
+                      â¹{item.price.toFixed(0)}
                     </span>
                     
                     <div className="flex items-center gap-2">
@@ -287,7 +287,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
       <div className="space-y-2 pb-1">
         <div className="flex justify-between items-center px-1">
           <span className="font-medium text-sm">Subtotal</span>
-          <span className="text-lg font-bold text-primary">₹{subtotal.toFixed(0)}</span>
+          <span className="text-lg font-bold text-primary">â¹{subtotal.toFixed(0)}</span>
         </div>
 
         <div className="flex flex-col items-center gap-2">
