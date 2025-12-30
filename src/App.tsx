@@ -10,7 +10,7 @@ import { FacebookPixelInitializer } from "./components/facebook-pixel-initialize
 import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import ProductsPage from "./pages/products/page.tsx";
-import ProductDetailPage from "./pages/products/detail/page.tsx";
+import ProductDetailPage from "./pages/products/detail/product-detail.tsx";
 import CheckoutPage from "./pages/checkout/page.tsx";
 import CartPage from "./pages/cart/page.tsx";
 import OrdersPage from "./pages/orders/page.tsx";

@@ -1,0 +1,21 @@
+{
+  "name": "skinly-image-migration",
+  "version": "1.0.0",
+  "description": "Migrate and optimize images from Shopify CDN to Hostinger",
+  "scripts": {
+    "download": "node download-images.js",
+    "download-optimize": "node download-and-optimize.js",
+    "optimize": "node optimize-images.js",
+    "update-db": "node update-database.js",
+    "full-migrate": "node migrate-images.js"
+  },
+  "dependencies": {
+    "cli-progress": "^3.12.0",
+    "convex": "^1.0.0",
+    "fs-extra": "^11.2.0",
+    "node-fetch": "^2.7.0",
+    "sharp": "^0.33.2",
+    "ssh2-sftp-client": "^10.0.3"
+  },
+  "type": "commonjs"
+}

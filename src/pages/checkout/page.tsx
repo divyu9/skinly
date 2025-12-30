@@ -228,6 +228,22 @@ function CheckoutPageInner() {
   // Determine which cart to use
   const cartItems = isAuthenticated ? dbCartItems : guestCart;
 
+  // Check stock status for cart items
+  const cartItemsForStockCheck = cartItems?.map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    quantity: item.quantity,
+  })) || [];
+
+  const stockStatus = useQuery(
+    api.cart.checkCartItemsStock,
+    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
+  );
+
+  // Check if there are any out-of-stock items
+  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
+  const outOfStockItems = stockStatus?.filter(status => status.isOutOfStock) || [];
+
   // Reset OTP state when payment method changes away from COD
   const handlePaymentMethodChange = (value: string) => {
     setFormData({ ...formData, paymentMethod: value });
@@ -801,6 +817,22 @@ function CheckoutPageInner() {
       paymentMethod: formData.paymentMethod 
     });
     
+    // Check for out-of-stock items
+    if (hasOutOfStockItems) {
+      const outOfStockProductNames = outOfStockItems.map(item => {
+        const cartItem = cartItems?.find(ci => 
+          ci.productId === item.productId && ci.variant === item.variant
+        );
+        return cartItem?.productTitle || 'Item';
+      }).join(', ');
+      
+      toast.error(
+        `Cannot proceed: Some items are out of stock (${outOfStockProductNames}). Please remove them from your cart and try again.`,
+        { duration: 5000 }
+      );
+      return;
+    }
+    
     // Validate all required fields
     if (!formData.fullName.trim()) {
       toast.error("Please enter your full name");
@@ -1087,6 +1119,40 @@ function CheckoutPageInner() {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Checkout Form */}
           <div className="lg:col-span-2">
+            {hasOutOfStockItems && (
+              <Card className="mb-6 border-destructive/50 bg-destructive/10">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircleIcon className="size-5 text-destructive shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-destructive mb-1">
+                        Out of Stock Items in Cart
+                      </h3>
+                      <p className="text-sm text-destructive/90 mb-2">
+                        Please remove the following out-of-stock items from your cart to proceed with checkout:
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 text-sm text-destructive/90">
+                        {outOfStockItems.map((item, idx) => {
+                          const cartItem = cartItems?.find(ci => 
+                            ci.productId === item.productId && ci.variant === item.variant
+                          );
+                          return (
+                            <li key={idx}>
+                              {cartItem?.productTitle} {cartItem && cartItem.variant !== "Default Title" && `- ${cartItem.variant}`}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <Link to="/cart">
+                        <Button variant="outline" size="sm" className="mt-3 border-destructive text-destructive hover:bg-destructive hover:text-white">
+                          Go to Cart
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Order Summary - Mobile Only */}
               <Card className="lg:hidden">
@@ -1096,21 +1162,34 @@ function CheckoutPageInner() {
                 <CardContent className="space-y-4">
                   {/* Items */}
                   <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {cartItems && cartItems.map((item, index) => (
-                      <div key={('_id' in item ? String(item._id) : `${item.productId}-${item.variant}-${index}`)} className="flex gap-3">
+                    {cartItems && cartItems.map((item, index) => {
+                      const stockInfo = stockStatus?.find(s => 
+                        s.productId === item.productId && s.variant === item.variant
+                      );
+                      const isOutOfStock = stockInfo?.isOutOfStock || false;
+                      
+                      return (
+                      <div key={('_id' in item ? String(item._id) : `${item.productId}-${item.variant}-${index}`)} className={`flex gap-3 ${isOutOfStock ? 'opacity-50' : ''}`}>
                         {item.productImage && (
                           <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
                             <img
                               src={item.productImage}
                               alt={item.productTitle}
-                              className="w-full h-full object-cover"
+                              className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale' : ''}`}
                             />
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium line-clamp-2">
-                            {item.productTitle}
-                          </p>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium line-clamp-2">
+                              {item.productTitle}
+                            </p>
+                            {isOutOfStock && (
+                              <Badge variant="destructive" className="text-xs shrink-0">
+                                Out of Stock
+                              </Badge>
+                            )}
+                          </div>
                           {item.phoneModel && (
                             <p className="text-xs text-muted-foreground">
                               {item.phoneModel}
@@ -1126,7 +1205,8 @@ function CheckoutPageInner() {
                           </p>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <Separator />
@@ -1761,7 +1841,7 @@ function CheckoutPageInner() {
                 type="submit"
                 size="lg"
                 className="w-full"
-                disabled={isSubmitting || isRedirectingToPayment}
+                disabled={isSubmitting || isRedirectingToPayment || hasOutOfStockItems}
               >
                 {isRedirectingToPayment ? (
                   <span className="flex items-center gap-2">
@@ -1792,21 +1872,34 @@ function CheckoutPageInner() {
               <CardContent className="space-y-4">
                 {/* Items */}
                 <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {cartItems && cartItems.map((item, index) => (
-                    <div key={('_id' in item ? String(item._id) : `${item.productId}-${item.variant}-${index}`)} className="flex gap-3">
+                  {cartItems && cartItems.map((item, index) => {
+                    const stockInfo = stockStatus?.find(s => 
+                      s.productId === item.productId && s.variant === item.variant
+                    );
+                    const isOutOfStock = stockInfo?.isOutOfStock || false;
+                    
+                    return (
+                    <div key={('_id' in item ? String(item._id) : `${item.productId}-${item.variant}-${index}`)} className={`flex gap-3 ${isOutOfStock ? 'opacity-50' : ''}`}>
                       {item.productImage && (
                         <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
                           <img
                             src={item.productImage}
                             alt={item.productTitle}
-                            className="w-full h-full object-cover"
+                            className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale' : ''}`}
                           />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium line-clamp-2">
-                          {item.productTitle}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium line-clamp-2">
+                            {item.productTitle}
+                          </p>
+                          {isOutOfStock && (
+                            <Badge variant="destructive" className="text-xs shrink-0">
+                              Out of Stock
+                            </Badge>
+                          )}
+                        </div>
                         {item.phoneModel && (
                           <p className="text-xs text-muted-foreground">
                             {item.phoneModel}
@@ -1822,7 +1915,8 @@ function CheckoutPageInner() {
                         </p>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <Separator />

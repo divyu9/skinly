@@ -511,3 +511,35 @@ export const getMissingMockups = query({
     };
   },
 });
+/**
+ * Batch fetch mockups - 100 queries → 1 query
+ */
+export const getBatchMockups = query({
+  args: {
+    brand: v.string(),
+    model: v.string(),
+    skus: v.array(v.string()),
+  },
+  handler: async (ctx, { brand, model, skus }) => {
+    if (!skus || skus.length === 0) return {};
+
+    const mockups = await ctx.db
+      .query("mockups")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("brand"), brand),
+          q.eq(q.field("model"), model)
+        )
+      )
+      .collect();
+
+    const result: Record<string, string> = {};
+    for (const mockup of mockups) {
+      const url = await ctx.storage.getUrl(mockup.fileId);
+      if (skus.includes(mockup.sku) && url) {
+        result[mockup.sku] = url;
+      }
+    }
+    return result;
+  },
+});

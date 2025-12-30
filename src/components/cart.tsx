@@ -9,7 +9,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet.tsx";
-import { ShoppingCartIcon, MinusIcon, PlusIcon, TrashIcon } from "lucide-react";
+import { ShoppingCartIcon, MinusIcon, PlusIcon, TrashIcon, AlertCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
@@ -105,6 +105,26 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   // Use guest cart if not authenticated, otherwise use database cart
   const displayItems = user ? (cartItems || []) : guestCart;
 
+  // Check stock status for cart items
+  const cartItemsForStockCheck = displayItems?.map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    quantity: item.quantity,
+  })) || [];
+
+  const stockStatus = useQuery(
+    api.cart.checkCartItemsStock,
+    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
+  );
+
+  // Create a map for quick stock lookup
+  const stockStatusMap = new Map(
+    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  );
+
+  // Check if there are any out-of-stock items
+  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -180,17 +200,19 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
         {displayItems.map((item, idx) => {
           const itemId = "_id" in item ? (item._id as Id<"cart">) : undefined;
           const key = itemId || `${item.productId}-${item.variant}-${idx}`;
+          const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
+          const isOutOfStock = stockInfo?.isOutOfStock || false;
           
           return (
             <div key={key}>
-              <div className="flex gap-3 py-3 px-1">
+              <div className={`flex gap-3 py-3 px-1 ${isOutOfStock ? 'opacity-50' : ''}`}>
                 {/* Product Image */}
                 {item.productImage && (
                   <div className="size-16 bg-muted rounded overflow-hidden shrink-0">
                     <img
                       src={item.productImage}
                       alt={item.productTitle}
-                      className="w-full h-full object-cover"
+                      className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale' : ''}`}
                     />
                   </div>
                 )}
@@ -198,9 +220,16 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                 {/* Product Details */}
                 <div className="flex-1 min-w-0 flex flex-col justify-between">
                   <div>
-                    <h4 className="font-medium text-sm line-clamp-1 mb-0.5">
-                      {item.productTitle}
-                    </h4>
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-medium text-sm line-clamp-1 mb-0.5">
+                        {item.productTitle}
+                      </h4>
+                      {isOutOfStock && (
+                        <Badge variant="destructive" className="text-xs shrink-0">
+                          Out of Stock
+                        </Badge>
+                      )}
+                    </div>
                     {item.phoneModel && (
                       <p className="text-xs text-muted-foreground">
                         {item.phoneModel}
@@ -216,6 +245,12 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                         {item.variant}
                       </p>
                     )}
+                    {isOutOfStock && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-destructive">
+                        <AlertCircleIcon className="size-3" />
+                        <span>Remove this item to proceed</span>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Price and Controls */}
@@ -225,12 +260,13 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                     </span>
                     
                     <div className="flex items-center gap-2">
-                      {/* Quantity Controls */}
-                      <div className="flex items-center border rounded">
+                      {/* Quantity Controls - Disabled for out-of-stock items */}
+                      <div className={`flex items-center border rounded ${isOutOfStock ? 'opacity-50' : ''}`}>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0"
+                          disabled={isOutOfStock}
                           onClick={() => handleUpdateQuantity(
                             item.productId,
                             item.variant,
@@ -245,6 +281,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                           size="sm"
                           variant="ghost"
                           className="h-7 w-7 p-0"
+                          disabled={isOutOfStock}
                           onClick={() => handleUpdateQuantity(
                             item.productId,
                             item.variant,
@@ -291,8 +328,16 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
         </div>
 
         <div className="flex flex-col items-center gap-2">
+          {hasOutOfStockItems && (
+            <div className="w-full max-w-[85%] p-2 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+              <AlertCircleIcon className="size-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-xs text-destructive">
+                Please remove out-of-stock items from your cart to proceed with checkout.
+              </p>
+            </div>
+          )}
           <Link to="/checkout" className="w-full max-w-[85%]" onClick={onCheckoutClick}>
-            <Button className="w-full" size="default">
+            <Button className="w-full" size="default" disabled={hasOutOfStockItems}>
               Proceed to Checkout
             </Button>
           </Link>

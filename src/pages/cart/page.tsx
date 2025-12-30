@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { MinusIcon, PlusIcon, TrashIcon, ShoppingCartIcon, ArrowLeftIcon } from "lucide-react";
+import { MinusIcon, PlusIcon, TrashIcon, ShoppingCartIcon, ArrowLeftIcon, AlertCircleIcon } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
@@ -163,6 +163,26 @@ function AuthenticatedCartContent() {
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  // Check stock status for cart items
+  const cartItemsForStockCheck = cartItems.map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    quantity: item.quantity,
+  }));
+
+  const stockStatus = useQuery(
+    api.cart.checkCartItemsStock,
+    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
+  );
+
+  // Create a map for quick stock lookup
+  const stockStatusMap = new Map(
+    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  );
+
+  // Check if there are any out-of-stock items
+  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
+
   const handleUpdateQuantity = async (cartId: Id<"cart">, newQuantity: number) => {
     try {
       await updateQuantity({ cartId, quantity: newQuantity });
@@ -197,11 +217,15 @@ function AuthenticatedCartContent() {
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
-          {cartItems.map((item) => (
-            <Card key={item._id}>
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex gap-4">
-                  {/* Product Image */}
+          {cartItems.map((item) => {
+            const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
+            const isOutOfStock = stockInfo?.isOutOfStock || false;
+            
+            return (
+              <Card key={item._id} className={isOutOfStock ? 'opacity-50' : ''}>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex gap-4">
+                    {/* Product Image */}
                   {item.productImage && (
                     <Link 
                       to={`/products/detail?id=${item.productId}`}
@@ -211,7 +235,7 @@ function AuthenticatedCartContent() {
                         <img
                           src={item.productImage}
                           alt={item.productTitle}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform"
+                          className={`w-full h-full object-cover hover:scale-105 transition-transform ${isOutOfStock ? 'grayscale' : ''}`}
                         />
                       </div>
                     </Link>
@@ -219,14 +243,21 @@ function AuthenticatedCartContent() {
 
                   {/* Product Details */}
                   <div className="flex-1 min-w-0">
-                    <Link 
-                      to={`/products/detail?id=${item.productId}`}
-                      className="hover:text-primary transition-colors"
-                    >
-                      <h3 className="font-semibold text-base line-clamp-2 mb-2">
-                        {item.productTitle}
-                      </h3>
-                    </Link>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <Link 
+                        to={`/products/detail?id=${item.productId}`}
+                        className="hover:text-primary transition-colors flex-1"
+                      >
+                        <h3 className="font-semibold text-base line-clamp-2">
+                          {item.productTitle}
+                        </h3>
+                      </Link>
+                      {isOutOfStock && (
+                        <Badge variant="destructive" className="text-xs shrink-0">
+                          Out of Stock
+                        </Badge>
+                      )}
+                    </div>
                     {item.phoneModel && (
                       <p className="text-sm text-muted-foreground mb-1">
                         For: {item.phoneModel}
@@ -242,17 +273,24 @@ function AuthenticatedCartContent() {
                         Variant: {item.variant}
                       </p>
                     )}
+                    {isOutOfStock && (
+                      <div className="flex items-center gap-1 mb-2 text-sm text-destructive">
+                        <AlertCircleIcon className="size-4" />
+                        <span>Remove this item to proceed with checkout</span>
+                      </div>
+                    )}
                     <p className="text-lg font-bold text-primary mb-4">
                       ₹{item.price.toFixed(0)}
                     </p>
 
                     {/* Quantity Controls */}
                     <div className="flex items-center gap-3">
-                      <div className="flex items-center border rounded-lg">
+                      <div className={`flex items-center border rounded-lg ${isOutOfStock ? 'opacity-50' : ''}`}>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-9 w-9 p-0"
+                          disabled={isOutOfStock}
                           onClick={() => handleUpdateQuantity(item._id, Math.max(1, item.quantity - 1))}
                         >
                           <MinusIcon className="size-4" />
@@ -264,6 +302,7 @@ function AuthenticatedCartContent() {
                           size="sm"
                           variant="ghost"
                           className="h-9 w-9 p-0"
+                          disabled={isOutOfStock}
                           onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
                         >
                           <PlusIcon className="size-4" />
@@ -283,7 +322,8 @@ function AuthenticatedCartContent() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+             );
+          })}
 
           <Button
             variant="outline"
@@ -315,9 +355,18 @@ function AuthenticatedCartContent() {
                 <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
               </div>
 
+              {hasOutOfStockItems && (
+                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-2 mb-2">
+                  <AlertCircleIcon className="size-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive">
+                    Please remove out-of-stock items from your cart to proceed with checkout.
+                  </p>
+                </div>
+              )}
               <Button 
                 className="w-full" 
                 size="lg"
+                disabled={hasOutOfStockItems}
                 onClick={() => navigate("/checkout")}
               >
                 Proceed to Checkout
@@ -370,6 +419,26 @@ function GuestCartContent() {
 
   const subtotal = guestCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  // Check stock status for guest cart items
+  const cartItemsForStockCheck = guestCart.map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    quantity: item.quantity,
+  }));
+
+  const stockStatus = useQuery(
+    api.cart.checkCartItemsStock,
+    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
+  );
+
+  // Create a map for quick stock lookup
+  const stockStatusMap = new Map(
+    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  );
+
+  // Check if there are any out-of-stock items
+  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
+
   const handleUpdateQuantity = (productId: string, variant: string, newQuantity: number) => {
     try {
       updateGuestCartQuantity(productId, variant, newQuantity);
@@ -403,9 +472,11 @@ function GuestCartContent() {
         <div className="lg:col-span-2 space-y-4">
           {guestCart.map((item, idx) => {
             const key = `${item.productId}-${item.variant}-${idx}`;
+            const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
+            const isOutOfStock = stockInfo?.isOutOfStock || false;
             
             return (
-              <Card key={key}>
+              <Card key={key} className={isOutOfStock ? 'opacity-50' : ''}>
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex gap-4">
                     {/* Product Image */}
@@ -418,7 +489,7 @@ function GuestCartContent() {
                           <img
                             src={item.productImage}
                             alt={item.productTitle}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform"
+                            className={`w-full h-full object-cover hover:scale-105 transition-transform ${isOutOfStock ? 'grayscale' : ''}`}
                           />
                         </div>
                       </Link>
@@ -426,14 +497,21 @@ function GuestCartContent() {
 
                     {/* Product Details */}
                     <div className="flex-1 min-w-0">
-                      <Link 
-                        to={`/products/detail?id=${item.productId}`}
-                        className="hover:text-primary transition-colors"
-                      >
-                        <h3 className="font-semibold text-base line-clamp-2 mb-2">
-                          {item.productTitle}
-                        </h3>
-                      </Link>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <Link 
+                          to={`/products/detail?id=${item.productId}`}
+                          className="hover:text-primary transition-colors flex-1"
+                        >
+                          <h3 className="font-semibold text-base line-clamp-2">
+                            {item.productTitle}
+                          </h3>
+                        </Link>
+                        {isOutOfStock && (
+                          <Badge variant="destructive" className="text-xs shrink-0">
+                            Out of Stock
+                          </Badge>
+                        )}
+                      </div>
                       {item.phoneModel && (
                         <p className="text-sm text-muted-foreground mb-1">
                           For: {item.phoneModel}
@@ -449,17 +527,24 @@ function GuestCartContent() {
                           Variant: {item.variant}
                         </p>
                       )}
+                      {isOutOfStock && (
+                        <div className="flex items-center gap-1 mb-2 text-sm text-destructive">
+                          <AlertCircleIcon className="size-4" />
+                          <span>Remove this item to proceed with checkout</span>
+                        </div>
+                      )}
                       <p className="text-lg font-bold text-primary mb-4">
                         ₹{item.price.toFixed(0)}
                       </p>
 
                       {/* Quantity Controls */}
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center border rounded-lg">
+                        <div className={`flex items-center border rounded-lg ${isOutOfStock ? 'opacity-50' : ''}`}>
                           <Button
                             size="sm"
                             variant="ghost"
                             className="h-9 w-9 p-0"
+                            disabled={isOutOfStock}
                             onClick={() => handleUpdateQuantity(
                               item.productId,
                               item.variant,
@@ -475,6 +560,7 @@ function GuestCartContent() {
                             size="sm"
                             variant="ghost"
                             className="h-9 w-9 p-0"
+                            disabled={isOutOfStock}
                             onClick={() => handleUpdateQuantity(
                               item.productId,
                               item.variant,
@@ -531,9 +617,18 @@ function GuestCartContent() {
                 <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
               </div>
 
+              {hasOutOfStockItems && (
+                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 flex items-start gap-2">
+                  <AlertCircleIcon className="size-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-xs text-destructive">
+                    Please remove out-of-stock items from your cart to proceed with checkout.
+                  </p>
+                </div>
+              )}
               <Button 
                 className="w-full" 
                 size="lg"
+                disabled={hasOutOfStockItems}
                 onClick={() => navigate("/checkout")}
               >
                 Proceed to Checkout
