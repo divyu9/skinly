@@ -1,21 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
+
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
-import { Textarea } from "@/components/ui/textarea.tsx";
-import { AlertCircleIcon, CheckCircleIcon, LoaderIcon, UploadIcon, XIcon } from "lucide-react";
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+import {
+  UploadIcon,
+  XIcon,
+  LoaderIcon,
+  CheckCircleIcon,
+  AlertCircleIcon,
+} from "lucide-react";
+
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth.ts";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { useUser } from "@clerk/clerk-react";
+
+/* ---------------------------------- TYPES --------------------------------- */
 
 interface BugReportModalProps {
   open: boolean;
@@ -24,373 +35,270 @@ interface BugReportModalProps {
 
 interface UploadedFile {
   file: File;
-  fileId?: Id<"_storage">;
   uploading: boolean;
-  progress: number;
   error?: string;
+  storageId?: Id<"_storage">;
 }
 
-export function BugReportModal({ open, onOpenChange }: BugReportModalProps) {
-  const { user } = useAuth();
-  const [email, setEmail] = useState(user?.profile.email || "");
+/* -------------------------------- COMPONENT -------------------------------- */
+
+export function BugReportModal({
+  open,
+  onOpenChange,
+}: BugReportModalProps) {
+  const { user, isLoaded } = useUser();
+
+  /* ------------------------------- FORM STATE ------------------------------- */
+
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [bugDetails, setBugDetails] = useState("");
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [details, setDetails] = useState("");
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  /* ------------------------------- CONVEX ----------------------------------- */
 
   const generateUploadUrl = useMutation(api.bugReports.generateUploadUrl);
   const submitBugReport = useMutation(api.bugReports.submitBugReport);
-  const attachFileToBug = useMutation(api.bugReports.attachFileToBug);
+  const attachFile = useMutation(api.bugReports.attachFileToBug);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
-    // Check total file count
-    if (uploadedFiles.length + files.length > 5) {
-      toast.error("Maximum of 5 files allowed per bug report");
+  /* ------------------------------- AUTO EMAIL -------------------------------- */
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const primaryEmail = user?.emailAddresses?.[0]?.emailAddress;
+    if (primaryEmail) {
+      setEmail(primaryEmail);
+    }
+  }, [user, isLoaded]);
+
+  /* ------------------------------ FILE HANDLING ------------------------------ */
+
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files ?? []);
+
+    if (files.length + selected.length > 5) {
+      toast.error("Maximum 5 files allowed");
       return;
     }
 
-    // Validate each file
-    for (const file of files) {
-      // Check file size (20MB)
+    const valid: UploadedFile[] = [];
+
+    for (const file of selected) {
       if (file.size > 20 * 1024 * 1024) {
-        toast.error(`${file.name} exceeds 20MB limit`);
+        toast.error(`${file.name} exceeds 20MB`);
         continue;
       }
 
-      // Check file type
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp", "video/mp4", "video/webm", "video/mov", "video/quicktime"];
-      if (!allowedTypes.includes(file.type.toLowerCase())) {
-        toast.error(`${file.name} is not a supported file type`);
-        continue;
-      }
-
-      // Add to uploaded files
-      setUploadedFiles((prev) => [
-        ...prev,
-        {
-          file,
-          uploading: false,
-          progress: 0,
-        },
-      ]);
+      valid.push({ file, uploading: false });
     }
 
-    // Reset input
+    setFiles((prev) => [...prev, ...valid]);
     e.target.value = "";
   };
 
   const removeFile = (index: number) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* -------------------------------- SUBMIT ---------------------------------- */
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      toast.error("Please enter a valid email address");
+    if (!email || !email.includes("@")) {
+      toast.error("Enter valid email");
       return;
     }
 
-    // Validate phone
-    const phoneRegex = /^(\+?\d{1,3})?[\s-]?\d{10}$/;
-    if (!phoneRegex.test(phone)) {
-      toast.error("Please enter a valid 10-digit phone number");
+    if (!/^\d{10}$/.test(phone)) {
+      toast.error("Enter valid 10-digit phone");
       return;
     }
 
-    // Validate bug details
-    if (bugDetails.length < 20) {
-      toast.error("Bug details must be at least 20 characters long");
+    if (details.trim().length < 20) {
+      toast.error("Bug details minimum 20 characters");
       return;
     }
 
-    setIsSubmitting(true);
+    setSubmitting(true);
 
     try {
-      // Submit bug report
-      const result = await submitBugReport({
+      const res = await submitBugReport({
         userEmail: email,
         userPhone: phone,
-        bugDetails,
+        bugDetails: details,
       });
 
-      // Upload files
-      if (uploadedFiles.length > 0) {
-        for (let i = 0; i < uploadedFiles.length; i++) {
-          const fileData = uploadedFiles[i];
-          
-          // Update uploading status
-          setUploadedFiles((prev) =>
-            prev.map((f, idx) => (idx === i ? { ...f, uploading: true } : f))
-          );
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
 
-          try {
-            // Get upload URL
-            const uploadUrl = await generateUploadUrl();
+        setFiles((prev) =>
+          prev.map((x, idx) =>
+            idx === i ? { ...x, uploading: true } : x
+          )
+        );
 
-            // Upload file
-            const uploadResult = await fetch(uploadUrl, {
-              method: "POST",
-              headers: { "Content-Type": fileData.file.type },
-              body: fileData.file,
-            });
+        const uploadUrl = await generateUploadUrl();
 
-            if (!uploadResult.ok) {
-              throw new Error("Failed to upload file");
-            }
+        const uploadRes = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": f.file.type },
+          body: f.file,
+        });
 
-            const { storageId } = await uploadResult.json();
+        if (!uploadRes.ok) throw new Error("Upload failed");
 
-            // Attach file to bug
-            await attachFileToBug({
-              bugReportId: result.bugReportId,
-              fileId: storageId,
-              fileName: fileData.file.name,
-              fileSize: fileData.file.size,
-              fileType: fileData.file.type,
-            });
+        const { storageId } = await uploadRes.json();
 
-            // Update file status
-            setUploadedFiles((prev) =>
-              prev.map((f, idx) =>
-                idx === i ? { ...f, uploading: false, fileId: storageId } : f
-              )
-            );
-          } catch (error) {
-            console.error("File upload error:", error);
-            setUploadedFiles((prev) =>
-              prev.map((f, idx) =>
-                idx === i
-                  ? {
-                      ...f,
-                      uploading: false,
-                      error: "Upload failed",
-                    }
-                  : f
-              )
-            );
-          }
-        }
+        await attachFile({
+          bugReportId: res.bugReportId,
+          fileId: storageId,
+          fileName: f.file.name,
+          fileSize: f.file.size,
+          fileType: f.file.type,
+        });
+
+        setFiles((prev) =>
+          prev.map((x, idx) =>
+            idx === i
+              ? { ...x, uploading: false, storageId }
+              : x
+          )
+        );
       }
 
-      // Show success message
-      setSubmitSuccess(true);
-      toast.success(`Bug report submitted successfully! Your bug ID: ${result.bugId}`);
+      toast.success(`Bug submitted • ID ${res.bugId}`);
+      setSuccess(true);
 
-      // Reset form after 2 seconds
       setTimeout(() => {
         resetForm();
         onOpenChange(false);
       }, 2000);
-    } catch (error) {
-      console.error("Submit error:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to submit bug report"
-      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to submit bug");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
+
+  /* -------------------------------- RESET ----------------------------------- */
 
   const resetForm = () => {
-    setEmail(user?.profile.email || "");
     setPhone("");
-    setBugDetails("");
-    setUploadedFiles([]);
-    setIsSubmitting(false);
-    setSubmitSuccess(false);
+    setDetails("");
+    setFiles([]);
+    setSuccess(false);
   };
 
-  const handleClose = () => {
-    if (!isSubmitting) {
-      resetForm();
-      onOpenChange(false);
-    }
-  };
-
-  const getTotalFileSize = () => {
-    return uploadedFiles.reduce((total, f) => total + f.file.size, 0);
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
-  };
+  /* --------------------------------- RENDER --------------------------------- */
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Report a Bug</DialogTitle>
           <DialogDescription>
-            Found an issue? Let us know and we'll fix it as soon as possible.
+            Help us improve by reporting issues
           </DialogDescription>
         </DialogHeader>
 
-        {submitSuccess ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <CheckCircleIcon className="size-16 text-green-600 mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Bug Report Submitted!</h3>
-            <p className="text-muted-foreground text-center">
-              Thank you for helping us improve. We'll review your report and get back to you soon.
+        {success ? (
+          <div className="flex flex-col items-center py-10">
+            <CheckCircleIcon className="size-14 text-green-600 mb-4" />
+            <p className="text-lg font-semibold">
+              Bug submitted successfully
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
+          <form onSubmit={onSubmit} className="space-y-4">
+            {/* EMAIL */}
             <div>
-              <Label htmlFor="email">
-                Email Address <span className="text-red-500">*</span>
-              </Label>
+              <Label>Email</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={isSubmitting}
+                disabled={submitting}
               />
             </div>
 
-            {/* Phone */}
+            {/* PHONE */}
             <div>
-              <Label htmlFor="phone">
-                Phone Number <span className="text-red-500">*</span>
-              </Label>
+              <Label>Phone</Label>
               <Input
-                id="phone"
-                type="tel"
-                placeholder="9876543210"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                required
-                disabled={isSubmitting}
+                disabled={submitting}
+                placeholder="9876543210"
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                Enter a 10-digit phone number
-              </p>
             </div>
 
-            {/* Bug Details */}
+            {/* DETAILS */}
             <div>
-              <Label htmlFor="bugDetails">
-                Bug Details <span className="text-red-500">*</span>
-              </Label>
+              <Label>Bug Details</Label>
               <Textarea
-                id="bugDetails"
-                placeholder="Describe the bug you encountered..."
-                value={bugDetails}
-                onChange={(e) => setBugDetails(e.target.value)}
-                required
-                disabled={isSubmitting}
                 rows={5}
-                className="resize-none"
+                value={details}
+                onChange={(e) => setDetails(e.target.value)}
+                disabled={submitting}
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                {bugDetails.length} / 20 characters minimum
-              </p>
             </div>
 
-            {/* File Upload */}
+            {/* FILE UPLOAD */}
             <div>
-              <Label>Screenshots / Videos (Optional)</Label>
-              <div className="mt-2">
-                <label
-                  htmlFor="file-upload"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/50 hover:bg-muted transition-colors"
-                >
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <UploadIcon className="size-8 mb-2 text-muted-foreground" />
-                    <p className="mb-2 text-sm text-muted-foreground">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Images or videos (max 5 files, 20MB each)
-                    </p>
-                  </div>
-                  <input
-                    id="file-upload"
-                    type="file"
-                    className="hidden"
-                    multiple
-                    accept="image/*,video/*"
-                    onChange={handleFileSelect}
-                    disabled={isSubmitting || uploadedFiles.length >= 5}
-                  />
-                </label>
-              </div>
+              <Label>Attachments (optional)</Label>
+              <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg h-32 cursor-pointer">
+                <UploadIcon className="size-6 mb-2" />
+                <span className="text-sm">Click to upload</span>
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={onFileSelect}
+                  disabled={submitting || files.length >= 5}
+                />
+              </label>
 
-              {/* Uploaded Files List */}
-              {uploadedFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  {uploadedFiles.map((fileData, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <p className="text-sm font-medium truncate">
-                          {fileData.file.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(fileData.file.size)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {fileData.uploading && (
-                          <LoaderIcon className="size-4 animate-spin text-blue-600" />
-                        )}
-                        {fileData.error && (
-                          <AlertCircleIcon className="size-4 text-red-600" />
-                        )}
-                        {!fileData.uploading && !isSubmitting && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(index)}
-                          >
-                            <XIcon className="size-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  <p className="text-xs text-muted-foreground">
-                    {uploadedFiles.length} / 5 files ({formatFileSize(getTotalFileSize())} total)
-                  </p>
+              {files.map((f, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between mt-2 bg-muted p-2 rounded"
+                >
+                  <span className="text-sm truncate">{f.file.name}</span>
+                  <div className="flex gap-2">
+                    {f.uploading && (
+                      <LoaderIcon className="size-4 animate-spin" />
+                    )}
+                    {!submitting && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeFile(i)}
+                      >
+                        <XIcon className="size-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
 
-            {/* Submit Button */}
+            {/* ACTIONS */}
             <div className="flex justify-end gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleClose}
-                disabled={isSubmitting}
+                onClick={() => onOpenChange(false)}
+                disabled={submitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <LoaderIcon className="size-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  "Submit Bug Report"
-                )}
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Submitting..." : "Submit"}
               </Button>
             </div>
           </form>

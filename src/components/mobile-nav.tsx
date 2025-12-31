@@ -59,7 +59,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const setOpen = onOpenChange || setInternalOpen;
   
   const navigate = useNavigate();
-  const { user, signoutRedirect } = useAuth();
+  const { user, signOut } = useAuth();
   const profileData = useQuery(api.users.getProfileData, user ? {} : "skip");
   const updateProfile = useMutation(api.users.updateProfile);
   const categories = useQuery(api.productCategories.listAllWithCounts, {});
@@ -91,7 +91,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
 
   const handleLogout = async () => {
     setAccountPanelOpen(false);
-    await signoutRedirect();
+    await signOut();
   };
 
   const handleCategoryClick = (href: string) => {

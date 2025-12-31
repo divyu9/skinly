@@ -18,9 +18,11 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
+import { SignInButton, useUser } from '@clerk/clerk-react';
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
+
 
 interface MobileHeaderProps {
   onMenuClick?: () => void;
@@ -28,7 +30,8 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderProps) {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, isLoaded } = useUser();
+  const isSignedIn = !!user;
   const navigate = useNavigate();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,10 +51,10 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   useEffect(() => {
     if (user && dbCartCount !== undefined) {
       setDisplayCount(dbCartCount);
-    } else if (!user && !authLoading) {
+    } else if (!user && isLoaded) {
       setDisplayCount(getGuestCartCount());
     }
-  }, [user, dbCartCount, guestCart, authLoading, getGuestCartCount]);
+  }, [user, dbCartCount, guestCart, isLoaded, getGuestCartCount]);
 
   // Server-side device search
   const deviceSearchResults = useQuery(
@@ -255,14 +258,27 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 />
               </Link>
 
-              {/* Right: Profile Icon */}
-              <button
-                onClick={() => navigate(user ? "/account" : "/auth/callback")}
-                className="flex-shrink-0 p-2 hover:bg-muted rounded-full transition-colors"
-                aria-label="Account"
-              >
-                <UserIcon className="size-5 text-foreground" />
-              </button>
+
+              {/* Right: Auth UI */}
+              <div className="flex items-center gap-1">
+                {/* Guests see SignIn modal, signed-in users go to /account. No navigation for guests! */}
+                {isLoaded && !isSignedIn ? (
+                  <SignInButton mode="modal">
+                    <button type="button" className="p-2 rounded-full hover:bg-primary/10 transition-colors" aria-label="Sign In">
+                      <UserIcon className="size-5 text-foreground" />
+                    </button>
+                  </SignInButton>
+                ) : isLoaded && isSignedIn ? (
+                  <button
+                    type="button"
+                    className="p-2 rounded-full hover:bg-primary/10 transition-colors"
+                    aria-label="Account"
+                    onClick={() => navigate("/account")}
+                  >
+                    <UserIcon className="size-5 text-foreground" />
+                  </button>
+                ) : null}
+              </div>
 
               {/* Right: Cart Icon with Badge */}
               <button

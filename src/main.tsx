@@ -5,14 +5,23 @@ import App from "./App.tsx";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-if (!clerkPubKey) {
-  throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY");
-}
+// Render based on whether Clerk key is available
+const root = document.getElementById("root")!;
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <ClerkProvider publishableKey={clerkPubKey}>
+if (clerkPubKey) {
+  // With Clerk auth
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
+      <ClerkProvider publishableKey={clerkPubKey}>
+        <App />
+      </ClerkProvider>
+    </React.StrictMode>
+  );
+} else {
+  // Without Clerk (graceful fallback)
+  ReactDOM.createRoot(root).render(
+    <React.StrictMode>
       <App />
-    </ClerkProvider>
-  </React.StrictMode>
-);
+    </React.StrictMode>
+  );
+}

@@ -1,8 +1,10 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { SignInButton, useUser } from "@clerk/clerk-react";
+import { UserIcon } from "lucide-react";
 import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { MobileNav } from "./mobile-nav.tsx";
-import { HeaderSearch } from "./header-search.tsx";
+import { api } from "@/convex/_generated/api";
+import { MobileNav } from "./mobile-nav";
+import { HeaderSearch } from "./header-search";
 
 interface SiteHeaderProps {
   onGadgetSelectorClick?: () => void;
@@ -10,95 +12,109 @@ interface SiteHeaderProps {
   onRequestModelClick?: () => void;
 }
 
-export function SiteHeader({ onGadgetSelectorClick, onPhoneSelectorClick, onRequestModelClick }: SiteHeaderProps) {
+export function SiteHeader({
+  onGadgetSelectorClick,
+  onPhoneSelectorClick,
+  onRequestModelClick,
+}: SiteHeaderProps) {
+  const navigate = useNavigate();
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
+
+  const { user, isLoaded } = useUser();
+  const isSignedIn = !!user;
 
   return (
     <>
+      {/* TOP NAV */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
+          {/* LOGO */}
           <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <img 
-              src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas" 
-              alt="Skinly" 
-              width="348"
-              height="140"
+            <img
+              src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas"
+              alt="Skinly"
               className="h-12 md:h-16"
             />
           </Link>
-          
-          {/* Header Search - Hidden on mobile, shown on tablet+ */}
+
+          {/* SEARCH (DESKTOP) */}
           <div className="hidden md:flex flex-1 max-w-lg">
-            <HeaderSearch onRequestModelClick={onRequestModelClick || (() => {})} />
+            <HeaderSearch
+              onRequestModelClick={onRequestModelClick ?? (() => {})}
+            />
           </div>
-          
-          <MobileNav 
+
+          {/* AUTH BUTTON */}
+          <div className="flex items-center gap-2">
+            {isLoaded && !isSignedIn && (
+              <SignInButton mode="modal">
+                <button
+                  type="button"
+                  aria-label="Sign In"
+                  className="px-3 py-1 rounded border border-primary text-primary bg-background hover:bg-primary/10 font-semibold"
+                >
+                  <UserIcon className="size-6" />
+                </button>
+              </SignInButton>
+            )}
+
+            {isLoaded && isSignedIn && (
+              <button
+                type="button"
+                aria-label="Account"
+                onClick={() => navigate("/account")}
+                className="px-3 py-1 rounded border border-primary text-primary bg-background hover:bg-primary/10 font-semibold"
+              >
+                <UserIcon className="size-6" />
+              </button>
+            )}
+          </div>
+
+          {/* MOBILE NAV */}
+          <MobileNav
             onGadgetSelectorClick={onGadgetSelectorClick}
             onPhoneSelectorClick={onPhoneSelectorClick}
           />
         </div>
       </nav>
 
-      {/* Latest Models Marquee */}
+      {/* LATEST MODELS STRIP */}
       <div className="w-full bg-primary/5 border-y border-primary/10 mt-24 overflow-hidden">
-        {latestModels === undefined ? (
-          // Loading state
+        {latestModels === undefined && (
           <div className="py-4 flex items-center justify-center gap-2">
             <div className="size-4 rounded-full bg-primary/40 animate-pulse" />
-            <span className="text-sm text-muted-foreground">Loading latest models...</span>
+            <span className="text-sm text-muted-foreground">
+              Loading latest models...
+            </span>
           </div>
-        ) : latestModels.length === 0 ? (
-          // Empty state
+        )}
+
+        {latestModels && latestModels.length === 0 && (
           <div className="py-4 text-center text-sm text-muted-foreground">
             No models available
           </div>
-        ) : (
-          <>
-            {/* Mobile: Stacked Horizontal Marquee */}
-            <div className="md:hidden">
-              <div className="text-center py-2 bg-primary text-primary-foreground text-xs font-bold">
-                ✨ Now supporting:
-              </div>
-              <div className="py-3 overflow-hidden">
-                <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap">
-                  {(() => {
-                    const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
-                    return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
-                      const emoji = emojis[idx % emojis.length];
-                      return (
-                        <span key={idx} className="text-base text-foreground font-semibold">
-                          {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
-                        </span>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
+        )}
+
+        {latestModels && latestModels.length > 0 && (
+          <div className="hidden md:flex items-center gap-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 bg-primary text-primary-foreground rounded-r-full">
+              ✨ Now supporting:
             </div>
 
-            {/* Desktop: Horizontal Marquee */}
-            <div className="hidden md:flex items-center gap-4 py-3">
-              <div className="flex items-center gap-2 text-sm font-bold px-4 py-1.5 flex-shrink-0 bg-primary text-primary-foreground rounded-r-full">
-                <span>✨</span>
-                <span className="whitespace-nowrap">Now supporting:</span>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <div className="animate-marquee flex gap-3 whitespace-nowrap">
-                  {(() => {
-                    const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
-                    return [...latestModels.slice(0, 20), ...latestModels.slice(0, 20), ...latestModels.slice(0, 20)].map((model, idx) => {
-                      const emoji = emojis[idx % emojis.length];
-                      return (
-                        <span key={idx} className="text-sm text-foreground/80 font-medium">
-                          {emoji} {model.brandName} {model.modelName} <span className="text-primary/40 mx-2">•</span>
-                        </span>
-                      );
-                    });
-                  })()}
-                </div>
+            <div className="flex-1 overflow-hidden">
+              <div className="animate-marquee flex gap-3 whitespace-nowrap">
+                {latestModels.map((model, idx) => (
+                  <span
+                    key={idx}
+                    className="text-sm text-foreground/80 font-medium"
+                  >
+                    {model.brandName} {model.modelName}
+                    <span className="text-primary/40 mx-2">•</span>
+                  </span>
+                ))}
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </>

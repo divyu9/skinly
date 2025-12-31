@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/radio-group.tsx";
 
 function AccountPageInner() {
-  const { signoutRedirect } = useAuth();
+  const { signOut } = useAuth();
   const currentUser = useQuery(api.users.getCurrentUser);
   const recentOrders = useQuery(api.orders.getOrders, { limit: 5 }) as Doc<"orders">[] | undefined;
   const phoneVerificationStatus = useQuery(api.loginOtp.checkPhoneVerified);
@@ -183,7 +183,7 @@ function AccountPageInner() {
             <Button
               variant="outline"
               className="w-full sm:w-auto"
-              onClick={() => signoutRedirect()}
+              onClick={() => signOut()}
             >
               <LogOutIcon className="size-4 mr-2" />
               Sign Out

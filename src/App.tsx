@@ -7,7 +7,6 @@ import { Skeleton } from "./components/ui/skeleton.tsx";
 import { FacebookPixelInitializer } from "./components/facebook-pixel-initializer.tsx";
 
 // Critical pages - loaded immediately
-import AuthCallback from "./pages/auth/Callback.tsx";
 import Index from "./pages/Index.tsx";
 import ProductsPage from "./pages/products/page.tsx";
 import ProductDetailPage from "./pages/products/detail/product-detail.tsx";
@@ -97,84 +96,84 @@ export default function App() {
         <FacebookPixelInitializer />
         <BrowserRouter>
           <Routes>
-          {/* Critical paths - eagerly loaded */}
-          <Route path="/" element={<Index />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/account/wallet" element={<WalletPage />} />
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/detail" element={<ProductDetailPage />} />
-          <Route path="/products/:slug" element={<ProductDetailPage />} />
-          <Route path="/cart" element={<CartPage />} />
-          <Route path="/checkout" element={<CheckoutPage />} />
-          <Route path="/orders" element={<OrdersPage />} />
-          <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-          <Route path="/devices" element={<DevicesPage />} />
-          <Route path="/payment/callback" element={<PaymentCallback />} />
-          <Route path="/auth/callback" element={<AuthCallback />} />
+            {/* Critical paths - eagerly loaded */}
+            <Route path="/" element={<Index />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route path="/account/wallet" element={<WalletPage />} />
+            <Route path="/products" element={<ProductsPage />} />
+            <Route path="/products/detail" element={<ProductDetailPage />} />
+            <Route path="/products/:slug" element={<ProductDetailPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+            <Route path="/devices" element={<DevicesPage />} />
+            <Route path="/payment/callback" element={<PaymentCallback />} />
+            
 
-          {/* Admin routes - lazy loaded */}
-          <Route path="/backend-skinly/products" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/products/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><NewProductPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/products/:productId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><EditProductPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/orders" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/orders/:orderId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrderDetailPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/coupons" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCouponsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/reviews" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminReviewsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/abandoned-carts" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminAbandonedCartsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/stock-notifications" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminStockNotificationsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/oos" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOOSPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/cod" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCODPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/shipping" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminShippingPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/whatsapp" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/whatsapp/messages" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppMessagesPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/whatsapp/health" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/whatsapp/debug-logs" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/wallet" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWalletPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/cashback" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCashbackPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/emails" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/bugs" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminBugsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/upsells" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminUpsellsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seo-templates" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOTemplatesPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seo-pages" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seo-pages/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesNewPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seo-pages/:pageId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesEditPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seo-pages/auto-generate" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesAutoGeneratePage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/settings" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSettingsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/mockups" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/mockups/missing" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/mockups-advanced" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsAdvancedPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/google-drive-import" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminModelsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seed-models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/phone-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/product-fields-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/variant-mode-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantModeMigrationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/gadget-consumption-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGadgetConsumptionMigrationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/variant-presets-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsMigrationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/variant-presets" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/variant-presets-auto-assign" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsAutoAssignPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/gst-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><GstMigrationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/fix-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/sitemap" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/product-classification" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/homepage" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminHomepagePage /></AdminPageWrapper></Suspense>} />
-          <Route path="/backend-skinly/unauthorized" element={<Suspense fallback={<PageSkeleton />}><AdminUnauthorizedPage /></Suspense>} />
+            {/* Admin routes - lazy loaded */}
+            <Route path="/backend-skinly/products" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/products/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><NewProductPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/products/:productId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><EditProductPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/orders" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/orders/:orderId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrderDetailPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/coupons" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCouponsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/reviews" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminReviewsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/abandoned-carts" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminAbandonedCartsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/stock-notifications" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminStockNotificationsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/oos" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOOSPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/cod" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCODPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/shipping" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminShippingPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/whatsapp" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/whatsapp/messages" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppMessagesPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/whatsapp/health" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/whatsapp/debug-logs" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/wallet" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWalletPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/cashback" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCashbackPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/emails" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/bugs" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminBugsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/upsells" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminUpsellsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seo-templates" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOTemplatesPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seo-pages" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seo-pages/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesNewPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seo-pages/:pageId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesEditPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seo-pages/auto-generate" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesAutoGeneratePage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/settings" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSettingsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/mockups" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/mockups/missing" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/mockups-advanced" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsAdvancedPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/google-drive-import" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminModelsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seed-models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/phone-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/product-fields-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/variant-mode-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantModeMigrationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/gadget-consumption-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGadgetConsumptionMigrationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/variant-presets-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsMigrationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/variant-presets" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/variant-presets-auto-assign" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsAutoAssignPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/gst-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><GstMigrationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/fix-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/sitemap" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/product-classification" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/homepage" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminHomepagePage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/unauthorized" element={<Suspense fallback={<PageSkeleton />}><AdminUnauthorizedPage /></Suspense>} />
 
-          {/* Policy pages - lazy loaded */}
-          <Route path="/policies/returns" element={<Suspense fallback={<PageSkeleton />}><ReturnsPolicy /></Suspense>} />
-          <Route path="/policies/shipping" element={<Suspense fallback={<PageSkeleton />}><ShippingPolicy /></Suspense>} />
-          <Route path="/policies/terms" element={<Suspense fallback={<PageSkeleton />}><TermsOfService /></Suspense>} />
-          <Route path="/policies/privacy" element={<Suspense fallback={<PageSkeleton />}><PrivacyPolicy /></Suspense>} />
+            {/* Policy pages - lazy loaded */}
+            <Route path="/policies/returns" element={<Suspense fallback={<PageSkeleton />}><ReturnsPolicy /></Suspense>} />
+            <Route path="/policies/shipping" element={<Suspense fallback={<PageSkeleton />}><ShippingPolicy /></Suspense>} />
+            <Route path="/policies/terms" element={<Suspense fallback={<PageSkeleton />}><TermsOfService /></Suspense>} />
+            <Route path="/policies/privacy" element={<Suspense fallback={<PageSkeleton />}><PrivacyPolicy /></Suspense>} />
 
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          {/* SEO landing pages (catch-all for root-level slugs) - must be second to last */}
-          <Route path="/:slug" element={<Suspense fallback={<PageSkeleton />}><SEOPage /></Suspense>} />
-          {/* 404 - must be absolute last */}
-          <Route path="*" element={<NotFound />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            {/* SEO landing pages (catch-all for root-level slugs) - must be second to last */}
+            <Route path="/:slug" element={<Suspense fallback={<PageSkeleton />}><SEOPage /></Suspense>} />
+            {/* 404 - must be absolute last */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </DefaultProviders>

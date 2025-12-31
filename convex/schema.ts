@@ -3,17 +3,29 @@ import { v } from "convex/values";
 
 export default defineSchema({
   users: defineTable({
-    tokenIdentifier: v.string(),
+    // 🔐 Auth identifiers
+    clerkId: v.optional(v.string()),        // NEW – Clerk user.id
+    tokenIdentifier: v.optional(v.string()), // OLD – Convex / legacy auth
+
+    // 👤 User profile
     name: v.optional(v.string()),
     email: v.optional(v.string()),
-    walletBalance: v.optional(v.number()), // Current wallet balance (default 0)
-    referralCode: v.optional(v.string()), // Unique referral code for this user
-    referredBy: v.optional(v.id("users")), // User who referred them
-    isAdmin: v.optional(v.boolean()), // Admin role for bug dashboard access
+
+    // 💰 Wallet & referrals
+    walletBalance: v.optional(v.number()), // default 0
+    referralCode: v.optional(v.string()),
+    referredBy: v.optional(v.id("users")),
+
+    // 🛡 Admin role
+    isAdmin: v.optional(v.boolean()), // true = admin
   })
+    // 🔍 Indexes
+    .index("by_clerk_id", ["clerkId"])
     .index("by_token", ["tokenIdentifier"])
+    .index("by_email", ["email"])
     .index("by_referral_code", ["referralCode"])
     .index("by_is_admin", ["isAdmin"]),
+
 
   cart: defineTable({
     userId: v.optional(v.id("users")), // Optional for guest carts
