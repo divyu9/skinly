@@ -13,17 +13,39 @@ export const updateCurrentUser = mutation({
       });
     }
 
-    // Check if we've already stored this identity before.
-    const user = await ctx.db
+    // 1. Check if user exists with current tokenIdentifier (already migrated)
+    const existingUser = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
-    if (user !== null) {
-      return user._id;
+    
+    if (existingUser !== null) {
+      await ctx.db.patch(existingUser._id, {
+        name: identity.name ?? existingUser.name,
+        email: identity.email ?? existingUser.email,
+      });
+      return existingUser._id;
     }
-    // If it's a new identity, create a new User.
+
+    // 2. Check if user exists with same email (Hercules migrating to Clerk)
+    if (identity.email) {
+      const userByEmail = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .unique();
+      
+      if (userByEmail !== null) {
+        await ctx.db.patch(userByEmail._id, {
+          tokenIdentifier: identity.tokenIdentifier,
+          name: identity.name ?? userByEmail.name,
+        });
+        return userByEmail._id;
+      }
+    }
+
+    // 3. New user - create fresh record
     return await ctx.db.insert("users", {
       name: identity.name,
       email: identity.email,
@@ -42,12 +64,23 @@ export const getCurrentUser = query({
         message: "Called getCurrentUser without authentication present",
       });
     }
-    const user = await ctx.db
+    
+    // First try by tokenIdentifier
+    let user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
+    
+    // If not found, try by email (for users being migrated)
+    if (!user && identity.email) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .unique();
+    }
+    
     return user;
   },
 });
@@ -66,12 +99,21 @@ export const getProfileData = query({
       });
     }
 
-    const user = await ctx.db
+    // First try by tokenIdentifier
+    let user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
+
+    // If not found, try by email (for users being migrated)
+    if (!user && identity.email) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .unique();
+    }
 
     if (!user) {
       throw new ConvexError({
@@ -128,12 +170,21 @@ export const updateProfile = mutation({
       });
     }
 
-    const user = await ctx.db
+    // First try by tokenIdentifier
+    let user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
+
+    // If not found, try by email (for users being migrated)
+    if (!user && identity.email) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .unique();
+    }
 
     if (!user) {
       throw new ConvexError({
@@ -176,12 +227,21 @@ export const isCurrentUserAdmin = query({
       return { isAuthenticated: false, isAdmin: false };
     }
 
-    const user = await ctx.db
+    // First try by tokenIdentifier
+    let user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
         q.eq("tokenIdentifier", identity.tokenIdentifier),
       )
       .unique();
+
+    // If not found, try by email (for users being migrated)
+    if (!user && identity.email) {
+      user = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .unique();
+    }
 
     if (!user) {
       return { isAuthenticated: true, isAdmin: false };

@@ -7,7 +7,7 @@ export function useAuth() {
 
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      return clerkAuth.getToken({ skipCache: forceRefreshToken }) ?? null;
+      return clerkAuth.getToken({ template: "convex", skipCache: forceRefreshToken }) ?? null;
     },
     [clerkAuth]
   );
