@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://relative-alpaca-77.clerk.accounts.dev",
+      domain: "https://clerk.goskinly.com",
       applicationID: "convex",
     },
   ],
