@@ -227,7 +227,7 @@ export const isCurrentUserAdmin = query({
       return { isAuthenticated: false, isAdmin: false };
     }
 
-    // First try by tokenIdentifier
+    // 1️⃣ Try by tokenIdentifier (existing logic)
     let user = await ctx.db
       .query("users")
       .withIndex("by_token", (q) =>
@@ -235,7 +235,17 @@ export const isCurrentUserAdmin = query({
       )
       .unique();
 
-    // If not found, try by email (for users being migrated)
+    // 2️⃣ Fallback: try by Clerk subject (STABLE ID) ✅
+    if (!user && identity.subject) {
+      user = await ctx.db
+        .query("users")
+        .filter((q) =>
+          q.eq(q.field("clerkId"), identity.subject)
+        )
+        .first();
+    }
+
+    // 3️⃣ Fallback: try by email (migration logic)
     if (!user && identity.email) {
       user = await ctx.db
         .query("users")
@@ -247,9 +257,13 @@ export const isCurrentUserAdmin = query({
       return { isAuthenticated: true, isAdmin: false };
     }
 
-    return { isAuthenticated: true, isAdmin: user.isAdmin === true };
+    return {
+      isAuthenticated: true,
+      isAdmin: user.isAdmin === true,
+    };
   },
 });
+
 
 /**
  * Get all users (for admin / abandoned cart tracking)

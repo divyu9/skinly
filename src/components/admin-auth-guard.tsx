@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 export function AdminAuthGuard({ children }: { children: ReactNode }) {
   const authStatus = useQuery(api.users.isCurrentUserAdmin);
 
-  // Loading state
+  // Still loading Convex auth
   if (authStatus === undefined) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
@@ -20,16 +20,16 @@ export function AdminAuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  // Not authenticated - redirect to sign in
-  if (!authStatus.isAuthenticated) {
+  // Not logged in OR identity missing
+  if (!authStatus?.isAuthenticated) {
+    return <Navigate to="/sign-in" replace />;
+  }
+
+  // Logged in but NOT admin
+  if (authStatus.isAdmin !== true) {
     return <Navigate to="/backend-skinly/unauthorized" replace />;
   }
 
-  // Not an admin - redirect to unauthorized page
-  if (!authStatus.isAdmin) {
-    return <Navigate to="/backend-skinly/unauthorized" replace />;
-  }
-
-  // Authenticated and admin - render children
+  // Admin verified
   return <>{children}</>;
 }
