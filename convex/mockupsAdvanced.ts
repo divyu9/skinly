@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel.d.ts";
+import { internal } from "./_generated/api.js";
 
 // Helper: Parse SKU from filename (e.g., "iphone11_L-01.jpg" -> "L-01")
 function parseSKUFromFilename(filename: string): string | null {
@@ -10,14 +11,15 @@ function parseSKUFromFilename(filename: string): string | null {
 }
 
 /**
- * Store mockup with advanced model linking
+ * Store mockup with advanced model linking and Cloudinary URL
  */
 export const storeMockupAdvanced = mutation({
   args: {
     brand: v.string(),
     model: v.string(),
     sku: v.string(),
-    fileId: v.id("_storage"),
+    cloudinaryUrl: v.string(),
+    cloudinaryPublicId: v.string(),
     supportedModelId: v.id("supportedModels"),
   },
   handler: async (ctx, args) => {
@@ -30,19 +32,22 @@ export const storeMockupAdvanced = mutation({
       .first();
 
     if (existing) {
-      // Update with supportedModelId
+      // Update with Cloudinary URL and supportedModelId
       await ctx.db.patch(existing._id, {
+        cloudinaryUrl: args.cloudinaryUrl,
+        cloudinaryPublicId: args.cloudinaryPublicId,
         supportedModelId: args.supportedModelId,
       });
       return existing._id;
     }
 
-    // Create new mockup
+    // Create new mockup with Cloudinary data
     return await ctx.db.insert("mockups", {
       brand: args.brand,
       model: args.model,
       sku: args.sku,
-      fileId: args.fileId,
+      cloudinaryUrl: args.cloudinaryUrl,
+      cloudinaryPublicId: args.cloudinaryPublicId,
       supportedModelId: args.supportedModelId,
     });
   },
@@ -263,6 +268,7 @@ export const getModelMockupStats = query({
         _id: m._id,
         sku: m.sku,
         fileId: m.fileId,
+        cloudinaryUrl: m.cloudinaryUrl,
       })),
     };
   },
@@ -327,8 +333,25 @@ export const deleteMockup = mutation({
       throw new Error("Mockup not found");
     }
 
-    // Delete the file from storage
-    await ctx.storage.delete(mockup.fileId);
+    // Delete from Cloudinary if cloudinaryPublicId exists
+    if (mockup.cloudinaryPublicId) {
+      try {
+        await ctx.scheduler.runAfter(0, (internal as any).cloudinary.deleteFromCloudinary, {
+          publicId: mockup.cloudinaryPublicId,
+        });
+      } catch (error) {
+        console.error("Failed to delete from Cloudinary:", error);
+      }
+    }
+
+    // Delete legacy file from Convex storage if it exists
+    if (mockup.fileId) {
+      try {
+        await ctx.storage.delete(mockup.fileId);
+      } catch (error) {
+        console.error("Failed to delete from Convex storage:", error);
+      }
+    }
 
     // Delete the mockup record
     await ctx.db.delete(args.mockupId);
@@ -348,13 +371,32 @@ export const deleteAllMockupsForModel = mutation({
     // Use the index to get only this model's mockups
     const modelMockups = await ctx.db
       .query("mockups")
-      .withIndex("by_supported_model", (q) => 
+      .withIndex("by_supported_model", (q) =>
         q.eq("supportedModelId", args.modelId)
       )
       .collect();
 
     for (const mockup of modelMockups) {
-      await ctx.storage.delete(mockup.fileId);
+      // Delete from Cloudinary if cloudinaryPublicId exists
+      if (mockup.cloudinaryPublicId) {
+        try {
+          await ctx.scheduler.runAfter(0, internal.cloudinary.deleteFromCloudinary, {
+            publicId: mockup.cloudinaryPublicId,
+          });
+        } catch (error) {
+          console.error("Failed to delete from Cloudinary:", error);
+        }
+      }
+
+      // Delete legacy file from Convex storage if it exists
+      if (mockup.fileId) {
+        try {
+          await ctx.storage.delete(mockup.fileId);
+        } catch (error) {
+          console.error("Failed to delete from Convex storage:", error);
+        }
+      }
+
       await ctx.db.delete(mockup._id);
     }
 

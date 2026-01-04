@@ -24,7 +24,7 @@ function normalizeModelName(model: string, brand?: string): string {
 
 /**
  * Get mockup file URL for a specific brand, model, and SKU
- * Returns the actual storage URL, not just the file ID
+ * Returns Cloudinary URL if available, otherwise falls back to Convex storage
  * Uses space-insensitive matching for model names
  */
 export const getMockupFileId = query({
@@ -36,7 +36,7 @@ export const getMockupFileId = query({
   handler: async (ctx, args) => {
     // Normalize the search model name with brand-aware logic
     const normalizedSearchModel = normalizeModelName(args.model, args.brand);
-    
+
     // Get all mockups for this brand and SKU
     const mockups = await ctx.db
       .query("mockups")
@@ -44,17 +44,26 @@ export const getMockupFileId = query({
         q.eq("brand", args.brand)
       )
       .collect();
-    
+
     // Find mockup with matching normalized model name and SKU
-    const mockup = mockups.find((m) => 
+    const mockup = mockups.find((m) =>
       normalizeModelName(m.model, args.brand) === normalizedSearchModel && m.sku === args.sku
     );
 
     if (!mockup) return null;
-    
-    // Get the actual storage URL
-    const url = await ctx.storage.getUrl(mockup.fileId);
-    return url;
+
+    // Return Cloudinary URL if available (WebP, optimized)
+    if (mockup.cloudinaryUrl) {
+      return mockup.cloudinaryUrl;
+    }
+
+    // Fallback to Convex storage for legacy mockups
+    if (mockup.fileId) {
+      const url = await ctx.storage.getUrl(mockup.fileId);
+      return url;
+    }
+
+    return null;
   },
 });
 
@@ -238,7 +247,14 @@ export const getProductsWithMockupsForModel = query({
     const uniqueProducts = new Map<string, string>();
     for (const mockup of matchingMockups) {
       if (!uniqueProducts.has(mockup.sku)) {
-        const url = await ctx.storage.getUrl(mockup.fileId);
+        // Prefer Cloudinary URL, fallback to Convex storage
+        let url: string | null = null;
+        if (mockup.cloudinaryUrl) {
+          url = mockup.cloudinaryUrl;
+        } else if (mockup.fileId) {
+          url = await ctx.storage.getUrl(mockup.fileId);
+        }
+
         if (url) {
           uniqueProducts.set(mockup.sku, url);
         }
@@ -263,10 +279,26 @@ export const verifyMockupFiles = query({
     const brokenMockups = [];
     
     for (const mockup of mockups) {
+      // Skip mockups that use Cloudinary (they're not broken)
+      if (mockup.cloudinaryUrl) {
+        continue;
+      }
+
       try {
         // Try to get the storage URL - if file doesn't exist, this will be null
-        const url = await ctx.storage.getUrl(mockup.fileId);
-        if (!url) {
+        if (mockup.fileId) {
+          const url = await ctx.storage.getUrl(mockup.fileId);
+          if (!url) {
+            brokenMockups.push({
+              id: mockup._id,
+              brand: mockup.brand,
+              model: mockup.model,
+              sku: mockup.sku,
+              fileId: mockup.fileId,
+            });
+          }
+        } else {
+          // No fileId and no cloudinaryUrl
           brokenMockups.push({
             id: mockup._id,
             brand: mockup.brand,
@@ -535,8 +567,17 @@ export const getBatchMockups = query({
 
     const result: Record<string, string> = {};
     for (const mockup of mockups) {
-      const url = await ctx.storage.getUrl(mockup.fileId);
-      if (skus.includes(mockup.sku) && url) {
+      if (!skus.includes(mockup.sku)) continue;
+
+      // Prefer Cloudinary URL, fallback to Convex storage
+      let url: string | null = null;
+      if (mockup.cloudinaryUrl) {
+        url = mockup.cloudinaryUrl;
+      } else if (mockup.fileId) {
+        url = await ctx.storage.getUrl(mockup.fileId);
+      }
+
+      if (url) {
         result[mockup.sku] = url;
       }
     }

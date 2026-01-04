@@ -21,6 +21,7 @@ import type * as cart from "../cart.js";
 import type * as cashback from "../cashback.js";
 import type * as cashbackHelpers from "../cashbackHelpers.js";
 import type * as checkoutUpsells from "../checkoutUpsells.js";
+import type * as cloudinary from "../cloudinary.js";
 import type * as cod from "../cod.js";
 import type * as codDisplayRules from "../codDisplayRules.js";
 import type * as codOtp from "../codOtp.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   cashback: typeof cashback;
   cashbackHelpers: typeof cashbackHelpers;
   checkoutUpsells: typeof checkoutUpsells;
+  cloudinary: typeof cloudinary;
   cod: typeof cod;
   codDisplayRules: typeof codDisplayRules;
   codOtp: typeof codOtp;

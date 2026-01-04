@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -290,7 +290,7 @@ function UploadMockupsDialog({
     fileStatuses: new Map(),
   });
 
-  const generateUploadUrl = useMutation(api.mockups.generateUploadUrl);
+  const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
   const storeMockup = useMutation(api.mockupsAdvanced.storeMockupAdvanced);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,6 +319,9 @@ function UploadMockupsDialog({
       fileStatuses: new Map(files.map(f => [f.name, 'pending' as const])),
     });
 
+    let completedCount = 0;
+    let failedCount = 0;
+
     for (const file of files) {
       const sku = parseSKUFromFilename(file.name);
       if (!sku) {
@@ -331,6 +334,7 @@ function UploadMockupsDialog({
             fileStatuses: newStatuses,
           };
         });
+        failedCount++;
         continue;
       }
 
@@ -341,24 +345,39 @@ function UploadMockupsDialog({
       });
 
       try {
-        const uploadUrl = await generateUploadUrl({});
-        const uploadResponse = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
+        // Convert file to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
 
-        if (!uploadResponse.ok) throw new Error("Upload failed");
+        // Create public ID for Cloudinary
+        const publicId = `mockups/${brandName}/${modelName}/${sku}`;
 
-        const { storageId } = await uploadResponse.json();
+        // Upload to Cloudinary
+        const cloudinaryResult = await uploadToCloudinary({
+          imageBase64: base64,
+          folder: `mockups/${brandName}/${modelName}`,
+          publicId: sku,
+        });
+
+        if (!cloudinaryResult.success) {
+          throw new Error(cloudinaryResult.error || "Cloudinary upload failed");
+        }
+
+        // Store mockup with Cloudinary URL
         await storeMockup({
           brand: brandName,
           model: modelName,
           sku,
-          fileId: storageId,
+          cloudinaryUrl: cloudinaryResult.cloudinaryUrl,
+          cloudinaryPublicId: cloudinaryResult.publicId,
           supportedModelId: modelId,
         });
 
+        completedCount++;
         setUploadProgress(prev => {
           const newStatuses = new Map(prev.fileStatuses);
           newStatuses.set(file.name, 'success');
@@ -370,6 +389,7 @@ function UploadMockupsDialog({
         });
       } catch (error) {
         console.error(`Failed to upload ${file.name}:`, error);
+        failedCount++;
         setUploadProgress(prev => {
           const newStatuses = new Map(prev.fileStatuses);
           newStatuses.set(file.name, 'failed');
@@ -383,7 +403,7 @@ function UploadMockupsDialog({
     }
 
     setUploading(false);
-    toast.success(`Upload complete: ${uploadProgress.completed} succeeded, ${uploadProgress.failed} failed`);
+    toast.success(`Upload complete: ${completedCount} succeeded, ${failedCount} failed`);
   };
 
   const progressPercentage = uploadProgress.total > 0

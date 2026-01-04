@@ -361,7 +361,9 @@ export default defineSchema({
     brand: v.string(), // e.g., "Apple", "Samsung"
     model: v.string(), // e.g., "iPhone 15 Pro", "Galaxy S24"
     sku: v.string(), // e.g., "M-174"
-    fileId: v.id("_storage"), // Convex storage ID
+    fileId: v.optional(v.id("_storage")), // Convex storage ID (legacy)
+    cloudinaryUrl: v.optional(v.string()), // Cloudinary CDN URL (WebP)
+    cloudinaryPublicId: v.optional(v.string()), // Cloudinary public ID for deletions
     supportedModelId: v.optional(v.id("supportedModels")), // Link to supported model (for advanced mockups)
   })
     .index("by_brand_model_sku", ["brand", "model", "sku"])

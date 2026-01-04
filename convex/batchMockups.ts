@@ -37,11 +37,19 @@ export const getBatchMockups = query({
 
     // Build result map: { sku: fileUrl }
     const result: Record<string, string> = {};
-    
+
     for (const mockup of mockups) {
-      // Only include if SKU was requested and storage file exists
-      const url = await ctx.storage.getUrl(mockup.fileId);
-      if (skus.includes(mockup.sku) && url) {
+      if (!skus.includes(mockup.sku)) continue;
+
+      // Prefer Cloudinary URL, fallback to Convex storage
+      let url: string | null = null;
+      if (mockup.cloudinaryUrl) {
+        url = mockup.cloudinaryUrl;
+      } else if (mockup.fileId) {
+        url = await ctx.storage.getUrl(mockup.fileId);
+      }
+
+      if (url) {
         result[mockup.sku] = url;
       }
     }
@@ -77,10 +85,19 @@ export const getBatchMockupsNoIndex = query({
       .collect();
 
     const result: Record<string, string> = {};
-    
+
     for (const mockup of mockups) {
-      const url = await ctx.storage.getUrl(mockup.fileId);
-      if (skus.includes(mockup.sku) && url) {
+      if (!skus.includes(mockup.sku)) continue;
+
+      // Prefer Cloudinary URL, fallback to Convex storage
+      let url: string | null = null;
+      if (mockup.cloudinaryUrl) {
+        url = mockup.cloudinaryUrl;
+      } else if (mockup.fileId) {
+        url = await ctx.storage.getUrl(mockup.fileId);
+      }
+
+      if (url) {
         result[mockup.sku] = url;
       }
     }
