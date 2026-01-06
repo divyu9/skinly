@@ -2,7 +2,8 @@
   "node": {
     "externalPackages": [
       "pdf-lib",
-      "openai"
+      "openai",
+      "twilio"
     ]
   },
   "$schema": "https://raw.githubusercontent.com/get-convex/convex-backend/refs/heads/main/npm-packages/convex/schemas/convex.schema.json"

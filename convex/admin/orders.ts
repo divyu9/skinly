@@ -1317,7 +1317,7 @@ export const updateOrderItems = mutation({
 
     // Recalculate subtotal based on new items
     const subtotal = args.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    
+
     // Keep existing fees but update total
     const total = subtotal + order.shippingFee + (order.codFee || 0);
 
@@ -1329,5 +1329,184 @@ export const updateOrderItems = mutation({
     });
 
     return { success: true };
+  },
+});
+
+// Create manual order (admin only)
+export const createManualOrder = mutation({
+  args: {
+    // Customer information
+    customerName: v.string(),
+    customerPhone: v.string(),
+    customerEmail: v.optional(v.string()),
+
+    // Shipping address
+    addressLine1: v.string(),
+    addressLine2: v.optional(v.string()),
+    city: v.string(),
+    state: v.string(),
+    pincode: v.string(),
+
+    // Order items
+    items: v.array(
+      v.object({
+        productId: v.string(),
+        productTitle: v.string(),
+        productImage: v.optional(v.string()),
+        variant: v.string(),
+        sku: v.optional(v.string()),
+        price: v.number(),
+        quantity: v.number(),
+        phoneModel: v.optional(v.string()),
+        phoneBrand: v.optional(v.string()),
+        coverage: v.optional(v.union(v.literal("only_back"), v.literal("full_body_wrap"))),
+      })
+    ),
+
+    // Order details
+    paymentMethod: v.string(),
+    shippingFee: v.number(),
+    codFee: v.optional(v.number()),
+    status: v.union(
+      v.literal("processing"),
+      v.literal("shipped"),
+      v.literal("delivered"),
+      v.literal("cancelled"),
+      v.literal("rto")
+    ),
+    paymentStatus: v.union(
+      v.literal("pending"),
+      v.literal("success"),
+      v.literal("failed")
+    ),
+
+    // Optional shipping info
+    awbNumber: v.optional(v.string()),
+    trackingUrl: v.optional(v.string()),
+    courierName: v.optional(v.string()),
+
+    // Optional notes
+    adminNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    // TODO: Add admin role check here
+
+    // Calculate subtotal
+    const subtotal = args.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    // Calculate total
+    const total = subtotal + args.shippingFee + (args.codFee || 0);
+
+    // Calculate GST (tax-inclusive pricing)
+    const taxableAmount = total / 1.18;
+    const totalGstAmount = total - taxableAmount;
+
+    // Determine if this is an intra-state or inter-state transaction
+    const isIntraState = args.state.toLowerCase() === "uttar pradesh";
+
+    // Generate order number based on payment status
+    let orderNumber: string | undefined;
+    let failedOrderNumber: string | undefined;
+
+    if (args.paymentStatus === "success") {
+      // Get the latest successful order number
+      const latestOrder = await ctx.db
+        .query("orders")
+        .filter((q) =>
+          q.and(
+            q.neq(q.field("orderNumber"), undefined),
+            q.eq(q.field("paymentStatus"), "success")
+          )
+        )
+        .order("desc")
+        .first();
+
+      let nextNumber = 4001;
+      if (latestOrder?.orderNumber) {
+        const match = latestOrder.orderNumber.match(/#(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+      orderNumber = `#${nextNumber}`;
+    } else if (args.paymentStatus === "failed") {
+      // Get the latest failed order number
+      const latestFailedOrder = await ctx.db
+        .query("orders")
+        .filter((q) => q.neq(q.field("failedOrderNumber"), undefined))
+        .order("desc")
+        .first();
+
+      let nextNumber = 1;
+      if (latestFailedOrder?.failedOrderNumber) {
+        const match = latestFailedOrder.failedOrderNumber.match(/F26-(\d+)/);
+        if (match) {
+          nextNumber = parseInt(match[1]) + 1;
+        }
+      }
+      failedOrderNumber = `F26-${String(nextNumber).padStart(3, "0")}`;
+    }
+
+    // Create the order
+    const orderId = await ctx.db.insert("orders", {
+      userId: undefined, // Manual orders are not linked to users
+      isGuest: true,
+      guestEmail: args.customerEmail,
+      customerEmail: args.customerEmail,
+      orderNumber,
+      failedOrderNumber,
+      status: args.status,
+      paymentStatus: args.paymentStatus,
+      paymentMethod: args.paymentMethod,
+
+      items: args.items,
+      subtotal,
+      shippingFee: args.shippingFee,
+      total,
+
+      // GST fields
+      taxableAmount,
+      gstRate: 0.18,
+      cgstRate: isIntraState ? 0.09 : undefined,
+      sgstRate: isIntraState ? 0.09 : undefined,
+      igstRate: isIntraState ? undefined : 0.18,
+      cgstAmount: isIntraState ? totalGstAmount / 2 : undefined,
+      sgstAmount: isIntraState ? totalGstAmount / 2 : undefined,
+      igstAmount: isIntraState ? undefined : totalGstAmount,
+      totalGstAmount,
+
+      // COD fields
+      codFee: args.codFee,
+
+      // Shipping address
+      shippingAddress: {
+        fullName: args.customerName,
+        phone: args.customerPhone,
+        addressLine1: args.addressLine1,
+        addressLine2: args.addressLine2,
+        city: args.city,
+        state: args.state,
+        pincode: args.pincode,
+      },
+
+      // Shipping info
+      awbNumber: args.awbNumber,
+      trackingUrl: args.trackingUrl,
+      courierName: args.courierName,
+    });
+
+    return {
+      success: true,
+      orderId,
+      orderNumber: orderNumber || failedOrderNumber,
+    };
   },
 });

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon, CalendarIcon } from "lucide-react";
+import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon, CalendarIcon, PlusIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 import { PDFDocument } from "pdf-lib";
+import { ManualOrderDialog } from "./manual-order-dialog.tsx";
 
 type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
@@ -38,12 +39,12 @@ function AdminOrdersPageInner() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
-  
+
   // Date filter state
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
-  
+
   // Bulk operations state
   const [showBulkShipDialog, setShowBulkShipDialog] = useState(false);
   const [showBulkLabelsDialog, setShowBulkLabelsDialog] = useState(false);
@@ -54,6 +55,9 @@ function AdminOrdersPageInner() {
     failed: number;
     details: Array<{ orderNumber: string; error?: string; awb?: string }>;
   } | null>(null);
+
+  // Manual order dialog state
+  const [showManualOrderDialog, setShowManualOrderDialog] = useState(false);
   
   // Actions
   const bulkCreateShipments = useAction(api.rapidshyp.bulkCreateShipments);
@@ -535,12 +539,18 @@ function AdminOrdersPageInner() {
             Manage all customer orders and track payments
           </p>
         </div>
-        <Link to="/backend-skinly/tax-export">
-          <Button variant="outline">
-            <FileTextIcon className="size-4 mr-2" />
-            Export for Tax Filing
+        <div className="flex gap-2">
+          <Button variant="default" onClick={() => setShowManualOrderDialog(true)}>
+            <PlusIcon className="size-4 mr-2" />
+            Create Manual Order
           </Button>
-        </Link>
+          <Link to="/backend-skinly/tax-export">
+            <Button variant="outline">
+              <FileTextIcon className="size-4 mr-2" />
+              Export for Tax Filing
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Statistics Cards */}
@@ -1090,6 +1100,12 @@ function AdminOrdersPageInner() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Manual Order Dialog */}
+      <ManualOrderDialog
+        open={showManualOrderDialog}
+        onOpenChange={setShowManualOrderDialog}
+      />
     </div>
   );
 }

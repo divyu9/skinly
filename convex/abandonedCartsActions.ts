@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel.d.ts";
-import twilio from "twilio";
+// import twilio from "twilio";
 
 /**
  * Send abandoned cart reminder via email and WhatsApp

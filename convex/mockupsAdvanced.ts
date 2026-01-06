@@ -380,7 +380,7 @@ export const deleteAllMockupsForModel = mutation({
       // Delete from Cloudinary if cloudinaryPublicId exists
       if (mockup.cloudinaryPublicId) {
         try {
-          await ctx.scheduler.runAfter(0, internal.cloudinary.deleteFromCloudinary, {
+          await ctx.scheduler.runAfter(0, (internal as any).cloudinary.deleteFromCloudinary, {
             publicId: mockup.cloudinaryPublicId,
           });
         } catch (error) {
