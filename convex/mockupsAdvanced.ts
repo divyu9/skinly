@@ -360,6 +360,50 @@ export const deleteMockup = mutation({
   },
 });
 
+export const deleteMockupsBySKU = mutation({
+  args: {
+    sku: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Find all mockups with this SKU
+    const mockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_sku", (q) => q.eq("sku", args.sku))
+      .collect();
+
+    if (mockups.length === 0) {
+      return { deleted: 0 };
+    }
+
+    for (const mockup of mockups) {
+      // Delete from Cloudinary if cloudinaryPublicId exists
+      if (mockup.cloudinaryPublicId) {
+        try {
+          await ctx.scheduler.runAfter(0, (internal as any).cloudinary.deleteFromCloudinary, {
+            publicId: mockup.cloudinaryPublicId,
+          });
+        } catch (error) {
+          console.error("Failed to delete from Cloudinary:", error);
+        }
+      }
+
+      // Delete legacy file from Convex storage if it exists
+      if (mockup.fileId) {
+        try {
+          await ctx.storage.delete(mockup.fileId);
+        } catch (error) {
+          console.error("Failed to delete from Convex storage:", error);
+        }
+      }
+
+      // Delete the mockup record
+      await ctx.db.delete(mockup._id);
+    }
+
+    return { deleted: mockups.length };
+  },
+});
+
 /**
  * Delete all mockups for a model
  */
@@ -401,6 +445,47 @@ export const deleteAllMockupsForModel = mutation({
     }
 
     return { deleted: modelMockups.length };
+  },
+});
+
+/**
+ * Delete ALL mockups in the system (Batched)
+ */
+export const deleteAllMockups = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Fetch a batch of mockups to delete (limit to prevent timeouts)
+    const mockups = await ctx.db.query("mockups").take(200);
+
+    for (const mockup of mockups) {
+      // Delete from Cloudinary if cloudinaryPublicId exists
+      if (mockup.cloudinaryPublicId) {
+        try {
+          await ctx.scheduler.runAfter(0, (internal as any).cloudinary.deleteFromCloudinary, {
+            publicId: mockup.cloudinaryPublicId,
+          });
+        } catch (error) {
+          console.error("Failed to delete from Cloudinary:", error);
+        }
+      }
+
+      // Delete legacy file from Convex storage if it exists
+      if (mockup.fileId) {
+        try {
+          await ctx.storage.delete(mockup.fileId);
+        } catch (error) {
+          console.error("Failed to delete from Convex storage:", error);
+        }
+      }
+
+      // Delete the mockup record
+      await ctx.db.delete(mockup._id);
+    }
+
+    return { 
+      deleted: mockups.length,
+      hasMore: mockups.length === 200 
+    };
   },
 });
 

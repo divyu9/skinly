@@ -46,8 +46,272 @@ import {
 
 // Parse SKU from filename
 function parseSKUFromFilename(filename: string): string | null {
-  const match = filename.match(/([LMSBF])-(\d+)/i);
+  // Remove _B, _B1, _B2 anywhere in the filename (case insensitive)
+  // Also handle cases where it might be attached to other words e.g. "Model_B1_SKU"
+  const cleanFilename = filename.replace(/_B\d*(?=_|\.|$| )/gi, "_");
+  
+  // Match patterns like L-01, M-123, S-45, etc.
+  const match = cleanFilename.match(/([LMSBF])-(\d+)/i);
   return match ? match[0].toUpperCase() : null;
+}
+
+// View Mockups Dialog
+function ViewMockupsDialog({
+  open,
+  onOpenChange,
+  modelId,
+  brandName,
+  modelName,
+  mockups,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  modelId: Id<"supportedModels">;
+  brandName: string;
+  modelName: string;
+  mockups: any[];
+}) {
+  const deleteMockup = useMutation(api.mockupsAdvanced.deleteMockup);
+  const [deletingId, setDeletingId] = useState<Id<"mockups"> | null>(null);
+
+  const handleDelete = async (id: Id<"mockups">) => {
+    if (!confirm("Are you sure you want to delete this mockup?")) return;
+    setDeletingId(id);
+    try {
+      await deleteMockup({ mockupId: id });
+      toast.success("Mockup deleted");
+    } catch (error) {
+      toast.error("Failed to delete mockup");
+      console.error(error);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle>Mockups for {brandName} {modelName}</DialogTitle>
+          <DialogDescription>
+            {mockups.length} mockups uploaded
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-y-auto p-1">
+          {mockups.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No mockups found for this model.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {mockups.map((mockup) => (
+                <div key={mockup._id} className="relative group border rounded-lg overflow-hidden">
+                  <div className="aspect-[9/16] bg-muted relative">
+                    <img
+                      src={mockup.cloudinaryUrl || "/placeholder.png"}
+                      alt={mockup.sku}
+                      className="object-cover w-full h-full"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => handleDelete(mockup._id)}
+                        disabled={deletingId === mockup._id}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-2 bg-background border-t text-center">
+                    <span className="font-mono font-bold text-sm">{mockup.sku}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Delete All Mockups Dialog
+function DeleteAllMockupsDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [deleting, setDeleting] = useState(false);
+  const deleteAll = useMutation(api.mockupsAdvanced.deleteAllMockups);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    let totalDeleted = 0;
+    
+    try {
+      // Loop until all deleted
+      while (true) {
+        const result = await deleteAll({});
+        totalDeleted += result.deleted;
+        if (!result.hasMore) break;
+      }
+      
+      toast.success(`Successfully deleted all ${totalDeleted} mockups.`);
+      onOpenChange(false);
+      setStep(1); // Reset for next time
+    } catch (error) {
+      toast.error("Failed to delete mockups");
+      console.error(error);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => {
+      if (!val) setStep(1); // Reset on close
+      onOpenChange(val);
+    }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete ALL Mockups</DialogTitle>
+          <DialogDescription>
+            {step === 1 
+              ? "This will delete EVERY mockup in the system. Are you sure you want to proceed?"
+              : "Please confirm your choice."
+            }
+          </DialogDescription>
+        </DialogHeader>
+
+        {step === 1 ? (
+          <div className="py-4">
+             <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>
+                This action will remove all mockups from the database and delete their images from Cloudinary.
+              </AlertDescription>
+            </Alert>
+          </div>
+        ) : (
+          <div className="py-4 space-y-4">
+            <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-md">
+              <p className="text-destructive font-bold text-center">
+                THIS ACTION IS IRREVERSIBLE!
+              </p>
+              <p className="text-destructive text-sm text-center mt-2">
+                You are about to permanently delete all mockups. This cannot be undone.
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              Are you absolutely sure?
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
+            Cancel
+          </Button>
+          {step === 1 ? (
+            <Button variant="destructive" onClick={() => setStep(2)}>
+              Next Step
+            </Button>
+          ) : (
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting Everything..." : "Yes, Delete Everything"}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Delete SKU Dialog
+function DeleteSKUDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [sku, setSku] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const deleteBySKU = useMutation(api.mockupsAdvanced.deleteMockupsBySKU);
+
+  const handleDelete = async () => {
+    if (!sku.trim()) return;
+    
+    if (!confirm(`Are you sure you want to delete SKU "${sku}" from ALL models? This action cannot be undone.`)) return;
+
+    setDeleting(true);
+    try {
+      const result = await deleteBySKU({ sku: sku.trim().toUpperCase() });
+      if (result.deleted > 0) {
+        toast.success(`Deleted ${result.deleted} mockups for SKU ${sku}`);
+        onOpenChange(false);
+        setSku("");
+      } else {
+        toast.info(`No mockups found for SKU ${sku}`);
+      }
+    } catch (error) {
+      toast.error("Failed to delete mockups");
+      console.error(error);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Mockups by SKU</DialogTitle>
+          <DialogDescription>
+            Enter a SKU (e.g., "L-01") to delete it from ALL models in the system.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">SKU to Delete</label>
+            <Input 
+              placeholder="e.g. L-01" 
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+            />
+          </div>
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Warning</AlertTitle>
+            <AlertDescription>
+              This will permanently delete all mockup images associated with this SKU from Cloudinary and the database.
+            </AlertDescription>
+          </Alert>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button 
+            variant="destructive" 
+            onClick={handleDelete}
+            disabled={!sku.trim() || deleting}
+          >
+            {deleting ? "Deleting..." : "Delete All Matches"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // Model card component with lazy-loaded stats
@@ -57,14 +321,16 @@ function ModelCard({
   modelName, 
   initialCount,
   onUploadClick,
-  onViewClick 
+  onViewClick,
+  onDeleteClick
 }: {
   modelId: Id<"supportedModels">;
   brandName: string;
   modelName: string;
   initialCount?: number;
   onUploadClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
-  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[]) => void;
+  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[], mockups?: any[]) => void;
+  onDeleteClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
 }) {
   const [showStats, setShowStats] = useState(false);
   const stats = useQuery(
@@ -82,13 +348,27 @@ function ModelCard({
               {initialCount !== undefined && `${initialCount} unique SKUs uploaded`}
             </CardDescription>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowStats(!showStats)}
-          >
-            <ChevronRight className={`h-4 w-4 transition-transform ${showStats ? 'rotate-90' : ''}`} />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteClick(modelId, brandName, modelName);
+              }}
+              title="Delete all mockups for this model"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowStats(!showStats)}
+            >
+              <ChevronRight className={`h-4 w-4 transition-transform ${showStats ? 'rotate-90' : ''}`} />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       
@@ -124,7 +404,7 @@ function ModelCard({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => onViewClick(modelId, brandName, modelName)}
+                  onClick={() => onViewClick(modelId, brandName, modelName, undefined, undefined, stats.mockups)}
                   className="flex-1"
                 >
                   <ImageIcon className="h-3 w-3 mr-1" />
@@ -426,6 +706,7 @@ function UploadMockupsDialog({
               type="file"
               accept="image/*"
               multiple
+              {...({ webkitdirectory: "", directory: "" } as any)}
               onChange={handleFileSelect}
               disabled={uploading}
             />
@@ -434,12 +715,12 @@ function UploadMockupsDialog({
           {files.length > 0 && (
             <>
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span>{uploadProgress.completed + uploadProgress.failed} / {uploadProgress.total}</span>
+                <div className="flex justify-between text-sm mb-1 font-medium">
+                  <span>Uploading... {Math.round(progressPercentage)}%</span>
+                  <span>{uploadProgress.completed + uploadProgress.failed} of {uploadProgress.total} images</span>
                 </div>
-                <Progress value={progressPercentage} />
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <Progress value={progressPercentage} className="h-2" />
+                <div className="flex justify-between text-xs text-muted-foreground mt-1">
                   <span className="text-green-600">{uploadProgress.completed} succeeded</span>
                   <span className="text-red-600">{uploadProgress.failed} failed</span>
                 </div>
@@ -510,6 +791,11 @@ export default function MockupsAdvancedPage() {
   const [modelSearch, setModelSearch] = useState<string>("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [missingSKUsDialogOpen, setMissingSKUsDialogOpen] = useState(false);
+  const [viewMockupsDialogOpen, setViewMockupsDialogOpen] = useState(false);
+  const [deleteSKUDialogOpen, setDeleteSKUDialogOpen] = useState(false);
+  const [deleteAllMockupsDialogOpen, setDeleteAllMockupsDialogOpen] = useState(false);
+  const [selectedMockups, setSelectedMockups] = useState<any[]>([]);
+  
   const [selectedModel, setSelectedModel] = useState<{
     id: Id<"supportedModels">;
     brand: string;
@@ -533,6 +819,7 @@ export default function MockupsAdvancedPage() {
 
   // Mutations
   const migrateMockups = useMutation(api.mockupsAdvanced.migrateMockupsToModels);
+  const deleteAllMockups = useMutation(api.mockupsAdvanced.deleteAllMockupsForModel);
   const [migrating, setMigrating] = useState(false);
 
   const handleMigration = async () => {
@@ -553,12 +840,28 @@ export default function MockupsAdvancedPage() {
     setUploadDialogOpen(true);
   };
 
-  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[]) => {
+  const handleDeleteClick = async (modelId: Id<"supportedModels">, brand: string, name: string) => {
+    if (!confirm(`Are you sure you want to delete ALL mockups for ${brand} ${name}? This action cannot be undone.`)) return;
+    
+    try {
+      const result = await deleteAllMockups({ modelId });
+      toast.success(`Deleted ${result.deleted} mockups for ${brand} ${name}`);
+    } catch (error) {
+      toast.error("Failed to delete mockups");
+      console.error(error);
+    }
+  };
+
+  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[], mockups?: any[]) => {
     if (missingSKUsInStock || missingSKUsOutOfStock) {
       setSelectedModel({ id: modelId, brand, name, missingSKUsInStock, missingSKUsOutOfStock });
       setMissingSKUsDialogOpen(true);
+    } else if (mockups && mockups.length > 0) {
+      setSelectedModel({ id: modelId, brand, name });
+      setSelectedMockups(mockups);
+      setViewMockupsDialogOpen(true);
     } else {
-      toast.info("View mockups feature coming soon");
+      toast.info("No mockups to view");
     }
   };
 
@@ -686,10 +989,20 @@ export default function MockupsAdvancedPage() {
             </div>
           </div>
 
-          <Button variant="outline" onClick={handleMigration} disabled={migrating}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${migrating ? 'animate-spin' : ''}`} />
-            {migrating ? 'Migrating...' : 'Sync Existing Mockups'}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="destructive" onClick={() => setDeleteAllMockupsDialogOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete ALL
+            </Button>
+            <Button variant="destructive" onClick={() => setDeleteSKUDialogOpen(true)}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete by SKU
+            </Button>
+            <Button variant="outline" onClick={handleMigration} disabled={migrating}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${migrating ? 'animate-spin' : ''}`} />
+              {migrating ? 'Migrating...' : 'Sync Existing Mockups'}
+            </Button>
+          </div>
         </div>
 
       <Tabs defaultValue="partial" className="space-y-4">
@@ -741,6 +1054,7 @@ export default function MockupsAdvancedPage() {
                   initialCount={model.mockupCount}
                   onUploadClick={handleUploadClick}
                   onViewClick={handleViewClick}
+                  onDeleteClick={handleDeleteClick}
                 />
               ))}
             </div>
@@ -773,6 +1087,7 @@ export default function MockupsAdvancedPage() {
                   modelName={model.modelName}
                   onUploadClick={handleUploadClick}
                   onViewClick={handleViewClick}
+                  onDeleteClick={handleDeleteClick}
                 />
               ))}
             </div>
@@ -806,6 +1121,7 @@ export default function MockupsAdvancedPage() {
                   initialCount={model.mockupCount}
                   onUploadClick={handleUploadClick}
                   onViewClick={handleViewClick}
+                  onDeleteClick={handleDeleteClick}
                 />
               ))}
             </div>
@@ -831,8 +1147,25 @@ export default function MockupsAdvancedPage() {
               modelName={`${selectedModel.brand} ${selectedModel.name}`}
             />
           )}
+          <ViewMockupsDialog
+            open={viewMockupsDialogOpen}
+            onOpenChange={setViewMockupsDialogOpen}
+            modelId={selectedModel.id}
+            brandName={selectedModel.brand}
+            modelName={selectedModel.name}
+            mockups={selectedMockups}
+          />
         </>
       )}
+
+      <DeleteSKUDialog 
+        open={deleteSKUDialogOpen} 
+        onOpenChange={setDeleteSKUDialogOpen} 
+      />
+      <DeleteAllMockupsDialog 
+        open={deleteAllMockupsDialogOpen} 
+        onOpenChange={setDeleteAllMockupsDialogOpen} 
+      />
     </div>
     </AdminLayout>
   );

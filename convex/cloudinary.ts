@@ -42,21 +42,66 @@ export const uploadToCloudinary = action({
 
       // Prepare upload parameters
       const timestamp = Math.floor(Date.now() / 1000).toString();
-      const uploadParams = {
-        file: args.imageBase64,
-        upload_preset: "unsigned_preset", // We'll use unsigned upload for simplicity
+      
+      // Use the signed preset "webp-auto-convert" as requested
+      const uploadParams: Record<string, string> = {
+        upload_preset: "webp-auto-convert", 
         folder: args.folder,
         public_id: args.publicId,
         timestamp: timestamp,
+        // Remove manual transformations since the preset handles them
+        // The preset "webp-auto-convert" handles format and quality
+      };
+
+      // Generate signature for signed upload
+      // Signature is SHA-1 of sorted parameters + api_secret
+      const sortedParams = Object.keys(uploadParams)
+        .sort()
+        .map(key => `${key}=${uploadParams[key]}`)
+        .join('&');
+      
+      // Use standard crypto API available in Convex runtime
+      const signatureInput = sortedParams + apiSecret;
+      
+      // Since we can't easily use crypto.subtle in all environments or it might be complex,
+      // we'll implement a simple SHA1 or use a library if available.
+      // However, Convex has built-in crypto support.
+      // Let's try to use a simple JS implementation or the web crypto API if available.
+      
+      // Actually, for signed uploads, we MUST provide a signature.
+      // Let's check if we have a SHA1 helper or can use one.
+      // Given the constraints, we will assume we can use the `crypto` module or a simple implementation.
+      // But wait, the environment might be limited.
+      // Let's try to use the `bun` style or `node` style crypto if available, or a pure JS one.
+      
+      // Re-evaluating: The user's screenshot shows the preset is "Signed".
+      // This means we NEED a signature.
+      
+      // Let's assume we can use a helper function for SHA1 or use `require('crypto')` if node compatible.
+      // Convex runs in a V8-like environment.
+      
+      // Using a simple SHA1 implementation for compatibility
+      async function sha1(str: string): Promise<string> {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(str);
+        const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      }
+      
+      const signature = await sha1(signatureInput);
+      
+      // Add api_key and signature to params (they are NOT part of the signature generation)
+      const finalParams = {
+        ...uploadParams,
         api_key: apiKey,
-        format: "webp",
-        quality: "auto:good",
-        transformation: "w_2000,h_2000,c_limit,q_auto:good",
+        signature: signature,
+        file: args.imageBase64,
       };
 
       // Upload to Cloudinary
       const formData = new FormData();
-      Object.entries(uploadParams).forEach(([key, value]) => {
+      Object.entries(finalParams).forEach(([key, value]) => {
         if (value !== undefined) {
           formData.append(key, value);
         }
