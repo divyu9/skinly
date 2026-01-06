@@ -47,6 +47,7 @@ import type * as gst from "../gst.js";
 import type * as homepage from "../homepage.js";
 import type * as homepageSectionCards from "../homepageSectionCards.js";
 import type * as http from "../http.js";
+import type * as internalMigration from "../internalMigration.js";
 import type * as loginOtp from "../loginOtp.js";
 import type * as migrateFinishTypeField from "../migrateFinishTypeField.js";
 import type * as migrateGadgetConsumption from "../migrateGadgetConsumption.js";
@@ -162,6 +163,7 @@ declare const fullApi: ApiFromModules<{
   homepage: typeof homepage;
   homepageSectionCards: typeof homepageSectionCards;
   http: typeof http;
+  internalMigration: typeof internalMigration;
   loginOtp: typeof loginOtp;
   migrateFinishTypeField: typeof migrateFinishTypeField;
   migrateGadgetConsumption: typeof migrateGadgetConsumption;

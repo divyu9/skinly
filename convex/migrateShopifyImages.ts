@@ -1,6 +1,9 @@
+"use node";
+
 import { v } from "convex/values";
 import { action, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import crypto from "crypto";
 
 /**
  * Migration Action: Moves images from Shopify CDN to Cloudinary
@@ -35,7 +38,7 @@ export const migrateImagesFromShopify = action({
         products: any[];
         nextCursor: string | null;
         totalRemaining: number;
-    } = await ctx.runMutation(internal.migrateShopifyImages.getProductsToMigrate, {
+    } = await ctx.runMutation(internal.internalMigration.getProductsToMigrate, {
       limit: batchSize,
       cursor: args.cursor,
     });
@@ -73,24 +76,8 @@ export const migrateImagesFromShopify = action({
             console.log(`Migrating image for ${product.title}: ${img.url}`);
             
             try {
-              // A. Fetch image from Shopify
-              const response = await fetch(img.url);
-              if (!response.ok) throw new Error(`Failed to fetch ${img.url}: ${response.statusText}`);
-              const blob = await response.blob();
-              
-              // Convert blob to base64
-              const base64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-              });
-
-              // B. Upload to Cloudinary
-              // Use existing logic from cloudinary.ts if possible, or replicate here for simplicity
-              // We'll call the existing action logic directly or via fetch if internal call is tricky from action
-              // Since we are inside an action, we can just call the upload logic.
-              // Re-implementing upload logic here to avoid "calling action from action" complexity if not supported
+              // A. Prepare Cloudinary Upload (Direct URL Fetch)
+              // We pass the Shopify URL directly to Cloudinary, saving bandwidth and processing time.
               
               const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
               const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -102,7 +89,7 @@ export const migrateImagesFromShopify = action({
               const folder = `products/${product.slug}`; // Organized folder structure
               const publicId = `img_${i}_${Date.now()}`; // Unique ID
 
-              // Prepare params for signature (excluding file, api_key, resource_type)
+              // Prepare params for signature
               const uploadParams: Record<string, string> = {
                 folder: folder,
                 public_id: publicId,
@@ -118,19 +105,16 @@ export const migrateImagesFromShopify = action({
               
               const signatureInput = sortedParams + apiSecret;
               
-              // SHA-1 helper
-              const sha1 = async (str: string): Promise<string> => {
-                const encoder = new TextEncoder();
-                const data = encoder.encode(str);
-                const hashBuffer = await crypto.subtle.digest('SHA-1', data);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+              // SHA-1 helper using Node.js crypto
+              const sha1 = (str: string): string => {
+                return crypto.createHash('sha1').update(str).digest('hex');
               };
 
-              const signature = await sha1(signatureInput);
+              const signature = sha1(signatureInput);
 
               const formData = new FormData();
-              formData.append("file", base64);
+              // Pass the Shopify URL directly as the "file"
+              formData.append("file", img.url);
               formData.append("api_key", apiKey);
               formData.append("signature", signature);
               
@@ -151,7 +135,7 @@ export const migrateImagesFromShopify = action({
 
               const uploadData = await uploadRes.json();
               
-              // C. Update URL
+              // B. Update URL
               newImages[i] = {
                 ...img,
                 url: uploadData.secure_url,
@@ -167,7 +151,7 @@ export const migrateImagesFromShopify = action({
 
         // 3. Save updates if modified
         if (productModified) {
-          await ctx.runMutation(internal.migrateShopifyImages.updateProductImages, {
+          await ctx.runMutation(internal.internalMigration.updateProductImages, {
             productId: product._id,
             images: newImages,
           });
@@ -195,60 +179,3 @@ export const migrateImagesFromShopify = action({
   },
 });
 
-/**
- * Internal Mutation: Get products that need migration
- * Returns products that have "shopify" in their image URLs
- */
-export const getProductsToMigrate = internalMutation({
-  args: {
-    limit: v.number(),
-    cursor: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    // We iterate through all products to find ones with shopify links.
-    // This is expensive but necessary for a one-time migration.
-    // To optimize, we paginate through the whole table.
-    
-    const products = await ctx.db.query("products").paginate({ cursor: args.cursor || null, numItems: 50 });
-    
-    // Filter for Shopify images in memory
-    const shopifyProducts = products.page.filter(p => 
-      p.images.some(img => img.url.includes("cdn.shopify.com") || img.url.includes("shopify"))
-    );
-
-    // If we didn't find enough in this page, we might return fewer than 'limit'.
-    // That's acceptable for a migration script; the client will just call again with the next cursor.
-    // We prioritize returning *some* work to do.
-    
-    // Slice to requested limit
-    const productsToProcess = shopifyProducts.slice(0, args.limit);
-
-    // Calculate approximate remaining (just checking if pagination is done)
-    const hasMore = !products.isDone || (shopifyProducts.length > args.limit);
-
-    return {
-      products: productsToProcess,
-      nextCursor: products.continueCursor, // This advances the global cursor, skipping non-shopify products effectively
-      totalRemaining: hasMore ? 999 : 0, // Placeholder
-    };
-  },
-});
-
-/**
- * Internal Mutation: Update product images
- */
-export const updateProductImages = internalMutation({
-  args: {
-    productId: v.id("products"),
-    images: v.array(v.object({
-      url: v.string(),
-      alt: v.optional(v.string()),
-      phoneModel: v.optional(v.string()),
-    })),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.productId, {
-      images: args.images,
-    });
-  },
-});
