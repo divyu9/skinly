@@ -18,6 +18,7 @@ export const migrateImagesFromShopify = action({
   args: {
     batchSize: v.optional(v.number()), // Default 5
     cursor: v.optional(v.string()), // Pagination cursor
+    source: v.optional(v.string()), // "shopify" or "hercules"
   },
   handler: async (ctx, args): Promise<{
     processed: number;
@@ -29,6 +30,7 @@ export const migrateImagesFromShopify = action({
     errors: string[];
   }> => {
     const batchSize = args.batchSize || 5;
+    const targetSource = args.source || "shopify";
     
     // 1. Get batch of products that need migration
     // We can't easily query "contains" in Convex without full scan, 
@@ -41,18 +43,20 @@ export const migrateImagesFromShopify = action({
     } = await ctx.runMutation(internal.internalMigration.getProductsToMigrate, {
       limit: batchSize,
       cursor: args.cursor,
+      source: targetSource,
     });
 
     const { products, nextCursor, totalRemaining } = result;
 
     if (products.length === 0) {
+      // Even if no products in this batch, we might have more pages to check
       return {
         processed: 0,
         success: 0,
         failed: 0,
-        hasMore: false,
-        nextCursor: null,
-        remaining: 0,
+        hasMore: !!nextCursor, // Continue if there's a next page
+        nextCursor: nextCursor,
+        remaining: totalRemaining, // Approx
         errors: [],
       };
     }
@@ -71,8 +75,15 @@ export const migrateImagesFromShopify = action({
         for (let i = 0; i < newImages.length; i++) {
           const img = newImages[i];
           
-          // Only migrate Shopify URLs
-          if (img.url.includes("cdn.shopify.com") || img.url.includes("shopify")) {
+          // Only migrate targeted URLs
+          let isLegacyUrl = false;
+          if (targetSource === "hercules") {
+            isLegacyUrl = img.url.includes("hercules");
+          } else {
+            isLegacyUrl = img.url.includes("cdn.shopify.com") || img.url.includes("shopify");
+          }
+                             
+          if (isLegacyUrl) {
             console.log(`Migrating image for ${product.title}: ${img.url}`);
             
             try {

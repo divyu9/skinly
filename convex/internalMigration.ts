@@ -9,6 +9,7 @@ export const getProductsToMigrate = internalMutation({
   args: {
     limit: v.number(),
     cursor: v.optional(v.string()),
+    source: v.optional(v.string()), // "shopify" or "hercules"
   },
   handler: async (ctx, args) => {
     // We iterate through all products to find ones with shopify links.
@@ -17,9 +18,17 @@ export const getProductsToMigrate = internalMutation({
     
     const products = await ctx.db.query("products").paginate({ cursor: args.cursor || null, numItems: 50 });
     
-    // Filter for Shopify images in memory
+    // Filter based on source
+    const targetSource = args.source || "shopify";
+    
     const shopifyProducts = products.page.filter(p => 
-      p.images.some(img => img.url.includes("cdn.shopify.com") || img.url.includes("shopify"))
+      p.images.some(img => {
+        if (targetSource === "hercules") {
+          return img.url.includes("hercules");
+        }
+        // Default to shopify
+        return img.url.includes("cdn.shopify.com") || img.url.includes("shopify");
+      })
     );
 
     // If we didn't find enough in this page, we might return fewer than 'limit'.

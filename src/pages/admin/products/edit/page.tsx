@@ -1,4 +1,7 @@
-import { useMutation, useQuery, useAction } from "convex/react";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -8,12 +11,12 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SaveIcon, SparklesIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SaveIcon, SparklesIcon, UploadCloud, GripHorizontal } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -30,6 +33,92 @@ interface Variant {
   customMultiplier?: string;
 }
 
+// Sortable Image Item Component
+function SortableImageItem({ 
+  id, 
+  image, 
+  index, 
+  updateImage, 
+  removeImage 
+}: { 
+  id: string, 
+  image: { url: string; alt?: string }, 
+  index: number, 
+  updateImage: (index: number, field: "url" | "alt", value: string) => void, 
+  removeImage: (index: number) => void 
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex gap-4 items-start p-3 border rounded-lg bg-muted/20 group relative">
+      <div {...attributes} {...listeners} className="absolute left-2 top-1/2 -translate-y-1/2 cursor-move p-2 opacity-50 hover:opacity-100 z-10">
+        <GripHorizontal className="h-5 w-5 text-muted-foreground" />
+      </div>
+
+      {/* Image Preview */}
+      <div className="w-20 h-20 bg-muted rounded overflow-hidden flex-shrink-0 border ml-8">
+        {image.url ? (
+          <img 
+            src={image.url} 
+            alt={image.alt || "Product image"} 
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = "https://placehold.co/100x100?text=Invalid+URL";
+            }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-1">
+            No Image
+          </div>
+        )}
+      </div>
+      
+      <div className="flex-1 space-y-3">
+        <div className="grid gap-2">
+          <Label className="text-xs">Image URL</Label>
+          <Input
+            placeholder="https://..."
+            value={image.url}
+            onChange={(e) => updateImage(index, "url", e.target.value)}
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label className="text-xs">Alt Text (SEO)</Label>
+          <Input
+            placeholder="Descriptive text for accessibility and SEO"
+            value={image.alt}
+            onChange={(e) => updateImage(index, "alt", e.target.value)}
+            className="text-xs"
+          />
+        </div>
+      </div>
+      
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+        onClick={() => removeImage(index)}
+        title="Remove image"
+      >
+        <TrashIcon className="size-4" />
+      </Button>
+    </div>
+  );
+}
+
 function EditProductPageInner() {
   const { productId } = useParams<{ productId: string }>();
   const navigate = useNavigate();
@@ -41,6 +130,8 @@ function EditProductPageInner() {
   const createVariant = useMutation(api.products.createVariant);
   const updateVariant = useMutation(api.products.updateVariant);
   const deleteVariant = useMutation(api.products.deleteVariant);
+  const generateUploadUrl = useMutation(api.cloudinary.generateUploadUrl);
+  const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
 
   const [formData, setFormData] = useState<{
     title: string;
@@ -50,7 +141,7 @@ function EditProductPageInner() {
     metaTitle: string;
     collectionId: Id<"collections"> | "";
     status: "active" | "draft" | "archived";
-    images: Array<{ url: string; alt?: string }>;
+    images: Array<{ url: string; alt?: string; id: string }>; // Added id for DnD
     tags: string;
     length: string;
     breadth: string;
@@ -69,7 +160,7 @@ function EditProductPageInner() {
     metaTitle: "",
     collectionId: "",
     status: "active",
-    images: [{ url: "", alt: "" }],
+    images: [{ url: "", alt: "", id: "img-init" }],
     tags: "",
     length: "10",
     breadth: "10",
@@ -84,6 +175,31 @@ function EditProductPageInner() {
 
   const [variants, setVariants] = useState<Variant[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  // DnD Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      setFormData((items) => {
+        const oldIndex = items.images.findIndex((img) => img.id === active.id);
+        const newIndex = items.images.findIndex((img) => img.id === over.id);
+        
+        return {
+          ...items,
+          images: arrayMove(items.images, oldIndex, newIndex),
+        };
+      });
+    }
+  };
   
   // Get presets for selected gadget type
   const variantPresets = useQuery(
@@ -113,7 +229,9 @@ function EditProductPageInner() {
         metaTitle: product.metaTitle || "",
         collectionId: product.collectionId || "",
         status: product.status,
-        images: product.images.length > 0 ? product.images : [{ url: "", alt: "" }],
+        images: product.images.length > 0 
+          ? product.images.map((img, idx) => ({ ...img, id: `img-${idx}-${Date.now()}` })) 
+          : [{ url: "", alt: "", id: `img-0-${Date.now()}` }],
         tags: product.tags.join(", "),
         length: (product.length ?? 10).toString(),
         breadth: (product.breadth ?? 10).toString(),
@@ -144,7 +262,7 @@ function EditProductPageInner() {
   const addImage = () => {
     setFormData({
       ...formData,
-      images: [...formData.images, { url: "", alt: "" }],
+      images: [...formData.images, { url: "", alt: "", id: `img-new-${Date.now()}` }],
     });
   };
 
@@ -159,6 +277,58 @@ function EditProductPageInner() {
     const newImages = [...formData.images];
     newImages[index][field] = value;
     setFormData({ ...formData, images: newImages });
+  };
+
+  // Image Upload Handler
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    setIsUploading(true);
+    const files = Array.from(e.target.files);
+    
+    try {
+      const uploadedImages = [];
+      
+      for (const file of files) {
+        // Convert to base64
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = error => reject(error);
+        });
+
+        // Upload to Cloudinary
+        const result = await uploadToCloudinary({
+          imageBase64: base64,
+          folder: "products", // General products folder
+          publicId: `upload_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9]/g, "")}`,
+        });
+
+        if (result.success && result.url) {
+          uploadedImages.push({
+            url: result.url,
+            alt: file.name.split('.')[0], // Use filename as default alt
+            id: `img-upload-${Date.now()}-${Math.random()}`
+          });
+        }
+      }
+
+      // Add uploaded images to form data
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images.filter(img => img.url !== ""), ...uploadedImages]
+      }));
+      
+      toast.success(`Successfully uploaded ${uploadedImages.length} images`);
+    } catch (error) {
+      console.error("Upload failed:", error);
+      toast.error("Failed to upload images");
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      e.target.value = '';
+    }
   };
 
   const addVariant = () => {
@@ -447,41 +617,58 @@ function EditProductPageInner() {
 
           {/* Images */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Product Images</CardTitle>
+              <div className="relative">
+                <Input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  id="image-upload"
+                  onChange={handleImageUpload}
+                  disabled={isUploading}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  disabled={isUploading}
+                  onClick={() => document.getElementById('image-upload')?.click()}
+                >
+                  <UploadCloud className={`size-4 mr-2 ${isUploading ? 'animate-bounce' : ''}`} />
+                  {isUploading ? 'Uploading...' : 'Upload Images'}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {formData.images.map((image, index) => (
-                <div key={index} className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Image URL"
-                      value={image.url}
-                      onChange={(e) => updateImage(index, "url", e.target.value)}
-                    />
+              <DndContext 
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext 
+                  items={formData.images.map(img => img.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  <div className="space-y-4">
+                    {formData.images.map((image, index) => (
+                      <SortableImageItem
+                        key={image.id}
+                        id={image.id}
+                        image={image}
+                        index={index}
+                        updateImage={updateImage}
+                        removeImage={removeImage}
+                      />
+                    ))}
                   </div>
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Alt text"
-                      value={image.alt}
-                      onChange={(e) => updateImage(index, "alt", e.target.value)}
-                    />
-                  </div>
-                  {formData.images.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeImage(index)}
-                    >
-                      <TrashIcon className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
+                </SortableContext>
+              </DndContext>
+              
               <Button type="button" variant="outline" size="sm" onClick={addImage}>
                 <PlusIcon className="size-4 mr-2" />
-                Add Image
+                Add Image URL
               </Button>
             </CardContent>
           </Card>
