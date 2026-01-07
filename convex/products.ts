@@ -358,10 +358,7 @@ export const getProduct = query({
   handler: async (ctx, args) => {
     const product = await ctx.db.get(args.productId);
     if (!product) {
-      throw new ConvexError({
-        message: "Product not found",
-        code: "NOT_FOUND",
-      });
+      return null;
     }
 
     const variants = await ctx.db

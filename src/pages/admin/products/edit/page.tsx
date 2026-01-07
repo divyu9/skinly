@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { ErrorBoundary } from "@/components/error-boundary.tsx";
 import { SEOPreviewDialog } from "../_components/seo-preview-dialog.tsx";
 
 interface Variant {
@@ -229,10 +230,10 @@ function EditProductPageInner() {
         metaTitle: product.metaTitle || "",
         collectionId: product.collectionId || "",
         status: product.status,
-        images: product.images.length > 0 
+        images: product.images?.length > 0 
           ? product.images.map((img, idx) => ({ ...img, id: `img-${idx}-${Date.now()}` })) 
           : [{ url: "", alt: "", id: `img-0-${Date.now()}` }],
-        tags: product.tags.join(", "),
+        tags: product.tags?.join(", ") || "",
         length: (product.length ?? 10).toString(),
         breadth: (product.breadth ?? 10).toString(),
         height: (product.height ?? 2).toString(),
@@ -1127,7 +1128,9 @@ export default function EditProductPage() {
           <Skeleton className="h-screen w-full" />
         </AuthLoading>
         <Authenticated>
-          <EditProductPageInner />
+          <ErrorBoundary>
+            <EditProductPageInner />
+          </ErrorBoundary>
       </Authenticated>
     </AdminLayout>
   );
