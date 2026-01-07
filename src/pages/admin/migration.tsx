@@ -20,6 +20,7 @@ export default function MigrationPage() {
     processed: 0,
     success: 0,
     failed: 0,
+    scanned: 0,
     errors: [] as string[],
   });
   const [cursor, setCursor] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export default function MigrationPage() {
       return;
     }
     setActiveTab(value);
-    setStats({ processed: 0, success: 0, failed: 0, errors: [] });
+    setStats({ processed: 0, success: 0, failed: 0, scanned: 0, errors: [] });
     setCursor(null);
     setIsFinished(false);
   };
@@ -57,6 +58,7 @@ export default function MigrationPage() {
           processed: prev.processed + result.processed,
           success: prev.success + result.success,
           failed: prev.failed + result.failed,
+          scanned: prev.scanned + (result.scanned || 0),
           errors: [...prev.errors, ...result.errors],
         }));
 
@@ -107,7 +109,7 @@ export default function MigrationPage() {
         // Reset to start over check
         setIsFinished(false);
         setCursor(null);
-        setStats({ processed: 0, success: 0, failed: 0, errors: [] });
+        setStats({ processed: 0, success: 0, failed: 0, scanned: 0, errors: [] });
     }
     setIsRunning(!isRunning);
   };
@@ -159,10 +161,14 @@ export default function MigrationPage() {
                   </AlertDescription>
                 </Alert>
 
-                <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-4 gap-4 text-center">
                   <div className="p-4 border rounded-lg bg-muted/50">
-                    <div className="text-2xl font-bold">{stats.processed}</div>
-                    <div className="text-xs text-muted-foreground">Products Scanned</div>
+                    <div className="text-2xl font-bold">{stats.scanned}</div>
+                    <div className="text-xs text-muted-foreground">Database Scanned</div>
+                  </div>
+                  <div className="p-4 border rounded-lg bg-blue-100/50 dark:bg-blue-900/20">
+                    <div className="text-2xl font-bold text-blue-600">{stats.processed}</div>
+                    <div className="text-xs text-muted-foreground">Matches Found</div>
                   </div>
                   <div className="p-4 border rounded-lg bg-green-100/50 dark:bg-green-900/20">
                     <div className="text-2xl font-bold text-green-600">{stats.success}</div>

@@ -428,7 +428,8 @@ function EditProductPageInner() {
         metaTitle: formData.metaTitle || undefined,
         collectionId: formData.collectionId ? (formData.collectionId as Id<"collections">) : undefined,
         status: formData.status,
-        images: formData.images.filter((img) => img.url),
+        // Strip 'id' field before sending to Convex
+        images: formData.images.filter((img) => img.url).map(({ url, alt }) => ({ url, alt })),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
         length: parseFloat(formData.length),
         breadth: parseFloat(formData.breadth),
@@ -486,6 +487,31 @@ function EditProductPageInner() {
 
   if (collections === undefined || product === undefined || gadgetTypes === undefined) {
     return <Skeleton className="h-screen w-full" />;
+  }
+
+  // Handle product not found gracefully
+  if (product === null) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <PackageIcon />
+          </EmptyMedia>
+          <EmptyTitle>Product Not Found</EmptyTitle>
+          <EmptyDescription>
+            The product you are looking for does not exist or has been deleted.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Link to="/backend-skinly/products">
+            <Button>
+              <ChevronLeftIcon className="size-4 mr-2" />
+              Back to Products
+            </Button>
+          </Link>
+        </EmptyContent>
+      </Empty>
+    );
   }
 
   return (

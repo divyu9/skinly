@@ -1485,11 +1485,19 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                             >
                               <ImagesIcon className="size-3" />
                             </Button>
-                            <Link to={`/backend-skinly/products/${product._id}`}>
+                            <Link to={`/backend-skinly/products/edit/${product._id}`}>
                               <Button size="sm" variant="outline" title="Edit Product">
                                 <EditIcon className="size-3" />
                               </Button>
                             </Link>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              title="Clone Product"
+                              onClick={() => handleClone(product._id)}
+                            >
+                              <SaveIcon className="size-3" />
+                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button size="sm" variant="outline" title="More Actions">
@@ -1497,12 +1505,6 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => handleClone(product._id)}
-                                >
-                                  <SaveIcon className="size-4 mr-2" />
-                                  Clone Product
-                                </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => handleDelete(product._id)}
                                   className="text-destructive focus:text-destructive"

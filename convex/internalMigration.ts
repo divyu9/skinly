@@ -35,16 +35,20 @@ export const getProductsToMigrate = internalMutation({
     // That's acceptable for a migration script; the client will just call again with the next cursor.
     // We prioritize returning *some* work to do.
     
-    // Slice to requested limit
-    const productsToProcess = shopifyProducts.slice(0, args.limit);
+    // Logic Fix: We return ALL matching items found in this page scan. 
+    // We do NOT slice by args.limit anymore because that causes skipping items if more than limit are found in one page.
+    // The batchSize is controlled by how many items we process in the action, but here we just return what we found in this "page scan".
+    
+    const productsToProcess = shopifyProducts;
 
     // Calculate approximate remaining (just checking if pagination is done)
-    const hasMore = !products.isDone || (shopifyProducts.length > args.limit);
+    const hasMore = !products.isDone;
 
     return {
       products: productsToProcess,
-      nextCursor: products.continueCursor, // This advances the global cursor, skipping non-shopify products effectively
+      nextCursor: products.continueCursor, // This advances the global cursor correctly
       totalRemaining: hasMore ? 999 : 0, // Placeholder
+      scanned: products.page.length, // Report how many raw items we scanned
     };
   },
 });

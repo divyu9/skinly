@@ -40,13 +40,14 @@ export const migrateImagesFromShopify = action({
         products: any[];
         nextCursor: string | null;
         totalRemaining: number;
+        scanned?: number;
     } = await ctx.runMutation(internal.internalMigration.getProductsToMigrate, {
-      limit: batchSize,
+      limit: batchSize, // Note: This limit is now just a suggestion for page size in some implementations, but scanning logic dominates
       cursor: args.cursor,
       source: targetSource,
     });
 
-    const { products, nextCursor, totalRemaining } = result;
+    const { products, nextCursor, totalRemaining, scanned } = result;
 
     if (products.length === 0) {
       // Even if no products in this batch, we might have more pages to check
@@ -58,6 +59,7 @@ export const migrateImagesFromShopify = action({
         nextCursor: nextCursor,
         remaining: totalRemaining, // Approx
         errors: [],
+        scanned: scanned || 0,
       };
     }
 
@@ -186,6 +188,7 @@ export const migrateImagesFromShopify = action({
       nextCursor,
       remaining: totalRemaining - products.length, // Approx
       errors,
+      scanned: scanned || products.length,
     };
   },
 });

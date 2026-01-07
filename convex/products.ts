@@ -180,27 +180,34 @@ export const getAllProductsPaginated = query({
       pageProducts = pageProducts.filter(p => productIdsInCollection.has(p._id));
     }
     
-    // Fetch ALL variants in one query and group by productId
-    const allVariants = await ctx.db.query("variants").collect();
-    const variantsByProduct = new Map<string, typeof allVariants>();
-    
-    for (const variant of allVariants) {
-      const productId = variant.productId;
-      if (!variantsByProduct.has(productId)) {
-        variantsByProduct.set(productId, []);
-      }
-      variantsByProduct.get(productId)!.push(variant);
-    }
+    // Optimization: ONLY fetch variants for the products in THIS PAGE
+    // Instead of fetching all variants (slow!), we map over the page items.
+    const productsWithVariants = await Promise.all(
+      pageProducts.map(async (product) => {
+        const productVariants = await ctx.db
+          .query("variants")
+          .withIndex("by_product", (q) => q.eq("productId", product._id))
+          .collect();
 
-    // Build products with their variants
-    const productsWithVariants = pageProducts.map((product) => {
-      const variants = variantsByProduct.get(product._id) || [];
-      return {
-        ...product,
-        variants,
-        collection: null, // Skip collection lookup for performance
-      };
-    });
+        const prices = productVariants.map((v) => v.price);
+        const inventory = productVariants.reduce((acc, v) => acc + v.inventoryQuantity, 0);
+
+        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+        return {
+          ...product,
+          variants: productVariants,
+          variantCount: productVariants.length,
+          totalInventory: inventory,
+          priceRange: {
+            min: minPrice,
+            max: maxPrice,
+          },
+          collection: null, // Skip collection lookup for performance
+        };
+      })
+    );
 
     return {
       page: productsWithVariants,
