@@ -7,12 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Play, Pause, CheckCircle2, AlertTriangle, Cloud, ArrowRight, ServerIcon } from "lucide-react";
+import { Play, Pause, CheckCircle2, AlertTriangle, Cloud, ArrowRight, ServerIcon, LayoutTemplateIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MigrationPage() {
   const migrateAction = useAction(api.migrateShopifyImages.migrateImagesFromShopify);
+  const migrateHomepageAction = useAction(api.migrateShopifyImages.migrateHomepageAssets);
   
   const [isRunning, setIsRunning] = useState(false);
   const [activeTab, setActiveTab] = useState("shopify");
@@ -26,9 +27,19 @@ export default function MigrationPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [isFinished, setIsFinished] = useState(false);
 
+  // New state for Homepage Migration
+  const [isHomepageRunning, setIsHomepageRunning] = useState(false);
+  const [homepageStats, setHomepageStats] = useState({
+    processed: 0,
+    success: 0,
+    failed: 0,
+    errors: [] as string[],
+    totalFound: 0,
+  });
+
   // Reset stats when switching tabs
   const handleTabChange = (value: string) => {
-    if (isRunning) {
+    if (isRunning || isHomepageRunning) {
       toast.error("Please stop the current migration before switching tabs.");
       return;
     }
@@ -38,7 +49,7 @@ export default function MigrationPage() {
     setIsFinished(false);
   };
 
-  // Auto-run effect when running is true
+  // Auto-run effect for Product Migration
   useEffect(() => {
     let active = true;
 
@@ -104,6 +115,40 @@ export default function MigrationPage() {
     return () => { active = false; };
   }, [isRunning, cursor, isFinished, migrateAction, activeTab]);
 
+  // Handler for Homepage Migration
+  const runHomepageMigration = async () => {
+    setIsHomepageRunning(true);
+    setHomepageStats({ processed: 0, success: 0, failed: 0, errors: [], totalFound: 0 });
+    
+    try {
+      const result = await migrateHomepageAction({});
+      
+      setHomepageStats({
+        processed: result.processed,
+        success: result.success,
+        failed: result.failed,
+        errors: result.errors,
+        totalFound: result.totalFound,
+      });
+
+      if (result.totalFound === 0) {
+        toast.info("No Hercules assets found in homepage sections.");
+      } else {
+        toast.success(`Processed ${result.processed} homepage assets.`);
+      }
+
+    } catch (error) {
+      console.error("Homepage migration failed:", error);
+      toast.error("Homepage migration failed");
+      setHomepageStats(prev => ({
+        ...prev,
+        errors: [...prev.errors, `System error: ${error instanceof Error ? error.message : "Unknown"}`]
+      }));
+    } finally {
+      setIsHomepageRunning(false);
+    }
+  };
+
   const toggleMigration = () => {
     if (isFinished) {
         // Reset to start over check
@@ -137,92 +182,222 @@ export default function MigrationPage() {
           </TabsList>
 
           <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-4">
-                  <div className={`p-3 rounded-full ${activeTab === 'shopify' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                    {activeTab === 'shopify' ? <Cloud className="h-6 w-6" /> : <ServerIcon className="h-6 w-6" />}
+            <TabsContent value="shopify">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-full bg-green-100 text-green-600">
+                      <Cloud className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <CardTitle>Shopify Image Migration</CardTitle>
+                      <CardDescription>
+                        Move all product images from cdn.shopify.com to your Cloudinary storage.
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="capitalize">{activeTab} Image Migration</CardTitle>
-                    <CardDescription>
-                      Move all product images from {activeTab === 'shopify' ? 'cdn.shopify.com' : 'Hercules CDN'} to your Cloudinary storage.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Before you start</AlertTitle>
-                  <AlertDescription>
-                    This process will scan all products, fetch images directly from {activeTab === 'shopify' ? 'Shopify' : 'Hercules'}, 
-                    upload them to Cloudinary, and update your database.
-                  </AlertDescription>
-                </Alert>
+                </CardHeader>
+                <CardContent>
+                  <MigrationRunner 
+                    isRunning={isRunning}
+                    isFinished={isFinished}
+                    stats={stats}
+                    toggleMigration={toggleMigration}
+                    type="Shopify"
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-                <div className="grid grid-cols-4 gap-4 text-center">
-                  <div className="p-4 border rounded-lg bg-muted/50">
-                    <div className="text-2xl font-bold">{stats.scanned}</div>
-                    <div className="text-xs text-muted-foreground">Database Scanned</div>
-                  </div>
-                  <div className="p-4 border rounded-lg bg-blue-100/50 dark:bg-blue-900/20">
-                    <div className="text-2xl font-bold text-blue-600">{stats.processed}</div>
-                    <div className="text-xs text-muted-foreground">Matches Found</div>
-                  </div>
-                  <div className="p-4 border rounded-lg bg-green-100/50 dark:bg-green-900/20">
-                    <div className="text-2xl font-bold text-green-600">{stats.success}</div>
-                    <div className="text-xs text-muted-foreground">Updated</div>
-                  </div>
-                  <div className="p-4 border rounded-lg bg-red-100/50 dark:bg-red-900/20">
-                    <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-                    <div className="text-xs text-muted-foreground">Failed</div>
-                  </div>
-                </div>
+            <TabsContent value="hercules">
+              <div className="space-y-6">
+                {/* Product Migration Section */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-full bg-blue-100 text-blue-600">
+                        <ServerIcon className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <CardTitle>Hercules Product Migration</CardTitle>
+                        <CardDescription>
+                          Move product images from Hercules CDN to Cloudinary.
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <MigrationRunner 
+                      isRunning={isRunning}
+                      isFinished={isFinished}
+                      stats={stats}
+                      toggleMigration={toggleMigration}
+                      type="Hercules"
+                    />
+                  </CardContent>
+                </Card>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Status</span>
-                    <span>{isRunning ? "Migrating..." : isFinished ? "Completed" : "Idle"}</span>
-                  </div>
-                  <Progress value={isRunning ? undefined : (isFinished ? 100 : 0)} className="h-2" />
-                </div>
+                {/* Homepage Assets Migration Section */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 rounded-full bg-purple-100 text-purple-600">
+                        <LayoutTemplateIcon className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <CardTitle>Homepage Assets Migration</CardTitle>
+                        <CardDescription>
+                          Migrate sections, banners, hero slides, and explore cards (Brand/Category/Gadget).
+                        </CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <Alert>
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Scan Scope</AlertTitle>
+                      <AlertDescription>
+                        Scans: Hero Slides, Feature Banners, Section Cards (Brand/Gadget), Category Display Settings, and Config JSONs.
+                      </AlertDescription>
+                    </Alert>
 
-                <div className="flex gap-4">
-                  <Button 
-                    onClick={toggleMigration} 
-                    size="lg"
-                    className={isRunning ? "bg-amber-500 hover:bg-amber-600" : ""}
-                  >
-                    {isRunning ? (
-                      <>
-                        <Pause className="mr-2 h-4 w-4" /> Pause Migration
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" /> {isFinished ? "Restart Scan" : "Start Migration"}
-                      </>
+                    <div className="grid grid-cols-4 gap-4 text-center">
+                      <div className="p-4 border rounded-lg bg-muted/50">
+                        <div className="text-2xl font-bold">{homepageStats.totalFound}</div>
+                        <div className="text-xs text-muted-foreground">Assets Found</div>
+                      </div>
+                      <div className="p-4 border rounded-lg bg-purple-100/50 dark:bg-purple-900/20">
+                        <div className="text-2xl font-bold text-purple-600">{homepageStats.processed}</div>
+                        <div className="text-xs text-muted-foreground">Processed</div>
+                      </div>
+                      <div className="p-4 border rounded-lg bg-green-100/50 dark:bg-green-900/20">
+                        <div className="text-2xl font-bold text-green-600">{homepageStats.success}</div>
+                        <div className="text-xs text-muted-foreground">Success</div>
+                      </div>
+                      <div className="p-4 border rounded-lg bg-red-100/50 dark:bg-red-900/20">
+                        <div className="text-2xl font-bold text-red-600">{homepageStats.failed}</div>
+                        <div className="text-xs text-muted-foreground">Failed</div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-4">
+                      <Button 
+                        onClick={runHomepageMigration} 
+                        size="lg"
+                        disabled={isHomepageRunning}
+                        className={isHomepageRunning ? "bg-purple-500 hover:bg-purple-600" : ""}
+                      >
+                        {isHomepageRunning ? (
+                          <>
+                            <Cloud className="mr-2 h-4 w-4 animate-bounce" /> Migrating...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="mr-2 h-4 w-4" /> Start Asset Migration
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {homepageStats.errors.length > 0 && (
+                      <div className="mt-6">
+                        <h3 className="text-sm font-medium mb-2 text-destructive">Error Log</h3>
+                        <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-muted/50">
+                          {homepageStats.errors.map((err, i) => (
+                            <div key={i} className="text-xs text-red-600 mb-1 font-mono">
+                              {err}
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      </div>
                     )}
-                  </Button>
-                </div>
-
-                {stats.errors.length > 0 && (
-                  <div className="mt-6">
-                    <h3 className="text-sm font-medium mb-2 text-destructive">Error Log</h3>
-                    <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-muted/50">
-                      {stats.errors.map((err, i) => (
-                        <div key={i} className="text-xs text-red-600 mb-1 font-mono">
-                          {err}
-                        </div>
-                      ))}
-                    </ScrollArea>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
           </div>
         </Tabs>
       </div>
     </AdminLayout>
+  );
+}
+
+// Reusable component for the standard product migration runner
+function MigrationRunner({ isRunning, isFinished, stats, toggleMigration, type }: { 
+  isRunning: boolean; 
+  isFinished: boolean; 
+  stats: any; 
+  toggleMigration: () => void;
+  type: string;
+}) {
+  return (
+    <div className="space-y-6">
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertTitle>Before you start</AlertTitle>
+        <AlertDescription>
+          This process will scan all products, fetch images directly from {type}, 
+          upload them to Cloudinary, and update your database.
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid grid-cols-4 gap-4 text-center">
+        <div className="p-4 border rounded-lg bg-muted/50">
+          <div className="text-2xl font-bold">{stats.scanned}</div>
+          <div className="text-xs text-muted-foreground">Database Scanned</div>
+        </div>
+        <div className="p-4 border rounded-lg bg-blue-100/50 dark:bg-blue-900/20">
+          <div className="text-2xl font-bold text-blue-600">{stats.processed}</div>
+          <div className="text-xs text-muted-foreground">Matches Found</div>
+        </div>
+        <div className="p-4 border rounded-lg bg-green-100/50 dark:bg-green-900/20">
+          <div className="text-2xl font-bold text-green-600">{stats.success}</div>
+          <div className="text-xs text-muted-foreground">Updated</div>
+        </div>
+        <div className="p-4 border rounded-lg bg-red-100/50 dark:bg-red-900/20">
+          <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
+          <div className="text-xs text-muted-foreground">Failed</div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span>Status</span>
+          <span>{isRunning ? "Migrating..." : isFinished ? "Completed" : "Idle"}</span>
+        </div>
+        <Progress value={isRunning ? undefined : (isFinished ? 100 : 0)} className="h-2" />
+      </div>
+
+      <div className="flex gap-4">
+        <Button 
+          onClick={toggleMigration} 
+          size="lg"
+          className={isRunning ? "bg-amber-500 hover:bg-amber-600" : ""}
+        >
+          {isRunning ? (
+            <>
+              <Pause className="mr-2 h-4 w-4" /> Pause Migration
+            </>
+          ) : (
+            <>
+              <Play className="mr-2 h-4 w-4" /> {isFinished ? "Restart Scan" : "Start Migration"}
+            </>
+          )}
+        </Button>
+      </div>
+
+      {stats.errors.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-sm font-medium mb-2 text-destructive">Error Log</h3>
+          <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-muted/50">
+            {stats.errors.map((err: string, i: number) => (
+              <div key={i} className="text-xs text-red-600 mb-1 font-mono">
+                {err}
+              </div>
+            ))}
+          </ScrollArea>
+        </div>
+      )}
+    </div>
   );
 }

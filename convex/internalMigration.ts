@@ -71,3 +71,133 @@ export const updateProductImages = internalMutation({
     });
   },
 });
+
+/**
+ * Internal Mutation: Get homepage assets that need migration
+ */
+export const getHomepageAssetsToMigrate = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const assets: Array<{
+      id: string;
+      table: string;
+      field: string;
+      url: string;
+      originalData: any; // For complex updates like config
+    }> = [];
+
+    // 1. Scan categoryDisplaySettings (Explore by Category/Gadget)
+    const categories = await ctx.db.query("categoryDisplaySettings").collect();
+    for (const cat of categories) {
+      if (cat.imageUrl && cat.imageUrl.includes("hercules")) {
+        assets.push({
+          id: cat._id,
+          table: "categoryDisplaySettings",
+          field: "imageUrl",
+          url: cat.imageUrl,
+          originalData: cat,
+        });
+      }
+    }
+
+    // 2. Scan homepageSectionCards (Explore by Brand manual cards)
+    const cards = await ctx.db.query("homepageSectionCards").collect();
+    for (const card of cards) {
+      if (card.imageUrl && card.imageUrl.includes("hercules")) {
+        assets.push({
+          id: card._id,
+          table: "homepageSectionCards",
+          field: "imageUrl",
+          url: card.imageUrl,
+          originalData: card,
+        });
+      }
+    }
+
+    // 3. Scan heroSlides
+    const slides = await ctx.db.query("heroSlides").collect();
+    for (const slide of slides) {
+      if (slide.imageUrl && slide.imageUrl.includes("hercules")) {
+        assets.push({
+          id: slide._id,
+          table: "heroSlides",
+          field: "imageUrl",
+          url: slide.imageUrl,
+          originalData: slide,
+        });
+      }
+    }
+
+    // 4. Scan featureBanners
+    const banners = await ctx.db.query("featureBanners").collect();
+    for (const banner of banners) {
+      if (banner.backgroundImage && banner.backgroundImage.includes("hercules")) {
+        assets.push({
+          id: banner._id,
+          table: "featureBanners",
+          field: "backgroundImage",
+          url: banner.backgroundImage,
+          originalData: banner,
+        });
+      }
+    }
+
+    // 5. Scan homepageSettings
+    const settings = await ctx.db.query("homepageSettings").collect();
+    for (const setting of settings) {
+      if (setting.logoImageUrl && setting.logoImageUrl.includes("hercules")) {
+        assets.push({
+          id: setting._id,
+          table: "homepageSettings",
+          field: "logoImageUrl",
+          url: setting.logoImageUrl,
+          originalData: setting,
+        });
+      }
+    }
+
+    // 6. Scan homepageSections (Deep scan of config)
+    const sections = await ctx.db.query("homepageSections").collect();
+    for (const section of sections) {
+      if (section.config) {
+        const configStr = JSON.stringify(section.config);
+        if (configStr.includes("hercules")) {
+          // Found a Hercules link in the config object
+          // We return the whole section to be processed by the action
+          // The action will need to parse, find urls, upload, and send back updated config
+          assets.push({
+            id: section._id,
+            table: "homepageSections",
+            field: "config",
+            url: "JSON_BLOB", // Special marker indicating complex object
+            originalData: section,
+          });
+        }
+      }
+    }
+
+    return {
+      assets,
+      totalFound: assets.length,
+    };
+  },
+});
+
+/**
+ * Internal Mutation: Update a generic homepage asset
+ */
+export const updateHomepageAsset = internalMutation({
+  args: {
+    table: v.string(),
+    id: v.string(),
+    updates: v.any(), // Flexible payload
+  },
+  handler: async (ctx, args) => {
+    // Cast ID to any because we know the table name but not the strict Id<Table> type at compile time
+    // This is safe because we trust the table name coming from our own scanner
+    const table = args.table as any;
+    const id = args.id as any;
+    
+    await ctx.db.patch(id, args.updates);
+  },
+});

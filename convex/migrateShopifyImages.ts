@@ -193,3 +193,150 @@ export const migrateImagesFromShopify = action({
   },
 });
 
+/**
+ * Migration Action: Moves Homepage Assets from Hercules CDN to Cloudinary
+ */
+export const migrateHomepageAssets = action({
+  args: {},
+  handler: async (ctx): Promise<{
+    processed: number;
+    success: number;
+    failed: number;
+    errors: string[];
+    totalFound: number;
+  }> => {
+    // 1. Get all homepage assets that need migration
+    const result = await ctx.runMutation(internal.internalMigration.getHomepageAssetsToMigrate, {});
+    const { assets, totalFound } = result;
+
+    if (assets.length === 0) {
+      return {
+        processed: 0,
+        success: 0,
+        failed: 0,
+        errors: [],
+        totalFound: 0,
+      };
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new Error("Cloudinary credentials missing");
+    }
+
+    // Helper to upload single URL
+    const uploadToCloudinary = async (url: string, folder: string): Promise<string> => {
+      const timestamp = Math.floor(Date.now() / 1000).toString();
+      const publicId = `asset_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+      const uploadParams: Record<string, string> = {
+        folder: folder,
+        public_id: publicId,
+        timestamp: timestamp,
+        upload_preset: "webp-auto-convert",
+      };
+
+      const sortedParams = Object.keys(uploadParams)
+        .sort()
+        .map(key => `${key}=${uploadParams[key]}`)
+        .join('&');
+      
+      const signatureInput = sortedParams + apiSecret;
+      const signature = crypto.createHash('sha1').update(signatureInput).digest('hex');
+
+      const formData = new FormData();
+      formData.append("file", url);
+      formData.append("api_key", apiKey);
+      formData.append("signature", signature);
+      Object.entries(uploadParams).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
+
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error(`Cloudinary upload failed: ${await uploadRes.text()}`);
+      }
+
+      const uploadData = await uploadRes.json();
+      return uploadData.secure_url;
+    };
+
+    // 2. Process each asset
+    for (const asset of assets) {
+      try {
+        console.log(`Migrating asset ${asset.id} (${asset.table}.${asset.field})`);
+        
+        let updates: any = {};
+        let needsUpdate = false;
+
+        if (asset.table === "homepageSections" && asset.field === "config") {
+          // Complex JSON object traversal
+          const config = asset.originalData.config;
+          const configStr = JSON.stringify(config);
+          
+          // Regex to find Hercules URLs
+          // Look for https://cdn.hercules.app/... until quote
+          const urlRegex = /(https:\/\/cdn\.hercules\.app\/[^"]+)/g;
+          const matches = configStr.match(urlRegex) || [];
+          
+          if (matches.length > 0) {
+            let newConfigStr = configStr;
+            for (const oldUrl of matches) {
+              try {
+                const newUrl = await uploadToCloudinary(oldUrl, "homepage_assets");
+                newConfigStr = newConfigStr.replace(oldUrl, newUrl);
+              } catch (e) {
+                console.error(`Failed to upload ${oldUrl}:`, e);
+                // Continue with other URLs
+              }
+            }
+            updates = { config: JSON.parse(newConfigStr) };
+            needsUpdate = true;
+          }
+
+        } else {
+          // Simple field update
+          const newUrl = await uploadToCloudinary(asset.url, "homepage_assets");
+          updates = { [asset.field]: newUrl };
+          needsUpdate = true;
+        }
+
+        if (needsUpdate) {
+          await ctx.runMutation(internal.internalMigration.updateHomepageAsset, {
+            table: asset.table,
+            id: asset.id,
+            updates: updates,
+          });
+          successCount++;
+        } else {
+          // No actual changes made (maybe upload failed?)
+          failCount++;
+        }
+
+      } catch (err) {
+        failCount++;
+        errors.push(`Asset ${asset.id}: ${err instanceof Error ? err.message : "Unknown error"}`);
+      }
+    }
+
+    return {
+      processed: assets.length,
+      success: successCount,
+      failed: failCount,
+      errors,
+      totalFound,
+    };
+  },
+});
+
