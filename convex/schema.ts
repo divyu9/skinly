@@ -57,7 +57,9 @@ export default defineSchema({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto")
+      v.literal("rto"),
+      v.literal("pending_payment"),
+      v.literal("failed")
     ),
     items: v.array(
       v.object({

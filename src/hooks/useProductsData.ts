@@ -205,33 +205,36 @@ export function useProductsData({
   }, [sortedProducts, viewportStart]);
   
   // Batch fetch mockups for viewport products - SINGLE QUERY!
-  const mockupMap = useQuery(
+  const mockupResult = useQuery(
     api.mockups.getBatchMockups,
     urlParams.brand && urlParams.model && viewportSkus.length > 0
-      ? { 
-          brand: urlParams.brand, 
-          model: urlParams.model, 
-          skus: viewportSkus 
+      ? {
+          brand: urlParams.brand,
+          model: urlParams.model,
+          skus: viewportSkus
         }
       : "skip"
   );
-  
+
   // Merge mockups into products
   const productsWithMockups = useMemo((): Product[] => {
-    if (!mockupMap || !urlParams.brand || !urlParams.model) {
+    // Extract mockups map from new paginated return format
+    const mockupMap = mockupResult?.mockups ?? {};
+
+    if (!mockupResult || !urlParams.brand || !urlParams.model) {
       return sortedProducts;
     }
-    
+
     return sortedProducts.map(product => {
       const sku = product.variants[0]?.sku;
       const mockupUrl = sku ? mockupMap[sku] : undefined;
-      
+
       return {
         ...product,
         mockupUrl,
       };
     });
-  }, [sortedProducts, mockupMap, urlParams.brand, urlParams.model]);
+  }, [sortedProducts, mockupResult, urlParams.brand, urlParams.model]);
   
   // Update viewport when user scrolls (called by intersection observer)
   const updateViewport = useCallback((newStart: number) => {
@@ -275,11 +278,11 @@ export function useProductsData({
   }, [handleLoadMore]);
   
   // Loading states
-  const isInitialLoading = status === "LoadingFirstPage" || 
+  const isInitialLoading = status === "LoadingFirstPage" ||
     (filters.collectionParam && collection === undefined);
-  
-  const isMockupsLoading = !!(urlParams.brand && urlParams.model && mockupMap === undefined);
-  
+
+  const isMockupsLoading = !!(urlParams.brand && urlParams.model && mockupResult === undefined);
+
   return {
     products: productsWithMockups,
     allProductsCount: allProductsBase.length,
@@ -296,6 +299,6 @@ export function useProductsData({
     // New: Mockup specific
     isMockupsLoading,
     updateViewport,
-    hasMockups: !!mockupMap && Object.keys(mockupMap).length > 0,
+    hasMockups: !!mockupResult?.mockups && Object.keys(mockupResult.mockups).length > 0,
   };
 }

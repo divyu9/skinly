@@ -127,7 +127,7 @@ function OrderDetailPageInner() {
   const [isRecordingRtoAction, setIsRecordingRtoAction] = useState(false);
 
   const handleStatusChange = async (
-    status: "processing" | "shipped" | "delivered" | "cancelled" | "rto"
+    status: "processing" | "shipped" | "delivered" | "cancelled" | "rto" | "pending_payment" | "failed"
   ) => {
     if (!orderId || !order) return;
     try {
@@ -570,6 +570,10 @@ function OrderDetailPageInner() {
         return "bg-red-500/10 text-red-600 border-red-500/20";
       case "rto":
         return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+      case "pending_payment":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      case "failed":
+        return "bg-red-500/10 text-red-600 border-red-500/20";
       default:
         return "";
     }
@@ -652,16 +656,18 @@ function OrderDetailPageInner() {
         <div className="flex flex-wrap gap-2">
           <Select
             value={order.status}
-            onValueChange={(value) => handleStatusChange(value as "processing" | "shipped" | "delivered" | "cancelled" | "rto")}
+            onValueChange={(value) => handleStatusChange(value as "processing" | "shipped" | "delivered" | "cancelled" | "rto" | "pending_payment" | "failed")}
           >
             <SelectTrigger className={`w-40 ${getStatusColor(order.status)}`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="pending_payment">Pending Payment</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="delivered">Delivered</SelectItem>
-              <SelectItem value="cancelled">Cancelled/Refunded</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+              <SelectItem value="failed">Failed</SelectItem>
               <SelectItem value="rto">RTO</SelectItem>
             </SelectContent>
           </Select>

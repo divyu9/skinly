@@ -544,30 +544,49 @@ export const getMissingMockups = query({
   },
 });
 /**
- * Batch fetch mockups - 100 queries → 1 query
+ * Batch fetch mockups - paginated to avoid read limits
+ * Returns map of sku -> url
  */
 export const getBatchMockups = query({
   args: {
     brand: v.string(),
     model: v.string(),
-    skus: v.array(v.string()),
+    skus: v.optional(v.array(v.string())),
+    cursor: v.optional(v.string()),
+    limit: v.optional(v.number()),
   },
-  handler: async (ctx, { brand, model, skus }) => {
-    if (!skus || skus.length === 0) return {};
+  handler: async (ctx, args) => {
+    // If skus is provided but empty, return empty result immediately
+    if (args.skus && args.skus.length === 0) {
+      return {
+        mockups: {},
+        cursor: "",
+        isDone: true,
+      };
+    }
 
-    const mockups = await ctx.db
+    const limit = args.limit || 100;
+
+    // Use withIndex to avoid full table scan (fixes "Too many documents read" error)
+    const mockupsQuery = ctx.db
       .query("mockups")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("brand"), brand),
-          q.eq(q.field("model"), model)
-        )
-      )
-      .collect();
+      .withIndex("by_brand_model_sku", (q) =>
+        q.eq("brand", args.brand).eq("model", args.model)
+      );
+
+    // Paginate results
+    const { page, isDone, continueCursor } = await mockupsQuery.paginate({
+      cursor: args.cursor ?? null,
+      numItems: limit,
+    });
 
     const result: Record<string, string> = {};
-    for (const mockup of mockups) {
-      if (!skus.includes(mockup.sku)) continue;
+    
+    for (const mockup of page) {
+      // If specific SKUs requested, filter for them
+      if (args.skus && !args.skus.includes(mockup.sku)) {
+        continue;
+      }
 
       // Prefer Cloudinary URL, fallback to Convex storage
       let url: string | null = null;
@@ -581,6 +600,11 @@ export const getBatchMockups = query({
         result[mockup.sku] = url;
       }
     }
-    return result;
+
+    return {
+      mockups: result,
+      cursor: continueCursor,
+      isDone,
+    };
   },
 });

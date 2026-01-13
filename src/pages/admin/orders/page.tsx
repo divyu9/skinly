@@ -117,6 +117,10 @@ function AdminOrdersPageInner() {
         return "bg-red-500/10 text-red-600 border-red-500/20";
       case "rto":
         return "bg-orange-500/10 text-orange-600 border-orange-500/20";
+      case "pending_payment":
+        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
+      case "failed":
+        return "bg-red-500/10 text-red-600 border-red-500/20";
       default:
         return "";
     }
@@ -635,6 +639,12 @@ function AdminOrdersPageInner() {
             Processing
             <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/20">
               {stats.processing}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="pending_payment" className="flex items-center gap-2">
+            Pending Payment
+            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+              {stats.pending_payment}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="shipped" className="flex items-center gap-2">

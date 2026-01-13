@@ -251,7 +251,7 @@ export const createOrder = mutation({
       trackingToken,
       orderNumber,
       customerEmail: args.customerEmail || args.guestEmail,
-      status: "processing",
+      status: (args.paymentMethod === "cod" || walletAmountUsed >= originalTotal) ? "processing" : "pending_payment",
       items: itemsWithSku,
       subtotal,
       shippingFee,
@@ -431,40 +431,54 @@ export const createOrder = mutation({
         });
 
         if (config.enabled && config.adminPhone) {
-          // Format payment type
-          let paymentType = args.paymentMethod.toUpperCase();
-          if (args.paymentMethod === "cod") {
-            if (args.prepaidAmount && args.prepaidAmount > 0) {
-              paymentType = "Partial COD";
-            } else {
-              paymentType = "COD";
+          // Check if we should send notification:
+          // 1. If payment method is COD, send immediately
+          // 2. If paid by wallet (fully), send immediately
+          // 3. For online payments (PhonePe), wait for payment success (in updatePaymentStatus)
+          
+          const isCod = args.paymentMethod === "cod";
+          const isWalletPaid = walletAmountUsed >= originalTotal;
+          
+          if (isCod || isWalletPaid) {
+            // Format payment type
+            let paymentType = args.paymentMethod.toUpperCase();
+            if (args.paymentMethod === "cod") {
+              if (args.prepaidAmount && args.prepaidAmount > 0) {
+                paymentType = "Partial COD";
+              } else {
+                paymentType = "COD";
+              }
+            } else if (args.paymentMethod === "phonepe") {
+              paymentType = "PhonePe";
+            } else if (isWalletPaid) {
+              paymentType = "Wallet";
             }
-          } else if (args.paymentMethod === "phonepe") {
-            paymentType = "PhonePe";
+
+            const adminVars = {
+              order_number: orderNumber || "Pending",
+              amount: `${total.toFixed(2)}`,
+              customer_name: args.shippingAddress.fullName || user?.name || "Customer",
+              number_of_products: cartItems.length.toString(),
+              payment_mode: paymentType,
+            };
+
+            console.log("Scheduling admin notification with variables:", adminVars);
+
+            await ctx.scheduler.runAfter(
+              0,
+              api.whatsappMessaging.queueMessage,
+              {
+                usecaseKey: "admin_new_order",
+                recipientPhone: config.adminPhone,
+                variables: adminVars,
+                priority: 9, // High priority for admin notifications
+              }
+            );
+
+            console.log("Admin notification scheduled successfully");
+          } else {
+            console.log("Skipping admin notification for pending online payment");
           }
-
-          const adminVars = {
-            order_number: orderNumber || "Pending",
-            amount: `${total.toFixed(2)}`,
-            customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-            number_of_products: cartItems.length.toString(),
-            payment_mode: paymentType,
-          };
-
-          console.log("Scheduling admin notification with variables:", adminVars);
-
-          await ctx.scheduler.runAfter(
-            0,
-            api.whatsappMessaging.queueMessage,
-            {
-              usecaseKey: "admin_new_order",
-              recipientPhone: config.adminPhone,
-              variables: adminVars,
-              priority: 9, // High priority for admin notifications
-            }
-          );
-
-          console.log("Admin notification scheduled successfully");
         } else {
           console.log("Admin notifications disabled or no phone configured");
         }
@@ -695,7 +709,9 @@ export const updateOrderStatus = mutation({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto")
+      v.literal("rto"),
+      v.literal("pending_payment"),
+      v.literal("failed")
     ),
   },
   handler: async (ctx, args) => {
@@ -924,7 +940,7 @@ export const updatePaymentStatus = mutation({
       args.paymentStatus === "success" 
         ? "processing" 
         : args.paymentStatus === "failed"
-          ? "cancelled"
+          ? "failed"
           : order.status;
 
     await ctx.db.patch(order._id, {
@@ -1043,6 +1059,43 @@ export const updatePaymentStatus = mutation({
           
           // Send order confirmed email for successful payment
           await triggerOrderConfirmedEmail(ctx, order, user);
+
+          // Send admin notification for successful payment
+          try {
+            const adminSettings = await ctx.db
+              .query("settings")
+              .withIndex("by_key", (q) => q.eq("key", "whatsapp_admin_notifications"))
+              .unique();
+
+            if (adminSettings) {
+              const config = typeof adminSettings.value === "string"
+                ? JSON.parse(adminSettings.value)
+                : adminSettings.value;
+
+              if (config.enabled && config.adminPhone) {
+                const adminVars = {
+                  order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                  amount: `${order.total.toFixed(2)}`,
+                  customer_name: order.shippingAddress.fullName || user?.name || "Customer",
+                  number_of_products: order.items.length.toString(),
+                  payment_mode: "PhonePe", // Assuming successful online payment
+                };
+
+                await ctx.scheduler.runAfter(
+                  0,
+                  api.whatsappMessaging.queueMessage,
+                  {
+                    usecaseKey: "admin_new_order",
+                    recipientPhone: config.adminPhone,
+                    variables: adminVars,
+                    priority: 9,
+                  }
+                );
+              }
+            }
+          } catch (error) {
+            console.error("Failed to queue admin notification for successful payment:", error);
+          }
         } else if (args.paymentStatus === "failed") {
           // Payment failed - send payment failed notification
           await ctx.scheduler.runAfter(
@@ -1215,9 +1268,10 @@ export const retryPayment = mutation({
     }
 
     // Reset payment status to pending to allow retry
-    // Keep order in cancelled status - don't move to processing
+    // Set order status to pending_payment
     await ctx.db.patch(order._id, {
       paymentStatus: "pending",
+      status: "pending_payment",
     });
 
     // Calculate remaining amount after wallet deduction

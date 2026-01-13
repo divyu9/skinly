@@ -217,7 +217,9 @@ export const updateOrderStatus = mutation({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto")
+      v.literal("rto"),
+      v.literal("pending_payment"),
+      v.literal("failed")
     ),
   },
   handler: async (ctx, args) => {
@@ -758,11 +760,12 @@ export const getOrderStats = query({
 
     const stats = {
       total: activeOrders.length,
-      processing: activeOrders.filter((o) => o.status === "processing" && o.paymentStatus === "success").length,
+      processing: activeOrders.filter((o) => o.status === "processing").length,
       shipped: activeOrders.filter((o) => o.status === "shipped").length,
       delivered: activeOrders.filter((o) => o.status === "delivered").length,
       cancelled: activeOrders.filter((o) => o.status === "cancelled").length,
       rto: activeOrders.filter((o) => o.status === "rto").length,
+      pending_payment: activeOrders.filter((o) => o.status === "pending_payment").length,
       failed: activeOrders.filter((o) => o.paymentStatus === "failed").length,
       deleted: deletedOrders.length,
       totalRevenue: activeOrders
@@ -1372,7 +1375,9 @@ export const createManualOrder = mutation({
       v.literal("shipped"),
       v.literal("delivered"),
       v.literal("cancelled"),
-      v.literal("rto")
+      v.literal("rto"),
+      v.literal("pending_payment"),
+      v.literal("failed")
     ),
     paymentStatus: v.union(
       v.literal("pending"),
