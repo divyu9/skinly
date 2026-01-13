@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SparklesIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -35,6 +35,7 @@ function NewProductPageInner() {
   const gadgetTypes = useQuery(api.gadgetTypes.listActive, {});
   const createProduct = useMutation(api.products.createProduct);
   const createVariant = useMutation(api.products.createVariant);
+  const generateSEO = useAction(api.seoProductGenerator.generateSEOFromFormData);
 
   const [formData, setFormData] = useState<{
     title: string;
@@ -89,6 +90,41 @@ function NewProductPageInner() {
   );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingSEO, setIsGeneratingSEO] = useState(false);
+
+  // Get selected finish type display name
+  const selectedFinishType = finishTypes?.find(f => f._id === formData.finishTypeId);
+
+  const handleGenerateSEO = async () => {
+    if (!formData.title.trim()) {
+      toast.error("Please enter a product title first");
+      return;
+    }
+
+    setIsGeneratingSEO(true);
+    try {
+      const result = await generateSEO({
+        title: formData.title,
+        gadgetCategory: formData.gadgetCategory,
+        finishType: selectedFinishType?.displayName,
+      });
+
+      // Update form with generated SEO content
+      setFormData(prev => ({
+        ...prev,
+        metaTitle: result.metaTitle,
+        description: result.description,
+        metaDescription: result.metaDescription,
+        tags: result.tags.join(", "),
+      }));
+
+      toast.success("SEO content generated successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to generate SEO content");
+    } finally {
+      setIsGeneratingSEO(false);
+    }
+  };
 
   const addImage = () => {
     setFormData({
@@ -293,6 +329,36 @@ function NewProductPageInner() {
                   onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* AI SEO Generator Card */}
+          <Card className="border-dashed border-primary/30 bg-primary/5">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <SparklesIcon className="h-5 w-5 text-primary" />
+                <CardTitle>AI SEO Content Generator</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Generate optimized SEO content including meta title, description, and tags using AI.
+              </p>
+              <Button
+                type="button"
+                onClick={handleGenerateSEO}
+                disabled={isGeneratingSEO || !formData.title.trim()}
+                variant="default"
+                className="w-full"
+              >
+                <SparklesIcon className="h-4 w-4 mr-2" />
+                {isGeneratingSEO ? "Generating..." : "Generate SEO Content with AI"}
+              </Button>
+              {!formData.title.trim() && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  Enter a product title first to generate SEO content
+                </p>
+              )}
             </CardContent>
           </Card>
 
