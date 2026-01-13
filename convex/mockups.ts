@@ -400,160 +400,134 @@ export const checkExistingMockupFilenames = query({
  * Used for displaying summary stats without loading full dataset
  */
 export const getMissingMockupsStats = query({
-  args: { 
+  args: {
     category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const category = args.category || "phone";
-    
-    // Get count of supported models
+
+    // Get ALL supported models for the category using index
     const supportedModels = await ctx.db
       .query("supportedModels")
-      .filter((q) => q.and(
-        q.eq(q.field("category"), category),
-        q.eq(q.field("isActive"), true)
-      ))
-      .take(500); // Limit to prevent timeout
-    
-    // Get sample of products to estimate SKU count
-    const allProducts = await ctx.db.query("products").take(100);
-    const skinProducts = allProducts.filter(p => 
-      p.title.toLowerCase().includes("phone skin")
-    );
-    const skinProductIds = new Set(skinProducts.map(p => p._id));
-    
-    // Get sample of variants
-    const variants = await ctx.db.query("variants").take(200);
-    const sampleSKUs = new Set<string>();
-    for (const variant of variants) {
-      if (skinProductIds.has(variant.productId)) {
-        sampleSKUs.add(variant.sku);
+      .withIndex("by_category", (q) => q.eq("category", category))
+      .collect();
+
+    // Filter to active models only
+    const activeModels = supportedModels.filter(m => m.isActive);
+
+    // Count models with mockups vs without
+    let modelsWithMockups = 0;
+    let modelsWithoutMockups = 0;
+
+    for (const model of activeModels) {
+      const hasMockup = await ctx.db
+        .query("mockups")
+        .withIndex("by_supported_model", (q) => q.eq("supportedModelId", model._id))
+        .first();
+
+      if (hasMockup) {
+        modelsWithMockups++;
+      } else {
+        modelsWithoutMockups++;
       }
     }
-    
-    // Estimate based on samples
-    const estimatedSKUs = sampleSKUs.size > 0 ? sampleSKUs.size : 50;
-    const estimatedModels = supportedModels.length;
-    const estimatedTotal = estimatedModels * estimatedSKUs;
-    
+
     // Get unique brands
-    const uniqueBrands = new Set(supportedModels.map(m => m.brandName)).size;
-    
+    const uniqueBrands = new Set(activeModels.map(m => m.brandName)).size;
+
     return {
-      totalMissingCombinations: estimatedTotal,
-      modelsAffected: estimatedModels,
+      totalMissingCombinations: modelsWithoutMockups, // Models without any mockups
+      modelsAffected: activeModels.length, // Total models in category
       brandsAffected: uniqueBrands,
-      totalSKUs: estimatedSKUs,
+      totalSKUs: modelsWithMockups, // Models that have mockups
+      modelsWithMockups,
+      modelsWithoutMockups,
     };
   },
 });
 
 /**
- * Get missing mockups by checking which phone model + SKU combinations lack mockup images
- * Returns models grouped by brand with their missing SKUs
- * Optimized with limits and brand filtering
+ * Get missing mockups - shows ALL models in category with their mockup status
+ * Returns models grouped by brand showing which have mockups and which don't
+ * Real-time: checks actual mockup records for each model
  */
 export const getMissingMockups = query({
-  args: { 
+  args: {
     category: v.optional(v.string()),
     brand: v.optional(v.string()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const category = args.category || "phone";
-    const limit = args.limit || 50; // Default to 50 models at a time
-    
-    // Get supported models for the category (optionally filtered by brand)
-    let modelsQuery = ctx.db
+    const limit = args.limit || 100; // Default to 100 models at a time
+
+    // Get ALL supported models for the category using index
+    const supportedModels = await ctx.db
       .query("supportedModels")
-      .filter((q) => q.and(
-        q.eq(q.field("category"), category),
-        q.eq(q.field("isActive"), true)
-      ));
-    
-    const supportedModels = await modelsQuery.take(500); // Max 500 models
-    
+      .withIndex("by_category", (q) => q.eq("category", category))
+      .collect();
+
+    // Filter to active models only
+    const activeModels = supportedModels.filter(m => m.isActive);
+
     // Filter by brand if specified
     const filteredModels = args.brand && args.brand !== "all"
-      ? supportedModels.filter(m => m.brandName === args.brand)
-      : supportedModels;
-    
+      ? activeModels.filter(m => m.brandName === args.brand)
+      : activeModels;
+
+    // Sort by brand then model name
+    filteredModels.sort((a, b) => {
+      if (a.brandName !== b.brandName) {
+        return a.brandName.localeCompare(b.brandName);
+      }
+      return a.modelName.localeCompare(b.modelName);
+    });
+
     // Take only the requested limit
     const limitedModels = filteredModels.slice(0, limit);
-    
-    // Get all products (limit to reduce load)
-    const allProducts = await ctx.db.query("products").take(200);
-    
-    // Filter to only products with "Phone Skin" in the title
-    const skinProducts = allProducts.filter(p => 
-      p.title.toLowerCase().includes("phone skin")
-    );
-    const skinProductIds = new Set(skinProducts.map(p => p._id));
-    
-    // Get product variants (SKUs) for skin products only (limited)
-    const variants = await ctx.db.query("variants").take(500);
-    const allSKUs = new Set<string>();
-    for (const variant of variants) {
-      if (skinProductIds.has(variant.productId)) {
-        allSKUs.add(variant.sku);
-      }
-    }
-    
-    // Get existing mockups (limited sample for performance)
-    const existingMockups = await ctx.db.query("mockups").take(2000);
-    
-    // Create a set of existing mockup combinations (normalized model + SKU)
-    const existingCombos = new Set<string>();
-    for (const mockup of existingMockups) {
-      const key = `${normalizeModelName(mockup.model)}|${mockup.sku}`;
-      existingCombos.add(key);
-    }
-    
-    // Find missing combinations for limited models only
+
+    // Check mockup status for each model (real-time)
     const results = [];
-    
-    for (const supportedModel of limitedModels) {
-      const normalizedModel = normalizeModelName(supportedModel.modelName);
-      const missingSKUs: string[] = [];
-      
-      for (const sku of allSKUs) {
-        const key = `${normalizedModel}|${sku}`;
-        if (!existingCombos.has(key)) {
-          missingSKUs.push(sku);
-        }
-      }
-      
-      if (missingSKUs.length > 0) {
-        results.push({
-          brand: supportedModel.brandName,
-          model: supportedModel.modelName,
-          missingSKUs,
-          totalMissing: missingSKUs.length,
-        });
-      }
+
+    for (const model of limitedModels) {
+      // Check if model has any mockups using the supportedModelId index
+      const mockups = await ctx.db
+        .query("mockups")
+        .withIndex("by_supported_model", (q) => q.eq("supportedModelId", model._id))
+        .collect();
+
+      const mockupCount = mockups.length;
+      const uniqueSKUs = [...new Set(mockups.map(m => m.sku))];
+
+      // Include ALL models - both with and without mockups
+      results.push({
+        brand: model.brandName,
+        model: model.modelName,
+        modelId: model._id,
+        hasMockups: mockupCount > 0,
+        mockupCount,
+        uniqueSKUs: uniqueSKUs.length,
+        missingSKUs: mockupCount === 0 ? ["No mockups uploaded"] : [],
+        totalMissing: mockupCount === 0 ? 1 : 0, // 1 if missing, 0 if has mockups
+      });
     }
-    
-    // Sort by brand then model
-    results.sort((a, b) => {
-      if (a.brand !== b.brand) {
-        return a.brand.localeCompare(b.brand);
-      }
-      return a.model.localeCompare(b.model);
-    });
-    
-    // Calculate stats for current page
-    const totalMissingCombinations = results.reduce((sum, r) => sum + r.totalMissing, 0);
+
+    // Calculate stats
+    const modelsWithMockups = results.filter(r => r.hasMockups).length;
+    const modelsWithoutMockups = results.filter(r => !r.hasMockups).length;
     const uniqueBrands = new Set(results.map(r => r.brand)).size;
-    
+
     return {
       results,
       hasMore: filteredModels.length > limit,
       totalAvailable: filteredModels.length,
       stats: {
-        totalMissingCombinations,
+        totalMissingCombinations: modelsWithoutMockups,
         modelsAffected: results.length,
         brandsAffected: uniqueBrands,
-        totalSKUs: allSKUs.size,
+        totalSKUs: modelsWithMockups,
+        modelsWithMockups,
+        modelsWithoutMockups,
       }
     };
   },

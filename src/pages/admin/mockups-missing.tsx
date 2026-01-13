@@ -101,23 +101,7 @@ export default function MissingMockupsPage() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Estimated Missing
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {stats.totalMissingCombinations.toLocaleString()}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Model + SKU combinations
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Models Affected
+                      Total Models
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -125,7 +109,39 @@ export default function MissingMockupsPage() {
                       {stats.modelsAffected.toLocaleString()}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Phone models
+                      In this category
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-destructive/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-destructive">
+                      Missing Mockups
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-destructive">
+                      {(stats.modelsWithoutMockups ?? stats.totalMissingCombinations).toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Models without mockups
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-green-500/50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-green-600">
+                      Has Mockups
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600">
+                      {(stats.modelsWithMockups ?? stats.totalSKUs).toLocaleString()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Models with mockups
                     </p>
                   </CardContent>
                 </Card>
@@ -133,7 +149,7 @@ export default function MissingMockupsPage() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Brands Affected
+                      Unique Brands
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -141,23 +157,7 @@ export default function MissingMockupsPage() {
                       {stats.brandsAffected}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Unique brands
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total SKUs
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {stats.totalSKUs.toLocaleString()}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Product variants
+                      In this category
                     </p>
                   </CardContent>
                 </Card>
@@ -260,9 +260,12 @@ export default function MissingMockupsPage() {
                       {filteredResults?.map(result => {
                         const modelKey = `${result.brand}|${result.model}`;
                         const isExpanded = expandedModels.has(modelKey);
-                        
+                        const hasMockups = (result as any).hasMockups ?? result.totalMissing === 0;
+                        const mockupCount = (result as any).mockupCount ?? 0;
+                        const uniqueSKUs = (result as any).uniqueSKUs ?? 0;
+
                         return (
-                          <div key={modelKey} className="border rounded-lg overflow-hidden">
+                          <div key={modelKey} className={`border rounded-lg overflow-hidden ${hasMockups ? 'border-green-500/30' : 'border-destructive/30'}`}>
                             {/* Model Row */}
                             <button
                               onClick={() => toggleModel(modelKey)}
@@ -279,36 +282,43 @@ export default function MissingMockupsPage() {
                                     {result.brand} {result.model}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
-                                    {result.totalMissing} missing SKU{result.totalMissing !== 1 ? 's' : ''}
+                                    {hasMockups
+                                      ? `${mockupCount} mockups (${uniqueSKUs} unique SKUs)`
+                                      : 'No mockups uploaded'
+                                    }
                                   </div>
                                 </div>
                               </div>
-                              <div className="bg-destructive/10 text-destructive px-3 py-1 rounded-full text-sm font-medium">
-                                {result.totalMissing}
-                              </div>
+                              {hasMockups ? (
+                                <div className="bg-green-500/10 text-green-600 px-3 py-1 rounded-full text-sm font-medium">
+                                  ✓ {mockupCount}
+                                </div>
+                              ) : (
+                                <div className="bg-destructive/10 text-destructive px-3 py-1 rounded-full text-sm font-medium">
+                                  Missing
+                                </div>
+                              )}
                             </button>
 
-                            {/* Expanded SKU List */}
+                            {/* Expanded Details */}
                             {isExpanded && (
                               <div className="border-t bg-muted/30 p-4">
-                                <h4 className="text-sm font-medium mb-3">Missing SKUs:</h4>
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                                  {result.missingSKUs.map(sku => (
-                                    <div
-                                      key={sku}
-                                      className="bg-background border rounded px-3 py-2 text-sm font-mono"
-                                    >
-                                      {sku}
-                                    </div>
-                                  ))}
-                                </div>
+                                {hasMockups ? (
+                                  <div className="text-sm text-green-600">
+                                    ✓ This model has {mockupCount} mockup{mockupCount !== 1 ? 's' : ''} uploaded covering {uniqueSKUs} unique SKU{uniqueSKUs !== 1 ? 's' : ''}.
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-destructive">
+                                    ✗ No mockups have been uploaded for this model yet.
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
                         );
                       })}
                     </div>
-                    
+
                     {/* Load More Button */}
                     {data?.hasMore && (
                       <div className="mt-6 text-center">

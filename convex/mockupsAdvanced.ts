@@ -450,6 +450,7 @@ export const deleteAllMockupsForModel = mutation({
 
 /**
  * Delete ALL mockups in the system (Batched)
+ * Also tries to delete associated storage files
  */
 export const deleteAllMockups = mutation({
   args: {},
@@ -474,7 +475,8 @@ export const deleteAllMockups = mutation({
         try {
           await ctx.storage.delete(mockup.fileId);
         } catch (error) {
-          console.error("Failed to delete from Convex storage:", error);
+          // Ignore storage errors - file may not exist in this account
+          console.log("Storage file not found (expected for migrated data):", mockup.fileId);
         }
       }
 
@@ -482,9 +484,34 @@ export const deleteAllMockups = mutation({
       await ctx.db.delete(mockup._id);
     }
 
-    return { 
+    return {
       deleted: mockups.length,
-      hasMore: mockups.length === 200 
+      hasMore: mockups.length === 200
+    };
+  },
+});
+
+/**
+ * Purge ALL mockup database records WITHOUT deleting storage files
+ * Use this for clearing imported data from old accounts where storage files don't exist
+ * Deletes 1000 records per call for speed
+ */
+export const purgeAllMockupRecords = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const BATCH_SIZE = 1000;
+    const mockups = await ctx.db.query("mockups").take(BATCH_SIZE);
+
+    for (const mockup of mockups) {
+      await ctx.db.delete(mockup._id);
+    }
+
+    // Check if there are more mockups remaining
+    const remaining = await ctx.db.query("mockups").first();
+
+    return {
+      deleted: mockups.length,
+      hasMore: remaining !== null
     };
   },
 });
