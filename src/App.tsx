@@ -32,6 +32,7 @@ const AdminProductsPage = lazy(() => import("./pages/admin/products/page.tsx"));
 const AdminCollectionsPage = lazy(() => import("./pages/admin/collections/page.tsx"));
 const NewProductPage = lazy(() => import("./pages/admin/products/new/page.tsx"));
 const EditProductPage = lazy(() => import("./pages/admin/products/edit/page.tsx"));
+const BulkProductCreatorPage = lazy(() => import("./pages/admin/products/bulk/page.tsx"));
 const AdminOrdersPage = lazy(() => import("./pages/admin/orders/page.tsx"));
 const AdminOrderDetailPage = lazy(() => import("./pages/admin/orders/detail.tsx"));
 const AdminCouponsPage = lazy(() => import("./pages/admin/coupons/page.tsx"));
@@ -114,6 +115,7 @@ export default function App() {
             {/* Admin routes - lazy loaded */}
             <Route path="/backend-skinly/products" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><NewProductPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/products/bulk" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><BulkProductCreatorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products/:productId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><EditProductPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/orders" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper></Suspense>} />

@@ -826,6 +826,12 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               View Last Report
             </Button>
           )}
+          <Link to="/backend-skinly/products/bulk">
+            <Button variant="outline">
+              <FileSpreadsheetIcon className="size-4 mr-2" />
+              Bulk Create
+            </Button>
+          </Link>
           <Link to="/backend-skinly/products/new">
             <Button>
               <PlusIcon className="size-4 mr-2" />
