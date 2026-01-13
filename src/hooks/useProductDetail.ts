@@ -130,16 +130,23 @@ export function useProductDetail() {
     }
   }, [phoneModel, productData?._id, mockupFileUrl]);
   
+  // Default logo image URL (used as placeholder when no product images uploaded)
+  const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
+
   // Display images with mockup priority
+  // Logic: If mockup exists, show mockup first. If only logo image exists, show it after mockup.
   const displayImages = useMemo(() => {
     if (!productData) return [];
-    
+
+    // Helper to check if an image is the default logo
+    const isDefaultLogo = (url: string) => url.includes("img_2_1767710584949") || url === DEFAULT_LOGO_IMAGE;
+
     if (!phoneModel) {
       return productData.images;
     }
-    
+
     const images = [];
-    
+
     // Add mockup image if found
     if (mockupState.url) {
       images.push({
@@ -148,20 +155,32 @@ export function useProductDetail() {
         phoneModel: phoneModel,
       });
     }
-    
+
     // Find model-specific images
     const modelSpecificImages = productData.images.filter(
       (img) => img.phoneModel?.toLowerCase() === phoneModel.toLowerCase()
     );
-    
+
     if (modelSpecificImages.length > 0) {
       images.push(...modelSpecificImages);
     }
-    
-    // Add default images
+
+    // Add default images - but if mockup exists, push logo images to the end
     const defaultImages = productData.images.filter((img) => !img.phoneModel);
-    images.push(...defaultImages);
-    
+
+    if (mockupState.url) {
+      // Separate logo images from other images
+      const logoImages = defaultImages.filter(img => isDefaultLogo(img.url));
+      const otherImages = defaultImages.filter(img => !isDefaultLogo(img.url));
+
+      // Add non-logo images first, then logo images at the end
+      images.push(...otherImages);
+      images.push(...logoImages);
+    } else {
+      // No mockup - just add all default images in order
+      images.push(...defaultImages);
+    }
+
     return images.length > 0 ? images : productData.images;
   }, [productData, phoneModel, mockupState.url]);
   

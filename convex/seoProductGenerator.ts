@@ -315,27 +315,68 @@ You must respond with ONLY a valid JSON object (no markdown, no code blocks) in 
   "metaTitle": "your meta title here",
   "description": "your full product description here",
   "metaDescription": "your meta description here",
-  "tags": ["tag1", "tag2", "tag3"]
-}`;
+  "tags": ["tag1", "tag2", "tag3"],
+  "slug": "url-friendly-slug-here",
+  "imageAlt": "descriptive alt text for product image"
+}
+
+SLUG RULES:
+• Must be URL-friendly (lowercase, hyphens instead of spaces, no special characters)
+• Should be concise but descriptive
+• Include key product identifiers (e.g., "matte-black-iphone-15-pro-skin")
+
+IMAGE ALT TEXT RULES:
+• Describe the product visually for accessibility
+• Include product type, design/finish, and device if applicable
+• Keep it natural and descriptive (50-100 characters)
+• Example: "Matte black vinyl skin wrap for iPhone 15 Pro"`;
 
     const userPrompt = `Generate SEO content for this product:
 
 Product Title: ${args.title}
 Product Category: ${categoryName}${finishType}
 
-Return ONLY the JSON object with metaTitle, description, metaDescription, and tags.`;
+Return ONLY the JSON object with metaTitle, description, metaDescription, tags, slug, and imageAlt.`;
 
     try {
       // Call OpenAI API
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000,
-      });
+      let completion;
+      try {
+        completion = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000,
+        });
+      } catch (openaiError: any) {
+        console.error("OpenAI API call failed:", openaiError);
+        // Provide more specific error messages for common issues
+        if (openaiError?.status === 401 || openaiError?.code === "invalid_api_key") {
+          throw new ConvexError({
+            message: "Invalid OpenAI API key. Please check your API key in Settings.",
+            code: "BAD_REQUEST",
+          });
+        }
+        if (openaiError?.status === 429) {
+          throw new ConvexError({
+            message: "OpenAI rate limit exceeded. Please try again later.",
+            code: "RATE_LIMITED",
+          });
+        }
+        if (openaiError?.status === 402 || openaiError?.code === "insufficient_quota") {
+          throw new ConvexError({
+            message: "OpenAI API quota exceeded. Please check your billing.",
+            code: "QUOTA_EXCEEDED",
+          });
+        }
+        throw new ConvexError({
+          message: `OpenAI API error: ${openaiError?.message || "Unknown error"}`,
+          code: "EXTERNAL_SERVICE_ERROR",
+        });
+      }
 
       const responseText = completion.choices[0]?.message?.content?.trim();
 
@@ -352,6 +393,8 @@ Return ONLY the JSON object with metaTitle, description, metaDescription, and ta
         description: string;
         metaDescription: string;
         tags: string[];
+        slug?: string;
+        imageAlt?: string;
       };
 
       try {
@@ -376,11 +419,24 @@ Return ONLY the JSON object with metaTitle, description, metaDescription, and ta
         });
       }
 
+      // Generate fallback slug if not provided
+      const slug = seoContent.slug || args.title
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .trim();
+
+      // Generate fallback imageAlt if not provided
+      const imageAlt = seoContent.imageAlt || `${args.title} - Skinly`;
+
       return {
         metaTitle: seoContent.metaTitle,
         description: seoContent.description,
         metaDescription: seoContent.metaDescription,
         tags: seoContent.tags,
+        slug,
+        imageAlt,
       };
     } catch (error) {
       console.error("OpenAI API error:", error);

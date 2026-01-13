@@ -95,6 +95,9 @@ function NewProductPageInner() {
   // Get selected finish type display name
   const selectedFinishType = finishTypes?.find(f => f._id === formData.finishTypeId);
 
+  // Default logo image URL for products without images
+  const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
+
   const handleGenerateSEO = async () => {
     if (!formData.title.trim()) {
       toast.error("Please enter a product title first");
@@ -109,13 +112,18 @@ function NewProductPageInner() {
         finishType: selectedFinishType?.displayName,
       });
 
-      // Update form with generated SEO content
+      // Update form with generated SEO content including slug and image alt
       setFormData(prev => ({
         ...prev,
         metaTitle: result.metaTitle,
         description: result.description,
         metaDescription: result.metaDescription,
         tags: result.tags.join(", "),
+        slug: result.slug,
+        // Update first image alt text, or add default image with alt if no images
+        images: prev.images.length > 0 && prev.images[0].url
+          ? prev.images.map((img, i) => i === 0 ? { ...img, alt: result.imageAlt } : img)
+          : [{ url: DEFAULT_LOGO_IMAGE, alt: result.imageAlt }],
       }));
 
       toast.success("SEO content generated successfully!");
