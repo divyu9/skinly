@@ -34,16 +34,32 @@ export const getMockupFileId = query({
     sku: v.string(),
   },
   handler: async (ctx, args) => {
-    // Normalize the search model name with brand-aware logic
-    const normalizedSearchModel = normalizeModelName(args.model, args.brand);
-
-    // Get all mockups for this brand and SKU
-    const mockups = await ctx.db
+    // First try exact match with full index (most efficient)
+    const exactMatch = await ctx.db
       .query("mockups")
       .withIndex("by_brand_model_sku", (q) =>
-        q.eq("brand", args.brand)
+        q.eq("brand", args.brand).eq("model", args.model).eq("sku", args.sku)
       )
-      .collect();
+      .first();
+
+    if (exactMatch) {
+      if (exactMatch.cloudinaryUrl) {
+        return exactMatch.cloudinaryUrl;
+      }
+      if (exactMatch.fileId) {
+        return await ctx.storage.getUrl(exactMatch.fileId);
+      }
+      return null;
+    }
+
+    // Fallback: Try normalized model matching (for model name variations)
+    // Use by_brand_model index with pagination to avoid full table scan
+    const normalizedSearchModel = normalizeModelName(args.model, args.brand);
+
+    const mockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_brand_model", (q) => q.eq("brand", args.brand))
+      .take(500); // Safety limit
 
     // Find mockup with matching normalized model name and SKU
     const mockup = mockups.find((m) =>
@@ -59,8 +75,7 @@ export const getMockupFileId = query({
 
     // Fallback to Convex storage for legacy mockups
     if (mockup.fileId) {
-      const url = await ctx.storage.getUrl(mockup.fileId);
-      return url;
+      return await ctx.storage.getUrl(mockup.fileId);
     }
 
     return null;
@@ -546,6 +561,9 @@ export const getMissingMockups = query({
 /**
  * Batch fetch mockups - paginated to avoid read limits
  * Returns map of sku -> url
+ *
+ * IMPORTANT: Uses by_brand_model index for efficient queries.
+ * Hard limit of 100 documents per call to prevent "Too many documents read" error.
  */
 export const getBatchMockups = query({
   args: {
@@ -565,23 +583,26 @@ export const getBatchMockups = query({
       };
     }
 
-    const limit = args.limit || 100;
+    // HARD SAFETY LIMIT: Never fetch more than 100 documents per call
+    // This prevents "Too many documents read (limit: 32000)" errors
+    const safeLimit = Math.min(args.limit || 100, 100);
 
-    // Use withIndex to avoid full table scan (fixes "Too many documents read" error)
+    // Use dedicated by_brand_model index for efficient queries
+    // This index is specifically designed for brand+model prefix queries
     const mockupsQuery = ctx.db
       .query("mockups")
-      .withIndex("by_brand_model_sku", (q) =>
+      .withIndex("by_brand_model", (q) =>
         q.eq("brand", args.brand).eq("model", args.model)
       );
 
-    // Paginate results
+    // Paginate results with safe limit
     const { page, isDone, continueCursor } = await mockupsQuery.paginate({
       cursor: args.cursor ?? null,
-      numItems: limit,
+      numItems: safeLimit,
     });
 
     const result: Record<string, string> = {};
-    
+
     for (const mockup of page) {
       // If specific SKUs requested, filter for them
       if (args.skus && !args.skus.includes(mockup.sku)) {

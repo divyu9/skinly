@@ -368,6 +368,7 @@ export default defineSchema({
     cloudinaryPublicId: v.optional(v.string()), // Cloudinary public ID for deletions
     supportedModelId: v.optional(v.id("supportedModels")), // Link to supported model (for advanced mockups)
   })
+    .index("by_brand_model", ["brand", "model"]) // For getBatchMockups queries
     .index("by_brand_model_sku", ["brand", "model", "sku"])
     .index("by_sku", ["sku"])
     .index("by_supported_model", ["supportedModelId"]),
