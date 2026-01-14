@@ -561,23 +561,64 @@ export const getBatchMockups = query({
     // This prevents "Too many documents read (limit: 32000)" errors
     const safeLimit = Math.min(args.limit || 100, 100);
 
-    // Use dedicated by_brand_model index for efficient queries
-    // This index is specifically designed for brand+model prefix queries
-    const mockupsQuery = ctx.db
+    // First try exact match with by_brand_model index (most efficient)
+    const exactMatchQuery = ctx.db
       .query("mockups")
       .withIndex("by_brand_model", (q) =>
         q.eq("brand", args.brand).eq("model", args.model)
       );
 
     // Paginate results with safe limit
-    const { page, isDone, continueCursor } = await mockupsQuery.paginate({
+    const { page: exactPage, isDone: exactDone, continueCursor: exactCursor } = await exactMatchQuery.paginate({
       cursor: args.cursor ?? null,
       numItems: safeLimit,
     });
 
     const result: Record<string, string> = {};
 
-    for (const mockup of page) {
+    for (const mockup of exactPage) {
+      // If specific SKUs requested, filter for them
+      if (args.skus && !args.skus.includes(mockup.sku)) {
+        continue;
+      }
+
+      // Prefer Cloudinary URL, fallback to Convex storage
+      let url: string | null = null;
+      if (mockup.cloudinaryUrl) {
+        url = mockup.cloudinaryUrl;
+      } else if (mockup.fileId) {
+        url = await ctx.storage.getUrl(mockup.fileId);
+      }
+
+      if (url) {
+        result[mockup.sku] = url;
+      }
+    }
+
+    // If we found mockups with exact match, return them
+    if (Object.keys(result).length > 0 || exactDone) {
+      return {
+        mockups: result,
+        cursor: exactCursor,
+        isDone: exactDone,
+      };
+    }
+
+    // Fallback: Try normalized model matching (for model name variations)
+    // Query all mockups for this brand and filter by normalized model
+    const normalizedSearchModel = normalizeModelName(args.model, args.brand);
+
+    const brandMockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_brand_model", (q) => q.eq("brand", args.brand))
+      .take(500); // Safety limit
+
+    for (const mockup of brandMockups) {
+      // Match by normalized model name
+      if (normalizeModelName(mockup.model, args.brand) !== normalizedSearchModel) {
+        continue;
+      }
+
       // If specific SKUs requested, filter for them
       if (args.skus && !args.skus.includes(mockup.sku)) {
         continue;
@@ -598,8 +639,8 @@ export const getBatchMockups = query({
 
     return {
       mockups: result,
-      cursor: continueCursor,
-      isDone,
+      cursor: "",
+      isDone: true,
     };
   },
 });
