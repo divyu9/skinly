@@ -225,14 +225,37 @@ export const getModelMockupStats = query({
       .collect();
 
     // Filter uploaded SKUs to only include valid phone skin SKUs
-    // Note: Uploaded SKUs might have suffixes like -PH which are valid but the base SKU in variants table is without suffix
-    // We need to normalize uploaded SKUs by stripping common suffixes before matching
-    const allUploadedSKUs = [...new Set(modelMockups.map(m => {
-      // Strip -PH suffix if present
-      return m.sku.toUpperCase().replace(/-PH$/, "");
-    }))];
+    // Note: We need bidirectional matching:
+    // 1. Uploaded "R-01-PH" matches DB "R-01" (strip suffix)
+    // 2. Uploaded "R-01" matches DB "R-01-PH" (add suffix check)
+    const allUploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
     
-    const validUploadedSKUs = allUploadedSKUs.filter(sku => uniqueTotalSKUsSet.has(sku));
+    // Create a set of covered DB SKUs
+    const coveredDbSKUs = new Set<string>();
+
+    for (const uploadedSku of allUploadedSKUs) {
+      // Direct match
+      if (uniqueTotalSKUsSet.has(uploadedSku)) {
+        coveredDbSKUs.add(uploadedSku);
+        continue;
+      }
+
+      // Try stripping suffix (Uploaded: R-01-PH -> DB: R-01)
+      const strippedSku = uploadedSku.replace(/-PH$/, "");
+      if (uniqueTotalSKUsSet.has(strippedSku)) {
+        coveredDbSKUs.add(strippedSku);
+        continue;
+      }
+
+      // Try adding suffix (Uploaded: R-01 -> DB: R-01-PH)
+      const suffixedSku = `${uploadedSku}-PH`;
+      if (uniqueTotalSKUsSet.has(suffixedSku)) {
+        coveredDbSKUs.add(suffixedSku);
+        continue;
+      }
+    }
+    
+    const validUploadedSKUs = Array.from(coveredDbSKUs);
     
     const coverage = uniqueTotalSKUs.length > 0 
       ? (validUploadedSKUs.length / uniqueTotalSKUs.length) * 100 
@@ -240,7 +263,7 @@ export const getModelMockupStats = query({
 
     // Find missing SKUs
     const missingSKUs = uniqueTotalSKUs.filter(
-      sku => !validUploadedSKUs.includes(sku.toUpperCase())
+      sku => !coveredDbSKUs.has(sku.toUpperCase())
     );
 
     // Get inventory data for missing SKUs

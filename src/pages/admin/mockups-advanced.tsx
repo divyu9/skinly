@@ -53,7 +53,11 @@ function parseSKUFromFilename(filename: string): string | null {
   // Match patterns like L-01, M-123, S-45, R-123, A-01, T-50 etc.
   // Also supports optional suffixes like R-123-PH
   const match = cleanFilename.match(/([LMSBFART])-(\d+)(?:-[A-Z0-9]+)?/i);
-  return match ? match[0].toUpperCase() : null;
+  
+  if (!match) return null;
+
+  // Always return uppercase
+  return match[0].toUpperCase();
 }
 
 // View Mockups Dialog
@@ -557,19 +561,29 @@ function UploadMockupsDialog({
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [skipExisting, setSkipExisting] = useState(true); // Default to skipping existing
   const [uploadProgress, setUploadProgress] = useState<{
     total: number;
     completed: number;
     failed: number;
+    skipped: number;
     current: string;
-    fileStatuses: Map<string, 'pending' | 'uploading' | 'success' | 'failed'>;
+    fileStatuses: Map<string, 'pending' | 'uploading' | 'success' | 'failed' | 'skipped'>;
   }>({
     total: 0,
     completed: 0,
     failed: 0,
+    skipped: 0,
     current: '',
     fileStatuses: new Map(),
   });
+
+  // Fetch current stats to check for existing mockups
+  const stats = useQuery(api.mockupsAdvanced.getModelMockupStats, { modelId });
+  const existingSKUs = useMemo(() => {
+    if (!stats) return new Set<string>();
+    return new Set(stats.mockups.map(m => m.sku.toUpperCase()));
+  }, [stats]);
 
   const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
   const storeMockup = useMutation(api.mockupsAdvanced.storeMockupAdvanced);
@@ -596,12 +610,14 @@ function UploadMockupsDialog({
       total: files.length,
       completed: 0,
       failed: 0,
+      skipped: 0,
       current: '',
       fileStatuses: new Map(files.map(f => [f.name, 'pending' as const])),
     });
 
     let completedCount = 0;
     let failedCount = 0;
+    let skippedCount = 0;
 
     for (const file of files) {
       const sku = parseSKUFromFilename(file.name);
@@ -616,6 +632,21 @@ function UploadMockupsDialog({
           };
         });
         failedCount++;
+        continue;
+      }
+
+      // Check if SKU already exists
+      if (skipExisting && existingSKUs.has(sku)) {
+        setUploadProgress(prev => {
+          const newStatuses = new Map(prev.fileStatuses);
+          newStatuses.set(file.name, 'skipped');
+          return {
+            ...prev,
+            skipped: prev.skipped + 1,
+            fileStatuses: newStatuses,
+          };
+        });
+        skippedCount++;
         continue;
       }
 
@@ -684,11 +715,11 @@ function UploadMockupsDialog({
     }
 
     setUploading(false);
-    toast.success(`Upload complete: ${completedCount} succeeded, ${failedCount} failed`);
+    toast.success(`Upload complete: ${completedCount} succeeded, ${skippedCount} skipped, ${failedCount} failed`);
   };
 
   const progressPercentage = uploadProgress.total > 0
-    ? ((uploadProgress.completed + uploadProgress.failed) / uploadProgress.total) * 100
+    ? ((uploadProgress.completed + uploadProgress.failed + uploadProgress.skipped) / uploadProgress.total) * 100
     : 0;
 
   return (
@@ -702,6 +733,25 @@ function UploadMockupsDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg">
+             <div className="flex items-center space-x-2">
+               <input 
+                 type="checkbox" 
+                 id="skipExisting"
+                 className="h-4 w-4 rounded border-gray-300"
+                 checked={skipExisting}
+                 onChange={(e) => setSkipExisting(e.target.checked)}
+                 disabled={uploading}
+               />
+               <label htmlFor="skipExisting" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                 Skip SKUs that already have mockups
+               </label>
+             </div>
+             <div className="text-xs text-muted-foreground ml-auto">
+               {existingSKUs.size} SKUs already uploaded
+             </div>
+          </div>
+
           <div>
             <Input
               type="file"
@@ -710,7 +760,16 @@ function UploadMockupsDialog({
               {...({ webkitdirectory: "", directory: "" } as any)}
               onChange={handleFileSelect}
               disabled={uploading}
+              className="hidden"
+              id="file-upload"
             />
+            <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload files</span> or drag and drop</p>
+                <p className="text-xs text-muted-foreground">Select individual images or entire folders</p>
+              </div>
+            </label>
           </div>
 
           {files.length > 0 && (
@@ -718,11 +777,12 @@ function UploadMockupsDialog({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm mb-1 font-medium">
                   <span>Uploading... {Math.round(progressPercentage)}%</span>
-                  <span>{uploadProgress.completed + uploadProgress.failed} of {uploadProgress.total} images</span>
+                  <span>{uploadProgress.completed + uploadProgress.failed + uploadProgress.skipped} of {uploadProgress.total} images</span>
                 </div>
                 <Progress value={progressPercentage} className="h-2" />
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                   <span className="text-green-600">{uploadProgress.completed} succeeded</span>
+                  <span className="text-blue-600">{uploadProgress.skipped} skipped</span>
                   <span className="text-red-600">{uploadProgress.failed} failed</span>
                 </div>
               </div>
@@ -756,6 +816,12 @@ function UploadMockupsDialog({
                             <Badge variant="default" className="bg-green-600">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Success
+                            </Badge>
+                          )}
+                          {status === 'skipped' && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Skipped
                             </Badge>
                           )}
                           {status === 'failed' && (
