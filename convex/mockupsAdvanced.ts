@@ -225,33 +225,34 @@ export const getModelMockupStats = query({
       .collect();
 
     // Filter uploaded SKUs to only include valid phone skin SKUs
-    // Note: We need bidirectional matching:
-    // 1. Uploaded "R-01-PH" matches DB "R-01" (strip suffix)
-    // 2. Uploaded "R-01" matches DB "R-01-PH" (add suffix check)
+    // Note: We need flexible bidirectional matching to handle suffixes
     const allUploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
     
     // Create a set of covered DB SKUs
     const coveredDbSKUs = new Set<string>();
 
-    for (const uploadedSku of allUploadedSKUs) {
-      // Direct match
-      if (uniqueTotalSKUsSet.has(uploadedSku)) {
-        coveredDbSKUs.add(uploadedSku);
-        continue;
-      }
-
-      // Try stripping suffix (Uploaded: R-01-PH -> DB: R-01)
-      const strippedSku = uploadedSku.replace(/-PH$/, "");
-      if (uniqueTotalSKUsSet.has(strippedSku)) {
-        coveredDbSKUs.add(strippedSku);
-        continue;
-      }
-
-      // Try adding suffix (Uploaded: R-01 -> DB: R-01-PH)
-      const suffixedSku = `${uploadedSku}-PH`;
-      if (uniqueTotalSKUsSet.has(suffixedSku)) {
-        coveredDbSKUs.add(suffixedSku);
-        continue;
+    for (const uploadedSkuRaw of allUploadedSKUs) {
+      const uploadedSku = uploadedSkuRaw.trim();
+      
+      // Iterate through ALL valid SKUs to find matches
+      // This is O(N*M) but M is small (~360) so it's efficient enough
+      for (const dbSku of uniqueTotalSKUs) {
+        const dbSkuUpper = dbSku.toUpperCase();
+        
+        // 1. Direct match (R-08 === R-08)
+        if (dbSkuUpper === uploadedSku) {
+          coveredDbSKUs.add(dbSku);
+        }
+        // 2. DB has suffix (DB: R-08-PH, Upload: R-08)
+        // Check if DB SKU starts with "R-08-"
+        else if (dbSkuUpper.startsWith(uploadedSku + "-")) {
+          coveredDbSKUs.add(dbSku);
+        }
+        // 3. Upload has suffix (DB: R-08, Upload: R-08-PH)
+        // Check if Upload SKU starts with "R-08-"
+        else if (uploadedSku.startsWith(dbSkuUpper + "-")) {
+          coveredDbSKUs.add(dbSku);
+        }
       }
     }
     
