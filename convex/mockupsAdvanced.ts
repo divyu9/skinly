@@ -225,7 +225,13 @@ export const getModelMockupStats = query({
       .collect();
 
     // Filter uploaded SKUs to only include valid phone skin SKUs
-    const allUploadedSKUs = [...new Set(modelMockups.map(m => m.sku.toUpperCase()))];
+    // Note: Uploaded SKUs might have suffixes like -PH which are valid but the base SKU in variants table is without suffix
+    // We need to normalize uploaded SKUs by stripping common suffixes before matching
+    const allUploadedSKUs = [...new Set(modelMockups.map(m => {
+      // Strip -PH suffix if present
+      return m.sku.toUpperCase().replace(/-PH$/, "");
+    }))];
+    
     const validUploadedSKUs = allUploadedSKUs.filter(sku => uniqueTotalSKUsSet.has(sku));
     
     const coverage = uniqueTotalSKUs.length > 0 
