@@ -50,8 +50,9 @@ function parseSKUFromFilename(filename: string): string | null {
   // Also handle cases where it might be attached to other words e.g. "Model_B1_SKU"
   const cleanFilename = filename.replace(/_B\d*(?=_|\.|$| )/gi, "_");
   
-  // Match patterns like L-01, M-123, S-45, etc.
-  const match = cleanFilename.match(/([LMSBF])-(\d+)/i);
+  // Match patterns like L-01, M-123, S-45, R-123, A-01, T-50 etc.
+  // Also supports optional suffixes like R-123-PH
+  const match = cleanFilename.match(/([LMSBFART])-(\d+)(?:-[A-Z0-9]+)?/i);
   return match ? match[0].toUpperCase() : null;
 }
 

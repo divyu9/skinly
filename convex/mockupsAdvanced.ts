@@ -5,8 +5,9 @@ import { internal } from "./_generated/api.js";
 
 // Helper: Parse SKU from filename (e.g., "iphone11_L-01.jpg" -> "L-01")
 function parseSKUFromFilename(filename: string): string | null {
-  // Match patterns like L-01, M-123, S-45, etc.
-  const match = filename.match(/([LMSBF])-(\d+)/i);
+  // Match patterns like L-01, M-123, S-45, R-123, A-01, T-50 etc.
+  // Also supports optional suffixes like R-123-PH
+  const match = filename.match(/([LMSBFART])-(\d+)(?:-[A-Z0-9]+)?/i);
   return match ? match[0].toUpperCase() : null;
 }
 

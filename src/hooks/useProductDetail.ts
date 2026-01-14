@@ -62,11 +62,12 @@ export function useProductDetail() {
   const isLoading = productData === undefined;
   
   // Query mockup file URL from database
+  // Use phoneBrand from URL params if available, otherwise try to extract from model name
   const mockupFileUrl = useQuery(
     api.mockups.getMockupFileId,
     phoneModel && productData
       ? {
-          brand: extractBrand(phoneModel) || "",
+          brand: phoneBrand || extractBrand(phoneModel) || "",
           model: phoneModel,
           sku: extractSKU(productData.title, productData.variants[0]?.sku) || "",
         }
