@@ -25,8 +25,10 @@ export const ProductCard = memo(function ProductCard({
   const hasDeviceSelected = !!(brandFilter && modelFilter);
   
   // Use mockupUrl if available (batch loaded), else fall back to default image
-  const hasMockup = !!product.mockupUrl;
+  // If we have a mockupUrl from batch loading, use it
+  // Otherwise, use main image
   const displayImageUrl = product.mockupUrl || mainImage?.url;
+  const hasMockup = !!product.mockupUrl;
   
   const minPrice = Math.min(...product.variants.map(v => v.price));
   const maxPrice = Math.max(...product.variants.map(v => v.price));

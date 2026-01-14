@@ -195,22 +195,20 @@ export function generateModelVariations(modelName: string): string[] {
  * @returns SKU code or null if not found
  */
 export function extractSKU(title: string, sku?: string): string | null {
-  const pattern = /([LMSBFART])-\d+/i;
-
-  // First try the variant SKU if provided
-  if (sku) {
-    const skuMatch = sku.match(pattern);
-    if (skuMatch) return skuMatch[0];
+  // STRICTLY use the provided SKU if available.
+  // The user confirmed SKU is the single source of truth.
+  if (sku && sku.trim().length > 0) {
+    // Return the SKU directly, just trimming whitespace
+    return sku.trim();
   }
   
-  // Then try to extract from title
-  // Handle (M-174) or just M-174
+  // Fallback to title ONLY if SKU is completely missing (should not happen for valid products)
+  // This is just a safety net for malformed data
+  const pattern = /([LMSBFART])-\d+/i;
   const titlePattern = new RegExp(`\\((${pattern.source})\\)|${pattern.source}`, 'i');
   const titleMatch = title.match(titlePattern);
   
   if (titleMatch) {
-    // titleMatch[0] is the full match (e.g. "(M-174)" or "M-174")
-    // We want to return the clean SKU
     return titleMatch[0].replace(/[()]/g, '');
   }
   
