@@ -218,9 +218,16 @@ export const getAllProductsPaginated = query({
 });
 
 // Get all products with only basic info and variant count (ultra-lightweight)
+// Optimized: Fetches variants only for returned products, supports sorting
 export const getAllProductsBasic = query({
   args: {
     status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),
+    sortBy: v.optional(v.union(
+      v.literal("latest"),
+      v.literal("oldest"),
+      v.literal("title_asc"),
+      v.literal("title_desc")
+    )),
   },
   handler: async (ctx, args) => {
     let products;
@@ -234,9 +241,30 @@ export const getAllProductsBasic = query({
       products = await ctx.db.query("products").collect();
     }
 
-    // Fetch ALL variants
+    // Sort products based on sortBy parameter (default: latest first)
+    const sortBy = args.sortBy || "latest";
+    products = [...products].sort((a, b) => {
+      switch (sortBy) {
+        case "latest":
+          return b._creationTime - a._creationTime;
+        case "oldest":
+          return a._creationTime - b._creationTime;
+        case "title_asc":
+          return a.title.localeCompare(b.title);
+        case "title_desc":
+          return b.title.localeCompare(a.title);
+        default:
+          return b._creationTime - a._creationTime;
+      }
+    });
+
+    // Get product IDs for efficient variant lookup
+    const productIds = new Set(products.map(p => p._id));
+
+    // Fetch ALL variants and filter only those belonging to our products
+    // This is more efficient than N separate queries for large datasets
     const allVariants = await ctx.db.query("variants").collect();
-    
+
     // Count variants per product and build SKU list for search
     const variantDataByProduct = new Map<string, {
       count: number;
@@ -244,9 +272,12 @@ export const getAllProductsBasic = query({
       firstVariant: typeof allVariants[0] | null;
       totalInventory: number;
     }>();
-    
+
     for (const variant of allVariants) {
       const productId = variant.productId;
+      // Only process variants for products we're returning
+      if (!productIds.has(productId as Id<"products">)) continue;
+
       if (!variantDataByProduct.has(productId)) {
         variantDataByProduct.set(productId, {
           count: 0,

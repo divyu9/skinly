@@ -1,10 +1,10 @@
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api.js";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, DownloadIcon, SearchIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
@@ -134,9 +134,7 @@ function EditableCell({
 
 function AdminProductsPageInner() {
   // State declarations first
-  const [isMigrating, setIsMigrating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isCheckingCount, setIsCheckingCount] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [managingImagesProduct, setManagingImagesProduct] = useState<{id: Id<"products">; title: string; images: Array<{url: string; alt?: string}>} | null>(null);
@@ -155,16 +153,6 @@ function AdminProductsPageInner() {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
   const [expandedProducts, setExpandedProducts] = useState<Set<Id<"products">>>(new Set());
-  const [migrationReport, setMigrationReport] = useState<{
-    total: number;
-    successful: number;
-    skipped: number;
-    failed: number;
-    successfulProducts: string[];
-    skippedProducts: Array<{ title: string; reason: string }>;
-    failedProducts: Array<{ title: string; reason: string }>;
-  } | null>(null);
-  const [showReportDialog, setShowReportDialog] = useState(false);
 
   // Tag manager state
   const [managingTagsProduct, setManagingTagsProduct] = useState<{
@@ -184,8 +172,11 @@ function AdminProductsPageInner() {
   const [inventorySortOrder, setInventorySortOrder] = useState<"asc" | "desc">("desc");
   const [activeSortColumn, setActiveSortColumn] = useState<"sku" | "inventory" | null>(null);
 
+  // Backend sort option (for efficient sorting)
+  const [backendSortBy, setBackendSortBy] = useState<"latest" | "oldest" | "title_asc" | "title_desc">("latest");
+
   // Queries and mutations
-  const products = useQuery(api.products.getAllProductsBasic, {});
+  const products = useQuery(api.products.getAllProductsBasic, { sortBy: backendSortBy });
   const collections = useQuery(api.collections.getAllCollections, {});
   // Only load stock levels when Rolls Management tab is active
   const stockLevelsArray = useQuery(
@@ -210,71 +201,6 @@ function AdminProductsPageInner() {
   const deleteAllProducts = useMutation(api.products.deleteAllProducts);
   const bulkUpdateVariants = useMutation(api.products.bulkUpdateVariants);
   const cloneProduct = useMutation(api.products.cloneProduct);
-  const migrateFromShopify = useAction(api.migration.migrateFromShopify);
-  const checkProductCount = useAction(api.migration.checkShopifyProductCount);
-
-  const handleCheckCount = async () => {
-    setIsCheckingCount(true);
-    try {
-      const result = await checkProductCount({});
-      const message = `
-Shopify: ${result.shopifyTotal} products
-Local DB: ${result.localTotal} products
-Missing: ${result.missing} products
-
-${result.missing > 0 ? "Click 'Import from Shopify' to import missing products." : "All products are synced!"}
-      `.trim();
-
-      if (result.missing > 0) {
-        toast.warning(message);
-      } else {
-        toast.success(message);
-      }
-    } catch (error) {
-      toast.error(
-        `Failed to check product count: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-    } finally {
-      setIsCheckingCount(false);
-    }
-  };
-
-  const handleMigration = async () => {
-    if (
-      !confirm(
-        "This will import all active products from Shopify. Products already in your database will be skipped automatically. Continue?"
-      )
-    ) {
-      return;
-    }
-
-    setIsMigrating(true);
-    try {
-      const result = await migrateFromShopify({ forceReimport: false });
-
-      // Store the full report
-      setMigrationReport(result);
-
-      const parts = [
-        `${result.successful} imported`,
-        result.skipped > 0 ? `${result.skipped} skipped` : null,
-        result.failed > 0 ? `${result.failed} failed` : null,
-      ].filter(Boolean);
-
-      toast.success(
-        `Migration complete! ${parts.join(", ")}. Click "View Details" to see full report.`
-      );
-
-      // Show the dialog with detailed report
-      setShowReportDialog(true);
-    } catch (error) {
-      toast.error(
-        `Migration failed: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
-    } finally {
-      setIsMigrating(false);
-    }
-  };
 
   const handleClearAll = async () => {
     if (
@@ -809,25 +735,8 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               </Button>
             </>
           )}
-          <Button variant="secondary" onClick={handleCheckCount} disabled={isCheckingCount}>
-            <PackageIcon className="size-4 mr-2" />
-            {isCheckingCount ? "Checking..." : "Check Product Count"}
-          </Button>
-          <Button variant="outline" onClick={handleMigration} disabled={isMigrating}>
-            <DownloadIcon className="size-4 mr-2" />
-            {isMigrating ? "Importing..." : "Import from Shopify"}
-          </Button>
-          {migrationReport && (
-            <Button
-              variant="ghost"
-              onClick={() => setShowReportDialog(true)}
-              className="text-xs"
-            >
-              View Last Report
-            </Button>
-          )}
           <Link to="/backend-skinly/products/bulk">
-            <Button variant="outline">
+            <Button variant="secondary">
               <FileSpreadsheetIcon className="size-4 mr-2" />
               Bulk Create
             </Button>
@@ -862,8 +771,22 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         <Card>
           <CardContent className="p-4">
             <div className="space-y-4">
-              {/* SKU and Sort Filters */}
+              {/* Sort By and SKU Filters */}
               <div className="flex items-center gap-6 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-muted-foreground">Sort By:</span>
+                  <Select value={backendSortBy} onValueChange={(v) => setBackendSortBy(v as typeof backendSortBy)}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="latest">Latest First</SelectItem>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
+                      <SelectItem value="title_asc">Title A-Z</SelectItem>
+                      <SelectItem value="title_desc">Title Z-A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-muted-foreground">SKU Filter:</span>
                   <div className="flex items-center gap-2">
@@ -1106,7 +1029,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
               )}
 
               {/* Reset Button */}
-              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all" || activeSortColumn !== null) && (
+              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all" || activeSortColumn !== null || backendSortBy !== "latest") && (
                 <div className="flex justify-end">
                   <Button
                     size="sm"
@@ -1121,6 +1044,7 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
                       setShowAdvancedFilters(false);
                       setActiveSortColumn(null);
                       setInventorySortOrder("desc");
+                      setBackendSortBy("latest");
                     }}
                     className="text-muted-foreground hover:text-foreground"
                   >
@@ -1649,121 +1573,6 @@ ${result.missing > 0 ? "Click 'Import from Shopify' to import missing products."
         </DialogContent>
       </Dialog>
 
-      {/* Migration Report Dialog */}
-      <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
-          <DialogHeader>
-            <DialogTitle>Import Report</DialogTitle>
-            <DialogDescription>
-              {migrationReport && (
-                <>
-                  Imported {migrationReport.successful} of {migrationReport.total} products from
-                  Shopify
-                  {migrationReport.skipped > 0 && ` (${migrationReport.skipped} skipped)`}
-                  {migrationReport.failed > 0 && ` (${migrationReport.failed} failed)`}
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          {migrationReport && (
-            <Tabs defaultValue="skipped" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="skipped" className="flex items-center gap-2">
-                  <AlertCircleIcon className="size-4" />
-                  Skipped ({migrationReport.skipped})
-                </TabsTrigger>
-                <TabsTrigger value="successful" className="flex items-center gap-2">
-                  <CheckCircleIcon className="size-4" />
-                  Imported ({migrationReport.successful})
-                </TabsTrigger>
-                <TabsTrigger value="failed" className="flex items-center gap-2">
-                  <XCircleIcon className="size-4" />
-                  Failed ({migrationReport.failed})
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="skipped">
-                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
-                  {migrationReport.skippedProducts.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      No products were skipped
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {migrationReport.skippedProducts.map((product, idx) => (
-                        <Card key={idx}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <AlertCircleIcon className="size-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-sm">{product.title}</h4>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {product.reason}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-
-              <TabsContent value="successful">
-                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
-                  {migrationReport.successfulProducts.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      No products were imported
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {migrationReport.successfulProducts.map((title, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-2 p-3 rounded-lg bg-muted/50"
-                        >
-                          <CheckCircleIcon className="size-4 text-green-500 flex-shrink-0" />
-                          <span className="text-sm">{title}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-
-              <TabsContent value="failed">
-                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
-                  {migrationReport.failedProducts.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      No products failed to import
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {migrationReport.failedProducts.map((product, idx) => (
-                        <Card key={idx}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <XCircleIcon className="size-5 text-red-500 mt-0.5 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-sm">{product.title}</h4>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {product.reason}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Bulk Price Edit Dialog - Temporarily disabled (needs full product data with variants) 
       <BulkPriceEditDialog
