@@ -187,22 +187,30 @@ export function generateModelVariations(modelName: string): string[] {
 
 /**
  * Extracts SKU code from product title or variant SKU
- * Looks for patterns like M-174, M-75, etc.
+ * Looks for patterns like M-174, R-08, A-01, etc.
+ * Supports prefixes: L, M, S, B, F, A, R, T
  * 
  * @param title Product title
  * @param sku Variant SKU
  * @returns SKU code or null if not found
  */
 export function extractSKU(title: string, sku?: string): string | null {
+  const pattern = /([LMSBFART])-\d+/i;
+
   // First try the variant SKU if provided
   if (sku) {
-    const skuMatch = sku.match(/M-\d+/i);
+    const skuMatch = sku.match(pattern);
     if (skuMatch) return skuMatch[0];
   }
   
   // Then try to extract from title
-  const titleMatch = title.match(/\(M-\d+\)/i) || title.match(/M-\d+/i);
+  // Handle (M-174) or just M-174
+  const titlePattern = new RegExp(`\\((${pattern.source})\\)|${pattern.source}`, 'i');
+  const titleMatch = title.match(titlePattern);
+  
   if (titleMatch) {
+    // titleMatch[0] is the full match (e.g. "(M-174)" or "M-174")
+    // We want to return the clean SKU
     return titleMatch[0].replace(/[()]/g, '');
   }
   
