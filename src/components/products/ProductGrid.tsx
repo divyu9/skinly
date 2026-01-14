@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Loader2Icon, Sparkles } from "lucide-react";
@@ -13,6 +13,7 @@ interface ProductGridProps {
   isLoading: boolean;
   loadingMessage?: string;
   isMockupsLoading?: boolean;
+  updateViewport?: (index: number) => void;
 }
 
 export const ProductGrid = memo(function ProductGrid({
@@ -23,7 +24,42 @@ export const ProductGrid = memo(function ProductGrid({
   isLoading,
   loadingMessage = "Loading products...",
   isMockupsLoading = false,
+  updateViewport,
 }: ProductGridProps) {
+  // Use intersection observer to track viewport for batch loading
+  // This helps load mockups for products as they scroll into view
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!updateViewport || !products.length || !gridRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Find index of this product card
+            const index = parseInt(entry.target.getAttribute('data-index') || '0');
+            updateViewport(index);
+          }
+        });
+      },
+      {
+        rootMargin: '200px', // Preload buffer
+        threshold: 0.1
+      }
+    );
+
+    // Observe every 12th item (half a batch) to trigger next batch
+    const items = gridRef.current.querySelectorAll('.product-card-wrapper');
+    items.forEach((item, index) => {
+      if (index % 12 === 0) {
+        observer.observe(item);
+      }
+    });
+
+    return () => observer.disconnect();
+  }, [products.length, updateViewport]);
+
   if (isLoading) {
     return (
       <>
@@ -59,15 +95,16 @@ export const ProductGrid = memo(function ProductGrid({
       )}
       
       {/* Product Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
-        {products.map((product) => (
-          <ProductCard
-            key={product._id}
-            product={product}
-            brandFilter={brandFilter}
-            modelFilter={modelFilter}
-            autoSortOOS={autoSortOOS}
-          />
+      <div ref={gridRef} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4">
+        {products.map((product, index) => (
+          <div key={product._id} className="product-card-wrapper" data-index={index}>
+            <ProductCard
+              product={product}
+              brandFilter={brandFilter}
+              modelFilter={modelFilter}
+              autoSortOOS={autoSortOOS}
+            />
+          </div>
         ))}
       </div>
     </>

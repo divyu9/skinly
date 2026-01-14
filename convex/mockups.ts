@@ -557,26 +557,97 @@ export const getBatchMockups = query({
       };
     }
 
-    // HARD SAFETY LIMIT: Never fetch more than 100 documents per call
-    // This prevents "Too many documents read (limit: 32000)" errors
-    const safeLimit = Math.min(args.limit || 100, 100);
+    // Optimization: If specific SKUs are provided, we don't need to limit to 100
+    // We can fetch exactly those SKUs.
+    // However, if NO skus provided (full list), we must keep the limit.
+    const isTargetedFetch = !!(args.skus && args.skus.length > 0);
+    const limit = isTargetedFetch ? 200 : (args.limit || 100);
 
-    // First try exact match with by_brand_model index (most efficient)
-    const exactMatchQuery = ctx.db
+    // FIX: Use withIndex to avoid full table scan
+    // We still use by_brand_model because we want to filter by brand+model first
+    const mockupsQuery = ctx.db
       .query("mockups")
       .withIndex("by_brand_model", (q) =>
         q.eq("brand", args.brand).eq("model", args.model)
       );
+    
+    // If we have specific SKUs, we can't efficiently filter in the DB query itself 
+    // without a complex "or" filter which Convex doesn't support well for arrays.
+    // So we paginate through the results.
+    
+    // If targeted fetch, we might need to scan more to find our specific SKUs
+    // But we shouldn't scan the WHOLE table.
+    // Strategy: 
+    // 1. If we have SKUs, use collect() with a reasonable limit (e.g. 1000) to find them all
+    //    since we know the model has <1000 mockups usually.
+    // 2. If no SKUs, use paginate() for infinite scroll.
 
-    // Paginate results with safe limit
-    const { page: exactPage, isDone: exactDone, continueCursor: exactCursor } = await exactMatchQuery.paginate({
+    if (isTargetedFetch) {
+       // Targeted fetch strategy: Get all mockups for this model (up to 1000)
+       // and filter in memory. This ensures we don't miss SKUs that are "deep" in the list.
+       const allModelMockups = await mockupsQuery.take(1000);
+       
+       const result: Record<string, string> = {};
+       const targetSkus = new Set(args.skus!.map(s => s.toUpperCase())); // Normalize input SKUs
+
+       for (const mockup of allModelMockups) {
+         // Flexible matching:
+         // 1. Exact match
+         // 2. Mockup is prefix (DB: R-01, Product: R-01-PH) -> match
+         // 3. Product is prefix (DB: R-01-PH, Product: R-01) -> match
+         
+         const mockupSku = mockup.sku.toUpperCase();
+         
+         // Check if this mockup matches ANY of our target SKUs
+         let matchedSku: string | null = null;
+         
+         if (targetSkus.has(mockupSku)) {
+            matchedSku = mockup.sku; // Use original case from DB? or input?
+            // Actually we want to map the INPUT sku to the URL.
+            // So if input is R-01-PH and match is R-01, we want result['R-01-PH'] = url
+         }
+         
+         // We need to find WHICH target SKU this mockup corresponds to
+         // Iterate targets (smaller list)
+         for (const target of args.skus!) {
+            const targetUpper = target.toUpperCase();
+            
+            // Match logic from bidirectional fix
+            if (mockupSku === targetUpper || 
+                mockupSku.startsWith(targetUpper + "-") || 
+                targetUpper.startsWith(mockupSku + "-")) {
+                
+                // Prefer Cloudinary URL, fallback to Convex storage
+                let url: string | null = null;
+                if (mockup.cloudinaryUrl) {
+                    url = mockup.cloudinaryUrl;
+                } else if (mockup.fileId) {
+                    url = await ctx.storage.getUrl(mockup.fileId);
+                }
+
+                if (url) {
+                    result[target] = url; // Map the REQUESTED sku to the url
+                }
+            }
+         }
+       }
+
+       return {
+         mockups: result,
+         cursor: "",
+         isDone: true,
+       };
+    }
+
+    // Default Paginated Strategy (for browsing all mockups without specific SKUs)
+    const { page, isDone, continueCursor } = await mockupsQuery.paginate({
       cursor: args.cursor ?? null,
-      numItems: safeLimit,
+      numItems: limit,
     });
 
     const result: Record<string, string> = {};
-
-    for (const mockup of exactPage) {
+    
+    for (const mockup of page) {
       // If specific SKUs requested, filter for them
       if (args.skus && !args.skus.includes(mockup.sku)) {
         continue;
@@ -595,52 +666,11 @@ export const getBatchMockups = query({
       }
     }
 
-    // If we found mockups with exact match, return them
-    if (Object.keys(result).length > 0 || exactDone) {
-      return {
-        mockups: result,
-        cursor: exactCursor,
-        isDone: exactDone,
-      };
-    }
-
-    // Fallback: Try normalized model matching (for model name variations)
-    // Query all mockups for this brand and filter by normalized model
-    const normalizedSearchModel = normalizeModelName(args.model, args.brand);
-
-    const brandMockups = await ctx.db
-      .query("mockups")
-      .withIndex("by_brand_model", (q) => q.eq("brand", args.brand))
-      .take(500); // Safety limit
-
-    for (const mockup of brandMockups) {
-      // Match by normalized model name
-      if (normalizeModelName(mockup.model, args.brand) !== normalizedSearchModel) {
-        continue;
-      }
-
-      // If specific SKUs requested, filter for them
-      if (args.skus && !args.skus.includes(mockup.sku)) {
-        continue;
-      }
-
-      // Prefer Cloudinary URL, fallback to Convex storage
-      let url: string | null = null;
-      if (mockup.cloudinaryUrl) {
-        url = mockup.cloudinaryUrl;
-      } else if (mockup.fileId) {
-        url = await ctx.storage.getUrl(mockup.fileId);
-      }
-
-      if (url) {
-        result[mockup.sku] = url;
-      }
-    }
-
+    // Return pagination info along with data
     return {
       mockups: result,
-      cursor: "",
-      isDone: true,
+      cursor: continueCursor,
+      isDone,
     };
   },
 });

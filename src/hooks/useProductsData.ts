@@ -3,6 +3,7 @@ import { api } from "@/convex/_generated/api.js";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { FilterState, URLParams } from "./useProductFilters";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { extractSKU } from "@/lib/mockups"; // Import extractSKU helper
 
 export interface ProductVariant {
   _id: Id<"variants">;
@@ -200,7 +201,11 @@ export function useProductsData({
     const endIndex = Math.min(viewportStart + MOCKUP_BATCH_SIZE + 8, sortedProducts.length);
     return sortedProducts
       .slice(0, endIndex) // Load from start to current viewport + buffer
-      .map(p => p.variants[0]?.sku)
+      .map(p => {
+        // Use extractSKU helper to get clean SKU from variant
+        const rawSku = p.variants[0]?.sku;
+        return extractSKU(p.title, rawSku);
+      })
       .filter(Boolean) as string[];
   }, [sortedProducts, viewportStart]);
   
@@ -226,7 +231,10 @@ export function useProductsData({
     }
 
     return sortedProducts.map(product => {
-      const sku = product.variants[0]?.sku;
+      // Use extractSKU to get consistent SKU for matching
+      const rawSku = product.variants[0]?.sku;
+      const sku = extractSKU(product.title, rawSku);
+      
       const mockupUrl = sku ? mockupMap[sku] : undefined;
 
       return {

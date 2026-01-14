@@ -320,6 +320,7 @@ export default function ProductsPage() {
             isLoading={!!isInitialLoading}
             loadingMessage={loadingMessage}
             isMockupsLoading={isMockupsLoading}
+            updateViewport={updateViewport} // Pass viewport update function
           />
           
           {/* Pagination Controls */}
