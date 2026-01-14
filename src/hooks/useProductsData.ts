@@ -235,7 +235,30 @@ export function useProductsData({
       const rawSku = product.variants[0]?.sku;
       const sku = extractSKU(product.title, rawSku);
       
-      const mockupUrl = sku ? mockupMap[sku] : undefined;
+      let mockupUrl = undefined;
+      
+      if (sku) {
+        // Direct match
+        if (mockupMap[sku]) {
+          mockupUrl = mockupMap[sku];
+        } 
+        // Fallback: Check for case-insensitive match or prefix/suffix match in the map keys
+        // The backend returns keys exactly as requested (from args.skus), 
+        // BUT if there's a mismatch in how we generated args.skus vs how we check here, we might miss it.
+        // Also, the backend result keys might be normalized? 
+        // Let's check keys directly.
+        else {
+           const skuUpper = sku.toUpperCase();
+           // Find any key in mockupMap that matches our SKU logic
+           const matchingKey = Object.keys(mockupMap).find(key => {
+             const keyUpper = key.toUpperCase();
+             return keyUpper === skuUpper; 
+           });
+           if (matchingKey) {
+             mockupUrl = mockupMap[matchingKey];
+           }
+        }
+      }
 
       return {
         ...product,
