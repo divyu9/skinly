@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SparklesIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SparklesIcon, ImageIcon } from "lucide-react";
+import { ProductImageUploader } from "../_components/product-image-uploader.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -132,26 +133,6 @@ function NewProductPageInner() {
     } finally {
       setIsGeneratingSEO(false);
     }
-  };
-
-  const addImage = () => {
-    setFormData({
-      ...formData,
-      images: [...formData.images, { url: "", alt: "" }],
-    });
-  };
-
-  const removeImage = (index: number) => {
-    setFormData({
-      ...formData,
-      images: formData.images.filter((_, i) => i !== index),
-    });
-  };
-
-  const updateImage = (index: number, field: "url" | "alt", value: string) => {
-    const newImages = [...formData.images];
-    newImages[index][field] = value;
-    setFormData({ ...formData, images: newImages });
   };
 
   const addVariant = () => {
@@ -373,41 +354,17 @@ function NewProductPageInner() {
           {/* Images */}
           <Card>
             <CardHeader>
-              <CardTitle>Product Images</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <ImageIcon className="size-5" />
+                Product Images
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {formData.images.map((image, index) => (
-                <div key={index} className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Image URL"
-                      value={image.url}
-                      onChange={(e) => updateImage(index, "url", e.target.value)}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Alt text"
-                      value={image.alt}
-                      onChange={(e) => updateImage(index, "alt", e.target.value)}
-                    />
-                  </div>
-                  {formData.images.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeImage(index)}
-                    >
-                      <TrashIcon className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addImage}>
-                <PlusIcon className="size-4 mr-2" />
-                Add Image
-              </Button>
+            <CardContent>
+              <ProductImageUploader
+                images={formData.images}
+                onImagesChange={(images) => setFormData({ ...formData, images })}
+                productSlug={formData.slug || formData.title}
+              />
             </CardContent>
           </Card>
 
