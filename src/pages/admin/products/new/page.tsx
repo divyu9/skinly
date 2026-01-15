@@ -92,6 +92,34 @@ function NewProductPageInner() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingSEO, setIsGeneratingSEO] = useState(false);
+  const [isSlugManuallyEdited, setIsSlugManuallyEdited] = useState(false);
+
+  // Generate slug from title
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "") // Remove special characters
+      .replace(/\s+/g, "-") // Replace spaces with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single
+      .replace(/^-|-$/g, ""); // Remove leading/trailing hyphens
+  };
+
+  // Handle title change - auto-update slug if not manually edited
+  const handleTitleChange = (newTitle: string) => {
+    setFormData(prev => ({
+      ...prev,
+      title: newTitle,
+      // Only auto-update slug if it hasn't been manually edited
+      slug: isSlugManuallyEdited ? prev.slug : generateSlug(newTitle),
+    }));
+  };
+
+  // Handle slug change - mark as manually edited
+  const handleSlugChange = (newSlug: string) => {
+    setIsSlugManuallyEdited(true);
+    setFormData(prev => ({ ...prev, slug: newSlug }));
+  };
 
   // Get selected finish type display name
   const selectedFinishType = finishTypes?.find(f => f._id === formData.finishTypeId);
@@ -255,7 +283,7 @@ function NewProductPageInner() {
                   required
                   placeholder="Matte Black Phone Skin"
                   value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  onChange={(e) => handleTitleChange(e.target.value)}
                 />
               </div>
 
@@ -266,8 +294,11 @@ function NewProductPageInner() {
                   required
                   placeholder="matte-black-phone-skin"
                   value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                  onChange={(e) => handleSlugChange(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isSlugManuallyEdited ? "Custom slug" : "Auto-generated from title"}
+                </p>
               </div>
 
               <div>
