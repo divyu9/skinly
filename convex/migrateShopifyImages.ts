@@ -28,6 +28,7 @@ export const migrateImagesFromShopify = action({
     nextCursor: string | null;
     remaining: number;
     errors: string[];
+    scanned?: number;
   }> => {
     const batchSize = args.batchSize || 5;
     const targetSource = args.source || "shopify";

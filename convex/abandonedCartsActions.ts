@@ -1,13 +1,11 @@
-"use node";
-
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel.d.ts";
-// import twilio from "twilio";
 
 /**
  * Send abandoned cart reminder via email and WhatsApp
+ * Uses MSG91 for email and Authkey.io for WhatsApp
  */
 export const sendAbandonedCartReminder = action({
   args: {
@@ -49,12 +47,15 @@ export const sendAbandonedCartReminder = action({
       allowedCustomerEmails: [cart.userEmail],
     });
 
-    // Send email via MSG91-based email system
+    // Send email via MSG91-based email system with dynamic settings
     let emailSent = false;
     try {
-      await ctx.runMutation(internal.abandonedCarts.triggerEmailReminder, {
+      await ctx.runMutation(internal.abandonedCartsInternal.triggerEmailReminderInternal, {
         cartId: args.cartId,
         couponCode,
+        discountValue,
+        discountType,
+        validityDays,
       });
       emailSent = true;
       console.log(`Email queued for abandoned cart ${args.cartId}`);
@@ -62,27 +63,30 @@ export const sendAbandonedCartReminder = action({
       console.error("Error queuing email:", error);
     }
 
-    // Send WhatsApp message
+    // Send WhatsApp message via Authkey.io queue system
     let whatsappSent = false;
     if (cart.userPhone) {
       try {
-        const client = twilio(
-          process.env.TWILIO_ACCOUNT_SID,
-          process.env.TWILIO_AUTH_TOKEN
-        );
-
-        const discountText = discountType === "percentage" 
-          ? `${discountValue}%` 
+        const discountText = discountType === "percentage"
+          ? `${discountValue}%`
           : `₹${discountValue}`;
 
-        await client.messages.create({
-          body: `Hi! You left items worth ₹${cart.cartTotal.toFixed(2)} in your Skinly cart 🛒\n\nComplete your order and save ${discountText} with code: ${couponCode}\n\n${process.env.VITE_SITE_URL || "https://yourdomain.onhercules.app"}/checkout`,
-          from: `whatsapp:${process.env.TWILIO_WHATSAPP_NUMBER}`,
-          to: `whatsapp:${cart.userPhone}`,
+        // Queue WhatsApp message via existing messaging system
+        await ctx.runMutation(internal.abandonedCartsInternal.queueWhatsAppReminder, {
+          cartId: args.cartId,
+          recipientPhone: cart.userPhone,
+          recipientUserId: cart.userId,
+          variables: {
+            cart_total: `₹${cart.cartTotal.toFixed(2)}`,
+            discount_text: discountText,
+            coupon_code: couponCode,
+            cart_link: `${process.env.VITE_SITE_URL || "https://goskinly.com"}/cart`,
+          },
         });
         whatsappSent = true;
+        console.log(`WhatsApp queued for abandoned cart ${args.cartId}`);
       } catch (error) {
-        console.error("Error sending WhatsApp:", error);
+        console.error("Error queuing WhatsApp:", error);
       }
     }
 
@@ -104,38 +108,40 @@ export const sendAbandonedCartReminder = action({
 /**
  * Scan all active carts and track them as abandoned if they meet criteria
  * This should be run periodically (e.g., every hour) to detect new abandoned carts
+ * Uses the internal function that correctly tracks cart item creation time as abandonedAt
  */
 export const scanAndTrackAbandonedCarts = action({
   args: {},
   handler: async (ctx): Promise<{ tracked: number; carts: Array<{ email: string; total: number }> }> => {
-    // Get all users with items in their cart
-    const allUsers = await ctx.runQuery(api.users.getAllUsers, {});
-    
+    // Use the internal scanning function that correctly tracks timestamps
+    const usersWithCarts = await ctx.runQuery(
+      internal.abandonedCartsInternal.getAllUsersWithCarts,
+      {}
+    );
+
     const trackedCarts: Array<{ email: string; total: number }> = [];
-    
-    for (const user of allUsers) {
-      // Get user's cart
-      const cartItems = await ctx.runQuery(api.cart.getCartForUser, { userId: user._id });
-      
-      // Skip if cart is empty
-      if (!cartItems || cartItems.length === 0) {
-        continue;
-      }
-      
+
+    for (const { user, cartItems, oldestItemTime } of usersWithCarts) {
+      if (!user || cartItems.length === 0) continue;
+
       // Get user's phone from most recent order
-      const recentOrders = await ctx.runQuery(api.orders.getOrdersForUser, { userId: user._id, limit: 1 });
-      const userPhone = recentOrders && recentOrders.length > 0 
-        ? recentOrders[0].shippingAddress?.phone 
-        : undefined;
-      
-      // Track this cart as abandoned
+      const userPhone = await ctx.runQuery(
+        internal.abandonedCartsInternal.getUserPhoneFromOrders,
+        { userId: user._id }
+      );
+
+      // Track this cart as abandoned with correct timestamp
       try {
-        await ctx.runMutation(api.abandonedCarts.trackAbandonedCart, {
-          userId: user._id,
-          userEmail: user.email || "",
-          userPhone,
-        });
-        
+        await ctx.runMutation(
+          internal.abandonedCartsInternal.trackAbandonedCartInternal,
+          {
+            userId: user._id,
+            userEmail: user.email || "",
+            userPhone: userPhone ?? undefined, // Convert null to undefined
+            oldestCartItemTime: oldestItemTime, // Use actual cart item creation time
+          }
+        );
+
         const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
         trackedCarts.push({
           email: user.email || "Unknown",
@@ -145,7 +151,7 @@ export const scanAndTrackAbandonedCarts = action({
         console.error(`Failed to track abandoned cart for user ${user._id}:`, error);
       }
     }
-    
+
     return {
       tracked: trackedCarts.length,
       carts: trackedCarts,

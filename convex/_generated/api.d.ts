@@ -11,6 +11,7 @@
 import type * as abandonedCartSettings from "../abandonedCartSettings.js";
 import type * as abandonedCarts from "../abandonedCarts.js";
 import type * as abandonedCartsActions from "../abandonedCartsActions.js";
+import type * as abandonedCartsInternal from "../abandonedCartsInternal.js";
 import type * as admin_bugReports from "../admin/bugReports.js";
 import type * as admin_manualTracking from "../admin/manualTracking.js";
 import type * as admin_orders from "../admin/orders.js";
@@ -27,6 +28,7 @@ import type * as codDisplayRules from "../codDisplayRules.js";
 import type * as codOtp from "../codOtp.js";
 import type * as collections from "../collections.js";
 import type * as coupons from "../coupons.js";
+import type * as crons from "../crons.js";
 import type * as emailAbandonedCartTriggers from "../emailAbandonedCartTriggers.js";
 import type * as emailManagement from "../emailManagement.js";
 import type * as emailMessaging from "../emailMessaging.js";
@@ -129,6 +131,7 @@ declare const fullApi: ApiFromModules<{
   abandonedCartSettings: typeof abandonedCartSettings;
   abandonedCarts: typeof abandonedCarts;
   abandonedCartsActions: typeof abandonedCartsActions;
+  abandonedCartsInternal: typeof abandonedCartsInternal;
   "admin/bugReports": typeof admin_bugReports;
   "admin/manualTracking": typeof admin_manualTracking;
   "admin/orders": typeof admin_orders;
@@ -145,6 +148,7 @@ declare const fullApi: ApiFromModules<{
   codOtp: typeof codOtp;
   collections: typeof collections;
   coupons: typeof coupons;
+  crons: typeof crons;
   emailAbandonedCartTriggers: typeof emailAbandonedCartTriggers;
   emailManagement: typeof emailManagement;
   emailMessaging: typeof emailMessaging;

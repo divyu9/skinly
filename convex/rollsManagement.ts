@@ -626,23 +626,207 @@ export const deductRollInventory = internalMutation({
     
     // Deduct meters from rolls
     const deductions: Array<{ rNumber: string; meters: number }> = [];
-    
+    const affectedRNumbers: string[] = [];
+
     for (const [rNumber, data] of metersNeeded) {
       const roll = await ctx.db.get(data.rollId);
       if (!roll || !("metersAvailable" in roll)) continue; // Type guard for rollInventory
-      
+
       const newMeters = Math.max(0, roll.metersAvailable - data.meters);
       await ctx.db.patch(data.rollId, {
         metersAvailable: newMeters,
       });
-      
+
       deductions.push({
         rNumber,
         meters: data.meters,
       });
+      affectedRNumbers.push(rNumber);
     }
-    
+
+    // IMPORTANT: Sync variant inventoryQuantity after deducting rolls
+    // This ensures the product pages show updated stock in real-time
+    if (affectedRNumbers.length > 0) {
+      await ctx.scheduler.runAfter(0, internal.rollsManagement.syncInventoryFromRollsInternal, {
+        rNumbers: affectedRNumbers,
+      });
+    }
+
     return { deductions };
+  },
+});
+
+/**
+ * Deduct variant inventoryQuantity when order is confirmed
+ * This handles ALL products (both roll-based and regular products)
+ * For roll-based products, it also updates rolls and syncs back
+ * For regular products, it directly decrements inventoryQuantity
+ */
+export const deductVariantInventory = internalMutation({
+  args: {
+    items: v.array(v.object({
+      variantId: v.id("variants"),
+      quantity: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const deductions: Array<{ variantId: string; sku: string; quantityDeducted: number; newQuantity: number }> = [];
+    const rollVariants: Array<{ variantId: typeof args.items[0]["variantId"]; quantity: number }> = [];
+
+    for (const item of args.items) {
+      const variant = await ctx.db.get(item.variantId);
+      if (!variant) {
+        console.log(`[Inventory] Variant ${item.variantId} not found, skipping`);
+        continue;
+      }
+
+      // Check if this is a roll-based variant (has rNumber)
+      if (variant.rNumber) {
+        // Collect for roll deduction (will be processed separately)
+        rollVariants.push({
+          variantId: item.variantId,
+          quantity: item.quantity,
+        });
+      } else {
+        // Regular product - directly deduct inventoryQuantity
+        const currentQuantity = variant.inventoryQuantity || 0;
+        const newQuantity = Math.max(0, currentQuantity - item.quantity);
+
+        await ctx.db.patch(item.variantId, {
+          inventoryQuantity: newQuantity,
+        });
+
+        deductions.push({
+          variantId: item.variantId,
+          sku: variant.sku || "unknown",
+          quantityDeducted: item.quantity,
+          newQuantity,
+        });
+
+        console.log(`[Inventory] Deducted ${item.quantity} from variant ${variant.sku || item.variantId}. New quantity: ${newQuantity}`);
+      }
+    }
+
+    // Process roll-based variants through the roll deduction system
+    if (rollVariants.length > 0) {
+      // Call deductRollInventory for roll-based products
+      // This will also sync the inventoryQuantity for those variants
+      const variants = await ctx.db.query("variants").collect();
+      const products = await ctx.db.query("products").collect();
+      const rolls = await ctx.db.query("rollInventory").collect();
+      const gadgets = await ctx.db.query("gadgetConsumption").collect();
+
+      // Build maps
+      const variantsMap = new Map<string, typeof variants[0]>();
+      for (const v of variants) {
+        variantsMap.set(v._id, v);
+      }
+
+      const productsMap = new Map<string, typeof products[0]>();
+      for (const product of products) {
+        productsMap.set(product._id, product);
+      }
+
+      const rollsMap = new Map<string, typeof rolls[0]>();
+      for (const roll of rolls) {
+        rollsMap.set(roll.rNumber, roll);
+      }
+
+      const gadgetsMap = new Map<string, typeof gadgets[0]>();
+      for (const gadget of gadgets) {
+        gadgetsMap.set(gadget.categoryName.toLowerCase(), gadget);
+      }
+
+      // Calculate meters needed per R-number
+      const metersNeeded = new Map<string, { rollId: typeof rolls[0]["_id"]; meters: number }>();
+      const affectedRNumbers: string[] = [];
+
+      for (const item of rollVariants) {
+        const variant = variantsMap.get(item.variantId);
+        if (!variant) continue;
+
+        const product = productsMap.get(variant.productId);
+        if (!product) continue;
+
+        const rNumber = variant.rNumber;
+        if (!rNumber) continue;
+
+        const roll = rollsMap.get(rNumber);
+        if (!roll) continue;
+
+        // Detect category
+        let gadgetCategory: string | null = null;
+        const titleLower = product.title.toLowerCase();
+
+        if (titleLower.includes("phone skin") || titleLower.includes("mobile skin")) {
+          gadgetCategory = "phone skin";
+        } else if (titleLower.includes("laptop")) {
+          gadgetCategory = "laptop skin";
+        } else if (titleLower.includes("tablet") || titleLower.includes("ipad")) {
+          gadgetCategory = "tablet skin";
+        } else if (titleLower.includes("camera")) {
+          gadgetCategory = "camera skin";
+        } else if (titleLower.includes("mac mini")) {
+          gadgetCategory = "mac mini skin";
+        } else if (titleLower.includes("console") || titleLower.includes("playstation") || titleLower.includes("ps5") || titleLower.includes("xbox")) {
+          gadgetCategory = "console skin";
+        } else if (titleLower.includes("lens")) {
+          gadgetCategory = "camera lens skin";
+        } else if (titleLower.includes("drone")) {
+          gadgetCategory = "drone skin";
+        } else if (titleLower.includes("charger")) {
+          gadgetCategory = "charger skin";
+        }
+
+        if (!gadgetCategory) continue;
+
+        const gadget = gadgetsMap.get(gadgetCategory);
+        if (!gadget) continue;
+
+        // Calculate meters
+        const ROLL_WIDTH_CM = 29.5;
+        const materialMultiplier = variant.materialMultiplier || 1;
+        const gadgetAreaCm2 = gadget.lengthCm * gadget.widthCm;
+        const totalAreaNeeded = gadgetAreaCm2 * item.quantity * materialMultiplier;
+        const metersForThisItem = totalAreaNeeded / (ROLL_WIDTH_CM * 100);
+
+        const existing = metersNeeded.get(rNumber);
+        if (existing) {
+          existing.meters += metersForThisItem;
+        } else {
+          metersNeeded.set(rNumber, {
+            rollId: roll._id,
+            meters: metersForThisItem,
+          });
+        }
+      }
+
+      // Deduct from rolls
+      for (const [rNumber, data] of metersNeeded) {
+        const roll = await ctx.db.get(data.rollId);
+        if (!roll || !("metersAvailable" in roll)) continue;
+
+        const newMeters = Math.max(0, roll.metersAvailable - data.meters);
+        await ctx.db.patch(data.rollId, {
+          metersAvailable: newMeters,
+        });
+
+        affectedRNumbers.push(rNumber);
+        console.log(`[Inventory] Deducted ${data.meters.toFixed(3)}m from roll ${rNumber}. New meters: ${newMeters.toFixed(3)}`);
+      }
+
+      // Sync variant inventoryQuantity for affected rolls
+      if (affectedRNumbers.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.rollsManagement.syncInventoryFromRollsInternal, {
+          rNumbers: affectedRNumbers,
+        });
+      }
+    }
+
+    return {
+      deductions,
+      rollVariantsProcessed: rollVariants.length,
+    };
   },
 });
 
@@ -712,6 +896,7 @@ export const syncInventoryFromRollsInternal = internalMutation({
   args: {
     variantIds: v.optional(v.array(v.id("variants"))),
     rNumber: v.optional(v.string()),
+    rNumbers: v.optional(v.array(v.string())), // Support array of R-numbers for bulk sync
     syncAll: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -720,23 +905,23 @@ export const syncInventoryFromRollsInternal = internalMutation({
     const rolls = await ctx.db.query("rollInventory").collect();
     const gadgets = await ctx.db.query("gadgetConsumption").collect();
     const variantPresets = await ctx.db.query("variantConsumptionPresets").collect();
-    
+
     // Build maps for quick lookup
     const productsMap = new Map<string, typeof products[0]>();
     for (const product of products) {
       productsMap.set(product._id, product);
     }
-    
+
     const rollsMap = new Map<string, typeof rolls[0]>();
     for (const roll of rolls) {
       rollsMap.set(roll.rNumber, roll);
     }
-    
+
     const gadgetsMap = new Map<string, typeof gadgets[0]>();
     for (const gadget of gadgets) {
       gadgetsMap.set(gadget.categoryName.toLowerCase(), gadget);
     }
-    
+
     // Map by gadgetTypeId for quick lookup
     const gadgetsByTypeMap = new Map<string, typeof gadgets[0]>();
     for (const gadget of gadgets) {
@@ -752,9 +937,13 @@ export const syncInventoryFromRollsInternal = internalMutation({
     
     // Determine which variants to sync
     let variantsToSync = variants;
-    
+
     if (args.variantIds && args.variantIds.length > 0) {
       variantsToSync = variants.filter(v => args.variantIds!.includes(v._id));
+    } else if (args.rNumbers && args.rNumbers.length > 0) {
+      // Filter by array of R-numbers (for bulk sync after order deduction)
+      const rNumberSet = new Set(args.rNumbers);
+      variantsToSync = variants.filter(v => v.rNumber && rNumberSet.has(v.rNumber));
     } else if (args.rNumber) {
       variantsToSync = variants.filter(v => v.rNumber === args.rNumber);
     } else if (!args.syncAll) {

@@ -490,13 +490,12 @@ export const createOrder = mutation({
       // Don't fail order creation if admin WhatsApp fails
     }
 
-    // If order is fully paid by wallet, keep it in processing and deduct inventory immediately
-    if (walletAmountUsed >= originalTotal) {
-      await ctx.db.patch(orderId, {
-        status: "processing",
-      });
+    // If order is COD or fully paid by wallet, deduct inventory immediately
+    // These orders go straight to "processing" status
+    if (args.paymentMethod === "cod" || walletAmountUsed >= originalTotal) {
+      // Status already set to "processing" during order creation (line 254)
 
-      // Deduct roll inventory
+      // Deduct inventory (handles both roll-based and regular products)
       const allVariants = await ctx.db.query("variants").collect();
       const items = cartItems
         .map((item) => {
@@ -512,7 +511,7 @@ export const createOrder = mutation({
         .filter((item) => item !== null);
 
       if (items.length > 0) {
-        await ctx.scheduler.runAfter(0, internal.rollsManagement.deductRollInventory, {
+        await ctx.scheduler.runAfter(0, internal.rollsManagement.deductVariantInventory, {
           items,
         });
       }
@@ -885,11 +884,11 @@ export const updatePaymentStatus = mutation({
       });
     }
 
-    // If payment successful and order was not already confirmed, deduct roll inventory
+    // If payment successful and order was not already confirmed, deduct inventory
     if (args.paymentStatus === "success" && order.paymentStatus !== "success") {
       // Get all variants to map productId + variant title to variant ID
       const allVariants = await ctx.db.query("variants").collect();
-      
+
       // Prepare items for inventory deduction by finding the variant ID
       const items = order.items
         .map((item) => {
@@ -897,11 +896,11 @@ export const updatePaymentStatus = mutation({
           const variant = allVariants.find(
             (v) => v.productId === item.productId && v.title === item.variant
           );
-          
+
           if (!variant) {
             return null;
           }
-          
+
           return {
             variantId: variant._id,
             quantity: item.quantity,
@@ -909,9 +908,9 @@ export const updatePaymentStatus = mutation({
         })
         .filter((item) => item !== null);
 
-      // Deduct roll inventory (run asynchronously to avoid blocking order confirmation)
+      // Deduct inventory (handles both roll-based and regular products)
       if (items.length > 0) {
-        await ctx.scheduler.runAfter(0, internal.rollsManagement.deductRollInventory, {
+        await ctx.scheduler.runAfter(0, internal.rollsManagement.deductVariantInventory, {
           items,
         });
       }
@@ -1002,6 +1001,7 @@ export const updatePaymentStatus = mutation({
 
             if (partialCodUsecase?.enabled && partialCodUsecase.providerTemplateId) {
               // Send partial COD notification if enabled
+              // Use orderNumberUpdate (freshly generated) for correct order number
               await ctx.scheduler.runAfter(
                 0,
                 api.whatsappMessaging.queueMessage,
@@ -1011,7 +1011,7 @@ export const updatePaymentStatus = mutation({
                   recipientUserId: order.userId,
                   variables: {
                     customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                    order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                    order_number: orderNumberUpdate || order.orderNumber || order.failedOrderNumber || "N/A",
                     order_total: `₹${order.total.toFixed(2)}`,
                     prepaid_amount: `₹${(order.prepaidAmount || 0).toFixed(2)}`,
                     cod_amount: `₹${(order.codAmount || 0).toFixed(2)}`,
@@ -1022,6 +1022,7 @@ export const updatePaymentStatus = mutation({
               );
             } else {
               // Fallback to order_received
+              // Use orderNumberUpdate (freshly generated) for correct order number
               await ctx.scheduler.runAfter(
                 0,
                 api.whatsappMessaging.queueMessage,
@@ -1031,7 +1032,7 @@ export const updatePaymentStatus = mutation({
                   recipientUserId: order.userId,
                   variables: {
                     customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                    order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                    order_number: orderNumberUpdate || order.orderNumber || order.failedOrderNumber || "N/A",
                     product_name: order.items.map(item => item.productTitle).join(", "),
                   },
                   priority: 8,
@@ -1040,6 +1041,7 @@ export const updatePaymentStatus = mutation({
             }
           } else {
             // Full prepaid payment - send order received notification
+            // Use orderNumberUpdate (freshly generated) for correct order number
             await ctx.scheduler.runAfter(
               0,
               api.whatsappMessaging.queueMessage,
@@ -1049,7 +1051,7 @@ export const updatePaymentStatus = mutation({
                 recipientUserId: order.userId,
                 variables: {
                   customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                  order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                  order_number: orderNumberUpdate || order.orderNumber || order.failedOrderNumber || "N/A",
                   product_name: order.items.map(item => item.productTitle).join(", "),
                 },
                 priority: 8,
@@ -1073,8 +1075,9 @@ export const updatePaymentStatus = mutation({
                 : adminSettings.value;
 
               if (config.enabled && config.adminPhone) {
+                // Use orderNumberUpdate (freshly generated) instead of order.orderNumber (stale)
                 const adminVars = {
-                  order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                  order_number: orderNumberUpdate || order.orderNumber || order.failedOrderNumber || "N/A",
                   amount: `${order.total.toFixed(2)}`,
                   customer_name: order.shippingAddress.fullName || user?.name || "Customer",
                   number_of_products: order.items.length.toString(),
@@ -1098,6 +1101,7 @@ export const updatePaymentStatus = mutation({
           }
         } else if (args.paymentStatus === "failed") {
           // Payment failed - send payment failed notification
+          // Use failedOrderNumberUpdate (freshly generated) for failed orders
           await ctx.scheduler.runAfter(
             0,
             api.whatsappMessaging.queueMessage,
@@ -1107,7 +1111,7 @@ export const updatePaymentStatus = mutation({
               recipientUserId: order.userId,
               variables: {
                 customer_name: order.shippingAddress.fullName || user?.name || "Customer",
-                order_number: order.orderNumber || order.failedOrderNumber || "Pending",
+                order_number: failedOrderNumberUpdate || order.failedOrderNumber || order.orderNumber || "N/A",
                 order_total: `₹${order.total.toFixed(2)}`,
                 payment_method: order.paymentMethod === "cod" ? "Partial COD" : "Prepaid",
               },
