@@ -44,6 +44,13 @@ import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
 
+// Product Page Sections
+import {
+  ProductLandingSections,
+  SuggestedProductsSection,
+  TrendingProductsSection,
+} from "@/components/products/sections";
+
 // Hooks
 import { useProductDetail } from "@/hooks/useProductDetail";
 import { useCartActions } from "@/hooks/useCartActions";
@@ -438,6 +445,15 @@ export default function ProductDetailPage() {
               </Button>
             </div>
           </div>
+
+          {/* Apple-like Landing Sections */}
+          <ProductLandingSections productId={productData._id} />
+
+          {/* Suggested Products Section */}
+          <SuggestedProductsSection productId={productData._id} />
+
+          {/* Trending Products Section */}
+          <TrendingProductsSection productId={productData._id} />
 
           {/* Reviews Section */}
           <ReviewSection

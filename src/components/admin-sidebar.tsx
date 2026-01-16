@@ -95,6 +95,7 @@ export function AdminSidebar() {
       items: [
         { path: "/backend-skinly/products", label: "Products", icon: Package },
         { path: "/backend-skinly/product-categories", label: "Categories", icon: Tags },
+        { path: "/backend-skinly/product-sections", label: "Page Sections", icon: Layout },
         { path: "/backend-skinly/product-classification", label: "Classification", icon: Layers },
         { path: "/backend-skinly/collections", label: "Collections", icon: Layers },
         { path: "/backend-skinly/phone-collections", label: "Phone Collections", icon: Smartphone },

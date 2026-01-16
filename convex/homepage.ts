@@ -166,15 +166,37 @@ export const getActiveCategoryDisplaySettings = query({
 
 /**
  * Get all category display settings (for admin)
+ * Now reads from productCategoriesConfig table
  */
 export const getAllCategoryDisplaySettings = query({
   args: {},
   handler: async (ctx) => {
+    // Get from new productCategoriesConfig table
+    const newCategories = await ctx.db
+      .query("productCategoriesConfig")
+      .collect();
+
+    if (newCategories.length > 0) {
+      return newCategories
+        .sort((a, b) => a.order - b.order)
+        .map((c) => ({
+          _id: c._id,
+          categoryName: c.slug,
+          displayName: c.name,
+          imageUrl: c.homepageImage || c.image,
+          linkUrl: c.homepageLink,
+          buttonText: c.homepageButtonText,
+          isActive: c.isActive && c.showOnHomepage,
+          order: c.order,
+        }));
+    }
+
+    // Fallback to old categoryDisplaySettings table for backwards compatibility
     const categories = await ctx.db
       .query("categoryDisplaySettings")
       .order("desc")
       .collect();
-    
+
     return categories.sort((a, b) => a.order - b.order);
   },
 });
@@ -769,6 +791,7 @@ export const updateCategoryDisplaySettings = mutation({
 
 /**
  * Bulk update category display settings
+ * Now updates productCategoriesConfig table (the new canonical source)
  */
 export const bulkUpdateCategoryDisplaySettings = mutation({
   args: {
@@ -789,16 +812,53 @@ export const bulkUpdateCategoryDisplaySettings = mutation({
     }
 
     const results = [];
-    
+
     for (const category of args.categories) {
+      // Update the NEW productCategoriesConfig table
+      const existingNewCategory = await ctx.db
+        .query("productCategoriesConfig")
+        .withIndex("by_slug", (q) => q.eq("slug", category.categoryName))
+        .first();
+
+      const now = Date.now();
+
+      if (existingNewCategory) {
+        // Update the new table
+        await ctx.db.patch(existingNewCategory._id, {
+          name: category.displayName,
+          homepageImage: category.imageUrl || undefined,
+          homepageLink: category.linkUrl || undefined,
+          homepageButtonText: category.buttonText || undefined,
+          showOnHomepage: category.isActive,
+          order: category.order,
+          updatedAt: now,
+        });
+        results.push(existingNewCategory._id);
+      } else {
+        // Category doesn't exist in new table, create it
+        const id = await ctx.db.insert("productCategoriesConfig", {
+          slug: category.categoryName,
+          name: category.displayName,
+          homepageImage: category.imageUrl || undefined,
+          homepageLink: category.linkUrl || undefined,
+          homepageButtonText: category.buttonText || undefined,
+          showOnHomepage: category.isActive,
+          isActive: true,
+          order: category.order,
+          createdAt: now,
+          updatedAt: now,
+        });
+        results.push(id);
+      }
+
+      // Also update the old table for backwards compatibility
       const existingCategory = await ctx.db
         .query("categoryDisplaySettings")
-        .withIndex("by_category_name", (q) => 
+        .withIndex("by_category_name", (q) =>
           q.eq("categoryName", category.categoryName)
         )
         .first();
-      
-      const now = Date.now();
+
       const updates = {
         ...category,
         updatedBy: identity.email,

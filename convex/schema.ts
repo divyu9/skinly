@@ -1517,4 +1517,94 @@ export default defineSchema({
     .index("by_order", ["order"])
     .index("by_active_and_order", ["isActive", "order"])
     .index("by_show_on_homepage", ["showOnHomepage", "order"]),
+
+  // ============================================
+  // Product Page Sections - Apple-like Descriptions
+  // ============================================
+  productSectionContent: defineTable({
+    // Scope: category-level OR product-level
+    productCategorySlug: v.optional(v.string()), // e.g., "skin", "case-cover"
+    productId: v.optional(v.id("products")), // For product-specific override
+
+    // Section content
+    sectionType: v.union(
+      v.literal("hero"),
+      v.literal("feature-left"), // Image left, text right
+      v.literal("feature-right"), // Image right, text left
+      v.literal("full-width"), // Full-width image with overlay text
+      v.literal("specs") // Specifications grid
+    ),
+    title: v.string(),
+    descriptionHtml: v.string(), // Rich text HTML content from WYSIWYG editor
+    imageUrl: v.optional(v.string()),
+    ctaText: v.optional(v.string()),
+    ctaLink: v.optional(v.string()),
+
+    // Display settings
+    order: v.number(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_category", ["productCategorySlug", "order"])
+    .index("by_product", ["productId", "order"])
+    .index("by_active", ["isActive"]),
+
+  // ============================================
+  // Product Page Sections - Suggested Products
+  // ============================================
+  suggestedProductsConfig: defineTable({
+    // Scope: category-level OR product-level
+    productCategorySlug: v.optional(v.string()),
+    productId: v.optional(v.id("products")),
+
+    // Configuration
+    sectionTitle: v.string(), // e.g., "Complete Your Setup"
+    sectionDescription: v.optional(v.string()),
+
+    // Method for getting products (default: same-category)
+    sourceType: v.union(
+      v.literal("same-category"), // Same product category (DEFAULT)
+      v.literal("manual"), // Manually selected product IDs
+      v.literal("tag-based") // Products with specific tags
+    ),
+    manualProductIds: v.optional(v.array(v.id("products"))),
+    filterTags: v.optional(v.array(v.string())),
+
+    maxProducts: v.number(), // Limit to show (e.g., 4, 6, 8)
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_category", ["productCategorySlug"])
+    .index("by_product", ["productId"]),
+
+  // ============================================
+  // Product Page Sections - Trending Products
+  // ============================================
+  trendingProductsConfig: defineTable({
+    // Scope: category-level OR product-level (usually category)
+    productCategorySlug: v.optional(v.string()),
+    productId: v.optional(v.id("products")),
+
+    // Configuration
+    sectionTitle: v.string(), // e.g., "Trending Now"
+    sectionDescription: v.optional(v.string()),
+
+    // Method for getting trending products
+    sourceType: v.union(
+      v.literal("manual"), // Manually selected product IDs
+      v.literal("tag-based"), // Products with "trending" tag
+      v.literal("auto") // Based on order/view counts (future)
+    ),
+    manualProductIds: v.optional(v.array(v.id("products"))),
+    filterTags: v.optional(v.array(v.string())), // e.g., ["trending", "bestseller"]
+
+    maxProducts: v.number(),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_category", ["productCategorySlug"])
+    .index("by_product", ["productId"]),
 });
