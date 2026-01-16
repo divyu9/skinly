@@ -9,15 +9,31 @@ import OpenAI from "openai";
 // Default logo image URL for products without images
 const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
 
+// Product category type
+type ProductCategory = "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
+
 // Generate SEO content for a product title
 async function generateSEOContent(
   openai: OpenAI,
   title: string,
+  productCategory: ProductCategory,
   gadgetCategory: string,
   finishType: string
 ) {
+  // Customize prompt based on product category
+  const categoryDescriptions: Record<ProductCategory, string> = {
+    "skin": "mobile skins and wraps",
+    "case-cover": "phone cases and covers",
+    "camera-ring": "camera lens protector rings",
+    "magneto-x": "magnetic phone accessories",
+    "glass": "tempered glass screen protectors",
+    "accessory": "phone accessories",
+  };
+
+  const productType = categoryDescriptions[productCategory] || "mobile accessories";
+
   const systemPrompt = `You are Skinly's SEO Product Content Generator AI.
-Generate high-quality, SEO-friendly product content for mobile skins and wraps.
+Generate high-quality, SEO-friendly product content for ${productType}.
 
 OUTPUT FORMAT - Return ONLY valid JSON:
 {
@@ -38,7 +54,8 @@ RULES:
 - Image Alt: 50-100 chars describing product`;
 
   const userPrompt = `Generate SEO content for: ${title}
-Category: ${gadgetCategory}
+Product Type: ${productCategory}
+Gadget Category: ${gadgetCategory}
 Finish: ${finishType}`;
 
   const completion = await openai.chat.completions.create({
@@ -69,14 +86,27 @@ export const createBulkProducts = action({
   args: {
     products: v.array(v.object({
       title: v.string(),
-      gadgetTypeId: v.id("gadgetTypes"),
-      finishTypeId: v.id("finishTypes"),
+      productCategory: v.union(
+        v.literal("skin"),
+        v.literal("case-cover"),
+        v.literal("camera-ring"),
+        v.literal("magneto-x"),
+        v.literal("glass"),
+        v.literal("accessory")
+      ),
+      gadgetTypeId: v.optional(v.id("gadgetTypes")),
+      finishTypeId: v.optional(v.id("finishTypes")),
       gadgetCategory: v.string(),
       sku: v.string(),
       price: v.number(),
       compareAtPrice: v.optional(v.number()),
       inventoryQuantity: v.number(),
       status: v.union(v.literal("active"), v.literal("draft")),
+      customDescription: v.optional(v.string()),
+      images: v.optional(v.array(v.object({
+        url: v.string(),
+        alt: v.optional(v.string()),
+      }))),
     })),
     generateSEO: v.boolean(),
   },
@@ -125,23 +155,25 @@ export const createBulkProducts = action({
     // Process each product
     for (const product of args.products) {
       try {
-        const finishTypeName = finishTypeMap.get(product.finishTypeId) || "";
+        const finishTypeName = product.finishTypeId ? (finishTypeMap.get(product.finishTypeId) || "") : "";
 
-        // Generate SEO content if requested
+        // Default SEO content
         let seoContent = {
           metaTitle: `${product.title} | Skinly`,
-          description: product.title,
-          metaDescription: `Shop ${product.title} at Skinly. Premium quality skin wrap.`,
-          tags: [product.gadgetCategory, "skin", "wrap", "premium"],
+          description: product.customDescription || product.title,
+          metaDescription: `Shop ${product.title} at Skinly. Premium quality ${product.productCategory}.`,
+          tags: [product.gadgetCategory, product.productCategory, "premium"],
           slug: product.title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-"),
           imageAlt: `${product.title} - Skinly`,
         };
 
-        if (args.generateSEO && openai) {
+        // Generate SEO content if requested AND no custom description provided
+        if (args.generateSEO && openai && !product.customDescription) {
           try {
             seoContent = await generateSEOContent(
               openai,
               product.title,
+              product.productCategory as ProductCategory,
               product.gadgetCategory,
               finishTypeName
             );
@@ -149,7 +181,15 @@ export const createBulkProducts = action({
             console.error(`SEO generation failed for ${product.title}:`, seoError);
             // Continue with fallback SEO
           }
+        } else if (product.customDescription) {
+          // Use custom description but still generate other SEO fields if enabled
+          seoContent.description = product.customDescription;
         }
+
+        // Determine images - use provided images or default
+        const productImages = (product.images && product.images.length > 0)
+          ? product.images.map(img => ({ url: img.url, alt: img.alt || seoContent.imageAlt }))
+          : [{ url: DEFAULT_LOGO_IMAGE, alt: seoContent.imageAlt }];
 
         // Create the product
         const productId = await ctx.runMutation(api.products.createProduct, {
@@ -160,11 +200,11 @@ export const createBulkProducts = action({
           metaDescription: seoContent.metaDescription,
           tags: Array.isArray(seoContent.tags) ? seoContent.tags : [],
           status: product.status,
-          images: [{ url: DEFAULT_LOGO_IMAGE, alt: seoContent.imageAlt }],
+          images: productImages,
           gadgetCategory: product.gadgetCategory as any,
           gadgetTypeId: product.gadgetTypeId,
           finishTypeId: product.finishTypeId,
-          productCategory: "skin",
+          productCategory: product.productCategory,
           productType: "physical",
           hasMultipleVariants: false,
           length: 10,
