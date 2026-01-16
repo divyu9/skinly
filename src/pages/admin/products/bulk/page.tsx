@@ -33,18 +33,6 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
 
-// Product categories
-const PRODUCT_CATEGORIES = [
-  { value: "skin", label: "Skin" },
-  { value: "case-cover", label: "Case/Cover" },
-  { value: "camera-ring", label: "Camera Ring" },
-  { value: "magneto-x", label: "Magneto X" },
-  { value: "glass", label: "Glass" },
-  { value: "accessory", label: "Accessory" },
-] as const;
-
-type ProductCategory = typeof PRODUCT_CATEGORIES[number]["value"];
-
 interface ProductImage {
   url: string;
   alt?: string;
@@ -53,7 +41,7 @@ interface ProductImage {
 interface ProductRow {
   id: string;
   title: string;
-  productCategory: ProductCategory;
+  productCategory: string;
   gadgetTypeId: Id<"gadgetTypes"> | "";
   finishTypeId: Id<"finishTypes"> | "";
   sku: string;
@@ -74,11 +62,12 @@ function generateId() {
 function BulkProductCreatorInner() {
   const gadgetTypes = useQuery(api.gadgetTypes.listActive, {});
   const finishTypes = useQuery(api.finishTypes.listActive, {});
+  const productCategories = useQuery(api.productCategories.listActive, {});
   const createBulkProducts = useAction(api.bulkProductCreator.createBulkProducts);
   const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
 
   // Default values for new rows
-  const [defaultProductCategory, setDefaultProductCategory] = useState<ProductCategory>("skin");
+  const [defaultProductCategory, setDefaultProductCategory] = useState<string>("skin");
   const [defaultGadgetTypeId, setDefaultGadgetTypeId] = useState<Id<"gadgetTypes"> | "">("");
   const [defaultFinishTypeId, setDefaultFinishTypeId] = useState<Id<"finishTypes"> | "">("");
   const [defaultPrice, setDefaultPrice] = useState("299");

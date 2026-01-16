@@ -34,6 +34,7 @@ function NewProductPageInner() {
   const collections = useQuery(api.collections.getAllCollections, {});
   const finishTypes = useQuery(api.finishTypes.listActive, {});
   const gadgetTypes = useQuery(api.gadgetTypes.listActive, {});
+  const productCategories = useQuery(api.productCategories.listActive, {});
   const createProduct = useMutation(api.products.createProduct);
   const createVariant = useMutation(api.products.createVariant);
   const generateSEO = useAction(api.seoProductGenerator.generateSEOFromFormData);
@@ -209,7 +210,7 @@ function NewProductPageInner() {
         gadgetCategory: formData.gadgetCategory,
         gadgetTypeId: formData.gadgetTypeId ? (formData.gadgetTypeId as Id<"gadgetTypes">) : undefined,
         finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
-        productCategory: formData.productCategory ? (formData.productCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory") : undefined,
+        productCategory: formData.productCategory || undefined,
         length: formData.length ? parseFloat(formData.length) : undefined,
         breadth: formData.breadth ? parseFloat(formData.breadth) : undefined,
         height: formData.height ? parseFloat(formData.height) : undefined,
@@ -621,12 +622,11 @@ function NewProductPageInner() {
                     <SelectValue placeholder="Select product category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="skin">Skin</SelectItem>
-                    <SelectItem value="case-cover">Cover & Case</SelectItem>
-                    <SelectItem value="camera-ring">Camera Rings</SelectItem>
-                    <SelectItem value="magneto-x">Magneto & More</SelectItem>
-                    <SelectItem value="glass">Membrane / Protectors</SelectItem>
-                    <SelectItem value="accessory">Accessory</SelectItem>
+                    {productCategories?.map((cat) => (
+                      <SelectItem key={cat.slug} value={cat.slug}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

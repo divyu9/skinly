@@ -126,16 +126,41 @@ export const getAllUgcVideos = query({
 
 /**
  * Get category display settings (active only, sorted by order)
+ * Now reads from productCategoriesConfig table with showOnHomepage flag
  */
 export const getActiveCategoryDisplaySettings = query({
   args: {},
   handler: async (ctx) => {
-    const categories = await ctx.db
+    // Try to get categories from the new productCategoriesConfig table first
+    const newCategories = await ctx.db
+      .query("productCategoriesConfig")
+      .withIndex("by_show_on_homepage", (q) => q.eq("showOnHomepage", true))
+      .collect();
+
+    // Filter for active ones and transform to match expected shape
+    if (newCategories.length > 0) {
+      return newCategories
+        .filter((c) => c.isActive)
+        .sort((a, b) => a.order - b.order)
+        .map((c) => ({
+          _id: c._id,
+          categoryName: c.slug,
+          displayName: c.name,
+          imageUrl: c.homepageImage || c.image,
+          linkUrl: c.homepageLink,
+          buttonText: c.homepageButtonText,
+          isActive: c.isActive,
+          order: c.order,
+        }));
+    }
+
+    // Fallback to old categoryDisplaySettings table for backwards compatibility
+    const oldCategories = await ctx.db
       .query("categoryDisplaySettings")
       .withIndex("by_active_and_order", (q) => q.eq("isActive", true))
       .collect();
-    
-    return categories.sort((a, b) => a.order - b.order);
+
+    return oldCategories.sort((a, b) => a.order - b.order);
   },
 });
 

@@ -74,6 +74,7 @@ const AdminSitemapGeneratorPage = lazy(() => import("./pages/admin/sitemap-gener
 const AdminSEOGeneratorPage = lazy(() => import("./pages/admin/seo-generator/page.tsx"));
 const AdminShippingPage = lazy(() => import("./pages/admin/shipping.tsx"));
 const AdminProductClassificationPage = lazy(() => import("./pages/admin/product-classification/page.tsx"));
+const AdminProductCategoriesPage = lazy(() => import("./pages/admin/product-categories/page.tsx"));
 const AdminHomepagePage = lazy(() => import("./pages/admin/homepage/page.tsx"));
 const AdminUnauthorizedPage = lazy(() => import("./pages/admin/unauthorized.tsx"));
 const GstMigrationPage = lazy(() => import("./pages/admin/gst-migration.tsx"));
@@ -162,6 +163,7 @@ export default function App() {
             <Route path="/backend-skinly/sitemap" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/product-classification" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/product-categories" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductCategoriesPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/homepage" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminHomepagePage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/unauthorized" element={<Suspense fallback={<PageSkeleton />}><AdminUnauthorizedPage /></Suspense>} />
 

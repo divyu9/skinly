@@ -9,8 +9,8 @@ import OpenAI from "openai";
 // Default logo image URL for products without images
 const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
 
-// Product category type
-type ProductCategory = "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
+// Product category type (now dynamic, but keeping default descriptions for SEO)
+type ProductCategory = string;
 
 // Generate SEO content for a product title
 async function generateSEOContent(
@@ -86,14 +86,7 @@ export const createBulkProducts = action({
   args: {
     products: v.array(v.object({
       title: v.string(),
-      productCategory: v.union(
-        v.literal("skin"),
-        v.literal("case-cover"),
-        v.literal("camera-ring"),
-        v.literal("magneto-x"),
-        v.literal("glass"),
-        v.literal("accessory")
-      ),
+      productCategory: v.string(), // Now accepts any category slug from productCategoriesConfig
       gadgetTypeId: v.optional(v.id("gadgetTypes")),
       finishTypeId: v.optional(v.id("finishTypes")),
       gadgetCategory: v.string(),

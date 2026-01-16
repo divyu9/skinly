@@ -1,9 +1,11 @@
 import { useQuery } from "convex/react";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, SignInButton } from "@clerk/clerk-react";
 import { api } from "@/convex/_generated/api.js";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { Navigate } from "react-router-dom";
 import { useState, useEffect, useRef, type ReactNode } from "react";
+import { LogIn } from "lucide-react";
 
 export function AdminAuthGuard({ children }: { children: ReactNode }) {
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
@@ -48,9 +50,22 @@ export function AdminAuthGuard({ children }: { children: ReactNode }) {
     );
   }
 
-  // Clerk says not signed in - redirect to sign-in
+  // Clerk says not signed in - show sign-in UI
   if (!isSignedIn) {
-    return <Navigate to="/sign-in" replace />;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
+        <div className="text-center space-y-4 p-8">
+          <h2 className="text-xl font-semibold">Admin Access Required</h2>
+          <p className="text-muted-foreground">Please sign in to access the admin panel.</p>
+          <SignInButton mode="modal">
+            <Button>
+              <LogIn className="size-4 mr-2" />
+              Sign In
+            </Button>
+          </SignInButton>
+        </div>
+      </div>
+    );
   }
 
   // Clerk says signed in, but Convex auth status is still loading
@@ -79,8 +94,16 @@ export function AdminAuthGuard({ children }: { children: ReactNode }) {
     if (hasVerifiedAdmin) {
       return <>{children}</>;
     }
-    // Otherwise redirect to sign-in
-    return <Navigate to="/sign-in" replace />;
+    // Show loading while Convex syncs with Clerk auth
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
+        <div className="space-y-4 w-full max-w-md p-8">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+      </div>
+    );
   }
 
   // Logged in but NOT admin

@@ -244,14 +244,7 @@ export default defineSchema({
       phoneModel: v.optional(v.string()), // e.g., "iPhone 14 Pro", "Realme 11", etc.
     })),
     tags: v.array(v.string()),
-    productCategory: v.optional(v.union(
-      v.literal("skin"),
-      v.literal("case-cover"),
-      v.literal("camera-ring"),
-      v.literal("magneto-x"),
-      v.literal("glass"),
-      v.literal("accessory")
-    )), // Product type category (skins vs accessories vs protectors)
+    productCategory: v.optional(v.string()), // Product type category slug (references productCategoriesConfig)
     gadgetCategory: v.optional(v.string()), // DEPRECATED - keeping temporarily for migration, now accepts any string
     gadgetTypeId: v.optional(v.id("gadgetTypes")), // Reference to gadgetTypes table
     finishType: v.optional(v.union(
@@ -1484,4 +1477,44 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_order", ["order"])
     .index("by_active_and_order", ["isActive", "order"]),
+
+  // ============================================
+  // Product Categories (Admin-editable)
+  // ============================================
+  productCategoriesConfig: defineTable({
+    // Core identification
+    slug: v.string(), // URL-safe identifier (e.g., "skin", "case-cover")
+    name: v.string(), // Display name (e.g., "Skins", "Cases & Covers")
+
+    // Display settings
+    description: v.optional(v.string()), // Short description for the category
+    icon: v.optional(v.string()), // Icon name from lucide-react (e.g., "Package2", "Shield")
+    image: v.optional(v.string()), // Placeholder/category image URL
+    color: v.optional(v.string()), // Accent color for the category (hex code)
+
+    // Homepage display settings
+    homepageImage: v.optional(v.string()), // Image shown on homepage category explorer
+    homepageTitle: v.optional(v.string()), // Custom title for homepage (defaults to name)
+    homepageSubtitle: v.optional(v.string()), // Subtitle shown on homepage card
+    homepageButtonText: v.optional(v.string()), // CTA button text (default: "Shop Now")
+    homepageLink: v.optional(v.string()), // Custom link (default: /products?category=slug)
+    showOnHomepage: v.boolean(), // Whether to show in homepage category explorer
+
+    // Behavior
+    isDefault: v.optional(v.boolean()), // Is this the default category (e.g., "skin")
+    requiresDevice: v.optional(v.boolean()), // Does this category require device selection (e.g., skins do)
+
+    // Status and ordering
+    isActive: v.boolean(), // Whether category is available for use
+    order: v.number(), // Display order (lower = first)
+
+    // Metadata
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_active", ["isActive"])
+    .index("by_order", ["order"])
+    .index("by_active_and_order", ["isActive", "order"])
+    .index("by_show_on_homepage", ["showOnHomepage", "order"]),
 });
