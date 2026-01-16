@@ -499,14 +499,14 @@ function BulkProductCreatorInner() {
               <Label>Category</Label>
               <Select
                 value={defaultProductCategory}
-                onValueChange={(v) => setDefaultProductCategory(v as ProductCategory)}
+                onValueChange={(v) => setDefaultProductCategory(v)}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRODUCT_CATEGORIES.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                  {productCategories?.map(cat => (
+                    <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -676,8 +676,8 @@ function BulkProductCreatorInner() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {PRODUCT_CATEGORIES.map(cat => (
-                            <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                          {productCategories?.map(cat => (
+                            <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

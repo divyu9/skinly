@@ -101,6 +101,7 @@ export default function ProductClassificationPage() {
   
   // Product category management queries
   const categoryStats = useQuery(api.productCategories.getCategoryStats, {});
+  const productCategories = useQuery(api.productCategories.listActive, {});
   const categorizedProducts = useQuery(
     api.productCategories.getProductsByCategory,
     { category: selectedCategory === "all" ? undefined : selectedCategory, limit: 100 }
@@ -460,7 +461,7 @@ export default function ProductClassificationPage() {
     try {
       const result = await bulkUpdateCategories({
         productIds: Array.from(selectedProducts),
-        category: bulkUpdateCategory as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory",
+        category: bulkUpdateCategory,
       });
       toast.success(result.message);
       setIsBulkUpdateDialogOpen(false);
@@ -477,7 +478,7 @@ export default function ProductClassificationPage() {
     try {
       await updateProductCategory({
         productId,
-        category: category === "none" ? null : category as "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory",
+        category: category === "none" ? null : category,
       });
       toast.success("Product category updated");
     } catch (error) {
@@ -1225,78 +1226,20 @@ export default function ProductClassificationPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          <TableRow>
-                            <TableCell className="font-medium">Skin</TableCell>
-                            <TableCell>
-                              <code className="rounded bg-muted px-2 py-1 text-xs">skin</code>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              Device skins and wraps
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">{categoryStats.skin}</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">Cover & Case</TableCell>
-                            <TableCell>
-                              <code className="rounded bg-muted px-2 py-1 text-xs">case-cover</code>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              Phone cases and protective covers
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">{categoryStats["case-cover"]}</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">Camera Rings</TableCell>
-                            <TableCell>
-                              <code className="rounded bg-muted px-2 py-1 text-xs">camera-ring</code>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              Camera lens protection rings
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">{categoryStats["camera-ring"]}</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">Magneto & More</TableCell>
-                            <TableCell>
-                              <code className="rounded bg-muted px-2 py-1 text-xs">magneto-x</code>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              Magnetic accessories and gadgets
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">{categoryStats["magneto-x"]}</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">Membrane / Protectors</TableCell>
-                            <TableCell>
-                              <code className="rounded bg-muted px-2 py-1 text-xs">glass</code>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              Screen protectors and membranes
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">{categoryStats.glass}</Badge>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell className="font-medium">Accessory</TableCell>
-                            <TableCell>
-                              <code className="rounded bg-muted px-2 py-1 text-xs">accessory</code>
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              General accessories and add-ons
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="secondary">{categoryStats.accessory}</Badge>
-                            </TableCell>
-                          </TableRow>
+                          {productCategories?.map(cat => (
+                            <TableRow key={cat.slug}>
+                              <TableCell className="font-medium">{cat.name}</TableCell>
+                              <TableCell>
+                                <code className="rounded bg-muted px-2 py-1 text-xs">{cat.slug}</code>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {cat.description || "—"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Badge variant="secondary">{categoryStats[cat.slug] || 0}</Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
                           <TableRow className="bg-muted/30">
                             <TableCell className="font-medium">Uncategorized</TableCell>
                             <TableCell>
@@ -1381,12 +1324,9 @@ export default function ProductClassificationPage() {
                       <SelectContent>
                         <SelectItem value="all">All Products</SelectItem>
                         <SelectItem value="uncategorized">Uncategorized</SelectItem>
-                        <SelectItem value="skin">Skin</SelectItem>
-                        <SelectItem value="case-cover">Cover & Case</SelectItem>
-                        <SelectItem value="camera-ring">Camera Rings</SelectItem>
-                        <SelectItem value="magneto-x">Magneto & More</SelectItem>
-                        <SelectItem value="glass">Membrane / Protectors</SelectItem>
-                        <SelectItem value="accessory">Accessory</SelectItem>
+                        {productCategories?.map(cat => (
+                          <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1446,11 +1386,7 @@ export default function ProductClassificationPage() {
                             <TableCell>
                               {product.productCategory ? (
                                 <Badge variant="default" className="text-xs">
-                                  {product.productCategory === "case-cover" ? "Cover & Case" :
-                                   product.productCategory === "camera-ring" ? "Camera Rings" :
-                                   product.productCategory === "magneto-x" ? "Magneto & More" :
-                                   product.productCategory === "glass" ? "Membrane / Protectors" :
-                                   product.productCategory.charAt(0).toUpperCase() + product.productCategory.slice(1)}
+                                  {productCategories?.find(c => c.slug === product.productCategory)?.name || product.productCategory}
                                 </Badge>
                               ) : (
                                 <Badge variant="destructive" className="text-xs">Uncategorized</Badge>
@@ -1466,12 +1402,9 @@ export default function ProductClassificationPage() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="none">-- None --</SelectItem>
-                                  <SelectItem value="skin">Skin</SelectItem>
-                                  <SelectItem value="case-cover">Cover & Case</SelectItem>
-                                  <SelectItem value="camera-ring">Camera Rings</SelectItem>
-                                  <SelectItem value="magneto-x">Magneto & More</SelectItem>
-                                  <SelectItem value="glass">Membrane / Protectors</SelectItem>
-                                  <SelectItem value="accessory">Accessory</SelectItem>
+                                  {productCategories?.map(cat => (
+                                    <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </TableCell>
@@ -1984,12 +1917,9 @@ export default function ProductClassificationPage() {
                     <SelectValue placeholder="Choose a category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="skin">Skin</SelectItem>
-                    <SelectItem value="case-cover">Cover & Case</SelectItem>
-                    <SelectItem value="camera-ring">Camera Rings</SelectItem>
-                    <SelectItem value="magneto-x">Magneto & More</SelectItem>
-                    <SelectItem value="glass">Membrane / Protectors</SelectItem>
-                    <SelectItem value="accessory">Accessory</SelectItem>
+                    {productCategories?.map(cat => (
+                      <SelectItem key={cat.slug} value={cat.slug}>{cat.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
