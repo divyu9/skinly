@@ -1607,4 +1607,31 @@ export default defineSchema({
   })
     .index("by_category", ["productCategorySlug"])
     .index("by_product", ["productId"]),
+
+  // ============================================
+  // Media Library - Uploaded images and videos
+  // ============================================
+  mediaLibrary: defineTable({
+    // Cloudinary info
+    cloudinaryUrl: v.string(),
+    cloudinaryPublicId: v.string(),
+
+    // File info
+    filename: v.string(),
+    folder: v.optional(v.string()),
+    mediaType: v.union(v.literal("image"), v.literal("video")),
+    format: v.optional(v.string()),
+    width: v.optional(v.number()),
+    height: v.optional(v.number()),
+    bytes: v.optional(v.number()),
+
+    // Metadata
+    tags: v.optional(v.array(v.string())),
+    uploadedBy: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.optional(v.number()),
+  })
+    .index("by_folder", ["folder"])
+    .index("by_media_type", ["mediaType"])
+    .index("by_created", ["createdAt"]),
 });

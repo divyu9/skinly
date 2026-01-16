@@ -77,6 +77,7 @@ const AdminProductClassificationPage = lazy(() => import("./pages/admin/product-
 const AdminProductCategoriesPage = lazy(() => import("./pages/admin/product-categories/page.tsx"));
 const AdminHomepagePage = lazy(() => import("./pages/admin/homepage/page.tsx"));
 const AdminProductSectionsPage = lazy(() => import("./pages/admin/product-sections/page.tsx"));
+const AdminMediaLibraryPage = lazy(() => import("./pages/admin/media/page.tsx"));
 const AdminUnauthorizedPage = lazy(() => import("./pages/admin/unauthorized.tsx"));
 const GstMigrationPage = lazy(() => import("./pages/admin/gst-migration.tsx"));
 const TaxExportPage = lazy(() => import("./pages/admin/tax-export.tsx"));
@@ -167,6 +168,7 @@ export default function App() {
             <Route path="/backend-skinly/product-categories" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductCategoriesPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/homepage" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminHomepagePage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/product-sections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductSectionsPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/media" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMediaLibraryPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/unauthorized" element={<Suspense fallback={<PageSkeleton />}><AdminUnauthorizedPage /></Suspense>} />
 
             {/* Policy pages - lazy loaded */}
