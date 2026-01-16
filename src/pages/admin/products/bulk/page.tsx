@@ -398,7 +398,7 @@ function BulkProductCreatorInner() {
     setResults(null);
   };
 
-  if (gadgetTypes === undefined || finishTypes === undefined) {
+  if (gadgetTypes === undefined || finishTypes === undefined || productCategories === undefined) {
     return <Skeleton className="h-screen w-full" />;
   }
 

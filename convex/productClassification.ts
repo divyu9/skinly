@@ -374,14 +374,7 @@ export const bulkUpdateClassification = mutation({
 export const updateSingleProductClassification = mutation({
   args: {
     productId: v.id("products"),
-    productCategory: v.optional(v.union(
-      v.literal("skin"),
-      v.literal("case-cover"),
-      v.literal("camera-ring"),
-      v.literal("magneto-x"),
-      v.literal("glass"),
-      v.literal("accessory")
-    )),
+    productCategory: v.optional(v.string()),
     gadgetCategory: v.optional(v.string()), // Accept any string for dynamic gadget types
     gadgetTypeId: v.optional(v.id("gadgetTypes")), // Support new gadgetTypeId field
     finishTypeId: v.optional(v.union(v.id("finishTypes"), v.null())),

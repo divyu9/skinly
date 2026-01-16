@@ -9,14 +9,7 @@ import type { Doc, Id } from "./_generated/dataModel.d.ts";
 export const getAllProductsPaginated = query({
   args: {
     status: v.optional(v.union(v.literal("active"), v.literal("draft"), v.literal("archived"))),
-    productCategory: v.optional(v.union(
-      v.literal("skin"),
-      v.literal("case-cover"),
-      v.literal("camera-ring"),
-      v.literal("magneto-x"),
-      v.literal("glass"),
-      v.literal("accessory")
-    )),
+    productCategory: v.optional(v.string()),
     gadgetCategory: v.optional(v.union(
       v.literal("phone"),
       v.literal("laptop"),
@@ -611,14 +604,7 @@ export const createProduct = mutation({
     ),
     gadgetTypeId: v.optional(v.id("gadgetTypes")),
     finishTypeId: v.optional(v.id("finishTypes")),
-    productCategory: v.optional(v.union(
-      v.literal("skin"),
-      v.literal("case-cover"),
-      v.literal("camera-ring"),
-      v.literal("magneto-x"),
-      v.literal("glass"),
-      v.literal("accessory")
-    )),
+    productCategory: v.optional(v.string()),
     length: v.optional(v.number()),
     breadth: v.optional(v.number()),
     height: v.optional(v.number()),
@@ -698,14 +684,7 @@ export const updateProduct = mutation({
     gadgetCategory: v.optional(v.string()),
     gadgetTypeId: v.optional(v.id("gadgetTypes")),
     finishTypeId: v.optional(v.id("finishTypes")),
-    productCategory: v.optional(v.union(
-      v.literal("skin"),
-      v.literal("case-cover"),
-      v.literal("camera-ring"),
-      v.literal("magneto-x"),
-      v.literal("glass"),
-      v.literal("accessory")
-    )),
+    productCategory: v.optional(v.string()),
     hasMultipleVariants: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -738,7 +717,7 @@ export const updateProduct = mutation({
       gadgetCategory?: "phone" | "laptop" | "camera" | "accessory" | "tablet" | "lens" | "drone" | "charger" | "console" | "mac-mini" | "cover";
       gadgetTypeId?: Id<"gadgetTypes">;
       finishTypeId?: Id<"finishTypes">;
-      productCategory?: "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory";
+      productCategory?: string;
       hasMultipleVariants?: boolean;
     }> = {
       ...rawUpdates,
