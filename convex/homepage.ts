@@ -347,6 +347,7 @@ export const updateHomepageSettings = mutation({
   args: {
     logoImageUrl: v.optional(v.string()),
     logoRedirectLink: v.optional(v.string()),
+    footerLogoImageUrl: v.optional(v.string()),
     showSearchIcon: v.optional(v.boolean()),
     marqueeEnabled: v.optional(v.boolean()),
     marqueeMaxModels: v.optional(v.number()),
@@ -361,14 +362,14 @@ export const updateHomepageSettings = mutation({
     }
 
     const existingSettings = await ctx.db.query("homepageSettings").first();
-    
+
     const now = Date.now();
     const updates = {
       ...args,
       updatedBy: identity.email,
       updatedAt: now,
     };
-    
+
     if (existingSettings) {
       await ctx.db.patch(existingSettings._id, updates);
       return existingSettings._id;
@@ -377,6 +378,7 @@ export const updateHomepageSettings = mutation({
       const newSettings = {
         logoImageUrl: args.logoImageUrl || undefined,
         logoRedirectLink: args.logoRedirectLink || "/",
+        footerLogoImageUrl: args.footerLogoImageUrl || undefined,
         showSearchIcon: args.showSearchIcon ?? true,
         marqueeEnabled: args.marqueeEnabled ?? true,
         marqueeMaxModels: args.marqueeMaxModels || 20,
@@ -386,7 +388,7 @@ export const updateHomepageSettings = mutation({
         updatedBy: identity.email,
         updatedAt: now,
       };
-      
+
       return await ctx.db.insert("homepageSettings", newSettings);
     }
   },
@@ -682,6 +684,11 @@ export const createFeatureBanner = mutation({
     ctaLink: v.optional(v.string()),
     isActive: v.boolean(),
     order: v.number(),
+    // Image dimension fields
+    mobileWidth: v.optional(v.string()),
+    mobileHeight: v.optional(v.string()),
+    desktopWidth: v.optional(v.string()),
+    desktopHeight: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -711,6 +718,11 @@ export const updateFeatureBanner = mutation({
     ctaLink: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     order: v.optional(v.number()),
+    // Image dimension fields
+    mobileWidth: v.optional(v.string()),
+    mobileHeight: v.optional(v.string()),
+    desktopWidth: v.optional(v.string()),
+    desktopHeight: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -803,6 +815,11 @@ export const bulkUpdateCategoryDisplaySettings = mutation({
       buttonText: v.optional(v.string()),
       isActive: v.boolean(),
       order: v.number(),
+      // Image dimension fields
+      mobileWidth: v.optional(v.string()),
+      mobileHeight: v.optional(v.string()),
+      desktopWidth: v.optional(v.string()),
+      desktopHeight: v.optional(v.string()),
     })),
   },
   handler: async (ctx, args) => {
@@ -831,6 +848,11 @@ export const bulkUpdateCategoryDisplaySettings = mutation({
           homepageButtonText: category.buttonText || undefined,
           showOnHomepage: category.isActive,
           order: category.order,
+          // Add dimension fields
+          homepageMobileWidth: category.mobileWidth || undefined,
+          homepageMobileHeight: category.mobileHeight || undefined,
+          homepageDesktopWidth: category.desktopWidth || undefined,
+          homepageDesktopHeight: category.desktopHeight || undefined,
           updatedAt: now,
         });
         results.push(existingNewCategory._id);
@@ -845,6 +867,11 @@ export const bulkUpdateCategoryDisplaySettings = mutation({
           showOnHomepage: category.isActive,
           isActive: true,
           order: category.order,
+          // Add dimension fields
+          homepageMobileWidth: category.mobileWidth || undefined,
+          homepageMobileHeight: category.mobileHeight || undefined,
+          homepageDesktopWidth: category.desktopWidth || undefined,
+          homepageDesktopHeight: category.desktopHeight || undefined,
           createdAt: now,
           updatedAt: now,
         });

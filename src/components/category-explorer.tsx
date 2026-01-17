@@ -77,47 +77,73 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
         </h2>
 
         {/* Horizontal Scrolling Cards - matches hero slider structure */}
-        <div 
+        <div
           className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {categories.map((category) => (
-            <Link
-              key={category._id}
-              to={getCategoryLink(category.categoryName, category.linkUrl)}
-              onClick={(e) => handleCategoryClick(category.categoryName, e, category.linkUrl)}
-              className="group relative flex-shrink-0 w-[70vw] md:w-[45vw] lg:w-[30vw] xl:w-[23vw] max-w-md h-[calc(87.5vw+30px)] md:h-[calc(56.25vw+30px)] lg:h-[calc(37.5vw+30px)] xl:h-96 rounded-2xl overflow-hidden shadow-lg snap-start"
-            >
-              {/* Background Image - Simplified */}
-              <img
-                src={getCategoryImage(category.categoryName, category.imageUrl)}
-                alt={category.displayName}
-                loading="lazy"
-                decoding="async"
-                width="800"
-                height="1000"
-                className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
-              />
-              
-              {/* Gradient Overlay - only show if button text exists */}
-              {category.buttonText && (
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
-              )}
-              
-              {/* Content - only show if button text exists */}
-              {category.buttonText && (
-                <div className="absolute inset-0 flex flex-col items-center justify-end p-6 text-center">
-                  <div className="bg-white/95 backdrop-blur-sm rounded-full px-6 py-2.5">
-                    <h3 className="text-base font-bold text-foreground">
-                      {category.buttonText}
-                    </h3>
+          {categories.map((category) => {
+            // Get configured dimensions or use defaults
+            const mobileWidth = category.mobileWidth || "70vw";
+            const mobileHeight = category.mobileHeight || "90vw";
+            const desktopWidth = category.desktopWidth || "23vw";
+            const desktopHeight = category.desktopHeight || "30vw";
+
+            return (
+              <Link
+                key={category._id}
+                to={getCategoryLink(category.categoryName, category.linkUrl)}
+                onClick={(e) => handleCategoryClick(category.categoryName, e, category.linkUrl)}
+                className="category-card group relative flex-shrink-0 rounded-2xl overflow-hidden shadow-lg snap-start"
+                style={{
+                  // Use CSS custom properties for responsive dimensions
+                  '--mobile-width': mobileWidth,
+                  '--mobile-height': mobileHeight,
+                  '--desktop-width': desktopWidth,
+                  '--desktop-height': desktopHeight,
+                  width: `var(--mobile-width)`,
+                  height: `var(--mobile-height)`,
+                } as React.CSSProperties}
+              >
+                {/* Responsive style override for desktop */}
+                <style>{`
+                  @media (min-width: 768px) {
+                    .category-card {
+                      width: var(--desktop-width) !important;
+                      height: var(--desktop-height) !important;
+                    }
+                  }
+                `}</style>
+                {/* Background Image - Simplified */}
+                <img
+                  src={getCategoryImage(category.categoryName, category.imageUrl)}
+                  alt={category.displayName}
+                  loading="lazy"
+                  decoding="async"
+                  width="800"
+                  height="1000"
+                  className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
+                />
+
+                {/* Gradient Overlay - only show if button text exists */}
+                {category.buttonText && (
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+                )}
+
+                {/* Content - only show if button text exists */}
+                {category.buttonText && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-end p-6 text-center">
+                    <div className="bg-white/95 backdrop-blur-sm rounded-full px-6 py-2.5">
+                      <h3 className="text-base font-bold text-foreground">
+                        {category.buttonText}
+                      </h3>
+                    </div>
                   </div>
-                </div>
-              )}
-            </Link>
-          ))}
+                )}
+              </Link>
+            );
+          })}
         </div>
 
         {/* Device Selector Dialog for Skins */}

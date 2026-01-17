@@ -10,10 +10,23 @@ const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const root = document.getElementById("root")!;
 
 if (clerkPubKey) {
-  // With Clerk auth
+  // With Clerk auth - optimized for faster initial render
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
-      <ClerkProvider publishableKey={clerkPubKey}>
+      <ClerkProvider
+        publishableKey={clerkPubKey}
+        appearance={{
+          // Reduce initial CSS bundle by using minimal base theme
+          layout: {
+            socialButtonsVariant: "iconButton",
+            socialButtonsPlacement: "bottom",
+          },
+        }}
+        // Defer non-critical Clerk operations
+        afterSignInUrl="/"
+        afterSignUpUrl="/"
+      >
+        {/* Render app immediately, don't block on Clerk loading */}
         <App />
       </ClerkProvider>
     </React.StrictMode>

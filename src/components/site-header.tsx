@@ -28,11 +28,16 @@ export function SiteHeader({
       {/* TOP NAV */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          {/* LOGO */}
+          {/* LOGO - LCP Element */}
           <Link to="/" className="flex items-center gap-2 flex-shrink-0">
             <img
               src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas"
               alt="Skinly"
+              width="174"
+              height="70"
+              fetchPriority="high"
+              loading="eager"
+              decoding="sync"
               className="h-12 md:h-16"
             />
           </Link>

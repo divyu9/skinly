@@ -2,20 +2,20 @@ import { useState, lazy, Suspense } from "react";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
-import { MobileNav } from "@/components/mobile-nav.tsx";
-import { ModelsMarquee } from "@/components/models-marquee.tsx";
 import { HeroSlider } from "@/components/hero-slider.tsx";
-import { ExploreModels } from "@/components/explore-models.tsx";
 import { CategoryExplorer } from "@/components/category-explorer.tsx";
-import { TopPicks } from "@/components/top-picks.tsx";
-import { MostTrendy } from "@/components/most-trendy.tsx";
-import { ExploreByBrand } from "@/components/explore-by-brand.tsx";
-import { ExploreByGadget } from "@/components/explore-by-gadget.tsx";
-import { SiteFooter } from "@/components/site-footer.tsx";
-import { BugReportModal } from "@/components/bug-report-modal.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 
-// Lazy load below-the-fold components for better initial load
+// Lazy load below-the-fold and modal components for better FCP/LCP
+const MobileNav = lazy(() => import("@/components/mobile-nav.tsx").then(m => ({ default: m.MobileNav })));
+const ModelsMarquee = lazy(() => import("@/components/models-marquee.tsx").then(m => ({ default: m.ModelsMarquee })));
+const ExploreModels = lazy(() => import("@/components/explore-models.tsx").then(m => ({ default: m.ExploreModels })));
+const TopPicks = lazy(() => import("@/components/top-picks.tsx").then(m => ({ default: m.TopPicks })));
+const MostTrendy = lazy(() => import("@/components/most-trendy.tsx").then(m => ({ default: m.MostTrendy })));
+const ExploreByBrand = lazy(() => import("@/components/explore-by-brand.tsx").then(m => ({ default: m.ExploreByBrand })));
+const ExploreByGadget = lazy(() => import("@/components/explore-by-gadget.tsx").then(m => ({ default: m.ExploreByGadget })));
+const SiteFooter = lazy(() => import("@/components/site-footer.tsx").then(m => ({ default: m.SiteFooter })));
+const BugReportModal = lazy(() => import("@/components/bug-report-modal.tsx").then(m => ({ default: m.BugReportModal })));
 const WhySkinly = lazy(() => import("@/components/why-skinly").then(m => ({ default: m.WhySkinly })));
 const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m => ({ default: m.FeatureBanner })));
 const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
@@ -71,71 +71,84 @@ export default function Index() {
   // Helper to render section by type
   const renderSection = (section: typeof sortedActiveSections[0]) => {
     const key = section._id;
-    
+
     switch (section.sectionType) {
       case "hero_slides":
+        // Hero slider is critical for LCP - keep it eager
         return <HeroSlider key={key} />;
-      
+
       case "models_marquee":
         return null; // Already rendered above header
-      
+
       case "explore_models":
-        return <ExploreModels key={key} onRequestModelClick={() => setIsRequestModelOpen(true)} />;
-      
+        return (
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />
+          </Suspense>
+        );
+
       case "category_explorer":
+        // Category explorer is above the fold - keep it eager
         return <CategoryExplorer key={key} onRequestModel={handleRequestModel} />;
-      
+
       case "top_picks":
-        return <TopPicks key={key} />;
-      
+        return (
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <TopPicks />
+          </Suspense>
+        );
+
       case "most_trendy":
         return (
-          <MostTrendy
-            key={key}
-            sectionId={section._id}
-            config={section.config as never}
-          />
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <MostTrendy
+              sectionId={section._id}
+              config={section.config as never}
+            />
+          </Suspense>
         );
-      
+
       case "explore_by_brand":
         return (
-          <ExploreByBrand
-            key={key}
-            sectionId={section._id}
-            config={section.config as never}
-          />
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <ExploreByBrand
+              sectionId={section._id}
+              config={section.config as never}
+            />
+          </Suspense>
         );
-      
+
       case "explore_by_gadget":
         return (
-          <ExploreByGadget
-            key={key}
-            sectionId={section._id}
-            config={section.config as never}
-          />
+          <Suspense key={key} fallback={<SectionSkeleton />}>
+            <ExploreByGadget
+              sectionId={section._id}
+              config={section.config as never}
+            />
+          </Suspense>
         );
-      
+
       case "why_skinly":
         return (
           <Suspense key={key} fallback={<SectionSkeleton />}>
             <WhySkinly />
           </Suspense>
         );
-      
+
       case "feature_banner":
         return (
           <Suspense key={key} fallback={<SectionSkeleton />}>
             <FeatureBanner />
           </Suspense>
         );
-      
+
       case "ugc_videos":
         return (
           <Suspense key={key} fallback={<SectionSkeleton />}>
             <UgcVideos />
           </Suspense>
         );
-      
+
       default:
         return null;
     }
@@ -200,7 +213,9 @@ export default function Index() {
 
       {/* Models Marquee - below header */}
       <div style={{ marginTop: `${headerOffset}px` }}>
-        <ModelsMarquee />
+        <Suspense fallback={<div className="h-10" />}>
+          <ModelsMarquee />
+        </Suspense>
       </div>
 
       {/* Main Content */}
@@ -210,13 +225,17 @@ export default function Index() {
       </main>
 
       {/* Footer */}
-      <SiteFooter />
+      <Suspense fallback={<div className="h-32" />}>
+        <SiteFooter />
+      </Suspense>
 
       {/* Mobile Navigation Sheet */}
-      <MobileNav 
-        open={isMobileMenuOpen}
-        onOpenChange={setIsMobileMenuOpen}
-      />
+      <Suspense fallback={null}>
+        <MobileNav
+          open={isMobileMenuOpen}
+          onOpenChange={setIsMobileMenuOpen}
+        />
+      </Suspense>
 
       {/* Request Model Dialog */}
       <Dialog open={isRequestModelOpen} onOpenChange={setIsRequestModelOpen}>
@@ -304,10 +323,12 @@ export default function Index() {
       </Dialog>
 
       {/* Bug Report Modal */}
-      <BugReportModal
-        open={isBugReportOpen}
-        onOpenChange={setIsBugReportOpen}
-      />
+      <Suspense fallback={null}>
+        <BugReportModal
+          open={isBugReportOpen}
+          onOpenChange={setIsBugReportOpen}
+        />
+      </Suspense>
     </>
   );
 }

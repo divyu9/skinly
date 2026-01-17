@@ -244,16 +244,19 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 </button>
               )}
 
-              {/* Center: Logo */}
-              <Link 
-                to={logoLink} 
+              {/* Center: Logo - LCP Element */}
+              <Link
+                to={logoLink}
                 className="flex-1 flex items-center justify-center"
               >
-                <img 
+                <img
                   src={logoUrl}
-                  alt="Skinly" 
+                  alt="Skinly"
                   width="174"
                   height="70"
+                  fetchPriority="high"
+                  loading="eager"
+                  decoding="sync"
                   className="h-10 w-auto object-contain"
                 />
               </Link>

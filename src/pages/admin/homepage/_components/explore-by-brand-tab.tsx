@@ -52,6 +52,11 @@ interface SectionConfig {
   subtitle: string;
   cardWidth: number;
   cardHeight: number;
+  // New: separate mobile/desktop dimensions
+  mobileCardWidth?: string;
+  mobileCardHeight?: string;
+  desktopCardWidth?: string;
+  desktopCardHeight?: string;
 }
 
 function SortableCard({ card, onEdit, onDelete }: { 
@@ -128,6 +133,11 @@ export function ExploreByBrandTab() {
   const [configSubtitle, setConfigSubtitle] = useState(sectionConfig?.subtitle || "");
   const [cardWidth, setCardWidth] = useState(sectionConfig?.cardWidth || 200);
   const [cardHeight, setCardHeight] = useState(sectionConfig?.cardHeight || 200);
+  // New: mobile/desktop dimension states
+  const [mobileCardWidth, setMobileCardWidth] = useState(sectionConfig?.mobileCardWidth || "40vw");
+  const [mobileCardHeight, setMobileCardHeight] = useState(sectionConfig?.mobileCardHeight || "40vw");
+  const [desktopCardWidth, setDesktopCardWidth] = useState(sectionConfig?.desktopCardWidth || "200px");
+  const [desktopCardHeight, setDesktopCardHeight] = useState(sectionConfig?.desktopCardHeight || "200px");
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
   // Sync local cards with fetched cards
@@ -204,6 +214,10 @@ export function ExploreByBrandTab() {
           autoGenerate: false,
           cardWidth,
           cardHeight,
+          mobileCardWidth: mobileCardWidth || undefined,
+          mobileCardHeight: mobileCardHeight || undefined,
+          desktopCardWidth: desktopCardWidth || undefined,
+          desktopCardHeight: desktopCardHeight || undefined,
         }),
       });
       toast.success("Section settings saved");
@@ -353,7 +367,7 @@ export function ExploreByBrandTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="card-width">Card Width (px)</Label>
+              <Label htmlFor="card-width">Card Width (px) - Legacy</Label>
               <Input
                 id="card-width"
                 type="number"
@@ -362,7 +376,7 @@ export function ExploreByBrandTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="card-height">Card Height (px)</Label>
+              <Label htmlFor="card-height">Card Height (px) - Legacy</Label>
               <Input
                 id="card-height"
                 type="number"
@@ -371,6 +385,71 @@ export function ExploreByBrandTab() {
               />
             </div>
           </div>
+
+          {/* Mobile/Desktop Dimensions Section */}
+          <div className="pt-4 border-t space-y-4">
+            <div>
+              <h4 className="text-sm font-semibold">Card Dimensions (Mobile & Desktop)</h4>
+              <p className="text-xs text-muted-foreground">
+                Set responsive card sizes. Use px, vw, or % units.
+              </p>
+            </div>
+
+            {/* Mobile Dimensions */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Mobile View</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="mobile-card-width" className="text-xs">Width</Label>
+                  <Input
+                    id="mobile-card-width"
+                    value={mobileCardWidth}
+                    onChange={(e) => setMobileCardWidth(e.target.value)}
+                    placeholder="40vw"
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="mobile-card-height" className="text-xs">Height</Label>
+                  <Input
+                    id="mobile-card-height"
+                    value={mobileCardHeight}
+                    onChange={(e) => setMobileCardHeight(e.target.value)}
+                    placeholder="40vw"
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Dimensions */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground">Desktop View</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="desktop-card-width" className="text-xs">Width</Label>
+                  <Input
+                    id="desktop-card-width"
+                    value={desktopCardWidth}
+                    onChange={(e) => setDesktopCardWidth(e.target.value)}
+                    placeholder="200px"
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="desktop-card-height" className="text-xs">Height</Label>
+                  <Input
+                    id="desktop-card-height"
+                    value={desktopCardHeight}
+                    onChange={(e) => setDesktopCardHeight(e.target.value)}
+                    placeholder="200px"
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Button onClick={handleSaveConfig} disabled={isSavingConfig}>
             <SaveIcon className="w-4 h-4 mr-2" />
             {isSavingConfig ? "Saving..." : "Save Settings"}

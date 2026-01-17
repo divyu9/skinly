@@ -1237,20 +1237,23 @@ export default defineSchema({
 
   // Homepage Settings (general homepage configuration)
   homepageSettings: defineTable({
-    // Header
-    logoImageUrl: v.optional(v.string()), // Logo image URL
+    // Header Logo
+    logoImageUrl: v.optional(v.string()), // Header logo image URL (Cloudinary)
     logoRedirectLink: v.optional(v.string()), // Logo redirect link (default: "/")
     showSearchIcon: v.boolean(), // Toggle search icon ON/OFF
-    
+
+    // Footer Logo (can be different from header)
+    footerLogoImageUrl: v.optional(v.string()), // Footer logo image URL (Cloudinary)
+
     // Marquee
     marqueeEnabled: v.boolean(), // Toggle marquee ON/OFF
     marqueeMaxModels: v.number(), // Max models to show in marquee (default: 20)
-    
+
     // Announcement Bar
     announcementEnabled: v.boolean(),
     announcementText: v.optional(v.string()),
     announcementLink: v.optional(v.string()),
-    
+
     // Metadata
     updatedBy: v.optional(v.string()), // Admin email
     updatedAt: v.optional(v.number()),
@@ -1339,6 +1342,12 @@ export default defineSchema({
       v.object({
         title: v.string(),
         subtitle: v.optional(v.string()),
+        // Mobile dimensions
+        mobileCardWidth: v.optional(v.string()), // e.g. "70vw" or "280px"
+        mobileCardHeight: v.optional(v.string()), // e.g. "90vw" or "360px"
+        // Desktop dimensions
+        desktopCardWidth: v.optional(v.string()), // e.g. "23vw" or "280px"
+        desktopCardHeight: v.optional(v.string()), // e.g. "30vw" or "360px"
       }),
       // Most Trendy config
       v.object({
@@ -1346,24 +1355,42 @@ export default defineSchema({
         subtitle: v.optional(v.string()),
         tags: v.array(v.string()), // Product tags to filter by
         maxProducts: v.number(), // Max products to show (default: 10)
-        cardWidth: v.number(), // Card width in pixels (default: 280)
-        cardHeight: v.number(), // Card height in pixels (default: 380)
+        cardWidth: v.number(), // Card width in pixels (default: 280) - legacy
+        cardHeight: v.number(), // Card height in pixels (default: 380) - legacy
+        // Mobile dimensions
+        mobileCardWidth: v.optional(v.string()), // e.g. "70vw" or "280px"
+        mobileCardHeight: v.optional(v.string()), // e.g. "90vw" or "380px"
+        // Desktop dimensions
+        desktopCardWidth: v.optional(v.string()), // e.g. "280px"
+        desktopCardHeight: v.optional(v.string()), // e.g. "380px"
       }),
       // Explore by Brand config
       v.object({
         title: v.string(),
         subtitle: v.optional(v.string()),
         autoGenerate: v.boolean(), // Auto-generate from supportedModels
-        cardWidth: v.number(), // Card width in pixels (default: 200)
-        cardHeight: v.number(), // Card height in pixels (default: 200)
+        cardWidth: v.number(), // Card width in pixels (default: 200) - legacy
+        cardHeight: v.number(), // Card height in pixels (default: 200) - legacy
+        // Mobile dimensions
+        mobileCardWidth: v.optional(v.string()), // e.g. "40vw" or "150px"
+        mobileCardHeight: v.optional(v.string()), // e.g. "40vw" or "150px"
+        // Desktop dimensions
+        desktopCardWidth: v.optional(v.string()), // e.g. "200px"
+        desktopCardHeight: v.optional(v.string()), // e.g. "200px"
       }),
       // Explore by Gadget config
       v.object({
         title: v.string(),
         subtitle: v.optional(v.string()),
         autoGenerate: v.boolean(), // Auto-generate from product categories
-        cardWidth: v.number(), // Card width in pixels (default: 280)
-        cardHeight: v.number(), // Card height in pixels (default: 320)
+        cardWidth: v.number(), // Card width in pixels (default: 280) - legacy
+        cardHeight: v.number(), // Card height in pixels (default: 320) - legacy
+        // Mobile dimensions
+        mobileCardWidth: v.optional(v.string()), // e.g. "70vw" or "280px"
+        mobileCardHeight: v.optional(v.string()), // e.g. "80vw" or "320px"
+        // Desktop dimensions
+        desktopCardWidth: v.optional(v.string()), // e.g. "280px"
+        desktopCardHeight: v.optional(v.string()), // e.g. "320px"
       })
     )),
     
@@ -1448,7 +1475,13 @@ export default defineSchema({
     buttonText: v.optional(v.string()), // Button text (if empty, button is hidden)
     isActive: v.boolean(), // Whether category is visible
     order: v.number(), // Display order (lower = earlier)
-    
+
+    // Image dimension fields (separate for mobile and desktop)
+    mobileWidth: v.optional(v.string()), // e.g. "70vw" or "280px"
+    mobileHeight: v.optional(v.string()), // e.g. "90vw" or "360px"
+    desktopWidth: v.optional(v.string()), // e.g. "23vw" or "280px"
+    desktopHeight: v.optional(v.string()), // e.g. "30vw" or "360px"
+
     // Metadata
     updatedBy: v.optional(v.string()), // Admin email
     updatedAt: v.optional(v.number()),
@@ -1467,7 +1500,13 @@ export default defineSchema({
     ctaLink: v.optional(v.string()), // CTA button link (optional)
     isActive: v.boolean(), // Whether banner is visible
     order: v.number(), // Display order (lower = earlier)
-    
+
+    // Image dimension fields (separate for mobile and desktop)
+    mobileWidth: v.optional(v.string()), // e.g. "100vw" or "full"
+    mobileHeight: v.optional(v.string()), // e.g. "200px" or "50vw"
+    desktopWidth: v.optional(v.string()), // e.g. "100vw" or "full"
+    desktopHeight: v.optional(v.string()), // e.g. "400px" or "25vw"
+
     // Metadata
     createdBy: v.optional(v.string()), // Admin email
     createdAt: v.number(),
@@ -1499,6 +1538,12 @@ export default defineSchema({
     homepageButtonText: v.optional(v.string()), // CTA button text (default: "Shop Now")
     homepageLink: v.optional(v.string()), // Custom link (default: /products?category=slug)
     showOnHomepage: v.boolean(), // Whether to show in homepage category explorer
+
+    // Homepage image dimensions (separate for mobile and desktop)
+    homepageMobileWidth: v.optional(v.string()), // e.g. "70vw" or "280px"
+    homepageMobileHeight: v.optional(v.string()), // e.g. "90vw" or "360px"
+    homepageDesktopWidth: v.optional(v.string()), // e.g. "23vw" or "280px"
+    homepageDesktopHeight: v.optional(v.string()), // e.g. "30vw" or "360px"
 
     // Behavior
     isDefault: v.optional(v.boolean()), // Is this the default category (e.g., "skin")

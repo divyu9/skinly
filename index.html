@@ -40,12 +40,16 @@
 
     <!-- Resource Hints for Performance -->
     <link rel="preconnect" href="https://cdn.hercules.app" crossorigin />
+    <link rel="preconnect" href="https://clerk.goskinly.com" crossorigin />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
     <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://connect.facebook.net" />
     <link rel="dns-prefetch" href="https://mercury.phonepe.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
+
+    <!-- Preload LCP image (logo) for faster rendering -->
+    <link rel="preload" href="https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV" as="image" fetchpriority="high" />
 
     <!-- PhonePe Checkout Script - Deferred for performance -->
     <script src="https://mercury.phonepe.com/web/bundle/checkout.js" defer></script>

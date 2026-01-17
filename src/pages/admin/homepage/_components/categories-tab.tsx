@@ -19,6 +19,11 @@ interface CategoryConfig {
   buttonText: string;
   isActive: boolean;
   order: number;
+  // Image dimensions for mobile and desktop
+  mobileWidth: string;
+  mobileHeight: string;
+  desktopWidth: string;
+  desktopHeight: string;
 }
 
 export function CategoriesTab() {
@@ -45,6 +50,10 @@ export function CategoriesTab() {
             buttonText: existing.buttonText || "",
             isActive: existing.isActive,
             order: existing.order,
+            mobileWidth: existing.mobileWidth || "70vw",
+            mobileHeight: existing.mobileHeight || "90vw",
+            desktopWidth: existing.desktopWidth || "23vw",
+            desktopHeight: existing.desktopHeight || "30vw",
           };
         } else {
           return {
@@ -55,6 +64,10 @@ export function CategoriesTab() {
             buttonText: "",
             isActive: true,
             order: index,
+            mobileWidth: "70vw",
+            mobileHeight: "90vw",
+            desktopWidth: "23vw",
+            desktopHeight: "30vw",
           };
         }
       });
@@ -75,6 +88,10 @@ export function CategoriesTab() {
           buttonText: config.buttonText || undefined,
           isActive: config.isActive,
           order: config.order,
+          mobileWidth: config.mobileWidth || undefined,
+          mobileHeight: config.mobileHeight || undefined,
+          desktopWidth: config.desktopWidth || undefined,
+          desktopHeight: config.desktopHeight || undefined,
         })),
       });
       toast.success("Categories saved successfully");
@@ -206,6 +223,62 @@ export function CategoriesTab() {
                     })
                   }
                 />
+              </div>
+
+              {/* Image Dimensions Section */}
+              <div className="space-y-3 pt-3 border-t">
+                <div>
+                  <Label className="text-xs font-semibold">Image Dimensions</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Set card size for mobile and desktop views
+                  </p>
+                </div>
+
+                {/* Mobile Dimensions */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Mobile (W × H)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={config.mobileWidth}
+                      onChange={(e) =>
+                        updateConfig(config.categoryName, { mobileWidth: e.target.value })
+                      }
+                      placeholder="70vw"
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      value={config.mobileHeight}
+                      onChange={(e) =>
+                        updateConfig(config.categoryName, { mobileHeight: e.target.value })
+                      }
+                      placeholder="90vw"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Desktop Dimensions */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Desktop (W × H)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={config.desktopWidth}
+                      onChange={(e) =>
+                        updateConfig(config.categoryName, { desktopWidth: e.target.value })
+                      }
+                      placeholder="23vw"
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      value={config.desktopHeight}
+                      onChange={(e) =>
+                        updateConfig(config.categoryName, { desktopHeight: e.target.value })
+                      }
+                      placeholder="30vw"
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

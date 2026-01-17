@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
+import { convertImageToWebP, blobToBase64 } from "@/lib/image-processing";
 import { 
   Upload, 
   Search, 
@@ -30,8 +31,10 @@ import {
   BarChart3,
   X,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Info
 } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -65,6 +68,7 @@ interface UploadTask {
   fileStatuses: Map<string, 'pending' | 'uploading' | 'success' | 'failed' | 'skipped'>;
   skipExisting: boolean;
   cancelController?: AbortController;
+  lastError?: string;
 }
 
 // --- COMPONENTS ---
@@ -132,10 +136,20 @@ function UploadProgressPanel({
                       <span>{task.progress.completed + task.progress.failed + task.progress.skipped} / {task.progress.total}</span>
                     </div>
                     <Progress value={percentage} className="h-2" />
-                    <div className="flex gap-3 text-xs pt-1">
-                      <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {task.progress.completed}</span>
-                      <span className="text-blue-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {task.progress.skipped}</span>
-                      <span className="text-red-600 flex items-center gap-1"><XCircle className="h-3 w-3" /> {task.progress.failed}</span>
+                    <div className="flex flex-col gap-1 pt-1">
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {task.progress.completed}</span>
+                        <span className="text-blue-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {task.progress.skipped}</span>
+                        <span className="text-red-600 flex items-center gap-1"><XCircle className="h-3 w-3" /> {task.progress.failed}</span>
+                      </div>
+                      {task.lastError && (
+                         <div className="text-xs text-destructive flex items-center gap-1 mt-1 bg-destructive/10 p-1 rounded">
+                           <Info className="h-3 w-3" />
+                           <span className="truncate" title={task.lastError}>
+                             Error: {task.lastError}
+                           </span>
+                         </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -892,10 +906,10 @@ export default function MockupsAdvancedPage() {
     let failed = 0;
     let skipped = 0;
 
-    // Concurrency limit
+    // Concurrency limit - strictly 5 as requested
     const CONCURRENCY = 5;
-
-    // Helper to upload a single file
+    
+    // Helper to upload a single file with retries and client-side conversion
     const uploadSingleFile = async (file: File) => {
        if (task.cancelController?.signal.aborted) return;
 
@@ -903,7 +917,7 @@ export default function MockupsAdvancedPage() {
        
        if (!sku) {
          failed++;
-         updateTaskStatus(task.id, 'uploading', { failed, current: `Failed: ${file.name}` });
+         updateTaskStatus(task.id, 'uploading', { failed, current: `Failed: ${file.name}`, lastError: `Invalid SKU in filename: ${file.name}` });
          return;
        }
 
@@ -913,48 +927,82 @@ export default function MockupsAdvancedPage() {
          return;
        }
 
-       updateTaskStatus(task.id, 'uploading', { current: `Uploading: ${file.name}` });
+       // Retry logic
+       let attempts = 0;
+       const MAX_RETRIES = 3;
+       
+       while (attempts < MAX_RETRIES) {
+         if (task.cancelController?.signal.aborted) return;
+         
+         try {
+           updateTaskStatus(task.id, 'uploading', { current: `Processing: ${file.name} (Attempt ${attempts + 1})` });
 
-       try {
-         const base64 = await new Promise<string>((resolve, reject) => {
-           const reader = new FileReader();
-           reader.onload = () => resolve(reader.result as string);
-           reader.onerror = reject;
-           reader.readAsDataURL(file);
-         });
+           // 1. Client-side WebP Conversion
+           // This saves Cloudinary transformation limits
+           const webpBlob = await convertImageToWebP(file);
+           const base64 = await blobToBase64(webpBlob);
 
-         const cloudinaryResult = await uploadToCloudinary({
-           imageBase64: base64,
-           folder: `mockups/${task.brandName}/${task.modelName}`,
-           publicId: sku,
-         });
+           // 2. Upload to Cloudinary
+           // Note: We upload the WebP blob directly.
+           const cloudinaryResult = await uploadToCloudinary({
+             imageBase64: base64,
+             folder: `mockups/${task.brandName}/${task.modelName}`,
+             publicId: sku,
+           });
 
-         if (!cloudinaryResult.success) throw new Error("Upload failed");
+           if (!cloudinaryResult.success) {
+             throw new Error(cloudinaryResult.error || "Unknown Cloudinary error");
+           }
 
-         await storeMockup({
-           brand: task.brandName,
-           model: task.modelName,
-           sku,
-           cloudinaryUrl: cloudinaryResult.cloudinaryUrl,
-           cloudinaryPublicId: cloudinaryResult.publicId,
-           supportedModelId: task.modelId,
-         });
+           // 3. Store in DB
+           await storeMockup({
+             brand: task.brandName,
+             model: task.modelName,
+             sku,
+             cloudinaryUrl: cloudinaryResult.cloudinaryUrl,
+             cloudinaryPublicId: cloudinaryResult.publicId,
+             supportedModelId: task.modelId,
+           });
 
-         completed++;
-         updateTaskStatus(task.id, 'uploading', { completed });
-       } catch (error) {
-         console.error(error);
-         failed++;
-         updateTaskStatus(task.id, 'uploading', { failed, current: `Error: ${file.name}` });
+           completed++;
+           updateTaskStatus(task.id, 'uploading', { completed });
+           return; // Success, exit retry loop
+           
+         } catch (error) {
+           console.error(`Upload error for ${file.name}:`, error);
+           attempts++;
+           
+           const errorMessage = error instanceof Error ? error.message : "Unknown error";
+           
+           if (attempts >= MAX_RETRIES) {
+             failed++;
+             updateTaskStatus(task.id, 'uploading', { 
+               failed, 
+               current: `Error: ${file.name}`,
+               lastError: errorMessage 
+             });
+           } else {
+             // Wait before retry (exponential backoff: 1s, 2s, 4s)
+             await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempts - 1)));
+           }
+         }
        }
     };
 
-    // Process files in chunks
+    // Process files in chunks to manage concurrency
     for (let i = 0; i < task.files.length; i += CONCURRENCY) {
       if (task.cancelController?.signal.aborted) break;
       
       const chunk = task.files.slice(i, i + CONCURRENCY);
+      
+      // We must catch errors here to ensure the loop continues even if Promise.all fails 
+      // (though uploadSingleFile handles its own errors, Promise.all shouldn't fail)
       await Promise.all(chunk.map(file => uploadSingleFile(file)));
+      
+      // Cleanup: The 'chunk' array and 'file' references will naturally be garbage collected 
+      // as we move to the next iteration. 
+      // The 'task.files' array still holds references, but browsers handle File objects efficiently (pointers to disk).
+      // The heavy base64 strings are inside uploadSingleFile scope and are GC'd.
     }
 
     if (!task.cancelController?.signal.aborted) {

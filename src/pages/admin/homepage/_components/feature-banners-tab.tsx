@@ -28,6 +28,11 @@ interface BannerFormData {
   ctaLink: string;
   isActive: boolean;
   order: number;
+  // Image dimensions for mobile and desktop
+  mobileWidth: string;
+  mobileHeight: string;
+  desktopWidth: string;
+  desktopHeight: string;
 }
 
 export function FeatureBannersTab() {
@@ -62,6 +67,10 @@ export function FeatureBannersTab() {
           ctaLink: banner.ctaLink || "",
           isActive: banner.isActive,
           order: banner.order,
+          mobileWidth: banner.mobileWidth || "100vw",
+          mobileHeight: banner.mobileHeight || "200px",
+          desktopWidth: banner.desktopWidth || "100vw",
+          desktopHeight: banner.desktopHeight || "400px",
         });
       }
     } else {
@@ -74,6 +83,10 @@ export function FeatureBannersTab() {
         ctaLink: "",
         isActive: true,
         order: banners ? banners.length : 0,
+        mobileWidth: "100vw",
+        mobileHeight: "200px",
+        desktopWidth: "100vw",
+        desktopHeight: "400px",
       });
     }
     setIsDialogOpen(true);
@@ -102,6 +115,10 @@ export function FeatureBannersTab() {
           ctaLink: formData.ctaLink || undefined,
           isActive: formData.isActive,
           order: formData.order,
+          mobileWidth: formData.mobileWidth || undefined,
+          mobileHeight: formData.mobileHeight || undefined,
+          desktopWidth: formData.desktopWidth || undefined,
+          desktopHeight: formData.desktopHeight || undefined,
         });
         toast.success("Banner updated successfully");
       } else {
@@ -113,6 +130,10 @@ export function FeatureBannersTab() {
           ctaLink: formData.ctaLink || undefined,
           isActive: formData.isActive,
           order: formData.order,
+          mobileWidth: formData.mobileWidth || undefined,
+          mobileHeight: formData.mobileHeight || undefined,
+          desktopWidth: formData.desktopWidth || undefined,
+          desktopHeight: formData.desktopHeight || undefined,
         });
         toast.success("Banner created successfully");
       }
@@ -304,6 +325,70 @@ export function FeatureBannersTab() {
                 value={formData.order}
                 onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value) || 0 })}
               />
+            </div>
+
+            {/* Banner Dimensions Section */}
+            <div className="space-y-3 pt-3 border-t">
+              <div>
+                <h4 className="text-sm font-semibold">Banner Dimensions</h4>
+                <p className="text-xs text-muted-foreground">
+                  Set banner size for mobile and desktop views
+                </p>
+              </div>
+
+              {/* Mobile Dimensions */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-muted-foreground">Mobile View</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="mobile-width" className="text-xs">Width</Label>
+                    <Input
+                      id="mobile-width"
+                      value={formData.mobileWidth}
+                      onChange={(e) => setFormData({ ...formData, mobileWidth: e.target.value })}
+                      placeholder="100vw"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="mobile-height" className="text-xs">Height</Label>
+                    <Input
+                      id="mobile-height"
+                      value={formData.mobileHeight}
+                      onChange={(e) => setFormData({ ...formData, mobileHeight: e.target.value })}
+                      placeholder="200px"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Dimensions */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-muted-foreground">Desktop View</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="desktop-width" className="text-xs">Width</Label>
+                    <Input
+                      id="desktop-width"
+                      value={formData.desktopWidth}
+                      onChange={(e) => setFormData({ ...formData, desktopWidth: e.target.value })}
+                      placeholder="100vw"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="desktop-height" className="text-xs">Height</Label>
+                    <Input
+                      id="desktop-height"
+                      value={formData.desktopHeight}
+                      onChange={(e) => setFormData({ ...formData, desktopHeight: e.target.value })}
+                      placeholder="400px"
+                      className="h-9 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-between">
