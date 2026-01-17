@@ -19,9 +19,12 @@ export const storeMockupAdvanced = mutation({
     brand: v.string(),
     model: v.string(),
     sku: v.string(),
-    cloudinaryUrl: v.string(),
-    cloudinaryPublicId: v.string(),
+    cloudinaryUrl: v.optional(v.string()), // Optional for R2 uploads
+    cloudinaryPublicId: v.optional(v.string()),
     supportedModelId: v.id("supportedModels"),
+    // New R2 fields
+    r2Key: v.optional(v.string()),
+    r2Bucket: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     // Check if mockup already exists
@@ -33,16 +36,20 @@ export const storeMockupAdvanced = mutation({
       .first();
 
     if (existing) {
-      // Update with Cloudinary URL and supportedModelId
+      // Update with new storage data (Cloudinary OR R2)
+      // Note: We use the `storageProvider` field implicitly by presence of keys
       await ctx.db.patch(existing._id, {
         cloudinaryUrl: args.cloudinaryUrl,
         cloudinaryPublicId: args.cloudinaryPublicId,
         supportedModelId: args.supportedModelId,
+        r2Key: args.r2Key,
+        r2Bucket: args.r2Bucket,
+        storageProvider: args.r2Key ? "r2" : (args.cloudinaryUrl ? "cloudinary" : existing.storageProvider),
       });
       return existing._id;
     }
 
-    // Create new mockup with Cloudinary data
+    // Create new mockup
     return await ctx.db.insert("mockups", {
       brand: args.brand,
       model: args.model,
@@ -50,6 +57,9 @@ export const storeMockupAdvanced = mutation({
       cloudinaryUrl: args.cloudinaryUrl,
       cloudinaryPublicId: args.cloudinaryPublicId,
       supportedModelId: args.supportedModelId,
+      r2Key: args.r2Key,
+      r2Bucket: args.r2Bucket,
+      storageProvider: args.r2Key ? "r2" : (args.cloudinaryUrl ? "cloudinary" : undefined),
     });
   },
 });
@@ -295,12 +305,21 @@ export const getModelMockupStats = query({
       missingSKUsInStock,
       missingSKUsOutOfStock,
       coverage: Math.round(coverage),
-      mockups: modelMockups.map(m => ({
-        _id: m._id,
-        sku: m.sku,
-        fileId: m.fileId,
-        cloudinaryUrl: m.cloudinaryUrl,
-      })),
+      mockups: modelMockups.map(m => {
+        // Resolve URL: Prefer R2 if available, then Cloudinary
+         let url = m.cloudinaryUrl;
+         if (m.storageProvider === 'r2' && m.r2Key) {
+            const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+            url = `${R2_PUBLIC_DOMAIN}/${m.r2Key}`;
+         }
+        
+        return {
+          _id: m._id,
+          sku: m.sku,
+          fileId: m.fileId,
+          cloudinaryUrl: url, // We use this field in frontend generally
+        };
+      }),
     };
   },
 });

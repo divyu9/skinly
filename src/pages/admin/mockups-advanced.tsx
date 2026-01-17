@@ -826,6 +826,7 @@ export default function MockupsAdvancedPage() {
   const migrateMockups = useMutation(api.mockupsAdvanced.migrateMockupsToModels);
   const deleteAllMockups = useMutation(api.mockupsAdvanced.deleteAllMockupsForModel);
   const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
+  const uploadToR2 = useAction(api.r2.uploadToR2); // R2 action
   const storeMockup = useMutation(api.mockupsAdvanced.storeMockupAdvanced);
   // Need to use getModelMockupStats for checking existing SKUs, but hooks can't be called in loop.
   // We'll pass the initial set of existing SKUs from the dialog to the task.
@@ -877,13 +878,14 @@ export default function MockupsAdvancedPage() {
   };
   
   // Helper to update task state
-  const updateTaskStatus = (id: string, status: UploadTask['status'], progress?: Partial<UploadTask['progress']>) => {
+  const updateTaskStatus = (id: string, status: UploadTask['status'], progress?: Partial<UploadTask['progress']>, error?: string) => {
     setUploadTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
       return {
         ...t,
         status,
-        progress: progress ? { ...t.progress, ...progress } : t.progress
+        progress: progress ? { ...t.progress, ...progress } : t.progress,
+        lastError: error || t.lastError
       };
     }));
   };
@@ -917,7 +919,7 @@ export default function MockupsAdvancedPage() {
        
        if (!sku) {
          failed++;
-         updateTaskStatus(task.id, 'uploading', { failed, current: `Failed: ${file.name}`, lastError: `Invalid SKU in filename: ${file.name}` });
+         updateTaskStatus(task.id, 'uploading', { failed, current: `Failed: ${file.name}` }, `Invalid SKU in filename: ${file.name}`);
          return;
        }
 
@@ -938,20 +940,22 @@ export default function MockupsAdvancedPage() {
            updateTaskStatus(task.id, 'uploading', { current: `Processing: ${file.name} (Attempt ${attempts + 1})` });
 
            // 1. Client-side WebP Conversion
-           // This saves Cloudinary transformation limits
            const webpBlob = await convertImageToWebP(file);
            const base64 = await blobToBase64(webpBlob);
 
-           // 2. Upload to Cloudinary
-           // Note: We upload the WebP blob directly.
-           const cloudinaryResult = await uploadToCloudinary({
-             imageBase64: base64,
-             folder: `mockups/${task.brandName}/${task.modelName}`,
-             publicId: sku,
+           // 2. Upload to R2 (Preferred) or Cloudinary
+           // We prioritize R2 for new uploads
+           const key = `mockups/${task.brandName}/${task.modelName}/${sku}.webp`;
+           
+           // Use R2
+           const r2Result = await uploadToR2({
+             fileBase64: base64,
+             key: key,
+             contentType: 'image/webp'
            });
 
-           if (!cloudinaryResult.success) {
-             throw new Error(cloudinaryResult.error || "Unknown Cloudinary error");
+           if (!r2Result.success) {
+             throw new Error(r2Result.error || "Unknown R2 error");
            }
 
            // 3. Store in DB
@@ -959,9 +963,12 @@ export default function MockupsAdvancedPage() {
              brand: task.brandName,
              model: task.modelName,
              sku,
-             cloudinaryUrl: cloudinaryResult.cloudinaryUrl,
-             cloudinaryPublicId: cloudinaryResult.publicId,
              supportedModelId: task.modelId,
+             r2Key: r2Result.key,
+             r2Bucket: r2Result.bucket,
+             // Optional fallback fields for backward compatibility if needed, but R2 fields take precedence
+             cloudinaryUrl: r2Result.url, 
+             cloudinaryPublicId: undefined, 
            });
 
            completed++;
@@ -978,11 +985,10 @@ export default function MockupsAdvancedPage() {
              failed++;
              updateTaskStatus(task.id, 'uploading', { 
                failed, 
-               current: `Error: ${file.name}`,
-               lastError: errorMessage 
-             });
+               current: `Error: ${file.name}`
+             }, errorMessage);
            } else {
-             // Wait before retry (exponential backoff: 1s, 2s, 4s)
+             // Wait before retry
              await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempts - 1)));
            }
          }

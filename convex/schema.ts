@@ -360,6 +360,10 @@ export default defineSchema({
     cloudinaryUrl: v.optional(v.string()), // Cloudinary CDN URL (WebP)
     cloudinaryPublicId: v.optional(v.string()), // Cloudinary public ID for deletions
     supportedModelId: v.optional(v.id("supportedModels")), // Link to supported model (for advanced mockups)
+    // Cloudflare R2 fields (new storage)
+    r2Key: v.optional(v.string()), // R2 object key
+    r2Bucket: v.optional(v.string()), // Bucket name
+    storageProvider: v.optional(v.union(v.literal("convex"), v.literal("cloudinary"), v.literal("r2"))), // Source of truth
   })
     .index("by_brand_model", ["brand", "model"]) // For getBatchMockups queries
     .index("by_brand_model_sku", ["brand", "model", "sku"])

@@ -43,9 +43,17 @@ export const getMockupFileId = query({
       .first();
 
     if (exactMatch) {
+      // 1. Check for R2 (Preferred for new uploads)
+      if (exactMatch.r2Key) {
+        // Use configured domain or fallback to the R2.dev URL
+        const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+        return `${R2_PUBLIC_DOMAIN}/${exactMatch.r2Key}`;
+      }
+      // 2. Fallback to Cloudinary (Legacy preferred)
       if (exactMatch.cloudinaryUrl) {
         return exactMatch.cloudinaryUrl;
       }
+      // 3. Fallback to Convex Storage (Legacy)
       if (exactMatch.fileId) {
         return await ctx.storage.getUrl(exactMatch.fileId);
       }
@@ -68,12 +76,18 @@ export const getMockupFileId = query({
 
     if (!mockup) return null;
 
-    // Return Cloudinary URL if available (WebP, optimized)
+    // 1. R2
+    if (mockup.r2Key) {
+      const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+      return `${R2_PUBLIC_DOMAIN}/${mockup.r2Key}`;
+    }
+
+    // 2. Cloudinary
     if (mockup.cloudinaryUrl) {
       return mockup.cloudinaryUrl;
     }
 
-    // Fallback to Convex storage for legacy mockups
+    // 3. Convex Storage
     if (mockup.fileId) {
       return await ctx.storage.getUrl(mockup.fileId);
     }
@@ -262,9 +276,12 @@ export const getProductsWithMockupsForModel = query({
     const uniqueProducts = new Map<string, string>();
     for (const mockup of matchingMockups) {
       if (!uniqueProducts.has(mockup.sku)) {
-        // Prefer Cloudinary URL, fallback to Convex storage
-        let url: string | null = null;
-        if (mockup.cloudinaryUrl) {
+        // Prefer R2, then Cloudinary, then Convex storage
+          let url: string | null = null;
+          if (mockup.r2Key) {
+            const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+            url = `${R2_PUBLIC_DOMAIN}/${mockup.r2Key}`;
+          } else if (mockup.cloudinaryUrl) {
           url = mockup.cloudinaryUrl;
         } else if (mockup.fileId) {
           url = await ctx.storage.getUrl(mockup.fileId);
@@ -617,9 +634,12 @@ export const getBatchMockups = query({
                 mockupSku.startsWith(targetUpper + "-") || 
                 targetUpper.startsWith(mockupSku + "-")) {
                 
-                // Prefer Cloudinary URL, fallback to Convex storage
-                let url: string | null = null;
-                if (mockup.cloudinaryUrl) {
+                // Prefer R2, then Cloudinary, then Convex storage
+                  let url: string | null = null;
+                  if (mockup.r2Key) {
+                      const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+                      url = `${R2_PUBLIC_DOMAIN}/${mockup.r2Key}`;
+                  } else if (mockup.cloudinaryUrl) {
                     url = mockup.cloudinaryUrl;
                 } else if (mockup.fileId) {
                     url = await ctx.storage.getUrl(mockup.fileId);
@@ -653,9 +673,12 @@ export const getBatchMockups = query({
         continue;
       }
 
-      // Prefer Cloudinary URL, fallback to Convex storage
+      // Prefer R2, then Cloudinary, then Convex storage
       let url: string | null = null;
-      if (mockup.cloudinaryUrl) {
+      if (mockup.r2Key) {
+        const R2_PUBLIC_DOMAIN = process.env.R2_PUBLIC_DOMAIN || "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+        url = `${R2_PUBLIC_DOMAIN}/${mockup.r2Key}`;
+      } else if (mockup.cloudinaryUrl) {
         url = mockup.cloudinaryUrl;
       } else if (mockup.fileId) {
         url = await ctx.storage.getUrl(mockup.fileId);
