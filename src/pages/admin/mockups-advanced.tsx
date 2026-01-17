@@ -874,7 +874,14 @@ export default function MockupsAdvancedPage() {
   const processUploadQueue = async (task: UploadTask, skipExisting: boolean, existingSKUs: Set<string>) => {
     // Update status to uploading
     updateTaskStatus(task.id, 'uploading');
-    await executeUpload(task, existingSKUs);
+    try {
+      await executeUpload(task, existingSKUs);
+    } catch (error) {
+      console.error("Upload queue error:", error);
+      updateTaskStatus(task.id, 'uploading', { 
+        current: "Fatal Error: " + (error instanceof Error ? error.message : "Unknown") 
+      }, error instanceof Error ? error.message : "Queue Error");
+    }
   };
   
   // Helper to update task state
@@ -923,7 +930,7 @@ export default function MockupsAdvancedPage() {
          return;
        }
 
-       if (task.skipExisting && existingSKUs.has(sku)) {
+       if (task.skipExisting && existingSKUs && existingSKUs.has(sku)) {
          skipped++;
          updateTaskStatus(task.id, 'uploading', { skipped, current: `Skipped: ${file.name}` });
          return;
@@ -1334,14 +1341,8 @@ export default function MockupsAdvancedPage() {
             modelId={selectedModel.id}
             brandName={selectedModel.brand}
             modelName={selectedModel.name}
-            onStartUpload={(files, skipExisting) => {
-              // We need to pass the existing SKUs here if we want to skip duplicates in the background
-              // Since the Dialog fetches them, we can capture them?
-              // Hack: The Dialog component has the data. 
-              // We can pass a callback `onStartUpload` that receives `existingSKUs` too.
-              // I'll fix the Dialog component to pass `existingSKUs` in the next step.
-              // For now, assume it's just files/skip.
-              handleStartUpload(files, skipExisting);
+            onStartUpload={(files, skipExisting, existingSKUs) => {
+              handleStartUpload(files, skipExisting, existingSKUs);
             }}
           />
           {(selectedModel.missingSKUsInStock || selectedModel.missingSKUsOutOfStock) && (
