@@ -160,9 +160,14 @@ export const getCouponsForProduct = query({
       (coupon) => coupon.startDate <= now && coupon.endDate >= now
     );
 
-    // Filter by usage limit
+    // Filter by usage limit AND exclude user-specific coupons
     const availableCoupons = activeCoupons.filter(
-      (coupon) => !coupon.usageLimit || coupon.usageCount < coupon.usageLimit
+      (coupon) => {
+        const hasUsage = !coupon.usageLimit || coupon.usageCount < coupon.usageLimit;
+        // Exclude coupons that are restricted to specific customer emails (abandoned cart, etc.)
+        const isPublic = !coupon.allowedCustomerEmails || coupon.allowedCustomerEmails.length === 0;
+        return hasUsage && isPublic;
+      }
     );
 
     const product = await ctx.db.get(args.productId);
