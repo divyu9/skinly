@@ -86,6 +86,7 @@ import type * as productCategories from "../productCategories.js";
 import type * as productClassification from "../productClassification.js";
 import type * as productSections from "../productSections.js";
 import type * as products from "../products.js";
+import type * as r2 from "../r2.js";
 import type * as rapidshyp from "../rapidshyp.js";
 import type * as rapidshypWebhook from "../rapidshypWebhook.js";
 import type * as reviews from "../reviews.js";
@@ -206,6 +207,7 @@ declare const fullApi: ApiFromModules<{
   productClassification: typeof productClassification;
   productSections: typeof productSections;
   products: typeof products;
+  r2: typeof r2;
   rapidshyp: typeof rapidshyp;
   rapidshypWebhook: typeof rapidshypWebhook;
   reviews: typeof reviews;

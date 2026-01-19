@@ -113,9 +113,15 @@ export const markAsReminded = internalMutation({
     couponCode: v.string(),
   },
   handler: async (ctx, args) => {
+    const cart = await ctx.db.get(args.cartId);
+    if (!cart) return;
+
+    const currentCount = cart.reminderCount || 0;
+
     await ctx.db.patch(args.cartId, {
       status: "reminded",
       reminderSentAt: Date.now(),
+      reminderCount: currentCount + 1,
       couponCode: args.couponCode,
     });
   },

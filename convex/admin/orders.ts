@@ -807,8 +807,27 @@ export const getOrderDetails = query({
 
     const user = order.userId ? await ctx.db.get(order.userId) : null;
 
+    // Fetch product slugs for items
+    const itemsWithSlugs = await Promise.all(
+      order.items.map(async (item) => {
+        let slug = "";
+        try {
+          // Attempt to fetch product to get slug
+          // productId is stored as string in orders, so we cast it
+          const product = await ctx.db.get(item.productId as Id<"products">);
+          if (product) {
+            slug = product.slug;
+          }
+        } catch (error) {
+          // Ignore errors if ID is invalid or product not found
+        }
+        return { ...item, slug };
+      })
+    );
+
     return {
       ...order,
+      items: itemsWithSlugs,
       user: user
         ? {
             name: user.name,

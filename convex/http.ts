@@ -186,9 +186,11 @@ http.route({
       const shipmentStatus = shipment.shipment_status;
       const statusCode = shipment.current_tracking_status_code;
       const statusDesc = shipment.current_tracking_status_desc;
+      const orderNumber = record.seller_order_id; // Extract order number
 
       console.log("Parsed fields:", { 
         awbNumber, 
+        orderNumber,
         shipmentStatus, 
         statusCode, 
         statusDesc 
@@ -212,6 +214,7 @@ http.route({
       // Process webhook update using internal mutation
       const result = await ctx.runMutation(internal.rapidshypWebhook.processWebhookUpdate, {
         awbNumber,
+        orderNumber,
         shipmentStatus,
         statusCode,
         statusDesc,

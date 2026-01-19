@@ -204,16 +204,35 @@ export const getCartsNeedingRemindersInternal = internalQuery({
     delayHours: v.number(),
   },
   handler: async (ctx, args) => {
-    const delayMs = args.delayHours * 60 * 60 * 1000;
-    const cutoffTime = Date.now() - delayMs;
+    const now = Date.now();
+    // 1st reminder: User defined delay (default 1h)
+    const delayMs1 = args.delayHours * 60 * 60 * 1000;
+    // 2nd reminder: Fixed 8h from abandonment
+    const delayMs2 = 8 * 60 * 60 * 1000;
 
-    const abandonedCarts = await ctx.db
+    const cutoffTime1 = now - delayMs1;
+    const cutoffTime2 = now - delayMs2;
+
+    // 1. Pending carts needing 1st reminder (abandoned > 1h ago)
+    const pendingCarts = await ctx.db
       .query("abandonedCarts")
       .withIndex("by_status", (q) => q.eq("status", "pending"))
-      .filter((q) => q.lt(q.field("abandonedAt"), cutoffTime))
+      .filter((q) => q.lt(q.field("abandonedAt"), cutoffTime1))
       .collect();
 
-    return abandonedCarts;
+    // 2. Reminded carts needing 2nd reminder (abandoned > 8h ago AND reminderCount == 1)
+    const remindedCarts = await ctx.db
+      .query("abandonedCarts")
+      .withIndex("by_status", (q) => q.eq("status", "reminded"))
+      .filter((q) =>
+        q.and(
+          q.lt(q.field("abandonedAt"), cutoffTime2),
+          q.eq(q.field("reminderCount"), 1)
+        )
+      )
+      .collect();
+
+    return [...pendingCarts, ...remindedCarts];
   },
 });
 
@@ -309,38 +328,45 @@ export const sendReminderInternal = internalAction({
       return { success: false, error: "Cart not found" };
     }
 
-    // Skip if cart is not in pending status
-    if (cart.status !== "pending") {
-      console.log(`[Reminder] Cart ${args.cartId} is not pending (status: ${cart.status})`);
-      return { success: false, error: "Cart not in pending status" };
+    // Allow pending OR reminded status (for 2nd reminder)
+    if (cart.status !== "pending" && cart.status !== "reminded") {
+      console.log(`[Reminder] Cart ${args.cartId} is not pending/reminded (status: ${cart.status})`);
+      return { success: false, error: "Cart not in pending/reminded status" };
     }
 
-    // Generate a unique coupon code
-    const couponCode = `${args.couponPrefix}${Math.random()
-      .toString(36)
-      .substring(2, 8)
-      .toUpperCase()}`;
+    // Reuse existing coupon or generate new one
+    let couponCode = cart.couponCode;
 
-    // Create the coupon with configured settings
-    try {
-      await ctx.runMutation(internal.coupons.createCouponInternal, {
-        code: couponCode,
-        description: `Special ${
-          args.discountType === "percentage"
-            ? args.discountValue + "%"
-            : "₹" + args.discountValue
-        } off for ${cart.userEmail}`,
-        discountType: args.discountType,
-        discountValue: args.discountValue,
-        startDate: Date.now(),
-        endDate: Date.now() + args.validityDays * 24 * 60 * 60 * 1000,
-        isActive: true,
-        usageLimit: 1,
-        allowedCustomerEmails: [cart.userEmail],
-      });
-    } catch (error) {
-      console.error(`[Reminder] Failed to create coupon for cart ${args.cartId}:`, error);
-      return { success: false, error: "Failed to create coupon" };
+    if (!couponCode) {
+      // Generate a unique coupon code
+      couponCode = `${args.couponPrefix}${Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase()}`;
+
+      // Create the coupon with configured settings
+      try {
+        await ctx.runMutation(internal.coupons.createCouponInternal, {
+          code: couponCode,
+          description: `Special ${
+            args.discountType === "percentage"
+              ? args.discountValue + "%"
+              : "₹" + args.discountValue
+          } off for ${cart.userEmail}`,
+          discountType: args.discountType,
+          discountValue: args.discountValue,
+          startDate: Date.now(),
+          endDate: Date.now() + args.validityDays * 24 * 60 * 60 * 1000,
+          isActive: true,
+          usageLimit: 1,
+          allowedCustomerEmails: [cart.userEmail],
+        });
+      } catch (error) {
+        console.error(`[Reminder] Failed to create coupon for cart ${args.cartId}:`, error);
+        return { success: false, error: "Failed to create coupon" };
+      }
+    } else {
+      console.log(`[Reminder] Reusing existing coupon ${couponCode} for cart ${args.cartId}`);
     }
 
     // Send email via MSG91-based email system

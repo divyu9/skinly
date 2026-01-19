@@ -5,6 +5,7 @@ import { MobileHeader } from "@/components/mobile-header.tsx";
 import { HeroSlider } from "@/components/hero-slider.tsx";
 import { CategoryExplorer } from "@/components/category-explorer.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { WelcomeBackCard } from "@/components/welcome-back-card.tsx";
 
 // Lazy load below-the-fold and modal components for better FCP/LCP
 const MobileNav = lazy(() => import("@/components/mobile-nav.tsx").then(m => ({ default: m.MobileNav })));
@@ -220,6 +221,9 @@ export default function Index() {
 
       {/* Main Content */}
       <main className="min-h-screen">
+        {/* Personalized Welcome Card for returning users */}
+        <WelcomeBackCard onRequestChangeModel={() => setIsRequestModelOpen(true)} />
+
         {/* Dynamically render sections based on layout manager order */}
         {sortedActiveSections.map((section) => renderSection(section))}
       </main>

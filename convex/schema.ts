@@ -167,6 +167,7 @@ export default defineSchema({
     .index("by_order_number", ["orderNumber"])
     .index("by_merchant_transaction", ["phonepeMerchantTransactionId"])
     .index("by_status", ["status"])
+    .index("by_awb", ["awbNumber"])
     .index("by_guest_email", ["guestEmail"])
     .index("by_tracking_token", ["trackingToken"])
     .index("by_payment_status", ["paymentStatus"])
@@ -390,6 +391,7 @@ export default defineSchema({
     cartTotal: v.number(),
     abandonedAt: v.number(), // timestamp when cart was abandoned
     reminderSentAt: v.optional(v.number()), // timestamp when reminder was sent
+    reminderCount: v.optional(v.number()), // Number of reminders sent (0, 1, 2)
     couponCode: v.optional(v.string()), // Custom coupon generated for this cart
     status: v.union(
       v.literal("pending"), // Abandoned but no reminder sent yet

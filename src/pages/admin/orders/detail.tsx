@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link, useParams } from "react-router-dom";
-import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon, AlertCircleIcon, PackageOpenIcon, RefreshCwIcon, EditIcon, PlusIcon, TrashIcon } from "lucide-react";
+import { PackageIcon, ArrowLeftIcon, TruckIcon, FileTextIcon, SendIcon, BanknoteIcon, PackageXIcon, RotateCcwIcon, CheckIcon, XCircleIcon, AlertCircleIcon, PackageOpenIcon, RefreshCwIcon, EditIcon, PlusIcon, TrashIcon, ExternalLinkIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -17,6 +17,12 @@ import { Input } from "@/components/ui/input.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { useState } from "react";
 import type { Id } from "@/convex/_generated/dataModel.d.ts";
@@ -724,7 +730,38 @@ function OrderDetailPageInner() {
                       </div>
                     )}
                     <div className="flex-1 space-y-1">
-                      <p className="font-medium">{item.productTitle}</p>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <p className="font-medium cursor-pointer hover:underline decoration-dashed underline-offset-4 flex items-center gap-1 w-fit">
+                            {item.productTitle}
+                            <ExternalLinkIcon className="size-3 opacity-50" />
+                          </p>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem asChild>
+                            <Link 
+                              to={`/backend-skinly/products/edit/${item.productId}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="cursor-pointer w-full"
+                            >
+                              Open in Backend
+                            </Link>
+                          </DropdownMenuItem>
+                          {(item as any).slug && (
+                            <DropdownMenuItem asChild>
+                              <a 
+                                href={`/product/${(item as any).slug}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="cursor-pointer w-full"
+                              >
+                                Open in Frontend
+                              </a>
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <div className="text-sm text-muted-foreground space-y-0.5">
                         <p>Variant: {item.variant}</p>
                         {item.phoneModel && <p>Model: {item.phoneModel}</p>}

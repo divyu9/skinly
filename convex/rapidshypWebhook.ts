@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { Doc } from "./_generated/dataModel";
 import {
   triggerOrderDispatchedEmail,
   triggerOrderDeliveredEmail,
@@ -11,22 +12,52 @@ import {
 export const processWebhookUpdate = internalMutation({
   args: {
     awbNumber: v.string(),
+    orderNumber: v.optional(v.string()), // Added orderNumber for robust lookup
     shipmentStatus: v.optional(v.string()),
     statusCode: v.optional(v.string()),
     statusDesc: v.optional(v.string()),
     rawPayload: v.string(),
   },
   handler: async (ctx, args) => {
-    // Find order by AWB number
-    const allOrders = await ctx.db.query("orders").collect();
-    const order = allOrders.find((o) => o.awbNumber === args.awbNumber);
+    // Try finding order by AWB number first
+    // Note: We use linear search or index if available. Added by_awb index in schema.
+    let order: Doc<"orders"> | null | undefined = await ctx.db
+      .query("orders")
+      .withIndex("by_awb", (q) => q.eq("awbNumber", args.awbNumber))
+      .first();
+
+    // Fallback: If not found by AWB, try finding by order number
+    if (!order && args.orderNumber) {
+      console.log(`Order not found by AWB ${args.awbNumber}, trying order number ${args.orderNumber}`);
+      order = await ctx.db
+        .query("orders")
+        .withIndex("by_order_number", (q) => q.eq("orderNumber", args.orderNumber!))
+        .first();
+
+      // If found by order number, update the AWB number
+      if (order) {
+        console.log(`Order found by number ${args.orderNumber}. Updating AWB to ${args.awbNumber}`);
+        await ctx.db.patch(order._id, {
+          awbNumber: args.awbNumber,
+        });
+        // Refresh order object
+        order = await ctx.db.get(order._id);
+      }
+    }
+
+    // Last resort: Linear search (only if indexes fail)
+    if (!order) {
+      const allOrders = await ctx.db.query("orders").collect();
+      order = allOrders.find((o) => o.awbNumber === args.awbNumber);
+    }
 
     if (!order) {
-      console.error(`Order not found for AWB: ${args.awbNumber}`);
-      throw new ConvexError({
-        message: "Order not found for AWB number",
-        code: "NOT_FOUND",
-      });
+      console.error(`Order not found for AWB: ${args.awbNumber} or Order: ${args.orderNumber}`);
+      // Don't throw error if not found, just return success false to prevent webhook retries loop if order doesn't exist
+      return {
+        success: false,
+        message: "Order not found",
+      };
     }
 
     // Log webhook for debugging
@@ -59,6 +90,8 @@ export const processWebhookUpdate = internalMutation({
       // UND (Undelivered/NDR), RTO (RTO Initiated), RTO_INT (RTO In Transit),
       // RTO_OFD (RTO Out For Delivery), RTO_DEL (RTO Delivered)
       
+      console.log(`Mapping RapidShyp status: ${statusCode} / ${shipmentStatus}`);
+
       if (
         statusCode === "PSH" ||
         statusCode === "NA" ||
@@ -77,6 +110,7 @@ export const processWebhookUpdate = internalMutation({
       ) {
         // Picked up / In Transit - move to shipped
         newOrderStatus = "shipped";
+        // Only update if currently processing (don't revert if already delivered/rto)
         shouldUpdateStatus = order.status === "processing";
       } else if (
         statusCode === "OFD" ||
@@ -96,7 +130,7 @@ export const processWebhookUpdate = internalMutation({
         statusCode === "RTO" ||
         statusCode === "RTO_INT" ||
         statusCode === "RTO_OFD" ||
-        shipmentStatus.includes("RTO") && !shipmentStatus.includes("RTO_DELIVERED")
+        (shipmentStatus.includes("RTO") && !shipmentStatus.includes("RTO_DELIVERED"))
       ) {
         // RTO in progress - return to origin
         newOrderStatus = "rto";
@@ -125,7 +159,7 @@ export const processWebhookUpdate = internalMutation({
 
       // Update order status if it should change
       if (shouldUpdateStatus && newOrderStatus !== order.status) {
-        console.log(`Updating order status from ${order.status} to ${newOrderStatus}`);
+        console.log(`Updating order status from ${order.status} to ${newOrderStatus} (Event: ${statusCode})`);
         await ctx.db.patch(order._id, { status: newOrderStatus });
 
         // Handle delivered status - credit cashback if not already done

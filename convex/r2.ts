@@ -60,6 +60,7 @@ export const uploadToR2 = action({
         method: "PUT",
         headers: {
           "Content-Type": args.contentType,
+          "Content-Length": bytes.length.toString(),
         },
         body: bytes,
       });

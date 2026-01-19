@@ -385,24 +385,8 @@ export const createOrder = mutation({
             );
           }
         }
-      } else {
-        // Prepaid orders - send order received notification
-        await ctx.scheduler.runAfter(
-          0,
-          api.whatsappMessaging.queueMessage,
-          {
-            usecaseKey: "order_received",
-            recipientPhone: args.shippingAddress.phone,
-            recipientUserId: user?._id,
-            variables: {
-              customer_name: args.shippingAddress.fullName || user?.name || "Customer",
-              order_number: orderNumber || "Pending",
-              product_name: cartItems.map(item => item.productTitle).join(", "),
-            },
-            priority: 8,
-          }
-        );
       }
+      // Prepaid orders: Notification will be sent in updatePaymentStatus after success
     } catch (error) {
       console.error("Failed to queue order WhatsApp notification:", error);
       // Don't fail order creation if WhatsApp fails
@@ -438,8 +422,13 @@ export const createOrder = mutation({
           
           const isCod = args.paymentMethod === "cod";
           const isWalletPaid = walletAmountUsed >= originalTotal;
+          const isPartialCod = isCod && args.prepaidAmount && args.prepaidAmount > 0;
           
-          if (isCod || isWalletPaid) {
+          // Only send admin notification immediately for:
+          // 1. Full COD (not partial)
+          // 2. Full Wallet payment
+          // Partial COD and Prepaid orders wait for payment success
+          if ((isCod && !isPartialCod) || isWalletPaid) {
             // Format payment type
             let paymentType = args.paymentMethod.toUpperCase();
             if (args.paymentMethod === "cod") {
@@ -596,6 +585,73 @@ export const getOrders = query({
     const orders = args.limit ? await ordersQuery.take(args.limit) : await ordersQuery.collect();
 
     return orders;
+  },
+});
+
+// Get the last ordered device for the current user (for personalized homepage)
+export const getLastOrderedDevice = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_token", (q) =>
+        q.eq("tokenIdentifier", identity.tokenIdentifier)
+      )
+      .unique();
+
+    if (!user) {
+      return null;
+    }
+
+    // Get recent orders
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .take(10); // Check last 10 orders to find a device-specific item
+
+    for (const order of orders) {
+      for (const item of order.items) {
+        if (item.phoneModel && item.phoneBrand) {
+          // Found a device-specific item
+          // Try to fetch product to get accurate gadget type
+          let gadgetTypeName = "phone"; // Default
+          let gadgetDisplayName = "Phone";
+
+          try {
+            const product = await ctx.db.get(item.productId as Id<"products">);
+            if (product && product.gadgetTypeId) {
+              const gadgetType = await ctx.db.get(product.gadgetTypeId);
+              if (gadgetType) {
+                gadgetTypeName = gadgetType.name;
+                gadgetDisplayName = gadgetType.displayName;
+              }
+            } else if (product && product.gadgetCategory) {
+               // Fallback to legacy field
+               gadgetTypeName = product.gadgetCategory;
+               gadgetDisplayName = product.gadgetCategory.charAt(0).toUpperCase() + product.gadgetCategory.slice(1);
+            }
+          } catch (e) {
+            // Ignore error, use default
+          }
+
+          return {
+            brand: item.phoneBrand,
+            model: item.phoneModel,
+            gadgetType: gadgetTypeName,
+            gadgetDisplayName: gadgetDisplayName,
+            userName: user.name || "there",
+          };
+        }
+      }
+    }
+
+    return null;
   },
 });
 

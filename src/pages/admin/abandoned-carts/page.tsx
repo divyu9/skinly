@@ -313,24 +313,6 @@ function AbandonedCartsPageInner() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      onClick={handleScanCarts}
-                      disabled={scanning}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <RefreshCwIcon className={`h-4 w-4 mr-2 ${scanning ? "animate-spin" : ""}`} />
-                      {scanning ? "Scanning..." : "Manual Scan"}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Scan runs automatically every 30 min. Use this for immediate scan.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
                     <Button onClick={handleProcessAll} disabled={processing} size="sm">
                       <SendIcon className={`h-4 w-4 mr-2 ${processing ? "animate-pulse" : ""}`} />
                       {processing ? "Processing..." : "Send All Reminders"}
