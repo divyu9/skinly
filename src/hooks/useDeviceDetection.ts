@@ -59,6 +59,10 @@ export function useDeviceDetection() {
         // Fallback for iOS
         setCandidate({ brand: "Apple", model: "iPhone" });
         setShowPrompt(true);
+    } else if (os === "Mac OS") {
+        // Fallback for Mac
+        setCandidate({ brand: "Apple", model: "MacBook" });
+        setShowPrompt(true);
     }
   };
 

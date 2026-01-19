@@ -231,7 +231,7 @@ export default function Index() {
         {/* If user has last order, this shows. If not, it falls back to null and we show DeviceDetectorCard */}
         <WelcomeBackCard 
           onRequestChangeModel={() => setIsDeviceSelectorOpen(true)}
-          detectedDevice={candidate} 
+          detectedDevice={candidate || device} 
           onUseDetectedDevice={() => {
             if (candidate) {
                 confirmDevice(candidate.brand, candidate.model);
