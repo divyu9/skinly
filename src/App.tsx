@@ -5,6 +5,8 @@ import { DefaultProviders } from "./components/providers/default.tsx";
 import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
 import { Skeleton } from "./components/ui/skeleton.tsx";
 import { FacebookPixelInitializer } from "./components/facebook-pixel-initializer.tsx";
+import { ReferralTracker } from "./components/referral-tracker.tsx";
+import { DeviceDetectionAlert } from "./components/device-detection-alert.tsx";
 
 // Critical pages - loaded immediately
 import Index from "./pages/Index.tsx";
@@ -17,6 +19,7 @@ import OrderDetailPage from "./pages/orders/detail/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
 import AccountPage from "./pages/account/page.tsx";
+import ReferralsPage from "./pages/account/referrals/page.tsx";
 import WalletPage from "./pages/account/wallet/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -99,10 +102,13 @@ export default function App() {
       <DefaultProviders>
         <FacebookPixelInitializer />
         <BrowserRouter>
+          <ReferralTracker />
+          <DeviceDetectionAlert />
           <Routes>
             {/* Critical paths - eagerly loaded */}
             <Route path="/" element={<Index />} />
             <Route path="/account" element={<AccountPage />} />
+            <Route path="/account/referrals" element={<ReferralsPage />} />
             <Route path="/account/wallet" element={<WalletPage />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/detail" element={<ProductDetailPage />} />

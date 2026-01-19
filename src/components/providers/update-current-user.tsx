@@ -16,8 +16,13 @@ export function UpdateCurrentUserProvider({
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    // 🔥 IMPORTANT: NO ARGUMENTS
-    updateUser();
+    // Check for stored referral code
+    const storedRefCode = localStorage.getItem("referralCode");
+
+    // 🔥 IMPORTANT: Pass referral code if available
+    updateUser({
+      referralCode: storedRefCode || undefined,
+    });
   }, [isLoaded, isSignedIn, updateUser]);
 
   return <>{children}</>;

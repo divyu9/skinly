@@ -1,10 +1,13 @@
 import { ConvexError } from "convex/values";
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { internal } from "./_generated/api";
 
 export const updateCurrentUser = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: {
+    referralCode: v.optional(v.string()), // Optional referral code from signup
+  },
+  handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new ConvexError({
@@ -22,9 +25,15 @@ export const updateCurrentUser = mutation({
       .unique();
     
     if (existingUser !== null) {
+      // Ensure existing users have a referral code
+      if (!existingUser.referralCode) {
+        await ctx.scheduler.runAfter(0, internal.referrals.generateUniqueReferralCode, { userId: existingUser._id });
+      }
+
       await ctx.db.patch(existingUser._id, {
         name: identity.name ?? existingUser.name,
         email: identity.email ?? existingUser.email,
+        clerkId: identity.subject ?? existingUser.clerkId, // Update Clerk ID if missing
       });
       return existingUser._id;
     }
@@ -37,8 +46,14 @@ export const updateCurrentUser = mutation({
         .unique();
       
       if (userByEmail !== null) {
+        // Ensure existing users have a referral code
+        if (!userByEmail.referralCode) {
+          await ctx.scheduler.runAfter(0, internal.referrals.generateUniqueReferralCode, { userId: userByEmail._id });
+        }
+
         await ctx.db.patch(userByEmail._id, {
           tokenIdentifier: identity.tokenIdentifier,
+          clerkId: identity.subject ?? userByEmail.clerkId,
           name: identity.name ?? userByEmail.name,
         });
         return userByEmail._id;
@@ -46,11 +61,25 @@ export const updateCurrentUser = mutation({
     }
 
     // 3. New user - create fresh record
-    return await ctx.db.insert("users", {
+    const userId = await ctx.db.insert("users", {
       name: identity.name,
       email: identity.email,
       tokenIdentifier: identity.tokenIdentifier,
+      clerkId: identity.subject,
     });
+
+    // Generate unique referral code for the new user
+    await ctx.scheduler.runAfter(0, internal.referrals.generateUniqueReferralCode, { userId });
+
+    // Process referral if provided
+    if (args.referralCode) {
+      await ctx.scheduler.runAfter(0, internal.referrals.processSignupReferral, {
+        newUserId: userId,
+        referralCode: args.referralCode,
+      });
+    }
+
+    return userId;
   },
 });
 

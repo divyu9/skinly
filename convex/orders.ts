@@ -790,6 +790,13 @@ export const updateOrderStatus = mutation({
     // Update order status
     await ctx.db.patch(args.orderId, { status: args.status });
 
+    // If status is now "delivered", check for referral rewards
+    if (args.status === "delivered" && order.userId) {
+      await ctx.scheduler.runAfter(0, internal.referrals.processOrderCompletion, {
+        userId: order.userId,
+      });
+    }
+
     // If status is now "delivered" and cashback hasn't been credited yet, process cashback
     if (args.status === "delivered" && !order.cashbackCredited) {
       // Get all variants to map order items to variant IDs

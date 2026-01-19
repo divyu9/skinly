@@ -192,6 +192,24 @@ function AccountPageInner() {
         </CardContent>
       </Card>
 
+      {/* Referral Program */}
+      <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border-indigo-200 dark:border-indigo-800">
+        <CardContent className="p-6 flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="font-semibold text-lg flex items-center gap-2">
+              <UsersIcon className="size-5 text-indigo-600" />
+              Refer & Earn ₹100
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Invite friends to Skinly and earn rewards when they shop.
+            </p>
+          </div>
+          <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
+            <Link to="/account/referrals">Invite Now</Link>
+          </Button>
+        </CardContent>
+      </Card>
+
       {/* Wallet Balance & Stats */}
       <Card className="mb-6">
         <CardHeader>

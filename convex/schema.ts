@@ -1685,4 +1685,54 @@ export default defineSchema({
     .index("by_folder", ["folder"])
     .index("by_media_type", ["mediaType"])
     .index("by_created", ["createdAt"]),
+
+  // Referral System
+  referrals: defineTable({
+    referrerId: v.id("users"), // User A (The Referrer)
+    refereeId: v.id("users"), // User B (The Referee/New User)
+    status: v.union(
+      v.literal("pending"), // Signed up, order not placed/completed yet
+      v.literal("completed"), // First order delivered
+      v.literal("rewarded") // Rewards have been processed
+    ),
+    createdAt: v.number(), // Signup time
+    completedAt: v.optional(v.number()), // Order delivery time
+  })
+    .index("by_referrer", ["referrerId"])
+    .index("by_referee", ["refereeId"])
+    .index("by_status", ["status"]),
+
+  referralRewards: defineTable({
+    userId: v.id("users"), // Who gets the reward
+    referralId: v.id("referrals"), // Link to referral record
+    type: v.union(
+      v.literal("referrer_bonus"), // Reward for User A
+      v.literal("referee_bonus")   // Reward for User B
+    ),
+    rewardType: v.union(
+      v.literal("wallet_credit"),
+      v.literal("coupon")
+    ),
+    amount: v.number(), // Value (₹)
+    couponId: v.optional(v.id("coupons")), // If it's a coupon
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processed"),
+      v.literal("failed")
+    ),
+    createdAt: v.number(),
+    processedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_referral", ["referralId"]),
+
+  // Device Detection Map (Browser UA -> Internal Device)
+  deviceDetectionMap: defineTable({
+    userAgentPattern: v.string(), // Regex or substring to match (e.g., "iPhone14,7")
+    brand: v.string(), // Mapped Brand (e.g., "Apple")
+    model: v.string(), // Mapped Model (e.g., "iPhone 14")
+    priority: v.number(), // Higher priority matches first (1-100)
+    isActive: v.boolean(),
+  })
+    .index("by_active_priority", ["isActive", "priority"]),
 });
