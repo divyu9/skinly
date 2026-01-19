@@ -616,6 +616,8 @@ export const getLastOrderedDevice = query({
       .take(10); // Check last 10 orders to find a device-specific item
 
     for (const order of orders) {
+      if (!order.items) continue; // Skip if no items
+      
       for (const item of order.items) {
         if (item.phoneModel && item.phoneBrand) {
           // Found a device-specific item
@@ -624,20 +626,27 @@ export const getLastOrderedDevice = query({
           let gadgetDisplayName = "Phone";
 
           try {
-            const product = await ctx.db.get(item.productId as Id<"products">);
-            if (product && product.gadgetTypeId) {
-              const gadgetType = await ctx.db.get(product.gadgetTypeId);
-              if (gadgetType) {
-                gadgetTypeName = gadgetType.name;
-                gadgetDisplayName = gadgetType.displayName;
+            // Check if productId is valid string and not empty
+            if (item.productId && typeof item.productId === "string") {
+              // We need to cast because productId is stored as string in orders
+              const product = await ctx.db.get(item.productId as Id<"products">);
+              if (product) {
+                if (product.gadgetTypeId) {
+                  const gadgetType = await ctx.db.get(product.gadgetTypeId);
+                  if (gadgetType) {
+                    gadgetTypeName = gadgetType.name;
+                    gadgetDisplayName = gadgetType.displayName;
+                  }
+                } else if (product.gadgetCategory) {
+                   // Fallback to legacy field
+                   gadgetTypeName = product.gadgetCategory;
+                   gadgetDisplayName = product.gadgetCategory.charAt(0).toUpperCase() + product.gadgetCategory.slice(1);
+                }
               }
-            } else if (product && product.gadgetCategory) {
-               // Fallback to legacy field
-               gadgetTypeName = product.gadgetCategory;
-               gadgetDisplayName = product.gadgetCategory.charAt(0).toUpperCase() + product.gadgetCategory.slice(1);
             }
           } catch (e) {
             // Ignore error, use default
+            console.error("Error fetching product details for device detection:", e);
           }
 
           return {
