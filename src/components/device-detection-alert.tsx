@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Smartphone, X, Check, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDeviceDetection } from "@/hooks/useDeviceDetection";
-import UAParser from "ua-parser-js";
+import { UAParser } from "ua-parser-js";
 import { useNavigate } from "react-router-dom";
 
 export function DeviceDetectionAlert() {

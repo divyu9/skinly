@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import UAParser from "ua-parser-js";
+import { UAParser } from "ua-parser-js";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
