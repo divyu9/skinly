@@ -579,19 +579,14 @@ export const getModelsByBrand = query({
   args: { brand: v.string() },
   handler: async (ctx, args) => {
     // 1. Find all active products
+    // Optimization: If brand is provided, maybe we can use a better index in future
+    // For now, fetch active products and filter in memory
     const products = await ctx.db
       .query("products")
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
 
-    // Helper to escape regex special characters
-    const escapeRegExp = (string: string) => {
-      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    };
-
-    const brandSafe = escapeRegExp(args.brand);
     const brandLower = args.brand.toLowerCase();
-    
     const models = new Set<string>();
 
     for (const product of products) {
@@ -602,24 +597,52 @@ export const getModelsByBrand = query({
       // If product title includes brand
       if (titleLower.includes(brandLower)) {
         try {
-          // Extract model name
-          let modelName = product.title
-            .replace(new RegExp(brandSafe, "i"), "") // Remove brand safely
-            .replace(/skin|wrap|cover|case|3m|sticker|decal/gi, "") // Remove keywords
-            .trim();
-
-          // Clean up common artifacts
+          // Robust model extraction without complex regex
+          // 1. Split title by brand to get the part after brand
+          const parts = titleLower.split(brandLower);
+          
+          // If split didn't work or brand is at the end, skip
+          if (parts.length < 2) continue;
+          
+          // We assume the model comes AFTER the brand
+          // parts[0] is before brand, parts[1] is after brand
+          // If title is "Apple iPhone 13 Skin", brand "Apple" -> parts=["", " iphone 13 skin"]
+          let afterBrand = parts.slice(1).join(brandLower); // Rejoin rest in case brand appears twice
+          
+          // 2. Remove known keywords from the "after brand" part
+          // We use simple replaceAll for safety
+          const keywords = ["skin", "wrap", "cover", "case", "3m", "sticker", "decal"];
+          for (const kw of keywords) {
+             afterBrand = afterBrand.replaceAll(kw, "");
+          }
+          
+          // 3. Clean up result
+          // Preserve original casing from title if possible? 
+          // Difficult because we lowercased everything.
+          // Let's use the original title for the final extraction.
+          
+          // Improved Strategy: Work with original string indices
+          const brandIndex = product.title.toLowerCase().indexOf(brandLower);
+          if (brandIndex === -1) continue;
+          
+          // Extract substring after brand
+          let modelName = product.title.substring(brandIndex + args.brand.length);
+          
+          // Remove keywords (case insensitive regex is safe for static keywords)
+          modelName = modelName.replace(/skin|wrap|cover|case|3m|sticker|decal/gi, "");
+          
+          // Clean up artifacts
           modelName = modelName
             .replace(/^[-–—]\s*/, "") // Remove leading hyphens
             .replace(/\s+[-–—]$/, "") // Remove trailing hyphens
             .replace(/\s+/g, " ")     // Normalize spaces
             .trim();
 
-          if (modelName.length > 0) {
+          if (modelName.length > 0 && modelName.length < 50) { // Sanity check length
             models.add(modelName);
           }
         } catch (e) {
-          // Ignore parsing errors for specific products
+          // Ignore parsing errors
           continue;
         }
       }

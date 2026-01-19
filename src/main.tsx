@@ -23,8 +23,8 @@ if (clerkPubKey) {
           },
         }}
         // Defer non-critical Clerk operations
-        afterSignInUrl="/"
-        afterSignUpUrl="/"
+        signInFallbackRedirectUrl="/"
+        signUpFallbackRedirectUrl="/"
       >
         {/* Render app immediately, don't block on Clerk loading */}
         <App />
