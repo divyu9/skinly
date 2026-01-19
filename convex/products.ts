@@ -578,71 +578,37 @@ export const getProductsByTag = query({
 export const getModelsByBrand = query({
   args: { brand: v.string() },
   handler: async (ctx, args) => {
-    // 1. Find all active products
-    // Optimization: If brand is provided, maybe we can use a better index in future
-    // For now, fetch active products and filter in memory
-    const products = await ctx.db
-      .query("products")
-      .withIndex("by_status", (q) => q.eq("status", "active"))
-      .collect();
-
+    // Optimization: Use supportedModels table instead of scanning all products
+    // This is significantly faster and more reliable
+    
     // Safety check for empty/undefined brand
     if (!args.brand || typeof args.brand !== 'string') {
       return [];
     }
 
-    const brandLower = args.brand.toLowerCase();
-    const models = new Set<string>();
+    // Use the exact brand name first (case sensitive usually, but let's try)
+    let models = await ctx.db
+      .query("supportedModels")
+      .withIndex("by_brand", (q) => q.eq("brandName", args.brand))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
 
-    for (const product of products) {
-      if (!product.title) continue;
-      
-      const titleLower = product.title.toLowerCase();
-      
-      // If product title includes brand
-      if (titleLower.includes(brandLower)) {
-        try {
-          // Robust model extraction without complex regex
-          
-          // Improved Strategy: Work with original string indices
-          const brandIndex = product.title.toLowerCase().indexOf(brandLower);
-          
-          // Safety: If brand not found (shouldn't happen due to includes check, but safe)
-          if (brandIndex === -1) continue;
-          
-          // Extract substring after brand
-          // Safety: Ensure we don't go out of bounds
-          const startIndex = brandIndex + args.brand.length;
-          if (startIndex >= product.title.length) continue;
-          
-          let modelName = product.title.substring(startIndex);
-          
-          // Safety: Check if modelName is valid string
-          if (!modelName) continue;
-          
-          // Remove keywords (case insensitive regex is safe for static keywords)
-          // We use a simple replace with a known safe regex
-          modelName = modelName.replace(/skin|wrap|cover|case|3m|sticker|decal/gi, "");
-          
-          // Clean up artifacts
-          modelName = modelName
-            .replace(/^[-–—]\s*/, "") // Remove leading hyphens
-            .replace(/\s+[-–—]$/, "") // Remove trailing hyphens
-            .replace(/\s+/g, " ")     // Normalize spaces
-            .trim();
-
-          if (modelName.length > 0 && modelName.length < 50) { // Sanity check length
-            models.add(modelName);
-          }
-        } catch (e) {
-          // Ignore parsing errors - critical for preventing query crash
-          console.error(`Error parsing model from product ${product._id}:`, e);
-          continue;
-        }
-      }
+    // If no models found, maybe casing mismatch? Try fetching all active models and filtering
+    // This is still better than scanning products table
+    if (models.length === 0) {
+      const allModels = await ctx.db
+        .query("supportedModels")
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+        
+      const brandLower = args.brand.toLowerCase().trim();
+      models = allModels.filter(m => m.brandName.toLowerCase().trim() === brandLower);
     }
 
-    return Array.from(models).sort();
+    // Extract unique model names and sort
+    const uniqueModels = [...new Set(models.map(m => m.modelName))].sort();
+    
+    return uniqueModels;
   },
 });
 
