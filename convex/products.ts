@@ -587,22 +587,33 @@ export const getModelsByBrand = query({
     }
 
     // Use the exact brand name first (case sensitive usually, but let's try)
-    let models = await ctx.db
-      .query("supportedModels")
-      .withIndex("by_brand", (q) => q.eq("brandName", args.brand))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .collect();
+    let models;
+    try {
+      models = await ctx.db
+        .query("supportedModels")
+        .withIndex("by_brand", (q) => q.eq("brandName", args.brand))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+    } catch (e) {
+      console.error(`Error querying supportedModels for brand: ${args.brand}`, e);
+      return [];
+    }
 
     // If no models found, maybe casing mismatch? Try fetching all active models and filtering
     // This is still better than scanning products table
     if (models.length === 0) {
-      const allModels = await ctx.db
-        .query("supportedModels")
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
-        
-      const brandLower = args.brand.toLowerCase().trim();
-      models = allModels.filter(m => m.brandName.toLowerCase().trim() === brandLower);
+      try {
+        const allModels = await ctx.db
+          .query("supportedModels")
+          .filter((q) => q.eq(q.field("isActive"), true))
+          .collect();
+          
+        const brandLower = args.brand.toLowerCase().trim();
+        models = allModels.filter(m => m.brandName.toLowerCase().trim() === brandLower);
+      } catch (e) {
+        console.error("Error fetching all supported models:", e);
+        return [];
+      }
     }
 
     // Extract unique model names and sort
