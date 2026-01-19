@@ -584,36 +584,43 @@ export const getModelsByBrand = query({
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
 
-    // 2. Filter products that match the brand in their title
-    // Logic: Look for products where title starts with Brand or contains Brand
-    // This is a heuristic since we don't have a dedicated "brand" field on products yet
-    // but typically titles are "Brand Model Skin"
+    // Helper to escape regex special characters
+    const escapeRegExp = (string: string) => {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    };
+
+    const brandSafe = escapeRegExp(args.brand);
     const brandLower = args.brand.toLowerCase();
     
     const models = new Set<string>();
 
     for (const product of products) {
+      if (!product.title) continue;
+      
       const titleLower = product.title.toLowerCase();
       
       // If product title includes brand
       if (titleLower.includes(brandLower)) {
-        // Extract model name:
-        // Heuristic: Remove brand name, remove "Skin", "Wrap", "Cover" keywords
-        // What remains is likely the model
-        let modelName = product.title
-          .replace(new RegExp(args.brand, "i"), "") // Remove brand
-          .replace(/skin|wrap|cover|case|3m|sticker|decal/gi, "") // Remove keywords
-          .trim();
+        try {
+          // Extract model name
+          let modelName = product.title
+            .replace(new RegExp(brandSafe, "i"), "") // Remove brand safely
+            .replace(/skin|wrap|cover|case|3m|sticker|decal/gi, "") // Remove keywords
+            .trim();
 
-        // Clean up common artifacts
-        modelName = modelName
-          .replace(/^[-–—]\s*/, "") // Remove leading hyphens
-          .replace(/\s+[-–—]$/, "") // Remove trailing hyphens
-          .replace(/\s+/g, " ")     // Normalize spaces
-          .trim();
+          // Clean up common artifacts
+          modelName = modelName
+            .replace(/^[-–—]\s*/, "") // Remove leading hyphens
+            .replace(/\s+[-–—]$/, "") // Remove trailing hyphens
+            .replace(/\s+/g, " ")     // Normalize spaces
+            .trim();
 
-        if (modelName.length > 0) {
-          models.add(modelName);
+          if (modelName.length > 0) {
+            models.add(modelName);
+          }
+        } catch (e) {
+          // Ignore parsing errors for specific products
+          continue;
         }
       }
     }
