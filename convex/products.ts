@@ -586,6 +586,11 @@ export const getModelsByBrand = query({
       .withIndex("by_status", (q) => q.eq("status", "active"))
       .collect();
 
+    // Safety check for empty/undefined brand
+    if (!args.brand || typeof args.brand !== 'string') {
+      return [];
+    }
+
     const brandLower = args.brand.toLowerCase();
     const models = new Set<string>();
 
@@ -598,37 +603,25 @@ export const getModelsByBrand = query({
       if (titleLower.includes(brandLower)) {
         try {
           // Robust model extraction without complex regex
-          // 1. Split title by brand to get the part after brand
-          const parts = titleLower.split(brandLower);
-          
-          // If split didn't work or brand is at the end, skip
-          if (parts.length < 2) continue;
-          
-          // We assume the model comes AFTER the brand
-          // parts[0] is before brand, parts[1] is after brand
-          // If title is "Apple iPhone 13 Skin", brand "Apple" -> parts=["", " iphone 13 skin"]
-          let afterBrand = parts.slice(1).join(brandLower); // Rejoin rest in case brand appears twice
-          
-          // 2. Remove known keywords from the "after brand" part
-          // We use simple replaceAll for safety
-          const keywords = ["skin", "wrap", "cover", "case", "3m", "sticker", "decal"];
-          for (const kw of keywords) {
-             afterBrand = afterBrand.replaceAll(kw, "");
-          }
-          
-          // 3. Clean up result
-          // Preserve original casing from title if possible? 
-          // Difficult because we lowercased everything.
-          // Let's use the original title for the final extraction.
           
           // Improved Strategy: Work with original string indices
           const brandIndex = product.title.toLowerCase().indexOf(brandLower);
+          
+          // Safety: If brand not found (shouldn't happen due to includes check, but safe)
           if (brandIndex === -1) continue;
           
           // Extract substring after brand
-          let modelName = product.title.substring(brandIndex + args.brand.length);
+          // Safety: Ensure we don't go out of bounds
+          const startIndex = brandIndex + args.brand.length;
+          if (startIndex >= product.title.length) continue;
+          
+          let modelName = product.title.substring(startIndex);
+          
+          // Safety: Check if modelName is valid string
+          if (!modelName) continue;
           
           // Remove keywords (case insensitive regex is safe for static keywords)
+          // We use a simple replace with a known safe regex
           modelName = modelName.replace(/skin|wrap|cover|case|3m|sticker|decal/gi, "");
           
           // Clean up artifacts
@@ -642,7 +635,8 @@ export const getModelsByBrand = query({
             models.add(modelName);
           }
         } catch (e) {
-          // Ignore parsing errors
+          // Ignore parsing errors - critical for preventing query crash
+          console.error(`Error parsing model from product ${product._id}:`, e);
           continue;
         }
       }

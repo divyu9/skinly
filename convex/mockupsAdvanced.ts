@@ -615,9 +615,18 @@ export const migrateMockupsToModels = mutation({
 export const getUniqueBrands = query({
   args: {},
   handler: async (ctx) => {
+    // Collect all unique brand names directly from the supportedModels table
+    // We can't use .collect() on large tables without limits, but brand list is critical
+    // Optimization: Use a custom index or pagination if this grows too large
+    // For now, fetching all is fine for < 2000 models
     const allModels = await ctx.db.query("supportedModels").collect();
-    const brands = [...new Set(allModels.map(m => m.brandName))];
-    return brands.sort();
+    
+    // Normalize and unique
+    // Trim whitespace to ensure "IQOO " becomes "IQOO"
+    const brands = [...new Set(allModels.map(m => m.brandName?.trim()).filter(Boolean))];
+    
+    // Custom sort to put popular brands first if needed, otherwise alpha
+    return brands.sort((a, b) => a.localeCompare(b));
   },
 });
 
