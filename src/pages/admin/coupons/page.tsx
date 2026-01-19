@@ -14,6 +14,10 @@ import {
   UsersIcon,
   TrendingUpIcon,
   EyeIcon,
+  XIcon,
+  CheckSquareIcon,
+  SquareIcon,
+  BanIcon,
 } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -25,6 +29,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
 import {
   Dialog,
   DialogContent,
@@ -76,10 +81,14 @@ function AdminCouponsPageInner() {
   const deleteCoupon = useMutation(api.coupons.deleteCoupon);
   const createCoupon = useMutation(api.coupons.createCoupon);
   const updateCoupon = useMutation(api.coupons.updateCoupon);
+  const bulkDeleteCoupons = useMutation(api.coupons.bulkDeleteCoupons);
+  const bulkDisableCoupons = useMutation(api.coupons.bulkDisableCoupons);
+  
   const [viewingEligibleProducts, setViewingEligibleProducts] = useState<Id<"coupons"> | null>(null);
   const [viewingStats, setViewingStats] = useState<Id<"coupons"> | null>(null);
   const [variantSearchQuery, setVariantSearchQuery] = useState("");
   const [collectionSearchQuery, setCollectionSearchQuery] = useState("");
+  const [selectedCoupons, setSelectedCoupons] = useState<Id<"coupons">[]>([]);
 
   const eligibleProducts = useQuery(
     api.coupons.getEligibleProducts,
@@ -136,6 +145,48 @@ function AdminCouponsPageInner() {
     });
     setEditingCoupon(couponId);
     setShowCreateDialog(true);
+  };
+
+  const toggleSelectCoupon = (couponId: Id<"coupons">) => {
+    setSelectedCoupons((prev) => 
+      prev.includes(couponId) 
+        ? prev.filter((id) => id !== couponId)
+        : [...prev, couponId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (!coupons) return;
+    if (selectedCoupons.length === coupons.length) {
+      setSelectedCoupons([]);
+    } else {
+      setSelectedCoupons(coupons.map((c) => c._id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCoupons.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedCoupons.length} coupons? This action cannot be undone.`)) return;
+
+    try {
+      await bulkDeleteCoupons({ couponIds: selectedCoupons });
+      toast.success(`${selectedCoupons.length} coupons deleted successfully`);
+      setSelectedCoupons([]);
+    } catch (error) {
+      toast.error("Failed to delete coupons");
+    }
+  };
+
+  const handleBulkDisable = async () => {
+    if (selectedCoupons.length === 0) return;
+    
+    try {
+      await bulkDisableCoupons({ couponIds: selectedCoupons });
+      toast.success(`${selectedCoupons.length} coupons disabled successfully`);
+      setSelectedCoupons([]);
+    } catch (error) {
+      toast.error("Failed to disable coupons");
+    }
   };
 
   const handleDelete = async (couponId: Id<"coupons">) => {
@@ -267,11 +318,61 @@ function AdminCouponsPageInner() {
           <h1 className="text-3xl font-bold">Coupons</h1>
           <p className="text-muted-foreground">Manage discount codes and promotions</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <PlusIcon className="size-4 mr-2" />
-          Create Coupon
-        </Button>
+        <div className="flex items-center gap-2">
+          {coupons.length > 0 && (
+            <div className="flex items-center gap-2 mr-4 bg-muted px-3 py-2 rounded-md">
+              <Checkbox 
+                id="select-all" 
+                checked={selectedCoupons.length === coupons.length && coupons.length > 0}
+                onCheckedChange={handleSelectAll}
+              />
+              <Label htmlFor="select-all" className="cursor-pointer">
+                {selectedCoupons.length === coupons.length ? "Deselect All" : "Select All"}
+              </Label>
+              <span className="text-xs text-muted-foreground ml-1">
+                ({selectedCoupons.length} selected)
+              </span>
+            </div>
+          )}
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <PlusIcon className="size-4 mr-2" />
+            Create Coupon
+          </Button>
+        </div>
       </div>
+
+      {selectedCoupons.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-6 py-3 rounded-full shadow-lg flex items-center gap-4 animate-in slide-in-from-bottom-5">
+          <span className="font-medium whitespace-nowrap">{selectedCoupons.length} coupons selected</span>
+          <div className="h-4 w-px bg-background/20" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-background hover:text-background/80 hover:bg-background/10 h-auto py-1 px-2"
+            onClick={handleBulkDisable}
+          >
+            <BanIcon className="size-4 mr-2" />
+            Disable
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-red-400 hover:text-red-300 hover:bg-red-900/20 h-auto py-1 px-2"
+            onClick={handleBulkDelete}
+          >
+            <TrashIcon className="size-4 mr-2" />
+            Delete
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="ml-2 h-6 w-6 rounded-full hover:bg-background/20 text-background"
+            onClick={() => setSelectedCoupons([])}
+          >
+            <XIcon className="size-4" />
+          </Button>
+        </div>
+      )}
 
       {coupons.length === 0 ? (
         <Empty>
@@ -297,39 +398,46 @@ function AdminCouponsPageInner() {
             const isUpcoming = coupon.startDate > now;
 
             return (
-              <Card key={coupon._id}>
+              <Card key={coupon._id} className={selectedCoupons.includes(coupon._id) ? "border-primary ring-1 ring-primary" : ""}>
                 <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-2xl font-mono">{coupon.code}</CardTitle>
-                        {coupon.effectType === "wallet_credit" && (
-                          <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">
-                            Wallet Credit
-                          </Badge>
-                        )}
-                        {isActive && (
-                          <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
-                            Active
-                          </Badge>
-                        )}
-                        {isExpired && (
-                          <Badge className="bg-gray-500/10 text-gray-500 border-gray-500/20">
-                            Expired
-                          </Badge>
-                        )}
-                        {isUpcoming && (
-                          <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">
-                            Upcoming
-                          </Badge>
-                        )}
-                        {!coupon.isActive && (
-                          <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
-                            Inactive
-                          </Badge>
-                        )}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <Checkbox 
+                        checked={selectedCoupons.includes(coupon._id)}
+                        onCheckedChange={() => toggleSelectCoupon(coupon._id)}
+                        className="mt-1.5"
+                      />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-2xl font-mono">{coupon.code}</CardTitle>
+                          {coupon.effectType === "wallet_credit" && (
+                            <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">
+                              Wallet Credit
+                            </Badge>
+                          )}
+                          {isActive && (
+                            <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                              Active
+                            </Badge>
+                          )}
+                          {isExpired && (
+                            <Badge className="bg-gray-500/10 text-gray-500 border-gray-500/20">
+                              Expired
+                            </Badge>
+                          )}
+                          {isUpcoming && (
+                            <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20">
+                              Upcoming
+                            </Badge>
+                          )}
+                          {!coupon.isActive && (
+                            <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                              Inactive
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription>{coupon.description}</CardDescription>
                       </div>
-                      <CardDescription>{coupon.description}</CardDescription>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button

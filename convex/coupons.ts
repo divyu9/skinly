@@ -728,6 +728,42 @@ export const deleteCoupon = mutation({
   },
 });
 
+// Bulk delete coupons
+export const bulkDeleteCoupons = mutation({
+  args: { couponIds: v.array(v.id("coupons")) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    for (const couponId of args.couponIds) {
+      await ctx.db.delete(couponId);
+    }
+  },
+});
+
+// Bulk disable coupons
+export const bulkDisableCoupons = mutation({
+  args: { couponIds: v.array(v.id("coupons")) },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError({
+        message: "User not logged in",
+        code: "UNAUTHENTICATED",
+      });
+    }
+
+    for (const couponId of args.couponIds) {
+      await ctx.db.patch(couponId, { isActive: false });
+    }
+  },
+});
+
 // Redeem wallet credit coupon
 export const redeemWalletCreditCoupon = mutation({
   args: {
