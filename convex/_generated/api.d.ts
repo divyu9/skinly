@@ -89,6 +89,7 @@ import type * as products from "../products.js";
 import type * as r2 from "../r2.js";
 import type * as rapidshyp from "../rapidshyp.js";
 import type * as rapidshypWebhook from "../rapidshypWebhook.js";
+import type * as referrals from "../referrals.js";
 import type * as reviews from "../reviews.js";
 import type * as rollsManagement from "../rollsManagement.js";
 import type * as runMigration from "../runMigration.js";
@@ -210,6 +211,7 @@ declare const fullApi: ApiFromModules<{
   r2: typeof r2;
   rapidshyp: typeof rapidshyp;
   rapidshypWebhook: typeof rapidshypWebhook;
+  referrals: typeof referrals;
   reviews: typeof reviews;
   rollsManagement: typeof rollsManagement;
   runMigration: typeof runMigration;

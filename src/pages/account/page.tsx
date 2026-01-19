@@ -140,15 +140,28 @@ function AccountPageInner() {
   };
 
   if (currentUser === undefined || recentOrders === undefined || phoneVerificationStatus === undefined || whatsappConsent === undefined || walletBalance === undefined || walletStats === undefined || recentTransactions === undefined) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="space-y-6">
-          <Skeleton className="h-32 w-full" />
-          <Skeleton className="h-64 w-full" />
+    // If any of these are strictly undefined (loading), show skeleton
+    // If any are null (which shouldn't happen for authenticated users), it might be an error state, but let's handle that gracefully
+    
+    // Check if we have at least user data to show something
+    if (!currentUser && !recentOrders) {
+      return (
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="space-y-6">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
+
+  // Fallback default values for potentially missing data to prevent crashes
+  const safeWalletBalance = walletBalance || { balance: 0 };
+  const safeWalletStats = walletStats || { lifetimeEarned: 0, lifetimeSpent: 0 };
+  const safeRecentTransactions = recentTransactions || [];
+  const safePhoneVerification = phoneVerificationStatus || { verified: false, phoneNumber: "" };
+  const safeWhatsAppConsent = whatsappConsent || { consentType: "none", phoneNumber: "" };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
@@ -197,7 +210,7 @@ function AccountPageInner() {
         <CardContent className="p-6 flex items-center justify-between gap-4">
           <div className="space-y-1">
             <h3 className="font-semibold text-lg flex items-center gap-2">
-              <UsersIcon className="size-5 text-indigo-600" />
+              <UserIcon className="size-5 text-indigo-600" />
               Refer & Earn ₹100
             </h3>
             <p className="text-sm text-muted-foreground">
@@ -230,7 +243,7 @@ function AccountPageInner() {
                 <p className="text-sm font-medium opacity-90">Available Balance</p>
               </div>
               <p className="text-4xl font-bold tracking-tight">
-                ₹{(walletBalance.balance || 0).toFixed(0)}
+                ₹{(safeWalletBalance.balance || 0).toFixed(0)}
               </p>
               <p className="text-xs opacity-75 mt-2">
                 Use your wallet balance to pay for orders and earn cashback on purchases
@@ -248,7 +261,7 @@ function AccountPageInner() {
                 <p className="text-xs text-muted-foreground">Lifetime Earned</p>
               </div>
               <p className="text-2xl font-bold text-green-600">
-                ₹{(walletStats.lifetimeEarned || 0).toFixed(0)}
+                ₹{(safeWalletStats.lifetimeEarned || 0).toFixed(0)}
               </p>
             </div>
             <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
@@ -257,13 +270,13 @@ function AccountPageInner() {
                 <p className="text-xs text-muted-foreground">Lifetime Spent</p>
               </div>
               <p className="text-2xl font-bold text-orange-600">
-                ₹{(walletStats.lifetimeSpent || 0).toFixed(0)}
+                ₹{(safeWalletStats.lifetimeSpent || 0).toFixed(0)}
               </p>
             </div>
           </div>
 
           {/* Recent Transactions */}
-          {recentTransactions && recentTransactions.length > 0 && (
+          {safeRecentTransactions && safeRecentTransactions.length > 0 && (
             <div className="space-y-3 pt-4 border-t">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -277,7 +290,7 @@ function AccountPageInner() {
                 </Link>
               </div>
               <div className="space-y-2">
-                {recentTransactions.slice(0, 3).map((txn) => (
+                {safeRecentTransactions.slice(0, 3).map((txn) => (
                   <div key={txn._id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className={`size-8 rounded-full flex items-center justify-center ${
@@ -365,7 +378,7 @@ function AccountPageInner() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {phoneVerificationStatus.verified ? (
+          {safePhoneVerification.verified ? (
             <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
               <ShieldCheckIcon className="size-5 text-green-600" />
               <div>
@@ -373,7 +386,7 @@ function AccountPageInner() {
                   Phone Number Verified
                 </p>
                 <p className="text-sm text-green-700 dark:text-green-300">
-                  {phoneVerificationStatus.phoneNumber}
+                  {safePhoneVerification.phoneNumber}
                 </p>
               </div>
             </div>
@@ -460,7 +473,7 @@ function AccountPageInner() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!phoneVerificationStatus.verified ? (
+          {!safePhoneVerification.verified ? (
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
                 Please verify your phone number first to manage WhatsApp notification preferences.
@@ -472,7 +485,7 @@ function AccountPageInner() {
                 <CheckCircle2Icon className="size-5 text-green-600 mt-0.5 shrink-0" />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                    Connected: {whatsappConsent.phoneNumber || phoneVerificationStatus.phoneNumber}
+                    Connected: {safeWhatsAppConsent.phoneNumber || safePhoneVerification.phoneNumber}
                   </p>
                   <p className="text-xs text-green-700 dark:text-green-300 mt-1">
                     You will receive notifications on this WhatsApp number
@@ -484,7 +497,7 @@ function AccountPageInner() {
                 <Label className="text-base font-semibold">Choose what notifications you want to receive:</Label>
                 
                 <RadioGroup
-                  value={whatsappConsent.consentType}
+                  value={safeWhatsAppConsent.consentType}
                   onValueChange={handleConsentChange}
                   disabled={isUpdatingConsent}
                   className="space-y-3"

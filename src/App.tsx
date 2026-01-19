@@ -6,7 +6,6 @@ import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
 import { Skeleton } from "./components/ui/skeleton.tsx";
 import { FacebookPixelInitializer } from "./components/facebook-pixel-initializer.tsx";
 import { ReferralTracker } from "./components/referral-tracker.tsx";
-import { DeviceDetectionAlert } from "./components/device-detection-alert.tsx";
 
 // Critical pages - loaded immediately
 import Index from "./pages/Index.tsx";
@@ -103,7 +102,6 @@ export default function App() {
         <FacebookPixelInitializer />
         <BrowserRouter>
           <ReferralTracker />
-          <DeviceDetectionAlert />
           <Routes>
             {/* Critical paths - eagerly loaded */}
             <Route path="/" element={<Index />} />

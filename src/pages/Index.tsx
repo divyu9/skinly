@@ -6,6 +6,9 @@ import { HeroSlider } from "@/components/hero-slider.tsx";
 import { CategoryExplorer } from "@/components/category-explorer.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { WelcomeBackCard } from "@/components/welcome-back-card.tsx";
+import { DeviceDetectorCard } from "@/components/device-detector-card.tsx";
+import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
+import { useDeviceDetection } from "@/hooks/useDeviceDetection";
 
 // Lazy load below-the-fold and modal components for better FCP/LCP
 const MobileNav = lazy(() => import("@/components/mobile-nav.tsx").then(m => ({ default: m.MobileNav })));
@@ -48,6 +51,9 @@ export default function Index() {
   const [isRequestModelOpen, setIsRequestModelOpen] = useState(false);
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDeviceSelectorOpen, setIsDeviceSelectorOpen] = useState(false);
+
+  const { device, showPrompt, dismissPrompt, confirmDevice, candidate } = useDeviceDetection();
   
   // Request model form state
   const [requestBrand, setRequestBrand] = useState("");
@@ -222,8 +228,17 @@ export default function Index() {
       {/* Main Content */}
       <main className="min-h-screen">
         {/* Personalized Welcome Card for returning users */}
-        <WelcomeBackCard onRequestChangeModel={() => setIsRequestModelOpen(true)} />
-
+        {/* If user has last order, this shows. If not, it falls back to null and we show DeviceDetectorCard */}
+        <WelcomeBackCard 
+          onRequestChangeModel={() => setIsDeviceSelectorOpen(true)}
+          detectedDevice={candidate} 
+          onUseDetectedDevice={() => {
+            if (candidate) {
+                confirmDevice(candidate.brand, candidate.model);
+            }
+          }} 
+        />
+        
         {/* Dynamically render sections based on layout manager order */}
         {sortedActiveSections.map((section) => renderSection(section))}
       </main>
@@ -240,6 +255,12 @@ export default function Index() {
           onOpenChange={setIsMobileMenuOpen}
         />
       </Suspense>
+
+      {/* Device Selector Dialog */}
+      <DeviceSelectorDialog 
+        open={isDeviceSelectorOpen}
+        onOpenChange={setIsDeviceSelectorOpen}
+      />
 
       {/* Request Model Dialog */}
       <Dialog open={isRequestModelOpen} onOpenChange={setIsRequestModelOpen}>

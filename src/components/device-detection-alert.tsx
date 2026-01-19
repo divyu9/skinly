@@ -35,7 +35,17 @@ export function DeviceDetectionAlert() {
     if (detectedBrand && detectedModel) {
         confirmDevice(detectedBrand, detectedModel);
         // Navigate to filtered products
-        navigate(`/products?brand=${detectedBrand}&fromGadgetSelector=true`);
+        // If detected model is generic "iPhone", don't pass it as model param
+        // This allows user to pick specific model on products page while still filtering by brand
+        const params = new URLSearchParams();
+        params.append("brand", detectedBrand);
+        
+        if (detectedModel !== "iPhone") {
+          params.append("model", detectedModel);
+        }
+        
+        params.append("fromGadgetSelector", "true");
+        navigate(`/products?${params.toString()}`);
     }
   };
 

@@ -12,6 +12,7 @@ export interface DetectedDevice {
 export function useDeviceDetection() {
   const [device, setDevice] = useState<DetectedDevice | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
+  const [candidate, setCandidate] = useState<{ brand: string; model: string } | null>(null);
 
   // Load saved preference from localStorage on mount
   useEffect(() => {
@@ -33,35 +34,30 @@ export function useDeviceDetection() {
     const result = parser.getResult();
     
     // Check for high-confidence matches
-    // Note: Most modern browsers hide precise model info for privacy
-    // But mobile devices often still leak it in UA string or we can infer
-    
     const vendor = result.device.vendor;
     const model = result.device.model;
     const os = result.os.name;
 
     if (vendor && model) {
-      // Basic mapping (can be enhanced with DB map later)
-      // For now, let's use what we get if it looks valid
-      
       let detectedBrand = vendor;
       let detectedModel = model;
 
       // Normalize Apple
       if (vendor === "Apple" && (model === "iPhone" || !model)) {
-        // iPhone usually doesn't give model version in standard UA anymore
-        // We might just know it's an iPhone
         detectedBrand = "Apple";
         detectedModel = "iPhone"; // Generic
+      } else if (vendor === "Apple" && model === "Macintosh") {
+        detectedBrand = "Apple";
+        detectedModel = "MacBook"; // Generic for Mac
       }
 
       if (detectedBrand && detectedModel) {
-        // Don't set state immediately, just show prompt
-        // We only set "device" state when confirmed
+        setCandidate({ brand: detectedBrand, model: detectedModel });
         setShowPrompt(true);
       }
     } else if (os === "iOS") {
         // Fallback for iOS
+        setCandidate({ brand: "Apple", model: "iPhone" });
         setShowPrompt(true);
     }
   };
@@ -71,6 +67,7 @@ export function useDeviceDetection() {
     setDevice(newDevice);
     localStorage.setItem("skinly_device_preference", JSON.stringify(newDevice));
     setShowPrompt(false);
+    setCandidate(null);
   };
 
   const clearDevice = () => {
@@ -81,8 +78,12 @@ export function useDeviceDetection() {
   return {
     device,
     showPrompt,
+    candidate,
     confirmDevice,
     clearDevice,
-    dismissPrompt: () => setShowPrompt(false),
+    dismissPrompt: () => {
+        setShowPrompt(false);
+        setCandidate(null);
+    },
   };
 }
