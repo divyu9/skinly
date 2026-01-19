@@ -1,7 +1,13 @@
 import { motion } from "framer-motion";
-import { Smartphone, ArrowRight, X } from "lucide-react";
+import { Smartphone, ArrowRight, X, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 interface DeviceDetectorCardProps {
   detectedBrand: string;
@@ -11,16 +17,34 @@ interface DeviceDetectorCardProps {
 
 export function DeviceDetectorCard({ detectedBrand, detectedModel, onDismiss }: DeviceDetectorCardProps) {
   const navigate = useNavigate();
+  const [modelSearchOpen, setModelSearchOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+
+  // Get models for the detected brand to populate dropdown
+  const detectedBrandModels = useQuery(api.products.getModelsByBrand, { brand: detectedBrand });
+
+  // Helper to determine gadget type based on model name
+  const getGadgetCategory = (model: string) => {
+    const lowerModel = model.toLowerCase();
+    if (lowerModel.includes("macbook") || lowerModel.includes("laptop")) return "laptop";
+    if (lowerModel.includes("ipad") || lowerModel.includes("tablet")) return "tablet";
+    return "phone"; // Default
+  };
 
   const handleCheckout = () => {
+    const modelToUse = selectedModel || detectedModel;
+    const gadgetCategory = getGadgetCategory(modelToUse);
+
     const params = new URLSearchParams({
       brand: detectedBrand,
       fromGadgetSelector: "true",
+      category: "skins", // Default to skins
+      gadget: gadgetCategory, // Pass correct gadget type
     });
     
-    // Only add model if it's specific (not generic iPhone/MacBook)
-    if (detectedModel !== "iPhone" && detectedModel !== "MacBook") {
-      params.append("model", detectedModel);
+    // Only add model if it's specific (not generic iPhone/MacBook) OR if user explicitly selected it
+    if (modelToUse !== "iPhone" && modelToUse !== "MacBook") {
+      params.append("model", modelToUse);
     }
     
     navigate(`/products?${params.toString()}`);
@@ -52,15 +76,59 @@ export function DeviceDetectorCard({ detectedBrand, detectedModel, onDismiss }: 
             <p className="text-zinc-400 text-sm sm:text-base">
               See the best skins and wraps designed specifically for your device.
             </p>
+
+            <div className="space-y-2 pt-2">
+              <p className="text-xs text-zinc-500">
+                * Beta feature. Correct model not detected? Select below:
+              </p>
+              {/* Inline Model Selector */}
+              <Popover open={modelSearchOpen} onOpenChange={setModelSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" aria-expanded={modelSearchOpen} className="w-full sm:w-[250px] justify-between border-zinc-700 text-zinc-300 bg-black/20">
+                    {selectedModel || `Select ${detectedBrand} Model...`}
+                    <ArrowRight className="ml-2 h-4 w-4 shrink-0 opacity-50 rotate-90" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[250px] p-0 bg-zinc-900 border-zinc-700 text-white">
+                  <Command className="bg-transparent">
+                    <CommandInput placeholder={`Search ${detectedBrand} models...`} className="h-9" />
+                    <CommandList>
+                      <CommandEmpty>No model found.</CommandEmpty>
+                      <CommandGroup>
+                        {detectedBrandModels?.map((model) => (
+                          <CommandItem
+                            key={model}
+                            value={model}
+                            onSelect={(currentValue) => {
+                              setSelectedModel(currentValue === selectedModel ? "" : currentValue);
+                              setModelSearchOpen(false);
+                            }}
+                            className="text-white hover:bg-zinc-800"
+                          >
+                            {model}
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                selectedModel === model ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto self-end">
             <Button 
               onClick={handleCheckout}
               size="lg" 
               className="group bg-green-600 text-white hover:bg-green-700 w-full sm:w-auto border-none"
             >
-              Yes, Show Skins
+              Show Skins {selectedModel ? `for ${selectedModel}` : ""}
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
             
@@ -71,7 +139,7 @@ export function DeviceDetectorCard({ detectedBrand, detectedModel, onDismiss }: 
               className="text-zinc-400 hover:text-white hover:bg-white/10 w-full sm:w-auto"
             >
               <X className="mr-2 h-4 w-4" />
-              No, Change Device
+              Wrong Device
             </Button>
           </div>
         </div>

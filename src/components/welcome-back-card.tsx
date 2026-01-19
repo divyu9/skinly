@@ -1,10 +1,14 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Smartphone, RefreshCw } from "lucide-react";
+import { ArrowRight, Smartphone, RefreshCw, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
+import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 interface WelcomeBackCardProps {
   onRequestChangeModel: () => void;
@@ -15,6 +19,22 @@ interface WelcomeBackCardProps {
 export function WelcomeBackCard({ onRequestChangeModel, detectedDevice, onUseDetectedDevice }: WelcomeBackCardProps) {
   const lastDevice = useQuery(api.orders.getLastOrderedDevice);
   const navigate = useNavigate();
+  const [modelSearchOpen, setModelSearchOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+
+  // Determine detected gadget type for categorization
+  // This logic should match backend/hook categorization
+  const getGadgetCategory = (model: string) => {
+    const lowerModel = model.toLowerCase();
+    if (lowerModel.includes("macbook") || lowerModel.includes("laptop")) return "laptop";
+    if (lowerModel.includes("ipad") || lowerModel.includes("tablet")) return "tablet";
+    return "phone"; // Default to phone
+  };
+
+  // Get models for the detected brand
+  const detectedBrandModels = useQuery(api.products.getModelsByBrand, 
+    detectedDevice?.brand ? { brand: detectedDevice.brand } : "skip"
+  );
 
   // If no last device AND no detected device, don't show anything
   // The parent component should handle showing the fallback DeviceDetectorCard
@@ -50,15 +70,20 @@ export function WelcomeBackCard({ onRequestChangeModel, detectedDevice, onUseDet
 
   if (!displayDevice) return null;
 
-  const handleCheckout = () => {
+  const handleCheckout = (overrideModel?: string) => {
+    const modelToUse = overrideModel || selectedModel || displayDevice.model;
+    const gadgetCategory = getGadgetCategory(modelToUse);
+    
     const params = new URLSearchParams({
       brand: displayDevice.brand,
       fromGadgetSelector: "true",
+      category: "skins", // Default category
+      gadget: gadgetCategory, // Map detected type to gadget param
     });
     
-    // Only add model if it's specific (not generic iPhone/MacBook)
-    if (displayDevice.model !== "iPhone" && displayDevice.model !== "MacBook") {
-      params.append("model", displayDevice.model);
+    // Only add model if it's specific (not generic iPhone/MacBook) OR if user explicitly selected it
+    if (modelToUse !== "iPhone" && modelToUse !== "MacBook") {
+      params.append("model", modelToUse);
     }
     
     navigate(`/products?${params.toString()}`);
@@ -112,20 +137,61 @@ export function WelcomeBackCard({ onRequestChangeModel, detectedDevice, onUseDet
             </p>
 
             {theme.showBetaWarning && (
-              <p className="text-xs text-zinc-500 mt-2">
-                * This feature is in beta and detects limited models. If incorrect, please select your gadget from "Choose another Model".
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs text-zinc-500 mt-2">
+                  * This feature is in beta. Correct model not detected? Select below:
+                </p>
+                {/* Inline Model Selector for Detected Devices */}
+                <Popover open={modelSearchOpen} onOpenChange={setModelSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" aria-expanded={modelSearchOpen} className="w-full sm:w-[250px] justify-between border-zinc-700 text-zinc-300">
+                      {selectedModel || `Select ${displayDevice.brand} Model...`}
+                      <ArrowRight className="ml-2 h-4 w-4 shrink-0 opacity-50 rotate-90" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[250px] p-0 bg-zinc-900 border-zinc-700 text-white">
+                    <Command className="bg-transparent">
+                      <CommandInput placeholder={`Search ${displayDevice.brand} models...`} className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No model found.</CommandEmpty>
+                        <CommandGroup>
+                          {detectedBrandModels?.map((model) => (
+                            <CommandItem
+                              key={model}
+                              value={model}
+                              onSelect={(currentValue) => {
+                                setSelectedModel(currentValue === selectedModel ? "" : currentValue);
+                                setModelSearchOpen(false);
+                                // Optional: Auto-navigate on selection? No, user might want to confirm.
+                              }}
+                              className="text-white hover:bg-zinc-800"
+                            >
+                              {model}
+                              <Check
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  selectedModel === model ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             )}
           </div>
 
           <div className="flex flex-col gap-3 w-full sm:w-auto">
             <div className="flex flex-col sm:flex-row gap-3">
               <Button 
-                onClick={handleCheckout}
+                onClick={() => handleCheckout()}
                 size="lg" 
                 className={`group ${theme.buttonBg} text-white w-full sm:w-auto border-none`}
               >
-                View Designs for {displayDevice.model}
+                View Designs {selectedModel ? `for ${selectedModel}` : ""}
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
               
