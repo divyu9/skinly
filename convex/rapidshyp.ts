@@ -72,7 +72,7 @@ export const createShipment = action({
 
       // Fetch product details for all items to get shipping dimensions
       const itemsWithProducts = await Promise.all(
-        order.items.map(async (item) => {
+        order.items.map(async (item: any) => {
           // productId is stored as a string in order items, cast to Id<"products">
           const product = await ctx.runQuery(api.products.getProduct, {
             productId: item.productId as Id<"products">,
@@ -83,7 +83,7 @@ export const createShipment = action({
 
       // Filter out digital products
       const physicalItems = itemsWithProducts.filter(
-        (item) => item.product?.productType !== "digital"
+        (item: any) => item.product?.productType !== "digital"
       );
 
       if (physicalItems.length === 0) {
@@ -214,7 +214,7 @@ export const createShipment = action({
         },
 
         // Order items - exact field names from API docs
-        orderItems: order.items.map((item) => {
+        orderItems: order.items.map((item: any) => {
           // Calculate GST amount from tax-inclusive price (18% GST)
           // Formula: GST amount = price × (0.18 / 1.18)
           const taxAmount = parseFloat((item.price * (0.18 / 1.18)).toFixed(2));

@@ -317,7 +317,7 @@ export const sendReminderInternal = internalAction({
     discountValue: v.number(),
     validityDays: v.number(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ success: boolean; error?: string; emailSent?: boolean; whatsappSent?: boolean; couponCode?: string }> => {
     // Get the abandoned cart from the database
     const cart = await ctx.runQuery(internal.abandonedCarts.getCart, {
       cartId: args.cartId,

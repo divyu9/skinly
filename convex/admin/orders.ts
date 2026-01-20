@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, mutation } from "../_generated/server";
 import { ConvexError } from "convex/values";
 import { api } from "../_generated/api.js";
+import { Id } from "../_generated/dataModel";
 import {
   triggerOrderConfirmedEmail,
   triggerOrderDispatchedEmail,
@@ -814,6 +815,7 @@ export const getOrderDetails = query({
         try {
           // Attempt to fetch product to get slug
           // productId is stored as string in orders, so we cast it
+          // We handle the case where it might be a valid ID string
           const product = await ctx.db.get(item.productId as Id<"products">);
           if (product) {
             slug = product.slug;

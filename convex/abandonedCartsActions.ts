@@ -142,7 +142,7 @@ export const scanAndTrackAbandonedCarts = action({
           }
         );
 
-        const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        const cartTotal = cartItems.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
         trackedCarts.push({
           email: user.email || "Unknown",
           total: cartTotal,
