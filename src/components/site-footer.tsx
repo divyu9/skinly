@@ -2,10 +2,19 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { BugIcon } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { BugReportModal } from "./bug-report-modal.tsx";
+
+// Default fallback logo URL
+const DEFAULT_LOGO_URL = "https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV";
 
 export function SiteFooter() {
   const [bugReportOpen, setBugReportOpen] = useState(false);
+  const homepageSettings = useQuery(api.homepage.getHomepageSettings);
+
+  // Use footer logo if set, otherwise fall back to header logo, then default
+  const logoUrl = homepageSettings?.footerLogoImageUrl || homepageSettings?.logoImageUrl || DEFAULT_LOGO_URL;
 
   return (
     <>
@@ -15,9 +24,9 @@ export function SiteFooter() {
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8 mb-6">
             {/* Logo & Tagline */}
             <div className="flex flex-col items-center md:items-start md:max-w-xs">
-              <img 
-                src="https://cdn.hercules.app/file_z5FY3JOmZTlB5GRUueA4GKas" 
-                alt="Skinly" 
+              <img
+                src={logoUrl}
+                alt="Skinly"
                 className="h-10 md:h-12 w-auto mb-2"
                 loading="lazy"
               />

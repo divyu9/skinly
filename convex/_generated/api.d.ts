@@ -107,6 +107,7 @@ import type * as sitemap from "../sitemap.js";
 import type * as stockNotifications from "../stockNotifications.js";
 import type * as stockNotificationsActions from "../stockNotificationsActions.js";
 import type * as supportedModels from "../supportedModels.js";
+import type * as test_iqoo from "../test_iqoo.js";
 import type * as updateCollectionRules from "../updateCollectionRules.js";
 import type * as uploadJobs from "../uploadJobs.js";
 import type * as users from "../users.js";
@@ -229,6 +230,7 @@ declare const fullApi: ApiFromModules<{
   stockNotifications: typeof stockNotifications;
   stockNotificationsActions: typeof stockNotificationsActions;
   supportedModels: typeof supportedModels;
+  test_iqoo: typeof test_iqoo;
   updateCollectionRules: typeof updateCollectionRules;
   uploadJobs: typeof uploadJobs;
   users: typeof users;
