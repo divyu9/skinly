@@ -131,7 +131,7 @@ export default {
 
     // For social media crawlers, fetch OG data and return custom HTML
     try {
-      const convexUrl = env.CONVEX_URL || 'https://disciplined-toad-759.convex.cloud';
+      const convexUrl = env.CONVEX_URL || 'https://acrobatic-pika-31.convex.cloud';
       const ogEndpoint = `${convexUrl}/api/og/product?slug=${encodeURIComponent(slug)}`;
 
       const response = await fetch(ogEndpoint, {
