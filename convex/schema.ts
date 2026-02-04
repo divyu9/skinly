@@ -1663,9 +1663,17 @@ export default defineSchema({
   // Media Library - Uploaded images and videos
   // ============================================
   mediaLibrary: defineTable({
-    // Cloudinary info
+    // Cloudinary info (legacy)
     cloudinaryUrl: v.string(),
     cloudinaryPublicId: v.string(),
+
+    // R2 info (new)
+    r2Key: v.optional(v.string()),
+    r2Url: v.optional(v.string()),
+    storageProvider: v.optional(v.union(
+      v.literal("cloudinary"),
+      v.literal("r2")
+    )),
 
     // File info
     filename: v.string(),
@@ -1735,4 +1743,33 @@ export default defineSchema({
     isActive: v.boolean(),
   })
     .index("by_active_priority", ["isActive", "priority"]),
+
+  // Migration Progress Tracking (Cloudinary → R2)
+  migrationProgress: defineTable({
+    migrationType: v.union(
+      v.literal("mockups"),
+      v.literal("products"),
+      v.literal("mediaLibrary"),
+      v.literal("siteAssets")
+    ),
+    totalItems: v.number(),
+    processedItems: v.number(),
+    successCount: v.number(),
+    failureCount: v.number(),
+    failedItems: v.optional(v.array(v.object({
+      id: v.string(),
+      url: v.string(),
+      error: v.string()
+    }))),
+    startedAt: v.number(),
+    completedAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("failed")
+    )
+  })
+    .index("by_type", ["migrationType"])
+    .index("by_status", ["status"]),
 });

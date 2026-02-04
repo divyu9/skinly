@@ -51,13 +51,6 @@ import {
 
 // --- TYPES ---
 
-interface UploadError {
-  timestamp: number;
-  fileName: string;
-  error: string;
-  step: 'parse' | 'convert' | 'upload' | 'store';
-}
-
 interface UploadTask {
   id: string;
   modelId: Id<"supportedModels">;
@@ -76,40 +69,26 @@ interface UploadTask {
   skipExisting: boolean;
   cancelController?: AbortController;
   lastError?: string;
-  errors: UploadError[];
 }
 
 // --- COMPONENTS ---
 
 // Upload Progress Panel (Floating)
-function UploadProgressPanel({
-  tasks,
-  onCancel,
-  onDismiss
-}: {
-  tasks: UploadTask[],
+function UploadProgressPanel({ 
+  tasks, 
+  onCancel, 
+  onDismiss 
+}: { 
+  tasks: UploadTask[], 
   onCancel: (id: string) => void,
-  onDismiss: (id: string) => void
+  onDismiss: (id: string) => void 
 }) {
   const [minimized, setMinimized] = useState(false);
-  const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
 
   if (tasks.length === 0) return null;
 
-  const toggleErrors = (taskId: string) => {
-    setExpandedErrors(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
-      }
-      return next;
-    });
-  };
-
   return (
-    <div className={`fixed bottom-4 right-4 z-50 w-full max-w-lg bg-background border shadow-xl rounded-lg overflow-hidden transition-all duration-300 ${minimized ? 'h-12' : 'max-h-[80vh]'}`}>
+    <div className={`fixed bottom-4 right-4 z-50 w-full max-w-md bg-background border shadow-xl rounded-lg overflow-hidden transition-all duration-300 ${minimized ? 'h-12' : 'max-h-[80vh]'}`}>
       <div className="bg-primary text-primary-foreground p-3 flex items-center justify-between cursor-pointer" onClick={() => setMinimized(!minimized)}>
         <div className="font-semibold flex items-center gap-2">
           <Upload className="h-4 w-4" />
@@ -119,16 +98,14 @@ function UploadProgressPanel({
           {minimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
         </div>
       </div>
-
+      
       {!minimized && (
-        <ScrollArea className="h-[500px]">
+        <ScrollArea className="h-[400px]">
           <div className="p-4 space-y-4">
             {tasks.map(task => {
-              const percentage = task.progress.total > 0
-                ? ((task.progress.completed + task.progress.failed + task.progress.skipped) / task.progress.total) * 100
+              const percentage = task.progress.total > 0 
+                ? ((task.progress.completed + task.progress.failed + task.progress.skipped) / task.progress.total) * 100 
                 : 0;
-              const showErrorsExpanded = expandedErrors.has(task.id);
-              const hasErrors = task.errors && task.errors.length > 0;
 
               return (
                 <div key={task.id} className="border rounded-md p-3 space-y-3">
@@ -136,7 +113,7 @@ function UploadProgressPanel({
                     <div>
                       <div className="font-medium text-sm">{task.brandName} {task.modelName}</div>
                       <div className="text-xs text-muted-foreground">
-                        {task.status === 'completed' ? 'Upload Complete' :
+                        {task.status === 'completed' ? 'Upload Complete' : 
                          task.status === 'cancelled' ? 'Cancelled' :
                          task.status === 'pending' ? 'Pending...' :
                          `Uploading... ${task.progress.current}`}
@@ -152,7 +129,7 @@ function UploadProgressPanel({
                       </Button>
                     )}
                   </div>
-
+                  
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span>{Math.round(percentage)}%</span>
@@ -167,47 +144,14 @@ function UploadProgressPanel({
                       </div>
                       {task.lastError && (
                          <div className="text-xs text-destructive flex items-center gap-1 mt-1 bg-destructive/10 p-1 rounded">
-                           <Info className="h-3 w-3 flex-shrink-0" />
+                           <Info className="h-3 w-3" />
                            <span className="truncate" title={task.lastError}>
-                             Latest: {task.lastError}
+                             Error: {task.lastError}
                            </span>
                          </div>
                       )}
-                      {/* Error Log Toggle */}
-                      {hasErrors && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-xs mt-1 text-destructive hover:text-destructive"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleErrors(task.id);
-                          }}
-                        >
-                          {showErrorsExpanded ? 'Hide' : 'Show'} Error Log ({task.errors.length})
-                        </Button>
-                      )}
                     </div>
                   </div>
-
-                  {/* Expanded Error Log */}
-                  {showErrorsExpanded && hasErrors && (
-                    <div className="mt-2 border-t pt-2 max-h-[200px] overflow-y-auto">
-                      <div className="text-xs font-medium mb-1 text-destructive">Error Log:</div>
-                      <div className="space-y-1">
-                        {task.errors.map((err, idx) => (
-                          <div key={idx} className="text-xs bg-destructive/5 p-1.5 rounded border border-destructive/20">
-                            <div className="flex justify-between text-muted-foreground mb-0.5">
-                              <span className="font-mono">[{err.step}]</span>
-                              <span>{new Date(err.timestamp).toLocaleTimeString()}</span>
-                            </div>
-                            <div className="font-medium truncate" title={err.fileName}>{err.fileName}</div>
-                            <div className="text-destructive mt-0.5 break-words">{err.error}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -919,7 +863,6 @@ export default function MockupsAdvancedPage() {
       fileStatuses: new Map(files.map(f => [f.name, 'pending'])),
       skipExisting,
       cancelController: controller,
-      errors: [],
     };
 
     setUploadTasks(prev => [...prev, newTask]);
@@ -942,24 +885,14 @@ export default function MockupsAdvancedPage() {
   };
   
   // Helper to update task state
-  const updateTaskStatus = (
-    id: string,
-    status: UploadTask['status'],
-    progress?: Partial<UploadTask['progress']>,
-    error?: string,
-    errorDetails?: { fileName: string; step: UploadError['step'] }
-  ) => {
+  const updateTaskStatus = (id: string, status: UploadTask['status'], progress?: Partial<UploadTask['progress']>, error?: string) => {
     setUploadTasks(prev => prev.map(t => {
       if (t.id !== id) return t;
-      const newErrors = error && errorDetails
-        ? [...t.errors, { timestamp: Date.now(), fileName: errorDetails.fileName, error, step: errorDetails.step }]
-        : t.errors;
       return {
         ...t,
         status,
         progress: progress ? { ...t.progress, ...progress } : t.progress,
-        lastError: error || t.lastError,
-        errors: newErrors,
+        lastError: error || t.lastError
       };
     }));
   };
@@ -984,22 +917,16 @@ export default function MockupsAdvancedPage() {
 
     // Concurrency limit - strictly 5 as requested
     const CONCURRENCY = 5;
-
+    
     // Helper to upload a single file with retries and client-side conversion
     const uploadSingleFile = async (file: File) => {
        if (task.cancelController?.signal.aborted) return;
 
        const sku = parseSKUFromFilename(file.name);
-
+       
        if (!sku) {
          failed++;
-         updateTaskStatus(
-           task.id,
-           'uploading',
-           { failed, current: `Failed: ${file.name}` },
-           `Invalid SKU in filename: ${file.name}`,
-           { fileName: file.name, step: 'parse' }
-         );
+         updateTaskStatus(task.id, 'uploading', { failed, current: `Failed: ${file.name}` }, `Invalid SKU in filename: ${file.name}`);
          return;
        }
 
@@ -1012,24 +939,21 @@ export default function MockupsAdvancedPage() {
        // Retry logic
        let attempts = 0;
        const MAX_RETRIES = 3;
-       let lastStep: UploadError['step'] = 'convert';
-
+       
        while (attempts < MAX_RETRIES) {
          if (task.cancelController?.signal.aborted) return;
-
+         
          try {
            updateTaskStatus(task.id, 'uploading', { current: `Processing: ${file.name} (Attempt ${attempts + 1})` });
 
            // 1. Client-side WebP Conversion
-           lastStep = 'convert';
            const webpBlob = await convertImageToWebP(file);
            const base64 = await blobToBase64(webpBlob);
 
            // 2. Upload to R2 (Preferred) or Cloudinary
            // We prioritize R2 for new uploads
-           lastStep = 'upload';
            const key = `mockups/${task.brandName}/${task.modelName}/${sku}.webp`;
-
+           
            // Use R2
            const r2Result = await uploadToR2({
              fileBase64: base64,
@@ -1042,7 +966,6 @@ export default function MockupsAdvancedPage() {
            }
 
            // 3. Store in DB
-           lastStep = 'store';
            await storeMockup({
              brand: task.brandName,
              model: task.modelName,
@@ -1051,31 +974,28 @@ export default function MockupsAdvancedPage() {
              r2Key: r2Result.key,
              r2Bucket: r2Result.bucket,
              // Optional fallback fields for backward compatibility if needed, but R2 fields take precedence
-             cloudinaryUrl: r2Result.url,
-             cloudinaryPublicId: undefined,
+             cloudinaryUrl: r2Result.url, 
+             cloudinaryPublicId: undefined, 
            });
 
            completed++;
            updateTaskStatus(task.id, 'uploading', { completed });
            return; // Success, exit retry loop
-
+           
          } catch (error) {
-           console.error(`Upload error for ${file.name} at step ${lastStep}:`, error);
+           console.error(`Upload error for ${file.name}:`, error);
            attempts++;
-
+           
            const errorMessage = error instanceof Error ? error.message : "Unknown error";
-
+           
            if (attempts >= MAX_RETRIES) {
              failed++;
-             updateTaskStatus(
-               task.id,
-               'uploading',
-               { failed, current: `Error: ${file.name}` },
-               errorMessage,
-               { fileName: file.name, step: lastStep }
-             );
+             updateTaskStatus(task.id, 'uploading', { 
+               failed, 
+               current: `Error: ${file.name}`
+             }, errorMessage);
            } else {
-             // Wait before retry with exponential backoff
+             // Wait before retry
              await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempts - 1)));
            }
          }

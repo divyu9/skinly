@@ -13,7 +13,7 @@ import { SaveIcon, UploadIcon, Loader2Icon, XIcon, ImageIcon } from "lucide-reac
 export function SettingsTab() {
   const settings = useQuery(api.homepage.getHomepageSettings);
   const updateSettings = useMutation(api.homepage.updateHomepageSettings);
-  const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
+  const uploadToR2 = useAction(api.r2.uploadToR2);
 
   const [logoImageUrl, setLogoImageUrl] = useState("");
   const [footerLogoImageUrl, setFooterLogoImageUrl] = useState("");
@@ -74,14 +74,17 @@ export function SettingsTab() {
     setUploading(true);
     try {
       const base64 = await fileToBase64(file);
-      const result = await uploadToCloudinary({
-        imageBase64: base64,
-        folder: "site-assets",
-        publicId: `${type}-logo-${Date.now()}`,
+      const timestamp = Date.now();
+      const r2Key = `site-assets/${type}-logo-${timestamp}.webp`;
+
+      const result = await uploadToR2({
+        fileBase64: base64,
+        key: r2Key,
+        contentType: "image/webp",
       });
 
-      if (result.success && result.cloudinaryUrl) {
-        setUrl(result.cloudinaryUrl);
+      if (result.success && result.publicUrl) {
+        setUrl(result.publicUrl);
         toast.success(`${type === "header" ? "Header" : "Footer"} logo uploaded successfully`);
       } else {
         throw new Error(result.error || "Upload failed");

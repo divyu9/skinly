@@ -403,6 +403,18 @@ export const deleteMockup = mutation({
       }
     }
 
+    // Delete from R2 if r2Key exists
+    if (mockup.r2Key) {
+      try {
+        await ctx.scheduler.runAfter(0, (internal as any).r2.deleteFromR2, {
+          key: mockup.r2Key,
+          bucket: mockup.r2Bucket || "skinly",
+        });
+      } catch (error) {
+        console.error("Failed to delete from R2:", error);
+      }
+    }
+
     // Delete the mockup record
     await ctx.db.delete(args.mockupId);
 
@@ -443,6 +455,18 @@ export const deleteMockupsBySKU = mutation({
           await ctx.storage.delete(mockup.fileId);
         } catch (error) {
           console.error("Failed to delete from Convex storage:", error);
+        }
+      }
+
+      // Delete from R2 if r2Key exists
+      if (mockup.r2Key) {
+        try {
+          await ctx.scheduler.runAfter(0, (internal as any).r2.deleteFromR2, {
+            key: mockup.r2Key,
+            bucket: mockup.r2Bucket || "skinly",
+          });
+        } catch (error) {
+          console.error("Failed to delete from R2:", error);
         }
       }
 
@@ -488,6 +512,18 @@ export const deleteAllMockupsForModel = mutation({
           await ctx.storage.delete(mockup.fileId);
         } catch (error) {
           console.error("Failed to delete from Convex storage:", error);
+        }
+      }
+
+      // Delete from R2 if r2Key exists
+      if (mockup.r2Key) {
+        try {
+          await ctx.scheduler.runAfter(0, (internal as any).r2.deleteFromR2, {
+            key: mockup.r2Key,
+            bucket: mockup.r2Bucket || "skinly",
+          });
+        } catch (error) {
+          console.error("Failed to delete from R2:", error);
         }
       }
 

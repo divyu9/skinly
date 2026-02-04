@@ -43,7 +43,7 @@ export function ProductImageUploader({
   const [altInput, setAltInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
+  const uploadToR2 = useAction(api.r2.uploadToR2);
 
   // Convert file to base64
   const fileToBase64 = (file: File): Promise<string> => {
@@ -82,12 +82,15 @@ export function ProductImageUploader({
       // Convert to base64
       const base64 = await fileToBase64(file);
 
-      // Upload to Cloudinary
+      // Upload to R2
       const slug = productSlug.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
-      const result = await uploadToCloudinary({
-        imageBase64: base64,
-        folder: `products/${slug}`,
-        publicId: generateFileName(index),
+      const timestamp = Date.now();
+      const r2Key = `products/${slug}/img_${index}_${timestamp}.webp`;
+
+      const result = await uploadToR2({
+        fileBase64: base64,
+        key: r2Key,
+        contentType: "image/webp",
       });
 
       if (!result.success) {
@@ -95,7 +98,7 @@ export function ProductImageUploader({
       }
 
       const newImage: ProductImage = {
-        url: result.cloudinaryUrl!,
+        url: result.publicUrl!,
         alt: file.name.replace(/\.[^/.]+$/, ""),
       };
 
@@ -135,7 +138,7 @@ export function ProductImageUploader({
     }
 
     setUploadingCount(0);
-  }, [images, onImagesChange, productSlug, uploadToCloudinary]);
+  }, [images, onImagesChange, productSlug, uploadToR2]);
 
   // Drag and drop handlers
   const handleDragEnter = useCallback((e: React.DragEvent) => {

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { ConvexError } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 // Get all cart items for the current user
 export const getCart = query({
@@ -376,43 +377,57 @@ export const checkCartItemsStock = query({
   handler: async (ctx, args) => {
     const stockStatus = await Promise.all(
       args.cartItems.map(async (cartItem) => {
-        // Get product to find variant
-        const product = await ctx.db.get(cartItem.productId as any);
-        if (!product) {
+        try {
+          // Cast string to proper ID type
+          const productId = cartItem.productId as Id<"products">;
+
+          // Get product to find variant
+          const product = await ctx.db.get(productId);
+          if (!product) {
+            return {
+              productId: cartItem.productId,
+              variant: cartItem.variant,
+              isOutOfStock: true,
+              availableQuantity: 0,
+            };
+          }
+
+          // Find variant by matching productId and variant title
+          const variant = await ctx.db
+            .query("variants")
+            .withIndex("by_product", (q) => q.eq("productId", productId))
+            .filter((q) => q.eq(q.field("title"), cartItem.variant))
+            .first();
+
+          if (!variant) {
+            return {
+              productId: cartItem.productId,
+              variant: cartItem.variant,
+              isOutOfStock: true,
+              availableQuantity: 0,
+            };
+          }
+
+          const availableQuantity = variant.inventoryQuantity || 0;
+          const isOutOfStock = availableQuantity <= 0 || availableQuantity < cartItem.quantity;
+
           return {
             productId: cartItem.productId,
             variant: cartItem.variant,
-            isOutOfStock: true,
-            availableQuantity: 0,
+            isOutOfStock,
+            availableQuantity,
+            requestedQuantity: cartItem.quantity,
           };
-        }
-
-        // Find variant by matching productId and variant title
-        const variant = await ctx.db
-          .query("variants")
-          .withIndex("by_product", (q) => q.eq("productId", cartItem.productId as any))
-          .filter((q) => q.eq(q.field("title"), cartItem.variant))
-          .first();
-
-        if (!variant) {
+        } catch (error) {
+          console.error(`Error checking stock for product ${cartItem.productId}:`, error);
+          // Return safe default on error
           return {
             productId: cartItem.productId,
             variant: cartItem.variant,
-            isOutOfStock: true,
-            availableQuantity: 0,
+            isOutOfStock: false, // Don't block checkout on error
+            availableQuantity: 999,
           };
         }
-
-        const availableQuantity = variant.inventoryQuantity || 0;
-        const isOutOfStock = availableQuantity <= 0 || availableQuantity < cartItem.quantity;
-
-        return {
-          productId: cartItem.productId,
-          variant: cartItem.variant,
-          isOutOfStock,
-          availableQuantity,
-          requestedQuantity: cartItem.quantity,
-        };
       })
     );
 

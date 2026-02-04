@@ -115,6 +115,33 @@ export const generateFailedOrderNumber = internalMutation({
   },
 });
 
+// Admin: Set order counter to a specific value (to avoid conflicts after migration)
+export const setOrderCounter = mutation({
+  args: {
+    newValue: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const counter = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "order_counter"))
+      .first();
+
+    if (counter) {
+      const oldValue = counter.value as number;
+      await ctx.db.patch(counter._id, {
+        value: args.newValue,
+      });
+      return { success: true, oldValue, newValue: args.newValue };
+    } else {
+      await ctx.db.insert("settings", {
+        key: "order_counter",
+        value: args.newValue,
+      });
+      return { success: true, oldValue: null, newValue: args.newValue };
+    }
+  },
+});
+
 // Generate model request number
 export const generateModelRequestNumber = internalMutation({
   args: {},
