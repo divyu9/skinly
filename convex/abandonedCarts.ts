@@ -30,10 +30,17 @@ export const trackAbandonedCart = mutation({
     );
 
     // Check if there's already an abandoned cart record for this user
+    // Must check both "pending" AND "reminded" to prevent creating duplicate records
+    // that would trigger the infinite email loop.
     const existing = await ctx.db
       .query("abandonedCarts")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.eq(q.field("status"), "pending"))
+      .filter((q) =>
+        q.or(
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("status"), "reminded")
+        )
+      )
       .first();
 
     if (existing) {

@@ -52,6 +52,8 @@ import type * as http from "../http.js";
 import type * as internalMigration from "../internalMigration.js";
 import type * as loginOtp from "../loginOtp.js";
 import type * as mediaLibrary from "../mediaLibrary.js";
+import type * as migrateCloudinaryToR2 from "../migrateCloudinaryToR2.js";
+import type * as migrateCloudinaryToR2Batch from "../migrateCloudinaryToR2Batch.js";
 import type * as migrateFinishTypeField from "../migrateFinishTypeField.js";
 import type * as migrateGadgetConsumption from "../migrateGadgetConsumption.js";
 import type * as migrateGadgetConsumptionInternal from "../migrateGadgetConsumptionInternal.js";
@@ -174,6 +176,8 @@ declare const fullApi: ApiFromModules<{
   internalMigration: typeof internalMigration;
   loginOtp: typeof loginOtp;
   mediaLibrary: typeof mediaLibrary;
+  migrateCloudinaryToR2: typeof migrateCloudinaryToR2;
+  migrateCloudinaryToR2Batch: typeof migrateCloudinaryToR2Batch;
   migrateFinishTypeField: typeof migrateFinishTypeField;
   migrateGadgetConsumption: typeof migrateGadgetConsumption;
   migrateGadgetConsumptionInternal: typeof migrateGadgetConsumptionInternal;

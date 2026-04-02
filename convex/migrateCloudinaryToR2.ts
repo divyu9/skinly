@@ -5,6 +5,7 @@ import {
   query,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
@@ -21,7 +22,7 @@ export const migrateImageToR2 = internalAction({
     r2Key: v.string(),
     contentType: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ publicUrl: string; key: string }> => {
     try {
       // 1. Download from Cloudinary
       console.log(`Downloading from Cloudinary: ${args.cloudinaryUrl}`);
@@ -37,14 +38,18 @@ export const migrateImageToR2 = internalAction({
 
       // 3. Upload to R2
       console.log(`Uploading to R2: ${args.r2Key}`);
-      const result = await ctx.runAction(internal.r2.uploadToR2, {
+      const uploadResult = await ctx.runAction(api.r2.uploadToR2, {
         fileBase64: base64,
         key: args.r2Key,
         contentType: args.contentType || response.headers.get("content-type") || "image/webp",
       });
 
+      if (!uploadResult.success || !uploadResult.url || !uploadResult.key) {
+        throw new Error(`R2 upload failed: ${uploadResult.error || 'Unknown error'}`);
+      }
+
       console.log(`Successfully migrated: ${args.r2Key}`);
-      return result;
+      return { publicUrl: uploadResult.url!, key: uploadResult.key! };
     } catch (error) {
       console.error(`Migration failed for ${args.r2Key}:`, error);
       throw error;
@@ -60,23 +65,27 @@ export const migrateImageToR2 = internalAction({
  * Tests R2 upload/download functionality with a small test image
  */
 export const testR2Upload = internalAction({
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<{ success: boolean; url: string; message: string }> => {
     try {
       // 1x1 transparent PNG (base64)
       const testBase64 =
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
       console.log("Testing R2 upload...");
-      const result = await ctx.runAction(internal.r2.uploadToR2, {
+      const uploadResult = await ctx.runAction(api.r2.uploadToR2, {
         fileBase64: testBase64,
         key: "test/test-image.png",
         contentType: "image/png",
       });
 
+      if (!uploadResult.success || !uploadResult.url) {
+        throw new Error(`R2 upload failed: ${uploadResult.error || 'Unknown error'}`);
+      }
+
       console.log("R2 upload successful, testing accessibility...");
 
       // 2. Verify URL is accessible
-      const checkResponse = await fetch(result.publicUrl);
+      const checkResponse = await fetch(uploadResult.url!);
       if (!checkResponse.ok) {
         throw new Error("R2 upload succeeded but image not accessible via public URL");
       }
@@ -84,7 +93,7 @@ export const testR2Upload = internalAction({
       console.log("R2 test completed successfully!");
       return {
         success: true,
-        url: result.publicUrl,
+        url: uploadResult.url!,
         message: "R2 is configured correctly and working"
       };
     } catch (error) {
@@ -287,7 +296,22 @@ export const getMigrationStatus = query({
         .withIndex("by_type", (q) => q.eq("migrationType", type))
         .first();
 
-      // Get total count for each type
+      // Skip the expensive full-table scan for completed migrations.
+      // All three .collect() calls combined can exceed Convex's 32K doc read limit
+      // per function execution (mockups ~9K + products + mediaLibrary).
+      if (progress?.status === "completed") {
+        status[type] = {
+          total: progress.processedItems,
+          processed: progress.processedItems,
+          successful: progress.successCount,
+          failed: progress.failureCount,
+          status: progress.status,
+          failedItems: progress.failedItems || [],
+        };
+        continue;
+      }
+
+      // Get total count for each type (only when migration is not yet completed)
       let total = 0;
       if (type === "mockups") {
         const mockups = await ctx.db
