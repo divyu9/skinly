@@ -34,13 +34,13 @@ crons.interval(
  * Comment out or remove after migration is complete
  */
 
-// PHASE 1: Critical assets migration (run this first)
-crons.interval(
-  "migrate-cloudinary-to-r2-phase1",
-  { minutes: 5 },
-  internal.migrateCloudinaryToR2Batch.autoMigrateCron,
-  { phase: "phase1" }
-);
+// MIGRATION COMPLETE - disabled 2026-04-02
+// crons.interval(
+//   "migrate-cloudinary-to-r2-phase1",
+//   { minutes: 5 },
+//   internal.migrateCloudinaryToR2Batch.autoMigrateCron,
+//   { phase: "phase1" }
+// );
 
 // PHASE 2: Mockups migration (uncomment after Phase 1 is complete)
 // crons.interval(
