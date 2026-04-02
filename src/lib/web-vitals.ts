@@ -1,4 +1,4 @@
-import { onCLS, onFID, onFCP, onLCP, onTTFB } from 'web-vitals';
+import { onCLS, onINP, onFCP, onLCP, onTTFB } from 'web-vitals';
 
 export function reportWebVitals() {
   const send = (metric: { name: string; value: number; id: string }) => {
@@ -11,7 +11,7 @@ export function reportWebVitals() {
   };
 
   onCLS(send);
-  onFID(send);
+  onINP(send);
   onFCP(send);
   onLCP(send);
   onTTFB(send);
