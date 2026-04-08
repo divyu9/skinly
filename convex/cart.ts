@@ -103,6 +103,31 @@ export const addToCart = mutation({
       });
     }
 
+    // Verify product and variant exist, and get the authoritative price from DB
+    const product = await ctx.db.get(args.productId as any);
+    if (!product) {
+      throw new ConvexError({
+        message: "Product not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    const variantData = await ctx.db
+      .query("variants")
+      .withIndex("by_product", (q) => q.eq("productId", args.productId as any))
+      .filter((q) => q.eq(q.field("title"), args.variant))
+      .first();
+
+    if (!variantData) {
+      throw new ConvexError({
+        message: "Variant not found",
+        code: "NOT_FOUND",
+      });
+    }
+
+    // Use DB price to prevent client-side price tampering
+    const authoritativePrice = variantData.price;
+
     // Check if item already exists in cart
     const existingItem = await ctx.db
       .query("cart")
@@ -116,6 +141,7 @@ export const addToCart = mutation({
       await ctx.db.patch(existingItem._id, {
         quantity: existingItem.quantity + args.quantity,
         coverage: args.coverage,
+        price: authoritativePrice, // Update to latest price
       });
       return existingItem._id;
     } else {
@@ -126,7 +152,7 @@ export const addToCart = mutation({
         productTitle: args.productTitle,
         productImage: args.productImage,
         variant: args.variant,
-        price: args.price,
+        price: authoritativePrice, // Use authoritative price
         quantity: args.quantity,
         phoneModel: args.phoneModel,
         phoneBrand: args.phoneBrand,
@@ -260,6 +286,18 @@ export const syncGuestCart = mutation({
 
     // Add each guest cart item to user's cart
     for (const item of args.guestCartItems) {
+      // Re-verify price from DB to prevent tampering
+      let authoritativePrice = item.price;
+      const variantData = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", item.productId as any))
+        .filter((q) => q.eq(q.field("title"), item.variant))
+        .first();
+        
+      if (variantData) {
+        authoritativePrice = variantData.price;
+      }
+
       // Check if item already exists in cart
       const existingItem = await ctx.db
         .query("cart")
@@ -273,6 +311,7 @@ export const syncGuestCart = mutation({
         await ctx.db.patch(existingItem._id, {
           quantity: existingItem.quantity + item.quantity,
           coverage: item.coverage,
+          price: authoritativePrice, // Update to authoritative price
         });
       } else {
         // Add new item
@@ -282,7 +321,7 @@ export const syncGuestCart = mutation({
           productTitle: item.productTitle,
           productImage: item.productImage,
           variant: item.variant,
-          price: item.price,
+          price: authoritativePrice, // Use authoritative price
           quantity: item.quantity,
           phoneModel: item.phoneModel,
           phoneBrand: item.phoneBrand,
@@ -324,13 +363,25 @@ export const syncGuestCartToDb = mutation({
 
     // Add guest cart items to database
     for (const item of args.guestCartItems) {
+      // Re-verify price from DB to prevent tampering
+      let authoritativePrice = item.price;
+      const variantData = await ctx.db
+        .query("variants")
+        .withIndex("by_product", (q) => q.eq("productId", item.productId as any))
+        .filter((q) => q.eq(q.field("title"), item.variant))
+        .first();
+        
+      if (variantData) {
+        authoritativePrice = variantData.price;
+      }
+
       await ctx.db.insert("cart", {
         sessionId: args.sessionId,
         productId: item.productId,
         productTitle: item.productTitle,
         productImage: item.productImage,
         variant: item.variant,
-        price: item.price,
+        price: authoritativePrice, // Use authoritative price
         quantity: item.quantity,
         phoneModel: item.phoneModel,
         phoneBrand: item.phoneBrand,

@@ -1759,8 +1759,20 @@ export function useMutation(apiRef: any) {
         }
         
         if (actionName === 'addToCart') {
+          // Fetch the real price from DB to prevent tampering
+          const productSnap = await getDoc(doc(db, 'products', args.productId));
+          let realPrice = args.price; // fallback
+          if (productSnap.exists()) {
+             const variantQ = query(collection(db, 'variants'), where('productId', '==', args.productId), where('title', '==', args.variant));
+             const variantSnap = await getDocs(variantQ);
+             if (!variantSnap.empty) {
+               realPrice = variantSnap.docs[0].data().price || args.price;
+             }
+          }
+          
           const docRef = await addDoc(collection(db, 'cart'), {
             ...args,
+            price: realPrice,
             userId: user.uid,
             addedAt: Date.now()
           });
@@ -1794,10 +1806,21 @@ export function useMutation(apiRef: any) {
         if (!user) return { success: false };
         
         const batch = writeBatch(db);
-        for (const item of args.items) {
+        for (const item of (args.items || args.guestCartItems || [])) {
+          // Re-verify prices for guest items to prevent tampering
+          let realPrice = item.price;
+          try {
+             const variantQ = query(collection(db, 'variants'), where('productId', '==', item.productId), where('title', '==', item.variant));
+             const variantSnap = await getDocs(variantQ);
+             if (!variantSnap.empty) {
+               realPrice = variantSnap.docs[0].data().price || item.price;
+             }
+          } catch(e) {}
+          
           const newDoc = doc(collection(db, 'cart'));
           batch.set(newDoc, {
             ...item,
+            price: realPrice,
             userId: user.uid,
             addedAt: Date.now()
           });
@@ -1823,85 +1846,43 @@ export function useMutation(apiRef: any) {
       }
       
       if (collectionName === 'orders' && actionName === 'createOrder') {
-        const { getAuth } = await import('firebase/auth');
-        const auth = getAuth();
-        const user = auth.currentUser;
-        
-        let orderItems = [];
-        if (user) {
-          const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
-          const snap = await getDocs(q);
-          orderItems = snap.docs.map(d => d.data());
-        } else if (args.guestItems) {
-          orderItems = args.guestItems;
-        } else if (args.sessionId) {
-          const q = query(collection(db, 'cart'), where('sessionId', '==', args.sessionId));
-          const snap = await getDocs(q);
-          orderItems = snap.docs.map(d => d.data());
-        }
-        
-        // Try to get order counter from settings, or fallback to random
-        let orderNumber = `#${Math.floor(4000 + Math.random() * 9000)}`;
-        try {
-          const settingsQ = query(collection(db, 'settings'), where('key', '==', 'order_counter'));
-          const settingsSnap = await getDocs(settingsQ);
-          
-          if (!settingsSnap.empty) {
-            const counterDoc = settingsSnap.docs[0];
-            const currentVal = counterDoc.data().value || 4001;
-            orderNumber = `#${currentVal}`;
-            await updateDoc(doc(db, 'settings', counterDoc.id), { value: currentVal + 1 });
-          } else {
-            // Create counter if it doesn't exist
-            await addDoc(collection(db, 'settings'), { key: 'order_counter', value: 4002 });
-            orderNumber = `#4001`;
-          }
-        } catch (e) {
-          console.warn("Failed to get/update order counter, using random", e);
-        }
-        
-        const newOrder = {
-          orderNumber: orderNumber,
-          userId: user?.uid || args.sessionId || 'guest',
-          customerName: args.shippingAddress.fullName,
-          email: args.customerEmail || args.guestEmail,
-          phone: args.shippingAddress.phone,
-          shippingAddress: args.shippingAddress,
-          paymentMethod: args.paymentMethod,
-          status: 'pending',
-          paymentStatus: 'pending',
-          total: args.remainingAmount || 0,
-          items: orderItems,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        };
-        
-        const docRef = await addDoc(collection(db, 'orders'), newOrder);
-
-        return { 
-          orderId: docRef.id, 
-          orderNumber: orderNumber,
-          remainingAmount: args.remainingAmount || 0,
-          trackingToken: `TRACK-${docRef.id}`
-        };
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
+        const callCreateOrder = httpsCallable(functions, 'createOrder');
+        const response = await callCreateOrder(args);
+        return response.data;
       }
       
       if (collectionName === 'phonepe' && actionName === 'initiatePayment') {
-        // Return mock payment URL for local development instead of calling Cloud Function
-        console.log("Mocking PhonePe payment initiation for:", args);
-        return {
-          success: true,
-          merchantTransactionId: `MTXN-${Date.now()}`,
-          paymentUrl: `http://localhost:5175/mock-payment?orderId=${args.orderId}&amount=${args.amount}`
-        };
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocal) {
+          console.log("Mocking PhonePe payment initiation for:", args);
+          return {
+            success: true,
+            merchantTransactionId: `MTXN-${Date.now()}`,
+            paymentUrl: `http://localhost:5175/mock-payment?orderId=${args.orderId}&amount=${args.amount}`
+          };
+        }
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
+        const callable = httpsCallable(functions, 'initiatePayment');
+        const res: any = await callable(args);
+        return res.data;
       }
       if (collectionName === 'phonepe' && actionName === 'checkPaymentStatus') {
-        // Return mock success status
-        return {
-          success: true,
-          paymentStatus: 'success',
-          transactionId: args.merchantTransactionId
-        };
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocal) {
+          return {
+            success: true,
+            paymentStatus: 'success',
+            transactionId: args.merchantTransactionId
+          };
+        }
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
+        const callable = httpsCallable(functions, 'checkPaymentStatus');
+        const res: any = await callable(args);
+        return res.data;
       }
       if (collectionName === 'codOtp' && actionName === 'generateCodOtp') {
         return { success: true };
@@ -2293,20 +2274,32 @@ export function useAction(apiRef: any) {
     
     // Check for mocked actions first
     if (collectionName === 'phonepe' && actionName === 'initiatePayment') {
-      console.log("Mocking PhonePe payment initiation for:", args);
-      return {
-        success: true,
-        merchantTransactionId: `MTXN-${Date.now()}`,
-        paymentUrl: `http://localhost:5175/mock-payment?orderId=${args.orderId}&amount=${args.amount}`
-      };
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocal) {
+        console.log("Mocking PhonePe payment initiation for:", args);
+        return {
+          success: true,
+          merchantTransactionId: `MTXN-${Date.now()}`,
+          paymentUrl: `http://localhost:5175/mock-payment?orderId=${args.orderId}&amount=${args.amount}`
+        };
+      }
+      const callable = httpsCallable(functions, 'initiatePayment');
+      const res: any = await callable(args);
+      return res.data;
     }
     
     if (collectionName === 'phonepe' && actionName === 'checkPaymentStatus') {
-      return {
-        success: true,
-        paymentStatus: 'success',
-        transactionId: args.merchantTransactionId
-      };
+      const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      if (isLocal) {
+        return {
+          success: true,
+          paymentStatus: 'success',
+          transactionId: args.merchantTransactionId
+        };
+      }
+      const callable = httpsCallable(functions, 'checkPaymentStatus');
+      const res: any = await callable(args);
+      return res.data;
     }
     
     if (collectionName === 'phoneCollections' && actionName === 'runPhoneCollectionsMigration') {
@@ -2638,24 +2631,35 @@ export function useConvex() {
       const actionName = path.split('.')[1];
       
       if (collectionName === 'phonepe' && actionName === 'initiatePayment') {
-        console.log("Mocking PhonePe payment initiation for:", args);
-        return {
-          success: true,
-          merchantTransactionId: `MTXN-${Date.now()}`,
-          paymentUrl: `http://localhost:5175/mock-payment?orderId=${args.orderId}&amount=${args.amount}`
-        };
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocal) {
+          console.log("Mocking PhonePe payment initiation for:", args);
+          return {
+            success: true,
+            merchantTransactionId: `MTXN-${Date.now()}`,
+            paymentUrl: `http://localhost:5175/mock-payment?orderId=${args.orderId}&amount=${args.amount}`
+          };
+        }
+        const callable = httpsCallable(functions, 'initiatePayment');
+        const res: any = await callable(args);
+        return res.data;
       }
       
       if (collectionName === 'phonepe' && actionName === 'checkPaymentStatus') {
-        return {
-          success: true,
-          paymentStatus: 'success',
-          transactionId: args.merchantTransactionId
-        };
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocal) {
+          return {
+            success: true,
+            paymentStatus: 'success',
+            transactionId: args.merchantTransactionId
+          };
+        }
+        const callable = httpsCallable(functions, 'checkPaymentStatus');
+        const res: any = await callable(args);
+        return res.data;
       }
       
       return null;
     }
   };
 }
-

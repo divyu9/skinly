@@ -1,0 +1,111 @@
+import { onCall } from "firebase-functions/v2/https";
+import * as admin from "firebase-admin";
+import { getCaller } from "./auth";
+import { enforceDailyRateLimit } from "./rate-limit";
+
+export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+  const { uid } = getCaller(request);
+  const data = request.data;
+  const { shippingAddress, customerEmail, guestEmail, paymentMethod, remainingAmount, guestItems, sessionId: reqSessionId } = data;
+  
+  // Use uid if logged in, otherwise use the session id passed from frontend
+  const trackingId = uid || reqSessionId || "guest";
+  
+  // Rate limit order creation (50 orders per user/session per day)
+  await enforceDailyRateLimit({ key: `createOrder_${trackingId}`, limit: 50 });
+
+  const db = admin.firestore();
+
+  // 1. Gather Cart Items Securely
+  let orderItems: any[] = [];
+  if (uid) {
+    const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
+    orderItems = cartSnap.docs.map(d => d.data());
+  } else if (guestItems && guestItems.length > 0) {
+    // If guest passes items directly, use them (you could also fetch them by session ID from the DB)
+    orderItems = guestItems;
+  } else if (reqSessionId) {
+    const cartSnap = await db.collection('cart').where('sessionId', '==', reqSessionId).get();
+    orderItems = cartSnap.docs.map(d => d.data());
+  }
+
+  if (!orderItems || orderItems.length === 0) {
+    throw new Error("Cannot create order with an empty cart");
+  }
+
+  // 2. Generate Order Number (Transactionally to avoid duplicates)
+  const counterRef = db.collection('settings').doc('order_counter');
+  let orderNumber = '';
+
+  await db.runTransaction(async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+    let currentVal = 4001; // Default starting number
+    if (counterDoc.exists) {
+      const docData = counterDoc.data();
+      currentVal = (docData && docData.value) ? docData.value : 4001;
+      transaction.update(counterRef, { value: currentVal + 1 });
+    } else {
+      transaction.set(counterRef, { key: 'order_counter', value: 4002 });
+    }
+    orderNumber = `#${currentVal}`;
+  });
+
+  // 3. Assemble the Order Payload securely by calculating total from database
+  let calculatedTotal = 0;
+  for (const item of orderItems) {
+    if (item.productId && item.variant) {
+      // Find variant price
+      const variantSnap = await db.collection('variants')
+        .where('productId', '==', item.productId)
+        .where('title', '==', item.variant)
+        .get();
+        
+      if (!variantSnap.empty) {
+        const variantData = variantSnap.docs[0].data();
+        calculatedTotal += (variantData.price || 0) * (item.quantity || 1);
+      } else {
+        // Fallback if variant not found in old DB structure, or reject
+        calculatedTotal += (item.price || 0) * (item.quantity || 1);
+      }
+    } else {
+      calculatedTotal += (item.price || 0) * (item.quantity || 1);
+    }
+  }
+
+  // Use calculated total instead of client-provided remainingAmount
+  const newOrder = {
+    orderNumber: orderNumber,
+    userId: uid || reqSessionId || 'guest',
+    customerName: shippingAddress?.fullName || 'Guest',
+    email: customerEmail || guestEmail || '',
+    phone: shippingAddress?.phone || '',
+    shippingAddress: shippingAddress || {},
+    paymentMethod: paymentMethod || 'prepaid',
+    status: 'pending',
+    paymentStatus: 'pending',
+    total: calculatedTotal,
+    items: orderItems,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+
+  // 4. Save to Firestore
+  const docRef = await db.collection('orders').add(newOrder);
+
+  // 5. Optional Cleanup (Delete user's cart after creating order)
+  if (uid) {
+    const batch = db.batch();
+    const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
+    cartSnap.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+  }
+
+  return {
+    orderId: docRef.id,
+    orderNumber: orderNumber,
+    remainingAmount: remainingAmount || 0,
+    trackingToken: `TRACK-${docRef.id}`
+  };
+});

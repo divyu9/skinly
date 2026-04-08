@@ -1,4 +1,6 @@
 import { onCall } from "firebase-functions/v2/https";
+import { requireAdmin } from "./auth";
+import { enforceDailyRateLimit } from "./rate-limit";
 
 const getOpenAIConfig = () => {
   const apiKey = process.env.OPENAI_API_KEY || "";
@@ -9,16 +11,17 @@ const getOpenAIConfig = () => {
 };
 
 export const generateSEOContent = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+  const { uid } = await requireAdmin(request);
+  await enforceDailyRateLimit({ key: `generateSEOContent_${uid}`, limit: Number(process.env.SEO_DAILY_LIMIT || 100) });
   const data = request.data;
-  // Ensure the user is an admin
-  // if (!context.auth?.token?.admin) {
-  //   throw new functions.https.HttpsError("permission-denied", "Unauthorized");
-  // }
 
   const { prompt } = data;
   
   if (!prompt) {
     throw new Error("Missing prompt");
+  }
+  if (typeof prompt !== "string" || prompt.length > Number(process.env.SEO_PROMPT_MAX_CHARS || 6000)) {
+    throw new Error("Invalid prompt");
   }
 
   const config = getOpenAIConfig();

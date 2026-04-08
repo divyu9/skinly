@@ -1,0 +1,38 @@
+{
+  "phonepe": {
+    "merchant_id": "REPLACE_ME",
+    "salt_key": "REPLACE_ME",
+    "salt_index": "1",
+    "environment": "PRODUCTION"
+  },
+  "rapidshyp": {
+    "api_key": "REPLACE_ME",
+    "api_url": "https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper",
+    "webhook_token": "REPLACE_ME"
+  },
+  "openai": {
+    "api_key": "REPLACE_ME"
+  },
+  "msg91": {
+    "auth_key": "REPLACE_ME",
+    "auth_token": "REPLACE_ME"
+  },
+  "whatsapp": {
+    "authkey": "REPLACE_ME"
+  },
+  "cloudinary": {
+    "api_key": "REPLACE_ME",
+    "api_secret": "REPLACE_ME",
+    "cloud_name": "REPLACE_ME"
+  },
+  "r2": {
+    "account_id": "REPLACE_ME",
+    "access_key_id": "REPLACE_ME",
+    "secret_access_key": "REPLACE_ME",
+    "bucket_name": "skinly",
+    "public_url": "https://cdn.goskinly.com"
+  },
+  "app": {
+    "site_url": "https://www.goskinly.com"
+  }
+}

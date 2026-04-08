@@ -30,6 +30,7 @@ tsconfig.tsbuildinfo
 .env*
 
 firebase-admin.json
+functions/.runtimeconfig.json
 migration-scripts/
 convex-export/
 convex-export.zip

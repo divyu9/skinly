@@ -12,6 +12,7 @@ import { GadgetSelector } from "@/components/gadget-selector.tsx";
 import { PhoneBrandSelector } from "@/components/phone-brand-selector.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { useState, useRef } from "react";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
 type DeviceType = "laptop" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
@@ -122,7 +123,7 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
             <div className="max-w-4xl mx-auto">
               <div
                 className="prose prose-lg dark:prose-invert max-w-none mb-12"
-                dangerouslySetInnerHTML={{ __html: page.contentHTML }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.contentHTML) }}
               />
             </div>
           </section>

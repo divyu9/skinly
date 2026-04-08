@@ -27,6 +27,8 @@ exports.paymentCallback = exports.checkPaymentStatus = exports.initiatePayment =
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const crypto = __importStar(require("crypto"));
+const auth_1 = require("./auth");
+const rate_limit_1 = require("./rate-limit");
 // PhonePe Config from Firebase environment config or secrets
 const getPhonePeConfig = () => {
     const merchantId = process.env.PHONEPE_MERCHANT_ID || "";
@@ -49,27 +51,63 @@ const generateXVerify = (base64Payload, endpoint, saltKey, saltIndex) => {
 exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     var _a, _b, _c;
     const data = request.data;
-    const context = request.auth ? { auth: request.auth } : { auth: null };
-    const { orderId, amount, customerPhone, orderNumber } = data;
+    const { uid } = (0, auth_1.getCaller)(request);
+    await (0, rate_limit_1.enforceDailyRateLimit)({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
+    const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
     if (!orderId || !amount || !customerPhone) {
         throw new Error("Missing required fields");
     }
+    if (typeof orderId !== "string" || orderId.length > 128) {
+        throw new Error("Invalid orderId");
+    }
+    const phoneDigits = String(customerPhone).replace(/\D/g, "");
+    if (!/^[0-9]{10,15}$/.test(phoneDigits)) {
+        throw new Error("Invalid phone");
+    }
+    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Invalid amount");
+    }
     const config = getPhonePeConfig();
+    const orderRef = admin.firestore().collection("orders").doc(orderId);
+    const orderSnap = await orderRef.get();
+    if (!orderSnap.exists) {
+        throw new Error("Order not found");
+    }
+    const order = orderSnap.data();
+    if (uid) {
+        if (order.userId !== uid) {
+            throw new Error("Unauthorized");
+        }
+    }
+    else {
+        if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) {
+            throw new Error("Unauthorized");
+        }
+        if (order.userId !== sessionId) {
+            throw new Error("Unauthorized");
+        }
+    }
+    if (order.phone) {
+        const orderPhoneDigits = String(order.phone).replace(/\D/g, "");
+        if (orderPhoneDigits && orderPhoneDigits !== phoneDigits) {
+            throw new Error("Unauthorized");
+        }
+    }
     const timestamp = Date.now();
     const last6 = timestamp.toString().slice(-6);
-    const orderRef = orderNumber || orderId.slice(-8);
-    const merchantTransactionId = `${orderRef}-${last6}`;
+    const orderRefSuffix = orderNumber || orderId.slice(-8);
+    const merchantTransactionId = `${orderRefSuffix}-${last6}`;
     const amountInPaise = Math.max(Math.round(amount * 100), 100);
     const siteUrl = process.env.SITE_URL || "https://www.goskinly.com";
     const paymentPayload = {
         merchantId: config.merchantId,
         merchantTransactionId: merchantTransactionId,
-        merchantUserId: (context && context.auth && context.auth.uid) ? context.auth.uid : "GUEST_USER",
+        merchantUserId: uid ? uid : (sessionId ? String(sessionId).slice(-24) : "GUEST_USER"),
         amount: amountInPaise,
         redirectUrl: `${siteUrl}/payment/callback`,
         redirectMode: "REDIRECT",
         callbackUrl: `${siteUrl}/payment/callback`,
-        mobileNumber: customerPhone,
+        mobileNumber: phoneDigits,
         paymentInstrument: {
             type: "PAY_PAGE",
         },
@@ -97,8 +135,7 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
         if (!paymentUrl) {
             throw new Error("No payment URL returned");
         }
-        // Save transaction info to order
-        await admin.firestore().collection("orders").doc(orderId).update({
+        await orderSnap.ref.update({
             paymentTransactionId: merchantTransactionId,
             paymentStatus: "PENDING",
             paymentProvider: "phonepe"
@@ -117,9 +154,36 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
 exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     var _a;
     const data = request.data;
-    const { merchantTransactionId } = data;
+    const { uid } = (0, auth_1.getCaller)(request);
+    await (0, rate_limit_1.enforceDailyRateLimit)({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
+    const { merchantTransactionId, orderId, sessionId } = data;
     if (!merchantTransactionId) {
         throw new Error("Missing merchantTransactionId");
+    }
+    if (typeof merchantTransactionId !== "string" || merchantTransactionId.length > 128) {
+        throw new Error("Invalid merchantTransactionId");
+    }
+    if (orderId) {
+        if (typeof orderId !== "string" || orderId.length > 128)
+            throw new Error("Invalid orderId");
+        const orderRef = admin.firestore().collection("orders").doc(orderId);
+        const orderSnap = await orderRef.get();
+        if (!orderSnap.exists)
+            throw new Error("Order not found");
+        const order = orderSnap.data();
+        if (uid) {
+            if (order.userId !== uid)
+                throw new Error("Unauthorized");
+        }
+        else {
+            if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128)
+                throw new Error("Unauthorized");
+            if (order.userId !== sessionId)
+                throw new Error("Unauthorized");
+        }
+    }
+    else {
+        (0, auth_1.requireAuth)(request);
     }
     const config = getPhonePeConfig();
     const endpoint = `/pg/v1/status/${config.merchantId}/${merchantTransactionId}`;

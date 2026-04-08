@@ -110,8 +110,85 @@ export const createOrder = mutation({
     const flatShippingFee = (flatFeeSetting?.value as number) ?? 50;
     const shippingFee = subtotal >= freeShippingThreshold ? 0 : flatShippingFee;
     
-    // Apply coupon discount
-    const couponDiscount = args.couponDiscount || 0;
+    // Apply coupon discount securely
+    let verifiedCouponDiscount = 0;
+    if (args.couponId) {
+      const coupon = await ctx.db.get(args.couponId);
+      if (coupon && coupon.isActive) {
+        // Re-evaluate eligible items for the coupon to prevent tampering
+        const eligibleItems = [];
+        for (const item of cartItems) {
+          let isEligible = false;
+          
+          // Check specific variants
+          if (coupon.applicableVariantIds && coupon.applicableVariantIds.length > 0) {
+            // Find variant ID
+            const variantData = await ctx.db
+              .query("variants")
+              .withIndex("by_product", (q) => q.eq("productId", item.productId as any))
+              .filter((q) => q.eq(q.field("title"), item.variant))
+              .first();
+              
+            if (variantData && coupon.applicableVariantIds.includes(variantData._id)) {
+              isEligible = true;
+            }
+          }
+
+          // Check collections
+          if (!isEligible && coupon.applicableCollectionIds && coupon.applicableCollectionIds.length > 0) {
+            const product = await ctx.db.get(item.productId as any);
+            if (product?.collectionId && coupon.applicableCollectionIds.includes(product.collectionId)) {
+              isEligible = true;
+            }
+          }
+
+          // Check product title
+          if (!isEligible && coupon.applicableProductKeywords && coupon.applicableProductKeywords.length > 0) {
+            const titleLower = item.productTitle.toLowerCase();
+            if (coupon.applicableProductKeywords.some((kw: string) => titleLower.includes(kw.toLowerCase()))) {
+              isEligible = true;
+            }
+          }
+
+          // Check min product value
+          if (!isEligible && coupon.minProductValue && item.price >= coupon.minProductValue) {
+            isEligible = true;
+          }
+
+          // If no specific conditions, all items are eligible
+          if (
+            !coupon.applicableVariantIds &&
+            !coupon.applicableCollectionIds &&
+            !coupon.applicableProductKeywords &&
+            !coupon.minProductValue
+          ) {
+            isEligible = true;
+          }
+
+          if (isEligible) {
+            eligibleItems.push(item);
+          }
+        }
+
+        // Calculate eligible total
+        const eligibleTotal = eligibleItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+        // Calculate discount
+        if (eligibleItems.length > 0) {
+          if (coupon.discountType === "percentage") {
+            verifiedCouponDiscount = (eligibleTotal * coupon.discountValue) / 100;
+            if (coupon.maxDiscount && verifiedCouponDiscount > coupon.maxDiscount) {
+              verifiedCouponDiscount = coupon.maxDiscount;
+            }
+          } else {
+            verifiedCouponDiscount = Math.min(coupon.discountValue, eligibleTotal);
+          }
+        }
+      }
+    }
+    
+    // Fallback to 0 if calculated discount is somehow invalid
+    const couponDiscount = verifiedCouponDiscount > 0 ? verifiedCouponDiscount : 0;
     let total = Math.max(0, subtotal + shippingFee - couponDiscount);
 
     // Handle wallet payment (only for authenticated users)

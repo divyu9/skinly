@@ -8,7 +8,7 @@ import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, Re
 import { Separator } from "@/components/ui/separator.tsx";
 import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
 // PhonePe TypeScript declarations
@@ -78,7 +78,7 @@ function OrderDetailPageInner() {
   };
 
   // PhonePe payment callback handler
-  const handlePhonePeCallback = async (response: 'USER_CANCEL' | 'CONCLUDED') => {
+  const handlePhonePeCallback = useCallback(async (response: 'USER_CANCEL' | 'CONCLUDED') => {
     console.log("PhonePe callback received:", response);
     
     if (response === 'USER_CANCEL') {
@@ -106,42 +106,47 @@ function OrderDetailPageInner() {
         return;
       }
       
-      try {
-        const currentRetry = retryCount + 1;
-        setRetryCount(currentRetry);
-        
-        const phonepeStatus = await checkPaymentStatus({
-          merchantTransactionId: currentMerchantTxnId,
-        });
-        
-        if (phonepeStatus.paymentStatus === "success") {
-          setRetryCount(0);
-          setIsRetrying(false);
-          toast.success("Payment successful!");
-          // Reload the page to show updated order
-          window.location.reload();
-          return;
-        } else if (phonepeStatus.paymentStatus === "failed") {
-          setRetryCount(0);
-          setIsRetrying(false);
-          toast.error("Payment failed");
-          return;
+      let currentRetry = 0;
+
+      const verify = async () => {
+        while (currentRetry < maxRetries) {
+          currentRetry++;
+          setRetryCount(currentRetry);
+          try {
+            const phonepeStatus = await checkPaymentStatus({
+              merchantTransactionId: currentMerchantTxnId,
+            });
+            
+            if (phonepeStatus.paymentStatus === "success") {
+              setRetryCount(0);
+              setIsRetrying(false);
+              toast.success("Payment successful!");
+              // Reload the page to show updated order
+              window.location.reload();
+              return;
+            } else if (phonepeStatus.paymentStatus === "failed") {
+              setRetryCount(0);
+              setIsRetrying(false);
+              toast.error("Payment failed");
+              return;
+            }
+          } catch (error) {
+            console.error("Error verifying payment:", error);
+          }
+
+          if (currentRetry >= maxRetries) {
+            setIsRetrying(false);
+            toast.error("Unable to verify payment. Please check your order status.");
+            return;
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
-        
-        // Still pending - retry
-        if (currentRetry >= maxRetries) {
-          setIsRetrying(false);
-          toast.error("Unable to verify payment. Please check your order status.");
-        } else {
-          setTimeout(() => handlePhonePeCallback('CONCLUDED'), 2000);
-        }
-      } catch (error) {
-        console.error("Error verifying payment:", error);
-        setIsRetrying(false);
-        toast.error("Failed to verify payment");
-      }
+      };
+
+      verify();
     }
-  };
+  }, [currentMerchantTxnId, checkPaymentStatus, updatePaymentStatus]);
 
   // Handle retry payment button click
   const handleRetryPayment = async () => {

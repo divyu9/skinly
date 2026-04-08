@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateSEOContent = void 0;
 const https_1 = require("firebase-functions/v2/https");
+const auth_1 = require("./auth");
+const rate_limit_1 = require("./rate-limit");
 const getOpenAIConfig = () => {
     const apiKey = process.env.OPENAI_API_KEY || "";
     if (!apiKey) {
@@ -11,14 +13,15 @@ const getOpenAIConfig = () => {
 };
 exports.generateSEOContent = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     var _a, _b, _c;
+    const { uid } = await (0, auth_1.requireAdmin)(request);
+    await (0, rate_limit_1.enforceDailyRateLimit)({ key: `generateSEOContent_${uid}`, limit: Number(process.env.SEO_DAILY_LIMIT || 100) });
     const data = request.data;
-    // Ensure the user is an admin
-    // if (!context.auth?.token?.admin) {
-    //   throw new functions.https.HttpsError("permission-denied", "Unauthorized");
-    // }
     const { prompt } = data;
     if (!prompt) {
         throw new Error("Missing prompt");
+    }
+    if (typeof prompt !== "string" || prompt.length > Number(process.env.SEO_PROMPT_MAX_CHARS || 6000)) {
+        throw new Error("Invalid prompt");
     }
     const config = getOpenAIConfig();
     try {

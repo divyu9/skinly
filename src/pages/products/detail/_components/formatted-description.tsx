@@ -1,3 +1,5 @@
+import { sanitizeHtml } from "@/lib/sanitize-html";
+
 interface FormattedDescriptionProps {
   description: string;
 }
@@ -30,7 +32,7 @@ export function FormattedDescription({ description }: FormattedDescriptionProps)
     return processedParagraphs.join('');
   };
 
-  const formattedHTML = formatDescription(description);
+  const formattedHTML = sanitizeHtml(formatDescription(description));
 
   return (
     <div 

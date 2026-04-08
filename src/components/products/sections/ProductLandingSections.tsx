@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { cn } from "@/lib/utils.ts";
 import { ArrowRight } from "lucide-react";
 import type { Id } from "@/lib/firebase-api";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
 interface ProductLandingSectionsProps {
   productId: Id<"products">;
@@ -73,7 +74,7 @@ function HeroSection({ section }: { section: SectionContent }) {
           </h2>
           <div
             className="text-lg md:text-xl text-muted-foreground prose prose-lg max-w-none"
-            dangerouslySetInnerHTML={{ __html: section.descriptionHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.descriptionHtml) }}
           />
           {section.imageUrl && (
             <div className="mt-8 md:mt-12">
@@ -137,7 +138,7 @@ function FeatureSection({
             </h2>
             <div
               className="text-base md:text-lg text-muted-foreground prose prose-base md:prose-lg max-w-none"
-              dangerouslySetInnerHTML={{ __html: section.descriptionHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.descriptionHtml) }}
             />
             {section.ctaText && section.ctaLink && (
               <Button asChild variant="outline" size="lg" className="rounded-full">
@@ -179,7 +180,7 @@ function FullWidthSection({ section }: { section: SectionContent }) {
           </h2>
           <div
             className="text-lg md:text-xl opacity-90 prose prose-lg prose-invert max-w-none"
-            dangerouslySetInnerHTML={{ __html: section.descriptionHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.descriptionHtml) }}
           />
           {section.ctaText && section.ctaLink && (
             <div className="pt-4">
@@ -213,7 +214,7 @@ function SpecsSection({ section }: { section: SectionContent }) {
           </h2>
           <div
             className="prose prose-base md:prose-lg max-w-none [&_ul]:grid [&_ul]:md:grid-cols-2 [&_ul]:gap-4 [&_li]:bg-background [&_li]:p-4 [&_li]:rounded-xl [&_li]:shadow-sm [&_li]:border"
-            dangerouslySetInnerHTML={{ __html: section.descriptionHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(section.descriptionHtml) }}
           />
           {section.ctaText && section.ctaLink && (
             <div className="text-center pt-8">

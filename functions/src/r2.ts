@@ -1,6 +1,8 @@
 import { onCall } from "firebase-functions/v2/https";
 import { S3Client, PutObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { requireAdmin } from "./auth";
+import { enforceDailyRateLimit } from "./rate-limit";
 
 const getR2Config = () => {
   const accountId = process.env.R2_ACCOUNT_ID || "";
@@ -16,12 +18,34 @@ const getR2Config = () => {
   return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 };
 
+const getAllowedOrigins = () => {
+  const env = process.env.R2_ALLOWED_ORIGINS;
+  const origins = (env ? env.split(",") : ["https://goskinly.com", "https://www.goskinly.com"])
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (process.env.NODE_ENV !== "production") {
+    origins.push("http://localhost:5173", "http://localhost:4173");
+  }
+
+  return Array.from(new Set(origins));
+};
+
+const validateKey = (key: string) => {
+  if (!key) throw new Error("Missing fileName");
+  if (key.includes("..")) throw new Error("Invalid fileName");
+  if (key.startsWith("/")) throw new Error("Invalid fileName");
+  if (!/^[a-zA-Z0-9/_\-.]+$/.test(key)) throw new Error("Invalid fileName");
+  const allowedPrefixes = ["general/", "homepage/", "products/", "mockups/", "seo/"];
+  if (!allowedPrefixes.some((p) => key.startsWith(p))) {
+    throw new Error("Invalid fileName");
+  }
+};
+
 // Admin function to setup CORS on the bucket
 export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: true }, async (request: any) => {
-  // In production, uncomment this to protect the endpoint
-  // if (!request.auth?.token?.admin) {
-  //   throw new Error("Unauthorized");
-  // }
+  const { uid } = await requireAdmin(request);
+  await enforceDailyRateLimit({ key: `setupR2Cors_${uid}`, limit: Number(process.env.R2_CORS_DAILY_LIMIT || 20) });
 
   const config = getR2Config();
   
@@ -39,8 +63,8 @@ export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: 
     CORSConfiguration: {
       CORSRules: [
         {
-          AllowedOrigins: ["*"], // Allow all origins (can be restricted in production)
-          AllowedMethods: ["GET", "PUT", "POST", "DELETE", "HEAD"],
+          AllowedOrigins: getAllowedOrigins(),
+          AllowedMethods: ["GET", "PUT", "POST", "HEAD"],
           AllowedHeaders: ["*"],
           ExposeHeaders: ["ETag"],
           MaxAgeSeconds: 3600,
@@ -59,16 +83,18 @@ export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: 
 });
 
 export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: true }, async (request: any) => {
+  const { uid } = await requireAdmin(request);
+  await enforceDailyRateLimit({ key: `generateUploadUrl_${uid}`, limit: Number(process.env.R2_UPLOAD_DAILY_LIMIT || 2000) });
   const data = request.data;
-  // Authentication check
-  // if (!context.auth?.token?.admin) {
-  //   throw new functions.https.HttpsError("permission-denied", "Unauthorized");
-  // }
   
   const { fileName, contentType } = data;
   if (!fileName || !contentType) {
     throw new Error("Missing file details");
   }
+  if (typeof contentType !== "string" || !contentType.startsWith("image/")) {
+    throw new Error("Invalid contentType");
+  }
+  validateKey(fileName);
 
   const config = getR2Config();
   
@@ -88,7 +114,7 @@ export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, 
       ContentType: contentType,
     });
 
-    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: Number(process.env.R2_SIGNED_URL_TTL_SECONDS || 300) });
     
     return {
       success: true,

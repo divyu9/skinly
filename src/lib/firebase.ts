@@ -4,6 +4,7 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 import { getAnalytics } from "firebase/analytics";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,6 +19,18 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
+// Initialize App Check (Only in browser environment)
+let appCheck;
+if (typeof window !== "undefined") {
+  // Use a placeholder reCAPTCHA site key if env var is missing, though it will fail verification
+  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "YOUR_RECAPTCHA_V3_SITE_KEY";
+  
+  appCheck = initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}
+
 // Initialize Services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -27,4 +40,5 @@ export const functions = getFunctions(app);
 // Initialize Analytics conditionally (only runs in browser)
 export const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;
 
+export { appCheck };
 export default app;

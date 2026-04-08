@@ -1,5 +1,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import { requireAdmin } from "./auth";
+import { enforceDailyRateLimit } from "./rate-limit";
 
 const getWhatsAppConfig = () => {
   const authkey = process.env.WHATSAPP_AUTHKEY || "";
@@ -10,11 +12,22 @@ const getWhatsAppConfig = () => {
 };
 
 export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+  const { uid } = await requireAdmin(request);
+  await enforceDailyRateLimit({ key: `sendWhatsAppMessage_${uid}`, limit: Number(process.env.WHATSAPP_DAILY_LIMIT || 500) });
   const data = request.data;
   const { phone, templateId, variables } = data;
 
   if (!phone || !templateId) {
     throw new Error("Missing required fields");
+  }
+  if (typeof phone !== "string" || !/^[0-9]{10,15}$/.test(phone.replace(/\D/g, ""))) {
+    throw new Error("Invalid phone");
+  }
+  if (typeof templateId !== "string" || templateId.length > 128) {
+    throw new Error("Invalid templateId");
+  }
+  if (variables && typeof variables !== "object") {
+    throw new Error("Invalid variables");
   }
 
   const config = getWhatsAppConfig();
@@ -28,7 +41,7 @@ export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60
     // Construct the payload for Authkey.io
     const params = new URLSearchParams({
       authkey: config.authkey,
-      mobile: phone,
+      mobile: phone.replace(/\D/g, ""),
       country_code: "91", // Assuming India, dynamically parse if needed
       sid: "XXX", // Sender ID
       template_id: templateId,

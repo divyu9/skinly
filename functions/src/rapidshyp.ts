@@ -1,5 +1,7 @@
 import { onCall } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import { requireAdmin } from "./auth";
+import { enforceDailyRateLimit } from "./rate-limit";
 
 const getRapidShypConfig = () => {
   const apiKey = process.env.RAPIDSHYP_API_KEY || "";
@@ -13,15 +15,14 @@ const getRapidShypConfig = () => {
 };
 
 export const createShipment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+  const { uid } = await requireAdmin(request);
+  await enforceDailyRateLimit({ key: `createShipment_${uid}`, limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200) });
   const data = request.data;
   const { orderId } = data;
 
   if (!orderId) {
     throw new Error("Missing orderId");
   }
-
-  // Ensure user is authenticated and is an admin if you want to restrict this
-  // if (!request.auth?.token.admin) throw new Error('Only admins can create shipments');
 
   const orderRef = admin.firestore().collection("orders").doc(orderId);
   const orderDoc = await orderRef.get();

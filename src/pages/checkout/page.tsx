@@ -81,6 +81,104 @@ function CheckoutPageInner() {
   const maxRetries = 5;
   const [guestSessionId] = useState(() => getGuestSessionId());
 
+  const handlePhonePeCallback = useCallback(async (response: "USER_CANCEL" | "CONCLUDED") => {
+    if (response === "USER_CANCEL") {
+      const merchantTxnId = currentMerchantTxnId || sessionStorage.getItem("skinly_merchant_txn_id");
+      const orderId = (currentOrderId || sessionStorage.getItem("skinly_order_id")) as Id<"orders"> | null;
+      if (orderId) {
+        try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "failed" }); } catch {}
+      }
+      setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0);
+      sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
+      toast.error("Payment cancelled");
+      if (orderId) setTimeout(() => navigate(`/orders/${orderId}`), 300);
+      return;
+    }
+
+    const merchantTxnId = currentMerchantTxnId || sessionStorage.getItem("skinly_merchant_txn_id");
+    const orderId = (currentOrderId || sessionStorage.getItem("skinly_order_id")) as Id<"orders"> | null;
+    if (!merchantTxnId || !orderId) { toast.error("Unable to verify payment"); setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0); return; }
+
+    let currentRetry = 0;
+
+    const verify = async () => {
+      while (currentRetry < maxRetries) {
+        currentRetry++;
+        setRetryCount(currentRetry);
+        try {
+          const phonepeStatus = await checkPaymentStatus({ merchantTransactionId: merchantTxnId, orderId: orderId, sessionId: !isAuthenticated ? guestSessionId : undefined });
+          if (phonepeStatus.paymentStatus === "success") {
+            // Manually update payment status for local development mock
+            try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "success" }); } catch {}
+            
+            sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
+            setRetryCount(0); setIsRedirectingToPayment(false); setIsSubmitting(false);
+            if (!isAuthenticated) clearGuestCart();
+            else clearUserCart();
+            toast.success("Payment successful!");
+            setTimeout(() => {
+              sessionStorage.removeItem("skinly_tracking_token");
+              navigate(`/orders/${orderId}`);
+            }, 300);
+            return;
+          } else if (phonepeStatus.paymentStatus === "failed") {
+            sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
+            setRetryCount(0); setIsRedirectingToPayment(false); setIsSubmitting(false);
+            toast.error("Payment failed");
+            setTimeout(() => navigate(`/orders/${orderId}`), 300);
+            return;
+          }
+        } catch {
+          // Ignore errors and let it retry
+        }
+
+        if (currentRetry >= maxRetries) {
+          setShowPaymentVerificationFailed(true); setIsRedirectingToPayment(false); setIsSubmitting(false);
+          return;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    };
+
+    verify();
+  }, [
+    currentMerchantTxnId, currentOrderId, isAuthenticated, guestSessionId,
+    checkPaymentStatus, updatePaymentStatus, clearGuestCart, clearUserCart, navigate, maxRetries
+  ]);
+
+  const openPhonePe = (paymentUrl: string, merchantTxnId: string, orderId: Id<"orders">) => {
+    setCurrentMerchantTxnId(merchantTxnId);
+    setCurrentOrderId(orderId);
+    sessionStorage.setItem("skinly_merchant_txn_id", merchantTxnId);
+    sessionStorage.setItem("skinly_order_id", orderId);
+    
+    // Redirect directly to PhonePe instead of IFRAME, which fixes the "page not opening" issue.
+    window.location.href = paymentUrl;
+  };
+
+  // Automatically check for returning from payment
+  useEffect(() => {
+    const merchantTxnId = sessionStorage.getItem("skinly_merchant_txn_id");
+    const orderId = sessionStorage.getItem("skinly_order_id");
+    
+    if (merchantTxnId && orderId && !isRedirectingToPayment && retryCount === 0) {
+      // User has returned from PhonePe
+      setIsRedirectingToPayment(true);
+      setIsSubmitting(true);
+      setCurrentMerchantTxnId(merchantTxnId);
+      setCurrentOrderId(orderId as Id<"orders">);
+      
+      // Clean up URL if there are query params from payment gateway
+      if (window.location.search) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      
+      // Verify payment
+      handlePhonePeCallback("CONCLUDED");
+    }
+  }, [handlePhonePeCallback, isRedirectingToPayment, retryCount]);
+
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState<{
     coupon: { _id: Id<"coupons">; code: string; description: string; effectType?: "discount" | "wallet_credit" };
@@ -260,97 +358,6 @@ function CheckoutPageInner() {
     }
   };
 
-  const handlePhonePeCallback = async (response: "USER_CANCEL" | "CONCLUDED") => {
-    if (response === "USER_CANCEL") {
-      const merchantTxnId = currentMerchantTxnId || sessionStorage.getItem("skinly_merchant_txn_id");
-      const orderId = (currentOrderId || sessionStorage.getItem("skinly_order_id")) as Id<"orders"> | null;
-      if (orderId) {
-        try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "failed" }); } catch {}
-      }
-      setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0);
-      sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
-      toast.error("Payment cancelled");
-      if (orderId) setTimeout(() => navigate(`/orders/${orderId}`), 300);
-      return;
-    }
-
-    const merchantTxnId = currentMerchantTxnId || sessionStorage.getItem("skinly_merchant_txn_id");
-    const orderId = (currentOrderId || sessionStorage.getItem("skinly_order_id")) as Id<"orders"> | null;
-    if (!merchantTxnId || !orderId) { toast.error("Unable to verify payment"); setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0); return; }
-
-    try {
-      const currentRetry = retryCount + 1;
-      setRetryCount(currentRetry);
-      try {
-        const phonepeStatus = await checkPaymentStatus({ merchantTransactionId: merchantTxnId });
-        if (phonepeStatus.paymentStatus === "success") {
-          // Manually update payment status for local development mock
-          try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "success" }); } catch {}
-          
-          sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
-          setRetryCount(0); setIsRedirectingToPayment(false); setIsSubmitting(false);
-          if (!isAuthenticated) clearGuestCart();
-          else clearUserCart();
-          toast.success("Payment successful!");
-          setTimeout(() => {
-            sessionStorage.removeItem("skinly_tracking_token");
-            navigate(`/orders/${orderId}`);
-          }, 300);
-        } else if (phonepeStatus.paymentStatus === "failed") {
-          sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
-          setRetryCount(0); setIsRedirectingToPayment(false); setIsSubmitting(false);
-          toast.error("Payment failed");
-          setTimeout(() => navigate(`/orders/${orderId}`), 300);
-        } else if (currentRetry >= maxRetries) {
-          setShowPaymentVerificationFailed(true); setIsRedirectingToPayment(false); setIsSubmitting(false);
-        } else {
-          setTimeout(() => handlePhonePeCallback("CONCLUDED"), 2000);
-        }
-      } catch {
-        if (currentRetry >= maxRetries) {
-          setShowPaymentVerificationFailed(true); setIsRedirectingToPayment(false); setIsSubmitting(false);
-        } else {
-          setTimeout(() => handlePhonePeCallback("CONCLUDED"), 2000);
-        }
-      }
-    } catch {
-      setShowPaymentVerificationFailed(true); setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0);
-    }
-  };
-
-  const openPhonePe = (paymentUrl: string, merchantTxnId: string, orderId: Id<"orders">) => {
-    setCurrentMerchantTxnId(merchantTxnId);
-    setCurrentOrderId(orderId);
-    sessionStorage.setItem("skinly_merchant_txn_id", merchantTxnId);
-    sessionStorage.setItem("skinly_order_id", orderId);
-    
-    // Redirect directly to PhonePe instead of IFRAME, which fixes the "page not opening" issue.
-    window.location.href = paymentUrl;
-  };
-
-  // Automatically check for returning from payment
-  useEffect(() => {
-    const merchantTxnId = sessionStorage.getItem("skinly_merchant_txn_id");
-    const orderId = sessionStorage.getItem("skinly_order_id");
-    
-    if (merchantTxnId && orderId && !isRedirectingToPayment && retryCount === 0) {
-      // User has returned from PhonePe
-      setIsRedirectingToPayment(true);
-      setIsSubmitting(true);
-      setCurrentMerchantTxnId(merchantTxnId);
-      setCurrentOrderId(orderId as Id<"orders">);
-      
-      // Clean up URL if there are query params from payment gateway
-      if (window.location.search) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-      
-      // Verify payment
-      handlePhonePeCallback("CONCLUDED");
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasOutOfStockItems) {
@@ -409,7 +416,7 @@ function CheckoutPageInner() {
           sessionStorage.setItem("skinly_tracking_token", result.trackingToken);
         }
         
-        const paymentResult = await initiatePayment({ orderId: result.orderId, orderNumber: result.orderNumber, amount, customerPhone: getFullPhoneNumber() });
+        const paymentResult = await initiatePayment({ orderId: result.orderId, orderNumber: result.orderNumber, amount, customerPhone: getFullPhoneNumber(), sessionId: !isAuthenticated ? guestSessionId : undefined });
         if (paymentResult.success && paymentResult.paymentUrl) {
           openPhonePe(paymentResult.paymentUrl, paymentResult.merchantTransactionId, result.orderId);
         } else {

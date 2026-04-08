@@ -1,7 +1,9 @@
 [
   {
     "AllowedOrigins": [
-      "*"
+      "https://goskinly.com",
+      "https://www.goskinly.com",
+      "http://localhost:5173"
     ],
     "AllowedMethods": [
       "GET",

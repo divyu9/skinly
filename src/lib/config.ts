@@ -3,7 +3,7 @@
 // CDN Domain for static assets and mockups
 // Prefer using the environment variable VITE_CDN_DOMAIN if available
 // Otherwise fallback to empty string (relative paths) or a specific default if needed
-export const CDN_DOMAIN = import.meta.env.VITE_CDN_DOMAIN || "https://cdn.skinly.in";
+export const CDN_DOMAIN = import.meta.env.VITE_CDN_DOMAIN || "https://cdn.goskinly.com";
 
 // Helper to construct full CDN URLs
 export const getCdnUrl = (path: string) => {

@@ -22,16 +22,35 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __exportStar = (this && this.__exportStar) || function(m, exports) {
-    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
-};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.enforceDailyRateLimit = void 0;
 const admin = __importStar(require("firebase-admin"));
-admin.initializeApp();
-__exportStar(require("./phonepe"), exports);
-__exportStar(require("./rapidshyp"), exports);
-__exportStar(require("./whatsapp"), exports);
-__exportStar(require("./seo"), exports);
-__exportStar(require("./r2"), exports);
-__exportStar(require("./orders"), exports);
-//# sourceMappingURL=index.js.map
+const toDayKey = (d) => {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+};
+const enforceDailyRateLimit = async ({ key, limit, }) => {
+    const db = admin.firestore();
+    const now = new Date();
+    const dayKey = toDayKey(now);
+    const docId = `${key}_${dayKey}`;
+    const ref = db.collection("rateLimits").doc(docId);
+    await db.runTransaction(async (tx) => {
+        var _a;
+        const snap = await tx.get(ref);
+        const current = snap.exists ? Number(((_a = snap.data()) === null || _a === void 0 ? void 0 : _a.count) || 0) : 0;
+        if (current >= limit) {
+            throw new Error("Rate limit exceeded");
+        }
+        tx.set(ref, {
+            key,
+            dayKey,
+            count: current + 1,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+    });
+};
+exports.enforceDailyRateLimit = enforceDailyRateLimit;
+//# sourceMappingURL=rate-limit.js.map

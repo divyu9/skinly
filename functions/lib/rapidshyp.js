@@ -26,6 +26,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createShipment = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
+const auth_1 = require("./auth");
+const rate_limit_1 = require("./rate-limit");
 const getRapidShypConfig = () => {
     const apiKey = process.env.RAPIDSHYP_API_KEY || "";
     const apiUrl = process.env.RAPIDSHYP_API_URL || "https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper";
@@ -36,13 +38,13 @@ const getRapidShypConfig = () => {
 };
 exports.createShipment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     var _a;
+    const { uid } = await (0, auth_1.requireAdmin)(request);
+    await (0, rate_limit_1.enforceDailyRateLimit)({ key: `createShipment_${uid}`, limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200) });
     const data = request.data;
     const { orderId } = data;
     if (!orderId) {
         throw new Error("Missing orderId");
     }
-    // Ensure user is authenticated and is an admin if you want to restrict this
-    // if (!request.auth?.token.admin) throw new Error('Only admins can create shipments');
     const orderRef = admin.firestore().collection("orders").doc(orderId);
     const orderDoc = await orderRef.get();
     if (!orderDoc.exists) {

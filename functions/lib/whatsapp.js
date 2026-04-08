@@ -26,6 +26,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendWhatsAppMessage = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
+const auth_1 = require("./auth");
+const rate_limit_1 = require("./rate-limit");
 const getWhatsAppConfig = () => {
     const authkey = process.env.WHATSAPP_AUTHKEY || "";
     if (!authkey) {
@@ -34,10 +36,21 @@ const getWhatsAppConfig = () => {
     return { authkey };
 };
 exports.sendWhatsAppMessage = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
+    const { uid } = await (0, auth_1.requireAdmin)(request);
+    await (0, rate_limit_1.enforceDailyRateLimit)({ key: `sendWhatsAppMessage_${uid}`, limit: Number(process.env.WHATSAPP_DAILY_LIMIT || 500) });
     const data = request.data;
     const { phone, templateId, variables } = data;
     if (!phone || !templateId) {
         throw new Error("Missing required fields");
+    }
+    if (typeof phone !== "string" || !/^[0-9]{10,15}$/.test(phone.replace(/\D/g, ""))) {
+        throw new Error("Invalid phone");
+    }
+    if (typeof templateId !== "string" || templateId.length > 128) {
+        throw new Error("Invalid templateId");
+    }
+    if (variables && typeof variables !== "object") {
+        throw new Error("Invalid variables");
     }
     const config = getWhatsAppConfig();
     // MSG91/Authkey logic implementation
@@ -46,7 +59,7 @@ exports.sendWhatsAppMessage = (0, https_1.onCall)({ memory: "256MiB", timeoutSec
         // Replace with actual provider URL (Authkey/MSG91)
         const url = "https://api.authkey.io/request";
         // Construct the payload for Authkey.io
-        const params = new URLSearchParams(Object.assign({ authkey: config.authkey, mobile: phone, country_code: "91", sid: "XXX", template_id: templateId }, variables));
+        const params = new URLSearchParams(Object.assign({ authkey: config.authkey, mobile: phone.replace(/\D/g, ""), country_code: "91", sid: "XXX", template_id: templateId }, variables));
         const response = await fetch(`${url}?${params.toString()}`, {
             method: "GET"
         });
