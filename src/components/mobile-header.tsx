@@ -23,7 +23,7 @@ import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-
+import { BrandLogo } from "./brand-logo.tsx";
 
 interface MobileHeaderProps {
   onMenuClick?: () => void;
@@ -184,8 +184,6 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
     // Handle search submit if needed
   };
 
-  const logoUrl = homepageSettings?.logoImageUrl || "/logo.webp";
-  const logoLink = homepageSettings?.logoRedirectLink || "/";
   const showSearch = homepageSettings?.showSearchIcon ?? true;
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
   const announcementHeight = showAnnouncement ? 28 : 0;
@@ -256,21 +254,9 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
               )}
 
               {/* Center: Logo - LCP Element */}
-              <Link
-                to={logoLink}
-                className="flex-1 flex items-center justify-center"
-              >
-                <img
-                  src={logoUrl}
-                  alt="Skinly"
-                  width="174"
-                  height="70"
-                  fetchpriority="high"
-                  loading="eager"
-                  decoding="sync"
-                  className="h-10 w-auto object-contain"
-                />
-              </Link>
+              <div className="flex-1 flex items-center justify-center">
+                <BrandLogo type="header" imgClassName="h-8 md:h-10" />
+              </div>
 
 
               {/* Right: Auth UI */}

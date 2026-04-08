@@ -12,6 +12,45 @@ function parseSKUFromFilename(filename: string): string | null {
 }
 
 /**
+ * Helper: Get unmigrated mockups for a model with case-insensitive matching
+ */
+async function getUnmigratedMockupsForModel(ctx: QueryCtx, brandName: string, modelName: string) {
+  // Try exact brand
+  let mockups = await ctx.db
+    .query("mockups")
+    .withIndex("by_brand_model", (q) => q.eq("brand", brandName))
+    .collect();
+    
+  // Try lowercase brand
+  if (mockups.length === 0) {
+    mockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_brand_model", (q) => q.eq("brand", brandName.toLowerCase()))
+      .collect();
+  }
+  
+  // Try uppercase brand
+  if (mockups.length === 0) {
+    mockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_brand_model", (q) => q.eq("brand", brandName.toUpperCase()))
+      .collect();
+  }
+  
+  // Try Capitalized brand (e.g. "Oneplus" instead of "OnePlus")
+  if (mockups.length === 0) {
+    const capitalized = brandName.charAt(0).toUpperCase() + brandName.slice(1).toLowerCase();
+    mockups = await ctx.db
+      .query("mockups")
+      .withIndex("by_brand_model", (q) => q.eq("brand", capitalized))
+      .collect();
+  }
+
+  // Filter by model case-insensitively
+  return mockups.filter(m => m.model.toLowerCase() === modelName.toLowerCase());
+}
+
+/**
  * Store mockup with advanced model linking and Cloudinary URL
  */
 export const storeMockupAdvanced = mutation({
@@ -28,12 +67,24 @@ export const storeMockupAdvanced = mutation({
   },
   handler: async (ctx, args) => {
     // Check if mockup already exists
-    const existing = await ctx.db
+    let existing = await ctx.db
       .query("mockups")
       .withIndex("by_brand_model_sku", (q) =>
         q.eq("brand", args.brand).eq("model", args.model).eq("sku", args.sku)
       )
       .first();
+
+    // If not found by brand/model/sku, try finding by supportedModelId and sku
+    if (!existing) {
+      const existingByModel = await ctx.db
+        .query("mockups")
+        .withIndex("by_supported_model", (q) =>
+          q.eq("supportedModelId", args.supportedModelId)
+        )
+        .collect();
+        
+      existing = existingByModel.find(m => m.sku === args.sku) || null;
+    }
 
     if (existing) {
       // Update with new storage data (Cloudinary OR R2)
@@ -78,27 +129,37 @@ export const getModelsWithMockups = query({
       ? await ctx.db
           .query("supportedModels")
           .withIndex("by_brand", (q) => q.eq("brandName", brandFilter))
-          .take(200)
-      : await ctx.db.query("supportedModels").take(200);
+          .collect()
+      : await ctx.db.query("supportedModels").collect();
 
     // For each model, check if it has mockups using the index
     const modelsWithMockups = [];
     for (const model of models) {
-      const firstMockup = await ctx.db
+      let firstMockup = await ctx.db
         .query("mockups")
         .withIndex("by_supported_model", (q) => 
           q.eq("supportedModelId", model._id)
         )
         .first();
 
+      if (!firstMockup) {
+        // Fallback for unmigrated mockups
+        const unmigrated = await getUnmigratedMockupsForModel(ctx as any, model.brandName, model.modelName);
+        firstMockup = unmigrated.length > 0 ? unmigrated[0] : null;
+      }
+
       if (firstMockup) {
         // Count mockups for this model
-        const modelMockups = await ctx.db
+        let modelMockups = await ctx.db
           .query("mockups")
           .withIndex("by_supported_model", (q) => 
             q.eq("supportedModelId", model._id)
           )
           .collect();
+
+        if (modelMockups.length === 0) {
+          modelMockups = await getUnmigratedMockupsForModel(ctx as any, model.brandName, model.modelName);
+        }
 
         modelsWithMockups.push({
           _id: model._id,
@@ -130,18 +191,23 @@ export const getModelsMissingMockups = query({
       ? await ctx.db
           .query("supportedModels")
           .withIndex("by_brand", (q) => q.eq("brandName", brandFilter))
-          .take(200)
-      : await ctx.db.query("supportedModels").take(200);
+          .collect()
+      : await ctx.db.query("supportedModels").collect();
 
     // For each model, check if it has any mockups using the index
     const missingModels = [];
     for (const model of models) {
-      const firstMockup = await ctx.db
+      let firstMockup = await ctx.db
         .query("mockups")
         .withIndex("by_supported_model", (q) => 
           q.eq("supportedModelId", model._id)
         )
         .first();
+
+      if (!firstMockup) {
+        const unmigrated = await getUnmigratedMockupsForModel(ctx as any, model.brandName, model.modelName);
+        firstMockup = unmigrated.length > 0 ? unmigrated[0] : null;
+      }
 
       if (!firstMockup) {
         missingModels.push({
@@ -173,8 +239,8 @@ export const getModelsWithFullCoverage = query({
       ? await ctx.db
           .query("supportedModels")
           .withIndex("by_brand", (q) => q.eq("brandName", brandFilter))
-          .take(200)
-      : await ctx.db.query("supportedModels").take(200);
+          .collect()
+      : await ctx.db.query("supportedModels").collect();
 
     // Get ALL unique phone skin SKUs using helper
     const uniqueTotalSKUs = await getAllPhoneSkinSKUs(ctx);
@@ -184,12 +250,16 @@ export const getModelsWithFullCoverage = query({
     // For each model, check mockup coverage using the index
     const fullCoverageModels = [];
     for (const model of models) {
-      const modelMockups = await ctx.db
+      let modelMockups = await ctx.db
         .query("mockups")
         .withIndex("by_supported_model", (q) => 
           q.eq("supportedModelId", model._id)
         )
         .collect();
+
+      if (modelMockups.length === 0) {
+        modelMockups = await getUnmigratedMockupsForModel(ctx as any, model.brandName, model.modelName);
+      }
 
       if (modelMockups.length === 0) continue;
 
@@ -227,12 +297,20 @@ export const getModelMockupStats = query({
     const uniqueTotalSKUsSet = new Set(uniqueTotalSKUs.map(s => s.toUpperCase()));
 
     // Get uploaded mockups for this model using the index
-    const modelMockups = await ctx.db
+    let modelMockups = await ctx.db
       .query("mockups")
       .withIndex("by_supported_model", (q) => 
         q.eq("supportedModelId", args.modelId)
       )
       .collect();
+
+    if (modelMockups.length === 0) {
+      // Fallback for unmigrated mockups
+      const model = await ctx.db.get(args.modelId);
+      if (model) {
+        modelMockups = await getUnmigratedMockupsForModel(ctx as any, model.brandName, model.modelName);
+      }
+    }
 
     // Filter uploaded SKUs to only include valid phone skin SKUs
     // Note: We need flexible bidirectional matching to handle suffixes
@@ -487,12 +565,19 @@ export const deleteAllMockupsForModel = mutation({
   },
   handler: async (ctx, args) => {
     // Use the index to get only this model's mockups
-    const modelMockups = await ctx.db
+    let modelMockups = await ctx.db
       .query("mockups")
       .withIndex("by_supported_model", (q) =>
         q.eq("supportedModelId", args.modelId)
       )
       .collect();
+
+    if (modelMockups.length === 0) {
+      const model = await ctx.db.get(args.modelId);
+      if (model) {
+        modelMockups = await getUnmigratedMockupsForModel(ctx as any, model.brandName, model.modelName);
+      }
+    }
 
     for (const mockup of modelMockups) {
       // Delete from Cloudinary if cloudinaryPublicId exists
@@ -615,7 +700,7 @@ export const migrateMockupsToModels = mutation({
       .take(1000);
     
     // Get models (limit to 200)
-    const allModels = await ctx.db.query("supportedModels").take(200);
+    const allModels = await ctx.db.query("supportedModels").collect();
 
     let updated = 0;
     let noMatch = 0;

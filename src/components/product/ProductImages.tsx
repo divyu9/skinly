@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { PackageIcon } from "lucide-react";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 

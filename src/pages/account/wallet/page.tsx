@@ -29,6 +29,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { Calendar } from "@/components/ui/calendar.tsx";
 
+import { BrandLogo } from "@/components/brand-logo.tsx";
+
 type TransactionFilter = "all" | "credit" | "debit";
 type DateFilter = "7" | "30" | "90" | "custom" | "all";
 
@@ -173,13 +175,7 @@ function WalletPageInner() {
                 </div>
               </div>
             </div>
-            <Link to="/">
-              <img
-                src="/logo.webp"
-                alt="Skinly"
-                className="h-10"
-              />
-            </Link>
+            <BrandLogo type="header" imgClassName="h-10" />
           </div>
         </div>
       </header>

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { AdminLayout } from "@/components/admin-layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, AlertCircle, Loader2, Info } from "lucide-react";
 import {
   Table,
@@ -12,10 +12,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { Label } from "@/components/ui/label.tsx";
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type MigrationResult = {
   success: boolean;
@@ -62,7 +62,7 @@ export default function VariantPresetsAutoAssignPage() {
   };
 
   return (
-    <AdminPageWrapper>
+    <AdminLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Auto-Assign Variant Presets</h1>
@@ -118,6 +118,7 @@ export default function VariantPresetsAutoAssignPage() {
               onClick={handleRun}
               disabled={isRunning}
               size="lg"
+              className="w-full sm:w-auto"
             >
               {isRunning ? (
                 <>
@@ -253,6 +254,6 @@ export default function VariantPresetsAutoAssignPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminPageWrapper>
+    </AdminLayout>
   );
 }

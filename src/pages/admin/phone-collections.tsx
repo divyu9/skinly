@@ -106,7 +106,7 @@ export default function PhoneCollections() {
                       </ul>
                     </div>
                   </div>
-                  {results.errors.length > 0 && (
+                  {results.errors && results.errors.length > 0 && (
                     <div className="flex items-start gap-3 text-sm">
                       <AlertCircle className="size-5 text-amber-500 mt-0.5" />
                       <div>
@@ -136,7 +136,7 @@ export default function PhoneCollections() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {collections === undefined ? (
+              {!collections ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="size-6 animate-spin text-muted-foreground" />
                 </div>

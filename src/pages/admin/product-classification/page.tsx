@@ -526,13 +526,13 @@ export default function ProductClassificationPage() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {stats === undefined ? (
+              {!stats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
                 <>
-                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <div className="text-2xl font-bold">{stats.total || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    {stats.classified} classified
+                    {stats.classified || 0} classified
                   </p>
                 </>
               )}
@@ -545,12 +545,12 @@ export default function ProductClassificationPage() {
               <AlertCircle className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              {stats === undefined ? (
+              {!stats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
                 <>
                   <div className="text-2xl font-bold text-yellow-600">
-                    {stats.unclassified}
+                    {stats.unclassified || 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Need classification
@@ -566,7 +566,7 @@ export default function ProductClassificationPage() {
               <Tag className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {stats === undefined ? (
+              {!stats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
                 <>
@@ -587,7 +587,7 @@ export default function ProductClassificationPage() {
               <Layers className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              {stats === undefined ? (
+              {!stats ? (
                 <Skeleton className="h-8 w-20" />
               ) : (
                 <>
@@ -619,19 +619,19 @@ export default function ProductClassificationPage() {
               <Button
                 onClick={() => setIsPreviewDialogOpen(true)}
                 variant="outline"
-                disabled={preview === undefined}
+                disabled={!preview}
               >
                 Preview Changes
               </Button>
               <Button
                 onClick={() => setIsApplyDialogOpen(true)}
-                disabled={preview === undefined || preview.results.length === 0}
+                disabled={!preview || preview.results.length === 0}
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
                 Apply Auto-Classification
               </Button>
             </div>
-            {preview !== undefined && preview.results.length > 0 && (
+            {preview && preview.results.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 Ready to classify {preview.results.length} products
               </p>
@@ -704,7 +704,7 @@ export default function ProductClassificationPage() {
 
                 {(selectedGadget !== "all" || selectedFinish !== "all") && (
                   <div className="rounded-lg border">
-                    {filtered === undefined ? (
+                    {!filtered ? (
                       <div className="p-8">
                         <Skeleton className="h-20 w-full" />
                       </div>
@@ -782,7 +782,7 @@ export default function ProductClassificationPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {unclassified === undefined ? (
+                {!unclassified ? (
                   <Skeleton className="h-40 w-full" />
                 ) : unclassified.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12">
@@ -922,9 +922,9 @@ export default function ProductClassificationPage() {
                   <CardTitle>By Gadget Type</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {stats === undefined ? (
-                    <Skeleton className="h-40 w-full" />
-                  ) : stats.byGadget ? (
+                  {!stats ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : stats.byGadget ? (
                     <div className="space-y-2">
                       {Object.entries(stats.byGadget).map(([gadget, count]) => (
                         <div
@@ -947,9 +947,9 @@ export default function ProductClassificationPage() {
                   <CardTitle>By Finish Type</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {stats === undefined ? (
-                    <Skeleton className="h-40 w-full" />
-                  ) : stats.byFinish ? (
+                  {!stats ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : stats.byFinish ? (
                     <div className="space-y-2">
                       {Object.entries(stats.byFinish).map(([finish, count]) => (
                         <div
@@ -1002,7 +1002,7 @@ export default function ProductClassificationPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {allFinishTypes === undefined ? (
+                {!allFinishTypes ? (
                   <Skeleton className="h-40 w-full" />
                 ) : allFinishTypes.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12">
@@ -1123,7 +1123,7 @@ export default function ProductClassificationPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {allGadgetTypes === undefined ? (
+                {!allGadgetTypes ? (
                   <Skeleton className="h-40 w-full" />
                 ) : allGadgetTypes.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12">
@@ -1211,7 +1211,7 @@ export default function ProductClassificationPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {categoryStats === undefined ? (
+                {!categoryStats ? (
                   <Skeleton className="h-40 w-full" />
                 ) : (
                   <div className="space-y-4">
@@ -1332,7 +1332,7 @@ export default function ProductClassificationPage() {
                   </div>
                 </div>
 
-                {categorizedProducts === undefined ? (
+                {!categorizedProducts ? (
                   <Skeleton className="h-40 w-full" />
                 ) : categorizedProducts.products.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12">
@@ -1757,7 +1757,7 @@ export default function ProductClassificationPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              {productCategoryPreview === undefined ? (
+              {!productCategoryPreview ? (
                 <div className="flex items-center justify-center py-12">
                   <Spinner className="h-8 w-8" />
                 </div>

@@ -974,8 +974,8 @@ export default function MockupsAdvancedPage() {
              supportedModelId: task.modelId,
              r2Key: r2Result.key,
              r2Bucket: r2Result.bucket,
-             // Map R2 url to r2Url directly. Cloudinary URL will be null.
-             r2Url: r2Result.url || r2Result.publicUrl, 
+             // Map R2 url to cloudinaryUrl directly so it is stored and returned
+             cloudinaryUrl: r2Result.url || r2Result.publicUrl, 
            });
 
            completed++;

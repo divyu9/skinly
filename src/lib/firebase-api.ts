@@ -19,3 +19,5 @@ const createProxy = (path = []) => {
 };
 
 export const api = createProxy();
+export type Id<T extends string> = string;
+

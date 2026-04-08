@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { CheckCircle2Icon } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { BrandLogo } from "@/components/brand-logo.tsx";
 
 export default function ProductConfirmPage() {
   const navigate = useNavigate();
@@ -24,13 +25,7 @@ export default function ProductConfirmPage() {
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="/logo.webp" 
-              alt="Skinly" 
-              className="h-16"
-            />
-          </Link>
+          <BrandLogo type="header" imgClassName="h-16" />
           <Button size="sm" variant="outline" asChild>
             <Link to="/">Back to Home</Link>
           </Button>

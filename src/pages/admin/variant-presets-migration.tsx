@@ -4,7 +4,7 @@ import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
-import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 export default function VariantPresetsMigrationPage() {
   const [result, setResult] = useState<{ success: boolean; created: number; message: string } | null>(null);
@@ -29,7 +29,7 @@ export default function VariantPresetsMigrationPage() {
   };
 
   return (
-    <AdminPageWrapper>
+    <AdminLayout>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Variant Consumption Presets</h1>
@@ -100,6 +100,6 @@ export default function VariantPresetsMigrationPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminPageWrapper>
+    </AdminLayout>
   );
 }

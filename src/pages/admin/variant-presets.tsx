@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
-import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import {
@@ -151,17 +151,17 @@ export default function VariantPresetsManagementPage() {
 
   if (presetsData === undefined) {
     return (
-      <AdminPageWrapper>
+      <AdminLayout>
         <div className="space-y-6">
           <Skeleton className="h-10 w-96" />
           <Skeleton className="h-64 w-full" />
         </div>
-      </AdminPageWrapper>
+      </AdminLayout>
     );
   }
 
   return (
-    <AdminPageWrapper>
+    <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -337,6 +337,6 @@ export default function VariantPresetsManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AdminPageWrapper>
+    </AdminLayout>
   );
 }

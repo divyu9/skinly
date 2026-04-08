@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { useState } from "react";
+import { BrandLogo } from "@/components/brand-logo.tsx";
 
 // PhonePe TypeScript declarations
 declare global {
@@ -212,13 +213,7 @@ function OrderDetailPageInner() {
                 Back to Orders
               </Button>
             </Link>
-            <Link to="/">
-              <img
-                src="/logo.webp"
-                alt="Skinly"
-                className="h-12"
-              />
-            </Link>
+            <BrandLogo type="header" imgClassName="h-12" />
           </div>
         </div>
       </header>

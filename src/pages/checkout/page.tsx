@@ -22,6 +22,8 @@ import { WalletSection } from "./_components/WalletSection.tsx";
 import { OrderSummaryPanel } from "./_components/OrderSummaryPanel.tsx";
 import { ActiveCouponsSection } from "./_components/ActiveCouponsSection.tsx";
 
+import { BrandLogo } from "@/components/brand-logo.tsx";
+
 // PhonePe TypeScript declarations
 declare global {
   interface Window {
@@ -518,7 +520,7 @@ function CheckoutPageInner() {
               <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="shrink-0">
                 ← Back
               </Button>
-              <Link to="/"><img src="/logo.webp" alt="Skinly" className="h-10" /></Link>
+              <BrandLogo type="header" imgClassName="h-10" />
               <h1 className="text-xl font-bold hidden sm:block">Checkout</h1>
             </div>
             <CartButton />

@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 import { useState, useEffect } from "react";
+import { BrandLogo } from "./brand-logo.tsx";
 
 interface NavItem {
   path: string;
@@ -179,15 +180,7 @@ export function AdminSidebar() {
       {/* Logo & Toggle */}
       <div className="p-4 border-b flex items-center justify-between">
         {!collapsed && (
-          <Link to="/" className="flex items-center">
-            <img
-              src="/logo.webp"
-              alt="Skinly"
-              width="200"
-              height="80"
-              className="h-8"
-            />
-          </Link>
+          <BrandLogo type="header" imgClassName="h-8" />
         )}
         <Button
           variant="ghost"

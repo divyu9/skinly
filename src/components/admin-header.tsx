@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "./ui/button.tsx";
 import { cn } from "@/lib/utils.ts";
+import { BrandLogo } from "./brand-logo.tsx";
 
 export function AdminHeader() {
   const location = useLocation();
@@ -31,15 +32,7 @@ export function AdminHeader() {
     <header className="border-b bg-card sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img
-              src="/logo.webp"
-              alt="Skinly"
-              width="300"
-              height="120"
-              className="h-12"
-            />
-          </Link>
+          <BrandLogo type="header" imgClassName="h-12" />
           <nav className="flex items-center gap-6">
             {navLinks.map((link) => (
               <Link

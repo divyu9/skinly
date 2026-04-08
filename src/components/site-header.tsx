@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
+import { BrandLogo } from "./brand-logo";
+
 interface SiteHeaderProps {
   onGadgetSelectorClick?: () => void;
   onPhoneSelectorClick?: () => void;
@@ -24,7 +26,6 @@ export function SiteHeader({
 }: SiteHeaderProps) {
   const navigate = useNavigate();
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
-  const homepageSettings = useQuery(api.homepage.getHomepageSettings);
 
   const { user, isLoaded } = useAuth();
   const isSignedIn = !!user;
@@ -37,28 +38,13 @@ export function SiteHeader({
     }
   };
 
-  // Use dynamic logo from settings, with fallback to default
-  const logoUrl = homepageSettings?.logoImageUrl || DEFAULT_LOGO_URL;
-  const logoLink = homepageSettings?.logoRedirectLink || "/";
-
   return (
     <>
       {/* TOP NAV */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           {/* LOGO - LCP Element */}
-          <Link to={logoLink} className="flex items-center gap-2 flex-shrink-0">
-            <img
-              src={logoUrl}
-              alt="Skinly"
-              width="174"
-              height="70"
-              fetchpriority="high"
-              loading="eager"
-              decoding="sync"
-              className="h-12 md:h-16"
-            />
-          </Link>
+          <BrandLogo type="header" imgClassName="h-10 md:h-14 lg:h-16" />
 
           {/* SEARCH (DESKTOP) */}
           <div className="hidden md:flex flex-1 max-w-lg">

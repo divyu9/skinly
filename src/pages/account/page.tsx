@@ -38,6 +38,7 @@ import {
   RadioGroup,
   RadioGroupItem,
 } from "@/components/ui/radio-group.tsx";
+import { BrandLogo } from "@/components/brand-logo.tsx";
 
 function AccountPageInner() {
   const { signOut } = useAuth();
@@ -307,7 +308,7 @@ function AccountPageInner() {
                       <div>
                         <p className="text-sm font-medium line-clamp-1">{txn.description}</p>
                         <p className="text-xs text-muted-foreground">
-                          {new Date(txn.createdAt).toLocaleDateString('en-IN', { 
+                          {new Date(txn.createdAt || txn._creationTime || Date.now()).toLocaleDateString('en-IN', { 
                             day: 'numeric', 
                             month: 'short'
                           })}
@@ -588,7 +589,7 @@ function AccountPageInner() {
                         </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(order._creationTime).toLocaleDateString('en-IN', { 
+                        {new Date(order._creationTime || order.createdAt || Date.now()).toLocaleDateString('en-IN', { 
                           day: 'numeric', 
                           month: 'short', 
                           year: 'numeric' 
@@ -627,13 +628,7 @@ export default function AccountPage() {
       {/* Navigation */}
       <nav className="fixed top-[28px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="/logo.webp" 
-              alt="Skinly" 
-              className="h-12 md:h-16"
-            />
-          </Link>
+          <BrandLogo type="header" imgClassName="h-12 md:h-16" />
           <MobileNav />
         </div>
       </nav>

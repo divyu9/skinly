@@ -437,10 +437,17 @@ export const getMissingMockupsStats = query({
     let modelsWithoutMockups = 0;
 
     for (const model of activeModels) {
-      const hasMockup = await ctx.db
+      let hasMockup = await ctx.db
         .query("mockups")
         .withIndex("by_supported_model", (q) => q.eq("supportedModelId", model._id))
         .first();
+
+      if (!hasMockup) {
+        hasMockup = await ctx.db
+          .query("mockups")
+          .withIndex("by_brand_model", (q) => q.eq("brand", model.brandName).eq("model", model.modelName))
+          .first();
+      }
 
       if (hasMockup) {
         modelsWithMockups++;
@@ -508,10 +515,17 @@ export const getMissingMockups = query({
 
     for (const model of limitedModels) {
       // Check if model has any mockups using the supportedModelId index
-      const mockups = await ctx.db
+      let mockups = await ctx.db
         .query("mockups")
         .withIndex("by_supported_model", (q) => q.eq("supportedModelId", model._id))
         .collect();
+
+      if (mockups.length === 0) {
+        mockups = await ctx.db
+          .query("mockups")
+          .withIndex("by_brand_model", (q) => q.eq("brand", model.brandName).eq("model", model.modelName))
+          .collect();
+      }
 
       const mockupCount = mockups.length;
       const uniqueSKUs = [...new Set(mockups.map(m => m.sku))];

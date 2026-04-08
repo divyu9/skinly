@@ -57,9 +57,40 @@ export function useProductDetail() {
     productSlug ? { slug: productSlug } : "skip"
   );
   
-  // Use whichever data loaded (prioritize id lookup)
-  const productData = productDataById || productDataBySlug;
-  const isLoading = productData === undefined;
+  // Determine final product data and loading state
+  let productData: any = undefined;
+  let isLoading = true;
+
+  if (productId && productSlug) {
+    if (productDataById !== undefined && productDataById !== null) {
+      // ID finished and found product
+      productData = productDataById;
+      isLoading = false;
+    } else if (productDataById === null) {
+      // ID finished and failed, fallback to slug
+      if (productDataBySlug !== undefined) {
+        productData = productDataBySlug;
+        isLoading = false;
+      }
+    } else {
+      // ID is still loading
+      isLoading = true;
+    }
+  } else if (productId) {
+    if (productDataById !== undefined) {
+      productData = productDataById;
+      isLoading = false;
+    }
+  } else if (productSlug) {
+    if (productDataBySlug !== undefined) {
+      productData = productDataBySlug;
+      isLoading = false;
+    }
+  } else {
+    // Neither ID nor slug provided
+    productData = null;
+    isLoading = false;
+  }
   
   // Query mockup file URL from database
   // Use phoneBrand from URL params if available, otherwise try to extract from model name
@@ -142,10 +173,10 @@ export function useProductDetail() {
   // Display images with mockup priority
   // Logic: If mockup exists, show mockup first. If only logo image exists, show it after mockup.
   const displayImages = useMemo(() => {
-    if (!productData) return [];
+    if (!productData || !productData.images) return [];
 
     // Helper to check if an image is the default logo
-    const isDefaultLogo = (url: string) => url.includes("img_2_1767710584949") || url === DEFAULT_LOGO_IMAGE;
+    const isDefaultLogo = (url: string) => url && (url.includes("img_2_1767710584949") || url === DEFAULT_LOGO_IMAGE);
 
     if (!phoneModel) {
       return productData.images;
@@ -164,7 +195,7 @@ export function useProductDetail() {
 
     // Find model-specific images
     const modelSpecificImages = productData.images.filter(
-      (img) => img.phoneModel?.toLowerCase() === phoneModel.toLowerCase()
+      (img) => img && img.phoneModel?.toLowerCase() === phoneModel.toLowerCase()
     );
 
     if (modelSpecificImages.length > 0) {
@@ -172,12 +203,12 @@ export function useProductDetail() {
     }
 
     // Add default images - but if mockup exists, push logo images to the end
-    const defaultImages = productData.images.filter((img) => !img.phoneModel);
+    const defaultImages = productData.images.filter((img) => img && !img.phoneModel);
 
     if (mockupState.url) {
       // Separate logo images from other images
-      const logoImages = defaultImages.filter(img => isDefaultLogo(img.url));
-      const otherImages = defaultImages.filter(img => !isDefaultLogo(img.url));
+      const logoImages = defaultImages.filter(img => img.url && isDefaultLogo(img.url));
+      const otherImages = defaultImages.filter(img => img.url && !isDefaultLogo(img.url));
 
       // Add non-logo images first, then logo images at the end
       images.push(...otherImages);
@@ -223,7 +254,7 @@ export function useProductDetail() {
     if (!productData) return null;
     
     const productUrl = `https://goskinly.com/products/${productData.slug || 'detail'}`;
-    const productImage = displayImages[0]?.url || productData.images[0]?.url || '/logo.webp';
+    const productImage = displayImages[0]?.url || productData.images?.[0]?.url || '/logo.webp';
     const productPrice = productData.variants && productData.variants[productState.selectedVariant]?.price || 0;
     
     return {

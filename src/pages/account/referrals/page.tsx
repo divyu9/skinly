@@ -210,19 +210,15 @@ function ReferralsPageInner() {
   );
 }
 
+import { BrandLogo } from "@/components/brand-logo.tsx";
+
 export default function ReferralsPage() {
   return (
     <div className="min-h-screen bg-background">
       <AnnouncementBar />
       <nav className="fixed top-[28px] w-full bg-background/80 backdrop-blur-lg border-b border-border z-40">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="/logo.webp" 
-              alt="Skinly" 
-              className="h-12 md:h-16"
-            />
-          </Link>
+          <BrandLogo type="header" imgClassName="h-12 md:h-16" />
           <MobileNav />
         </div>
       </nav>

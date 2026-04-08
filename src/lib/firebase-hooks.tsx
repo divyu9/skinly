@@ -205,20 +205,43 @@ export function useQuery(apiRef: any, args?: any) {
           };
         }
         else if (path === 'orders.getOrders') {
+          let innerUnsubscribe = () => {};
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
-          const user = auth.currentUser;
-          if (!user) {
-            setData([]);
-            return;
-          }
-          let q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-          if (args?.limit) {
-            q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'), limit(args.limit));
-          }
-          unsubscribe = onSnapshot(q, (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+          
+          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+            // Clear existing listener when user changes
+            innerUnsubscribe();
+            
+            if (!user) {
+              setData([]);
+              return;
+            }
+            
+            // Removed orderBy('createdAt', 'desc') to avoid requiring a composite index.
+            // Sorting is done in-memory.
+            const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
+            
+            innerUnsubscribe = onSnapshot(q, (snap) => {
+              let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+              docs.sort((a: any, b: any) => {
+                const aTime = a.createdAt || a._creationTime || 0;
+                const bTime = b.createdAt || b._creationTime || 0;
+                return bTime - aTime;
+              });
+              if (args?.limit) {
+                docs = docs.slice(0, args.limit);
+              }
+              setData(docs);
+            }, (error) => {
+              console.error("orders.getOrders error:", error);
+            });
           });
+          
+          unsubscribe = () => {
+            unsubscribeAuth();
+            innerUnsubscribe();
+          };
         }
         else if (path === 'orders.getOrderPublic' || path === 'admin.orders.getOrderDetails') {
           if (!args?.orderId) {
@@ -456,9 +479,6 @@ export function useQuery(apiRef: any, args?: any) {
             }
           });
         }
-        else if (path === 'wallet.getWalletBalance') {
-          setData({ balance: 0, history: [] });
-        }
         else if (path === 'wallet.getWalletSettings') {
           unsubscribe = onSnapshot(doc(db, 'walletSettings', 'default'), (snap) => {
             if (snap.exists()) {
@@ -488,12 +508,21 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'wallet.getWalletStats') {
+          let innerUnsubscribe = () => {};
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
           const unsubscribeAuth = auth.onAuthStateChanged((user) => {
             if (!user) {
-              setData({ currentBalance: 0, lifetimeEarned: 0, lifetimeSpent: 0, totalCredit: 0, totalDebit: 0, pendingWithdrawals: 0, activeWallets: 0 });
+              setData({ 
+                currentBalance: 0, 
+                lifetimeEarned: 0, 
+                lifetimeSpent: 0, 
+                totalCredit: 0, 
+                totalDebit: 0, 
+                pendingWithdrawals: 0, 
+                activeWallets: 0 
+              });
               return;
             }
 
@@ -535,6 +564,7 @@ export function useQuery(apiRef: any, args?: any) {
           unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'wallet.getWalletTransactions') {
+          let innerUnsubscribe = () => {};
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
@@ -554,23 +584,24 @@ export function useQuery(apiRef: any, args?: any) {
           unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'wallet.getWalletBalance') {
+          let innerUnsubscribe = () => {};
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
           const unsubscribeAuth = auth.onAuthStateChanged((user) => {
             if (!user) {
-              setData(0);
+              setData({ balance: 0 });
               return;
             }
 
             innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
-              setData(snap.exists() ? (snap.data().walletBalance || 0) : 0);
+              setData(snap.exists() ? { balance: snap.data().walletBalance || 0, userId: user.uid } : { balance: 0, userId: user.uid });
             });
           });
           unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'whatsappConsent.getMyConsent') {
-          setData({ consented: false, optInDate: null });
+          setData({ consented: false, optInDate: null, consentType: "none" });
         }
         else if (path === 'loginOtp.checkPhoneVerified') {
           setData({ verified: false, phoneNumber: null });
@@ -1109,37 +1140,42 @@ export function useQuery(apiRef: any, args?: any) {
           setData([]);
         }
         else if (path === 'products.getProduct' || path === 'products.getProductBySlug') {
-          let unsubscribeProducts = () => {};
-          const targetId = args?.productId || args?.id;
-          if (targetId) {
-            unsubscribeProducts = onSnapshot(doc(db, 'products', targetId), async (snap) => {
-              if (!snap.exists()) {
+          const fetchProduct = async () => {
+            try {
+              const targetId = args?.productId || args?.id;
+              let productData = null;
+
+              if (targetId) {
+                const snap = await getDoc(doc(db, 'products', targetId));
+                if (snap.exists()) {
+                  productData = { _id: snap.id, ...snap.data() };
+                }
+              } else if (args?.slug) {
+                const q = query(collection(db, 'products'), where('slug', '==', args.slug), limit(1));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                  productData = { _id: snap.docs[0].id, ...snap.docs[0].data() };
+                }
+              }
+
+              if (!productData) {
                 setData(null);
                 return;
               }
-              const product = { _id: snap.id, ...snap.data() };
-              const vq = query(collection(db, 'variants'), where('productId', '==', product._id));
+
+              const vq = query(collection(db, 'variants'), where('productId', '==', productData._id));
               const vsnap = await getDocs(vq);
-              product.variants = vsnap.docs.map(d => ({ _id: d.id, ...d.data() }));
-              setData(product);
-            });
-          } else if (args?.slug) {
-            const q = query(collection(db, 'products'), where('slug', '==', args.slug), limit(1));
-            unsubscribeProducts = onSnapshot(q, async (snap) => {
-              if (snap.empty) {
-                setData(null);
-                return;
-              }
-              const product = { _id: snap.docs[0].id, ...snap.docs[0].data() };
-              const vq = query(collection(db, 'variants'), where('productId', '==', product._id));
-              const vsnap = await getDocs(vq);
-              product.variants = vsnap.docs.map(d => ({ _id: d.id, ...d.data() }));
-              setData(product);
-            });
-          } else {
-            setData(null);
-          }
-          unsubscribe = unsubscribeProducts;
+              productData.variants = vsnap.docs.map(d => ({ _id: d.id, ...d.data() }));
+              
+              setData(productData);
+            } catch (error) {
+              console.error("Error fetching product and variants:", error);
+              setData(null);
+            }
+          };
+
+          fetchProduct();
+          unsubscribe = () => {};
         }
         else if (path === 'productCategories.listAllWithCounts' || path === 'productCategories.listAll' || path === 'productCategories.listActive' || path === 'productCategories.listAllCategories') {
           const q = query(collection(db, 'productCategoriesConfig'));
@@ -1338,6 +1374,174 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'mockups.getBatchMockups') {
           setData({ mockups: {} });
+        }
+        else if (path === 'mockupsAdvanced.getUniqueBrands') {
+          const q = query(collection(db, 'supportedModels'));
+          unsubscribe = onSnapshot(q, (snap) => {
+            const brands = new Set<string>();
+            snap.docs.forEach(d => {
+              const brandName = d.data().brandName;
+              if (brandName) brands.add(brandName.trim());
+            });
+            setData(Array.from(brands).sort((a, b) => a.localeCompare(b)));
+          });
+        }
+        else if (path === 'mockupsAdvanced.getModelsWithMockups') {
+          let q = query(collection(db, 'supportedModels'));
+          if (args?.brandFilter && args.brandFilter !== "all") {
+            q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brandFilter));
+          }
+          unsubscribe = onSnapshot(q, async (snap) => {
+            const models = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            // Fetch all mockups to group them efficiently
+            const mockupsSnap = await getDocs(collection(db, 'mockups'));
+            
+            // Map models by their names (case-insensitive) for fallback matching
+            const mockupsCountByModelId = new Map<string, number>();
+            const mockupsCountByBrandModel = new Map<string, number>();
+            
+            mockupsSnap.docs.forEach(d => {
+              const data = d.data();
+              const modelId = data.supportedModelId;
+              const brand = data.brand?.toLowerCase().trim() || "";
+              const modelName = data.model?.toLowerCase().trim() || "";
+              const key = `${brand}_${modelName}`;
+              
+              if (modelId) {
+                mockupsCountByModelId.set(modelId, (mockupsCountByModelId.get(modelId) || 0) + 1);
+              } else if (brand && modelName) {
+                mockupsCountByBrandModel.set(key, (mockupsCountByBrandModel.get(key) || 0) + 1);
+              }
+            });
+            
+            const modelsWithMockups = models.filter(m => {
+              const brand = m.brandName?.toLowerCase().trim() || "";
+              const modelName = m.modelName?.toLowerCase().trim() || "";
+              const key = `${brand}_${modelName}`;
+              return mockupsCountByModelId.has(m._id) || mockupsCountByBrandModel.has(key);
+            }).map(m => {
+              const brand = m.brandName?.toLowerCase().trim() || "";
+              const modelName = m.modelName?.toLowerCase().trim() || "";
+              const key = `${brand}_${modelName}`;
+              const count = (mockupsCountByModelId.get(m._id) || 0) + (mockupsCountByBrandModel.get(key) || 0);
+              return {
+                ...m,
+                mockupCount: count
+              };
+            });
+            setData(modelsWithMockups);
+          });
+        }
+        else if (path === 'mockupsAdvanced.getModelsMissingMockups') {
+          let q = query(collection(db, 'supportedModels'));
+          if (args?.brandFilter && args.brandFilter !== "all") {
+            q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brandFilter));
+          }
+          unsubscribe = onSnapshot(q, async (snap) => {
+            const models = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            // Fetch all mockups to group them efficiently
+            const mockupsSnap = await getDocs(collection(db, 'mockups'));
+            
+            const modelsWithMockups = new Set<string>();
+            const modelsWithMockupsByBrandModel = new Set<string>();
+            
+            mockupsSnap.docs.forEach(d => {
+              const data = d.data();
+              const modelId = data.supportedModelId;
+              const brand = data.brand?.toLowerCase().trim() || "";
+              const modelName = data.model?.toLowerCase().trim() || "";
+              const key = `${brand}_${modelName}`;
+              
+              if (modelId) {
+                modelsWithMockups.add(modelId);
+              } else if (brand && modelName) {
+                modelsWithMockupsByBrandModel.add(key);
+              }
+            });
+            
+            const missingModels = models.filter(m => {
+              const brand = m.brandName?.toLowerCase().trim() || "";
+              const modelName = m.modelName?.toLowerCase().trim() || "";
+              const key = `${brand}_${modelName}`;
+              return !modelsWithMockups.has(m._id) && !modelsWithMockupsByBrandModel.has(key);
+            });
+            setData(missingModels);
+          });
+        }
+        else if (path === 'mockupsAdvanced.getModelsWithFullCoverage') {
+          setData([]); // Mocked as empty for now, as it requires complex logic
+        }
+        else if (path === 'mockupsAdvanced.getOverviewStats') {
+          setData({
+            totalMockups: 0,
+            uniqueSKUs: 0,
+            totalSKUs: 359,
+            coverage: 0
+          });
+        }
+        else if (path === 'mockupsAdvanced.getModelMockupStats') {
+          if (!args?.modelId) {
+            setData(null);
+            return;
+          }
+          
+          // First, get the model details to fallback to brand/model name matching
+          const modelDoc = await getDoc(doc(db, 'supportedModels', args.modelId));
+          const modelData = modelDoc.exists() ? modelDoc.data() : null;
+          
+          // Try to find mockups by modelId
+          let q = query(collection(db, 'mockups'), where('supportedModelId', '==', args.modelId));
+          
+          unsubscribe = onSnapshot(q, async (snap) => {
+            let mockups = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            
+            // Fallback: If no mockups found by ID but we have model data, search by brand/model name
+            if (mockups.length === 0 && modelData) {
+               const allMockupsSnap = await getDocs(collection(db, 'mockups'));
+               const brandNameLower = modelData.brandName?.toLowerCase().trim() || "";
+               const modelNameLower = modelData.modelName?.toLowerCase().trim() || "";
+               
+               if (brandNameLower && modelNameLower) {
+                 mockups = allMockupsSnap.docs
+                   .map(d => ({ _id: d.id, ...d.data() }))
+                   .filter((m: any) => 
+                     !m.supportedModelId && 
+                     m.brand?.toLowerCase().trim() === brandNameLower && 
+                     m.model?.toLowerCase().trim() === modelNameLower
+                   );
+               }
+            }
+            
+            setData({
+              totalSKUs: 359,
+              uploadedSKUs: mockups.length,
+              missingSKUs: [],
+              missingSKUsInStock: [],
+              missingSKUsOutOfStock: [],
+              coverage: Math.min(Math.round((mockups.length / 359) * 100), 100),
+              mockups: mockups
+            });
+          });
+        }
+        else if (path === 'variantConsumptionPresets.listAll') {
+          const q = query(collection(db, 'gadgetTypes'));
+          unsubscribe = onSnapshot(q, async (snap) => {
+            const gadgetTypes = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            const presetsSnap = await getDocs(collection(db, 'variantConsumptionPresets'));
+            const presets = presetsSnap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            
+            const result = gadgetTypes.map(gt => ({
+              gadgetType: gt,
+              presets: presets.filter((p: any) => p.gadgetTypeId === gt._id)
+            }));
+            setData(result);
+          });
+        }
+        else if (path === 'phoneCollectionsQueries.getPhoneCollectionsWithCounts') {
+          const q = query(collection(db, 'phoneCollections'));
+          unsubscribe = onSnapshot(q, (snap) => {
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+          });
         }
         else if (path === 'whatsapp.getApprovedTemplates') {
           const q = query(collection(db, 'whatsappTemplates'));
@@ -1860,6 +2064,70 @@ export function useMutation(apiRef: any) {
         }
       }
       
+      if (collectionName === 'mockupsAdvanced') {
+        if (actionName === 'migrateMockupsToModels') {
+          return { updated: 0, noMatch: 0, total: 0 };
+        }
+        if (actionName === 'deleteAllMockupsForModel') {
+          const q = query(collection(db, 'mockups'), where('supportedModelId', '==', args.modelId));
+          const snap = await getDocs(q);
+          const batch = writeBatch(db);
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          return { deleted: snap.size };
+        }
+        if (actionName === 'storeMockupAdvanced') {
+          const docRef = await addDoc(collection(db, 'mockups'), args);
+          return docRef.id;
+        }
+        if (actionName === 'deleteMockup') {
+          await deleteDoc(doc(db, 'mockups', args.mockupId));
+          return { success: true };
+        }
+        if (actionName === 'deleteAllMockups') {
+          return { deleted: 0, hasMore: false };
+        }
+        if (actionName === 'deleteMockupsBySKU') {
+          const q = query(collection(db, 'mockups'), where('sku', '==', args.sku));
+          const snap = await getDocs(q);
+          const batch = writeBatch(db);
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          return { deleted: snap.size };
+        }
+      }
+
+      if (collectionName === 'variantConsumptionPresets') {
+        if (actionName === 'create') {
+          const docRef = await addDoc(collection(db, 'variantConsumptionPresets'), { ...args, isActive: true });
+          return docRef.id;
+        }
+        if (actionName === 'update') {
+          await updateDoc(doc(db, 'variantConsumptionPresets', args.presetId), args);
+          return args.presetId;
+        }
+        if (actionName === 'remove') {
+          await deleteDoc(doc(db, 'variantConsumptionPresets', args.presetId));
+          return { success: true };
+        }
+        if (actionName === 'toggleActive') {
+          await updateDoc(doc(db, 'variantConsumptionPresets', args.presetId), { isActive: args.isActive });
+          return args.presetId;
+        }
+      }
+      
+      if (collectionName === 'phoneCollections') {
+        if (actionName === 'runPhoneCollectionsMigration') {
+          return { collectionsCreated: 0, productsAssigned: 0, errors: [] };
+        }
+      }
+      
+      if (collectionName === 'migrateVariantPresetsAutoAssign') {
+        if (actionName === 'autoAssignPresets') {
+          return { success: true, matched: 0, unmatched: 0, skipped: 0, statusBreakdown: { active: 0, draft: 0, archived: 0 }, unmatchedVariants: [] };
+        }
+      }
+
       if (collectionName === 'rapidshyp') {
         return { success: true, message: "Mocked rapidshyp response" };
       }
@@ -2041,6 +2309,14 @@ export function useAction(apiRef: any) {
       };
     }
     
+    if (collectionName === 'phoneCollections' && actionName === 'runPhoneCollectionsMigration') {
+      return { collectionsCreated: 0, productsAssigned: 0, errors: [] };
+    }
+    
+    if (collectionName === 'migrateVariantPresetsAutoAssign' && actionName === 'autoAssignPresets') {
+      return { success: true, matched: 0, unmatched: 0, skipped: 0, statusBreakdown: { active: 0, draft: 0, archived: 0 }, unmatchedVariants: [] };
+    }
+
     // Intercept R2 uploads to use presigned URLs directly from the client
     // This avoids sending huge base64 payloads through Firebase Functions
     if ((collectionName === 'r2' && actionName === 'uploadToR2') || 

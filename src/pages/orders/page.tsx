@@ -108,13 +108,7 @@ function OrdersPageInner() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link to="/">
-                <img
-                  src="/logo.webp"
-                  alt="Skinly"
-                  className="h-12"
-                />
-              </Link>
+              <BrandLogo type="header" imgClassName="h-10" />
               <h1 className="text-2xl font-bold">My Orders</h1>
             </div>
             <Link to="/">
@@ -399,6 +393,8 @@ function OrdersPageInner() {
     </div>
   );
 }
+
+import { BrandLogo } from "@/components/brand-logo.tsx";
 
 export default function OrdersPage() {
   return (
