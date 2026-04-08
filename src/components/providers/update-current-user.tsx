@@ -1,15 +1,15 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { useUser } from "@clerk/clerk-react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import { useAuth } from "@/hooks/use-auth";
 
 export function UpdateCurrentUserProvider({
   children,
 }: {
   children: ReactNode;
 }) {
-  const { isLoaded, isSignedIn } = useUser();
+  const { isLoaded, isSignedIn } = useAuth();
 
   const updateUser = useMutation(api.users.updateCurrentUser);
 
@@ -20,9 +20,11 @@ export function UpdateCurrentUserProvider({
     const storedRefCode = localStorage.getItem("referralCode");
 
     // 🔥 IMPORTANT: Pass referral code if available
-    updateUser({
-      referralCode: storedRefCode || undefined,
-    });
+    if (storedRefCode) {
+      updateUser({
+        referralCode: storedRefCode,
+      });
+    }
   }, [isLoaded, isSignedIn, updateUser]);
 
   return <>{children}</>;

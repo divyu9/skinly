@@ -2,12 +2,12 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { BugIcon } from "lucide-react";
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { BugReportModal } from "./bug-report-modal.tsx";
 
 // Default fallback logo URL
-const DEFAULT_LOGO_URL = "https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV";
+const DEFAULT_LOGO_URL = "/logo.webp";
 
 export function SiteFooter() {
   const [bugReportOpen, setBugReportOpen] = useState(false);

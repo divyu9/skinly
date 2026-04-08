@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -175,7 +175,7 @@ function WalletPageInner() {
             </div>
             <Link to="/">
               <img
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
+                src="/logo.webp"
                 alt="Skinly"
                 className="h-10"
               />

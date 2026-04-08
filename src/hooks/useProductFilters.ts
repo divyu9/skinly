@@ -85,21 +85,30 @@ export function useProductFilters() {
     }
   }, [urlParams.brand, urlParams.model, prevBrandModel]);
   
-  // Update URL without page reload
+  // Update URL using React Router
   const updateURL = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
     
+    let hasChanges = false;
     Object.entries(updates).forEach(([key, value]) => {
+      const current = params.get(key);
       if (value === null || value === '') {
-        params.delete(key);
+        if (params.has(key)) {
+          params.delete(key);
+          hasChanges = true;
+        }
       } else {
-        params.set(key, value);
+        if (current !== value) {
+          params.set(key, value);
+          hasChanges = true;
+        }
       }
     });
     
-    const newUrl = `${window.location.pathname}?${params.toString()}`;
-    window.history.pushState({}, '', newUrl);
-  }, []);
+    if (hasChanges) {
+      navigate(`?${params.toString()}`, { replace: true });
+    }
+  }, [navigate]);
   
   // Update filters with URL sync
   const updateFilters = useCallback((updates: Partial<FilterState>) => {

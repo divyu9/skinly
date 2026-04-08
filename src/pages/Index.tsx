@@ -43,8 +43,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useMutation, useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
 
 export default function Index() {
@@ -253,6 +253,8 @@ export default function Index() {
         <MobileNav
           open={isMobileMenuOpen}
           onOpenChange={setIsMobileMenuOpen}
+          onGadgetSelectorClick={() => setIsDeviceSelectorOpen(true)}
+          onPhoneSelectorClick={() => setIsDeviceSelectorOpen(true)}
         />
       </Suspense>
 

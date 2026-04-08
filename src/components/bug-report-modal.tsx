@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import type { Id } from "@/lib/firebase-api";
 
 import {
   Dialog,
@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 import { toast } from "sonner";
-import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/hooks/use-auth";
 
 /* ---------------------------------- TYPES --------------------------------- */
 
@@ -46,7 +46,7 @@ export function BugReportModal({
   open,
   onOpenChange,
 }: BugReportModalProps) {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuth();
 
   /* ------------------------------- FORM STATE ------------------------------- */
 
@@ -68,7 +68,7 @@ export function BugReportModal({
   useEffect(() => {
     if (!isLoaded) return;
 
-    const primaryEmail = user?.emailAddresses?.[0]?.emailAddress;
+    const primaryEmail = user?.email;
     if (primaryEmail) {
       setEmail(primaryEmail);
     }

@@ -1,12 +1,12 @@
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, RefreshCwIcon, AlertTriangleIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { useState } from "react";
 
@@ -65,7 +65,8 @@ function OrderDetailPageInner() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return "N/A";
     return new Date(timestamp).toLocaleDateString("en-IN", {
       year: "numeric",
       month: "long",
@@ -213,7 +214,7 @@ function OrderDetailPageInner() {
             </Link>
             <Link to="/">
               <img
-                src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv"
+                src="/logo.webp"
                 alt="Skinly"
                 className="h-12"
               />
@@ -232,7 +233,7 @@ function OrderDetailPageInner() {
                 {order.orderNumber || order.failedOrderNumber || "Pending"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Placed on {formatDate(order._creationTime)}
+                Placed on {formatDate(order.createdAt || order._creationTime)}
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
@@ -262,7 +263,7 @@ function OrderDetailPageInner() {
                   <Button
                     className="w-full md:hidden mt-2"
                     onClick={handleRetryPayment}
-                    disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
+                    disabled={isRetrying || (inventoryCheck !== undefined && !inventoryCheck?.available)}
                   >
                     <RefreshCwIcon className={`size-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
                     {isRetrying ? 'Processing...' : 'Retry Payment'}
@@ -285,7 +286,7 @@ function OrderDetailPageInner() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {order.items.map((item, idx) => (
+                {(order.items || []).map((item: any, idx: number) => (
                   <div key={idx}>
                     {idx > 0 && <Separator className="my-4" />}
                     <div className="flex gap-4">
@@ -317,13 +318,13 @@ function OrderDetailPageInner() {
                             Qty: {item.quantity}
                           </span>
                           <span className="font-semibold text-primary">
-                            ₹{item.price.toFixed(0)} each
+                            ₹{(item.price ?? 0).toFixed(0)} each
                           </span>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-primary">
-                          ₹{(item.price * item.quantity).toFixed(0)}
+                          ₹{((item.price ?? 0) * (item.quantity ?? 1)).toFixed(0)}
                         </p>
                       </div>
                     </div>
@@ -474,7 +475,7 @@ function OrderDetailPageInner() {
                       <>
                         <div>
                           <p className="text-xs text-muted-foreground uppercase mb-1">Prepaid (PhonePe)</p>
-                          <p className="text-sm font-semibold text-blue-600">₹{order.prepaidAmount.toFixed(0)}</p>
+                          <p className="text-sm font-semibold text-blue-600">₹{(order.prepaidAmount ?? 0).toFixed(0)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground uppercase mb-1">Balance on Delivery</p>
@@ -482,14 +483,14 @@ function OrderDetailPageInner() {
                         </div>
                         <div className="bg-blue-500/10 p-3 rounded-lg text-sm">
                           <p className="text-blue-900 dark:text-blue-100">
-                            You paid ₹{order.prepaidAmount.toFixed(0)} upfront. Pay ₹{(order.codAmount ?? 0).toFixed(0)} when the order is delivered.
+                            You paid ₹{(order.prepaidAmount ?? 0).toFixed(0)} upfront. Pay ₹{(order.codAmount ?? 0).toFixed(0)} when the order is delivered.
                           </p>
                         </div>
                       </>
                     ) : (
                       <div className="bg-amber-500/10 p-3 rounded-lg text-sm">
                         <p className="text-amber-900 dark:text-amber-100">
-                          Pay ₹{order.total.toFixed(0)} cash when your order is delivered.
+                          Pay ₹{(order.total ?? 0).toFixed(0)} cash when your order is delivered.
                         </p>
                       </div>
                     )}
@@ -509,7 +510,7 @@ function OrderDetailPageInner() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal</span>
-                    <span>₹{order.subtotal.toFixed(0)}</span>
+                    <span>₹{(order.subtotal ?? 0).toFixed(0)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="flex items-center gap-1">
@@ -517,17 +518,17 @@ function OrderDetailPageInner() {
                       Shipping
                     </span>
                     <span>
-                      {order.shippingFee === 0 ? (
+                      {(order.shippingFee ?? 0) === 0 ? (
                         <span className="text-green-600 font-medium">FREE</span>
                       ) : (
-                        `₹${order.shippingFee.toFixed(0)}`
+                        `₹${(order.shippingFee ?? 0).toFixed(0)}`
                       )}
                     </span>
                   </div>
                   {order.codFee !== undefined && order.codFee > 0 && (
                     <div className="flex justify-between text-sm">
                       <span>COD Fee</span>
-                      <span>₹{order.codFee.toFixed(0)}</span>
+                      <span>₹{(order.codFee ?? 0).toFixed(0)}</span>
                     </div>
                   )}
                 </div>
@@ -537,7 +538,7 @@ function OrderDetailPageInner() {
                 <div className="flex justify-between items-center">
                   <span className="font-semibold">Total</span>
                   <span className="text-2xl font-bold text-primary">
-                    ₹{order.total.toFixed(0)}
+                    ₹{(order.total ?? 0).toFixed(0)}
                   </span>
                 </div>
 
@@ -551,28 +552,28 @@ function OrderDetailPageInner() {
                       </p>
                       <div className="flex justify-between text-xs">
                         <span>Taxable Amount</span>
-                        <span>₹{order.taxableAmount.toFixed(2)}</span>
+                        <span>₹{(order.taxableAmount ?? 0).toFixed(2)}</span>
                       </div>
                       {order.cgstAmount !== undefined && order.sgstAmount !== undefined ? (
                         <>
                           <div className="flex justify-between text-xs">
                             <span>CGST (9%)</span>
-                            <span>₹{order.cgstAmount.toFixed(2)}</span>
+                            <span>₹{(order.cgstAmount ?? 0).toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span>SGST (9%)</span>
-                            <span>₹{order.sgstAmount.toFixed(2)}</span>
+                            <span>₹{(order.sgstAmount ?? 0).toFixed(2)}</span>
                           </div>
                         </>
                       ) : order.igstAmount !== undefined ? (
                         <div className="flex justify-between text-xs">
                           <span>IGST (18%)</span>
-                          <span>₹{order.igstAmount.toFixed(2)}</span>
+                          <span>₹{(order.igstAmount ?? 0).toFixed(2)}</span>
                         </div>
                       ) : null}
                       <div className="flex justify-between text-xs font-medium pt-1 border-t">
                         <span>Total GST</span>
-                        <span>₹{order.totalGstAmount.toFixed(2)}</span>
+                        <span>₹{(order.totalGstAmount ?? 0).toFixed(2)}</span>
                       </div>
                     </div>
                   </>
@@ -583,7 +584,7 @@ function OrderDetailPageInner() {
                 {/* Retry Payment Section */}
                 {order.paymentStatus === "failed" && (
                   <>
-                    {inventoryCheck && !inventoryCheck.available && (
+                    {inventoryCheck && !inventoryCheck.available && inventoryCheck.unavailableItems && (
                       <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                         <div className="flex items-start gap-2">
                           <AlertTriangleIcon className="size-4 text-red-600 mt-0.5 shrink-0" />
@@ -607,7 +608,7 @@ function OrderDetailPageInner() {
                     <Button
                       className="w-full hidden md:block"
                       onClick={handleRetryPayment}
-                      disabled={isRetrying || (inventoryCheck && !inventoryCheck.available)}
+                      disabled={isRetrying || (inventoryCheck !== undefined && !inventoryCheck?.available)}
                     >
                       <RefreshCwIcon className={`size-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
                       {isRetrying ? 'Processing...' : 'Retry Payment'}

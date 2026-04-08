@@ -28,3 +28,8 @@ tsconfig.tsbuildinfo
 
 # Environment variables
 .env*
+
+firebase-admin.json
+migration-scripts/
+convex-export/
+convex-export.zip

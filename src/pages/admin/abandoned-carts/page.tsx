@@ -1,5 +1,5 @@
-import { useQuery, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -41,7 +41,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link } from "react-router-dom";
 import { AdminLayout } from "@/components/admin-layout.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AbandonedCartSettings } from "./settings.tsx";

@@ -1,4 +1,4 @@
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
+import type { Doc } from "@/lib/firebase-api";
 
 /**
  * Product with variant data for structured data generation

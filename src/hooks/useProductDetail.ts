@@ -1,8 +1,8 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useParams } from "react-router-dom";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView } from "@/lib/analytics.ts";
 
@@ -69,7 +69,7 @@ export function useProductDetail() {
       ? {
           brand: phoneBrand || extractBrand(phoneModel) || "",
           model: phoneModel,
-          sku: extractSKU(productData.title, productData.variants[0]?.sku) || "",
+          sku: extractSKU(productData.title, productData.variants && productData.variants[0]?.sku) || "",
         }
       : "skip"
   );
@@ -77,7 +77,7 @@ export function useProductDetail() {
   // Fetch applicable coupons
   const applicableCoupons = useQuery(
     api.coupons.getCouponsForProduct,
-    productData && productData.variants[0]
+    productData && productData.variants && productData.variants[0]
       ? { productId: productData._id, variantId: productData.variants[0]._id }
       : "skip"
   );
@@ -90,7 +90,7 @@ export function useProductDetail() {
   
   // Track product view
   useEffect(() => {
-    if (productData && productData.variants.length > 0) {
+    if (productData && productData.variants && productData.variants.length > 0) {
       trackProductView(
         productData._id,
         productData.title,
@@ -106,7 +106,7 @@ export function useProductDetail() {
       return;
     }
     
-    const firstVariantSku = productData.variants[0]?.sku;
+    const firstVariantSku = productData.variants && productData.variants[0]?.sku;
     const sku = extractSKU(productData.title, firstVariantSku);
     
     if (!sku) {
@@ -123,16 +123,21 @@ export function useProductDetail() {
     if (mockupFileUrl) {
       setMockupState({ url: mockupFileUrl, loading: false });
     } else {
-      // No mockup in database, try legacy fallback
-      setMockupState(prev => ({ ...prev, loading: true }));
-      findMockupImageUrl(phoneModel, sku, null)
-        .then(url => setMockupState({ url, loading: false }))
-        .catch(() => setMockupState({ url: null, loading: false }));
+      // No mockup in database, use fallback URL string without making HEAD requests
+      const url = findMockupImageUrl(phoneModel, sku, null) as unknown as string;
+      if (url && typeof url === 'string') {
+        setMockupState({ url, loading: false });
+      } else if (url instanceof Promise) {
+        url.then(resolvedUrl => setMockupState({ url: resolvedUrl, loading: false }))
+           .catch(() => setMockupState({ url: null, loading: false }));
+      } else {
+        setMockupState({ url: null, loading: false });
+      }
     }
   }, [phoneModel, productData?._id, mockupFileUrl]);
   
   // Default logo image URL (used as placeholder when no product images uploaded)
-  const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
+  const DEFAULT_LOGO_IMAGE = "/logo.webp";
 
   // Display images with mockup priority
   // Logic: If mockup exists, show mockup first. If only logo image exists, show it after mockup.
@@ -218,8 +223,8 @@ export function useProductDetail() {
     if (!productData) return null;
     
     const productUrl = `https://goskinly.com/products/${productData.slug || 'detail'}`;
-    const productImage = displayImages[0]?.url || productData.images[0]?.url || 'https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv';
-    const productPrice = productData.variants[productState.selectedVariant]?.price || 0;
+    const productImage = displayImages[0]?.url || productData.images[0]?.url || '/logo.webp';
+    const productPrice = productData.variants && productData.variants[productState.selectedVariant]?.price || 0;
     
     return {
       title: productData.metaTitle || `${productData.title} | Skinly`,
@@ -233,7 +238,7 @@ export function useProductDetail() {
   
   // Price display
   const priceDisplay = useMemo(() => {
-    if (!productData) return "";
+    if (!productData || !productData.variants || productData.variants.length === 0) return "";
     const prices = productData.variants.map(v => v.price);
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);

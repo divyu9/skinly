@@ -245,8 +245,8 @@ export default function ProductDetailPage() {
   // Derived values
   const productUrl = `https://goskinly.com/products/${productData.slug || 'detail'}`;
   const productImage = displayImages[0]?.url || productData.images[0]?.url || '';
-  const productPrice = productData.variants[productState.selectedVariant]?.price || 0;
-  const isInStock = productData.variants[productState.selectedVariant].inventoryQuantity > 0;
+  const productPrice = productData.variants && productData.variants[productState.selectedVariant]?.price || 0;
+  const isInStock = productData.variants && productData.variants[productState.selectedVariant]?.inventoryQuantity > 0;
   const isButtonDisabled = isSkinProduct && needsDeviceSelector && !phoneModel;
   
   return (
@@ -388,11 +388,13 @@ export default function ProductDetailPage() {
               )}
               
               {/* Variant Selection */}
-              <VariantSelector
-                variants={productData.variants}
-                selectedVariant={productState.selectedVariant}
-                onVariantChange={handleVariantChange}
-              />
+              {productData.variants && productData.variants.length > 0 && (
+                <VariantSelector
+                  variants={productData.variants}
+                  selectedVariant={productState.selectedVariant}
+                  onVariantChange={handleVariantChange}
+                />
+              )}
               
               {/* Add to Cart / Buy Now Buttons */}
               {isInStock ? (
@@ -417,12 +419,12 @@ export default function ProductDetailPage() {
                     {isBuyingNow ? "Processing..." : "Buy Now"}
                   </Button>
                 </div>
-              ) : (
+              ) : productData.variants && productData.variants.length > 0 ? (
                 <StockNotification
-                  variantId={productData.variants[productState.selectedVariant]._id}
-                  variantTitle={productData.variants[productState.selectedVariant].title}
+                  variantId={productData.variants[productState.selectedVariant]?._id}
+                  variantTitle={productData.variants[productState.selectedVariant]?.title}
                 />
-              )}
+              ) : null}
               
               {/* Delivery Info */}
               <DeliveryInfo isSkinProduct={isSkinProduct} />

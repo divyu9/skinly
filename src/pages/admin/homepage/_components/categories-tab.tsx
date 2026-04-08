@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -183,7 +183,7 @@ export function CategoriesTab() {
                   onChange={(e) =>
                     updateConfig(config.categoryName, { imageUrl: e.target.value })
                   }
-                  placeholder="https://cdn.hercules.app/file_..."
+                  placeholder="https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/..."
                 />
               </div>
 

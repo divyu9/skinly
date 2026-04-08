@@ -1,5 +1,5 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -19,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 export default function AdminReviews() {
   const reviews = useQuery(api.reviews.getAllReviews);

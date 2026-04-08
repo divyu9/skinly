@@ -19,7 +19,7 @@ export const ProductCard = memo(function ProductCard({
   modelFilter,
   autoSortOOS,
 }: ProductCardProps) {
-  const mainImage = product.images[0];
+  const mainImage = product.images?.[0];
   
   // Check if device is selected
   const hasDeviceSelected = !!(brandFilter && modelFilter);
@@ -30,15 +30,16 @@ export const ProductCard = memo(function ProductCard({
   const displayImageUrl = product.mockupUrl || mainImage?.url;
   const hasMockup = !!product.mockupUrl;
   
-  const minPrice = Math.min(...product.variants.map(v => v.price));
-  const maxPrice = Math.max(...product.variants.map(v => v.price));
+  const variants = product.variants || [];
+  const minPrice = variants.length > 0 ? Math.min(...variants.map(v => v.price || 0)) : 0;
+  const maxPrice = variants.length > 0 ? Math.max(...variants.map(v => v.price || 0)) : 0;
   
   const priceDisplay = minPrice === maxPrice 
     ? `₹${minPrice.toFixed(0)}`
     : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
   
   // Check if all variants are out of stock
-  const isOutOfStock = product.variants.every(v => !v.available || v.inventory_quantity === 0);
+  const isOutOfStock = variants.length > 0 && variants.every(v => !v.available || v.inventory_quantity === 0);
 
   // Get finish type display name
   const finishTypeDisplay = product.finishType 

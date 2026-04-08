@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from "react";
-import { useQuery, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -28,10 +28,10 @@ import {
   ChevronUpIcon,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 interface ProductImage {
   url: string;
@@ -64,7 +64,7 @@ function BulkProductCreatorInner() {
   const finishTypes = useQuery(api.finishTypes.listActive, {});
   const productCategories = useQuery(api.productCategories.listActive, {});
   const createBulkProducts = useAction(api.bulkProductCreator.createBulkProducts);
-  const uploadToCloudinary = useAction(api.cloudinary.uploadToCloudinary);
+  const uploadToR2 = useAction(api.r2.uploadToR2);
 
   // Default values for new rows
   const [defaultProductCategory, setDefaultProductCategory] = useState<string>("skin");
@@ -245,16 +245,19 @@ function BulkProductCreatorInner() {
           reader.onerror = reject;
         });
 
-        // Upload to Cloudinary
-        const result = await uploadToCloudinary({
-          imageBase64: base64,
-          folder: `products/${slug}`,
-          publicId: `bulk_${rowId}_${Date.now()}_${i}`,
+        // Extract base64 part
+        const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+
+        // Upload to R2
+        const result = await uploadToR2({
+          fileBase64: base64Data,
+          key: `products/${slug}/bulk_${rowId}_${Date.now()}_${i}.${file.name.split('.').pop()}`,
+          contentType: file.type,
         });
 
-        if (result.success && result.cloudinaryUrl) {
+        if (result.success && (result.url || result.publicUrl)) {
           newImages.push({
-            url: result.cloudinaryUrl,
+            url: result.url || result.publicUrl,
             alt: file.name.replace(/\.[^/.]+$/, ""),
           });
         }

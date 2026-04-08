@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useQuery, usePaginatedQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
+import { useQuery, usePaginatedQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import type { Id } from "@/lib/firebase-api";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Card,
@@ -106,7 +106,7 @@ export default function WhatsAppDebugLogsPage() {
 
   if (!logs || !stats) {
     return (
-      <AdminPageWrapper>
+      <AdminLayout>
         <div className="space-y-6 p-6">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold">WhatsApp Debug Logs</h1>
@@ -115,12 +115,12 @@ export default function WhatsAppDebugLogsPage() {
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
-      </AdminPageWrapper>
+      </AdminLayout>
     );
   }
 
   return (
-    <AdminPageWrapper>
+    <AdminLayout>
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
@@ -536,6 +536,6 @@ export default function WhatsAppDebugLogsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </AdminPageWrapper>
+    </AdminLayout>
   );
 }

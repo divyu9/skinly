@@ -1,8 +1,8 @@
-import { usePaginatedQuery, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { usePaginatedQuery, useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { FilterState, URLParams } from "./useProductFilters";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { extractSKU } from "@/lib/mockups"; // Import extractSKU helper
 
 export interface ProductVariant {
@@ -112,6 +112,8 @@ export function useProductsData({
       ? accumulatedCollectionProducts
       : productsData || [];
     
+    if (!Array.isArray(sourceProducts)) return [];
+
     return sourceProducts.map((product: any) => ({
       _id: product._id,
       slug: product.slug,
@@ -122,7 +124,7 @@ export function useProductsData({
       images: product.images,
       gadgetCategory: product.gadgetCategory,
       finishType: product.finishType,
-      variants: product.variants.map((v: any) => ({
+      variants: product.variants?.map((v: any) => ({
         _id: v._id,
         title: v.title,
         price: v.price,
@@ -130,7 +132,7 @@ export function useProductsData({
         sku: v.sku,
         inventory_quantity: v.inventoryQuantity ?? v.inventory_quantity ?? 0,
         available: (v.inventoryQuantity ?? v.inventory_quantity ?? 0) > 0,
-      })),
+      })) || [],
     }));
   }, [productsData, accumulatedCollectionProducts, filters.collectionParam]);
   

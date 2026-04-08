@@ -1,12 +1,12 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { StarIcon, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/lib/firebase-api";
 
 interface TrendingProductsSectionProps {
   productId: Id<"products">;
@@ -53,10 +53,10 @@ export function TrendingProductsSection({ productId }: TrendingProductsSectionPr
             id="trending-products-scroll"
             className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory"
           >
-            {products.map((product, index) => {
-              const firstVariant = product.variants?.[0];
-              const isOutOfStock = firstVariant?.inventoryQuantity === 0;
-              const price = firstVariant?.price || 0;
+            {products.map((product) => {
+            const firstVariant = product.variants && product.variants[0];
+            const isOutOfStock = firstVariant?.inventoryQuantity === 0 || firstVariant?.inventory_quantity === 0;
+            const price = firstVariant?.price || 0;
               const compareAtPrice = firstVariant?.compareAtPrice;
               const hasDiscount = compareAtPrice && compareAtPrice > price;
               const discountPercent = hasDiscount

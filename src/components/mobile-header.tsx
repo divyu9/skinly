@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { 
   MenuIcon, 
   SearchIcon, 
@@ -18,10 +18,11 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
-import { SignInButton, useUser } from '@clerk/clerk-react';
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
+import { auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 
 interface MobileHeaderProps {
@@ -30,8 +31,16 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderProps) {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuth();
   const isSignedIn = !!user;
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (err) {
+      console.error(err);
+    }
+  };
   const navigate = useNavigate();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,11 +134,13 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
     // 3. SKU matches
     const skuMatches: Array<{ product: typeof designMatches[0]; variant: typeof designMatches[0]['variants'][0] }> = [];
     productsFromSearch.forEach(product => {
-      product.variants.forEach(variant => {
-        if (variant.sku && normalizeForSearch(variant.sku).includes(normalizeForSearch(query))) {
-          skuMatches.push({ product: product as typeof designMatches[0], variant });
-        }
-      });
+      if (product.variants) {
+        product.variants.forEach((variant: any) => {
+          if (variant.sku && normalizeForSearch(variant.sku).includes(normalizeForSearch(query))) {
+            skuMatches.push({ product: product as typeof designMatches[0], variant });
+          }
+        });
+      }
     });
 
     return {
@@ -173,7 +184,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
     // Handle search submit if needed
   };
 
-  const logoUrl = homepageSettings?.logoImageUrl || "https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV";
+  const logoUrl = homepageSettings?.logoImageUrl || "/logo.webp";
   const logoLink = homepageSettings?.logoRedirectLink || "/";
   const showSearch = homepageSettings?.showSearchIcon ?? true;
   const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
@@ -254,7 +265,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                   alt="Skinly"
                   width="174"
                   height="70"
-                  fetchPriority="high"
+                  fetchpriority="high"
                   loading="eager"
                   decoding="sync"
                   className="h-10 w-auto object-contain"
@@ -266,11 +277,9 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
               <div className="flex items-center gap-1">
                 {/* Guests see SignIn modal, signed-in users go to /account. No navigation for guests! */}
                 {isLoaded && !isSignedIn ? (
-                  <SignInButton mode="modal">
-                    <button type="button" className="p-2 rounded-full hover:bg-primary/10 transition-colors" aria-label="Sign In">
-                      <UserIcon className="size-5 text-foreground" />
-                    </button>
-                  </SignInButton>
+                  <button onClick={handleSignIn} type="button" className="p-2 rounded-full hover:bg-primary/10 transition-colors" aria-label="Sign In">
+                    <UserIcon className="size-5 text-foreground" />
+                  </button>
                 ) : isLoaded && isSignedIn ? (
                   <button
                     type="button"
@@ -397,7 +406,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                             setSearchQuery("");
                           }}
                         >
-                          {product.images[0] && (
+                          {product.images && product.images[0] && (
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
@@ -409,7 +418,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm">{product.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
+                              {product.variants?.length || 0} variant{product.variants?.length !== 1 ? 's' : ''}
                             </p>
                           </div>
                         </Link>
@@ -434,7 +443,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                             setSearchQuery("");
                           }}
                         >
-                          {product.images[0] && (
+                          {product.images && product.images[0] && (
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}

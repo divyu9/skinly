@@ -1,20 +1,23 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { MinusIcon, PlusIcon, TrashIcon, ShoppingCartIcon, ArrowLeftIcon, AlertCircleIcon } from "lucide-react";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
+import { CheckoutUpsells } from "../checkout/_components/checkout-upsells.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { CartButton } from "@/components/cart.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
+
+import { SiteHeader } from "@/components/site-header.tsx";
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -31,32 +34,9 @@ export default function CartPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Announcement Bar */}
-      <AnnouncementBar />
+      <SiteHeader />
       
-      {/* Header */}
-      <header className="sticky top-[28px] z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(-1)}
-              className="gap-2"
-            >
-              <ArrowLeftIcon className="size-4" />
-              Back
-            </Button>
-            <h1 className="text-xl font-bold">Shopping Cart</h1>
-          </div>
-          <Link to="/" className="text-xl font-bold text-primary">
-            SKINLY
-          </Link>
-        </div>
-      </header>
-
-      {/* Cart Content */}
-      <div className="container mx-auto px-4 py-8">
+      <main className="container max-w-4xl mx-auto px-4 py-8">
         {(authLoading || !showContent) ? (
           <div className="max-w-4xl mx-auto space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -68,7 +48,7 @@ export default function CartPage() {
         ) : (
           <GuestCartContent />
         )}
-      </div>
+      </main>
     </div>
   );
 }
@@ -83,6 +63,26 @@ function AuthenticatedCartContent() {
   const { guestCart, clearGuestCart } = useGuestCart();
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasError, setHasError] = useState(false);
+
+  // Check stock status for cart items (Must be called unconditionally at the very top)
+  const cartItemsForStockCheck = (cartItems || []).map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    quantity: item.quantity,
+  }));
+
+  const stockStatus = useQuery(
+    api.cart.checkCartItemsStock,
+    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
+  );
+
+  // Create a map for quick stock lookup
+  const stockStatusMap = new Map(
+    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  );
+
+  // Check if there are any out-of-stock items
+  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
 
   // Sync guest cart when user signs in
   useEffect(() => {
@@ -163,26 +163,6 @@ function AuthenticatedCartContent() {
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  // Check stock status for cart items
-  const cartItemsForStockCheck = cartItems.map(item => ({
-    productId: item.productId,
-    variant: item.variant,
-    quantity: item.quantity,
-  }));
-
-  const stockStatus = useQuery(
-    api.cart.checkCartItemsStock,
-    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
-  );
-
-  // Create a map for quick stock lookup
-  const stockStatusMap = new Map(
-    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
-  );
-
-  // Check if there are any out-of-stock items
-  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
-
   const handleUpdateQuantity = async (cartId: Id<"cart">, newQuantity: number) => {
     try {
       await updateQuantity({ cartId, quantity: newQuantity });
@@ -236,6 +216,9 @@ function AuthenticatedCartContent() {
                           src={item.productImage}
                           alt={item.productTitle}
                           className={`w-full h-full object-cover hover:scale-105 transition-transform ${isOutOfStock ? 'grayscale' : ''}`}
+                          onError={(e) => {
+                            e.currentTarget.src = "/logo.webp";
+                          }}
                         />
                       </div>
                     </Link>
@@ -332,6 +315,11 @@ function AuthenticatedCartContent() {
           >
             Clear Cart
           </Button>
+
+          {/* Upsells Section */}
+          <div className="mt-8">
+            <CheckoutUpsells />
+          </div>
         </div>
 
         {/* Order Summary */}
@@ -394,6 +382,26 @@ function GuestCartContent() {
     clearGuestCart,
   } = useGuestCart();
 
+  // Check stock status for guest cart items (Must be called unconditionally)
+  const cartItemsForStockCheck = (guestCart || []).map(item => ({
+    productId: item.productId,
+    variant: item.variant,
+    quantity: item.quantity,
+  }));
+
+  const stockStatus = useQuery(
+    api.cart.checkCartItemsStock,
+    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
+  );
+
+  // Create a map for quick stock lookup
+  const stockStatusMap = new Map(
+    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  );
+
+  // Check if there are any out-of-stock items
+  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
+
   if (!guestCart || guestCart.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
@@ -418,26 +426,6 @@ function GuestCartContent() {
   }
 
   const subtotal = guestCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-  // Check stock status for guest cart items
-  const cartItemsForStockCheck = guestCart.map(item => ({
-    productId: item.productId,
-    variant: item.variant,
-    quantity: item.quantity,
-  }));
-
-  const stockStatus = useQuery(
-    api.cart.checkCartItemsStock,
-    cartItemsForStockCheck.length > 0 ? { cartItems: cartItemsForStockCheck } : "skip"
-  );
-
-  // Create a map for quick stock lookup
-  const stockStatusMap = new Map(
-    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
-  );
-
-  // Check if there are any out-of-stock items
-  const hasOutOfStockItems = stockStatus?.some(status => status.isOutOfStock) || false;
 
   const handleUpdateQuantity = (productId: string, variant: string, newQuantity: number) => {
     try {
@@ -490,6 +478,9 @@ function GuestCartContent() {
                             src={item.productImage}
                             alt={item.productTitle}
                             className={`w-full h-full object-cover hover:scale-105 transition-transform ${isOutOfStock ? 'grayscale' : ''}`}
+                            onError={(e) => {
+                              e.currentTarget.src = "/logo.webp";
+                            }}
                           />
                         </div>
                       </Link>

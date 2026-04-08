@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { AdminPageWrapper } from "@/components/admin-page-wrapper.tsx";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Card,
@@ -76,7 +76,7 @@ export default function WhatsAppHealthPage() {
 
   if (health === undefined) {
     return (
-      <AdminPageWrapper>
+      <AdminLayout>
         <div className="space-y-6 p-6">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold">WhatsApp Health</h1>
@@ -85,7 +85,7 @@ export default function WhatsAppHealthPage() {
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-96 w-full" />
         </div>
-      </AdminPageWrapper>
+      </AdminLayout>
     );
   }
 
@@ -127,7 +127,7 @@ export default function WhatsAppHealthPage() {
       : "Critical Issues Detected";
 
   return (
-    <AdminPageWrapper>
+    <AdminLayout>
       <div className="space-y-6 p-6">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold">WhatsApp Health</h1>
@@ -388,6 +388,6 @@ export default function WhatsAppHealthPage() {
           </CardContent>
         </Card>
       </div>
-    </AdminPageWrapper>
+    </AdminLayout>
   );
 }

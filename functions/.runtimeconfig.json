@@ -1,0 +1,38 @@
+{
+  "phonepe": {
+    "merchant_id": "M12FBKU200NU",
+    "salt_key": "928194c0-e286-434b-9918-93667f779991",
+    "salt_index": "1",
+    "environment": "PRODUCTION"
+  },
+  "rapidshyp": {
+    "api_key": "420a16088504841a6f84d2673f2811dabf9c0de567fccb0fec60279809e029ac",
+    "api_url": "https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper",
+    "webhook_token": "qazwsxedcrfvtgbyhnujmikolp123"
+  },
+  "openai": {
+    "api_key": "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"
+  },
+  "msg91": {
+    "auth_key": "481541ADfxYO7HJB69391c49P1",
+    "auth_token": "481541ADfxYO7HJB69391c49P1"
+  },
+  "whatsapp": {
+    "authkey": "e2cd9c948b39593a"
+  },
+  "cloudinary": {
+    "api_key": "425811419382789",
+    "api_secret": "9VAd1j2XhdTRUnaXKQpEh-JFqZQ",
+    "cloud_name": "dcpjatdxs"
+  },
+  "r2": {
+    "account_id": "5bab319c0cebca43cf0f629fb0ca5824",
+    "access_key_id": "e6f604b1d93411e642d1f95d0a3d06d8",
+    "secret_access_key": "e61a879eabf67b686f4de152b652cb15505ea66e3d1b5da80a5ec343e287d425",
+    "bucket_name": "skinly",
+    "public_url": "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev"
+  },
+  "app": {
+    "site_url": "https://www.goskinly.com"
+  }
+}

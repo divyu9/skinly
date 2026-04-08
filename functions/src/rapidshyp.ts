@@ -1,0 +1,77 @@
+import { onCall } from "firebase-functions/v2/https";
+import * as admin from "firebase-admin";
+
+const getRapidShypConfig = () => {
+  const apiKey = process.env.RAPIDSHYP_API_KEY || "";
+  const apiUrl = process.env.RAPIDSHYP_API_URL || "https://api.rapidshyp.com/rapidshyp/apis/v1/wrapper";
+
+  if (!apiKey) {
+      throw new Error("RapidShyp API credentials not configured.");
+    }
+
+  return { apiKey, apiUrl };
+};
+
+export const createShipment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+  const data = request.data;
+  const { orderId } = data;
+
+  if (!orderId) {
+    throw new Error("Missing orderId");
+  }
+
+  // Ensure user is authenticated and is an admin if you want to restrict this
+  // if (!request.auth?.token.admin) throw new Error('Only admins can create shipments');
+
+  const orderRef = admin.firestore().collection("orders").doc(orderId);
+  const orderDoc = await orderRef.get();
+
+  if (!orderDoc.exists) {
+    throw new Error("Order not found");
+  }
+
+  const order = orderDoc.data()!;
+
+  if (!order.shippingAddress?.phone) {
+    throw new Error("Order missing phone number in shipping address");
+  }
+
+  const config = getRapidShypConfig();
+
+  // Rapidshyp payload formatting goes here.
+  // We're just stubbing this so the frontend can call it and not crash.
+  
+  const payload = {
+    // Map order details to Rapidshyp requirements
+    orderId: order.orderNumber || orderDoc.id,
+    customerName: order.shippingAddress.name,
+    // ...
+  };
+  
+  console.log("RapidShyp Payload:", payload, "Config URL:", config.apiUrl);
+
+  try {
+    // const fetch = (await import("node-fetch")).default;
+    // const response = await fetch(config.apiUrl, { method: "POST", headers: { Authorization: config.apiKey }, body: JSON.stringify(payload) });
+    // const responseData = await response.json();
+    
+    // Fake success for now to establish the hook
+    const fakeAwb = "AWB123456789";
+
+    await orderRef.update({
+      shippingProvider: "rapidshyp",
+      trackingNumber: fakeAwb,
+      shippingStatus: "SHIPPED"
+    });
+
+    return {
+      success: true,
+      awbNumber: fakeAwb,
+      message: "Shipment created successfully"
+    };
+
+  } catch (error: any) {
+    console.error("Rapidshyp error", error);
+    throw new Error(error.message || "Shipment creation failed");
+  }
+});

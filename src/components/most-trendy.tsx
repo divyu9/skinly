@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { cn } from "@/lib/utils.ts";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
 interface MostTrendyProps {
@@ -52,8 +52,8 @@ export function MostTrendy({ config }: MostTrendyProps) {
           }}
         >
           {products.map((product) => {
-            const firstVariant = product.variants[0];
-            const isOutOfStock = firstVariant?.inventoryQuantity === 0;
+            const firstVariant = product.variants && product.variants[0];
+            const isOutOfStock = firstVariant?.inventoryQuantity === 0 || firstVariant?.inventory_quantity === 0;
             const price = firstVariant?.price || 0;
             const compareAtPrice = firstVariant?.compareAtPrice;
             const hasDiscount = compareAtPrice && compareAtPrice > price;

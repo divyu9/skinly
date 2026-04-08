@@ -1,9 +1,9 @@
-import { useQuery, useMutation, useAction, useConvex } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction, useConvex } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { PackageIcon, AlertCircleIcon } from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
@@ -13,7 +13,7 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { CheckoutUpsells } from "./_components/checkout-upsells.tsx";
 import { AddressForm, type FormData } from "./_components/AddressForm.tsx";
 import { PaymentMethodSelector } from "./_components/PaymentMethodSelector.tsx";
@@ -55,6 +55,7 @@ function CheckoutPageInner() {
   const dbCartItems = useQuery(api.cart.getCart, isAuthenticated ? {} : "skip");
   const { guestCart, clearGuestCart } = useGuestCart();
   const syncGuestCartToDb = useMutation(api.cart.syncGuestCartToDb);
+  const clearUserCart = useMutation(api.cart.clearCart);
   const createOrder = useMutation(api.orders.createOrder);
   const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
   const initiatePayment = useAction(api.phonepe.initiatePayment);
@@ -179,36 +180,30 @@ function CheckoutPageInner() {
     if (couponMessage) setCouponMessage(null);
   };
 
-  const handleApplyCoupon = async (codeToApply?: string) => {
-    const code = codeToApply || couponCode;
+  const handleApplyCoupon = async (codeToApply?: string | React.MouseEvent | React.FormEvent) => {
+    // Determine the actual code string to apply.
+    // When called from the button onClick, codeToApply might be an Event object, which doesn't have a trim method.
+    let code = "";
+    if (typeof codeToApply === "string") {
+      code = codeToApply;
+    } else {
+      code = couponCode;
+    }
+    
     setCouponMessage(null);
-    if (!code.trim()) { setCouponMessage({ type: "error", text: "Please enter a coupon code" }); return; }
+    if (!code || typeof code !== "string" || !code.trim()) { 
+      setCouponMessage({ type: "error", text: "Please enter a coupon code" }); 
+      return; 
+    }
     if (!cartItems?.length) { setCouponMessage({ type: "error", text: "Your cart is empty" }); return; }
 
     setIsApplyingCoupon(true);
     try {
-      const validCartItems = cartItems.filter((i) => i.productId?.startsWith("j"));
-      if (!validCartItems.length) {
-        setCouponMessage({ type: "error", text: "This coupon does not apply to the items in your cart" });
-        return;
-      }
-      const cartItemsWithVariantIds = await Promise.all(
-        validCartItems.map(async (item) => {
-          const variants = await convex.query(api.products.getProductVariants, { productId: item.productId as Id<"products"> });
-          const match = variants.find((v) => v.title === item.variant);
-          return { variantId: match?._id as Id<"variants"> | undefined, productId: item.productId as Id<"products">, productTitle: item.productTitle, price: item.price, quantity: item.quantity };
-        })
-      );
-      const itemsWithValidVariants = cartItemsWithVariantIds.filter((i) => i.variantId);
-      if (!itemsWithValidVariants.length) {
-        setCouponMessage({ type: "error", text: "This coupon does not apply to the items in your cart" });
-        return;
-      }
       const result = await convex.query(api.coupons.validateCoupon, {
         code: code.trim(),
         cartTotal: subtotal,
         userEmail: formData.email || undefined,
-        cartItems: itemsWithValidVariants.map((i) => ({ variantId: i.variantId!, productId: i.productId, productTitle: i.productTitle, price: i.price, quantity: i.quantity })),
+        cartItems: cartItems.map((i) => ({ productId: i.productId, productTitle: i.productTitle, price: i.price, quantity: i.quantity })),
       });
       setAppliedCoupon(result);
       setCouponCode(code.toUpperCase());
@@ -267,8 +262,8 @@ function CheckoutPageInner() {
     if (response === "USER_CANCEL") {
       const merchantTxnId = currentMerchantTxnId || sessionStorage.getItem("skinly_merchant_txn_id");
       const orderId = (currentOrderId || sessionStorage.getItem("skinly_order_id")) as Id<"orders"> | null;
-      if (merchantTxnId) {
-        try { await updatePaymentStatus({ merchantTransactionId: merchantTxnId, paymentStatus: "failed" }); } catch {}
+      if (orderId) {
+        try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "failed" }); } catch {}
       }
       setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0);
       sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
@@ -287,13 +282,17 @@ function CheckoutPageInner() {
       try {
         const phonepeStatus = await checkPaymentStatus({ merchantTransactionId: merchantTxnId });
         if (phonepeStatus.paymentStatus === "success") {
+          // Manually update payment status for local development mock
+          try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "success" }); } catch {}
+          
           sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
           setRetryCount(0); setIsRedirectingToPayment(false); setIsSubmitting(false);
           if (!isAuthenticated) clearGuestCart();
+          else clearUserCart();
           toast.success("Payment successful!");
           setTimeout(() => {
-            const trackingToken = new URLSearchParams(window.location.search).get("trackingToken");
-            navigate(!isAuthenticated && trackingToken ? `/orders/track?token=${trackingToken}` : `/orders/${orderId}`);
+            sessionStorage.removeItem("skinly_tracking_token");
+            navigate(`/orders/${orderId}`);
           }, 300);
         } else if (phonepeStatus.paymentStatus === "failed") {
           sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
@@ -322,9 +321,33 @@ function CheckoutPageInner() {
     setCurrentOrderId(orderId);
     sessionStorage.setItem("skinly_merchant_txn_id", merchantTxnId);
     sessionStorage.setItem("skinly_order_id", orderId);
-    if (!window.PhonePeCheckout) { toast.error("Payment service not available. Please refresh and try again."); setIsRedirectingToPayment(false); return; }
-    window.PhonePeCheckout.transact({ tokenUrl: paymentUrl, callback: handlePhonePeCallback, type: "IFRAME" });
+    
+    // Redirect directly to PhonePe instead of IFRAME, which fixes the "page not opening" issue.
+    window.location.href = paymentUrl;
   };
+
+  // Automatically check for returning from payment
+  useEffect(() => {
+    const merchantTxnId = sessionStorage.getItem("skinly_merchant_txn_id");
+    const orderId = sessionStorage.getItem("skinly_order_id");
+    
+    if (merchantTxnId && orderId && !isRedirectingToPayment && retryCount === 0) {
+      // User has returned from PhonePe
+      setIsRedirectingToPayment(true);
+      setIsSubmitting(true);
+      setCurrentMerchantTxnId(merchantTxnId);
+      setCurrentOrderId(orderId as Id<"orders">);
+      
+      // Clean up URL if there are query params from payment gateway
+      if (window.location.search) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+      
+      // Verify payment
+      handlePhonePeCallback("CONCLUDED");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -363,18 +386,27 @@ function CheckoutPageInner() {
         walletCreditAmount: appliedCoupon?.walletCreditAmount,
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,
+        remainingAmount: finalTotal, // Pass final total for Firebase hook mock
+        guestItems: !isAuthenticated ? guestCart : undefined, // Pass guest items directly
       });
 
       const remainingAmount = result.remainingAmount || 0;
-      const guestNav = () => !isAuthenticated && result.trackingToken ? navigate(`/orders/track?token=${result.trackingToken}`) : navigate(`/orders/${result.orderId}`);
+      const guestNav = () => navigate(`/orders/${result.orderId}`);
 
       if (remainingAmount === 0) {
         if (!isAuthenticated) clearGuestCart();
+        else clearUserCart();
         toast.success("Order placed successfully!");
         guestNav();
       } else if (formData.paymentMethod === "phonepe" || (formData.paymentMethod === "cod" && prepaidAmount > 0)) {
         setIsRedirectingToPayment(true);
         const amount = formData.paymentMethod === "cod" ? prepaidAmount : remainingAmount;
+        
+        // Save tracking token for when user returns from payment gateway
+        if (result.trackingToken) {
+          sessionStorage.setItem("skinly_tracking_token", result.trackingToken);
+        }
+        
         const paymentResult = await initiatePayment({ orderId: result.orderId, orderNumber: result.orderNumber, amount, customerPhone: getFullPhoneNumber() });
         if (paymentResult.success && paymentResult.paymentUrl) {
           openPhonePe(paymentResult.paymentUrl, paymentResult.merchantTransactionId, result.orderId);
@@ -383,6 +415,7 @@ function CheckoutPageInner() {
         }
       } else {
         if (!isAuthenticated) clearGuestCart();
+        else clearUserCart();
         toast.success("Order placed successfully!");
         guestNav();
       }
@@ -485,7 +518,7 @@ function CheckoutPageInner() {
               <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="shrink-0">
                 ← Back
               </Button>
-              <Link to="/"><img src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" alt="Skinly" className="h-10" /></Link>
+              <Link to="/"><img src="/logo.webp" alt="Skinly" className="h-10" /></Link>
               <h1 className="text-xl font-bold hidden sm:block">Checkout</h1>
             </div>
             <CartButton />
@@ -580,6 +613,11 @@ function CheckoutPageInner() {
                   "Place Order"
                 )}
               </Button>
+
+              {/* Upsells Section under Place Order */}
+              <div className="mt-8">
+                <CheckoutUpsells />
+              </div>
             </form>
           </div>
 

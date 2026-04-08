@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { Loader2, Save, RotateCcw, ArrowUp, ArrowDown, X, Plus, Image } from "lucide-react";
 import { toast } from "sonner";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 
 type PageType = "brand" | "device" | "product" | "skin-type" | "keyword";
@@ -403,10 +403,10 @@ export default function SEOTemplatesPage() {
                         id="defaultHeroImage"
                         value={editedTemplate.defaultHeroImage || ""}
                         onChange={(e) => updateField("defaultHeroImage", e.target.value)}
-                        placeholder="https://cdn.hercules.app/file_..."
+                        placeholder="https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/..."
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Use a Hercules CDN URL (https://cdn.hercules.app/file_...)
+                        Use a Cloudinary or R2 CDN URL (https://...)
                       </p>
                     </div>
                     {editedTemplate.defaultHeroImage && (

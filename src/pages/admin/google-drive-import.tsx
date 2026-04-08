@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
@@ -22,7 +22,7 @@ import {
   DownloadIcon,
   AlertTriangleIcon
 } from "lucide-react";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -35,7 +35,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 interface ImportJob {
   _id: Id<"importJobs">;
@@ -856,6 +856,8 @@ function AdminGoogleDriveImportInner() {
   );
 }
 
+import { AdminLayout } from "@/components/admin-layout.tsx";
+
 export default function AdminGoogleDriveImportPage() {
   return (
     <>
@@ -878,7 +880,9 @@ export default function AdminGoogleDriveImportPage() {
         </div>
       </AuthLoading>
       <Authenticated>
-        <AdminGoogleDriveImportInner />
+        <AdminLayout>
+          <AdminGoogleDriveImportInner />
+        </AdminLayout>
       </Authenticated>
     </>
   );

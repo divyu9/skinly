@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -92,8 +92,8 @@ export function TopPicks({
             // Products
             <div id="top-picks-scroll" className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
               {products.map((product) => {
-                const firstVariant = product.variants[0];
-                const isOutOfStock = firstVariant?.inventoryQuantity === 0;
+                const firstVariant = product.variants?.[0];
+                const isOutOfStock = firstVariant?.inventoryQuantity === 0 || firstVariant?.inventory_quantity === 0;
                 const price = firstVariant?.price || 0;
                 const compareAtPrice = firstVariant?.compareAtPrice;
                 const hasDiscount = compareAtPrice && compareAtPrice > price;
@@ -111,7 +111,7 @@ export function TopPicks({
                       <CardContent className="p-0">
                         {/* Image */}
                         <div className="relative aspect-square overflow-hidden bg-muted">
-                          {product.images[0] && (
+                          {product.images?.[0] && (
                             <img
                               src={product.images[0].url}
                               alt={product.title}
@@ -133,7 +133,7 @@ export function TopPicks({
                                 {discountPercent}% OFF
                               </span>
                             )}
-                            {product.tags.includes("new") && (
+                            {product.tags?.includes("new") && (
                               <span className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full shadow-lg">
                                 NEW
                               </span>

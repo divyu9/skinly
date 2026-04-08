@@ -1,6 +1,6 @@
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import type { Doc } from "@/lib/firebase-api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion.tsx";

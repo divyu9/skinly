@@ -1,5 +1,5 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { AnnouncementBar } from "@/components/announcement-bar";
 import { Link } from "react-router-dom";
 import { MobileNav } from "@/components/mobile-nav";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -218,7 +218,7 @@ export default function ReferralsPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              src="/logo.webp" 
               alt="Skinly" 
               className="h-12 md:h-16"
             />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { ArrowLeft, Save, Loader2, Plus, Trash2, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 export default function EditSEOPage() {
   const { pageId } = useParams<{ pageId: string }>();

@@ -1,10 +1,12 @@
 import { Link, useNavigate } from "react-router-dom";
-import { SignInButton, useUser } from "@clerk/clerk-react";
 import { UserIcon } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { MobileNav } from "./mobile-nav";
 import { HeaderSearch } from "./header-search";
+import { useAuth } from "@/hooks/use-auth";
+import { auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 
 interface SiteHeaderProps {
   onGadgetSelectorClick?: () => void;
@@ -13,7 +15,7 @@ interface SiteHeaderProps {
 }
 
 // Default fallback logo URL
-const DEFAULT_LOGO_URL = "https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV";
+const DEFAULT_LOGO_URL = "/logo.webp";
 
 export function SiteHeader({
   onGadgetSelectorClick,
@@ -24,8 +26,16 @@ export function SiteHeader({
   const latestModels = useQuery(api.supportedModels.getLatest, { count: 20 });
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
 
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useAuth();
   const isSignedIn = !!user;
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // Use dynamic logo from settings, with fallback to default
   const logoUrl = homepageSettings?.logoImageUrl || DEFAULT_LOGO_URL;
@@ -43,7 +53,7 @@ export function SiteHeader({
               alt="Skinly"
               width="174"
               height="70"
-              fetchPriority="high"
+              fetchpriority="high"
               loading="eager"
               decoding="sync"
               className="h-12 md:h-16"
@@ -60,15 +70,14 @@ export function SiteHeader({
           {/* AUTH BUTTON */}
           <div className="flex items-center gap-2">
             {isLoaded && !isSignedIn && (
-              <SignInButton mode="modal">
-                <button
-                  type="button"
-                  aria-label="Sign In"
-                  className="px-3 py-1 rounded border border-primary text-primary bg-background hover:bg-primary/10 font-semibold"
-                >
-                  <UserIcon className="size-6" />
-                </button>
-              </SignInButton>
+              <button
+                type="button"
+                aria-label="Sign In"
+                onClick={handleSignIn}
+                className="px-3 py-1 rounded border border-primary text-primary bg-background hover:bg-primary/10 font-semibold"
+              >
+                <UserIcon className="size-6" />
+              </button>
             )}
 
             {isLoaded && isSignedIn && (

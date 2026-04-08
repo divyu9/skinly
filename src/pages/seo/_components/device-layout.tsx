@@ -1,6 +1,6 @@
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import type { Doc } from "@/lib/firebase-api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion.tsx";
@@ -41,8 +41,8 @@ export default function DevicePageLayout({ page }: DevicePageLayoutProps) {
 
   // Filter products by device model (based on title since phone models not in query result)
   const deviceProducts = products?.filter((p: Doc<"products">) => 
-    page.h1Heading.toLowerCase().includes(p.title.toLowerCase()) ||
-    p.title.toLowerCase().includes(page.h1Heading.toLowerCase())
+    (page.h1Heading || "").toLowerCase().includes((p.title || "").toLowerCase()) ||
+    (p.title || "").toLowerCase().includes((page.h1Heading || "").toLowerCase())
   ) || [];
 
   const displayProducts = deviceProducts.length > 0 ? deviceProducts : products?.slice(0, 12) || [];

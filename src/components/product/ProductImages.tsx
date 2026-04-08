@@ -25,30 +25,49 @@ export function ProductImages({
   phoneModel,
   mockupUrl,
 }: ProductImagesProps) {
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    const failedUrl = e.currentTarget.src;
+    
+    // Add to failed images list so we don't render it in the thumbnails
+    setFailedImages(prev => {
+      const newSet = new Set(prev);
+      newSet.add(failedUrl);
+      return newSet;
+    });
+
+    // If the failed image was the currently selected one, select the next available one
+    if (selectedImage === failedUrl) {
+      const fallbackImage = images.find(img => img.url !== failedUrl && !failedImages.has(img.url));
+      if (fallbackImage) {
+        onImageSelect(fallbackImage.url);
+      }
+    }
+  }, [images, selectedImage, failedImages, onImageSelect]);
+  
+  // Filter out images that have failed to load
+  const validImages = useMemo(() => {
+    return images.filter(img => !failedImages.has(img.url));
+  }, [images, failedImages]);
+  
   const currentIndex = useMemo(() => {
-    return images.findIndex(img => img.url === selectedImage);
-  }, [images, selectedImage]);
+    return validImages.findIndex(img => img.url === selectedImage);
+  }, [validImages, selectedImage]);
   
   const handleSwipeLeft = useCallback(() => {
-    if (currentIndex < images.length - 1) {
-      onImageSelect(images[currentIndex + 1].url);
+    if (currentIndex < validImages.length - 1) {
+      onImageSelect(validImages[currentIndex + 1].url);
     }
-  }, [currentIndex, images, onImageSelect]);
+  }, [currentIndex, validImages, onImageSelect]);
   
   const handleSwipeRight = useCallback(() => {
     if (currentIndex > 0) {
-      onImageSelect(images[currentIndex - 1].url);
+      onImageSelect(validImages[currentIndex - 1].url);
     }
-  }, [currentIndex, images, onImageSelect]);
+  }, [currentIndex, validImages, onImageSelect]);
   
   const swipeHandlers = useSwipeNavigation(handleSwipeLeft, handleSwipeRight);
-  
-  const handleImageError = useCallback(() => {
-    const nextImage = images.find(img => img.url !== selectedImage);
-    if (nextImage) {
-      onImageSelect(nextImage.url);
-    }
-  }, [images, selectedImage, onImageSelect]);
   
   const isMockupImage = mockupUrl && selectedImage === mockupUrl;
   
@@ -78,11 +97,11 @@ export function ProductImages({
             )}
             
             {/* Swipe Indicator Dots */}
-            {images.length > 1 && (
+            {validImages.length > 1 && (
               <div className={`absolute left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none ${
                 phoneModel && isMockupImage ? "bottom-14 md:bottom-3" : "bottom-3"
               }`}>
-                {images.map((_, idx) => (
+                {validImages.map((_, idx) => (
                   <div
                     key={idx}
                     className={`h-1.5 rounded-full transition-all ${
@@ -103,9 +122,9 @@ export function ProductImages({
       </div>
       
       {/* Thumbnail Gallery */}
-      {images.length > 1 && (
+      {validImages.length > 1 && (
         <div className="grid grid-cols-4 gap-2">
-          {images.slice(0, 4).map((image, idx) => (
+          {validImages.slice(0, 4).map((image, idx) => (
             <button
               key={idx}
               onClick={() => onImageSelect(image.url)}

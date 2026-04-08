@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -142,7 +142,7 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent side="left" className="w-[300px] p-0">
+      <SheetContent side="left" className="w-[300px] p-0" aria-describedby={undefined}>
         <SheetHeader className="p-6 pb-4">
           <SheetTitle className="text-left">Menu</SheetTitle>
         </SheetHeader>

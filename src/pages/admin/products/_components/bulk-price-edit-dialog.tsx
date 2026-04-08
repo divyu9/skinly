@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import type { Id } from "@/lib/firebase-api";
 import {
   Dialog,
   DialogContent,

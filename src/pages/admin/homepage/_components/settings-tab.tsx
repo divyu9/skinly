@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -75,7 +75,7 @@ export function SettingsTab() {
     try {
       const base64 = await fileToBase64(file);
       const timestamp = Date.now();
-      const r2Key = `site-assets/${type}-logo-${timestamp}.webp`;
+      const r2Key = `general/${type}-logo-${timestamp}.webp`;
 
       const result = await uploadToR2({
         fileBase64: base64,
@@ -83,8 +83,8 @@ export function SettingsTab() {
         contentType: "image/webp",
       });
 
-      if (result.success && result.publicUrl) {
-        setUrl(result.publicUrl);
+      if (result.success && (result.url || result.publicUrl)) {
+        setUrl(result.url || result.publicUrl);
         toast.success(`${type === "header" ? "Header" : "Footer"} logo uploaded successfully`);
       } else {
         throw new Error(result.error || "Upload failed");
@@ -131,7 +131,7 @@ export function SettingsTab() {
   }
 
   // Default logo URL (fallback)
-  const defaultLogoUrl = "https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV";
+  const defaultLogoUrl = "/logo.webp";
 
   return (
     <div className="space-y-6">

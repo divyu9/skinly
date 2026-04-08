@@ -1,16 +1,7 @@
-import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
-import { useCallback } from "react";
+import { useAuth } from "./use-auth";
 
 export function useConvexAuth() {
-  const clerkAuth = useClerkAuth();
-  const { isLoaded, user } = useUser();
-
-  const fetchAccessToken = useCallback(
-    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      return clerkAuth.getToken({ skipCache: forceRefreshToken }) ?? null;
-    },
-    [clerkAuth]
-  );
+  const { isLoaded, user, fetchAccessToken } = useAuth();
 
   return {
     isLoading: !isLoaded,

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation, useAction, useConvex } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction, useConvex } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";

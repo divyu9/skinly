@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -50,9 +50,9 @@ import {
   Filter,
   Plus,
 } from "lucide-react";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { cn } from "@/lib/utils.ts";
 
 export default function MediaLibraryPage() {
@@ -86,18 +86,37 @@ function MediaLibraryContent() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
+  // Map backend fields to frontend expected fields
+  const processMediaItems = (result: any) => {
+    if (!result || !result.items) return { items: [], totalCount: 0 };
+    
+    return {
+      ...result,
+      items: result.items.map((item: any) => ({
+        ...item,
+        // The backend stores the URL in cloudinaryUrl for backward compatibility
+        // or r2Url for newer uploads. The frontend components expect 'url'.
+        url: item.cloudinaryUrl || item.r2Url || "",
+        publicId: item.cloudinaryPublicId || item.r2Key || ""
+      }))
+    };
+  };
+
   // Queries
-  const mediaResult = useQuery(api.mediaLibrary.listMedia, {
+  const rawMediaResult = useQuery(api.mediaLibrary.listMedia, {
     folder: selectedFolder || undefined,
     mediaType: selectedType === "all" ? undefined : selectedType,
     searchQuery: searchQuery || undefined,
     limit: 100,
   });
+  
+  const mediaResult = rawMediaResult === undefined ? undefined : processMediaItems(rawMediaResult);
+  
   const folders = useQuery(api.mediaLibrary.getFolders);
 
-  // Mutations
-  const deleteMedia = useMutation(api.mediaLibrary.deleteMedia);
-  const bulkDelete = useMutation(api.mediaLibrary.bulkDeleteMedia);
+  // Actions
+  const deleteMedia = useAction(api.mediaLibrary.deleteMedia);
+  const bulkDelete = useAction(api.mediaLibrary.bulkDeleteMedia);
 
   // Copy URL to clipboard
   const copyToClipboard = useCallback(async (url: string) => {
@@ -286,9 +305,9 @@ function MediaLibraryContent() {
               key={item._id}
               item={item}
               isSelected={selectedItems.has(item._id)}
-              isCopied={copiedUrl === item.cloudinaryUrl}
+              isCopied={copiedUrl === item.url}
               onSelect={() => toggleSelection(item._id)}
-              onCopy={() => copyToClipboard(item.cloudinaryUrl)}
+              onCopy={() => copyToClipboard(item.url)}
               onDelete={() => handleDelete(item._id)}
             />
           ))}
@@ -300,9 +319,9 @@ function MediaLibraryContent() {
               key={item._id}
               item={item}
               isSelected={selectedItems.has(item._id)}
-              isCopied={copiedUrl === item.cloudinaryUrl}
+              isCopied={copiedUrl === item.url}
               onSelect={() => toggleSelection(item._id)}
-              onCopy={() => copyToClipboard(item.cloudinaryUrl)}
+              onCopy={() => copyToClipboard(item.url)}
               onDelete={() => handleDelete(item._id)}
               formatBytes={formatBytes}
             />
@@ -338,7 +357,7 @@ function MediaCard({
 }: {
   item: {
     _id: Id<"mediaLibrary">;
-    cloudinaryUrl: string;
+    url: string;
     filename: string;
     mediaType: "image" | "video";
     folder?: string;
@@ -365,7 +384,7 @@ function MediaCard({
         >
           {item.mediaType === "image" ? (
             <img
-              src={item.cloudinaryUrl}
+              src={item.url}
               alt={item.filename}
               className="w-full h-full object-cover"
               loading="lazy"
@@ -471,7 +490,7 @@ function MediaListItem({
 }: {
   item: {
     _id: Id<"mediaLibrary">;
-    cloudinaryUrl: string;
+    url: string;
     filename: string;
     mediaType: "image" | "video";
     folder?: string;
@@ -512,7 +531,7 @@ function MediaListItem({
       <div className="size-12 rounded bg-muted flex-shrink-0 overflow-hidden">
         {item.mediaType === "image" ? (
           <img
-            src={item.cloudinaryUrl}
+            src={item.url}
             alt={item.filename}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -542,7 +561,7 @@ function MediaListItem({
       {/* URL Display */}
       <div className="hidden lg:flex items-center gap-2 max-w-xs">
         <code className="text-xs bg-muted px-2 py-1 rounded truncate">
-          {item.cloudinaryUrl.split("/").slice(-2).join("/")}
+          {item.url.split("/").slice(-2).join("/")}
         </code>
       </div>
 

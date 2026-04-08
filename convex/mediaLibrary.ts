@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation, action, internalMutation } from "./_generated/server";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 
 /**
  * Media Library - Store and manage uploaded media files
@@ -125,8 +125,8 @@ export const updateMedia = mutation({
   },
 });
 
-// Delete media item from library (note: doesn't delete from Cloudinary)
-export const deleteMedia = mutation({
+// Delete media item from library
+export const deleteMediaInternal = internalMutation({
   args: { id: v.id("mediaLibrary") },
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.id);
@@ -134,6 +134,28 @@ export const deleteMedia = mutation({
 
     await ctx.db.delete(args.id);
     return { success: true, publicId: existing.cloudinaryPublicId };
+  },
+});
+
+// Action to delete media from R2 and database
+export const deleteMedia = action({
+  args: { id: v.id("mediaLibrary") },
+  handler: async (ctx, args) => {
+    const existing = await ctx.runQuery(api.mediaLibrary.getMediaById, { id: args.id });
+    if (!existing) throw new Error("Media not found");
+
+    // Delete from R2
+    if (existing.cloudinaryPublicId) {
+      try {
+        await ctx.runAction((internal as any).r2.deleteFromR2, {
+          key: existing.cloudinaryPublicId,
+        });
+      } catch (e) {
+        console.error(`Failed to delete ${existing.cloudinaryPublicId} from R2`, e);
+      }
+    }
+
+    return await ctx.runMutation(internal.mediaLibrary.deleteMediaInternal, { id: args.id });
   },
 });
 
@@ -160,8 +182,8 @@ export const addMediaInternal = internalMutation({
   },
 });
 
-// Bulk delete media items
-export const bulkDeleteMedia = mutation({
+// Internal bulk delete
+export const bulkDeleteMediaInternal = internalMutation({
   args: { ids: v.array(v.id("mediaLibrary")) },
   handler: async (ctx, args) => {
     const publicIds: string[] = [];
@@ -178,7 +200,34 @@ export const bulkDeleteMedia = mutation({
   },
 });
 
-// Upload to Cloudinary and add to media library
+// Bulk delete media items from R2 and database
+export const bulkDeleteMedia = action({
+  args: { ids: v.array(v.id("mediaLibrary")) },
+  handler: async (ctx, args) => {
+    let deletedCount = 0;
+    const publicIds: string[] = [];
+
+    for (const id of args.ids) {
+      const existing = await ctx.runQuery(api.mediaLibrary.getMediaById, { id });
+      if (existing && existing.cloudinaryPublicId) {
+        try {
+          await ctx.runAction((internal as any).r2.deleteFromR2, {
+            key: existing.cloudinaryPublicId,
+          });
+          publicIds.push(existing.cloudinaryPublicId);
+          deletedCount++;
+        } catch (e) {
+          console.error(`Failed to delete ${existing.cloudinaryPublicId} from R2`, e);
+        }
+      }
+    }
+
+    await ctx.runMutation(internal.mediaLibrary.bulkDeleteMediaInternal, { ids: args.ids });
+    return { success: true, deletedCount, publicIds };
+  },
+});
+
+// Upload to R2 and add to media library
 export const uploadAndAddToLibrary = action({
   args: {
     imageBase64: v.string(),
@@ -189,102 +238,72 @@ export const uploadAndAddToLibrary = action({
   },
   handler: async (ctx, args) => {
     try {
-      const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-      const apiKey = process.env.CLOUDINARY_API_KEY;
-      const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-      if (!cloudName || !apiKey || !apiSecret) {
-        throw new Error("Cloudinary credentials not configured");
-      }
-
-      // Generate a unique public ID
-      const timestamp = Math.floor(Date.now() / 1000).toString();
+      // Generate a unique file name
       const sanitizedFilename = args.filename
         .replace(/\.[^/.]+$/, "") // Remove extension
         .replace(/[^a-zA-Z0-9-_]/g, "_"); // Sanitize
-      const publicId = `${sanitizedFilename}_${Date.now()}`;
       const folder = args.folder || "media-library";
-
-      // Prepare upload parameters
-      const uploadParams: Record<string, string> = {
-        upload_preset: "webp-auto-convert",
-        folder: folder,
-        public_id: publicId,
-        timestamp: timestamp,
-      };
-
-      // Generate signature
-      const sortedParams = Object.keys(uploadParams)
-        .sort()
-        .map((key) => `${key}=${uploadParams[key]}`)
-        .join("&");
-
-      const signatureInput = sortedParams + apiSecret;
-
-      async function sha1(str: string): Promise<string> {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(str);
-        const hashBuffer = await crypto.subtle.digest("SHA-1", data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-      }
-
-      const signature = await sha1(signatureInput);
-
-      // Determine resource type based on media type
-      const resourceType = args.mediaType === "video" ? "video" : "image";
-
-      const finalParams = {
-        ...uploadParams,
-        api_key: apiKey,
-        signature: signature,
-        file: args.imageBase64,
-      };
-
-      // Upload to Cloudinary
-      const formData = new FormData();
-      Object.entries(finalParams).forEach(([key, value]) => {
-        if (value !== undefined) {
-          formData.append(key, value);
+      
+      // Determine file extension
+      let extension = "webp"; // default
+      if (args.imageBase64.startsWith("data:")) {
+        const mimeMatch = args.imageBase64.match(/data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+).*,.*/);
+        if (mimeMatch && mimeMatch.length > 1) {
+          const mimeType = mimeMatch[1];
+          if (mimeType.includes("jpeg") || mimeType.includes("jpg")) extension = "jpg";
+          else if (mimeType.includes("png")) extension = "png";
+          else if (mimeType.includes("gif")) extension = "gif";
+          else if (mimeType.includes("mp4")) extension = "mp4";
+          else if (mimeType.includes("webm")) extension = "webm";
         }
+      }
+      
+      const fileKey = `${folder}/${sanitizedFilename}_${Date.now()}.${extension}`;
+      
+      // Extract base64 data
+      const base64Data = args.imageBase64.includes(',') 
+        ? args.imageBase64.split(',')[1] 
+        : args.imageBase64;
+        
+      const contentType = args.mediaType === "video" ? `video/${extension}` : `image/${extension}`;
+
+      // Upload to R2
+      const r2Result = await ctx.runAction((internal as any).r2.uploadToR2, {
+        fileBase64: base64Data,
+        key: fileKey,
+        contentType: contentType,
       });
 
-      const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
-
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Cloudinary upload failed: ${errorText}`);
+      if (!r2Result.success) {
+        throw new Error(r2Result.error || "Failed to upload to R2");
       }
 
-      const result = await response.json();
+      // We need to estimate file size since R2 action doesn't return it yet
+      // A base64 string is about 33% larger than the original binary
+      const estimatedBytes = Math.floor((base64Data.length * 3) / 4);
 
       // Add to media library using internal mutation
       await ctx.runMutation(internal.mediaLibrary.addMediaInternal, {
-        cloudinaryUrl: result.secure_url,
-        cloudinaryPublicId: result.public_id,
+        cloudinaryUrl: r2Result.url, // Keeping the field name for backward compatibility in DB schema, but storing R2 URL
+        cloudinaryPublicId: r2Result.key, // Store R2 key here for deletion later
         filename: args.filename,
         folder: folder,
         mediaType: args.mediaType || "image",
-        format: result.format,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes,
+        format: extension,
+        width: 0, // We can't easily determine dimensions server-side without a library
+        height: 0,
+        bytes: estimatedBytes,
         tags: args.tags || [],
       });
 
       return {
         success: true,
-        cloudinaryUrl: result.secure_url,
-        publicId: result.public_id,
-        format: result.format,
-        width: result.width,
-        height: result.height,
-        bytes: result.bytes,
+        cloudinaryUrl: r2Result.url, // Return R2 URL
+        publicId: r2Result.key, // Return R2 key
+        format: extension,
+        width: 0,
+        height: 0,
+        bytes: estimatedBytes,
       };
     } catch (error) {
       console.error("Media upload error:", error);

@@ -2,44 +2,14 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 import { SearchIcon } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link, useNavigate } from "react-router-dom";
 
-// Brand logo mapping
-const brandLogos: Record<string, string> = {
-  "Acer": "https://cdn.hercules.app/file_VPsF9hKlLl5MN9q0RE6GFnB1",
-  "Apple": "https://cdn.hercules.app/file_qcbK94JAlKCQO3s4ECR3BDw8",
-  "Asus": "https://cdn.hercules.app/file_4m1ytbCQzLWgFlSMk1J1ZCru",
-  "CMF": "https://cdn.hercules.app/file_4c1OKYG0fSACOsMluL75owT2",
-  "Canon": "https://cdn.hercules.app/file_off0gfWoUMcir0QQZCzi7GIU",
-  "DJI": "https://cdn.hercules.app/file_EGoBVi2MqXFIfQ9azAk17mLW",
-  "Dell": "https://cdn.hercules.app/file_2tP7hAQL78de6m08Vul1woh2",
-  "Google": "https://cdn.hercules.app/file_9C2bkc6R18Zlw3kzIlyEc37z",
-  "HP": "https://cdn.hercules.app/file_tmMxAwkMVSRtMfVY57qWMZUV",
-  "HMD": "https://cdn.hercules.app/file_6SgBKQgyl2Yu5etoIDWd7brZ",
-  "Honor": "https://cdn.hercules.app/file_we74pfzTJnEtTUdJhYuW5ThV",
-  "Infinix": "https://cdn.hercules.app/file_vAGQJl0uxGOQGpi2bezQ1Awc",
-  "Lava": "https://cdn.hercules.app/file_7hHzwp413xD518fxJ5x0baw6",
-  "Lenovo": "https://cdn.hercules.app/file_LFviHa1inqcy1Wep9Y5iFpO9",
-  "Motorola": "https://cdn.hercules.app/file_mrd4R2pm62O76PqkzhyqHbeh",
-  "Nikon": "https://cdn.hercules.app/file_ylLjoFqbjC30tGQqjNW6HyTr",
-  "Nothing": "https://cdn.hercules.app/file_n1uEhYdL5ZtXcIo6CRLXRG9L",
-  "One Plus": "https://cdn.hercules.app/file_CFmZ3JACXeL3XhcE9uOqiEGB",
-  "Oppo": "https://cdn.hercules.app/file_MJ0Tzj4OvYrNYt0PiECFcoL3",
-  "PlayStation": "https://cdn.hercules.app/file_G2wSLrMTBTW2Kcy9GtGCv5KW",
-  "Poco": "https://cdn.hercules.app/file_DMUZvqLtfG3xqHV8GA1rnCJD",
-  "Realme": "https://cdn.hercules.app/file_NrBIl0OOhvh0eLyAhLKluYU9",
-  "Samsung": "https://cdn.hercules.app/file_wtgTFk2vMW6YlMu15GbUnFvJ",
-  "Sony": "https://cdn.hercules.app/file_8mYsjEHmr72IQRnEON8FEfD2",
-  "Tecno": "https://cdn.hercules.app/file_d4D7g77UjY356BBldBKW7HNo",
-  "Vivo": "https://cdn.hercules.app/file_o3IQVV2jjv2h9nbO09Wf08D6",
-  "Xbox": "https://cdn.hercules.app/file_RMC3F2D6573iOGnDKKenuTH7",
-  "Xiaomi": "https://cdn.hercules.app/file_8B5z2x34UxKbxnje3MH1w59O",
-  "iQOO": "https://cdn.hercules.app/file_m1bBgRqmZsG4VorENlmoX7w0",
-};
+// Brand logo mapping removed as per migration
+const brandLogos: Record<string, string> = {};
 
 // Fallback phone brands for instant cold start display
 const FALLBACK_PHONE_BRANDS = [

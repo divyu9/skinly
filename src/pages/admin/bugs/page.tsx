@@ -1,6 +1,6 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import { Authenticated } from "convex/react";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import { Authenticated } from "@/lib/firebase-hooks";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { useState } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import { formatDistanceToNow } from "date-fns";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -657,10 +657,14 @@ function BugReportsContent() {
   );
 }
 
+import { AdminLayout } from "@/components/admin-layout.tsx";
+
 export default function BugsPage() {
   return (
     <Authenticated>
-      <BugReportsContent />
+      <AdminLayout>
+        <BugReportsContent />
+      </AdminLayout>
     </Authenticated>
   );
 }

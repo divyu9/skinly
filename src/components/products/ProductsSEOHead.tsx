@@ -10,7 +10,7 @@ export const ProductsSEOHead = memo(function ProductsSEOHead({
   title = "Shop Premium Phone Skins & Gadget Accessories | Skinly",
   description = "Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application.",
 }: ProductsSEOHeadProps) {
-  const imageUrl = "https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv";
+  const imageUrl = "/logo.webp";
   const siteUrl = "https://goskinly.com/products";
   
   return (

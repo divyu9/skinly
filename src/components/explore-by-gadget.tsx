@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import type { Id } from "@/lib/firebase-api";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
 interface ExploreByGadgetProps {

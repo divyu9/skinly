@@ -1,6 +1,6 @@
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import type { Doc } from "@/lib/firebase-api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion.tsx";
@@ -40,12 +40,12 @@ export default function BrandPageLayout({ page }: BrandPageLayoutProps) {
   };
 
   // Extract brand name from heading
-  const brandName = page.h1Heading.replace(/Skins for |Phone Skins for |Skins/gi, "").trim();
+  const brandName = (page.h1Heading || page.title || "").replace(/Skins for |Phone Skins for |Skins/gi, "").trim();
 
   // Filter products by brand (based on title/tags since phone models not in query result)
   const brandProducts = products?.filter((p: Doc<"products">) => 
-    p.title.toLowerCase().includes(brandName.toLowerCase()) ||
-    p.tags?.some((tag: string) => tag.toLowerCase().includes(brandName.toLowerCase()))
+    (p.title || "").toLowerCase().includes(brandName.toLowerCase()) ||
+    p.tags?.some((tag: string) => (tag || "").toLowerCase().includes(brandName.toLowerCase()))
   ) || [];
 
   const displayProducts = brandProducts.length > 0 ? brandProducts : products?.slice(0, 12) || [];

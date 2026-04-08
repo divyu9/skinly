@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card } from "@/components/ui/card.tsx";
@@ -47,7 +47,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -229,14 +229,14 @@ export default function SEOPagesPage() {
       setUploadingPageId(pageId);
       
       // Create a simple prompt to paste URL
-      const url = prompt("Paste the image URL from Files & Media (must start with https://cdn.hercules.app/file_):");
+      const url = prompt("Paste the image URL from Files & Media (must start with https://):");
       
       if (!url) {
         toast.info("Upload cancelled");
         return;
       }
 
-      if (!url.startsWith("https://cdn.hercules.app/file_")) {
+      if (!url.startsWith("https://")) {
         toast.error("Invalid URL. Please upload the image to Files & Media first and paste the URL here.");
         return;
       }

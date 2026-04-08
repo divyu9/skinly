@@ -1,16 +1,16 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
 import { UploadIcon, TrashIcon, FileTextIcon, CopyIcon, ImageIcon, DownloadIcon, AlertCircleIcon, CheckCircleIcon, FolderIcon, ExternalLinkIcon, PlayIcon, PauseIcon, XIcon, RefreshCwIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { useConvex } from "convex/react";
+import { useConvex } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/lib/firebase-api";
 
 interface FailedFile {
   filename: string;
@@ -24,6 +24,8 @@ interface BrokenMockup {
   sku: string;
   fileId: Id<"_storage">;
 }
+
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 export default function MockupsPage() {
   const [csvData, setCsvData] = useState("");
@@ -739,7 +741,7 @@ export default function MockupsPage() {
         const trimmed = line.trim();
         if (!trimmed) continue;
         
-        // Extract file ID (pattern: file_xxxxx or https://cdn.hercules.app/file_xxxxx)
+        // Extract file ID (pattern: file_xxxxx or https://...)
         let fileId = '';
         if (trimmed.startsWith('file_')) {
           fileId = trimmed.split(/[\s,\t]/)[0];
@@ -912,8 +914,9 @@ export default function MockupsPage() {
       </AuthLoading>
       
       <Authenticated>
-        <div className="container mx-auto py-8 px-4">
-          <div className="mb-6 flex items-start justify-between">
+        <AdminLayout>
+          <div className="container mx-auto py-8 px-4">
+            <div className="mb-6 flex items-start justify-between">
             <div>
               <h1 className="text-3xl font-bold">Mockup Management</h1>
               <p className="text-muted-foreground mt-2">
@@ -1426,7 +1429,7 @@ alert('Copied ' + files.length + ' files to clipboard!');`;
               <Textarea
                 placeholder="Paste file URLs, file IDs, or filenames here...
 Examples:
-https://cdn.hercules.app/file_abc123
+https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/mockups/...
 file_abc123 Apple_iPhone15Pro_M-174.jpg
 Samsung_GalaxyS24_M-174.jpg"
                 value={fileListData}
@@ -1701,6 +1704,7 @@ Samsung_GalaxyS24_M-174.jpg"
           </Card>
         )}
         </div>
+        </AdminLayout>
       </Authenticated>
     </>
   );

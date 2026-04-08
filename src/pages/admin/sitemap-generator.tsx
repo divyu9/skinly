@@ -1,8 +1,8 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
-import { Authenticated } from "convex/react";
+import { Authenticated } from "@/lib/firebase-hooks";
 import { Download, RefreshCw, CheckCircle2, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

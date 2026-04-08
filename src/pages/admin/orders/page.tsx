@@ -1,5 +1,5 @@
-import { useQuery, useAction, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useAction, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -9,7 +9,7 @@ import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, Ind
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -27,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar.tsx";
 import { toast } from "sonner";
 import { useState, useMemo } from "react";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { PDFDocument } from "pdf-lib";
 import { ManualOrderDialog } from "./manual-order-dialog.tsx";
 
@@ -104,6 +104,31 @@ function AdminOrdersPageInner() {
     
     return filtered;
   }, [baseOrders, dateFilter, customStartDate, customEndDate]);
+
+  const computedStats = useMemo(() => {
+    if (!displayOrders) return null;
+    return {
+      total: displayOrders.length,
+      processing: displayOrders.filter((o) => o.status === "processing").length,
+      shipped: displayOrders.filter((o) => o.status === "shipped").length,
+      delivered: displayOrders.filter((o) => o.status === "delivered").length,
+      cancelled: displayOrders.filter((o) => o.status === "cancelled").length,
+      rto: displayOrders.filter((o) => o.status === "rto").length,
+      pending_payment: displayOrders.filter((o) => o.status === "pending_payment").length,
+      failed: displayOrders.filter((o) => o.paymentStatus === "failed").length,
+      deleted: displayOrders.filter((o) => o.isDeleted).length,
+      totalRevenue: displayOrders
+        .filter((o) => o.paymentStatus === "success")
+        .reduce((sum, o) => sum + o.total, 0),
+      pendingPayments: displayOrders.filter(
+        (o) => o.paymentStatus === "pending" || !o.paymentStatus
+      ).length,
+      successfulPayments: displayOrders.filter((o) => o.paymentStatus === "success")
+        .length,
+      failedPayments: displayOrders.filter((o) => o.paymentStatus === "failed")
+        .length,
+    };
+  }, [displayOrders]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -569,9 +594,9 @@ function AdminOrdersPageInner() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold">{computedStats.total}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.processing} processing
+              {computedStats.processing} processing
             </p>
           </CardContent>
         </Card>
@@ -586,9 +611,9 @@ function AdminOrdersPageInner() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{stats.totalRevenue.toFixed(0)}</div>
+            <div className="text-2xl font-bold">₹{computedStats.totalRevenue.toFixed(0)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.successfulPayments} paid orders
+              {computedStats.successfulPayments} paid orders
             </p>
           </CardContent>
         </Card>
@@ -604,10 +629,10 @@ function AdminOrdersPageInner() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {stats.successfulPayments}
+              {computedStats.successfulPayments}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.pendingPayments} pending, {stats.failedPayments} failed
+              {computedStats.pendingPayments} pending, {computedStats.failedPayments} failed
             </p>
           </CardContent>
         </Card>
@@ -623,74 +648,74 @@ function AdminOrdersPageInner() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-indigo-600">
-              {stats.shipped}
+              {computedStats.shipped}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {stats.delivered} delivered
+              {computedStats.delivered} delivered
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Status Tabs */}
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="processing" className="flex items-center gap-2">
-            Processing
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/20">
-              {stats.processing}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="pending_payment" className="flex items-center gap-2">
-            Pending Payment
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-              {stats.pending_payment}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="shipped" className="flex items-center gap-2">
-            Shipped
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
-              {stats.shipped}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="delivered" className="flex items-center gap-2">
-            Delivered
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-green-500/10 text-green-600 border-green-500/20">
-              {stats.delivered}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="cancelled" className="flex items-center gap-2">
-            Cancelled
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
-              {stats.cancelled}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="rto" className="flex items-center gap-2">
-            RTO
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
-              {stats.rto}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="failed" className="flex items-center gap-2">
-            Failed Orders
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
-              {stats.failed}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="deleted" className="flex items-center gap-2">
-            Deleted Orders
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-gray-500/10 text-gray-600 border-gray-500/20">
-              {stats.deleted}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            All Orders
-            <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-              {stats.total}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+          <TabsList className="w-full justify-start overflow-x-auto h-auto py-2">
+            <TabsTrigger value="processing" className="flex items-center gap-2 data-[state=active]:bg-purple-500/10 dark:data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-600 data-[state=active]:shadow-none">
+              Processing
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/20">
+                {stats.processing}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="pending_payment" className="flex items-center gap-2 data-[state=active]:bg-yellow-500/10 dark:data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-600 data-[state=active]:shadow-none">
+              Pending Payment
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
+                {stats.pending_payment}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="shipped" className="flex items-center gap-2 data-[state=active]:bg-indigo-500/10 dark:data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-600 data-[state=active]:shadow-none">
+              Shipped
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
+                {stats.shipped}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="delivered" className="flex items-center gap-2 data-[state=active]:bg-green-500/10 dark:data-[state=active]:bg-green-500/20 data-[state=active]:text-green-600 data-[state=active]:shadow-none">
+              Delivered
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-green-500/10 text-green-600 border-green-500/20">
+                {stats.delivered}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="cancelled" className="flex items-center gap-2 data-[state=active]:bg-red-500/10 dark:data-[state=active]:bg-red-500/20 data-[state=active]:text-red-600 data-[state=active]:shadow-none">
+              Cancelled
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
+                {stats.cancelled}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="rto" className="flex items-center gap-2 data-[state=active]:bg-orange-500/10 dark:data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-600 data-[state=active]:shadow-none">
+              RTO
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
+                {stats.rto}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="failed" className="flex items-center gap-2 data-[state=active]:bg-red-500/10 dark:data-[state=active]:bg-red-500/20 data-[state=active]:text-red-600 data-[state=active]:shadow-none">
+              Failed Orders
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
+                {stats.failed}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="deleted" className="flex items-center gap-2 data-[state=active]:bg-gray-500/10 dark:data-[state=active]:bg-gray-500/20 data-[state=active]:text-gray-600 data-[state=active]:shadow-none">
+              Deleted Orders
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-gray-500/10 text-gray-600 border-gray-500/20">
+                {stats.deleted}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="all" className="flex items-center gap-2 data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-none">
+              All Orders
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                {stats.total}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
       {/* Filters and Search */}
       <Card>

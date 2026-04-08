@@ -1,15 +1,14 @@
-import { useAuth } from "@clerk/clerk-react";
-import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ThemeProvider } from "next-themes";
 import { convex } from "@/lib/convex";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@/components/providers/query-client";
 import { UpdateCurrentUserProvider } from "@/components/providers/update-current-user";
+import { ConvexProvider } from "@/lib/firebase-hooks";
 
 export function DefaultProviders({ children }: { children: React.ReactNode }) {
   return (
-    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+    <ConvexProvider client={convex}>
       <QueryClientProvider>
         <UpdateCurrentUserProvider>
           <TooltipProvider>
@@ -24,6 +23,6 @@ export function DefaultProviders({ children }: { children: React.ReactNode }) {
           </TooltipProvider>
         </UpdateCurrentUserProvider>
       </QueryClientProvider>
-    </ConvexProviderWithClerk>
+    </ConvexProvider>
   );
 }

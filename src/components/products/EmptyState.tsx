@@ -26,7 +26,7 @@ export const EmptyState = memo(function EmptyState({
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <img 
-              src="https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv" 
+              src="/logo.webp" 
               alt="Skinly" 
               className="h-10 sm:h-12"
             />

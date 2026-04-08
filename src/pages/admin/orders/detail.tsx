@@ -1,16 +1,16 @@
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Link, useParams } from "react-router-dom";
 import { PackageIcon, ArrowLeftIcon } from "lucide-react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 import { OrderHeader, type OrderStatus, type PaymentStatus } from "./_components/OrderHeader.tsx";
 import { CustomerInfoCard, type CustomerFormData, type AddressFormData } from "./_components/CustomerInfoCard.tsx";

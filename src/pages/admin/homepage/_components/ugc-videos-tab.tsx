@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import type { Id } from "@/lib/firebase-api";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -307,7 +307,7 @@ export function UgcVideosTab() {
                 id="video-url"
                 value={formData.videoUrl}
                 onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
-                placeholder="https://cdn.hercules.app/file_..."
+                placeholder="https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/..."
               />
             </div>
 
@@ -317,7 +317,7 @@ export function UgcVideosTab() {
                 id="thumbnail-url"
                 value={formData.thumbnailUrl}
                 onChange={(e) => setFormData({ ...formData, thumbnailUrl: e.target.value })}
-                placeholder="https://cdn.hercules.app/file_..."
+                placeholder="https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/..."
               />
             </div>
 

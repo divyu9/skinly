@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useMutation, useQuery, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -11,13 +11,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { PackageIcon, PlusIcon, TrashIcon, ChevronLeftIcon, SparklesIcon, ImageIcon } from "lucide-react";
 import { ProductImageUploader } from "../_components/product-image-uploader.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 interface Variant {
   sku: string;
@@ -126,7 +126,7 @@ function NewProductPageInner() {
   const selectedFinishType = finishTypes?.find(f => f._id === formData.finishTypeId);
 
   // Default logo image URL for products without images
-  const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
+  const DEFAULT_LOGO_IMAGE = "/logo.webp";
 
   const handleGenerateSEO = async () => {
     if (!formData.title.trim()) {

@@ -181,7 +181,7 @@ export function AdminSidebar() {
         {!collapsed && (
           <Link to="/" className="flex items-center">
             <img
-              src="https://cdn.hercules.app/file_BeLyyzbB027HpdANiT8hKqMV"
+              src="/logo.webp"
               alt="Skinly"
               width="200"
               height="80"

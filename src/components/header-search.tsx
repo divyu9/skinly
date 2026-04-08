@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Link, useLocation } from "react-router-dom";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -98,11 +98,13 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
     // 3. SKU matches
     const skuMatches: Array<{ product: typeof designMatches[0]; variant: typeof designMatches[0]['variants'][0] }> = [];
     productsFromSearch.forEach(product => {
-      product.variants.forEach(variant => {
-        if (variant.sku && normalizeForSearch(variant.sku).includes(normalizeForSearch(query))) {
-          skuMatches.push({ product: product as typeof designMatches[0], variant });
-        }
-      });
+      if (product.variants) {
+        product.variants.forEach((variant: any) => {
+          if (variant.sku && normalizeForSearch(variant.sku).includes(normalizeForSearch(query))) {
+            skuMatches.push({ product: product as typeof designMatches[0], variant });
+          }
+        });
+      }
     });
 
     return {
@@ -250,19 +252,19 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
                           className="flex items-center gap-3 p-2 hover:bg-muted rounded-md"
                           onClick={() => setShowResults(false)}
                         >
-                          {product.images[0] && (
+                          {product.images && product.images[0] && (
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
-                              width="40"
-                              height="40"
-                              className="size-10 object-cover rounded"
+                              width="48"
+                              height="48"
+                              className="size-12 object-cover rounded-lg flex-shrink-0"
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{product.title}</p>
+                            <p className="font-medium text-sm">{product.title}</p>
                             <p className="text-xs text-muted-foreground">
-                              {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
+                              {product.variants?.length || 0} variant{product.variants?.length !== 1 ? 's' : ''}
                             </p>
                           </div>
                         </Link>
@@ -283,18 +285,18 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
                           className="flex items-center gap-3 p-2 hover:bg-muted rounded-md"
                           onClick={() => setShowResults(false)}
                         >
-                          {product.images[0] && (
+                          {product.images && product.images[0] && (
                             <img 
                               src={product.images[0].url} 
                               alt={product.title}
-                              width="40"
-                              height="40"
-                              className="size-10 object-cover rounded"
+                              width="48"
+                              height="48"
+                              className="size-12 object-cover rounded-lg flex-shrink-0"
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{product.title}</p>
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p className="font-medium text-sm">{product.title}</p>
+                            <p className="text-xs text-muted-foreground">
                               SKU: {variant.sku} • {variant.title}
                             </p>
                           </div>

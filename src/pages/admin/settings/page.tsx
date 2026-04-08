@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
-import { Loader2, Key, BarChart3 } from "lucide-react";
+import { Loader2, Key, BarChart3, Database } from "lucide-react";
 
 export default function SettingsPage() {
   const openAIKeySetting = useQuery(api.settings.getSetting, { key: "OPENAI_API_KEY" });
@@ -15,10 +15,12 @@ export default function SettingsPage() {
   const metaPixelSetting = useQuery(api.settings.getSetting, { key: "META_PIXEL_ID" });
   const updateSetting = useMutation(api.settings.updateSetting);
   const migrateKey = useMutation(api.migrateOpenAIKey.migrateOpenAIKey);
+  const setupR2Cors = useAction(api.r2.setupR2Cors);
   
   const [apiKey, setApiKey] = useState("");
   const [metaPixelId, setMetaPixelId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSettingUpCors, setIsSettingUpCors] = useState(false);
   const [isSavingPixel, setIsSavingPixel] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
 
@@ -83,6 +85,23 @@ export default function SettingsPage() {
     }
   };
 
+  const handleSetupCors = async () => {
+    setIsSettingUpCors(true);
+    try {
+      const result = await setupR2Cors({});
+      if (result?.success) {
+        toast.success(result.message || "R2 CORS configured successfully");
+      } else {
+        toast.error(result?.error || "Failed to configure CORS");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to configure CORS");
+      console.error(error);
+    } finally {
+      setIsSettingUpCors(false);
+    }
+  };
+
   const isLoading = openAIKeySetting === undefined || metaPixelSetting === undefined;
   const hasKey = openAIKeySetting?.value;
   const hasPixel = metaPixelSetting?.value;
@@ -90,12 +109,12 @@ export default function SettingsPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
+        <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold">Settings</h1>
           <p className="text-muted-foreground">Manage your application settings</p>
         </div>
 
-        <Card>
+      <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Key className="h-5 w-5" />
@@ -226,6 +245,34 @@ export default function SettingsPage() {
                 </Button>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Cloudflare R2 Storage
+            </CardTitle>
+            <CardDescription>
+              Manage your R2 storage bucket settings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>CORS Configuration</Label>
+              <p className="text-sm text-muted-foreground mb-4">
+                Sets up the required Cross-Origin Resource Sharing (CORS) headers on your R2 bucket to allow direct image uploads from the browser. You only need to run this once per bucket.
+              </p>
+              <Button 
+                onClick={handleSetupCors} 
+                disabled={isSettingUpCors}
+                variant="secondary"
+              >
+                {isSettingUpCors && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Configure R2 CORS
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

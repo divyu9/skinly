@@ -1,6 +1,6 @@
 import { useParams, Navigate } from "react-router-dom";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Helmet } from "react-helmet-async";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import KeywordPageLayout from "./_components/keyword-layout.tsx";

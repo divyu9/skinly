@@ -1,6 +1,6 @@
 import { Package2, Shield, Video, Zap, Glasses, ShoppingBag, Box } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 
 interface ProductCategoryHeaderProps {

@@ -1,10 +1,10 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { ConvexError } from "convex/values";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 interface ReviewFormState {
   dialogOpen: boolean;

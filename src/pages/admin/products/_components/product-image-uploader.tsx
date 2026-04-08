@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -56,7 +56,7 @@ export function ProductImageUploader({
   };
 
   // Generate unique filename
-  const generateFileName = (index: number) => {
+  const getUniqueFileName = (index: number) => {
     const timestamp = Date.now();
     return `img_${index}_${timestamp}`;
   };
@@ -84,13 +84,13 @@ export function ProductImageUploader({
 
       // Upload to R2
       const slug = productSlug.toLowerCase().replace(/[^a-z0-9]/g, "-").slice(0, 30);
-      const timestamp = Date.now();
-      const r2Key = `products/${slug}/img_${index}_${timestamp}.webp`;
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'webp';
+      const r2Key = `products/${slug}/${getUniqueFileName(index)}.${extension}`;
 
       const result = await uploadToR2({
         fileBase64: base64,
         key: r2Key,
-        contentType: "image/webp",
+        contentType: file.type || "image/webp",
       });
 
       if (!result.success) {
@@ -98,7 +98,7 @@ export function ProductImageUploader({
       }
 
       const newImage: ProductImage = {
-        url: result.publicUrl!,
+        url: result.url || result.publicUrl!,
         alt: file.name.replace(/\.[^/.]+$/, ""),
       };
 

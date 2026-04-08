@@ -1,27 +1,39 @@
-import { useAuth as useClerkAuth, useUser } from "@clerk/clerk-react";
-import { useCallback } from "react";
+import { useState, useEffect } from "react";
+import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
+import type { User } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export function useAuth() {
-  const clerkAuth = useClerkAuth();
-  const { user, isLoaded } = useUser();
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const fetchAccessToken = useCallback(
-    async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
-      return clerkAuth.getToken({ template: "convex", skipCache: forceRefreshToken }) ?? null;
-    },
-    [clerkAuth]
-  );
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setIsLoaded(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const fetchAccessToken = async ({ forceRefreshToken = false }: { forceRefreshToken?: boolean } = {}) => {
+    if (!user) return null;
+    return await user.getIdToken(forceRefreshToken);
+  };
+
+  const signOut = async () => {
+    await firebaseSignOut(auth);
+  };
 
   return {
-    // 🔹 Convex-required shape
+    // Convex-required shape (temporarily keeping these for backward compatibility during migration)
     isLoading: !isLoaded,
     isAuthenticated: !!user,
     fetchAccessToken,
 
-    // 🔹 App usage
+    // App usage
     user,
     isLoaded,
     isSignedIn: !!user,
-    signOut: clerkAuth.signOut,
+    signOut,
   };
 }

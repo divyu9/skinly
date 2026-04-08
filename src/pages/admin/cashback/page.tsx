@@ -1,14 +1,14 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import {
   Dialog,
   DialogContent,
@@ -112,6 +112,22 @@ function AdminCashbackPageInner() {
     isActive: true,
   });
 
+  const getTargetDisplayName = (type: TargetType, id: string) => {
+    if (type === "product" && allProducts) {
+      const product = allProducts.find(p => p._id === id);
+      return product ? product.title : id;
+    }
+    if (type === "variant" && allVariants) {
+      const variant = allVariants.find(v => v._id === id);
+      return variant ? `${variant.productTitle} - ${variant.title} (${variant.sku})` : id;
+    }
+    if (type === "collection" && allCollections) {
+      const collection = allCollections.find(c => c._id === id);
+      return collection ? collection.name : id;
+    }
+    return id;
+  };
+
   // Filter searchable items based on target type and search query
   const searchResults = useMemo(() => {
     if (!debouncedTargetSearch.trim()) return [];
@@ -185,16 +201,17 @@ function AdminCashbackPageInner() {
       filtered = filtered.filter((rule) => rule.targetType === filterTargetType);
     }
 
-    // Search by target ID
+    // Search by target ID or name
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((rule) =>
-        rule.targetId.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter((rule) => {
+        const displayName = getTargetDisplayName(rule.targetType, rule.targetId).toLowerCase();
+        return rule.targetId.toLowerCase().includes(query) || displayName.includes(query);
+      });
     }
 
     return filtered;
-  }, [rules, filterTargetType, searchQuery]);
+  }, [rules, filterTargetType, searchQuery, allProducts, allVariants, allCollections]);
 
   const openCreateDialog = () => {
     setEditingRuleId(null);
@@ -448,7 +465,7 @@ function AdminCashbackPageInner() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Target Type</TableHead>
-                      <TableHead>Target ID</TableHead>
+                      <TableHead>Target Name</TableHead>
                       <TableHead>Cashback</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created</TableHead>
@@ -461,7 +478,10 @@ function AdminCashbackPageInner() {
                         <TableCell>
                           <Badge variant="outline">{formatTargetType(rule.targetType)}</Badge>
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{rule.targetId}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          {getTargetDisplayName(rule.targetType, rule.targetId)}
+                          <div className="text-xs text-muted-foreground font-mono">{rule.targetId}</div>
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary">

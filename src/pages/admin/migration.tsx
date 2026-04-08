@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";

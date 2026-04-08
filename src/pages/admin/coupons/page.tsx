@@ -1,5 +1,5 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -21,10 +21,10 @@ import {
 } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { useState } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -164,20 +164,23 @@ function AdminCouponsPageInner() {
     }
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (selectedCoupons.length === 0) return;
-    if (!confirm(`Are you sure you want to delete ${selectedCoupons.length} coupons? This action cannot be undone.`)) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedCoupons.length} coupons? This action cannot be undone.`)) return;
 
     try {
       await bulkDeleteCoupons({ couponIds: selectedCoupons });
       toast.success(`${selectedCoupons.length} coupons deleted successfully`);
       setSelectedCoupons([]);
     } catch (error) {
+      console.error("Bulk delete error:", error);
       toast.error("Failed to delete coupons");
     }
   };
 
-  const handleBulkDisable = async () => {
+  const handleBulkDisable = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (selectedCoupons.length === 0) return;
     
     try {
@@ -185,17 +188,19 @@ function AdminCouponsPageInner() {
       toast.success(`${selectedCoupons.length} coupons disabled successfully`);
       setSelectedCoupons([]);
     } catch (error) {
+      console.error("Bulk disable error:", error);
       toast.error("Failed to disable coupons");
     }
   };
 
   const handleDelete = async (couponId: Id<"coupons">) => {
-    if (!confirm("Are you sure you want to delete this coupon?")) return;
+    if (!window.confirm("Are you sure you want to delete this coupon?")) return;
 
     try {
       await deleteCoupon({ couponId });
       toast.success("Coupon deleted successfully");
     } catch (error) {
+      console.error("Delete coupon error:", error);
       toast.error("Failed to delete coupon");
     }
   };
@@ -229,13 +234,25 @@ function AdminCouponsPageInner() {
       };
 
       if (editingCoupon) {
+        const updateData = {
+          ...data,
+          minPurchase: data.minPurchase === undefined ? null : data.minPurchase,
+          maxDiscount: data.maxDiscount === undefined ? null : data.maxDiscount,
+          usageLimit: data.usageLimit === undefined ? null : data.usageLimit,
+          applicableVariantIds: data.applicableVariantIds === undefined ? null : data.applicableVariantIds,
+          applicableCollectionIds: data.applicableCollectionIds === undefined ? null : data.applicableCollectionIds,
+          applicableProductKeywords: data.applicableProductKeywords === undefined ? null : data.applicableProductKeywords,
+          minCartValue: data.minCartValue === undefined ? null : data.minCartValue,
+          minProductValue: data.minProductValue === undefined ? null : data.minProductValue,
+          allowedCustomerEmails: data.allowedCustomerEmails === undefined ? null : data.allowedCustomerEmails,
+        };
         await updateCoupon({
           couponId: editingCoupon,
-          ...data,
+          ...updateData,
         });
         toast.success("Coupon updated successfully");
       } else {
-        await createCoupon(data);
+        await createCoupon(data as any);
         toast.success("Coupon created successfully");
       }
 
@@ -301,15 +318,15 @@ function AdminCouponsPageInner() {
   const filteredVariants = variants ? variants.filter((variant) => {
     const searchLower = variantSearchQuery.toLowerCase();
     return (
-      variant.productTitle.toLowerCase().includes(searchLower) ||
-      variant.title.toLowerCase().includes(searchLower) ||
-      variant.sku.toLowerCase().includes(searchLower)
+      (variant.productTitle || "").toLowerCase().includes(searchLower) ||
+      (variant.title || "").toLowerCase().includes(searchLower) ||
+      (variant.sku || "").toLowerCase().includes(searchLower)
     );
   }) : [];
 
-  const filteredCollections = collections.filter((collection) => {
-    return collection.name.toLowerCase().includes(collectionSearchQuery.toLowerCase());
-  });
+  const filteredCollections = collections ? collections.filter((collection) => {
+    return (collection.name || "").toLowerCase().includes(collectionSearchQuery.toLowerCase());
+  }) : [];
 
   return (
     <div className="space-y-6">
@@ -443,7 +460,7 @@ function AdminCouponsPageInner() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setViewingEligibleProducts(coupon._id)}
+                        onClick={(e) => { e.stopPropagation(); setViewingEligibleProducts(coupon._id); }}
                       >
                         <PackageIcon className="size-4 mr-1" />
                         Eligible Products
@@ -451,18 +468,18 @@ function AdminCouponsPageInner() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setViewingStats(coupon._id)}
+                        onClick={(e) => { e.stopPropagation(); setViewingStats(coupon._id); }}
                       >
                         <TrendingUpIcon className="size-4 mr-1" />
                         Stats
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(coupon._id)}>
+                      <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); handleEdit(coupon._id); }}>
                         <EditIcon className="size-3" />
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleDelete(coupon._id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(coupon._id); }}
                         className="text-destructive hover:text-destructive"
                       >
                         <TrashIcon className="size-3" />
@@ -917,7 +934,7 @@ function AdminCouponsPageInner() {
       {/* Eligible Products Dialog */}
       <Dialog
         open={!!viewingEligibleProducts}
-        onOpenChange={() => setViewingEligibleProducts(null)}
+        onOpenChange={(open) => !open && setViewingEligibleProducts(null)}
       >
         <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
@@ -987,7 +1004,7 @@ function AdminCouponsPageInner() {
       </Dialog>
 
       {/* Stats Dialog */}
-      <Dialog open={!!viewingStats} onOpenChange={() => setViewingStats(null)}>
+      <Dialog open={!!viewingStats} onOpenChange={(open) => !open && setViewingStats(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Coupon Statistics</DialogTitle>

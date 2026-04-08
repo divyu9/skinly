@@ -1,5 +1,5 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useRef, useState, useEffect, useCallback } from "react";
@@ -117,7 +117,7 @@ export function HeroSlider() {
                 src={slide.imageUrl}
                 alt={slide.heading || "Hero slide"}
                 loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
-                fetchPriority={slide._id === heroSlides[0]._id ? "high" : "auto"}
+                fetchpriority={slide._id === heroSlides[0]._id ? "high" : "auto"}
                 decoding={slide._id === heroSlides[0]._id ? "sync" : "async"}
                 width="1200"
                 height="1320"

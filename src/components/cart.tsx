@@ -1,5 +1,5 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Sheet,
@@ -13,7 +13,7 @@ import { ShoppingCartIcon, MinusIcon, PlusIcon, TrashIcon, AlertCircleIcon } fro
 import { Badge } from "@/components/ui/badge.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty.tsx";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth.ts";
@@ -213,6 +213,9 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                       src={item.productImage}
                       alt={item.productTitle}
                       className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale' : ''}`}
+                      onError={(e) => {
+                        e.currentTarget.src = "/logo.webp";
+                      }}
                     />
                   </div>
                 )}

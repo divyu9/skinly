@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useAction } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";

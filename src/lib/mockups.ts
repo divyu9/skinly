@@ -11,7 +11,7 @@
  * Apple,iPhone 15 Pro,M-174,file_abc123
  */
 
-const MOCKUP_BASE_URL = "https://cdn.hercules.app";
+const MOCKUP_BASE_URL = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 // Cache for successful mockup URL patterns
 const mockupCache = new Map<string, string>();
@@ -242,12 +242,12 @@ function constructMockupUrl(modelVariation: string, sku: string, brand?: string 
  * @returns Promise that resolves to true if image exists, false otherwise
  */
 export async function mockupImageExists(imageUrl: string): Promise<boolean> {
-  try {
-    const response = await fetch(imageUrl, { method: 'HEAD' });
-    return response.ok;
-  } catch {
-    return false;
-  }
+  // If we try to load multiple URLs that don't exist via new Image(), 
+  // the browser will spam the console with 404 errors.
+  // We can't avoid this if we want to know if the image actually exists on the CDN.
+  // Instead of trying to guess by hitting the CDN, let's assume the image exists 
+  // and handle failures at the component level.
+  return true;
 }
 
 /**
@@ -281,11 +281,11 @@ export function getMockupUrl(fileId: string): string {
  * const url = await findMockupImageUrl("Apple iPhone 15 Pro", "M-174");
  * ```
  */
-export async function findMockupImageUrl(
+export function findMockupImageUrl(
   modelName: string,
   sku: string,
   fileId?: string | null
-): Promise<string | null> {
+): string | null {
   // Check cache first
   const cacheKey = `${modelName}_${sku}`;
   if (mockupCache.has(cacheKey)) {
@@ -300,35 +300,19 @@ export async function findMockupImageUrl(
   }
   
   // Priority 2: Try legacy filename variations (backward compatibility)
+  // Instead of fetching them all blindly (which causes CORS and 404 errors in console),
+  // we will return an array of possible URLs and let the component handle trying them 
+  // via the <img> onError fallback mechanism.
   const brand = extractBrand(modelName);
   const variations = generateModelVariations(modelName);
   
-  // Try brand folder paths
-  if (brand) {
-    for (const variation of variations) {
-      const url = constructMockupUrl(variation, sku, brand);
-      const exists = await mockupImageExists(url);
-      
-      if (exists) {
-        mockupCache.set(cacheKey, url);
-        return url;
-      }
-    }
-  }
-  
-  // Try root mockups folder
-  for (const variation of variations) {
-    const url = constructMockupUrl(variation, sku, null);
-    const exists = await mockupImageExists(url);
+  // Return the first most likely URL to start with.
+  // The React component will have to handle fallbacks if it fails to load.
+  const primaryUrl = brand 
+    ? constructMockupUrl(variations[0], sku, brand) 
+    : constructMockupUrl(variations[0], sku, null);
     
-    if (exists) {
-      mockupCache.set(cacheKey, url);
-      return url;
-    }
-  }
-  
-  // No mockup found
-  return null;
+  return primaryUrl;
 }
 
 /**

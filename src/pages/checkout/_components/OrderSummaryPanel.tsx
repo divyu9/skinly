@@ -11,7 +11,7 @@ import {
   CheckCircleIcon,
   XIcon,
 } from "lucide-react";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 export interface CartItemData {
   productId: string;
@@ -139,6 +139,9 @@ export function OrderSummaryPanel({
                         src={item.productImage}
                         alt={item.productTitle}
                         className={`w-full h-full object-cover ${isOutOfStock ? "grayscale" : ""}`}
+                        onError={(e) => {
+                          e.currentTarget.src = "/logo.webp";
+                        }}
                       />
                     </div>
                   )}

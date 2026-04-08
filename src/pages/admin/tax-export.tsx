@@ -1,5 +1,5 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -10,9 +10,10 @@ import { toast } from "sonner";
 import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 
 function TaxExportPageInner() {
   const [dateRangeType, setDateRangeType] = useState<string>("this-month");
@@ -467,7 +468,9 @@ export default function TaxExportPage() {
         </div>
       </AuthLoading>
       <Authenticated>
-        <TaxExportPageInner />
+        <AdminLayout>
+          <TaxExportPageInner />
+        </AdminLayout>
       </Authenticated>
     </>
   );

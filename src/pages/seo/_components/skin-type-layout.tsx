@@ -1,6 +1,6 @@
-import type { Doc } from "@/convex/_generated/dataModel.d.ts";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import type { Doc } from "@/lib/firebase-api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion.tsx";
@@ -40,11 +40,11 @@ export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
   };
 
   // Extract skin type from heading (e.g., "Matte", "Glossy", "Carbon Fiber")
-  const skinType = page.h1Heading.replace(/Skins|Phone Skins/gi, "").trim();
+  const skinType = (page.h1Heading || page.title || "").replace(/Skins|Phone Skins/gi, "").trim();
 
   // Filter products by variant/finish (show all for now since variant filtering is complex)
   const skinTypeProducts = products?.filter((p: Doc<"products">) => 
-    p.title.toLowerCase().includes(skinType.toLowerCase())
+    (p.title || "").toLowerCase().includes(skinType.toLowerCase())
   ) || [];
 
   const displayProducts = skinTypeProducts.length > 0 ? skinTypeProducts : products?.slice(0, 12) || [];

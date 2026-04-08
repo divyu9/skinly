@@ -1,5 +1,5 @@
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Smartphone, RefreshCw, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -133,7 +133,7 @@ export function WelcomeBackCard({ onRequestChangeModel, detectedDevice, onUseDet
             </h2>
             
             <p className="text-zinc-400 text-sm sm:text-base">
-              {theme.subtitle} {displayDevice.gadgetType.toLowerCase()}.
+              {theme.subtitle} {displayDevice.gadgetType?.toLowerCase() || "device"}.
             </p>
 
             {theme.showBetaWarning && (

@@ -7,7 +7,7 @@ import { api } from "./_generated/api.js";
 import OpenAI from "openai";
 
 // Default logo image URL for products without images
-const DEFAULT_LOGO_IMAGE = "https://res.cloudinary.com/dcpjatdxs/image/upload/v1767710585/products/abstract-art-multi/img_2_1767710584949.webp";
+const DEFAULT_LOGO_IMAGE = "/logo.webp";
 
 // Product category type (now dynamic, but keeping default descriptions for SEO)
 type ProductCategory = string;

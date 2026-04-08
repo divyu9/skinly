@@ -1,5 +1,5 @@
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -7,7 +7,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { ConvexError } from "convex/values";
 import { trackAddToCart } from "@/lib/analytics.ts";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
+import type { Id } from "@/lib/firebase-api";
 
 interface CartItemParams {
   productId: Id<"products">;
@@ -59,22 +59,26 @@ export function useCartActions({
   const [isBuyingNow, setIsBuyingNow] = useState(false);
   
   const createCartItem = useCallback((): CartItemParams | null => {
-    if (!product) return null;
+    if (!product || !product.variants || product.variants.length === 0) return null;
     
     const variant = product.variants[selectedVariant];
     if (!variant) return null;
     
-    return {
+    // Clean up undefined values for Firestore
+    const item: any = {
       productId: product._id,
       productTitle: product.title,
       productImage: displayImage,
       variant: variant.title,
       price: variant.price,
       quantity: 1,
-      phoneModel: phoneModel || undefined,
-      phoneBrand: phoneBrand || undefined,
-      coverage: coverage,
+      coverage: coverage || null,
     };
+    
+    if (phoneModel) item.phoneModel = phoneModel;
+    if (phoneBrand) item.phoneBrand = phoneBrand;
+    
+    return item as CartItemParams;
   }, [product, selectedVariant, displayImage, phoneModel, phoneBrand, coverage]);
   
   const addToCart = useCallback(async (cartItem: CartItemParams) => {
@@ -93,7 +97,7 @@ export function useCartActions({
   }, [user, addToCartMutation, addToGuestCart]);
   
   const handleAddToCart = useCallback(async () => {
-    if (!product) return;
+    if (!product || !product.variants || product.variants.length === 0) return;
     
     if (requiresDeviceSelection && !phoneModel) {
       toast.error("Please select your device model first");
@@ -118,8 +122,9 @@ export function useCartActions({
     try {
       await addToCart(cartItem);
       toast.success("Added to cart!");
-    } catch (error) {
-      if (error instanceof ConvexError && (error.data as { code?: string })?.code === "UNAUTHENTICATED") {
+    } catch (error: any) {
+      console.error("Add to cart error:", error);
+      if (error?.message === "UNAUTHENTICATED" || (error instanceof ConvexError && (error.data as { code?: string })?.code === "UNAUTHENTICATED")) {
         addToGuestCart(cartItem);
         trackAddToCart(
           cartItem.productId,
@@ -137,7 +142,7 @@ export function useCartActions({
   }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart]);
   
   const handleBuyNow = useCallback(async () => {
-    if (!product) return;
+    if (!product || !product.variants || product.variants.length === 0) return;
     
     if (requiresDeviceSelection && !phoneModel) {
       toast.error("Please select your device model first");
@@ -162,8 +167,9 @@ export function useCartActions({
     try {
       await addToCart(cartItem);
       navigate("/checkout");
-    } catch (error) {
-      if (error instanceof ConvexError && (error.data as { code?: string })?.code === "UNAUTHENTICATED") {
+    } catch (error: any) {
+      console.error("Buy now error:", error);
+      if (error?.message === "UNAUTHENTICATED" || (error instanceof ConvexError && (error.data as { code?: string })?.code === "UNAUTHENTICATED")) {
         addToGuestCart(cartItem);
         trackAddToCart(
           cartItem.productId,

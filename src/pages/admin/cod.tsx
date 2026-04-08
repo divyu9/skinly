@@ -1,5 +1,5 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -36,8 +36,8 @@ import {
   PlusIcon,
   TrashIcon,
 } from "lucide-react";
-import type { Id } from "@/convex/_generated/dataModel.d.ts";
-import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
+import type { Id } from "@/lib/firebase-api";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 
 function AdminCODInner() {

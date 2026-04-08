@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
 import { Search, Power, PowerOff, AlertTriangle, Database, HelpCircle, MessageSquareIcon, RefreshCw } from "lucide-react";
-import { Authenticated } from "convex/react";
+import { Authenticated } from "@/lib/firebase-hooks";
 import {
   Dialog,
   DialogContent,

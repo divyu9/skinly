@@ -1,6 +1,8 @@
-import { useQuery } from "convex/react";
-import { useAuth, SignInButton } from "@clerk/clerk-react";
-import { api } from "@/convex/_generated/api.js";
+import { useQuery } from "@/lib/firebase-hooks";
+import { useAuth } from "@/hooks/use-auth";
+import { auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { api } from "@/lib/firebase-api";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Navigate } from "react-router-dom";
@@ -52,17 +54,23 @@ export function AdminAuthGuard({ children }: { children: ReactNode }) {
 
   // Clerk says not signed in - show sign-in UI
   if (!isSignedIn) {
+    const handleSignIn = async () => {
+      try {
+        await signInWithPopup(auth, new GoogleAuthProvider());
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-gray-950">
         <div className="text-center space-y-4 p-8">
           <h2 className="text-xl font-semibold">Admin Access Required</h2>
           <p className="text-muted-foreground">Please sign in to access the admin panel.</p>
-          <SignInButton mode="modal">
-            <Button>
-              <LogIn className="size-4 mr-2" />
-              Sign In
-            </Button>
-          </SignInButton>
+          <Button onClick={handleSignIn}>
+            <LogIn className="size-4 mr-2" />
+            Sign In
+          </Button>
         </div>
       </div>
     );

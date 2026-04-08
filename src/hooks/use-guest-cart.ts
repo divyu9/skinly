@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export interface GuestCartItem {
   productId: string;
@@ -13,6 +13,7 @@ export interface GuestCartItem {
 }
 
 const GUEST_CART_KEY = "skinly_guest_cart";
+const GUEST_CART_UPDATE_EVENT = "guest_cart_updated";
 
 export function useGuestCart() {
   const [guestCart, setGuestCart] = useState<GuestCartItem[]>(() => {
@@ -30,57 +31,80 @@ export function useGuestCart() {
     return [];
   });
 
-  // Save to localStorage whenever cart changes
+  // Sync state across components via custom event and localStorage
   useEffect(() => {
-    localStorage.setItem(GUEST_CART_KEY, JSON.stringify(guestCart));
-  }, [guestCart]);
+    const syncCart = () => {
+      const stored = localStorage.getItem(GUEST_CART_KEY);
+      if (stored) {
+        try {
+          setGuestCart(JSON.parse(stored));
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        setGuestCart([]);
+      }
+    };
+
+    window.addEventListener(GUEST_CART_UPDATE_EVENT, syncCart);
+    window.addEventListener("storage", (e) => {
+      if (e.key === GUEST_CART_KEY) syncCart();
+    });
+
+    return () => {
+      window.removeEventListener(GUEST_CART_UPDATE_EVENT, syncCart);
+      window.removeEventListener("storage", syncCart);
+    };
+  }, []);
+
+  const persistCart = useCallback((newCart: GuestCartItem[]) => {
+    setGuestCart(newCart);
+    localStorage.setItem(GUEST_CART_KEY, JSON.stringify(newCart));
+    window.dispatchEvent(new Event(GUEST_CART_UPDATE_EVENT));
+  }, []);
 
   const addToGuestCart = (item: Omit<GuestCartItem, "quantity"> & { quantity?: number }) => {
-    setGuestCart((prev) => {
-      // Check if item already exists
-      const existingIndex = prev.findIndex(
-        (i) => i.productId === item.productId && i.variant === item.variant
-      );
+    const prev = guestCart;
+    const existingIndex = prev.findIndex(
+      (i) => i.productId === item.productId && i.variant === item.variant
+    );
 
-      if (existingIndex >= 0) {
-        // Update quantity
-        const updated = [...prev];
-        updated[existingIndex].quantity += item.quantity || 1;
-        return updated;
-      } else {
-        // Add new item
-        return [...prev, { ...item, quantity: item.quantity || 1 }];
-      }
-    });
+    let newCart;
+    if (existingIndex > -1) {
+      newCart = [...prev];
+      newCart[existingIndex].quantity += item.quantity || 1;
+    } else {
+      newCart = [...prev, { ...item, quantity: item.quantity || 1 }];
+    }
+    persistCart(newCart);
   };
 
   const updateGuestCartQuantity = (productId: string, variant: string, quantity: number) => {
-    setGuestCart((prev) =>
-      prev.map((item) =>
-        item.productId === productId && item.variant === variant
-          ? { ...item, quantity: Math.max(1, quantity) }
-          : item
-      )
+    const newCart = guestCart.map((item) =>
+      item.productId === productId && item.variant === variant
+        ? { ...item, quantity: Math.max(1, quantity) }
+        : item
     );
+    persistCart(newCart);
   };
 
   const removeFromGuestCart = (productId: string, variant: string) => {
-    setGuestCart((prev) =>
-      prev.filter((item) => !(item.productId === productId && item.variant === variant))
+    const newCart = guestCart.filter(
+      (item) => !(item.productId === productId && item.variant === variant)
     );
+    persistCart(newCart);
   };
 
   const clearGuestCart = () => {
-    setGuestCart([]);
-    localStorage.removeItem(GUEST_CART_KEY);
+    persistCart([]);
   };
 
   const getGuestCartCount = () => {
-    return guestCart.reduce((sum, item) => sum + item.quantity, 0);
+    return guestCart.reduce((total, item) => total + item.quantity, 0);
   };
 
   const getGuestCartTotal = () => {
-    return guestCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return guestCart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
   return {

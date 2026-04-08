@@ -84,6 +84,7 @@ const AdminUnauthorizedPage = lazy(() => import("./pages/admin/unauthorized.tsx"
 const GstMigrationPage = lazy(() => import("./pages/admin/gst-migration.tsx"));
 const TaxExportPage = lazy(() => import("./pages/admin/tax-export.tsx"));
 const FixCollectionsPage = lazy(() => import("./pages/admin/fix-collections.tsx"));
+const MockPaymentPage = lazy(() => import("./pages/mock-payment/page.tsx"));
 
 // Loading fallback for lazy-loaded routes
 function PageSkeleton() {
@@ -182,6 +183,7 @@ export default function App() {
             <Route path="/policies/privacy" element={<Suspense fallback={<PageSkeleton />}><PrivacyPolicy /></Suspense>} />
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/mock-payment" element={<Suspense fallback={<PageSkeleton />}><MockPaymentPage /></Suspense>} />
             {/* SEO landing pages (catch-all for root-level slugs) - must be second to last */}
             <Route path="/:slug" element={<Suspense fallback={<PageSkeleton />}><SEOPage /></Suspense>} />
             {/* 404 - must be absolute last */}
