@@ -72,17 +72,26 @@ function OrdersPageInner() {
       if (dateFilter === "custom") {
         if (customStartDate) {
           startDate = customStartDate.getTime();
-          filtered = filtered.filter(order => order._creationTime >= startDate);
+          filtered = filtered.filter(order => {
+            const time = order._creationTime || order.createdAt || 0;
+            return time >= startDate;
+          });
         }
         if (customEndDate) {
           const endDate = new Date(customEndDate);
           endDate.setHours(23, 59, 59, 999);
-          filtered = filtered.filter(order => order._creationTime <= endDate.getTime());
+          filtered = filtered.filter(order => {
+            const time = order._creationTime || order.createdAt || 0;
+            return time <= endDate.getTime();
+          });
         }
       } else {
         const days = parseInt(dateFilter);
         startDate = now - (days * 24 * 60 * 60 * 1000);
-        filtered = filtered.filter(order => order._creationTime >= startDate);
+        filtered = filtered.filter(order => {
+            const time = order._creationTime || order.createdAt || 0;
+            return time >= startDate;
+        });
       }
     }
     
@@ -265,7 +274,7 @@ function OrdersPageInner() {
                     <div>
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Placed on {formatDate(order._creationTime)}
+                        Placed on {formatDate(order._creationTime || order.createdAt || Date.now())}
                       </p>
                     </div>
                     <Badge className={getStatusColor(order.status)}>

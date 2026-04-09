@@ -25,6 +25,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.enforceDailyRateLimit = void 0;
 const admin = __importStar(require("firebase-admin"));
+const https_1 = require("firebase-functions/v2/https");
 const toDayKey = (d) => {
     const y = d.getUTCFullYear();
     const m = String(d.getUTCMonth() + 1).padStart(2, "0");
@@ -42,7 +43,7 @@ const enforceDailyRateLimit = async ({ key, limit, }) => {
         const snap = await tx.get(ref);
         const current = snap.exists ? Number(((_a = snap.data()) === null || _a === void 0 ? void 0 : _a.count) || 0) : 0;
         if (current >= limit) {
-            throw new Error("Rate limit exceeded");
+            throw new https_1.HttpsError("resource-exhausted", "Rate limit exceeded");
         }
         tx.set(ref, {
             key,

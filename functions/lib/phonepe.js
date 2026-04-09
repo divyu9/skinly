@@ -76,15 +76,18 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
     const order = orderSnap.data();
     if (uid) {
         if (order.userId !== uid) {
-            throw new Error("Unauthorized");
+            console.error(`Auth mismatch. order.userId: ${order.userId}, uid: ${uid}`);
+            throw new Error("UNAUTHENTICATED");
         }
     }
     else {
         if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) {
-            throw new Error("Unauthorized");
+            console.error(`Missing or invalid sessionId: ${sessionId}`);
+            throw new Error("UNAUTHENTICATED");
         }
-        if (order.userId !== sessionId) {
-            throw new Error("Unauthorized");
+        if (order.userId !== sessionId && order.userId !== "guest") {
+            console.error(`Auth mismatch. order.userId: ${order.userId}, sessionId: ${sessionId}`);
+            throw new Error("UNAUTHENTICATED");
         }
     }
     if (order.phone) {

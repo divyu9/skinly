@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { HttpsError } from "firebase-functions/v2/https";
 
 export const getCaller = (request: any) => {
   const auth = request?.auth;
@@ -10,7 +11,7 @@ export const getCaller = (request: any) => {
 export const requireAuth = (request: any) => {
   const { uid } = getCaller(request);
   if (!uid) {
-    throw new Error("Unauthorized");
+    throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
   }
   return { uid };
 };
@@ -26,7 +27,7 @@ const parseAllowlist = (value: string | undefined) => {
 export const requireAdmin = async (request: any) => {
   const { uid, token } = getCaller(request);
   if (!uid) {
-    throw new Error("Unauthorized");
+    throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
   }
 
   if (token?.admin === true) {
@@ -44,6 +45,6 @@ export const requireAdmin = async (request: any) => {
     return { uid };
   }
 
-  throw new Error("Unauthorized");
+  throw new HttpsError("permission-denied", "UNAUTHENTICATED");
 };
 

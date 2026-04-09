@@ -1754,9 +1754,51 @@ export function useMutation(apiRef: any) {
         const { getAuth } = await import('firebase/auth');
         const auth = getAuth();
         const user = auth.currentUser;
-        if (!user) {
+        
+        // --- CART & CHECKOUT (Guest operations) ---
+        if (actionName === 'syncGuestCartToDb' || actionName === 'syncGuestCart') {
+          // Allow this operation for both authenticated users and guests
+          const sessionId = args.sessionId;
+          if (!user && !sessionId) return { success: false };
+          
+          const batch = writeBatch(db);
+          for (const item of (args.items || args.guestCartItems || [])) {
+            // Re-verify prices for guest items to prevent tampering
+            let realPrice = item.price;
+            try {
+               const variantQ = query(collection(db, 'variants'), where('productId', '==', item.productId), where('title', '==', item.variant));
+               const variantSnap = await getDocs(variantQ);
+               if (!variantSnap.empty) {
+                 realPrice = variantSnap.docs[0].data().price || item.price;
+               }
+            } catch(e) {}
+            
+            const newDoc = doc(collection(db, 'cart'));
+            const cartData: any = {
+              ...item,
+              price: realPrice,
+              addedAt: Date.now()
+            };
+            
+            if (user) {
+              cartData.userId = user.uid;
+            } else if (sessionId) {
+              cartData.sessionId = sessionId;
+            }
+            
+            batch.set(newDoc, cartData);
+          }
+          await batch.commit();
+          return { success: true };
+        }
+        
+        // For other cart operations, try to use user OR sessionId
+        const sessionId = args.sessionId;
+        
+        if (!user && !sessionId) {
           throw new Error('UNAUTHENTICATED');
         }
+
         
         if (actionName === 'addToCart') {
           // Fetch the real price from DB to prevent tampering
@@ -1770,12 +1812,16 @@ export function useMutation(apiRef: any) {
              }
           }
           
-          const docRef = await addDoc(collection(db, 'cart'), {
+          const cartData: any = {
             ...args,
             price: realPrice,
-            userId: user.uid,
             addedAt: Date.now()
-          });
+          };
+          
+          if (user) cartData.userId = user.uid;
+          else if (sessionId) cartData.sessionId = sessionId;
+          
+          const docRef = await addDoc(collection(db, 'cart'), cartData);
           return docRef.id;
         }
         if (actionName === 'removeFromCart') {
@@ -1789,45 +1835,24 @@ export function useMutation(apiRef: any) {
           return targetId;
         }
         if (actionName === 'clearCart') {
-          const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
-          const snap = await getDocs(q);
-          const batch = writeBatch(db);
-          snap.docs.forEach(d => batch.delete(d.ref));
-          await batch.commit();
+          if (user) {
+            const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
+            const snap = await getDocs(q);
+            const batch = writeBatch(db);
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          } else if (sessionId) {
+            const q = query(collection(db, 'cart'), where('sessionId', '==', sessionId));
+            const snap = await getDocs(q);
+            const batch = writeBatch(db);
+            snap.docs.forEach(d => batch.delete(d.ref));
+            await batch.commit();
+          }
           return true;
         }
       }
       
-      // --- CART & CHECKOUT ---
-      if (collectionName === 'cart' && (actionName === 'syncGuestCartToDb' || actionName === 'syncGuestCart')) {
-        const { getAuth } = await import('firebase/auth');
-        const auth = getAuth();
-        const user = auth.currentUser;
-        if (!user) return { success: false };
-        
-        const batch = writeBatch(db);
-        for (const item of (args.items || args.guestCartItems || [])) {
-          // Re-verify prices for guest items to prevent tampering
-          let realPrice = item.price;
-          try {
-             const variantQ = query(collection(db, 'variants'), where('productId', '==', item.productId), where('title', '==', item.variant));
-             const variantSnap = await getDocs(variantQ);
-             if (!variantSnap.empty) {
-               realPrice = variantSnap.docs[0].data().price || item.price;
-             }
-          } catch(e) {}
-          
-          const newDoc = doc(collection(db, 'cart'));
-          batch.set(newDoc, {
-            ...item,
-            price: realPrice,
-            userId: user.uid,
-            addedAt: Date.now()
-          });
-        }
-        await batch.commit();
-        return { success: true };
-      }
+
       
       if (collectionName === 'coupons' && actionName === 'validateCoupon') {
         const q = query(collection(db, 'coupons'), where('code', '==', args.code), limit(1));

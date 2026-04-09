@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { HttpsError } from "firebase-functions/v2/https";
 
 const toDayKey = (d: Date) => {
   const y = d.getUTCFullYear();
@@ -24,7 +25,7 @@ export const enforceDailyRateLimit = async ({
     const snap = await tx.get(ref);
     const current = snap.exists ? Number(snap.data()?.count || 0) : 0;
     if (current >= limit) {
-      throw new Error("Rate limit exceeded");
+      throw new HttpsError("resource-exhausted", "Rate limit exceeded");
     }
     tx.set(
       ref,

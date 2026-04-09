@@ -416,11 +416,38 @@ function CheckoutPageInner() {
           sessionStorage.setItem("skinly_tracking_token", result.trackingToken);
         }
         
-        const paymentResult = await initiatePayment({ orderId: result.orderId, orderNumber: result.orderNumber, amount, customerPhone: getFullPhoneNumber(), sessionId: !isAuthenticated ? guestSessionId : undefined });
-        if (paymentResult.success && paymentResult.paymentUrl) {
-          openPhonePe(paymentResult.paymentUrl, paymentResult.merchantTransactionId, result.orderId);
-        } else {
-          setIsRedirectingToPayment(false); throw new Error("Failed to initiate payment");
+        try {
+          // PhonePe merchantTransactionId only allows alphanumeric, hyphens, and underscores.
+          const safeOrderNumber = result.orderNumber?.replace(/[^a-zA-Z0-9_-]/g, "");
+          const paymentResult = await initiatePayment({ 
+            orderId: result.orderId, 
+            orderNumber: safeOrderNumber, 
+            amount, 
+            customerPhone: getFullPhoneNumber(), 
+            sessionId: !isAuthenticated ? guestSessionId : undefined 
+          });
+          
+          if (paymentResult.success && paymentResult.paymentUrl) {
+            openPhonePe(paymentResult.paymentUrl, paymentResult.merchantTransactionId, result.orderId);
+          } else {
+            throw new Error("Failed to initiate payment");
+          }
+        } catch (paymentError) {
+          console.error("Payment initiation failed:", paymentError);
+          // Order was created successfully but payment initiation failed.
+          // We must redirect to the order page so the user can retry payment there.
+          setIsRedirectingToPayment(false);
+          
+          if (!isAuthenticated) clearGuestCart();
+          else clearUserCart();
+          
+          let errMsg = "Order created but payment failed to initiate.";
+          if (paymentError instanceof Error) {
+            errMsg = paymentError.message;
+          }
+          toast.error(errMsg + " You can retry payment from the order page.");
+          
+          guestNav();
         }
       } else {
         if (!isAuthenticated) clearGuestCart();

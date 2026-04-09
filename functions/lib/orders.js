@@ -30,7 +30,7 @@ const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
 exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     const { uid } = (0, auth_1.getCaller)(request);
-    const data = request.data;
+    const data = request.data || {};
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, remainingAmount, guestItems, sessionId: reqSessionId } = data;
     // Use uid if logged in, otherwise use the session id passed from frontend
     const trackingId = uid || reqSessionId || "guest";
@@ -52,7 +52,7 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
         orderItems = cartSnap.docs.map(d => d.data());
     }
     if (!orderItems || orderItems.length === 0) {
-        throw new Error("Cannot create order with an empty cart");
+        throw new https_1.HttpsError("failed-precondition", "Cannot create order with an empty cart");
     }
     // 2. Generate Order Number (Transactionally to avoid duplicates)
     const counterRef = db.collection('settings').doc('order_counter');
@@ -70,9 +70,29 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
         }
         orderNumber = `#${currentVal}`;
     });
-    // 3. Assemble the Order Payload
-    // Note: For a fully secure implementation, calculate the `total` here by pulling variant prices from DB.
-    // Since the frontend is passing `remainingAmount`, we use it for now but it's a future optimization point.
+    // 3. Assemble the Order Payload securely by calculating total from database
+    let calculatedTotal = 0;
+    for (const item of orderItems) {
+        if (item.productId && item.variant) {
+            // Find variant price
+            const variantSnap = await db.collection('variants')
+                .where('productId', '==', item.productId)
+                .where('title', '==', item.variant)
+                .get();
+            if (!variantSnap.empty) {
+                const variantData = variantSnap.docs[0].data();
+                calculatedTotal += (variantData.price || 0) * (item.quantity || 1);
+            }
+            else {
+                // Fallback if variant not found in old DB structure, or reject
+                calculatedTotal += (item.price || 0) * (item.quantity || 1);
+            }
+        }
+        else {
+            calculatedTotal += (item.price || 0) * (item.quantity || 1);
+        }
+    }
+    // Use calculated total instead of client-provided remainingAmount
     const newOrder = {
         orderNumber: orderNumber,
         userId: uid || reqSessionId || 'guest',
@@ -83,7 +103,7 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
         paymentMethod: paymentMethod || 'prepaid',
         status: 'pending',
         paymentStatus: 'pending',
-        total: remainingAmount || 0,
+        total: calculatedTotal,
         items: orderItems,
         createdAt: Date.now(),
         updatedAt: Date.now()
@@ -91,14 +111,15 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
     // 4. Save to Firestore
     const docRef = await db.collection('orders').add(newOrder);
     // 5. Optional Cleanup (Delete user's cart after creating order)
-    if (uid) {
-        const batch = db.batch();
-        const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
-        cartSnap.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        await batch.commit();
-    }
+    // Moved to client side so we only clear on SUCCESSFUL payment
+    // if (uid) {
+    //   const batch = db.batch();
+    //   const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
+    //   cartSnap.docs.forEach(doc => {
+    //     batch.delete(doc.ref);
+    //   });
+    //   await batch.commit();
+    // }
     return {
         orderId: docRef.id,
         orderNumber: orderNumber,

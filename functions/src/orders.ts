@@ -1,12 +1,13 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 
 export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
   const { uid } = getCaller(request);
-  const data = request.data;
+  const data = request.data || {};
   const { shippingAddress, customerEmail, guestEmail, paymentMethod, remainingAmount, guestItems, sessionId: reqSessionId } = data;
+
   
   // Use uid if logged in, otherwise use the session id passed from frontend
   const trackingId = uid || reqSessionId || "guest";
@@ -30,7 +31,7 @@ export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, asyn
   }
 
   if (!orderItems || orderItems.length === 0) {
-    throw new Error("Cannot create order with an empty cart");
+    throw new HttpsError("failed-precondition", "Cannot create order with an empty cart");
   }
 
   // 2. Generate Order Number (Transactionally to avoid duplicates)
@@ -93,14 +94,15 @@ export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, asyn
   const docRef = await db.collection('orders').add(newOrder);
 
   // 5. Optional Cleanup (Delete user's cart after creating order)
-  if (uid) {
-    const batch = db.batch();
-    const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
-    cartSnap.docs.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-    await batch.commit();
-  }
+  // Moved to client side so we only clear on SUCCESSFUL payment
+  // if (uid) {
+  //   const batch = db.batch();
+  //   const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
+  //   cartSnap.docs.forEach(doc => {
+  //     batch.delete(doc.ref);
+  //   });
+  //   await batch.commit();
+  // }
 
   return {
     orderId: docRef.id,

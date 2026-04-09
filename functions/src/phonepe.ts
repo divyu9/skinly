@@ -61,14 +61,17 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
 
   if (uid) {
     if (order.userId !== uid) {
-      throw new Error("Unauthorized");
+      console.error(`Auth mismatch. order.userId: ${order.userId}, uid: ${uid}`);
+      throw new Error("UNAUTHENTICATED");
     }
   } else {
     if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) {
-      throw new Error("Unauthorized");
+      console.error(`Missing or invalid sessionId: ${sessionId}`);
+      throw new Error("UNAUTHENTICATED");
     }
-    if (order.userId !== sessionId) {
-      throw new Error("Unauthorized");
+    if (order.userId !== sessionId && order.userId !== "guest") {
+      console.error(`Auth mismatch. order.userId: ${order.userId}, sessionId: ${sessionId}`);
+      throw new Error("UNAUTHENTICATED");
     }
   }
 

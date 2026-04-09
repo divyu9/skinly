@@ -25,6 +25,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAdmin = exports.requireAuth = exports.getCaller = void 0;
 const admin = __importStar(require("firebase-admin"));
+const https_1 = require("firebase-functions/v2/https");
 const getCaller = (request) => {
     const auth = request === null || request === void 0 ? void 0 : request.auth;
     const uid = (auth === null || auth === void 0 ? void 0 : auth.uid) || null;
@@ -35,7 +36,7 @@ exports.getCaller = getCaller;
 const requireAuth = (request) => {
     const { uid } = (0, exports.getCaller)(request);
     if (!uid) {
-        throw new Error("Unauthorized");
+        throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
     return { uid };
 };
@@ -52,7 +53,7 @@ const requireAdmin = async (request) => {
     var _a;
     const { uid, token } = (0, exports.getCaller)(request);
     if (!uid) {
-        throw new Error("Unauthorized");
+        throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
     if ((token === null || token === void 0 ? void 0 : token.admin) === true) {
         return { uid };
@@ -66,7 +67,7 @@ const requireAdmin = async (request) => {
     if (snap.exists && ((_a = snap.data()) === null || _a === void 0 ? void 0 : _a.isAdmin) === true) {
         return { uid };
     }
-    throw new Error("Unauthorized");
+    throw new https_1.HttpsError("permission-denied", "UNAUTHENTICATED");
 };
 exports.requireAdmin = requireAdmin;
 //# sourceMappingURL=auth.js.map
