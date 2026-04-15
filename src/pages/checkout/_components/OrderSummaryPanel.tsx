@@ -10,8 +10,11 @@ import {
   AlertCircleIcon,
   CheckCircleIcon,
   XIcon,
+  PackageIcon,
 } from "lucide-react";
 import type { Id } from "@/lib/firebase-api";
+import { useState } from "react";
+import { getCdnUrl } from "@/lib/config";
 
 export interface CartItemData {
   productId: string;
@@ -89,6 +92,34 @@ interface OrderSummaryPanelProps {
   cardClassName?: string;
 }
 
+function OrderItemImage({ src, alt, grayscale }: { src?: string; alt: string; grayscale: boolean }) {
+  const [hasError, setHasError] = useState(false);
+  const normalizedSrc = src ? getCdnUrl(src) : "";
+
+  if (!normalizedSrc || hasError) {
+    return (
+      <div className={grayscale ? "size-16 bg-muted rounded-lg overflow-hidden shrink-0 grayscale" : "size-16 bg-muted rounded-lg overflow-hidden shrink-0"}>
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+          <PackageIcon className="size-6" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
+      <img
+        src={normalizedSrc}
+        alt={alt}
+        className={grayscale ? "w-full h-full object-cover grayscale" : "w-full h-full object-cover"}
+        loading="lazy"
+        decoding="async"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
 export function OrderSummaryPanel({
   cartItems,
   stockStatus,
@@ -133,18 +164,7 @@ export function OrderSummaryPanel({
                   key={item._id ? String(item._id) : `${item.productId}-${item.variant}-${index}`}
                   className={`flex gap-3 ${isOutOfStock ? "opacity-50" : ""}`}
                 >
-                  {item.productImage && (
-                    <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
-                      <img
-                        src={item.productImage}
-                        alt={item.productTitle}
-                        className={`w-full h-full object-cover ${isOutOfStock ? "grayscale" : ""}`}
-                        onError={(e) => {
-                          e.currentTarget.src = "/logo.webp";
-                        }}
-                      />
-                    </div>
-                  )}
+                  <OrderItemImage src={item.productImage} alt={item.productTitle} grayscale={isOutOfStock} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-sm font-medium line-clamp-2">{item.productTitle}</p>
