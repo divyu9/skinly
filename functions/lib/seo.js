@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateSEOContent = void 0;
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
 const getOpenAIConfig = () => {
@@ -11,11 +11,10 @@ const getOpenAIConfig = () => {
     }
     return { apiKey };
 };
-exports.generateSEOContent = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
+exports.generateSEOContent = (0, https_1.onCall)(async (data, context) => {
     var _a, _b, _c;
-    const { uid } = await (0, auth_1.requireAdmin)(request);
+    const { uid } = await (0, auth_1.requireAdmin)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `generateSEOContent_${uid}`, limit: Number(process.env.SEO_DAILY_LIMIT || 100) });
-    const data = request.data;
     const { prompt } = data;
     if (!prompt) {
         throw new Error("Missing prompt");

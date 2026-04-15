@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateUploadUrl = exports.setupR2Cors = void 0;
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
 const auth_1 = require("./auth");
@@ -42,8 +42,8 @@ const validateKey = (key) => {
     }
 };
 // Admin function to setup CORS on the bucket
-exports.setupR2Cors = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
-    const { uid } = await (0, auth_1.requireAdmin)(request);
+exports.setupR2Cors = (0, https_1.onCall)(async (data, context) => {
+    const { uid } = await (0, auth_1.requireAdmin)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `setupR2Cors_${uid}`, limit: Number(process.env.R2_CORS_DAILY_LIMIT || 20) });
     const config = getR2Config();
     const s3 = new client_s3_1.S3Client({
@@ -77,10 +77,9 @@ exports.setupR2Cors = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
         throw new Error(error.message || "Failed to configure CORS");
     }
 });
-exports.generateUploadUrl = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
-    const { uid } = await (0, auth_1.requireAdmin)(request);
+exports.generateUploadUrl = (0, https_1.onCall)(async (data, context) => {
+    const { uid } = await (0, auth_1.requireAdmin)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `generateUploadUrl_${uid}`, limit: Number(process.env.R2_UPLOAD_DAILY_LIMIT || 2000) });
-    const data = request.data;
     const { fileName, contentType } = data;
     if (!fileName || !contentType) {
         throw new Error("Missing file details");

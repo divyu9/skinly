@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { HttpsError } from "firebase-functions/v2/https";
+import { HttpsError } from "firebase-functions/v1/https";
 
 export const getCaller = (request: any) => {
   const auth = request?.auth;

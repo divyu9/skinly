@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v1/https";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 
@@ -10,13 +10,12 @@ const getOpenAIConfig = () => {
   return { apiKey };
 };
 
-export const generateSEOContent = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const { uid } = await requireAdmin(request);
+export const generateSEOContent = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
   await enforceDailyRateLimit({ key: `generateSEOContent_${uid}`, limit: Number(process.env.SEO_DAILY_LIMIT || 100) });
-  const data = request.data;
 
   const { prompt } = data;
-  
+
   if (!prompt) {
     throw new Error("Missing prompt");
   }
@@ -35,7 +34,7 @@ export const generateSEOContent = onCall({ memory: "256MiB", timeoutSeconds: 60,
         "Authorization": `Bearer ${config.apiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini", // Use gpt-4o-mini for cost efficiency
+        model: "gpt-4o-mini",
         messages: [
           {
             role: "system",

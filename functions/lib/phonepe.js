@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.paymentCallback = exports.checkPaymentStatus = exports.initiatePayment = void 0;
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const crypto = __importStar(require("crypto"));
 const auth_1 = require("./auth");
@@ -48,10 +48,9 @@ const generateXVerify = (base64Payload, endpoint, saltKey, saltIndex) => {
     const sha256Hash = crypto.createHash("sha256").update(stringToHash).digest("hex");
     return `${sha256Hash}###${saltIndex}`;
 };
-exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
+exports.initiatePayment = (0, https_1.onCall)(async (data, context) => {
     var _a, _b, _c;
-    const data = request.data || {};
-    const { uid } = (0, auth_1.getCaller)(request);
+    const { uid } = (0, auth_1.getCaller)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
     const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
     if (!orderId || !amount || !customerPhone) {
@@ -183,10 +182,9 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
         throw new https_1.HttpsError("unavailable", (error === null || error === void 0 ? void 0 : error.message) || "PhonePe API error");
     }
 });
-exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
+exports.checkPaymentStatus = (0, https_1.onCall)(async (data, context) => {
     var _a;
-    const data = request.data || {};
-    const { uid } = (0, auth_1.getCaller)(request);
+    const { uid } = (0, auth_1.getCaller)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
     const { merchantTransactionId, orderId, sessionId } = data;
     if (!merchantTransactionId) {
@@ -215,7 +213,7 @@ exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeco
         }
     }
     else {
-        (0, auth_1.requireAuth)(request);
+        (0, auth_1.requireAuth)(context);
     }
     const config = getPhonePeConfig();
     const endpoint = `/pg/v1/status/${config.merchantId}/${merchantTransactionId}`;
@@ -267,7 +265,7 @@ exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeco
         throw new https_1.HttpsError("internal", (error === null || error === void 0 ? void 0 : error.message) || "Status check error");
     }
 });
-exports.paymentCallback = (0, https_1.onRequest)({ memory: "256MiB", timeoutSeconds: 60 }, async (req, res) => {
+exports.paymentCallback = (0, https_1.onRequest)(async (req, res) => {
     res.status(200).send("OK");
 });
 //# sourceMappingURL=phonepe.js.map

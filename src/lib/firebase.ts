@@ -33,13 +33,7 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// On production (goskinly.com), route function calls through Firebase Hosting rewrites
-// to avoid CORS issues with Cloud Run. On localhost, use direct Cloud Functions URL.
-const functionsOrigin =
-  typeof window !== "undefined" && window.location.hostname.includes("goskinly.com")
-    ? "https://goskinly.com/api"
-    : "us-central1";
-export const functions = getFunctions(app, functionsOrigin);
+export const functions = getFunctions(app, "us-central1");
 
 // Initialize Analytics conditionally (only runs in browser)
 export const analytics = typeof window !== "undefined" ? getAnalytics(app) : null;

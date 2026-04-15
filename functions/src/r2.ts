@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v1/https";
 import { S3Client, PutObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAdmin } from "./auth";
@@ -10,11 +10,11 @@ const getR2Config = () => {
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || "";
   const bucketName = process.env.R2_BUCKET_NAME || "skinly";
   const publicUrl = process.env.R2_PUBLIC_URL || "https://cdn.goskinly.com";
-  
+
   if (!accountId || !accessKeyId || !secretAccessKey) {
-      throw new Error("R2 credentials not configured.");
-    }
-  
+    throw new Error("R2 credentials not configured.");
+  }
+
   return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 };
 
@@ -43,12 +43,12 @@ const validateKey = (key: string) => {
 };
 
 // Admin function to setup CORS on the bucket
-export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const { uid } = await requireAdmin(request);
+export const setupR2Cors = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
   await enforceDailyRateLimit({ key: `setupR2Cors_${uid}`, limit: Number(process.env.R2_CORS_DAILY_LIMIT || 20) });
 
   const config = getR2Config();
-  
+
   const s3 = new S3Client({
     region: "auto",
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
@@ -82,11 +82,10 @@ export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, invoke
   }
 });
 
-export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const { uid } = await requireAdmin(request);
+export const generateUploadUrl = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
   await enforceDailyRateLimit({ key: `generateUploadUrl_${uid}`, limit: Number(process.env.R2_UPLOAD_DAILY_LIMIT || 2000) });
-  const data = request.data;
-  
+
   const { fileName, contentType } = data;
   if (!fileName || !contentType) {
     throw new Error("Missing file details");
@@ -97,7 +96,7 @@ export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, 
   validateKey(fileName);
 
   const config = getR2Config();
-  
+
   const s3 = new S3Client({
     region: "auto",
     endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
@@ -106,7 +105,7 @@ export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, 
       secretAccessKey: config.secretAccessKey,
     },
   });
-  
+
   try {
     const command = new PutObjectCommand({
       Bucket: config.bucketName,
@@ -115,7 +114,7 @@ export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, 
     });
 
     const uploadUrl = await getSignedUrl(s3, command, { expiresIn: Number(process.env.R2_SIGNED_URL_TTL_SECONDS || 300) });
-    
+
     return {
       success: true,
       uploadUrl,

@@ -25,7 +25,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAdmin = exports.requireAuth = exports.getCaller = void 0;
 const admin = __importStar(require("firebase-admin"));
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const getCaller = (request) => {
     const auth = request === null || request === void 0 ? void 0 : request.auth;
     const uid = (auth === null || auth === void 0 ? void 0 : auth.uid) || null;

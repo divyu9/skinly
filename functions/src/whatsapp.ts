@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
@@ -6,15 +6,14 @@ import { enforceDailyRateLimit } from "./rate-limit";
 const getWhatsAppConfig = () => {
   const authkey = process.env.WHATSAPP_AUTHKEY || "";
   if (!authkey) {
-      throw new Error("WhatsApp API credentials not configured.");
-    }
+    throw new Error("WhatsApp API credentials not configured.");
+  }
   return { authkey };
 };
 
-export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const { uid } = await requireAdmin(request);
+export const sendWhatsAppMessage = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
   await enforceDailyRateLimit({ key: `sendWhatsAppMessage_${uid}`, limit: Number(process.env.WHATSAPP_DAILY_LIMIT || 500) });
-  const data = request.data;
   const { phone, templateId, variables } = data;
 
   if (!phone || !templateId) {
@@ -36,8 +35,8 @@ export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60
   try {
     const fetch = require("node-fetch");
     // Replace with actual provider URL (Authkey/MSG91)
-    const url = "https://api.authkey.io/request"; 
-    
+    const url = "https://api.authkey.io/request";
+
     // Construct the payload for Authkey.io
     const params = new URLSearchParams({
       authkey: config.authkey,
@@ -70,7 +69,7 @@ export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60
 
   } catch (error: any) {
     console.error("WhatsApp Send Error:", error);
-    
+
     await admin.firestore().collection("whatsappLogs").add({
       phone,
       templateId,

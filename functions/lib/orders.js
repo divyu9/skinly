@@ -24,13 +24,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createOrder = void 0;
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
-exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
-    const { uid } = (0, auth_1.getCaller)(request);
-    const data = request.data || {};
+exports.createOrder = (0, https_1.onCall)(async (data, context) => {
+    const { uid } = (0, auth_1.getCaller)(context);
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
     // Use uid if logged in, otherwise use the session id passed from frontend
     const trackingId = uid || reqSessionId || "guest";
@@ -106,16 +105,6 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
     };
     // 4. Save to Firestore
     const docRef = await db.collection('orders').add(newOrder);
-    // 5. Optional Cleanup (Delete user's cart after creating order)
-    // Moved to client side so we only clear on SUCCESSFUL payment
-    // if (uid) {
-    //   const batch = db.batch();
-    //   const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
-    //   cartSnap.docs.forEach(doc => {
-    //     batch.delete(doc.ref);
-    //   });
-    //   await batch.commit();
-    // }
     return {
         orderId: docRef.id,
         orderNumber: orderNumber,

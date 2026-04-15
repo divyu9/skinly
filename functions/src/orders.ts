@@ -1,17 +1,16 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 
-export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const { uid } = getCaller(request);
-  const data = request.data || {};
+export const createOrder = onCall(async (data: any, context: any) => {
+  const { uid } = getCaller(context);
   const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
 
-  
+
   // Use uid if logged in, otherwise use the session id passed from frontend
   const trackingId = uid || reqSessionId || "guest";
-  
+
   // Rate limit order creation (50 orders per user/session per day)
   await enforceDailyRateLimit({ key: `createOrder_${trackingId}`, limit: 50 });
 
@@ -93,17 +92,6 @@ export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60, invoke
 
   // 4. Save to Firestore
   const docRef = await db.collection('orders').add(newOrder);
-
-  // 5. Optional Cleanup (Delete user's cart after creating order)
-  // Moved to client side so we only clear on SUCCESSFUL payment
-  // if (uid) {
-  //   const batch = db.batch();
-  //   const cartSnap = await db.collection('cart').where('userId', '==', uid).get();
-  //   cartSnap.docs.forEach(doc => {
-  //     batch.delete(doc.ref);
-  //   });
-  //   await batch.commit();
-  // }
 
   return {
     orderId: docRef.id,

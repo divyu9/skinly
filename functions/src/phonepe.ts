@@ -1,4 +1,4 @@
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { requireAuth, getCaller } from "./auth";
@@ -29,9 +29,8 @@ const generateXVerify = (base64Payload: string, endpoint: string, saltKey: strin
   return `${sha256Hash}###${saltIndex}`;
 };
 
-export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const data = request.data || {};
-  const { uid } = getCaller(request);
+export const initiatePayment = onCall(async (data: any, context: any) => {
+  const { uid } = getCaller(context);
   await enforceDailyRateLimit({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
 
   const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
@@ -179,9 +178,8 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60, in
   }
 });
 
-export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
-  const data = request.data || {};
-  const { uid } = getCaller(request);
+export const checkPaymentStatus = onCall(async (data: any, context: any) => {
+  const { uid } = getCaller(context);
   await enforceDailyRateLimit({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
 
   const { merchantTransactionId, orderId, sessionId } = data;
@@ -205,7 +203,7 @@ export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60,
       if (order.userId !== sessionId) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
   } else {
-    requireAuth(request);
+    requireAuth(context);
   }
 
   const config = getPhonePeConfig();
@@ -265,6 +263,6 @@ export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60,
   }
 });
 
-export const paymentCallback = onRequest({ memory: "256MiB", timeoutSeconds: 60 }, async (req: any, res: any) => {
+export const paymentCallback = onRequest(async (req: any, res: any) => {
   res.status(200).send("OK");
 });

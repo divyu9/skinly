@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendWhatsAppMessage = void 0;
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
@@ -35,10 +35,9 @@ const getWhatsAppConfig = () => {
     }
     return { authkey };
 };
-exports.sendWhatsAppMessage = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
-    const { uid } = await (0, auth_1.requireAdmin)(request);
+exports.sendWhatsAppMessage = (0, https_1.onCall)(async (data, context) => {
+    const { uid } = await (0, auth_1.requireAdmin)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `sendWhatsAppMessage_${uid}`, limit: Number(process.env.WHATSAPP_DAILY_LIMIT || 500) });
-    const data = request.data;
     const { phone, templateId, variables } = data;
     if (!phone || !templateId) {
         throw new Error("Missing required fields");

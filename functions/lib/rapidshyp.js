@@ -24,7 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createShipment = void 0;
-const https_1 = require("firebase-functions/v2/https");
+const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
@@ -36,11 +36,10 @@ const getRapidShypConfig = () => {
     }
     return { apiKey, apiUrl };
 };
-exports.createShipment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
+exports.createShipment = (0, https_1.onCall)(async (data, context) => {
     var _a;
-    const { uid } = await (0, auth_1.requireAdmin)(request);
+    const { uid } = await (0, auth_1.requireAdmin)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `createShipment_${uid}`, limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200) });
-    const data = request.data;
     const { orderId } = data;
     if (!orderId) {
         throw new Error("Missing orderId");
