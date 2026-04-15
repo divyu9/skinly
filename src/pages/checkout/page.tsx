@@ -438,11 +438,11 @@ function CheckoutPageInner() {
           // We must redirect to the order page so the user can retry payment there.
           setIsRedirectingToPayment(false);
           
-          if (!isAuthenticated) clearGuestCart();
-          else clearUserCart();
-          
           let errMsg = "Order created but payment failed to initiate.";
-          if (paymentError instanceof Error) {
+          if (paymentError && typeof paymentError === "object" && "data" in paymentError) {
+            const e = paymentError as { data?: { message?: string } };
+            if (e.data?.message) errMsg = e.data.message;
+          } else if (paymentError instanceof Error) {
             errMsg = paymentError.message;
           }
           toast.error(errMsg + " You can retry payment from the order page.");

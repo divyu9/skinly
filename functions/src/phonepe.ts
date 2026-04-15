@@ -1,4 +1,4 @@
-import { onCall, onRequest } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { requireAuth, getCaller } from "./auth";
@@ -12,8 +12,8 @@ const getPhonePeConfig = () => {
   const environment = process.env.PHONEPE_ENVIRONMENT || "PRODUCTION";
 
   if (!merchantId || !saltKey) {
-      throw new Error("PhonePe credentials not configured.");
-    }
+    throw new HttpsError("failed-precondition", "PhonePe credentials not configured.");
+  }
 
   const v1BaseUrl =
     environment === "PRODUCTION"
@@ -30,24 +30,27 @@ const generateXVerify = (base64Payload: string, endpoint: string, saltKey: strin
 };
 
 export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
-  const data = request.data;
+  const data = request.data || {};
   const { uid } = getCaller(request);
   await enforceDailyRateLimit({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
 
   const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
 
   if (!orderId || !amount || !customerPhone) {
-      throw new Error("Missing required fields");
-    }
-  if (typeof orderId !== "string" || orderId.length > 128) {
-    throw new Error("Invalid orderId");
+    throw new HttpsError("invalid-argument", "Missing required fields");
   }
-  const phoneDigits = String(customerPhone).replace(/\D/g, "");
-  if (!/^[0-9]{10,15}$/.test(phoneDigits)) {
-    throw new Error("Invalid phone");
+  if (typeof orderId !== "string" || orderId.length > 128) {
+    throw new HttpsError("invalid-argument", "Invalid orderId");
+  }
+  let phoneDigits = String(customerPhone).replace(/\D/g, "");
+  if (phoneDigits.length === 12 && phoneDigits.startsWith("91")) {
+    phoneDigits = phoneDigits.slice(2);
+  }
+  if (!/^[0-9]{10}$/.test(phoneDigits)) {
+    throw new HttpsError("invalid-argument", "Invalid phone number");
   }
   if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
-    throw new Error("Invalid amount");
+    throw new HttpsError("invalid-argument", "Invalid amount");
   }
 
   const config = getPhonePeConfig();
@@ -55,30 +58,33 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
   const orderRef = admin.firestore().collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
   if (!orderSnap.exists) {
-    throw new Error("Order not found");
+    throw new HttpsError("not-found", "Order not found");
   }
   const order = orderSnap.data() as any;
 
   if (uid) {
     if (order.userId !== uid) {
       console.error(`Auth mismatch. order.userId: ${order.userId}, uid: ${uid}`);
-      throw new Error("UNAUTHENTICATED");
+      throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
   } else {
     if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) {
       console.error(`Missing or invalid sessionId: ${sessionId}`);
-      throw new Error("UNAUTHENTICATED");
+      throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
     if (order.userId !== sessionId && order.userId !== "guest") {
       console.error(`Auth mismatch. order.userId: ${order.userId}, sessionId: ${sessionId}`);
-      throw new Error("UNAUTHENTICATED");
+      throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
   }
 
   if (order.phone) {
-    const orderPhoneDigits = String(order.phone).replace(/\D/g, "");
+    let orderPhoneDigits = String(order.phone).replace(/\D/g, "");
+    if (orderPhoneDigits.length === 12 && orderPhoneDigits.startsWith("91")) {
+      orderPhoneDigits = orderPhoneDigits.slice(2);
+    }
     if (orderPhoneDigits && orderPhoneDigits !== phoneDigits) {
-      throw new Error("Unauthorized");
+      throw new HttpsError("permission-denied", "Unauthorized");
     }
   }
 
@@ -88,7 +94,7 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
   const merchantTransactionId = `${orderRefSuffix}-${last6}`;
 
   const amountInPaise = Math.max(Math.round(amount * 100), 100);
-  const siteUrl = process.env.SITE_URL || "https://www.goskinly.com";
+  const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
 
   const paymentPayload = {
     merchantId: config.merchantId,
@@ -124,12 +130,12 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
 
     if (!response.ok || !responseData.success) {
       console.error("PhonePe Initiation Failed", responseData);
-      throw new Error(responseData.message || "Payment initiation failed");
+      throw new HttpsError("internal", responseData.message || "Payment initiation failed");
     }
 
     const paymentUrl = responseData.data?.instrumentResponse?.redirectInfo?.url;
     if (!paymentUrl) {
-      throw new Error("No payment URL returned");
+      throw new HttpsError("internal", "No payment URL returned");
     }
 
     await orderSnap.ref.update({
@@ -145,34 +151,37 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
     };
   } catch (error: any) {
     console.error("PhonePe API Error", error);
-    throw new Error(error.message || "Unknown error");
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError("internal", error?.message || "PhonePe API error");
   }
 });
 
 export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
-  const data = request.data;
+  const data = request.data || {};
   const { uid } = getCaller(request);
   await enforceDailyRateLimit({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
 
   const { merchantTransactionId, orderId, sessionId } = data;
 
   if (!merchantTransactionId) {
-    throw new Error("Missing merchantTransactionId");
+    throw new HttpsError("invalid-argument", "Missing merchantTransactionId");
   }
   if (typeof merchantTransactionId !== "string" || merchantTransactionId.length > 128) {
-    throw new Error("Invalid merchantTransactionId");
+    throw new HttpsError("invalid-argument", "Invalid merchantTransactionId");
   }
   if (orderId) {
-    if (typeof orderId !== "string" || orderId.length > 128) throw new Error("Invalid orderId");
+    if (typeof orderId !== "string" || orderId.length > 128) throw new HttpsError("invalid-argument", "Invalid orderId");
     const orderRef = admin.firestore().collection("orders").doc(orderId);
     const orderSnap = await orderRef.get();
-    if (!orderSnap.exists) throw new Error("Order not found");
+    if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
     const order = orderSnap.data() as any;
     if (uid) {
-      if (order.userId !== uid) throw new Error("Unauthorized");
+      if (order.userId !== uid) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     } else {
-      if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) throw new Error("Unauthorized");
-      if (order.userId !== sessionId) throw new Error("Unauthorized");
+      if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
+      if (order.userId !== sessionId) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     }
   } else {
     requireAuth(request);
@@ -201,7 +210,7 @@ export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60 
 
     if (!response.ok) {
       console.error("PhonePe Status Failed", responseData);
-      throw new Error(responseData.message || "Payment status check failed");
+      throw new HttpsError("internal", responseData.message || "Payment status check failed");
     }
 
     const state = responseData.data?.state;
@@ -228,7 +237,10 @@ export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60 
     };
   } catch (error: any) {
     console.error("PhonePe Status Check Error", error);
-    throw new Error(error.message || "Status check error");
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError("internal", error?.message || "Status check error");
   }
 });
 

@@ -1,4 +1,6 @@
+import * as dotenv from "dotenv";
 import * as admin from "firebase-admin";
+dotenv.config();
 admin.initializeApp();
 
 export * from "./phonepe";

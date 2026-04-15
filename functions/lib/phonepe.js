@@ -36,7 +36,7 @@ const getPhonePeConfig = () => {
     const saltIndex = process.env.PHONEPE_SALT_INDEX || "1";
     const environment = process.env.PHONEPE_ENVIRONMENT || "PRODUCTION";
     if (!merchantId || !saltKey) {
-        throw new Error("PhonePe credentials not configured.");
+        throw new https_1.HttpsError("failed-precondition", "PhonePe credentials not configured.");
     }
     const v1BaseUrl = environment === "PRODUCTION"
         ? "https://api.phonepe.com/apis/hermes"
@@ -50,50 +50,56 @@ const generateXVerify = (base64Payload, endpoint, saltKey, saltIndex) => {
 };
 exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     var _a, _b, _c;
-    const data = request.data;
+    const data = request.data || {};
     const { uid } = (0, auth_1.getCaller)(request);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
     const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
     if (!orderId || !amount || !customerPhone) {
-        throw new Error("Missing required fields");
+        throw new https_1.HttpsError("invalid-argument", "Missing required fields");
     }
     if (typeof orderId !== "string" || orderId.length > 128) {
-        throw new Error("Invalid orderId");
+        throw new https_1.HttpsError("invalid-argument", "Invalid orderId");
     }
-    const phoneDigits = String(customerPhone).replace(/\D/g, "");
-    if (!/^[0-9]{10,15}$/.test(phoneDigits)) {
-        throw new Error("Invalid phone");
+    let phoneDigits = String(customerPhone).replace(/\D/g, "");
+    if (phoneDigits.length === 12 && phoneDigits.startsWith("91")) {
+        phoneDigits = phoneDigits.slice(2);
+    }
+    if (!/^[0-9]{10}$/.test(phoneDigits)) {
+        throw new https_1.HttpsError("invalid-argument", "Invalid phone number");
     }
     if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
-        throw new Error("Invalid amount");
+        throw new https_1.HttpsError("invalid-argument", "Invalid amount");
     }
     const config = getPhonePeConfig();
     const orderRef = admin.firestore().collection("orders").doc(orderId);
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) {
-        throw new Error("Order not found");
+        throw new https_1.HttpsError("not-found", "Order not found");
     }
     const order = orderSnap.data();
     if (uid) {
         if (order.userId !== uid) {
             console.error(`Auth mismatch. order.userId: ${order.userId}, uid: ${uid}`);
-            throw new Error("UNAUTHENTICATED");
+            throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
         }
     }
     else {
         if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) {
             console.error(`Missing or invalid sessionId: ${sessionId}`);
-            throw new Error("UNAUTHENTICATED");
+            throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
         }
         if (order.userId !== sessionId && order.userId !== "guest") {
             console.error(`Auth mismatch. order.userId: ${order.userId}, sessionId: ${sessionId}`);
-            throw new Error("UNAUTHENTICATED");
+            throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
         }
     }
     if (order.phone) {
-        const orderPhoneDigits = String(order.phone).replace(/\D/g, "");
+        let orderPhoneDigits = String(order.phone).replace(/\D/g, "");
+        if (orderPhoneDigits.length === 12 && orderPhoneDigits.startsWith("91")) {
+            orderPhoneDigits = orderPhoneDigits.slice(2);
+        }
         if (orderPhoneDigits && orderPhoneDigits !== phoneDigits) {
-            throw new Error("Unauthorized");
+            throw new https_1.HttpsError("permission-denied", "Unauthorized");
         }
     }
     const timestamp = Date.now();
@@ -101,7 +107,7 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
     const orderRefSuffix = orderNumber || orderId.slice(-8);
     const merchantTransactionId = `${orderRefSuffix}-${last6}`;
     const amountInPaise = Math.max(Math.round(amount * 100), 100);
-    const siteUrl = process.env.SITE_URL || "https://www.goskinly.com";
+    const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
     const paymentPayload = {
         merchantId: config.merchantId,
         merchantTransactionId: merchantTransactionId,
@@ -132,11 +138,11 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
         const responseData = await response.json();
         if (!response.ok || !responseData.success) {
             console.error("PhonePe Initiation Failed", responseData);
-            throw new Error(responseData.message || "Payment initiation failed");
+            throw new https_1.HttpsError("internal", responseData.message || "Payment initiation failed");
         }
         const paymentUrl = (_c = (_b = (_a = responseData.data) === null || _a === void 0 ? void 0 : _a.instrumentResponse) === null || _b === void 0 ? void 0 : _b.redirectInfo) === null || _c === void 0 ? void 0 : _c.url;
         if (!paymentUrl) {
-            throw new Error("No payment URL returned");
+            throw new https_1.HttpsError("internal", "No payment URL returned");
         }
         await orderSnap.ref.update({
             paymentTransactionId: merchantTransactionId,
@@ -151,38 +157,41 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
     }
     catch (error) {
         console.error("PhonePe API Error", error);
-        throw new Error(error.message || "Unknown error");
+        if (error instanceof https_1.HttpsError) {
+            throw error;
+        }
+        throw new https_1.HttpsError("internal", (error === null || error === void 0 ? void 0 : error.message) || "PhonePe API error");
     }
 });
 exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     var _a;
-    const data = request.data;
+    const data = request.data || {};
     const { uid } = (0, auth_1.getCaller)(request);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
     const { merchantTransactionId, orderId, sessionId } = data;
     if (!merchantTransactionId) {
-        throw new Error("Missing merchantTransactionId");
+        throw new https_1.HttpsError("invalid-argument", "Missing merchantTransactionId");
     }
     if (typeof merchantTransactionId !== "string" || merchantTransactionId.length > 128) {
-        throw new Error("Invalid merchantTransactionId");
+        throw new https_1.HttpsError("invalid-argument", "Invalid merchantTransactionId");
     }
     if (orderId) {
         if (typeof orderId !== "string" || orderId.length > 128)
-            throw new Error("Invalid orderId");
+            throw new https_1.HttpsError("invalid-argument", "Invalid orderId");
         const orderRef = admin.firestore().collection("orders").doc(orderId);
         const orderSnap = await orderRef.get();
         if (!orderSnap.exists)
-            throw new Error("Order not found");
+            throw new https_1.HttpsError("not-found", "Order not found");
         const order = orderSnap.data();
         if (uid) {
             if (order.userId !== uid)
-                throw new Error("Unauthorized");
+                throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
         }
         else {
             if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128)
-                throw new Error("Unauthorized");
+                throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
             if (order.userId !== sessionId)
-                throw new Error("Unauthorized");
+                throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
         }
     }
     else {
@@ -207,7 +216,7 @@ exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeco
         const responseData = await response.json();
         if (!response.ok) {
             console.error("PhonePe Status Failed", responseData);
-            throw new Error(responseData.message || "Payment status check failed");
+            throw new https_1.HttpsError("internal", responseData.message || "Payment status check failed");
         }
         const state = (_a = responseData.data) === null || _a === void 0 ? void 0 : _a.state;
         let paymentStatus = "pending";
@@ -232,7 +241,10 @@ exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeco
     }
     catch (error) {
         console.error("PhonePe Status Check Error", error);
-        throw new Error(error.message || "Status check error");
+        if (error instanceof https_1.HttpsError) {
+            throw error;
+        }
+        throw new https_1.HttpsError("internal", (error === null || error === void 0 ? void 0 : error.message) || "Status check error");
     }
 });
 exports.paymentCallback = (0, https_1.onRequest)({ memory: "256MiB", timeoutSeconds: 60 }, async (req, res) => {

@@ -286,7 +286,7 @@ function OrdersPageInner() {
                   <div className="space-y-4">
                     {/* Order Items */}
                     <div className="space-y-2">
-                      {order.items.slice(0, 2).map((item, idx) => (
+                      {(Array.isArray(order.items) ? order.items : []).slice(0, 2).map((item, idx) => (
                         <div key={idx} className="flex gap-3">
                           {item.productImage && (
                             <div className="size-16 bg-muted rounded-lg overflow-hidden shrink-0">
@@ -311,13 +311,13 @@ function OrdersPageInner() {
                             </p>
                           </div>
                           <div className="text-sm font-semibold text-primary">
-                            ₹{(item.price * item.quantity).toFixed(0)}
+                            ₹{(Number(item.price || 0) * Number(item.quantity || 0)).toFixed(0)}
                           </div>
                         </div>
                       ))}
-                      {order.items.length > 2 && (
+                      {(Array.isArray(order.items) ? order.items : []).length > 2 && (
                         <p className="text-sm text-muted-foreground">
-                          +{order.items.length - 2} more item(s)
+                          +{(Array.isArray(order.items) ? order.items : []).length - 2} more item(s)
                         </p>
                       )}
                     </div>
@@ -366,7 +366,7 @@ function OrdersPageInner() {
                       <div>
                         <p className="text-sm text-muted-foreground">Order Total</p>
                         <p className="text-xl font-bold text-primary">
-                          ₹{order.total.toFixed(0)}
+                          ₹{Number(order.total ?? 0).toFixed(0)}
                         </p>
                         {order.paymentMethod === "cod" && (
                           <div className="flex items-center gap-2 mt-1">

@@ -31,7 +31,7 @@ const rate_limit_1 = require("./rate-limit");
 exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
     const { uid } = (0, auth_1.getCaller)(request);
     const data = request.data || {};
-    const { shippingAddress, customerEmail, guestEmail, paymentMethod, remainingAmount, guestItems, sessionId: reqSessionId } = data;
+    const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
     // Use uid if logged in, otherwise use the session id passed from frontend
     const trackingId = uid || reqSessionId || "guest";
     // Rate limit order creation (50 orders per user/session per day)
@@ -71,27 +71,23 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
         orderNumber = `#${currentVal}`;
     });
     // 3. Assemble the Order Payload securely by calculating total from database
-    let calculatedTotal = 0;
-    for (const item of orderItems) {
-        if (item.productId && item.variant) {
-            // Find variant price
-            const variantSnap = await db.collection('variants')
-                .where('productId', '==', item.productId)
-                .where('title', '==', item.variant)
+    const lineTotals = await Promise.all(orderItems.map(async (item) => {
+        const quantity = Number((item === null || item === void 0 ? void 0 : item.quantity) || 1);
+        if ((item === null || item === void 0 ? void 0 : item.productId) && (item === null || item === void 0 ? void 0 : item.variant)) {
+            const variantSnap = await db
+                .collection("variants")
+                .where("productId", "==", item.productId)
+                .where("title", "==", item.variant)
+                .limit(1)
                 .get();
             if (!variantSnap.empty) {
                 const variantData = variantSnap.docs[0].data();
-                calculatedTotal += (variantData.price || 0) * (item.quantity || 1);
-            }
-            else {
-                // Fallback if variant not found in old DB structure, or reject
-                calculatedTotal += (item.price || 0) * (item.quantity || 1);
+                return Number((variantData === null || variantData === void 0 ? void 0 : variantData.price) || 0) * quantity;
             }
         }
-        else {
-            calculatedTotal += (item.price || 0) * (item.quantity || 1);
-        }
-    }
+        return Number((item === null || item === void 0 ? void 0 : item.price) || 0) * quantity;
+    }));
+    const calculatedTotal = lineTotals.reduce((sum, n) => sum + Number(n || 0), 0);
     // Use calculated total instead of client-provided remainingAmount
     const newOrder = {
         orderNumber: orderNumber,
@@ -123,7 +119,7 @@ exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
     return {
         orderId: docRef.id,
         orderNumber: orderNumber,
-        remainingAmount: remainingAmount || 0,
+        remainingAmount: calculatedTotal,
         trackingToken: `TRACK-${docRef.id}`
     };
 });

@@ -15,11 +15,31 @@ export function BrandLogo({
   className, 
   imgClassName, 
   type = "any", 
-  fallbackUrl = "/logo.webp",
+  fallbackUrl = "",
   disableLink = false
 }: BrandLogoProps) {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   
+  const logoLink = homepageSettings?.logoRedirectLink || "/";
+
+  if (homepageSettings === undefined) {
+    const placeholder = (
+      <div className={cn("h-10 md:h-12 flex items-center", imgClassName)}>
+        <span className="font-bold text-lg leading-none">Skinly</span>
+      </div>
+    );
+
+    if (disableLink) {
+      return <div className={cn("flex items-center gap-2 flex-shrink-0", className)}>{placeholder}</div>;
+    }
+
+    return (
+      <Link to={logoLink} className={cn("flex items-center gap-2 flex-shrink-0", className)}>
+        {placeholder}
+      </Link>
+    );
+  }
+
   let logoUrl = fallbackUrl;
   if (homepageSettings) {
     if (type === "footer" && homepageSettings.footerLogoImageUrl) {
@@ -28,10 +48,8 @@ export function BrandLogo({
       logoUrl = homepageSettings.logoImageUrl;
     }
   }
-  
-  const logoLink = homepageSettings?.logoRedirectLink || "/";
 
-  const imgContent = (
+  const imgContent = logoUrl ? (
     <img
       src={logoUrl}
       alt="Brand Logo"
@@ -40,6 +58,10 @@ export function BrandLogo({
       decoding="sync"
       className={cn("h-10 md:h-12 w-auto max-w-[200px] object-contain", imgClassName)}
     />
+  ) : (
+    <div className={cn("h-10 md:h-12 flex items-center", imgClassName)}>
+      <span className="font-bold text-lg leading-none">Skinly</span>
+    </div>
   );
 
   if (disableLink) {

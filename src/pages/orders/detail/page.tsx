@@ -164,26 +164,14 @@ function OrderDetailPageInner() {
       // Initiate PhonePe payment
       const paymentResult = await initiatePayment({
         orderId: retryResult.orderId,
-        orderNumber: retryResult.orderNumber,
+        orderNumber: String(retryResult.orderNumber || "").replace(/[^a-zA-Z0-9_-]/g, ""),
         amount: retryResult.remainingAmount,
-        customerPhone: retryResult.shippingPhone,
+        customerPhone: String(retryResult.shippingPhone || "").replace(/\D/g, "").slice(-10),
       });
       
       if (paymentResult.success && paymentResult.paymentUrl) {
         setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
-        
-        if (!window.PhonePeCheckout) {
-          toast.error("Payment service not available. Please refresh and try again.");
-          setIsRetrying(false);
-          return;
-        }
-        
-        // Open PhonePe payment in iframe
-        window.PhonePeCheckout.transact({
-          tokenUrl: paymentResult.paymentUrl,
-          callback: handlePhonePeCallback,
-          type: "IFRAME"
-        });
+        window.location.href = paymentResult.paymentUrl;
       } else {
         throw new Error("Failed to initiate payment");
       }

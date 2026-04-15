@@ -6,7 +6,7 @@ import { enforceDailyRateLimit } from "./rate-limit";
 export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
   const { uid } = getCaller(request);
   const data = request.data || {};
-  const { shippingAddress, customerEmail, guestEmail, paymentMethod, remainingAmount, guestItems, sessionId: reqSessionId } = data;
+  const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
 
   
   // Use uid if logged in, otherwise use the session id passed from frontend
@@ -52,26 +52,27 @@ export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, asyn
   });
 
   // 3. Assemble the Order Payload securely by calculating total from database
-  let calculatedTotal = 0;
-  for (const item of orderItems) {
-    if (item.productId && item.variant) {
-      // Find variant price
-      const variantSnap = await db.collection('variants')
-        .where('productId', '==', item.productId)
-        .where('title', '==', item.variant)
-        .get();
-        
-      if (!variantSnap.empty) {
-        const variantData = variantSnap.docs[0].data();
-        calculatedTotal += (variantData.price || 0) * (item.quantity || 1);
-      } else {
-        // Fallback if variant not found in old DB structure, or reject
-        calculatedTotal += (item.price || 0) * (item.quantity || 1);
+  const lineTotals = await Promise.all(
+    orderItems.map(async (item) => {
+      const quantity = Number(item?.quantity || 1);
+      if (item?.productId && item?.variant) {
+        const variantSnap = await db
+          .collection("variants")
+          .where("productId", "==", item.productId)
+          .where("title", "==", item.variant)
+          .limit(1)
+          .get();
+
+        if (!variantSnap.empty) {
+          const variantData = variantSnap.docs[0].data() as any;
+          return Number(variantData?.price || 0) * quantity;
+        }
       }
-    } else {
-      calculatedTotal += (item.price || 0) * (item.quantity || 1);
-    }
-  }
+
+      return Number(item?.price || 0) * quantity;
+    })
+  );
+  const calculatedTotal = lineTotals.reduce((sum, n) => sum + Number(n || 0), 0);
 
   // Use calculated total instead of client-provided remainingAmount
   const newOrder = {
@@ -107,7 +108,7 @@ export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, asyn
   return {
     orderId: docRef.id,
     orderNumber: orderNumber,
-    remainingAmount: remainingAmount || 0,
+    remainingAmount: calculatedTotal,
     trackingToken: `TRACK-${docRef.id}`
   };
 });
