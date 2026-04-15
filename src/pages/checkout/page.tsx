@@ -376,14 +376,15 @@ function CheckoutPageInner() {
 
     setIsSubmitting(true); setRetryCount(0); setShowPaymentVerificationFailed(false);
     try {
-      if (!isAuthenticated && guestCart.length > 0) await syncGuestCartToDb({ sessionId: guestSessionId, guestCartItems: guestCart });
-
       let codFeeAmount = 0, prepaidAmount = 0, codAmount = 0;
       if (formData.paymentMethod === "cod" && codAvailability?.available) {
         codFeeAmount = codAvailability.codFee; prepaidAmount = codAvailability.prepaidAmount; codAmount = codAvailability.codAmount;
       }
 
       const isPhonePePayment = formData.paymentMethod === "phonepe" || (formData.paymentMethod === "cod" && prepaidAmount > 0);
+      if (isPhonePePayment) {
+        setIsRedirectingToPayment(true);
+      }
 
       const result = await placeOrder({
         shippingAddress: { fullName: formData.fullName, phone: getFullPhoneNumber(), addressLine1: formData.addressLine1, addressLine2: formData.addressLine2, city: formData.city, state: formData.state, pincode: formData.pincode },
@@ -398,7 +399,7 @@ function CheckoutPageInner() {
         guestEmail: !isAuthenticated ? formData.email : undefined,
         guestItems: !isAuthenticated ? guestCart : undefined,
         // Pass phone + amount so the function can call PhonePe in one shot
-        customerPhone: isPhonePePayment ? getFullPhoneNumber() : undefined,
+        customerPhone: isPhonePePayment ? String(getFullPhoneNumber()).replace(/\D/g, "").slice(-10) : undefined,
         amount: isPhonePePayment ? (formData.paymentMethod === "cod" ? prepaidAmount : finalTotal) : undefined,
       });
 

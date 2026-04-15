@@ -377,16 +377,23 @@ export function useQuery(apiRef: any, args?: any) {
           setData([]);
         }
         else if (path === 'admin.orders.getOrderStats') {
-          // Dummy stats for now
-          setData({
-            totalOrders: 0,
-            totalRevenue: 0,
-            pendingOrders: 0,
-            shippedOrders: 0,
-            processingOrders: 0,
-            deliveredOrders: 0,
-            rtoOrders: 0,
-            rtoDeliveredOrders: 0
+          const q = query(collection(db, 'orders'), limit(500));
+          unsubscribe = onSnapshot(q, (snap) => {
+            const docs = snap.docs.map(d => d.data() as any);
+            const nonDeleted = docs.filter((d) => !d?.isDeleted);
+            const getPayStatus = (d: any) => d?.paymentStatus || d?.paymentInfo?.status;
+
+            setData({
+              total: nonDeleted.length,
+              processing: nonDeleted.filter((d) => d?.status === 'processing').length,
+              pending_payment: nonDeleted.filter((d) => getPayStatus(d) === 'pending' || !getPayStatus(d)).length,
+              shipped: nonDeleted.filter((d) => d?.status === 'shipped').length,
+              delivered: nonDeleted.filter((d) => d?.status === 'delivered').length,
+              cancelled: nonDeleted.filter((d) => d?.status === 'cancelled').length,
+              rto: nonDeleted.filter((d) => d?.status === 'rto').length,
+              failed: nonDeleted.filter((d) => getPayStatus(d) === 'failed').length,
+              deleted: docs.filter((d) => d?.isDeleted).length,
+            });
           });
         }
         else if (path === 'orders.checkOrderInventory') {

@@ -52,26 +52,44 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
   });
 
   // 3. Assemble the Order Payload securely by calculating total from database
-  const lineTotals = await Promise.all(
-    orderItems.map(async (item) => {
-      const quantity = Number(item?.quantity || 1);
-      if (item?.productId && item?.variant) {
-        const variantSnap = await db
-          .collection("variants")
-          .where("productId", "==", item.productId)
-          .where("title", "==", item.variant)
-          .limit(1)
-          .get();
-
-        if (!variantSnap.empty) {
-          const variantData = variantSnap.docs[0].data() as any;
-          return Number(variantData?.price || 0) * quantity;
-        }
-      }
-
-      return Number(item?.price || 0) * quantity;
-    })
+  const productIds = Array.from(
+    new Set(
+      orderItems
+        .map((i) => i?.productId)
+        .filter((p) => typeof p === "string" && p.length > 0)
+    )
   );
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < productIds.length; i += 10) {
+    chunks.push(productIds.slice(i, i + 10));
+  }
+
+  const variantsArr = (await Promise.all(
+    chunks.map(async (chunk) => {
+      if (chunk.length === 0) return [];
+      const snap = await db.collection("variants").where("productId", "in", chunk).get();
+      return snap.docs.map((d) => d.data());
+    })
+  )).flat() as any[];
+
+  const priceMap = new Map<string, number>();
+  for (const v of variantsArr) {
+    const key = `${String(v.productId)}::${String(v.title)}`;
+    priceMap.set(key, Number(v.price || 0));
+  }
+
+  const lineTotals = orderItems.map((item) => {
+    const quantity = Number(item?.quantity || 1);
+    if (item?.productId && item?.variant) {
+      const key = `${String(item.productId)}::${String(item.variant)}`;
+      const dbPrice = priceMap.get(key);
+      if (typeof dbPrice === "number") {
+        return dbPrice * quantity;
+      }
+    }
+    return Number(item?.price || 0) * quantity;
+  });
   const calculatedTotal = lineTotals.reduce((sum, n) => sum + Number(n || 0), 0);
 
   // Use calculated total instead of client-provided remainingAmount

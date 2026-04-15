@@ -71,22 +71,35 @@ exports.createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 60, m
         orderNumber = `#${currentVal}`;
     });
     // 3. Assemble the Order Payload securely by calculating total from database
-    const lineTotals = await Promise.all(orderItems.map(async (item) => {
+    const productIds = Array.from(new Set(orderItems
+        .map((i) => i === null || i === void 0 ? void 0 : i.productId)
+        .filter((p) => typeof p === "string" && p.length > 0)));
+    const chunks = [];
+    for (let i = 0; i < productIds.length; i += 10) {
+        chunks.push(productIds.slice(i, i + 10));
+    }
+    const variantsArr = (await Promise.all(chunks.map(async (chunk) => {
+        if (chunk.length === 0)
+            return [];
+        const snap = await db.collection("variants").where("productId", "in", chunk).get();
+        return snap.docs.map((d) => d.data());
+    }))).flat();
+    const priceMap = new Map();
+    for (const v of variantsArr) {
+        const key = `${String(v.productId)}::${String(v.title)}`;
+        priceMap.set(key, Number(v.price || 0));
+    }
+    const lineTotals = orderItems.map((item) => {
         const quantity = Number((item === null || item === void 0 ? void 0 : item.quantity) || 1);
         if ((item === null || item === void 0 ? void 0 : item.productId) && (item === null || item === void 0 ? void 0 : item.variant)) {
-            const variantSnap = await db
-                .collection("variants")
-                .where("productId", "==", item.productId)
-                .where("title", "==", item.variant)
-                .limit(1)
-                .get();
-            if (!variantSnap.empty) {
-                const variantData = variantSnap.docs[0].data();
-                return Number((variantData === null || variantData === void 0 ? void 0 : variantData.price) || 0) * quantity;
+            const key = `${String(item.productId)}::${String(item.variant)}`;
+            const dbPrice = priceMap.get(key);
+            if (typeof dbPrice === "number") {
+                return dbPrice * quantity;
             }
         }
         return Number((item === null || item === void 0 ? void 0 : item.price) || 0) * quantity;
-    }));
+    });
     const calculatedTotal = lineTotals.reduce((sum, n) => sum + Number(n || 0), 0);
     // Use calculated total instead of client-provided remainingAmount
     const newOrder = {
