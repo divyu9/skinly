@@ -11,7 +11,7 @@ const getWhatsAppConfig = () => {
   return { authkey };
 };
 
-export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request: any) => {
+export const sendWhatsAppMessage = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
   const { uid } = await requireAdmin(request);
   await enforceDailyRateLimit({ key: `sendWhatsAppMessage_${uid}`, limit: Number(process.env.WHATSAPP_DAILY_LIMIT || 500) });
   const data = request.data;

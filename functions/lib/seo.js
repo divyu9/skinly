@@ -11,7 +11,7 @@ const getOpenAIConfig = () => {
     }
     return { apiKey };
 };
-exports.generateSEOContent = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request) => {
+exports.generateSEOContent = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
     var _a, _b, _c;
     const { uid } = await (0, auth_1.requireAdmin)(request);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `generateSEOContent_${uid}`, limit: Number(process.env.SEO_DAILY_LIMIT || 100) });

@@ -28,7 +28,7 @@ const https_1 = require("firebase-functions/v2/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
-exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request) => {
+exports.createOrder = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
     const { uid } = (0, auth_1.getCaller)(request);
     const data = request.data || {};
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
