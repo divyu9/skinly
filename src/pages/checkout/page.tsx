@@ -58,9 +58,8 @@ function CheckoutPageInner() {
   const { guestCart, clearGuestCart } = useGuestCart();
   const syncGuestCartToDb = useMutation(api.cart.syncGuestCartToDb);
   const clearUserCart = useMutation(api.cart.clearCart);
-  const createOrder = useMutation(api.orders.createOrder);
+  const placeOrder = useMutation(api.orders.placeOrder);
   const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
-  const initiatePayment = useAction(api.phonepe.initiatePayment);
   const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
   const generateCodOtp = useMutation(api.codOtp.generateCodOtp);
   const verifyCodOtp = useMutation(api.codOtp.verifyCodOtp);
@@ -384,7 +383,9 @@ function CheckoutPageInner() {
         codFeeAmount = codAvailability.codFee; prepaidAmount = codAvailability.prepaidAmount; codAmount = codAvailability.codAmount;
       }
 
-      const result = await createOrder({
+      const isPhonePePayment = formData.paymentMethod === "phonepe" || (formData.paymentMethod === "cod" && prepaidAmount > 0);
+
+      const result = await placeOrder({
         shippingAddress: { fullName: formData.fullName, phone: getFullPhoneNumber(), addressLine1: formData.addressLine1, addressLine2: formData.addressLine2, city: formData.city, state: formData.state, pincode: formData.pincode },
         customerEmail: formData.email || undefined,
         paymentMethod: formData.paymentMethod,
@@ -395,56 +396,26 @@ function CheckoutPageInner() {
         walletCreditAmount: appliedCoupon?.walletCreditAmount,
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,
-        remainingAmount: finalTotal, // Pass final total for Firebase hook mock
-        guestItems: !isAuthenticated ? guestCart : undefined, // Pass guest items directly
+        guestItems: !isAuthenticated ? guestCart : undefined,
+        // Pass phone + amount so the function can call PhonePe in one shot
+        customerPhone: isPhonePePayment ? getFullPhoneNumber() : undefined,
+        amount: isPhonePePayment ? (formData.paymentMethod === "cod" ? prepaidAmount : finalTotal) : undefined,
       });
 
-      const remainingAmount = result.remainingAmount || 0;
       const guestNav = () => navigate(`/orders/${result.orderId}`);
 
-      if (remainingAmount === 0) {
-        if (!isAuthenticated) clearGuestCart();
-        else clearUserCart();
-        toast.success("Order placed successfully!");
-        guestNav();
-      } else if (formData.paymentMethod === "phonepe" || (formData.paymentMethod === "cod" && prepaidAmount > 0)) {
-        setIsRedirectingToPayment(true);
-        const amount = formData.paymentMethod === "cod" ? prepaidAmount : remainingAmount;
-        
-        // Save tracking token for when user returns from payment gateway
-        if (result.trackingToken) {
-          sessionStorage.setItem("skinly_tracking_token", result.trackingToken);
-        }
-        
-        try {
-          // PhonePe merchantTransactionId only allows alphanumeric, hyphens, and underscores.
-          const safeOrderNumber = result.orderNumber?.replace(/[^a-zA-Z0-9_-]/g, "");
-          const paymentResult = await initiatePayment({ 
-            orderId: result.orderId, 
-            orderNumber: safeOrderNumber, 
-            amount, 
-            customerPhone: getFullPhoneNumber(), 
-            sessionId: !isAuthenticated ? guestSessionId : undefined 
-          });
-          
-          if (paymentResult.success && paymentResult.paymentUrl) {
-            openPhonePe(paymentResult.paymentUrl, paymentResult.merchantTransactionId, result.orderId);
-          } else {
-            throw new Error("Failed to initiate payment");
-          }
-        } catch (paymentError) {
-          const e = paymentError as any;
-          console.error("Payment initiation failed — full error:", JSON.stringify({ message: e?.message, code: e?.code, details: e?.details, data: e?.data }, null, 2));
-          // Order was created successfully but payment initiation failed.
-          // We must redirect to the order page so the user can retry payment there.
-          setIsRedirectingToPayment(false);
+      if (result.trackingToken) {
+        sessionStorage.setItem("skinly_tracking_token", result.trackingToken);
+      }
 
-          const rawMsg: string = e?.message || e?.details?.message || e?.data?.message || "";
-          const errMsg = rawMsg || "Payment failed to initiate.";
-          toast.error(errMsg + " You can retry payment from the order page.");
-          
-          guestNav();
-        }
+      if (result.paymentError) {
+        // Order was created but PhonePe failed — let user retry from order page
+        console.error("Payment initiation failed:", result.paymentError);
+        toast.error(result.paymentError + " You can retry payment from the order page.");
+        guestNav();
+      } else if (result.paymentUrl && result.merchantTransactionId) {
+        setIsRedirectingToPayment(true);
+        openPhonePe(result.paymentUrl, result.merchantTransactionId, result.orderId);
       } else {
         if (!isAuthenticated) clearGuestCart();
         else clearUserCart();
@@ -452,13 +423,11 @@ function CheckoutPageInner() {
         guestNav();
       }
     } catch (error) {
+      const e = error as any;
+      console.error("placeOrder failed:", JSON.stringify({ message: e?.message, code: e?.code, details: e?.details }, null, 2));
       let msg = "Failed to place order. Please try again.";
-      if (error && typeof error === "object" && "data" in error) {
-        const e = error as { data?: { message?: string } };
-        if (e.data?.message) msg = e.data.message;
-      } else if (error instanceof Error) {
-        msg = error.message;
-      }
+      if (e?.message && !e.message.includes("INTERNAL")) msg = e.message;
+      else if (e?.data?.message) msg = e.data.message;
       toast.error(msg); setIsSubmitting(false); setIsRedirectingToPayment(false);
     }
   };
@@ -637,10 +606,10 @@ function CheckoutPageInner() {
                 {isRedirectingToPayment ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="size-4" />
-                    {retryCount > 0 ? `Verifying payment... (${retryCount}/${maxRetries})` : "Processing payment..."}
+                    {retryCount > 0 ? `Verifying payment... (${retryCount}/${maxRetries})` : "Redirecting to payment..."}
                   </span>
                 ) : isSubmitting ? (
-                  <span className="flex items-center gap-2"><Spinner className="size-4" />Creating order...</span>
+                  <span className="flex items-center gap-2"><Spinner className="size-4" />Placing order...</span>
                 ) : (
                   "Place Order"
                 )}

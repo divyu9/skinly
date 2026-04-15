@@ -31,6 +31,7 @@ const admin = __importStar(require("firebase-admin"));
 dotenv.config();
 admin.initializeApp();
 __exportStar(require("./phonepe"), exports);
+__exportStar(require("./placeorder"), exports);
 __exportStar(require("./rapidshyp"), exports);
 __exportStar(require("./whatsapp"), exports);
 __exportStar(require("./seo"), exports);

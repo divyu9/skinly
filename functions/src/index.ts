@@ -4,6 +4,7 @@ dotenv.config();
 admin.initializeApp();
 
 export * from "./phonepe";
+export * from "./placeorder";
 export * from "./rapidshyp";
 export * from "./whatsapp";
 export * from "./seo";

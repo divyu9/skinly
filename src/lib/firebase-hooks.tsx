@@ -1877,6 +1877,24 @@ export function useMutation(apiRef: any) {
         const response = await callCreateOrder(args);
         return response.data;
       }
+
+      if (collectionName === 'orders' && actionName === 'placeOrder') {
+        const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        if (isLocal) {
+          const mockOrderId = `mock-order-${Date.now()}`;
+          const result: any = { orderId: mockOrderId, orderNumber: `#9001`, remainingAmount: args.amount || 100, trackingToken: `TRACK-${mockOrderId}` };
+          if (args.paymentMethod === 'phonepe') {
+            result.paymentUrl = `http://localhost:5175/mock-payment?orderId=${mockOrderId}&amount=${args.amount}`;
+            result.merchantTransactionId = `MTXN-${Date.now()}`;
+          }
+          return result;
+        }
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions();
+        const callable = httpsCallable(functions, 'placeOrder');
+        const response = await callable(args);
+        return response.data;
+      }
       
       if (collectionName === 'phonepe' && actionName === 'initiatePayment') {
         const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
