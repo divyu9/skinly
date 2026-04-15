@@ -29,7 +29,7 @@ const generateXVerify = (base64Payload: string, endpoint: string, saltKey: strin
   return `${sha256Hash}###${saltIndex}`;
 };
 
-export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request: any) => {
   const data = request.data || {};
   const { uid } = getCaller(request);
   await enforceDailyRateLimit({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
@@ -179,7 +179,7 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
   }
 });
 
-export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+export const checkPaymentStatus = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request: any) => {
   const data = request.data || {};
   const { uid } = getCaller(request);
   await enforceDailyRateLimit({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });

@@ -10,7 +10,7 @@ const getOpenAIConfig = () => {
   return { apiKey };
 };
 
-export const generateSEOContent = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+export const generateSEOContent = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request: any) => {
   const { uid } = await requireAdmin(request);
   await enforceDailyRateLimit({ key: `generateSEOContent_${uid}`, limit: Number(process.env.SEO_DAILY_LIMIT || 100) });
   const data = request.data;

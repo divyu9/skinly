@@ -42,7 +42,7 @@ const validateKey = (key) => {
     }
 };
 // Admin function to setup CORS on the bucket
-exports.setupR2Cors = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, cors: true }, async (request) => {
+exports.setupR2Cors = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
     const { uid } = await (0, auth_1.requireAdmin)(request);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `setupR2Cors_${uid}`, limit: Number(process.env.R2_CORS_DAILY_LIMIT || 20) });
     const config = getR2Config();
@@ -77,7 +77,7 @@ exports.setupR2Cors = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60
         throw new Error(error.message || "Failed to configure CORS");
     }
 });
-exports.generateUploadUrl = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, cors: true }, async (request) => {
+exports.generateUploadUrl = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request) => {
     const { uid } = await (0, auth_1.requireAdmin)(request);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `generateUploadUrl_${uid}`, limit: Number(process.env.R2_UPLOAD_DAILY_LIMIT || 2000) });
     const data = request.data;

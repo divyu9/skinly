@@ -48,7 +48,7 @@ const generateXVerify = (base64Payload, endpoint, saltKey, saltIndex) => {
     const sha256Hash = crypto.createHash("sha256").update(stringToHash).digest("hex");
     return `${sha256Hash}###${saltIndex}`;
 };
-exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
+exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request) => {
     var _a, _b, _c;
     const data = request.data || {};
     const { uid } = (0, auth_1.getCaller)(request);
@@ -183,7 +183,7 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
         throw new https_1.HttpsError("unavailable", (error === null || error === void 0 ? void 0 : error.message) || "PhonePe API error");
     }
 });
-exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
+exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request) => {
     var _a;
     const data = request.data || {};
     const { uid } = (0, auth_1.getCaller)(request);

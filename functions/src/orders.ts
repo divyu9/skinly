@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import { getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 
-export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+export const createOrder = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request: any) => {
   const { uid } = getCaller(request);
   const data = request.data || {};
   const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;

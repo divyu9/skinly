@@ -43,7 +43,7 @@ const validateKey = (key: string) => {
 };
 
 // Admin function to setup CORS on the bucket
-export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: true }, async (request: any) => {
+export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
   const { uid } = await requireAdmin(request);
   await enforceDailyRateLimit({ key: `setupR2Cors_${uid}`, limit: Number(process.env.R2_CORS_DAILY_LIMIT || 20) });
 
@@ -82,7 +82,7 @@ export const setupR2Cors = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: 
   }
 });
 
-export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, cors: true }, async (request: any) => {
+export const generateUploadUrl = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public", cors: true }, async (request: any) => {
   const { uid } = await requireAdmin(request);
   await enforceDailyRateLimit({ key: `generateUploadUrl_${uid}`, limit: Number(process.env.R2_UPLOAD_DAILY_LIMIT || 2000) });
   const data = request.data;

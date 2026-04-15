@@ -14,7 +14,7 @@ const getRapidShypConfig = () => {
   return { apiKey, apiUrl };
 };
 
-export const createShipment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, async (request: any) => {
+export const createShipment = onCall({ memory: "256MiB", timeoutSeconds: 60, invoker: "public" }, async (request: any) => {
   const { uid } = await requireAdmin(request);
   await enforceDailyRateLimit({ key: `createShipment_${uid}`, limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200) });
   const data = request.data;
