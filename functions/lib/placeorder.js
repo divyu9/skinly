@@ -29,6 +29,19 @@ const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const crypto = __importStar(require("crypto"));
 const auth_1 = require("./auth");
+/** Atomic counter increment — runs in background while cart is being fetched */
+const reserveOrderNumber = async (db) => {
+    const counterRef = db.collection("settings").doc("order_counter");
+    let orderNumber = "";
+    await db.runTransaction(async (tx) => {
+        var _a, _b;
+        const snap = await tx.get(counterRef);
+        const current = snap.exists ? ((_b = (_a = snap.data()) === null || _a === void 0 ? void 0 : _a.value) !== null && _b !== void 0 ? _b : 4001) : 4001;
+        tx.set(counterRef, { value: current + 1 }, { merge: true });
+        orderNumber = `#${current}`;
+    });
+    return orderNumber;
+};
 const getPhonePeConfig = () => {
     const merchantId = process.env.PHONEPE_MERCHANT_ID || "";
     const saltKey = process.env.PHONEPE_SALT_KEY || "";
@@ -60,10 +73,13 @@ exports.placeOrder = functions
     const { uid } = (0, auth_1.getCaller)(context);
     const db = admin.firestore();
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId, customerPhone } = data;
-    // ── 1. Pre-generate doc ref → free unique order number, no Firestore round-trip ──
+    // ── 1. Kick off order number reservation immediately (runs in background) ──
+    // Cart fetch + variant query take ~500ms. The counter transaction takes ~800-1200ms.
+    // By starting both at the same time we overlap most of the wait.
+    const orderNumberPromise = reserveOrderNumber(db);
+    // Pre-generate doc ref so we have orderId before any writes
     const docRef = db.collection("orders").doc();
     const orderId = docRef.id;
-    const orderNumber = `#${orderId.slice(-6).toUpperCase()}`;
     // ── 2. Fetch cart items ───────────────────────────────────────────────────
     let orderItems = [];
     if (uid) {
@@ -106,6 +122,9 @@ exports.placeOrder = functions
         return sum + Number((item === null || item === void 0 ? void 0 : item.price) || 0) * qty;
     }, 0);
     // ── 4. Write order ────────────────────────────────────────────────────────
+    // Collect the order number now — by this point cart+variants took ~500ms,
+    // so the counter transaction (started at step 1) is usually already done.
+    const orderNumber = await orderNumberPromise;
     await docRef.set({
         orderNumber,
         userId: uid || reqSessionId || "guest",
@@ -121,7 +140,7 @@ exports.placeOrder = functions
         createdAt: Date.now(),
         updatedAt: Date.now(),
     });
-    // ── 5. Initiate PhonePe (same function, no second round-trip) ─────────────
+    // ── 5. Initiate PhonePe (same function call, no second round-trip) ──────────
     if (paymentMethod === "phonepe" && calculatedTotal > 0 && customerPhone) {
         let phoneDigits = String(customerPhone).replace(/\D/g, "");
         if (phoneDigits.length === 12 && phoneDigits.startsWith("91"))
