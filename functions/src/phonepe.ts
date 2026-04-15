@@ -1,4 +1,5 @@
-import { onCall, onRequest, HttpsError } from "firebase-functions/v1/https";
+import * as functions from "firebase-functions/v1";
+import { onRequest, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { requireAuth, getCaller } from "./auth";
@@ -29,7 +30,7 @@ const generateXVerify = (base64Payload: string, endpoint: string, saltKey: strin
   return `${sha256Hash}###${saltIndex}`;
 };
 
-export const initiatePayment = onCall(async (data: any, context: any) => {
+export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data: any, context: any) => {
   const { uid } = getCaller(context);
   await enforceDailyRateLimit({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
 
@@ -178,7 +179,7 @@ export const initiatePayment = onCall(async (data: any, context: any) => {
   }
 });
 
-export const checkPaymentStatus = onCall(async (data: any, context: any) => {
+export const checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data: any, context: any) => {
   const { uid } = getCaller(context);
   await enforceDailyRateLimit({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
 

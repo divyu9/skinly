@@ -24,6 +24,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.paymentCallback = exports.checkPaymentStatus = exports.initiatePayment = void 0;
+const functions = __importStar(require("firebase-functions/v1"));
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const crypto = __importStar(require("crypto"));
@@ -48,7 +49,7 @@ const generateXVerify = (base64Payload, endpoint, saltKey, saltIndex) => {
     const sha256Hash = crypto.createHash("sha256").update(stringToHash).digest("hex");
     return `${sha256Hash}###${saltIndex}`;
 };
-exports.initiatePayment = (0, https_1.onCall)(async (data, context) => {
+exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data, context) => {
     var _a, _b, _c;
     const { uid } = (0, auth_1.getCaller)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
@@ -182,7 +183,7 @@ exports.initiatePayment = (0, https_1.onCall)(async (data, context) => {
         throw new https_1.HttpsError("unavailable", (error === null || error === void 0 ? void 0 : error.message) || "PhonePe API error");
     }
 });
-exports.checkPaymentStatus = (0, https_1.onCall)(async (data, context) => {
+exports.checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data, context) => {
     var _a;
     const { uid } = (0, auth_1.getCaller)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });

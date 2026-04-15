@@ -1,9 +1,10 @@
-import { onCall, HttpsError } from "firebase-functions/v1/https";
+import * as functions from "firebase-functions/v1";
+import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 
-export const createOrder = onCall(async (data: any, context: any) => {
+export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data: any, context: any) => {
   const { uid } = getCaller(context);
   const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
 

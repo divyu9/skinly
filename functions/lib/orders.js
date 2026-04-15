@@ -24,11 +24,12 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createOrder = void 0;
+const functions = __importStar(require("firebase-functions/v1"));
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
-exports.createOrder = (0, https_1.onCall)(async (data, context) => {
+exports.createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data, context) => {
     const { uid } = (0, auth_1.getCaller)(context);
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId } = data;
     // Use uid if logged in, otherwise use the session id passed from frontend
