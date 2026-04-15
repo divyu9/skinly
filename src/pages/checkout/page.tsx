@@ -437,13 +437,20 @@ function CheckoutPageInner() {
           // Order was created successfully but payment initiation failed.
           // We must redirect to the order page so the user can retry payment there.
           setIsRedirectingToPayment(false);
-          
-          let errMsg = "Order created but payment failed to initiate.";
-          if (paymentError && typeof paymentError === "object" && "data" in paymentError) {
-            const e = paymentError as { data?: { message?: string } };
-            if (e.data?.message) errMsg = e.data.message;
-          } else if (paymentError instanceof Error) {
-            errMsg = paymentError.message;
+
+          let errMsg = "Payment failed to initiate.";
+          if (paymentError && typeof paymentError === "object") {
+            const e = paymentError as any;
+            // Firebase FunctionsError: check message (skip if it's just the code like "internal"/"unavailable")
+            const msg: string = e?.message || "";
+            const code: string = (e?.code || "").replace("functions/", "");
+            if (msg && msg !== code && msg !== "internal" && msg !== "unavailable") {
+              errMsg = msg;
+            } else if (e?.details?.message) {
+              errMsg = e.details.message;
+            } else if (e?.data?.message) {
+              errMsg = e.data.message;
+            }
           }
           toast.error(errMsg + " You can retry payment from the order page.");
           

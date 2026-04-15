@@ -95,6 +95,8 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
 
   const amountInPaise = Math.max(Math.round(amount * 100), 100);
   const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
+  // callbackUrl must be the Firebase Function endpoint so PhonePe can POST to a real server
+  const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
 
   const paymentPayload = {
     merchantId: config.merchantId,
@@ -103,12 +105,21 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
     amount: amountInPaise,
     redirectUrl: `${siteUrl}/payment/callback`,
     redirectMode: "REDIRECT",
-    callbackUrl: `${siteUrl}/payment/callback`,
+    callbackUrl: callbackFnUrl,
     mobileNumber: phoneDigits,
     paymentInstrument: {
       type: "PAY_PAGE",
     },
   };
+
+  console.log("PhonePe initiating payment", {
+    merchantId: config.merchantId,
+    merchantTransactionId,
+    amount: amountInPaise,
+    redirectUrl: paymentPayload.redirectUrl,
+    callbackUrl: callbackFnUrl,
+    mobileNumber: phoneDigits,
+  });
 
   const base64Payload = Buffer.from(JSON.stringify(paymentPayload)).toString("base64");
   const endpoint = "/pg/v1/pay";
@@ -126,16 +137,26 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
       body: JSON.stringify({ request: base64Payload }),
     });
 
-    const responseData: any = await response.json();
+    const responseText = await response.text();
+    let responseData: any = {};
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      console.error("PhonePe non-JSON response", { status: response.status, body: responseText.slice(0, 500) });
+      throw new HttpsError("unavailable", `PhonePe returned non-JSON response (HTTP ${response.status})`);
+    }
+
+    console.log("PhonePe response", { status: response.status, code: responseData.code, success: responseData.success, message: responseData.message });
 
     if (!response.ok || !responseData.success) {
+      const errMsg = `PhonePe error: ${responseData.code || "UNKNOWN"} - ${responseData.message || "Payment initiation failed"}`;
       console.error("PhonePe Initiation Failed", responseData);
-      throw new HttpsError("internal", responseData.message || "Payment initiation failed");
+      throw new HttpsError("unavailable", errMsg);
     }
 
     const paymentUrl = responseData.data?.instrumentResponse?.redirectInfo?.url;
     if (!paymentUrl) {
-      throw new HttpsError("internal", "No payment URL returned");
+      throw new HttpsError("unavailable", "PhonePe returned no payment URL");
     }
 
     await orderSnap.ref.update({
@@ -150,11 +171,11 @@ export const initiatePayment = onCall({ memory: "256MiB", timeoutSeconds: 60 }, 
       merchantTransactionId,
     };
   } catch (error: any) {
-    console.error("PhonePe API Error", error);
+    console.error("PhonePe API Error", error?.message || error);
     if (error instanceof HttpsError) {
       throw error;
     }
-    throw new HttpsError("internal", error?.message || "PhonePe API error");
+    throw new HttpsError("unavailable", error?.message || "PhonePe API error");
   }
 });
 

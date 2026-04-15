@@ -108,6 +108,8 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
     const merchantTransactionId = `${orderRefSuffix}-${last6}`;
     const amountInPaise = Math.max(Math.round(amount * 100), 100);
     const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
+    // callbackUrl must be the Firebase Function endpoint so PhonePe can POST to a real server
+    const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
     const paymentPayload = {
         merchantId: config.merchantId,
         merchantTransactionId: merchantTransactionId,
@@ -115,12 +117,20 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
         amount: amountInPaise,
         redirectUrl: `${siteUrl}/payment/callback`,
         redirectMode: "REDIRECT",
-        callbackUrl: `${siteUrl}/payment/callback`,
+        callbackUrl: callbackFnUrl,
         mobileNumber: phoneDigits,
         paymentInstrument: {
             type: "PAY_PAGE",
         },
     };
+    console.log("PhonePe initiating payment", {
+        merchantId: config.merchantId,
+        merchantTransactionId,
+        amount: amountInPaise,
+        redirectUrl: paymentPayload.redirectUrl,
+        callbackUrl: callbackFnUrl,
+        mobileNumber: phoneDigits,
+    });
     const base64Payload = Buffer.from(JSON.stringify(paymentPayload)).toString("base64");
     const endpoint = "/pg/v1/pay";
     const xVerify = generateXVerify(base64Payload, endpoint, config.saltKey, config.saltIndex);
@@ -135,14 +145,24 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
             },
             body: JSON.stringify({ request: base64Payload }),
         });
-        const responseData = await response.json();
+        const responseText = await response.text();
+        let responseData = {};
+        try {
+            responseData = JSON.parse(responseText);
+        }
+        catch (_d) {
+            console.error("PhonePe non-JSON response", { status: response.status, body: responseText.slice(0, 500) });
+            throw new https_1.HttpsError("unavailable", `PhonePe returned non-JSON response (HTTP ${response.status})`);
+        }
+        console.log("PhonePe response", { status: response.status, code: responseData.code, success: responseData.success, message: responseData.message });
         if (!response.ok || !responseData.success) {
+            const errMsg = `PhonePe error: ${responseData.code || "UNKNOWN"} - ${responseData.message || "Payment initiation failed"}`;
             console.error("PhonePe Initiation Failed", responseData);
-            throw new https_1.HttpsError("internal", responseData.message || "Payment initiation failed");
+            throw new https_1.HttpsError("unavailable", errMsg);
         }
         const paymentUrl = (_c = (_b = (_a = responseData.data) === null || _a === void 0 ? void 0 : _a.instrumentResponse) === null || _b === void 0 ? void 0 : _b.redirectInfo) === null || _c === void 0 ? void 0 : _c.url;
         if (!paymentUrl) {
-            throw new https_1.HttpsError("internal", "No payment URL returned");
+            throw new https_1.HttpsError("unavailable", "PhonePe returned no payment URL");
         }
         await orderSnap.ref.update({
             paymentTransactionId: merchantTransactionId,
@@ -156,11 +176,11 @@ exports.initiatePayment = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds
         };
     }
     catch (error) {
-        console.error("PhonePe API Error", error);
+        console.error("PhonePe API Error", (error === null || error === void 0 ? void 0 : error.message) || error);
         if (error instanceof https_1.HttpsError) {
             throw error;
         }
-        throw new https_1.HttpsError("internal", (error === null || error === void 0 ? void 0 : error.message) || "PhonePe API error");
+        throw new https_1.HttpsError("unavailable", (error === null || error === void 0 ? void 0 : error.message) || "PhonePe API error");
     }
 });
 exports.checkPaymentStatus = (0, https_1.onCall)({ memory: "256MiB", timeoutSeconds: 60 }, async (request) => {
