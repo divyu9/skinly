@@ -19,14 +19,11 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize App Check (Only in browser environment)
+// Initialize App Check (Only when a valid reCAPTCHA site key is configured)
 let appCheck;
-if (typeof window !== "undefined") {
-  // Use a placeholder reCAPTCHA site key if env var is missing, though it will fail verification
-  const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || "YOUR_RECAPTCHA_V3_SITE_KEY";
-  
+if (typeof window !== "undefined" && import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
   appCheck = initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
     isTokenAutoRefreshEnabled: true
   });
 }
