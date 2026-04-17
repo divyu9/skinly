@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -13,6 +14,12 @@ export default function PrivacyPolicy() {
   
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Privacy Policy | GoSkinly</title>
+        <meta name="description" content="Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy." />
+        <link rel="canonical" href="https://www.goskinly.com/policies/privacy" />
+      </Helmet>
+
       {/* Announcement Bar */}
       <AnnouncementBar />
       

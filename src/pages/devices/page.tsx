@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -358,11 +359,22 @@ export default function DevicesPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Supported Devices & Models | GoSkinly</title>
+        <meta name="description" content="Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom vinyl skins starting ₹149. Free delivery across India." />
+        <link rel="canonical" href="https://www.goskinly.com/devices" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Supported Devices & Models | GoSkinly" />
+        <meta property="og:description" content="Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom vinyl skins starting ₹149." />
+        <meta property="og:url" content="https://www.goskinly.com/devices" />
+        <meta property="og:site_name" content="GoSkinly" />
+      </Helmet>
+
       {/* Announcement Bar */}
       <AnnouncementBar />
-      
+
       {/* Mobile Header */}
-      <MobileHeader 
+      <MobileHeader
         onMenuClick={() => setIsMobileMenuOpen(true)}
         onRequestModelClick={() => setRequestDialogOpen(true)}
       />

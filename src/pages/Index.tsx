@@ -205,8 +205,14 @@ export default function Index() {
   return (
     <>
       <Helmet>
-        <title>Skinly - Premium Device Skins & Accessories</title>
-        <meta name="description" content="Shop premium skins and accessories for your devices. High-quality materials, precise fit, and stunning designs." />
+        <title>GoSkinly - Premium Device Skins & Accessories | Starting ₹149</title>
+        <meta name="description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported. Free delivery across India. COD available. Starting ₹149." />
+        <link rel="canonical" href="https://www.goskinly.com/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="GoSkinly - Premium Device Skins & Accessories | Starting ₹149" />
+        <meta property="og:description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported. Free delivery across India. COD available. Starting ₹149." />
+        <meta property="og:url" content="https://www.goskinly.com/" />
+        <meta property="og:site_name" content="GoSkinly" />
       </Helmet>
 
       {/* Announcement Bar */}

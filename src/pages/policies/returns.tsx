@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, ShieldCheckIcon } from "lucide-react";
 import { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -13,6 +14,11 @@ export default function ReturnsPolicy() {
   
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Returns & Refund Policy | GoSkinly</title>
+        <meta name="description" content="GoSkinly returns and refund policy. Easy returns, hassle-free refunds on vinyl device skins." />
+        <link rel="canonical" href="https://www.goskinly.com/policies/returns" />
+      </Helmet>
       {/* Announcement Bar */}
       <AnnouncementBar />
       
