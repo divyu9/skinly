@@ -2635,7 +2635,118 @@ export function useMutation(apiRef: any) {
       if (collectionName === 'rapidshyp') {
         return { success: true, message: "Mocked rapidshyp response" };
       }
-      
+
+      // ── seoPages: must come BEFORE generic update/delete/create handlers ──
+      if (collectionName === 'seoPages') {
+        const pagesCollection = collection(db, 'seoPages');
+
+        if (actionName === 'regeneratePageContent') {
+          const snap = await getDoc(doc(pagesCollection, args.pageId));
+          if (!snap.exists()) throw new Error('Page not found');
+          const page = snap.data() as any;
+          return { value: page.h1Heading || page.title || page.slug || '', pageType: page.pageType || 'keyword' };
+        }
+
+        if (actionName === 'updatePage') {
+          const { pageId, ...updates } = args;
+          const clean: any = { updatedAt: Date.now() };
+          const fields = ['contentHTML', 'metaDescription', 'metaTitle', 'h1Heading', 'slug', 'faqs', 'imageAltTexts', 'heroImageUrl', 'isPublished', 'keywords', 'filterConfig'];
+          fields.forEach(f => { if (updates[f] !== undefined) clean[f] = updates[f]; });
+          await updateDoc(doc(pagesCollection, pageId), clean);
+          return { pageId };
+        }
+
+        if (actionName === 'createPage') {
+          const docRef = await addDoc(pagesCollection, { ...args, createdAt: Date.now(), updatedAt: Date.now() });
+          return { pageId: docRef.id, slug: args.slug };
+        }
+
+        if (actionName === 'deletePage') {
+          await deleteDoc(doc(pagesCollection, args.pageId));
+          return { pageId: args.pageId };
+        }
+
+        if (actionName === 'togglePublish') {
+          await updateDoc(doc(pagesCollection, args.pageId), { isPublished: args.isPublished, updatedAt: Date.now() });
+          return { pageId: args.pageId, isPublished: args.isPublished };
+        }
+
+        if (actionName === 'clonePage') {
+          const snap = await getDoc(doc(pagesCollection, args.pageId));
+          if (!snap.exists()) throw new Error('Page not found');
+          const data = snap.data() as any;
+          const newSlug = `${data.slug || 'page'}-copy-${Date.now()}`;
+          const docRef = await addDoc(pagesCollection, { ...data, slug: newSlug, isPublished: false, createdAt: Date.now(), updatedAt: Date.now() });
+          return { pageId: docRef.id, slug: newSlug };
+        }
+
+        if (actionName === 'bulkTogglePublish') {
+          const batch = writeBatch(db);
+          (args.pageIds || []).forEach((id: string) => {
+            batch.update(doc(pagesCollection, id), { isPublished: args.isPublished, updatedAt: Date.now() });
+          });
+          await batch.commit();
+          return { updatedCount: (args.pageIds || []).length };
+        }
+
+        if (actionName === 'bulkDeletePages') {
+          const batch = writeBatch(db);
+          (args.pageIds || []).forEach((id: string) => {
+            batch.delete(doc(pagesCollection, id));
+          });
+          await batch.commit();
+          return { deletedCount: (args.pageIds || []).length };
+        }
+
+        if (actionName === 'updateHeroImage') {
+          await updateDoc(doc(pagesCollection, args.pageId), { heroImageUrl: args.heroImageUrl, updatedAt: Date.now() });
+          return { pageId: args.pageId };
+        }
+
+        if (actionName === 'syncPageWithTemplate') {
+          const pageSnap = await getDoc(doc(pagesCollection, args.pageId));
+          if (!pageSnap.exists()) throw new Error('Page not found');
+          const page = pageSnap.data() as any;
+          const tq = query(collection(db, 'seoPageTemplates'), where('pageType', '==', page.pageType), limit(1));
+          const tSnap = await getDocs(tq);
+          if (tSnap.empty) return { addedSections: 0 };
+          const template = tSnap.docs[0].data() as any;
+          const existingSections = (page.layoutConfig?.sections || []).map((s: any) => s.id);
+          const newSections = (template.layoutConfig?.sections || []).filter((s: any) => !existingSections.includes(s.id));
+          if (newSections.length > 0) {
+            const merged = [...(page.layoutConfig?.sections || []), ...newSections];
+            await updateDoc(doc(pagesCollection, args.pageId), { 'layoutConfig.sections': merged, updatedAt: Date.now() });
+          }
+          return { addedSections: newSections.length };
+        }
+
+        if (actionName === 'syncAllPagesWithTemplates') {
+          const allPages = await getDocs(pagesCollection);
+          const allTemplates = await getDocs(collection(db, 'seoPageTemplates'));
+          const templateMap: Record<string, any> = {};
+          allTemplates.docs.forEach(d => { templateMap[d.data().pageType] = d.data(); });
+          let syncedPages = 0;
+          let totalAddedSections = 0;
+          const batch = writeBatch(db);
+          allPages.docs.forEach(d => {
+            const page = d.data() as any;
+            const template = templateMap[page.pageType];
+            if (!template) return;
+            const existingSections = (page.layoutConfig?.sections || []).map((s: any) => s.id);
+            const newSections = (template.layoutConfig?.sections || []).filter((s: any) => !existingSections.includes(s.id));
+            if (newSections.length > 0) {
+              const merged = [...(page.layoutConfig?.sections || []), ...newSections];
+              batch.update(d.ref, { 'layoutConfig.sections': merged, updatedAt: Date.now() });
+              syncedPages++;
+              totalAddedSections += newSections.length;
+            }
+          });
+          if (syncedPages > 0) await batch.commit();
+          return { syncedPages, totalAddedSections };
+        }
+      }
+      // ── end seoPages ──
+
       let targetCollection = collectionName;
       if (actionName.toLowerCase().includes('heroslide')) targetCollection = 'heroSlides';
       else if (actionName.toLowerCase().includes('featurebanner')) targetCollection = 'featureBanners';
@@ -2786,115 +2897,6 @@ export function useMutation(apiRef: any) {
       if (actionName === 'autoGenerateBrandCards' || actionName === 'autoGenerateGadgetCards') {
         // Mock implementation for generating cards
         return { success: true };
-      }
-      
-      if (collectionName === 'seoPages') {
-        const pagesCollection = collection(db, 'seoPages');
-
-        if (actionName === 'regeneratePageContent') {
-          const snap = await getDoc(doc(pagesCollection, args.pageId));
-          if (!snap.exists()) throw new Error('Page not found');
-          const page = snap.data() as any;
-          return { value: page.h1Heading || page.title || page.slug || '', pageType: page.pageType || 'keyword' };
-        }
-
-        if (actionName === 'updatePage') {
-          const { pageId, ...updates } = args;
-          const clean: any = { updatedAt: Date.now() };
-          const fields = ['contentHTML', 'metaDescription', 'metaTitle', 'h1Heading', 'slug', 'faqs', 'imageAltTexts', 'heroImageUrl', 'isPublished', 'keywords', 'filterConfig'];
-          fields.forEach(f => { if (updates[f] !== undefined) clean[f] = updates[f]; });
-          await updateDoc(doc(pagesCollection, pageId), clean);
-          return { pageId };
-        }
-
-        if (actionName === 'createPage') {
-          const docRef = await addDoc(pagesCollection, { ...args, createdAt: Date.now(), updatedAt: Date.now() });
-          return { pageId: docRef.id, slug: args.slug };
-        }
-
-        if (actionName === 'deletePage') {
-          await deleteDoc(doc(pagesCollection, args.pageId));
-          return { pageId: args.pageId };
-        }
-
-        if (actionName === 'togglePublish') {
-          await updateDoc(doc(pagesCollection, args.pageId), { isPublished: args.isPublished, updatedAt: Date.now() });
-          return { pageId: args.pageId, isPublished: args.isPublished };
-        }
-
-        if (actionName === 'clonePage') {
-          const snap = await getDoc(doc(pagesCollection, args.pageId));
-          if (!snap.exists()) throw new Error('Page not found');
-          const data = snap.data() as any;
-          const newSlug = `${data.slug || 'page'}-copy-${Date.now()}`;
-          const docRef = await addDoc(pagesCollection, { ...data, slug: newSlug, isPublished: false, createdAt: Date.now(), updatedAt: Date.now() });
-          return { pageId: docRef.id, slug: newSlug };
-        }
-
-        if (actionName === 'bulkTogglePublish') {
-          const batch = writeBatch(db);
-          (args.pageIds || []).forEach((id: string) => {
-            batch.update(doc(pagesCollection, id), { isPublished: args.isPublished, updatedAt: Date.now() });
-          });
-          await batch.commit();
-          return { updatedCount: (args.pageIds || []).length };
-        }
-
-        if (actionName === 'bulkDeletePages') {
-          const batch = writeBatch(db);
-          (args.pageIds || []).forEach((id: string) => {
-            batch.delete(doc(pagesCollection, id));
-          });
-          await batch.commit();
-          return { deletedCount: (args.pageIds || []).length };
-        }
-
-        if (actionName === 'updateHeroImage') {
-          await updateDoc(doc(pagesCollection, args.pageId), { heroImageUrl: args.heroImageUrl, updatedAt: Date.now() });
-          return { pageId: args.pageId };
-        }
-
-        if (actionName === 'syncPageWithTemplate') {
-          const pageSnap = await getDoc(doc(pagesCollection, args.pageId));
-          if (!pageSnap.exists()) throw new Error('Page not found');
-          const page = pageSnap.data() as any;
-          const tq = query(collection(db, 'seoPageTemplates'), where('pageType', '==', page.pageType), limit(1));
-          const tSnap = await getDocs(tq);
-          if (tSnap.empty) return { addedSections: 0 };
-          const template = tSnap.docs[0].data() as any;
-          const existingSections = (page.layoutConfig?.sections || []).map((s: any) => s.id);
-          const newSections = (template.layoutConfig?.sections || []).filter((s: any) => !existingSections.includes(s.id));
-          if (newSections.length > 0) {
-            const merged = [...(page.layoutConfig?.sections || []), ...newSections];
-            await updateDoc(doc(pagesCollection, args.pageId), { 'layoutConfig.sections': merged, updatedAt: Date.now() });
-          }
-          return { addedSections: newSections.length };
-        }
-
-        if (actionName === 'syncAllPagesWithTemplates') {
-          const allPages = await getDocs(pagesCollection);
-          const allTemplates = await getDocs(collection(db, 'seoPageTemplates'));
-          const templateMap: Record<string, any> = {};
-          allTemplates.docs.forEach(d => { templateMap[d.data().pageType] = d.data(); });
-          let syncedPages = 0;
-          let totalAddedSections = 0;
-          const batch = writeBatch(db);
-          allPages.docs.forEach(d => {
-            const page = d.data() as any;
-            const template = templateMap[page.pageType];
-            if (!template) return;
-            const existingSections = (page.layoutConfig?.sections || []).map((s: any) => s.id);
-            const newSections = (template.layoutConfig?.sections || []).filter((s: any) => !existingSections.includes(s.id));
-            if (newSections.length > 0) {
-              const merged = [...(page.layoutConfig?.sections || []), ...newSections];
-              batch.update(d.ref, { 'layoutConfig.sections': merged, updatedAt: Date.now() });
-              syncedPages++;
-              totalAddedSections += newSections.length;
-            }
-          });
-          if (syncedPages > 0) await batch.commit();
-          return { syncedPages, totalAddedSections };
-        }
       }
 
       // Default: try calling a cloud function
