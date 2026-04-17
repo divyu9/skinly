@@ -2974,6 +2974,72 @@ export function useAction(apiRef: any) {
       }
     }
 
+    // seoProductGenerator — reuses the deployed generateSEOContent Cloud Function
+    if (collectionName === 'seoProductGenerator') {
+      const callGenerate = httpsCallable(functions, 'generateSEOContent');
+
+      const extractSEOFields = (data: any, title: string) => {
+        const h2Match = data.contentHTML?.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+        const metaTitle = (h2Match?.[1]?.replace(/<[^>]*>/g, '') || `${title} Skin | GoSkinly`).substring(0, 60);
+        const pMatch = data.contentHTML?.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+        const metaDescription = (pMatch?.[1]?.replace(/<[^>]*>/g, '') || `Buy ${title} skin at GoSkinly. Starting ₹149. Free delivery across India.`).substring(0, 160);
+        const tags: string[] = (data.imageAltTexts || [])
+          .slice(0, 8)
+          .map((t: string) => t.split(' ').filter((w: string) => w.length > 3).slice(0, 3).join(' '))
+          .filter(Boolean);
+        return { metaTitle, metaDescription, tags, description: data.contentHTML || '' };
+      };
+
+      if (actionName === 'generateProductSEO') {
+        const productSnap = await getDoc(doc(db, 'products', args.productId));
+        if (!productSnap.exists()) throw new Error('Product not found');
+        const product = productSnap.data() as any;
+        const title = product.title || product.name || 'Phone Skin';
+        const response: any = await callGenerate({
+          pageType: 'product',
+          keywords: [title],
+          productType: product.gadgetCategory || product.category,
+        });
+        return extractSEOFields(response.data, title);
+      }
+
+      if (actionName === 'generateSEOFromFormData') {
+        const title = args.title || 'Phone Skin';
+        const response: any = await callGenerate({
+          pageType: 'product',
+          keywords: [title],
+          productType: args.gadgetCategory,
+          notes: args.finishType ? `Finish type: ${args.finishType}` : undefined,
+        });
+        const fields = extractSEOFields(response.data, title);
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const imageAlt = (response.data as any).imageAltTexts?.[0] || `${title} phone skin India`;
+        return { ...fields, slug, imageAlt };
+      }
+
+      if (actionName === 'bulkGenerateProductSEO') {
+        const productIds: string[] = args.productIds || [];
+        for (const productId of productIds) {
+          const productSnap = await getDoc(doc(db, 'products', productId));
+          if (!productSnap.exists()) continue;
+          const product = productSnap.data() as any;
+          const title = product.title || product.name || 'Phone Skin';
+          const response: any = await callGenerate({
+            pageType: 'product',
+            keywords: [title],
+            productType: product.gadgetCategory || product.category,
+          });
+          const { metaTitle, metaDescription } = extractSEOFields(response.data, title);
+          await updateDoc(doc(db, 'products', productId), {
+            metaTitle,
+            metaDescription,
+            updatedAt: Date.now(),
+          });
+        }
+        return { success: true };
+      }
+    }
+
     // Default to calling cloud function
     const callable = httpsCallable(functions, actionName);
     const result = await callable(args);
