@@ -6,6 +6,33 @@
   "hosting": {
     "public": "dist",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "redirects": [
+      { "source": "/collections/all",             "destination": "/products",          "type": 301 },
+      { "source": "/collections/:slug",           "destination": "/:slug",             "type": 301 },
+
+      { "source": "/brand/:slug",                 "destination": "/:slug",             "type": 301 },
+      { "source": "/device/:slug",                "destination": "/:slug",             "type": 301 },
+      { "source": "/skin-type/:slug",             "destination": "/:slug",             "type": 301 },
+      { "source": "/product/:slug",               "destination": "/:slug",             "type": 301 },
+
+      { "source": "/shop",                        "destination": "/products",          "type": 301 },
+      { "source": "/search",                      "destination": "/products",          "type": 301 },
+      { "source": "/blogs/**",                    "destination": "/",                  "type": 301 },
+
+      { "source": "/pages/returns",               "destination": "/policies/returns",  "type": 301 },
+      { "source": "/pages/return-policy",         "destination": "/policies/returns",  "type": 301 },
+      { "source": "/pages/refund-policy",         "destination": "/policies/returns",  "type": 301 },
+      { "source": "/pages/shipping",              "destination": "/policies/shipping", "type": 301 },
+      { "source": "/pages/shipping-policy",       "destination": "/policies/shipping", "type": 301 },
+      { "source": "/pages/privacy-policy",        "destination": "/policies/privacy",  "type": 301 },
+      { "source": "/pages/terms-of-service",      "destination": "/policies/terms",    "type": 301 },
+      { "source": "/pages/terms",                 "destination": "/policies/terms",    "type": 301 },
+      { "source": "/pages/**",                    "destination": "/",                  "type": 301 },
+
+      { "source": "/account/login",               "destination": "/account",           "type": 301 },
+      { "source": "/account/register",            "destination": "/account",           "type": 301 },
+      { "source": "/account/signup",              "destination": "/account",           "type": 301 }
+    ],
     "rewrites": [
       { "source": "/api/initiatePayment/**", "function": "initiatePayment", "region": "us-central1" },
       { "source": "/api/initiatePayment", "function": "initiatePayment", "region": "us-central1" },

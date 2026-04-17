@@ -1,7 +1,6 @@
 User-agent: *
 Allow: /
 
-# Block admin and backend routes
 Disallow: /backend-skinly/
 Disallow: /auth/
 Disallow: /account/
@@ -9,15 +8,6 @@ Disallow: /orders/
 Disallow: /cart/
 Disallow: /checkout/
 Disallow: /payment/
+Disallow: /mock-payment/
 
-# Allow SEO landing pages
-Allow: /brand/
-Allow: /device/
-Allow: /product/
-Allow: /skin-type/
-
-# Sitemap location
 Sitemap: https://www.goskinly.com/sitemap.xml
-
-# Crawl delay (optional - remove if you want faster crawling)
-Crawl-delay: 1
