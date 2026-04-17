@@ -12,6 +12,19 @@ export default function SitemapGenerator() {
   const urls = useQuery(api.sitemap.getSitemapUrls, {});
   const [copied, setCopied] = useState(false);
 
+  const escapeXml = (unsafe: string) => {
+    return unsafe.replace(/[<>&'"]/g, (c) => {
+      switch (c) {
+        case '<': return '&lt;';
+        case '>': return '&gt;';
+        case '&': return '&amp;';
+        case '\'': return '&apos;';
+        case '"': return '&quot;';
+        default: return c;
+      }
+    });
+  };
+
   const generateSitemapXml = () => {
     if (!urls) return "";
 
@@ -20,7 +33,7 @@ export default function SitemapGenerator() {
 
     urls.forEach((entry) => {
       xml += "  <url>\n";
-      xml += `    <loc>${entry.url}</loc>\n`;
+      xml += `    <loc>${escapeXml(entry.url)}</loc>\n`;
       xml += `    <lastmod>${entry.lastmod}</lastmod>\n`;
       xml += `    <changefreq>${entry.changefreq}</changefreq>\n`;
       xml += `    <priority>${entry.priority}</priority>\n`;
