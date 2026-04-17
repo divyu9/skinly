@@ -127,7 +127,7 @@ function AdminOrdersPageInner() {
       deleted: displayOrders.filter((o) => o.isDeleted).length,
       totalRevenue: displayOrders
         .filter((o) => o.paymentStatus === "success")
-        .reduce((sum, o) => sum + o.total, 0),
+        .reduce((sum, o) => sum + (o.total || 0), 0),
       pendingPayments: displayOrders.filter(
         (o) => o.paymentStatus === "pending" || !o.paymentStatus
       ).length,
@@ -1055,11 +1055,11 @@ function AdminOrdersPageInner() {
                       </td>
                       <td className="p-3">
                         <span className="text-sm font-medium">
-                          ₹{order.total.toFixed(0)}
+                          ₹{(order.total || 0).toFixed(0)}
                         </span>
                       </td>
                       <td className="p-3">
-                        <span className="text-sm">{order.items.length}</span>
+                        <span className="text-sm">{order.items?.length ?? 0}</span>
                       </td>
                       <td className="p-3">
                         <Badge variant="outline" className={getStatusColor(order.status)}>
