@@ -3,7 +3,7 @@ import { db, functions } from './firebase';
 import { 
   collection, query, where, getDocs, onSnapshot, doc, getDoc, 
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
-  writeBatch, DocumentSnapshot, QuerySnapshot
+  writeBatch, DocumentSnapshot, QuerySnapshot, documentId
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
@@ -1781,29 +1781,69 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'exports.getOrdersForExport') {
-          const { startDate, endDate } = args || {};
-          let q = query(collection(db, 'orders'));
-          
-          if (startDate && endDate) {
-            q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
+          const { startDate, endDate, orderIds, status } = args || {};
+          const statusFilter = status && status !== 'all' ? status : null;
+
+          const applyFilters = (orders: any[]) => {
+            let filtered = orders;
+            if (startDate && endDate) {
+              filtered = filtered.filter((o: any) => {
+                const t = o?._creationTime || 0;
+                return t >= startDate && t <= endDate;
+              });
+            }
+            if (statusFilter) {
+              filtered = filtered.filter((o: any) => o?.status === statusFilter);
+            }
+            filtered.sort((a: any, b: any) => (b._creationTime || 0) - (a._creationTime || 0));
+            return filtered;
+          };
+
+          if (Array.isArray(orderIds) && orderIds.length > 0) {
+            const chunks: string[][] = [];
+            for (let i = 0; i < orderIds.length; i += 10) chunks.push(orderIds.slice(i, i + 10));
+
+            const unsubs: Array<() => void> = [];
+            const ordersById = new Map<string, any>();
+
+            chunks.forEach((chunk) => {
+              const q = query(collection(db, 'orders'), where(documentId(), 'in', chunk));
+              const u = onSnapshot(q, (snap) => {
+                snap.docs.forEach((d) => ordersById.set(d.id, { _id: d.id, ...d.data() }));
+                setData(applyFilters(Array.from(ordersById.values())));
+              });
+              unsubs.push(u);
+            });
+
+            unsubscribe = () => unsubs.forEach((u) => u());
+          } else {
+            let q = query(collection(db, 'orders'));
+            if (startDate && endDate) {
+              q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
+            }
+
+            unsubscribe = onSnapshot(q, (snap) => {
+              const orders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+              setData(applyFilters(orders));
+            });
           }
-          
-          unsubscribe = onSnapshot(q, (snap) => {
-            const orders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            setData(orders.sort((a: any, b: any) => (b._creationTime || 0) - (a._creationTime || 0)));
-          });
         }
         else if (path === 'exports.getExportStats') {
-          const { startDate, endDate } = args || {};
-          let q = query(collection(db, 'orders'));
-          
-          if (startDate && endDate) {
-            q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
-          }
-          
-          unsubscribe = onSnapshot(q, (snap) => {
-            const orders = snap.docs.map(d => d.data());
-            
+          const { startDate, endDate, orderIds, status } = args || {};
+          const statusFilter = status && status !== 'all' ? status : null;
+
+          const computeStats = (orders: any[]) => {
+            let filtered = orders;
+            if (startDate && endDate) {
+              filtered = filtered.filter((o: any) => {
+                const t = o?._creationTime || 0;
+                return t >= startDate && t <= endDate;
+              });
+            }
+            if (statusFilter) {
+              filtered = filtered.filter((o: any) => o?.status === statusFilter);
+            }
+
             let totalRevenue = 0;
             let totalTaxableAmount = 0;
             let totalGst = 0;
@@ -1811,27 +1851,56 @@ export function useQuery(apiRef: any, args?: any) {
             let totalSgst = 0;
             let totalIgst = 0;
 
-            orders.forEach((order: any) => {
-              if (order.status !== 'Cancelled' && order.status !== 'Failed') {
-                totalRevenue += order.total || 0;
-                totalTaxableAmount += order.taxableAmount || 0;
-                totalGst += order.totalGstAmount || 0;
-                totalCgst += order.cgstAmount || 0;
-                totalSgst += order.sgstAmount || 0;
-                totalIgst += order.igstAmount || 0;
+            filtered.forEach((order: any) => {
+              if (order?.status !== 'Cancelled' && order?.status !== 'Failed') {
+                totalRevenue += order?.total || 0;
+                totalTaxableAmount += order?.taxableAmount || 0;
+                totalGst += order?.totalGstAmount || 0;
+                totalCgst += order?.cgstAmount || 0;
+                totalSgst += order?.sgstAmount || 0;
+                totalIgst += order?.igstAmount || 0;
               }
             });
 
-            setData({
-              totalOrders: orders.length,
+            return {
+              totalOrders: filtered.length,
               totalRevenue,
               totalTaxableAmount,
               totalGst,
               totalCgst,
               totalSgst,
               totalIgst
+            };
+          };
+
+          if (Array.isArray(orderIds) && orderIds.length > 0) {
+            const chunks: string[][] = [];
+            for (let i = 0; i < orderIds.length; i += 10) chunks.push(orderIds.slice(i, i + 10));
+
+            const unsubs: Array<() => void> = [];
+            const ordersById = new Map<string, any>();
+
+            chunks.forEach((chunk) => {
+              const q = query(collection(db, 'orders'), where(documentId(), 'in', chunk));
+              const u = onSnapshot(q, (snap) => {
+                snap.docs.forEach((d) => ordersById.set(d.id, { _id: d.id, ...d.data() }));
+                setData(computeStats(Array.from(ordersById.values())));
+              });
+              unsubs.push(u);
             });
-          });
+
+            unsubscribe = () => unsubs.forEach((u) => u());
+          } else {
+            let q = query(collection(db, 'orders'));
+            if (startDate && endDate) {
+              q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
+            }
+
+            unsubscribe = onSnapshot(q, (snap) => {
+              const orders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+              setData(computeStats(orders));
+            });
+          }
         }
         // Fallback for direct document gets
         else if (args?.id) {

@@ -573,7 +573,14 @@ function AdminOrdersPageInner() {
             <PlusIcon className="size-4 mr-2" />
             Create Manual Order
           </Button>
-          <Link to="/backend-skinly/tax-export">
+          <Link
+            to="/backend-skinly/tax-export"
+            state={
+              selectedOrders.size > 0
+                ? { selectedOrderIds: Array.from(selectedOrders) }
+                : undefined
+            }
+          >
             <Button variant="outline">
               <FileTextIcon className="size-4 mr-2" />
               Export for Tax Filing
@@ -930,7 +937,7 @@ function AdminOrdersPageInner() {
                   <tr>
                     <th className="p-3 text-left">
                       <Checkbox
-                        className="w-4 h-4 border-2 border-black/40 dark:border-white/40 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
+                        className="w-4 h-4 bg-background border-2 border-black/60 dark:border-white/60 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
                         checked={
                           displayOrders.length > 0 &&
                           selectedOrders.size === displayOrders.length
@@ -964,7 +971,7 @@ function AdminOrdersPageInner() {
                     >
                       <td className="p-3" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          className="w-4 h-4 border-2 border-black/40 dark:border-white/40 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
+                          className="w-4 h-4 bg-background border-2 border-black/60 dark:border-white/60 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
                           checked={selectedOrders.has(order._id)}
                           onCheckedChange={(checked) =>
                             handleSelectOrder(order._id, checked as boolean)

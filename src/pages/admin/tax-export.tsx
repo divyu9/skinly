@@ -14,11 +14,21 @@ import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hook
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
+import { useLocation } from "react-router-dom";
 
 function TaxExportPageInner() {
-  const [dateRangeType, setDateRangeType] = useState<string>("this-month");
+  const location = useLocation();
+  const selectedOrderIds = useMemo(() => {
+    const ids = (location.state as any)?.selectedOrderIds;
+    return Array.isArray(ids) ? ids : [];
+  }, [location.state]);
+
+  const [dateRangeType, setDateRangeType] = useState<string>(
+    selectedOrderIds.length > 0 ? "all-time" : "this-month"
+  );
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [orderStatus, setOrderStatus] = useState<string>("all");
 
   // Calculate date range based on selection
   const dateRange = useMemo(() => {
@@ -27,6 +37,10 @@ function TaxExportPageInner() {
     let endDate: Date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
     switch (dateRangeType) {
+      case "all-time": {
+        startDate = new Date(0);
+        break;
+      }
       case "this-month": {
         startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
         break;
@@ -80,8 +94,16 @@ function TaxExportPageInner() {
     };
   }, [dateRangeType, customStartDate, customEndDate]);
 
-  const orders = useQuery(api.exports.getOrdersForExport, dateRange);
-  const stats = useQuery(api.exports.getExportStats, dateRange);
+  const queryArgs = useMemo(() => {
+    return {
+      ...dateRange,
+      orderIds: selectedOrderIds.length > 0 ? selectedOrderIds : undefined,
+      status: orderStatus,
+    };
+  }, [dateRange, selectedOrderIds, orderStatus]);
+
+  const orders = useQuery(api.exports.getOrdersForExport, queryArgs);
+  const stats = useQuery(api.exports.getExportStats, queryArgs);
 
   const handleExport = () => {
     if (!orders || orders.length === 0) {
@@ -336,6 +358,7 @@ function TaxExportPageInner() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all-time">All Time</SelectItem>
                   <SelectItem value="this-month">This Month</SelectItem>
                   <SelectItem value="last-month">Last Month</SelectItem>
                   <SelectItem value="this-quarter">This Quarter</SelectItem>
@@ -376,6 +399,11 @@ function TaxExportPageInner() {
                 {new Date(dateRange.startDate).toLocaleDateString("en-IN")} to{" "}
                 {new Date(dateRange.endDate).toLocaleDateString("en-IN")}
               </p>
+              {selectedOrderIds.length > 0 ? (
+                <p className="text-sm mt-1">
+                  <strong>Selected Orders:</strong> {selectedOrderIds.length}
+                </p>
+              ) : null}
               <p className="text-sm mt-1">
                 <strong>Orders to export:</strong> {orders.length}
               </p>
@@ -396,6 +424,25 @@ function TaxExportPageInner() {
                 <li>Taxable amount calculations</li>
                 <li>Shipping information (AWB, tracking)</li>
               </ul>
+            </div>
+
+            <div>
+              <Label htmlFor="orderStatus">Order Status</Label>
+              <Select value={orderStatus} onValueChange={setOrderStatus}>
+                <SelectTrigger id="orderStatus">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="processing">Processing</SelectItem>
+                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                  <SelectItem value="shipped">Shipped</SelectItem>
+                  <SelectItem value="delivered">Delivered</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="rto">RTO</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <Button
