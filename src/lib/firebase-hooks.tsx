@@ -290,20 +290,26 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'admin.orders.getAllOrders') {
-          // Fetch recent orders and filter by status locally to avoid requiring complex composite indexes immediately
-          // Note: Migrated orders use _creationTime instead of createdAt
           const q = query(collection(db, 'orders'), limit(500));
           unsubscribe = onSnapshot(q, (snap) => {
             let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            // Sort in memory by createdAt or _creationTime
             docs.sort((a: any, b: any) => {
               const aTime = a.createdAt || a._creationTime || 0;
               const bTime = b.createdAt || b._creationTime || 0;
               return bTime - aTime;
             });
-            if (args?.status && args.status !== 'all') {
-              docs = docs.filter((d: any) => d.status === args.status);
+
+            if (args?.showDeleted) {
+              // Deleted tab: only orders explicitly marked deleted
+              docs = docs.filter((d: any) => d.isDeleted === true || d.status === 'deleted');
+            } else {
+              // All other tabs: exclude deleted orders
+              docs = docs.filter((d: any) => !d.isDeleted && d.status !== 'deleted');
+              if (args?.status && args.status !== 'all') {
+                docs = docs.filter((d: any) => d.status === args.status);
+              }
             }
+
             if (args?.paymentStatus && args.paymentStatus !== 'all') {
               docs = docs.filter((d: any) => (d.paymentStatus || d.paymentInfo?.status) === args.paymentStatus);
             }
@@ -2513,19 +2519,37 @@ export function useMutation(apiRef: any) {
         if (actualActionName === 'softDeleteOrders') {
           const batch = writeBatch(db);
           args.orderIds.forEach((id: string) => {
-            batch.update(doc(db, 'orders', id), { status: 'deleted', updatedAt: Date.now() });
+            batch.update(doc(db, 'orders', id), { isDeleted: true, status: 'deleted', updatedAt: Date.now() });
           });
           await batch.commit();
-          return true;
+          return { deletedCount: args.orderIds.length };
         }
-        
+
         if (actualActionName === 'restoreOrders') {
           const batch = writeBatch(db);
           args.orderIds.forEach((id: string) => {
-            batch.update(doc(db, 'orders', id), { status: 'pending', updatedAt: Date.now() });
+            batch.update(doc(db, 'orders', id), { isDeleted: false, status: 'processing', updatedAt: Date.now() });
           });
           await batch.commit();
-          return true;
+          return { restoredCount: args.orderIds.length };
+        }
+
+        if (actualActionName === 'bulkUpdateOrderStatus') {
+          const batch = writeBatch(db);
+          args.orderIds.forEach((id: string) => {
+            batch.update(doc(db, 'orders', id), { status: args.status, updatedAt: Date.now() });
+          });
+          await batch.commit();
+          return { updatedCount: args.orderIds.length };
+        }
+
+        if (actualActionName === 'bulkUpdatePaymentStatus') {
+          const batch = writeBatch(db);
+          args.orderIds.forEach((id: string) => {
+            batch.update(doc(db, 'orders', id), { paymentStatus: args.paymentStatus, updatedAt: Date.now() });
+          });
+          await batch.commit();
+          return { updatedCount: args.orderIds.length };
         }
         
         if (actualActionName === 'deleteOrder') {

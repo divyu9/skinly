@@ -59,11 +59,19 @@ function AdminOrdersPageInner() {
   // Manual order dialog state
   const [showManualOrderDialog, setShowManualOrderDialog] = useState(false);
   
+  // Bulk status change state
+  const [showBulkOrderStatusDialog, setShowBulkOrderStatusDialog] = useState(false);
+  const [showBulkPaymentStatusDialog, setShowBulkPaymentStatusDialog] = useState(false);
+  const [bulkNewOrderStatus, setBulkNewOrderStatus] = useState("processing");
+  const [bulkNewPaymentStatus, setBulkNewPaymentStatus] = useState("success");
+
   // Actions
   const bulkCreateShipments = useAction(api.rapidshyp.bulkCreateShipments);
   const bulkFetchLabels = useAction(api.rapidshyp.bulkFetchLabels);
   const softDeleteOrders = useMutation(api.admin.orders.softDeleteOrders);
   const restoreOrders = useMutation(api.admin.orders.restoreOrders);
+  const bulkUpdateOrderStatus = useMutation(api.admin.orders.bulkUpdateOrderStatus);
+  const bulkUpdatePaymentStatus = useMutation(api.admin.orders.bulkUpdatePaymentStatus);
 
   const stats = useQuery(api.admin.orders.getOrderStats);
   const allOrders = useQuery(api.admin.orders.getAllOrders, {
@@ -458,7 +466,7 @@ function AdminOrdersPageInner() {
 
   const handleRestore = async () => {
     if (selectedOrders.size === 0) return;
-    
+
     try {
       const result = await restoreOrders({
         orderIds: Array.from(selectedOrders),
@@ -467,6 +475,36 @@ function AdminOrdersPageInner() {
       setSelectedOrders(new Set());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to restore orders");
+    }
+  };
+
+  const handleBulkOrderStatus = async () => {
+    if (selectedOrders.size === 0 || !bulkNewOrderStatus) return;
+    try {
+      const result = await bulkUpdateOrderStatus({
+        orderIds: Array.from(selectedOrders),
+        status: bulkNewOrderStatus,
+      });
+      toast.success(`${result.updatedCount} order(s) updated to "${bulkNewOrderStatus}"`);
+      setSelectedOrders(new Set());
+      setShowBulkOrderStatusDialog(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update order status");
+    }
+  };
+
+  const handleBulkPaymentStatus = async () => {
+    if (selectedOrders.size === 0 || !bulkNewPaymentStatus) return;
+    try {
+      const result = await bulkUpdatePaymentStatus({
+        orderIds: Array.from(selectedOrders),
+        paymentStatus: bulkNewPaymentStatus,
+      });
+      toast.success(`${result.updatedCount} order(s) payment status updated to "${bulkNewPaymentStatus}"`);
+      setSelectedOrders(new Set());
+      setShowBulkPaymentStatusDialog(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update payment status");
     }
   };
 
@@ -876,6 +914,24 @@ function AdminOrdersPageInner() {
               </Button>
             )}
             
+            {/* Bulk Order Status Change */}
+            <Button
+              onClick={() => setShowBulkOrderStatusDialog(true)}
+              disabled={selectedOrders.size === 0}
+              variant="outline"
+            >
+              Change Order Status ({selectedOrders.size})
+            </Button>
+
+            {/* Bulk Payment Status Change */}
+            <Button
+              onClick={() => setShowBulkPaymentStatusDialog(true)}
+              disabled={selectedOrders.size === 0}
+              variant="outline"
+            >
+              Change Payment Status ({selectedOrders.size})
+            </Button>
+
             {/* Soft Delete - All tabs except deleted */}
             {statusFilter !== "deleted" && (
               <Button
@@ -886,7 +942,7 @@ function AdminOrdersPageInner() {
                 Delete Selected ({selectedOrders.size})
               </Button>
             )}
-            
+
             {/* Restore - Deleted tab only */}
             {statusFilter === "deleted" && (
               <Button
@@ -897,7 +953,7 @@ function AdminOrdersPageInner() {
                 Restore Selected ({selectedOrders.size})
               </Button>
             )}
-            
+
             {/* Pack List - All tabs */}
             <Button
               onClick={generatePackList}
@@ -988,14 +1044,14 @@ function AdminOrdersPageInner() {
                       </td>
                       <td className="p-3">
                         <span className="text-sm font-medium">
-                          {order.shippingAddress.fullName}
+                          {order.shippingAddress?.fullName || "—"}
                         </span>
                       </td>
                       <td className="p-3">
-                        <span className="text-sm">{order.shippingAddress.phone}</span>
+                        <span className="text-sm">{order.shippingAddress?.phone || "—"}</span>
                       </td>
                       <td className="p-3">
-                        <span className="text-sm">{order.shippingAddress.city}</span>
+                        <span className="text-sm">{order.shippingAddress?.city || "—"}</span>
                       </td>
                       <td className="p-3">
                         <span className="text-sm font-medium">
@@ -1150,6 +1206,75 @@ function AdminOrdersPageInner() {
         open={showManualOrderDialog}
         onOpenChange={setShowManualOrderDialog}
       />
+
+      {/* Bulk Order Status Change Dialog */}
+      <Dialog open={showBulkOrderStatusDialog} onOpenChange={setShowBulkOrderStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Order Status</DialogTitle>
+            <DialogDescription>
+              Update order status for {selectedOrders.size} selected order{selectedOrders.size !== 1 ? "s" : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="bulk-order-status">New Order Status</Label>
+            <Select value={bulkNewOrderStatus} onValueChange={setBulkNewOrderStatus}>
+              <SelectTrigger id="bulk-order-status" className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="processing">Processing</SelectItem>
+                <SelectItem value="pending_payment">Pending Payment</SelectItem>
+                <SelectItem value="shipped">Shipped</SelectItem>
+                <SelectItem value="delivered">Delivered</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="rto">RTO</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkOrderStatusDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkOrderStatus}>
+              Update {selectedOrders.size} Order{selectedOrders.size !== 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Payment Status Change Dialog */}
+      <Dialog open={showBulkPaymentStatusDialog} onOpenChange={setShowBulkPaymentStatusDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Payment Status</DialogTitle>
+            <DialogDescription>
+              Update payment status for {selectedOrders.size} selected order{selectedOrders.size !== 1 ? "s" : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="bulk-payment-status">New Payment Status</Label>
+            <Select value={bulkNewPaymentStatus} onValueChange={setBulkNewPaymentStatus}>
+              <SelectTrigger id="bulk-payment-status" className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowBulkPaymentStatusDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkPaymentStatus}>
+              Update {selectedOrders.size} Order{selectedOrders.size !== 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
