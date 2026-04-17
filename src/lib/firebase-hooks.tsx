@@ -1304,6 +1304,36 @@ export function useQuery(apiRef: any, args?: any) {
             }
           });
         }
+        else if (path === 'seoPages.getPage' || path === 'seoPages.getPageById') {
+          const ref = doc(db, 'seoPages', args.pageId);
+          unsubscribe = onSnapshot(ref, (snap) => {
+            setData(snap.exists() ? { _id: snap.id, ...snap.data() } : null);
+          });
+        }
+        else if (path === 'seoPages.listPages') {
+          const baseConstraints: any[] = [];
+          if (args?.pageType) {
+            baseConstraints.push(where('pageType', '==', args.pageType));
+          }
+          if (typeof args?.isPublished === 'boolean') {
+            baseConstraints.push(where('isPublished', '==', args.isPublished));
+          }
+          const q = query(collection(db, 'seoPages'), ...baseConstraints);
+          unsubscribe = onSnapshot(q, (snap) => {
+            const term = String(args?.searchQuery || '').toLowerCase().trim();
+            let data = snap.docs.map(d => ({ _id: d.id, ...d.data() })) as any[];
+            if (term) {
+              data = data.filter((p) => {
+                const metaTitle = String(p.metaTitle || '').toLowerCase();
+                const slug = String(p.slug || '').toLowerCase();
+                const h1Heading = String(p.h1Heading || '').toLowerCase();
+                return metaTitle.includes(term) || slug.includes(term) || h1Heading.includes(term);
+              });
+            }
+            data.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+            setData(data);
+          });
+        }
         else if (path === 'seoTemplates.getTemplates') {
           const q = query(collection(db, 'seoPageTemplates'));
           unsubscribe = onSnapshot(q, (snap) => {

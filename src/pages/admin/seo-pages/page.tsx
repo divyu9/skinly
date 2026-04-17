@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
@@ -73,6 +73,7 @@ export default function SEOPagesPage() {
   const [pageTypeFilter, setPageTypeFilter] = useState<PageType | "all">("all");
   const [publishedFilter, setPublishedFilter] = useState<"all" | "published" | "draft">("all");
   const [selectedPages, setSelectedPages] = useState<Set<Id<"seoPages">>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [pageToDelete, setPageToDelete] = useState<Id<"seoPages"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -82,6 +83,18 @@ export default function SEOPagesPage() {
     isPublished: publishedFilter === "all" ? undefined : publishedFilter === "published",
     searchQuery: searchQuery || undefined,
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setSelectedPages(new Set());
+  }, [searchQuery, pageTypeFilter, publishedFilter]);
+
+  const pageSize = 25;
+  const totalPages = pages ? Math.max(1, Math.ceil(pages.length / pageSize)) : 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedPages = pages
+    ? pages.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize)
+    : [];
 
   const deletePage = useMutation(api.seoPages.deletePage);
   const clonePage = useMutation(api.seoPages.clonePage);
@@ -169,11 +182,15 @@ export default function SEOPagesPage() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedPages.size === pages?.length) {
-      setSelectedPages(new Set());
+    const visibleIds = paginatedPages.map((p) => p._id);
+    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedPages.has(id));
+    const next = new Set(selectedPages);
+    if (allVisibleSelected) {
+      visibleIds.forEach((id) => next.delete(id));
     } else {
-      setSelectedPages(new Set(pages?.map((p) => p._id) || []));
+      visibleIds.forEach((id) => next.add(id));
     }
+    setSelectedPages(next);
   };
 
   const toggleSelectPage = (pageId: Id<"seoPages">) => {
@@ -537,7 +554,7 @@ export default function SEOPagesPage() {
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedPages.size === pages.length && pages.length > 0}
+                  checked={paginatedPages.length > 0 && paginatedPages.every((p) => selectedPages.has(p._id))}
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
@@ -557,7 +574,7 @@ export default function SEOPagesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              pages.map((page) => (
+              paginatedPages.map((page) => (
                 <TableRow key={page._id}>
                   <TableCell>
                     <Checkbox
@@ -687,6 +704,34 @@ export default function SEOPagesPage() {
             )}
           </TableBody>
         </Table>
+        {pages.length > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t">
+            <div className="text-sm text-muted-foreground">
+              Showing {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, pages.length)} of {pages.length}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={safeCurrentPage <= 1}
+              >
+                Prev
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                {safeCurrentPage}/{totalPages}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Delete Confirmation Dialog */}
