@@ -1852,7 +1852,7 @@ export function useQuery(apiRef: any, args?: any) {
             let totalIgst = 0;
 
             filtered.forEach((order: any) => {
-              if (order?.status !== 'Cancelled' && order?.status !== 'Failed') {
+              if (order?.status !== 'cancelled' && order?.status !== 'failed') {
                 totalRevenue += order?.total || 0;
                 totalTaxableAmount += order?.taxableAmount || 0;
                 totalGst += order?.totalGstAmount || 0;

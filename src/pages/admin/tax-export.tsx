@@ -343,14 +343,14 @@ function TaxExportPageInner() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarIcon className="size-5" />
-            Select Date Range
+            Filter Orders for Export
           </CardTitle>
           <CardDescription>
-            Choose a time period to export order data
+            Choose a time period and order status to filter the export
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="dateRange">Date Range</Label>
               <Select value={dateRangeType} onValueChange={setDateRangeType}>
@@ -370,62 +370,6 @@ function TaxExportPageInner() {
               </Select>
             </div>
 
-            {dateRangeType === "custom" && (
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">End Date</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <p className="text-sm">
-                <strong>Selected Period:</strong>{" "}
-                {new Date(dateRange.startDate).toLocaleDateString("en-IN")} to{" "}
-                {new Date(dateRange.endDate).toLocaleDateString("en-IN")}
-              </p>
-              {selectedOrderIds.length > 0 ? (
-                <p className="text-sm mt-1">
-                  <strong>Selected Orders:</strong> {selectedOrderIds.length}
-                </p>
-              ) : null}
-              <p className="text-sm mt-1">
-                <strong>Orders to export:</strong> {orders.length}
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-medium mb-2">Export Includes:</h3>
-              <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
-                <li>Order details (number, date, status)</li>
-                <li>Customer information (name, phone, address)</li>
-                <li>Item details and quantities</li>
-                <li>Amount breakdown (subtotal, shipping, total)</li>
-                <li>Complete GST details (CGST, SGST, IGST)</li>
-                <li>Taxable amount calculations</li>
-                <li>Shipping information (AWB, tracking)</li>
-              </ul>
-            </div>
-
             <div>
               <Label htmlFor="orderStatus">Order Status</Label>
               <Select value={orderStatus} onValueChange={setOrderStatus}>
@@ -443,6 +387,66 @@ function TaxExportPageInner() {
                   <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          {dateRangeType === "custom" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="startDate">Start Date</Label>
+                <Input
+                  id="startDate"
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="endDate">End Date</Label>
+                <Input
+                  id="endDate"
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+            <p className="text-sm">
+              <strong>Selected Period:</strong>{" "}
+              {new Date(dateRange.startDate).toLocaleDateString("en-IN")} to{" "}
+              {new Date(dateRange.endDate).toLocaleDateString("en-IN")}
+            </p>
+            <p className="text-sm mt-1">
+              <strong>Status filter:</strong>{" "}
+              {orderStatus === "all" ? "All statuses" : orderStatus.replace("_", " ")}
+            </p>
+            {selectedOrderIds.length > 0 ? (
+              <p className="text-sm mt-1">
+                <strong>Selected Orders:</strong> {selectedOrderIds.length}
+              </p>
+            ) : null}
+            <p className="text-sm mt-1">
+              <strong>Orders matching filters:</strong> {orders.length}
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium mb-2">Export Includes:</h3>
+              <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
+                <li>Order details (number, date, status)</li>
+                <li>Customer information (name, phone, address)</li>
+                <li>Item details and quantities</li>
+                <li>Amount breakdown (subtotal, shipping, total)</li>
+                <li>Complete GST details (CGST, SGST, IGST)</li>
+                <li>Taxable amount calculations</li>
+                <li>Shipping information (AWB, tracking)</li>
+              </ul>
             </div>
 
             <Button
