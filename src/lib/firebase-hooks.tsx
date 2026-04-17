@@ -3085,10 +3085,101 @@ export function useAction(apiRef: any) {
       }
     }
 
-    // seoProductGenerator — reuses the deployed generateSEOContent Cloud Function
-    if (collectionName === 'seoProductGenerator') {
-      const callGenerate = httpsCallable(functions, 'generateSEOContent');
+    // ── Shared: call OpenAI directly (avoids CF auth issues) ──
+    const callOpenAIForSEO = async (payload: {
+      pageType: string; keywords: string[]; brandName?: string;
+      deviceCategory?: string; productType?: string; designType?: string; notes?: string;
+    }): Promise<{ success: boolean; contentHTML: string; faqs: any[]; imageAltTexts: string[]; error?: string }> => {
+      const keySnap = await getDoc(doc(db, 'settings', 'openaiApiKey'));
+      const apiKey = keySnap.exists() ? (keySnap.data()?.value as string) : '';
+      if (!apiKey) return { success: false, contentHTML: '', faqs: [], imageAltTexts: [], error: 'OpenAI API key not configured in Admin → Settings' };
 
+      const brand = payload.brandName || payload.deviceCategory || payload.designType || payload.productType || payload.keywords[0] || '';
+      const pk = payload.pageType === 'brand' ? `${brand} Phone Skins`
+        : payload.pageType === 'device' ? `${brand} Skins`
+        : payload.pageType === 'skin-type' ? `${brand} Phone Skins`
+        : payload.pageType === 'product' ? `${brand} Skins`
+        : payload.keywords[0];
+      const bSlug = brand.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const notesSection = payload.notes ? `\nADDITIONAL NOTES: ${payload.notes}` : '';
+
+      const systemPrompt = `You are an SEO content writer for GoSkinly, an Indian phone and gadget skin brand. Write in a friendly, conversational Indian English tone.
+
+BRAND FACTS:
+- Brand: GoSkinly. Products: vinyl skins/wraps for phones, laptops, tablets, cameras, drones, consoles.
+- Price: starting ₹149. Free delivery across India. COD available. 1000+ device models.
+- Finish: matte, 3D textured, transparent.
+- Designs: anime, 3D textured, carbon fiber, marble, camouflage, god/religious, gaming, abstract.
+
+BANNED PHRASES: "in conclusion","it's worth noting","certainly","as an AI","top-notch","look no further"
+
+OUTPUT FORMAT: Respond with valid JSON only. No markdown fences, no backticks.`;
+
+      const userPrompt = `Generate SEO content for GoSkinly landing page.
+PAGE TYPE: ${payload.pageType}
+PRIMARY KEYWORD: ${pk}
+BRAND: ${brand}
+DESIGN TYPES: anime, 3D textured, carbon fiber, marble, camouflage, god/religious, gaming, abstract${notesSection}
+
+Return valid JSON only:
+{
+  "contentHTML": "<h2>Best ${pk} in India — Starting ₹149</h2>...(750-900 words with h2 sections, p tags, ul lists, 3 internal links like <a href='/${bSlug}-skins'>${brand} Skins</a>)...",
+  "faqs": [{"question":"...","answer":"..."}],
+  "imageAltTexts": ["..."]
+}
+
+RULES:
+1. contentHTML: 750-900 words. Sections: intro (mention ₹149, COD, free delivery), popular models, design themes, why GoSkinly (4-5 bullets), how to apply (3-4 steps).
+2. faqs: exactly 7. First 3 must contain "${pk}". Questions = exact search queries.
+3. imageAltTexts: exactly 15. Pattern: "[design] [brand] [model] phone skin India". 3 must mention ₹149.
+4. Use ₹ symbol. Mention "free delivery across India" and "COD available".`;
+
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+          temperature: 0.65,
+          max_tokens: 3000,
+          response_format: { type: 'json_object' },
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('OpenAI error:', errText);
+        return { success: false, contentHTML: '', faqs: [], imageAltTexts: [], error: `OpenAI error: ${res.status}` };
+      }
+
+      const resData: any = await res.json();
+      const text: string = resData.choices?.[0]?.message?.content || '';
+      if (!text) return { success: false, contentHTML: '', faqs: [], imageAltTexts: [], error: 'OpenAI returned empty response' };
+
+      try {
+        // Try direct parse first, then extract JSON block
+        let parsed: any;
+        try { parsed = JSON.parse(text); } catch {
+          const m = text.match(/\{[\s\S]*\}/);
+          if (m) parsed = JSON.parse(m[0]); else throw new Error('No JSON in response');
+        }
+        return {
+          success: true,
+          contentHTML: parsed.contentHTML || '',
+          faqs: Array.isArray(parsed.faqs) ? parsed.faqs : [],
+          imageAltTexts: Array.isArray(parsed.imageAltTexts) ? parsed.imageAltTexts : [],
+        };
+      } catch {
+        return { success: false, contentHTML: '', faqs: [], imageAltTexts: [], error: 'Failed to parse OpenAI response' };
+      }
+    };
+
+    if (collectionName === 'seoContentGenerator' && actionName === 'generateSEOContent') {
+      return await callOpenAIForSEO(args);
+    }
+
+    // seoProductGenerator — also uses callOpenAIForSEO (no CF)
+    if (collectionName === 'seoProductGenerator') {
       const extractSEOFields = (data: any, title: string) => {
         const h2Match = data.contentHTML?.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
         const metaTitle = (h2Match?.[1]?.replace(/<[^>]*>/g, '') || `${title} Skin | GoSkinly`).substring(0, 60);
@@ -3106,25 +3197,16 @@ export function useAction(apiRef: any) {
         if (!productSnap.exists()) throw new Error('Product not found');
         const product = productSnap.data() as any;
         const title = product.title || product.name || 'Phone Skin';
-        const response: any = await callGenerate({
-          pageType: 'product',
-          keywords: [title],
-          productType: product.gadgetCategory || product.category,
-        });
-        return extractSEOFields(response.data, title);
+        const data = await callOpenAIForSEO({ pageType: 'product', keywords: [title], productType: product.gadgetCategory || product.category });
+        return extractSEOFields(data, title);
       }
 
       if (actionName === 'generateSEOFromFormData') {
         const title = args.title || 'Phone Skin';
-        const response: any = await callGenerate({
-          pageType: 'product',
-          keywords: [title],
-          productType: args.gadgetCategory,
-          notes: args.finishType ? `Finish type: ${args.finishType}` : undefined,
-        });
-        const fields = extractSEOFields(response.data, title);
+        const data = await callOpenAIForSEO({ pageType: 'product', keywords: [title], productType: args.gadgetCategory, notes: args.finishType ? `Finish type: ${args.finishType}` : undefined });
+        const fields = extractSEOFields(data, title);
         const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-        const imageAlt = (response.data as any).imageAltTexts?.[0] || `${title} phone skin India`;
+        const imageAlt = (data.imageAltTexts || [])[0] || `${title} phone skin India`;
         return { ...fields, slug, imageAlt };
       }
 
@@ -3135,17 +3217,9 @@ export function useAction(apiRef: any) {
           if (!productSnap.exists()) continue;
           const product = productSnap.data() as any;
           const title = product.title || product.name || 'Phone Skin';
-          const response: any = await callGenerate({
-            pageType: 'product',
-            keywords: [title],
-            productType: product.gadgetCategory || product.category,
-          });
-          const { metaTitle, metaDescription } = extractSEOFields(response.data, title);
-          await updateDoc(doc(db, 'products', productId), {
-            metaTitle,
-            metaDescription,
-            updatedAt: Date.now(),
-          });
+          const data = await callOpenAIForSEO({ pageType: 'product', keywords: [title], productType: product.gadgetCategory || product.category });
+          const { metaTitle, metaDescription } = extractSEOFields(data, title);
+          await updateDoc(doc(db, 'products', productId), { metaTitle, metaDescription, updatedAt: Date.now() });
         }
         return { success: true };
       }
