@@ -50,7 +50,7 @@ export default function SEOPage() {
 
   // Determine current URL - all SEO pages are at root level
   const getCurrentUrl = () => {
-    const baseUrl = "https://goskinly.com"; // Production domain
+    const baseUrl = "https://www.goskinly.com";
     return `${baseUrl}/${page.slug}`;
   };
 
@@ -70,7 +70,7 @@ export default function SEOPage() {
         <meta property="og:description" content={page.metaDescription} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={currentUrl} />
-        <meta property="og:site_name" content="Skinly" />
+        <meta property="og:site_name" content="GoSkinly" />
         {page.heroImageUrl && (
           <>
             <meta property="og:image" content={page.heroImageUrl} />
@@ -89,53 +89,44 @@ export default function SEOPage() {
           <meta name="twitter:image" content={page.heroImageUrl} />
         )}
         
-        {/* Organization Structured Data */}
+        {/* CollectionPage Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
-            "@type": "Organization",
-            "name": "GoSkinly",
-            "url": "https://goskinly.com",
-            "logo": "https://goskinly.com/logo.png",
-            "description": "Premium phone skins and protection accessories",
-            "sameAs": []
-          })}
-        </script>
-
-        {/* WebPage Structured Data */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "WebPage",
-            "name": page.metaTitle,
+            "@type": "CollectionPage",
+            "name": page.h1Heading,
             "description": page.metaDescription,
             "url": currentUrl,
-            "datePublished": new Date(page.createdAt).toISOString(),
-            "dateModified": new Date(page.updatedAt || page.createdAt).toISOString(),
-            "publisher": {
+            "provider": {
               "@type": "Organization",
-              "name": "GoSkinly"
-            },
-            "breadcrumb": {
-              "@type": "BreadcrumbList",
-              "itemListElement": [
-                {
-                  "@type": "ListItem",
-                  "position": 1,
-                  "name": "Home",
-                  "item": "https://goskinly.com"
-                },
-                {
-                  "@type": "ListItem",
-                  "position": 2,
-                  "name": page.h1Heading,
-                  "item": currentUrl
-                }
-              ]
+              "name": "GoSkinly",
+              "url": "https://www.goskinly.com"
             }
           })}
         </script>
-        
+
+        {/* BreadcrumbList Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Home",
+                "item": "https://www.goskinly.com"
+              },
+              {
+                "@type": "ListItem",
+                "position": 2,
+                "name": page.h1Heading,
+                "item": currentUrl
+              }
+            ]
+          })}
+        </script>
+
         {/* FAQPage Structured Data */}
         {page.faqs && page.faqs.length > 0 && (
           <script type="application/ld+json">
@@ -150,19 +141,6 @@ export default function SEOPage() {
                   "text": faq.answer
                 }
               }))
-            })}
-          </script>
-        )}
-
-        {/* Product Collection Structured Data (for product-related pages) */}
-        {(page.pageType === "brand" || page.pageType === "device" || page.pageType === "product" || page.pageType === "skin-type") && (
-          <script type="application/ld+json">
-            {JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "CollectionPage",
-              "name": page.h1Heading,
-              "description": page.metaDescription,
-              "url": currentUrl
             })}
           </script>
         )}

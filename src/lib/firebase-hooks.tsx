@@ -1027,17 +1027,19 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'products.getAllProducts' || path === 'products.getAllProductsBasic') {
           const q = query(collection(db, 'products'));
           unsubscribe = onSnapshot(q, async (snap) => {
-            // Also fetch all variants to compute variantSkus efficiently
+            // Fetch all variants in one batch, build both a SKUs map and a full variants map
             const variantsSnap = await getDocs(collection(db, 'variants'));
             const variantSkusMap: Record<string, string[]> = {};
+            const variantsMap: Record<string, any[]> = {};
             variantsSnap.docs.forEach(vDoc => {
               const vData = vDoc.data();
-              if (vData.productId && vData.sku) {
-                if (!variantSkusMap[vData.productId]) {
-                  variantSkusMap[vData.productId] = [];
-                }
+              if (!vData.productId) return;
+              if (vData.sku) {
+                if (!variantSkusMap[vData.productId]) variantSkusMap[vData.productId] = [];
                 variantSkusMap[vData.productId].push(vData.sku);
               }
+              if (!variantsMap[vData.productId]) variantsMap[vData.productId] = [];
+              variantsMap[vData.productId].push({ _id: vDoc.id, ...vData });
             });
 
             let docs = snap.docs.map(d => {
@@ -1050,6 +1052,7 @@ export function useQuery(apiRef: any, args?: any) {
                 slug: data.slug || "",
                 tags: data.tags || [],
                 variantSkus: data.variantSkus || variantSkusMap[d.id] || [],
+                variants: variantsMap[d.id] || [],
               };
             });
             setData(docs);
@@ -1696,6 +1699,33 @@ export function useQuery(apiRef: any, args?: any) {
           });
           unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
+        else if (path === 'reviews.getAllReviews') {
+          const q = query(collection(db, 'reviews'));
+          unsubscribe = onSnapshot(q, (snap) => {
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+          });
+        }
+        else if (path === 'reviews.getProductReviews') {
+          if (!args?.productId) { setData([]); return; }
+          const q = query(collection(db, 'reviews'), where('productId', '==', args.productId));
+          unsubscribe = onSnapshot(q, (snap) => {
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+          });
+        }
+        else if (path === 'reviews.getReviewStats') {
+          if (!args?.productId) { setData({ count: 0, verifiedCount: 0, averageRating: 0 }); return; }
+          const q = query(collection(db, 'reviews'), where('productId', '==', args.productId));
+          unsubscribe = onSnapshot(q, (snap) => {
+            const all = snap.docs.map(d => d.data());
+            const verified = all.filter(r => r.verified);
+            const totalRating = all.reduce((sum, r) => sum + (r.rating || 0), 0);
+            setData({
+              count: all.length,
+              verifiedCount: verified.length,
+              averageRating: all.length > 0 ? totalRating / all.length : 0,
+            });
+          });
+        }
         // Fallback for direct document gets
         else if (args?.id) {
           const collectionName = path.split('.')[0];
@@ -2290,12 +2320,26 @@ export function useMutation(apiRef: any) {
             return { success: true };
           }
 
-          if (!args.id && !args.couponId && !args.ruleId && !args.pageId && !args.slideId && !args.bannerId && !args.videoId) throw new Error(`ID required for delete (${actionName})`);
-          const targetId = args.id || args.couponId || args.ruleId || args.pageId || args.slideId || args.bannerId || args.videoId;
+          if (!args.id && !args.couponId && !args.ruleId && !args.pageId && !args.slideId && !args.bannerId && !args.videoId && !args.reviewId) throw new Error(`ID required for delete (${actionName})`);
+          const targetId = args.id || args.couponId || args.ruleId || args.pageId || args.slideId || args.bannerId || args.videoId || args.reviewId;
           await deleteDoc(doc(db, targetCollection, targetId));
           return targetId;
         }
       
+      if (collectionName === 'reviews' && actionName === 'addReview') {
+        const { getAuth } = await import('firebase/auth');
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) throw new Error('Must be logged in to post a review');
+        const reviewDoc = await addDoc(collection(db, 'reviews'), {
+          ...args,
+          userId: user.uid,
+          verified: false,
+          createdAt: Date.now(),
+        });
+        return reviewDoc.id;
+      }
+
       if (actionName === 'autoGenerateBrandCards' || actionName === 'autoGenerateGadgetCards') {
         // Mock implementation for generating cards
         return { success: true };

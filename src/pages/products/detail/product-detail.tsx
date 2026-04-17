@@ -258,6 +258,8 @@ export default function ProductDetailPage() {
         productImage={productImage}
         productUrl={productUrl}
         productPrice={productPrice}
+        variants={productData?.variants}
+        reviews={reviews}
       />
       
       {/* Layout */}
