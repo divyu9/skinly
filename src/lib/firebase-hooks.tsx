@@ -3090,7 +3090,7 @@ export function useAction(apiRef: any) {
       pageType: string; keywords: string[]; brandName?: string;
       deviceCategory?: string; productType?: string; designType?: string; notes?: string;
     }): Promise<{ success: boolean; contentHTML: string; faqs: any[]; imageAltTexts: string[]; error?: string }> => {
-      const keySnap = await getDoc(doc(db, 'settings', 'openaiApiKey'));
+      const keySnap = await getDoc(doc(db, 'settings', 'openaiAPIkey'));
       const apiKey = keySnap.exists() ? (keySnap.data()?.value as string) : '';
       if (!apiKey) return { success: false, contentHTML: '', faqs: [], imageAltTexts: [], error: 'OpenAI API key not configured in Admin → Settings' };
 
