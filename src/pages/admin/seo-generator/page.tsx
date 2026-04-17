@@ -75,7 +75,8 @@ function SEOGeneratorPageInner() {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesTitle = product.title.toLowerCase().includes(query);
-        const matchesTag = product.tags.some(tag => tag.toLowerCase().includes(query));
+        const tags = Array.isArray(product.tags) ? product.tags : [];
+        const matchesTag = tags.some(tag => String(tag).toLowerCase().includes(query));
         if (!matchesTitle && !matchesTag) return false;
       }
       
@@ -201,7 +202,7 @@ function SEOGeneratorPageInner() {
     return <Skeleton className="h-screen w-full" />;
   }
 
-  if (products.length === 0) {
+  if (!products || products.length === 0) {
     return (
       <Empty>
         <EmptyHeader>
@@ -540,7 +541,7 @@ function ProductRow({
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>{product.variantCount} variant(s)</span>
           <span>•</span>
-          <span>{product.tags.length} tag(s)</span>
+          <span>{(Array.isArray(product.tags) ? product.tags : []).length} tag(s)</span>
           {!product.metaTitle && (
             <>
               <span>•</span>

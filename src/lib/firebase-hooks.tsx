@@ -1044,13 +1044,18 @@ export function useQuery(apiRef: any, args?: any) {
 
             let docs = snap.docs.map(d => {
               const data = d.data();
+              const normalizedTags = Array.isArray(data.tags)
+                ? data.tags
+                : typeof data.tags === "string"
+                  ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
+                  : [];
               return {
                 _id: d.id,
                 ...data,
                 title: data.title || "",
                 description: data.description || "",
                 slug: data.slug || "",
-                tags: data.tags || [],
+                tags: normalizedTags,
                 variantSkus: data.variantSkus || variantSkusMap[d.id] || [],
                 variants: variantsMap[d.id] || [],
               };
@@ -1291,6 +1296,25 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'seoPages.getPageBySlug') {
           const q = query(collection(db, 'seoPages'), where('slug', '==', args.slug), limit(1));
+          unsubscribe = onSnapshot(q, (snap) => {
+            if (!snap.empty) {
+              setData({ _id: snap.docs[0].id, ...snap.docs[0].data() });
+            } else {
+              setData(null);
+            }
+          });
+        }
+        else if (path === 'seoTemplates.getTemplates') {
+          const q = query(collection(db, 'seoPageTemplates'));
+          unsubscribe = onSnapshot(q, (snap) => {
+            const data = snap.docs
+              .map(d => ({ _id: d.id, ...d.data() }))
+              .sort((a: any, b: any) => String(a.pageType || '').localeCompare(String(b.pageType || '')));
+            setData(data);
+          });
+        }
+        else if (path === 'seoTemplates.getTemplateByType') {
+          const q = query(collection(db, 'seoPageTemplates'), where('pageType', '==', args.pageType), limit(1));
           unsubscribe = onSnapshot(q, (snap) => {
             if (!snap.empty) {
               setData({ _id: snap.docs[0].id, ...snap.docs[0].data() });
@@ -1784,6 +1808,249 @@ export function useMutation(apiRef: any) {
           await setDoc(doc(db, 'users', user.uid), cleanArgs, { merge: true });
         }
         return { success: true };
+      }
+
+      if (collectionName === 'seoTemplates') {
+        const { getAuth } = await import('firebase/auth');
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (!user) throw new Error('UNAUTHENTICATED');
+        const updatedBy = user.email || user.uid;
+        const updatedAt = Date.now();
+        const templatesCollection = collection(db, 'seoPageTemplates');
+
+        const buildDefaultTemplates = () => ([
+          {
+            pageType: "brand",
+            displayName: "Brand Pages",
+            description: "Landing pages for each brand (Samsung, Apple, etc.)",
+            layoutConfig: {
+              sections: [
+                { id: "hero", label: "Hero Banner", enabled: true, order: 1 },
+                { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+                { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+                { id: "intro", label: "Brand Introduction", enabled: true, order: 4 },
+                { id: "products", label: "Product Grid", enabled: true, order: 5 },
+                { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+              ],
+            },
+            defaultFilters: {
+              autoCategorize: true,
+              filterByBrand: true,
+              filterByDevice: false,
+              filterByProduct: false,
+              filterByDesign: false,
+              showModelSelector: false,
+            },
+            contentStructure: {
+              h1Pattern: "{Brand} Skins - Premium Protection for All Devices",
+              introLength: "2-3 paragraphs",
+              includeSections: ["benefits", "features", "compatibility"],
+              keywordsToInclude: ["premium", "protection", "durability", "quality"],
+            },
+          },
+          {
+            pageType: "device",
+            displayName: "Device Pages",
+            description: "Landing pages for device categories (Mobile, Tablet, etc.)",
+            layoutConfig: {
+              sections: [
+                { id: "hero", label: "Device Hero", enabled: true, order: 1 },
+                { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+                { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+                { id: "showcase", label: "Device Showcase", enabled: true, order: 4 },
+                { id: "products", label: "Product Grid", enabled: true, order: 5 },
+                { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+              ],
+            },
+            defaultFilters: {
+              autoCategorize: false,
+              filterByBrand: false,
+              filterByDevice: true,
+              filterByProduct: false,
+              filterByDesign: false,
+              showModelSelector: true,
+            },
+            contentStructure: {
+              h1Pattern: "{Device} Skins - Perfect Fit for All {Device} Models",
+              introLength: "2-3 paragraphs",
+              includeSections: ["benefits", "features", "installation", "models"],
+              keywordsToInclude: ["perfect fit", "precise cut", "easy application"],
+            },
+          },
+          {
+            pageType: "product",
+            displayName: "Product Pages",
+            description: "Landing pages for product types (Skins, Cases, etc.)",
+            layoutConfig: {
+              sections: [
+                { id: "hero", label: "Product Hero", enabled: true, order: 1 },
+                { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+                { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+                { id: "features", label: "Feature Highlights", enabled: true, order: 4 },
+                { id: "products", label: "Product Grid", enabled: true, order: 5 },
+                { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+              ],
+            },
+            defaultFilters: {
+              autoCategorize: false,
+              filterByBrand: false,
+              filterByDevice: false,
+              filterByProduct: true,
+              filterByDesign: false,
+              showModelSelector: false,
+            },
+            contentStructure: {
+              h1Pattern: "{Product} - Premium Quality at Best Prices",
+              introLength: "2-3 paragraphs",
+              includeSections: ["benefits", "features", "quality", "installation"],
+              keywordsToInclude: ["premium", "quality", "affordable", "best price"],
+            },
+          },
+          {
+            pageType: "skin-type",
+            displayName: "Skin Type Pages",
+            description: "Landing pages for skin designs (Anime, Carbon Fiber, etc.)",
+            layoutConfig: {
+              sections: [
+                { id: "hero", label: "Skin Type Hero", enabled: true, order: 1 },
+                { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+                { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+                { id: "benefits", label: "Benefits", enabled: true, order: 4 },
+                { id: "products", label: "Product Grid", enabled: true, order: 5 },
+                { id: "guide", label: "Installation Guide", enabled: true, order: 6 },
+                { id: "faqs", label: "FAQs", enabled: true, order: 7 },
+              ],
+            },
+            defaultFilters: {
+              autoCategorize: false,
+              filterByBrand: false,
+              filterByDevice: false,
+              filterByProduct: false,
+              filterByDesign: true,
+              showModelSelector: false,
+            },
+            contentStructure: {
+              h1Pattern: "{DesignType} Skins - Unique Designs for Your Device",
+              introLength: "2-3 paragraphs",
+              includeSections: ["benefits", "features", "style", "installation"],
+              keywordsToInclude: ["unique", "design", "style", "personalization"],
+            },
+          },
+          {
+            pageType: "keyword",
+            displayName: "Keyword Pages",
+            description: "SEO landing pages for specific keywords",
+            layoutConfig: {
+              sections: [
+                { id: "hero", label: "SEO Hero", enabled: true, order: 1 },
+                { id: "gadget-selector", label: "Gadget Selector", enabled: true, order: 2 },
+                { id: "phone-brand-selector", label: "Phone Brand Selector", enabled: true, order: 3 },
+                { id: "content", label: "SEO Content", enabled: true, order: 4 },
+                { id: "products", label: "Wide Product Grid", enabled: true, order: 5 },
+                { id: "faqs", label: "FAQs", enabled: true, order: 6 },
+                { id: "cta", label: "Call to Action", enabled: true, order: 7 },
+              ],
+            },
+            defaultFilters: {
+              autoCategorize: false,
+              filterByBrand: false,
+              filterByDevice: false,
+              filterByProduct: false,
+              filterByDesign: false,
+              showModelSelector: false,
+            },
+            contentStructure: {
+              h1Pattern: "{Keyword} - Best Quality at GoSkinly",
+              introLength: "3-4 paragraphs",
+              includeSections: ["benefits", "features", "comparison", "why-goskinly", "installation"],
+              keywordsToInclude: ["best", "premium", "quality", "goskinly", "noida"],
+            },
+          },
+        ]);
+
+        if (actionName === 'getTemplates') {
+          const snap = await getDocs(templatesCollection);
+          return snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+        }
+
+        if (actionName === 'updateTemplate') {
+          const q = query(templatesCollection, where('pageType', '==', args.pageType), limit(1));
+          const snap = await getDocs(q);
+          const updates: any = { updatedAt, updatedBy };
+          if (args.displayName !== undefined) updates.displayName = args.displayName;
+          if (args.description !== undefined) updates.description = args.description;
+          if (args.defaultHeroImage !== undefined) updates.defaultHeroImage = args.defaultHeroImage;
+          if (args.layoutConfig !== undefined) updates.layoutConfig = args.layoutConfig;
+          if (args.defaultFilters !== undefined) updates.defaultFilters = args.defaultFilters;
+          if (args.contentStructure !== undefined) updates.contentStructure = args.contentStructure;
+
+          if (!snap.empty) {
+            await updateDoc(snap.docs[0].ref, updates);
+            return { templateId: snap.docs[0].id, isNew: false };
+          }
+
+          const docRef = await addDoc(templatesCollection, {
+            pageType: args.pageType,
+            displayName: args.displayName || args.pageType,
+            description: args.description,
+            defaultHeroImage: args.defaultHeroImage,
+            layoutConfig: args.layoutConfig || { sections: [] },
+            defaultFilters: args.defaultFilters || {},
+            contentStructure: args.contentStructure || { h1Pattern: "", introLength: "2-3 paragraphs", includeSections: [], keywordsToInclude: [] },
+            updatedAt,
+            updatedBy,
+          });
+          return { templateId: docRef.id, isNew: true };
+        }
+
+        if (actionName === 'initializeDefaultTemplates') {
+          const existing = await getDocs(templatesCollection);
+          if (existing.size > 0) return { message: "Templates already initialized", count: existing.size };
+          const batch = writeBatch(db);
+          buildDefaultTemplates().forEach((t) => {
+            const ref = doc(templatesCollection);
+            batch.set(ref, { ...t, updatedAt, updatedBy });
+          });
+          await batch.commit();
+          return { message: "Default templates initialized", count: 5 };
+        }
+
+        if (actionName === 'reinitializeTemplates') {
+          const existing = await getDocs(templatesCollection);
+          const batch = writeBatch(db);
+          existing.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          const batch2 = writeBatch(db);
+          buildDefaultTemplates().forEach((t) => {
+            const ref = doc(templatesCollection);
+            batch2.set(ref, { ...t, updatedAt, updatedBy });
+          });
+          await batch2.commit();
+          return { message: "Templates re-initialized successfully", deleted: existing.size, created: 5 };
+        }
+
+        if (actionName === 'initializeDefaultHeroImages') {
+          const heroImageMap: Record<string, string> = {
+            brand: "https://cdn.hercules.app/file_TTzspgzZHTPer5BlbFkBEwTv",
+            device: "https://cdn.hercules.app/file_SLIDqJBWTItllHEEDr05Il5U",
+            keyword: "https://cdn.hercules.app/file_iIOCvr6i3EsGFeGd2zOn77Qm",
+            "skin-type": "https://cdn.hercules.app/file_iIOCvr6i3EsGFeGd2zOn77Qm",
+          };
+          const existing = await getDocs(templatesCollection);
+          const batch = writeBatch(db);
+          let updatedCount = 0;
+          existing.docs.forEach(d => {
+            const data = d.data() as any;
+            const hero = heroImageMap[String(data.pageType || "")];
+            if (hero) {
+              batch.update(d.ref, { defaultHeroImage: hero, updatedAt, updatedBy });
+              updatedCount++;
+            }
+          });
+          if (updatedCount > 0) await batch.commit();
+          return { success: true, updatedCount, message: `Updated ${updatedCount} templates with default hero images` };
+        }
       }
       
       // Handle cart specific operations
