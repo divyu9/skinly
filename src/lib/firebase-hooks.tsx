@@ -1780,6 +1780,59 @@ export function useQuery(apiRef: any, args?: any) {
             });
           });
         }
+        else if (path === 'exports.getOrdersForExport') {
+          const { startDate, endDate } = args || {};
+          let q = query(collection(db, 'orders'));
+          
+          if (startDate && endDate) {
+            q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
+          }
+          
+          unsubscribe = onSnapshot(q, (snap) => {
+            const orders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            setData(orders.sort((a: any, b: any) => (b._creationTime || 0) - (a._creationTime || 0)));
+          });
+        }
+        else if (path === 'exports.getExportStats') {
+          const { startDate, endDate } = args || {};
+          let q = query(collection(db, 'orders'));
+          
+          if (startDate && endDate) {
+            q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
+          }
+          
+          unsubscribe = onSnapshot(q, (snap) => {
+            const orders = snap.docs.map(d => d.data());
+            
+            let totalRevenue = 0;
+            let totalTaxableAmount = 0;
+            let totalGst = 0;
+            let totalCgst = 0;
+            let totalSgst = 0;
+            let totalIgst = 0;
+
+            orders.forEach((order: any) => {
+              if (order.status !== 'Cancelled' && order.status !== 'Failed') {
+                totalRevenue += order.total || 0;
+                totalTaxableAmount += order.taxableAmount || 0;
+                totalGst += order.totalGstAmount || 0;
+                totalCgst += order.cgstAmount || 0;
+                totalSgst += order.sgstAmount || 0;
+                totalIgst += order.igstAmount || 0;
+              }
+            });
+
+            setData({
+              totalOrders: orders.length,
+              totalRevenue,
+              totalTaxableAmount,
+              totalGst,
+              totalCgst,
+              totalSgst,
+              totalIgst
+            });
+          });
+        }
         // Fallback for direct document gets
         else if (args?.id) {
           const collectionName = path.split('.')[0];
