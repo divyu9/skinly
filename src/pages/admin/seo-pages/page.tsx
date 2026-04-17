@@ -90,11 +90,29 @@ export default function SEOPagesPage() {
   }, [searchQuery, pageTypeFilter, publishedFilter]);
 
   const pageSize = 25;
-  const totalPages = pages ? Math.max(1, Math.ceil(pages.length / pageSize)) : 1;
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const paginatedPages = pages
-    ? pages.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize)
+  const filteredPages = pages
+    ? pages.filter((p) => {
+        if (pageTypeFilter !== "all" && p.pageType !== pageTypeFilter) return false;
+        if (publishedFilter !== "all") {
+          const shouldBePublished = publishedFilter === "published";
+          if (p.isPublished !== shouldBePublished) return false;
+        }
+        if (searchQuery.trim()) {
+          const term = searchQuery.toLowerCase().trim();
+          const metaTitle = String(p.metaTitle || "").toLowerCase();
+          const slug = String(p.slug || "").toLowerCase();
+          return metaTitle.includes(term) || slug.includes(term);
+        }
+        return true;
+      })
     : [];
+
+  const totalPages = Math.max(1, Math.ceil(filteredPages.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedPages = filteredPages.slice(
+    (safeCurrentPage - 1) * pageSize,
+    safeCurrentPage * pageSize
+  );
 
   const deletePage = useMutation(api.seoPages.deletePage);
   const clonePage = useMutation(api.seoPages.clonePage);
@@ -567,7 +585,7 @@ export default function SEOPagesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {pages.length === 0 ? (
+            {filteredPages.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   No pages found. Create your first SEO page to get started.
@@ -704,10 +722,10 @@ export default function SEOPagesPage() {
             )}
           </TableBody>
         </Table>
-        {pages.length > 0 && (
+        {filteredPages.length > 0 && (
           <div className="flex items-center justify-between px-4 py-3 border-t">
             <div className="text-sm text-muted-foreground">
-              Showing {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, pages.length)} of {pages.length}
+              Showing {(safeCurrentPage - 1) * pageSize + 1}-{Math.min(safeCurrentPage * pageSize, filteredPages.length)} of {filteredPages.length}
             </div>
             <div className="flex items-center gap-2">
               <Button

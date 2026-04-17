@@ -930,7 +930,7 @@ function AdminOrdersPageInner() {
                   <tr>
                     <th className="p-3 text-left">
                       <Checkbox
-                        className="border-muted-foreground/60 bg-background data-[state=checked]:border-primary"
+                        className="bg-background border-foreground/40 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
                         checked={
                           displayOrders.length > 0 &&
                           selectedOrders.size === displayOrders.length
@@ -964,7 +964,7 @@ function AdminOrdersPageInner() {
                     >
                       <td className="p-3" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
-                          className="border-muted-foreground/60 bg-background data-[state=checked]:border-primary"
+                          className="bg-background border-foreground/40 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground data-[state=checked]:border-primary"
                           checked={selectedOrders.has(order._id)}
                           onCheckedChange={(checked) =>
                             handleSelectOrder(order._id, checked as boolean)
