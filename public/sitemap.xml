@@ -2,43 +2,43 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.goskinly.com/</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>1</priority>
   </url>
   <url>
     <loc>https://www.goskinly.com/products</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.goskinly.com/devices</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://www.goskinly.com/policies/privacy</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://www.goskinly.com/policies/terms</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
   <url>
     <loc>https://www.goskinly.com/policies/shipping</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
     <loc>https://www.goskinly.com/policies/returns</loc>
-    <lastmod>2026-04-17T06:09:42.411Z</lastmod>
+    <lastmod>2026-04-17T09:31:57.286Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
@@ -6169,127 +6169,127 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=nature</loc>
+    <loc>https://www.goskinly.com/shop?collection=nature</loc>
     <lastmod>2025-11-27T17:53:57.343Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=marvel</loc>
+    <loc>https://www.goskinly.com/shop?collection=marvel</loc>
     <lastmod>2025-11-27T17:53:43.519Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=sports</loc>
+    <loc>https://www.goskinly.com/shop?collection=sports</loc>
     <lastmod>2025-11-27T17:54:19.502Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=cars-bikes</loc>
+    <loc>https://www.goskinly.com/shop?collection=cars-bikes</loc>
     <lastmod>2025-11-27T17:53:55.850Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=music</loc>
+    <loc>https://www.goskinly.com/shop?collection=music</loc>
     <lastmod>2025-11-27T17:54:18.942Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=tempered-glasses</loc>
+    <loc>https://www.goskinly.com/shop?collection=tempered-glasses</loc>
     <lastmod>2025-11-25T07:26:27.235Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=space-cosmic</loc>
+    <loc>https://www.goskinly.com/shop?collection=space-cosmic</loc>
     <lastmod>2025-11-27T17:54:17.098Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=dc</loc>
+    <loc>https://www.goskinly.com/shop?collection=dc</loc>
     <lastmod>2025-11-27T17:53:44.496Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=gaming</loc>
+    <loc>https://www.goskinly.com/shop?collection=gaming</loc>
     <lastmod>2025-11-27T17:53:59.896Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=minimal</loc>
+    <loc>https://www.goskinly.com/shop?collection=minimal</loc>
     <lastmod>2025-11-27T17:54:16.547Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=abstract</loc>
+    <loc>https://www.goskinly.com/shop?collection=abstract</loc>
     <lastmod>2025-11-27T17:53:50.608Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=anime</loc>
+    <loc>https://www.goskinly.com/shop?collection=anime</loc>
     <lastmod>2025-11-27T17:53:39.143Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=magneto-x</loc>
+    <loc>https://www.goskinly.com/shop?collection=magneto-x</loc>
     <lastmod>2025-11-25T07:27:07.959Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=cover-and-case</loc>
+    <loc>https://www.goskinly.com/shop?collection=cover-and-case</loc>
     <lastmod>2025-11-25T07:26:02.287Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=animals</loc>
+    <loc>https://www.goskinly.com/shop?collection=animals</loc>
     <lastmod>2025-11-27T17:54:18.004Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=3d-embossed-phone-skins</loc>
+    <loc>https://www.goskinly.com/shop?collection=3d-embossed-phone-skins</loc>
     <lastmod>2025-11-25T07:09:16.877Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=matte-phone-skins</loc>
+    <loc>https://www.goskinly.com/shop?collection=matte-phone-skins</loc>
     <lastmod>2025-11-25T07:02:24.665Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=mac-mini-skins</loc>
+    <loc>https://www.goskinly.com/shop?collection=mac-mini-skins</loc>
     <lastmod>2025-11-25T07:09:50.610Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=god-religious</loc>
+    <loc>https://www.goskinly.com/shop?collection=god-religious</loc>
     <lastmod>2025-11-27T17:53:57.732Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=black-specials</loc>
+    <loc>https://www.goskinly.com/shop?collection=black-specials</loc>
     <lastmod>2025-11-27T17:53:45.086Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.goskinly.com/products?collection=quotes-typography</loc>
+    <loc>https://www.goskinly.com/shop?collection=quotes-typography</loc>
     <lastmod>2025-11-27T17:54:05.130Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
