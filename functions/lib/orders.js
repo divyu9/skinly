@@ -110,7 +110,7 @@ exports.createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 60, m
         phone: (shippingAddress === null || shippingAddress === void 0 ? void 0 : shippingAddress.phone) || '',
         shippingAddress: shippingAddress || {},
         paymentMethod: paymentMethod || 'prepaid',
-        status: 'pending',
+        status: (paymentMethod || 'prepaid') === 'cod' ? 'processing' : 'pending_payment',
         paymentStatus: 'pending',
         total: calculatedTotal,
         items: orderItems,

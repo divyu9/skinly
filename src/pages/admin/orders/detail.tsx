@@ -442,6 +442,23 @@ function OrderDetailPageInner() {
   }
 
   const orderEmail = order.user?.email || order.customerEmail || order.guestEmail;
+  const rawShippingAddress =
+    order.shippingAddress && typeof order.shippingAddress === "object"
+      ? order.shippingAddress
+      : order.customerInfo?.shippingAddress && typeof order.customerInfo.shippingAddress === "object"
+        ? order.customerInfo.shippingAddress
+        : {};
+  const shippingAddress = {
+    fullName: "",
+    phone: "",
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    state: "",
+    pincode: "",
+    ...rawShippingAddress,
+  };
+  const creationTime = order._creationTime ?? order.createdAt;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -460,7 +477,7 @@ function OrderDetailPageInner() {
       {/* Header: order number + status dropdowns */}
       <OrderHeader
         orderNumber={order.orderNumber}
-        creationTime={order._creationTime}
+        creationTime={creationTime}
         status={order.status}
         paymentStatus={order.paymentStatus}
         onStatusChange={handleStatusChange}
@@ -552,14 +569,14 @@ function OrderDetailPageInner() {
         {/* Right column */}
         <div className="space-y-6">
           <CustomerInfoCard
-            shippingAddress={order.shippingAddress}
+            shippingAddress={shippingAddress}
             email={orderEmail}
             showEditCustomerDialog={showEditCustomerDialog}
             customerForm={customerForm}
             onOpenEditCustomer={() => {
               setCustomerForm({
-                fullName: order.shippingAddress.fullName,
-                phone: order.shippingAddress.phone,
+                fullName: shippingAddress.fullName,
+                phone: shippingAddress.phone,
                 email: orderEmail || "",
               });
               setShowEditCustomerDialog(true);
@@ -571,11 +588,11 @@ function OrderDetailPageInner() {
             addressForm={addressForm}
             onOpenEditAddress={() => {
               setAddressForm({
-                addressLine1: order.shippingAddress.addressLine1,
-                addressLine2: order.shippingAddress.addressLine2 || "",
-                city: order.shippingAddress.city,
-                state: order.shippingAddress.state,
-                pincode: order.shippingAddress.pincode,
+                addressLine1: shippingAddress.addressLine1,
+                addressLine2: shippingAddress.addressLine2 || "",
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                pincode: shippingAddress.pincode,
               });
               setShowEditAddressDialog(true);
             }}

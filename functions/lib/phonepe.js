@@ -166,8 +166,9 @@ exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 6
         }
         await orderSnap.ref.update({
             paymentTransactionId: merchantTransactionId,
-            paymentStatus: "PENDING",
-            paymentProvider: "phonepe"
+            paymentStatus: "pending",
+            paymentProvider: "phonepe",
+            updatedAt: Date.now()
         });
         return {
             success: true,
@@ -249,7 +250,11 @@ exports.checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds
                 .limit(1)
                 .get();
             if (!ordersSnap.empty) {
-                await ordersSnap.docs[0].ref.update({ paymentStatus: "PAID" });
+                await ordersSnap.docs[0].ref.update({
+                    paymentStatus: "success",
+                    status: "processing",
+                    updatedAt: Date.now()
+                });
             }
         }
         return {

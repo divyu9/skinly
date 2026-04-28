@@ -101,7 +101,7 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
     phone: shippingAddress?.phone || '',
     shippingAddress: shippingAddress || {},
     paymentMethod: paymentMethod || 'prepaid',
-    status: 'pending',
+    status: (paymentMethod || 'prepaid') === 'cod' ? 'processing' : 'pending_payment',
     paymentStatus: 'pending',
     total: calculatedTotal,
     items: orderItems,

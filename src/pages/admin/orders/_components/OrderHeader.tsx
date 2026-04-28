@@ -13,7 +13,7 @@ export type PaymentStatus = "pending" | "success" | "failed";
 
 interface OrderHeaderProps {
   orderNumber: string;
-  creationTime: number;
+  creationTime: any;
   status: string;
   paymentStatus?: string;
   onStatusChange: (status: OrderStatus) => void;
@@ -37,6 +37,7 @@ const PAYMENT_COLORS: Record<string, string> = {
 };
 
 function formatDate(timestamp: number) {
+  if (!timestamp) return "—";
   return new Date(timestamp).toLocaleDateString("en-IN", {
     year: "numeric",
     month: "short",
@@ -44,6 +45,14 @@ function formatDate(timestamp: number) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function toMillis(value: any): number {
+  if (!value) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  return 0;
 }
 
 export function OrderHeader({
@@ -63,7 +72,7 @@ export function OrderHeader({
     <div className="flex items-start justify-between gap-4">
       <div>
         <h1 className="text-3xl font-bold">{orderNumber}</h1>
-        <p className="text-muted-foreground">{formatDate(creationTime)}</p>
+        <p className="text-muted-foreground">{formatDate(toMillis(creationTime))}</p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Select

@@ -25,6 +25,49 @@ export function useQuery(apiRef: any, args?: any) {
     let unsubscribe = () => {};
 
     const fetchData = async () => {
+        const toMillis = (value: any): number => {
+          if (!value) return 0;
+          if (typeof value === 'number') return value;
+          if (typeof value?.toMillis === 'function') return value.toMillis();
+          if (typeof value?.seconds === 'number') return value.seconds * 1000;
+          return 0;
+        };
+
+        const normalizePaymentStatus = (value: any) => {
+          const v = String(value || '').toLowerCase();
+          if (v === 'paid') return 'success';
+          if (v === 'success') return 'success';
+          if (v === 'pending') return 'pending';
+          if (v === 'failed') return 'failed';
+          if (v === 'pending_payment') return 'pending';
+          return value;
+        };
+
+        const normalizeOrderStatus = (value: any, paymentStatus?: string) => {
+          const v = String(value || '').toLowerCase();
+          if (paymentStatus === 'success' && (v === '' || v === 'pending' || v === 'pending_payment')) return 'processing';
+          if (v === 'pending') return 'pending_payment';
+          if (v === 'pending_payment') return 'pending_payment';
+          if (v === 'processing') return 'processing';
+          if (v === 'shipped') return 'shipped';
+          if (v === 'delivered') return 'delivered';
+          if (v === 'cancelled') return 'cancelled';
+          if (v === 'rto') return 'rto';
+          if (v === 'failed') return 'failed';
+          return value;
+        };
+
+        const normalizeOrder = (order: any) => {
+          const paymentStatus = normalizePaymentStatus(order?.paymentStatus || order?.paymentInfo?.status);
+          const status = normalizeOrderStatus(order?.status, paymentStatus);
+          const createdAt = toMillis(order?.createdAt) || toMillis(order?._creationTime) || 0;
+          return {
+            ...order,
+            paymentStatus,
+            status,
+            _creationTime: createdAt,
+          };
+        };
         try {
           if (path === 'homepage.getActiveHomepageSections') {
           const q = query(collection(db, 'homepageSections'));
@@ -249,7 +292,7 @@ export function useQuery(apiRef: any, args?: any) {
             return;
           }
           unsubscribe = onSnapshot(doc(db, 'orders', args.orderId), (snap) => {
-            setData(snap.exists() ? { _id: snap.id, ...snap.data() } : null);
+            setData(snap.exists() ? normalizeOrder({ _id: snap.id, ...snap.data() }) : null);
           });
         }
         else if (path === 'orders.getLastOrderedDevice') {
@@ -292,12 +335,8 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'admin.orders.getAllOrders') {
           const q = query(collection(db, 'orders'), limit(500));
           unsubscribe = onSnapshot(q, (snap) => {
-            let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            docs.sort((a: any, b: any) => {
-              const aTime = a.createdAt || a._creationTime || 0;
-              const bTime = b.createdAt || b._creationTime || 0;
-              return bTime - aTime;
-            });
+            let docs = snap.docs.map(d => normalizeOrder({ _id: d.id, ...d.data() }));
+            docs.sort((a: any, b: any) => (b._creationTime || 0) - (a._creationTime || 0));
 
             if (args?.showDeleted) {
               // Deleted tab: only orders explicitly marked deleted
@@ -311,7 +350,7 @@ export function useQuery(apiRef: any, args?: any) {
             }
 
             if (args?.paymentStatus && args.paymentStatus !== 'all') {
-              docs = docs.filter((d: any) => (d.paymentStatus || d.paymentInfo?.status) === args.paymentStatus);
+              docs = docs.filter((d: any) => d.paymentStatus === args.paymentStatus);
             }
             setData(docs);
           });

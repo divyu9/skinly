@@ -123,17 +123,17 @@ function AdminOrdersPageInner() {
       cancelled: displayOrders.filter((o) => o.status === "cancelled").length,
       rto: displayOrders.filter((o) => o.status === "rto").length,
       pending_payment: displayOrders.filter((o) => o.status === "pending_payment").length,
-      failed: displayOrders.filter((o) => o.paymentStatus === "failed").length,
+      failed: displayOrders.filter((o) => normalizePaymentStatus(o.paymentStatus) === "failed").length,
       deleted: displayOrders.filter((o) => o.isDeleted).length,
       totalRevenue: displayOrders
-        .filter((o) => o.paymentStatus === "success")
+        .filter((o) => normalizePaymentStatus(o.paymentStatus) === "success")
         .reduce((sum, o) => sum + (o.total || 0), 0),
       pendingPayments: displayOrders.filter(
-        (o) => o.paymentStatus === "pending" || !o.paymentStatus
+        (o) => normalizePaymentStatus(o.paymentStatus) === "pending" || !o.paymentStatus
       ).length,
-      successfulPayments: displayOrders.filter((o) => o.paymentStatus === "success")
+      successfulPayments: displayOrders.filter((o) => normalizePaymentStatus(o.paymentStatus) === "success")
         .length,
-      failedPayments: displayOrders.filter((o) => o.paymentStatus === "failed")
+      failedPayments: displayOrders.filter((o) => normalizePaymentStatus(o.paymentStatus) === "failed")
         .length,
     };
   }, [displayOrders]);
@@ -172,15 +172,34 @@ function AdminOrdersPageInner() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString("en-IN", {
+  function normalizePaymentStatus(value: any) {
+    const v = String(value || "").toLowerCase();
+    if (v === "paid") return "success";
+    if (v === "pending") return "pending";
+    if (v === "success") return "success";
+    if (v === "failed") return "failed";
+    return value;
+  }
+
+  function toMillis(value: any): number {
+    if (!value) return 0;
+    if (typeof value === "number") return value;
+    if (typeof value?.toMillis === "function") return value.toMillis();
+    if (typeof value?.seconds === "number") return value.seconds * 1000;
+    return 0;
+  }
+
+  function formatDate(timestamp: any) {
+    const ts = toMillis(timestamp);
+    if (!ts) return "—";
+    return new Date(ts).toLocaleDateString("en-IN", {
       year: "numeric",
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
+  }
 
   const handleSelectOrder = (orderId: Id<"orders">, checked: boolean) => {
     const newSelected = new Set(selectedOrders);
@@ -1040,7 +1059,7 @@ function AdminOrdersPageInner() {
                         </span>
                       </td>
                       <td className="p-3">
-                        <span className="text-sm">{formatDate(order._creationTime)}</span>
+                        <span className="text-sm">{formatDate(order._creationTime ?? order.createdAt)}</span>
                       </td>
                       <td className="p-3">
                         <span className="text-sm font-medium">
@@ -1070,9 +1089,9 @@ function AdminOrdersPageInner() {
                         <div className="flex flex-col gap-1">
                           <Badge
                             variant="outline"
-                            className={getPaymentStatusColor(order.paymentStatus)}
+                            className={getPaymentStatusColor(normalizePaymentStatus(order.paymentStatus))}
                           >
-                            {order.paymentStatus || "pending"}
+                            {normalizePaymentStatus(order.paymentStatus) || "pending"}
                           </Badge>
                           {order.paymentMethod === "cod" && (
                             <div className="flex items-center gap-1">
