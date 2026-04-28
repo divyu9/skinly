@@ -194,6 +194,16 @@ function OrderDetailPageInner() {
     );
   }
 
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center flex-col gap-4">
+        <p className="text-xl font-semibold">Order not found</p>
+        <p className="text-muted-foreground text-sm">This order may not exist or you may not have access to it.</p>
+        <Link to="/orders"><Button variant="outline">View All Orders</Button></Link>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -225,8 +235,8 @@ function OrderDetailPageInner() {
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <Badge className={`${getStatusColor(order.status)} text-base px-4 py-2`}>
-                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+              <Badge className={`${getStatusColor(order.status || "")} text-base px-4 py-2`}>
+                {(order.status || "pending").charAt(0).toUpperCase() + (order.status || "pending").slice(1)}
               </Badge>
               {order.paymentStatus === "failed" && (
                 <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
@@ -414,19 +424,18 @@ function OrderDetailPageInner() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-1 text-sm">
-                  <p className="font-semibold">{order.shippingAddress.fullName}</p>
-                  <p className="text-muted-foreground">{order.shippingAddress.phone}</p>
+                  <p className="font-semibold">{order.shippingAddress?.fullName}</p>
+                  <p className="text-muted-foreground">{order.shippingAddress?.phone}</p>
                   <p className="text-muted-foreground">
-                    {order.shippingAddress.addressLine1}
+                    {order.shippingAddress?.addressLine1}
                   </p>
-                  {order.shippingAddress.addressLine2 && (
+                  {order.shippingAddress?.addressLine2 && (
                     <p className="text-muted-foreground">
                       {order.shippingAddress.addressLine2}
                     </p>
                   )}
                   <p className="text-muted-foreground">
-                    {order.shippingAddress.city}, {order.shippingAddress.state} -{" "}
-                    {order.shippingAddress.pincode}
+                    {order.shippingAddress?.city}{order.shippingAddress?.state ? `, ${order.shippingAddress.state}` : ""}{order.shippingAddress?.pincode ? ` - ${order.shippingAddress.pincode}` : ""}
                   </p>
                 </div>
               </CardContent>
