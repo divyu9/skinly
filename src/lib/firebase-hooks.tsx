@@ -8,6 +8,8 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
 
+const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+
 // Helper to resolve the string path from the proxy
 const getPath = (apiRef: any) => String(apiRef);
 
@@ -1482,7 +1484,34 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'mockups.getBatchMockups') {
-          setData({ mockups: {} });
+          const requestedSkus: string[] = Array.isArray(args?.skus) ? args.skus : [];
+          if (!args?.brand || !args?.model || requestedSkus.length === 0) {
+            setData({ mockups: {}, cursor: "", isDone: true });
+          } else {
+            const q = query(
+              collection(db, 'mockups'),
+              where('brand', '==', args.brand),
+              where('model', '==', args.model)
+            );
+            unsubscribe = onSnapshot(q, (snap) => {
+              const result: Record<string, string> = {};
+              snap.docs.forEach(d => {
+                const m: any = d.data();
+                const mockupSku = (m.sku || "").toUpperCase();
+                if (!mockupSku) return;
+                for (const target of requestedSkus) {
+                  const t = target.toUpperCase();
+                  // Bidirectional prefix match: R-01 <-> R-01-PH
+                  if (mockupSku !== t && !mockupSku.startsWith(t + "-") && !t.startsWith(mockupSku + "-")) continue;
+                  const url = m.r2Key
+                    ? `${R2_PUBLIC_DOMAIN}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}`
+                    : m.cloudinaryUrl;
+                  if (url) result[target] = url;
+                }
+              });
+              setData({ mockups: result, cursor: "", isDone: true });
+            });
+          }
         }
         else if (path === 'mockupsAdvanced.getUniqueBrands') {
           const q = query(collection(db, 'supportedModels'));
