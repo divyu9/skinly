@@ -1,14 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db, functions } from './firebase';
 import { 
-  collection, query, where, getDocs, onSnapshot, doc, getDoc, 
+  collection, query, where, getDocs, onSnapshot, doc, getDoc,
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
-  writeBatch, DocumentSnapshot, QuerySnapshot, documentId
+  writeBatch, DocumentSnapshot, QuerySnapshot, documentId, getCountFromServer
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
 
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+
+const TOTAL_PHONE_SKIN_SKUS = 359;
+
+// The mockups collection holds ~100k docs, so unique-SKU counting reads a
+// bounded sample rather than the whole collection (mirrors the Convex original).
+const MOCKUP_SAMPLE_LIMIT = 15000;
 
 // Helper to resolve the string path from the proxy
 const getPath = (apiRef: any) => String(apiRef);
@@ -1607,15 +1613,67 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'mockupsAdvanced.getModelsWithFullCoverage') {
-          setData([]); // Mocked as empty for now, as it requires complex logic
+          let q = query(collection(db, 'supportedModels'));
+          if (args?.brandFilter && args.brandFilter !== "all") {
+            q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brandFilter));
+          }
+          unsubscribe = onSnapshot(q, async (snap) => {
+            const models = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            const mockupsSnap = await getDocs(collection(db, 'mockups'));
+
+            const skusByModelId = new Map<string, Set<string>>();
+            const skusByBrandModel = new Map<string, Set<string>>();
+            mockupsSnap.docs.forEach(d => {
+              const m: any = d.data();
+              const sku = (m.sku || "").toUpperCase();
+              if (!sku) return;
+              if (m.supportedModelId) {
+                if (!skusByModelId.has(m.supportedModelId)) skusByModelId.set(m.supportedModelId, new Set());
+                skusByModelId.get(m.supportedModelId)!.add(sku);
+              } else {
+                const key = `${(m.brand || "").toLowerCase().trim()}_${(m.model || "").toLowerCase().trim()}`;
+                if (!skusByBrandModel.has(key)) skusByBrandModel.set(key, new Set());
+                skusByBrandModel.get(key)!.add(sku);
+              }
+            });
+
+            const full = models.flatMap(model => {
+              const key = `${(model.brandName || "").toLowerCase().trim()}_${(model.modelName || "").toLowerCase().trim()}`;
+              const skus = skusByModelId.get(model._id) ?? skusByBrandModel.get(key);
+              if (!skus || skus.size < TOTAL_PHONE_SKIN_SKUS) return [];
+              return [{
+                _id: model._id,
+                brandName: model.brandName,
+                modelName: model.modelName,
+                category: model.category,
+                mockupCount: skus.size,
+                totalSKUs: TOTAL_PHONE_SKIN_SKUS,
+              }];
+            });
+
+            full.sort((a, b) =>
+              a.brandName.localeCompare(b.brandName) || a.modelName.localeCompare(b.modelName)
+            );
+            setData(full);
+          });
         }
         else if (path === 'mockupsAdvanced.getOverviewStats') {
-          setData({
-            totalMockups: 0,
-            uniqueSKUs: 0,
-            totalSKUs: 359,
-            coverage: 0
-          });
+          (async () => {
+            const countSnap = await getCountFromServer(collection(db, 'mockups'));
+            const totalMockups = countSnap.data().count;
+
+            const sampleSnap = await getDocs(query(collection(db, 'mockups'), limit(MOCKUP_SAMPLE_LIMIT)));
+            const uniqueSKUs = new Set(
+              sampleSnap.docs.map(d => (d.data().sku || "").toUpperCase()).filter(Boolean)
+            ).size;
+
+            setData({
+              totalMockups,
+              uniqueSKUs,
+              totalSKUs: TOTAL_PHONE_SKIN_SKUS,
+              coverage: Math.min(Math.round((uniqueSKUs / TOTAL_PHONE_SKIN_SKUS) * 100), 100),
+            });
+          })();
         }
         else if (path === 'mockupsAdvanced.getModelMockupStats') {
           if (!args?.modelId) {
@@ -1651,12 +1709,12 @@ export function useQuery(apiRef: any, args?: any) {
             }
             
             setData({
-              totalSKUs: 359,
+              totalSKUs: TOTAL_PHONE_SKIN_SKUS,
               uploadedSKUs: mockups.length,
               missingSKUs: [],
               missingSKUsInStock: [],
               missingSKUsOutOfStock: [],
-              coverage: Math.min(Math.round((mockups.length / 359) * 100), 100),
+              coverage: Math.min(Math.round((mockups.length / TOTAL_PHONE_SKIN_SKUS) * 100), 100),
               mockups: mockups
             });
           });
