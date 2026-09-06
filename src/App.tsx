@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { DefaultProviders } from "./components/providers/default.tsx";
 import { AdminPageWrapper } from "./components/admin-page-wrapper.tsx";
@@ -121,6 +121,8 @@ export default function App() {
             
 
             {/* Admin routes - lazy loaded */}
+            {/* Without this the bare path falls through to the /:slug SEO page and 404s */}
+            <Route path="/backend-skinly" element={<Navigate to="/backend-skinly/products" replace />} />
             <Route path="/backend-skinly/products" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><NewProductPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products/bulk" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><BulkProductCreatorPage /></AdminPageWrapper></Suspense>} />

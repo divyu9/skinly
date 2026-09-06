@@ -412,15 +412,22 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'abandonedCarts.getAbandonedCartStats') {
-          setData({
-            total: 0,
-            recovered: 0,
-            pending: 0,
-            revenue: 0,
-            recoveryRate: 0,
-            totalValue: 0,
-            reminded: 0,
-            recoveredValue: 0
+          unsubscribe = onSnapshot(collection(db, 'abandonedCarts'), (snap) => {
+            const carts = snap.docs.map(d => d.data() as any);
+            const byStatus = (s: string) => carts.filter(c => c.status === s);
+            const sum = (list: any[]) => list.reduce((n, c) => n + (c.cartTotal || 0), 0);
+            const recovered = byStatus("recovered");
+            setData({
+              total: carts.length,
+              pending: byStatus("pending").length,
+              reminded: byStatus("reminded").length,
+              recovered: recovered.length,
+              expired: byStatus("expired").length,
+              totalValue: sum(carts),
+              recoveredValue: sum(recovered),
+              revenue: sum(recovered),
+              recoveryRate: carts.length ? (recovered.length / carts.length) * 100 : 0,
+            });
           });
         }
         else if (path === 'abandonedCartSettings.getSettings') {
@@ -856,10 +863,94 @@ export function useQuery(apiRef: any, args?: any) {
           })();
         }
         else if (path === 'wallet.calculateMaxWalletUsage') {
-          setData(0);
+          const orderTotal: number = args?.orderTotal ?? 0;
+          let innerUnsubscribe = () => {};
+          const { getAuth } = await import('firebase/auth');
+          const auth = getAuth();
+
+          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+            innerUnsubscribe();
+            if (!user) {
+              setData({ maxUsage: 0, currentBalance: 0, canUseWallet: false });
+              return;
+            }
+            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), async (snap) => {
+              const currentBalance = snap.exists() ? (snap.data().walletBalance || 0) : 0;
+              const ssnap = await getDocs(query(collection(db, 'walletSettings'), limit(1)));
+              const s: any = ssnap.empty ? null : ssnap.docs[0].data();
+
+              if (s && s.walletEnabled === false) {
+                setData({ maxUsage: 0, currentBalance, canUseWallet: false });
+                return;
+              }
+
+              let maxUsage: number;
+              if (!s || s.maxUsageType === "unlimited") {
+                maxUsage = Math.min(currentBalance, orderTotal);
+              } else if (s.maxUsageType === "percentage") {
+                maxUsage = Math.min(currentBalance, (orderTotal * s.maxUsageValue) / 100, orderTotal);
+              } else {
+                maxUsage = Math.min(currentBalance, s.maxUsageValue, orderTotal);
+              }
+
+              setData({
+                maxUsage: Math.max(0, maxUsage),
+                currentBalance,
+                canUseWallet: s?.walletEnabled !== false && currentBalance > 0,
+              });
+            });
+          });
+          unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'cashbackHelpers.calculateCartCashback') {
-          setData(0);
+          const items: any[] = Array.isArray(args?.items) ? args.items : [];
+          if (items.length === 0) {
+            setData({ totalCashback: 0, itemCashbacks: [] });
+          } else {
+            (async () => {
+              const cartTotal = items.reduce((sum, i) => sum + i.finalPrice * i.quantity, 0);
+              const rsnap = await getDocs(query(collection(db, 'cashbackRules'), where('isActive', '==', true)));
+              const rules = rsnap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+
+              const itemCashbacks = await Promise.all(items.map(async (item) => {
+                let collectionIds: string[] = [];
+                if (rules.some(r => r.targetType === "collection")) {
+                  const cp = await getDocs(query(collection(db, 'collectionProducts'),
+                    where('productId', '==', item.productId)));
+                  collectionIds = cp.docs.map(d => d.data().collectionId);
+                }
+
+                const applicable = rules.filter(r =>
+                  (r.targetType === "variant" && r.targetId === item.variantId) ||
+                  (r.targetType === "product" && r.targetId === item.productId) ||
+                  (r.targetType === "collection" && collectionIds.includes(r.targetId))
+                ).filter(r =>
+                  (r.minCartValue === undefined || cartTotal >= r.minCartValue) &&
+                  (r.maxCartValue === undefined || cartTotal <= r.maxCartValue)
+                );
+
+                const perUnit = applicable.reduce((best, r) => {
+                  const amount = Math.round(r.cashbackType === "fixed"
+                    ? r.cashbackValue
+                    : (item.finalPrice * r.cashbackValue) / 100);
+                  return amount > best ? amount : best;
+                }, 0);
+
+                return {
+                  productId: item.productId,
+                  variantId: item.variantId,
+                  cashbackPerUnit: perUnit,
+                  totalCashback: perUnit * item.quantity,
+                  quantity: item.quantity,
+                };
+              }));
+
+              setData({
+                totalCashback: itemCashbacks.reduce((s, i) => s + i.totalCashback, 0),
+                itemCashbacks,
+              });
+            })();
+          }
         }
         else if (path === 'cashback.getAllCashbackRules') {
           const q = query(collection(db, 'cashbackRules'));
@@ -1160,7 +1251,14 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'supportedModels.getModelCountByGadgetType') {
-          setData(0);
+          if (!args?.gadgetTypeId) {
+            setData(0);
+          } else {
+            unsubscribe = onSnapshot(
+              query(collection(db, 'supportedModels'), where('gadgetTypeId', '==', args.gadgetTypeId)),
+              (snap) => setData(snap.size)
+            );
+          }
         }
         else if (path === 'supportedModels.getLatest') {
           const q = query(collection(db, 'supportedModels'), limit(args?.count || 20));
@@ -1169,10 +1267,44 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'stockNotifications.getNotificationStats') {
-          setData([]);
+          unsubscribe = onSnapshot(
+            query(collection(db, 'stockNotifications'), where('status', '==', 'waiting')),
+            (snap) => {
+              const products = new Map<string, any>();
+              snap.docs.forEach(d => {
+                const n: any = d.data();
+                if (!products.has(n.productId)) {
+                  products.set(n.productId, {
+                    productId: n.productId,
+                    productTitle: n.productTitle,
+                    variants: new Map<string, any>(),
+                    totalCount: 0,
+                  });
+                }
+                const p = products.get(n.productId);
+                p.totalCount++;
+                if (!p.variants.has(n.variantId)) {
+                  p.variants.set(n.variantId, {
+                    variantId: n.variantId, variantTitle: n.variantTitle, sku: n.sku, count: 0,
+                  });
+                }
+                p.variants.get(n.variantId).count++;
+              });
+              setData(Array.from(products.values()).map(p => ({
+                ...p, variants: Array.from(p.variants.values()),
+              })));
+            }
+          );
         }
         else if (path === 'mediaLibrary.getFolders') {
-          setData([]);
+          unsubscribe = onSnapshot(collection(db, 'mediaLibrary'), (snap) => {
+            const folders = new Set<string>();
+            snap.docs.forEach(d => {
+              const f = d.data().folder;
+              if (f) folders.add(f);
+            });
+            setData(Array.from(folders).sort());
+          });
         }
         else if (path === 'mediaLibrary.listMedia') {
           const q = query(collection(db, 'mediaLibrary'));
@@ -2018,10 +2150,23 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'whatsappMessaging.getQueueStats') {
-          setData({ pending: 0, processing: 0, failed: 0 });
+          unsubscribe = onSnapshot(collection(db, 'whatsappQueue'), (snap) => {
+            const count = (s: string) => snap.docs.filter(d => d.data().status === s).length;
+            setData({ pending: count("pending"), processing: count("processing"), failed: count("failed") });
+          });
         }
         else if (path === 'whatsappMessaging.getDeliveryStats') {
-          setData({ total: 0, delivered: 0, failed: 0, pending: 0, sent: 0, read: 0 });
+          unsubscribe = onSnapshot(collection(db, 'whatsappMessages'), (snap) => {
+            const count = (s: string) => snap.docs.filter(d => d.data().status === s).length;
+            setData({
+              total: snap.size,
+              delivered: count("delivered"),
+              failed: count("failed"),
+              pending: count("pending"),
+              sent: count("sent"),
+              read: count("read"),
+            });
+          });
         }
         else if (path === 'whatsappMessaging.getMessageDetails') {
           if (!args?.messageId) {
