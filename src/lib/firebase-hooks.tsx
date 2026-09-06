@@ -1390,10 +1390,20 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'mediaLibrary.listMedia') {
-          const q = query(collection(db, 'mediaLibrary'));
-          unsubscribe = onSnapshot(q, (snap) => {
-            const docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            setData({ items: docs, totalCount: docs.length });
+          unsubscribe = onSnapshot(collection(db, 'mediaLibrary'), (snap) => {
+            let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+
+            if (args?.folder) docs = docs.filter(m => m.folder === args.folder);
+            if (args?.mediaType) docs = docs.filter(m => (m.mediaType || 'image') === args.mediaType);
+            if (args?.searchQuery) {
+              const needle = String(args.searchQuery).toLowerCase();
+              docs = docs.filter(m => (m.filename || "").toLowerCase().includes(needle));
+            }
+
+            docs.sort((a, b) => (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
+            const total = docs.length;
+            if (args?.limit) docs = docs.slice(0, args.limit);
+            setData({ items: docs, totalCount: total });
           });
         }
         else if (path === 'collections.getAllCollections' || path === 'collections.getAllCollectionsWithCounts') {

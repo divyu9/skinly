@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
+import { MediaPickerDialog } from "./media-picker-dialog.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -13,7 +14,8 @@ import {
   GripVerticalIcon,
   Loader2Icon,
   LinkIcon,
-  XIcon
+  XIcon,
+  ImageIcon
 } from "lucide-react";
 
 interface ProductImage {
@@ -35,6 +37,7 @@ export function ProductImageUploader({
   productSlug = "product",
   generateId = false
 }: ProductImageUploaderProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
@@ -248,6 +251,32 @@ export function ProductImageUploader({
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Upload new images, or reuse ones already in your media library.
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
+          <ImageIcon className="mr-2 size-4" />
+          Choose from library
+        </Button>
+      </div>
+
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        existingUrls={images.map((img) => img.url)}
+        onSelect={(picked) => {
+          const startIndex = images.length;
+          const added = picked.map((p, i) => ({
+            url: p.url,
+            alt: p.alt,
+            ...(generateId ? { id: `img-${startIndex + i}-${Date.now()}` } : {}),
+          }));
+          onImagesChange([...images, ...added]);
+          toast.success(`${added.length} image(s) added from library`);
+        }}
+      />
+
       {/* Drop Zone */}
       <div
         className={`
