@@ -7,6 +7,7 @@ import {
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
+import { normalizeModelName } from '@/lib/mockups';
 
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
@@ -755,8 +756,40 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'mockups.getMockupFileId') {
-          // Dummy mockup implementation for now
-          setData(null);
+          if (!args?.brand || !args?.model || !args?.sku) {
+            setData(null);
+          } else {
+            (async () => {
+              const urlFor = (m: any): string | null => {
+                if (m.r2Key) return `${R2_PUBLIC_DOMAIN}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}`;
+                return m.cloudinaryUrl ?? null;
+              };
+
+              const exact = await getDocs(query(
+                collection(db, 'mockups'),
+                where('brand', '==', args.brand),
+                where('model', '==', args.model),
+                where('sku', '==', args.sku),
+                limit(1)
+              ));
+              if (!exact.empty) {
+                setData(urlFor(exact.docs[0].data()));
+                return;
+              }
+
+              // Model names vary in spacing/punctuation between catalogs, so retry
+              // on brand+sku and compare normalized model names.
+              const wanted = normalizeModelName(args.model).toLowerCase();
+              const bySku = await getDocs(query(
+                collection(db, 'mockups'),
+                where('brand', '==', args.brand),
+                where('sku', '==', args.sku),
+                limit(500)
+              ));
+              const hit = bySku.docs.find(d => normalizeModelName(d.data().model || "").toLowerCase() === wanted);
+              setData(hit ? urlFor(hit.data()) : null);
+            })();
+          }
         }
         else if (path === 'supportedModels.getMetadata') {
           const q = query(collection(db, 'modelMetadata'), where('key', '==', 'current'), limit(1));
@@ -837,7 +870,18 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'supportedModels.listAll') {
           const q = query(collection(db, 'supportedModels'));
           unsubscribe = onSnapshot(q, (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+            let models = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            if (args?.category !== undefined) {
+              models = models.filter(m => m.category === args.category);
+            }
+            if (args?.brandName !== undefined) {
+              models = models.filter(m => m.brandName === args.brandName);
+            }
+            if (args?.isActive !== undefined) {
+              models = models.filter(m => m.isActive === args.isActive);
+            }
+            models.sort((a, b) => (b._creationTime ?? 0) - (a._creationTime ?? 0));
+            setData(models);
           });
         }
         else if (path === 'supportedModels.getBrands') {

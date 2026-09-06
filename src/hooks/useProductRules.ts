@@ -26,7 +26,9 @@ interface ProductLike {
   title?: string;
   // Accept any string from backend for backward compatibility
   gadgetCategory?: string | undefined;
+  productCategory?: string | undefined;
   finishType?: string | null;
+  finishTypeId?: string | null;
 }
 
 export function useProductRules(product: ProductLike | null | undefined) {
@@ -42,8 +44,11 @@ export function useProductRules(product: ProductLike | null | undefined) {
     const titleLower = (product.title || "").toLowerCase();
     const category = product.gadgetCategory;
 
-    // Determine if product is a skin (backend truth preferred)
-    const isSkinProduct = Boolean(product.finishType);
+    // Determine if product is a skin (backend truth preferred).
+    // finishType is legacy; products migrated to finishTypeId no longer carry it.
+    const isSkinProduct = Boolean(
+      product.finishType || product.finishTypeId || product.productCategory === "skin"
+    );
 
     // Accessories / non-device-specific exclusions
     const isAccessory =
