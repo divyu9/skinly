@@ -3965,6 +3965,41 @@ export function useMutation(apiRef: any) {
       }
       // ── end seoPages ──
 
+      // These namespaces have no collection of their own — they edit products in
+      // bulk, so the generic writer would aim at a collection that
+      // does not exist (and they carry no single document id anyway).
+      if (collectionName === 'productClassification' || collectionName === 'productCategories') {
+        const applyToProducts = async (ids: string[], patch: Record<string, any>) => {
+          const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
+          if (Object.keys(clean).length === 0) return { updated: 0 };
+          for (let i = 0; i < ids.length; i += 400) {
+            const batch = writeBatch(db);
+            ids.slice(i, i + 400).forEach(id => batch.update(doc(db, 'products', id), clean));
+            await batch.commit();
+          }
+          return { updated: ids.length };
+        };
+
+        if (actionName === 'bulkUpdateClassification') {
+          return applyToProducts(args.productIds || [], {
+            gadgetCategory: args.gadgetCategory,
+            finishTypeId: args.finishTypeId,
+          });
+        }
+        if (actionName === 'updateSingleProductClassification') {
+          return applyToProducts([args.productId], {
+            gadgetCategory: args.gadgetCategory,
+            finishTypeId: args.finishTypeId,
+          });
+        }
+        if (actionName === 'bulkUpdateProductCategories') {
+          return applyToProducts(args.productIds || [], { productCategory: args.category });
+        }
+        if (actionName === 'updateProductCategory') {
+          return applyToProducts([args.productId], { productCategory: args.category });
+        }
+      }
+
       // Variants live under api.products.* but are their own collection; without
       // this the generic writer would create variants as product documents.
       if (collectionName === 'products' && actionName.toLowerCase().includes('variant')) {
@@ -4061,21 +4096,39 @@ export function useMutation(apiRef: any) {
           throw new Error("Invalid or expired coupon code");
         }
 
-        // Note collectionId is absent on purpose — on a product that is a real
-        // field (which collection it belongs to), not the document id.
-        const ID_KEYS = [
-          'id', 'ruleId', 'sectionId', 'slideId', 'bannerId', 'videoId',
-          'productId', 'variantId', 'couponId', 'orderId', 'pageId', 'templateId',
-          'presetId', 'usecaseId', 'jobId', 'mockupId', 'modelId', 'categoryId',
+        // Which argument holds the document's own id depends on the collection:
+        // sectionId is the card's parent, but the section's own id. Resolve by
+        // collection first so a parent reference is never mistaken for the target.
+        const OWN_ID_BY_COLLECTION: Record<string, string> = {
+          products: 'productId',
+          variants: 'variantId',
+          coupons: 'couponId',
+          orders: 'orderId',
+          collections: 'collectionId',
+          homepageSections: 'sectionId',
+          homepageSectionCards: 'cardId',
+          heroSlides: 'slideId',
+          featureBanners: 'bannerId',
+          ugcVideos: 'videoId',
+          seoPages: 'pageId',
+          seoTemplates: 'templateId',
+          variantConsumptionPresets: 'presetId',
+        };
+        const FALLBACK_ID_KEYS = [
+          'id', 'cardId', 'ruleId', 'bugReportId', 'requestId', 'reviewId', 'slideId', 'bannerId', 'videoId', 'productId',
+          'variantId', 'couponId', 'orderId', 'pageId', 'templateId', 'presetId',
+          'usecaseId', 'jobId', 'mockupId', 'modelId', 'categoryId',
         ];
-        const idKey = ID_KEYS.find(k => args[k]);
+
+        const preferred = OWN_ID_BY_COLLECTION[targetCollection];
+        const idKey = (preferred && args[preferred]) ? preferred : FALLBACK_ID_KEYS.find(k => args[k]);
         if (!idKey) throw new Error(`ID required for update (${actionName})`);
         const targetId = args[idKey];
 
-        // Firestore rejects undefined outright, and these payloads are full of
-        // `value || undefined` for cleared optional fields.
+        // Strip only the id being written to — every other key is real data, and
+        // Firestore rejects undefined, which these payloads use for cleared fields.
         const data = Object.fromEntries(
-          Object.entries(args).filter(([k, v]) => !ID_KEYS.includes(k) && v !== undefined)
+          Object.entries(args).filter(([k, v]) => k !== idKey && v !== undefined)
         );
 
         await updateDoc(doc(db, targetCollection, targetId), data);

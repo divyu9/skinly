@@ -296,7 +296,8 @@ export function ExploreByGadgetTab() {
       }
       handleCloseDialog();
     } catch (error) {
-      toast.error("Failed to save card");
+      console.error("Card save failed:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to save card");
       console.error(error);
     } finally {
       setIsSaving(false);
