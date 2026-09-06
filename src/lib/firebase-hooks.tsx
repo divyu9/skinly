@@ -1402,7 +1402,8 @@ export function useQuery(apiRef: any, args?: any) {
 
             docs.sort((a, b) => (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
             const total = docs.length;
-            if (args?.limit) docs = docs.slice(0, args.limit);
+            const offset = args?.offset || 0;
+            if (args?.limit) docs = docs.slice(offset, offset + args.limit);
             setData({ items: docs, totalCount: total });
           });
         }

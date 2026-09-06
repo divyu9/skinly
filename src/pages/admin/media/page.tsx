@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -49,6 +49,8 @@ import {
   List,
   Filter,
   Plus,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from "lucide-react";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
@@ -81,6 +83,8 @@ function MediaLibraryContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<"all" | "image" | "video">("all");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 100;
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedItems, setSelectedItems] = useState<Set<Id<"mediaLibrary">>>(new Set());
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -107,8 +111,15 @@ function MediaLibraryContent() {
     folder: selectedFolder || undefined,
     mediaType: selectedType === "all" ? undefined : selectedType,
     searchQuery: searchQuery || undefined,
-    limit: 100,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
   });
+
+  // A filter change re-slices the whole set, so page 3 of the old result is
+  // meaningless against the new one.
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, selectedFolder, selectedType]);
   
   const mediaResult = rawMediaResult === undefined ? undefined : processMediaItems(rawMediaResult);
   
@@ -329,12 +340,44 @@ function MediaLibraryContent() {
         </div>
       )}
 
-      {/* Stats */}
-      {mediaResult && mediaResult.totalCount > 0 && (
-        <div className="text-sm text-muted-foreground text-center">
-          Showing {mediaResult.items.length} of {mediaResult.totalCount} items
-        </div>
-      )}
+      {/* Stats + pagination */}
+      {mediaResult && mediaResult.totalCount > 0 && (() => {
+        const totalPages = Math.max(1, Math.ceil(mediaResult.totalCount / PAGE_SIZE));
+        const first = page * PAGE_SIZE + 1;
+        const last = page * PAGE_SIZE + mediaResult.items.length;
+        return (
+          <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {first}–{last} of {mediaResult.totalCount} items
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                >
+                  <ChevronLeftIcon className="mr-1 size-4" />
+                  Previous
+                </Button>
+                <span className="px-2 text-sm text-muted-foreground">
+                  Page {page + 1} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                >
+                  Next
+                  <ChevronRightIcon className="ml-1 size-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Upload Dialog */}
       <UploadDialog
