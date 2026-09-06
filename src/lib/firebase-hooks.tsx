@@ -470,8 +470,37 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'orders.checkOrderInventory') {
-          // Mock inventory check for now
-          setData({ isAvailable: true, outOfStockItems: [] });
+          if (!args?.orderId) {
+            setData(null);
+          } else {
+            (async () => {
+              const osnap = await getDoc(doc(db, 'orders', args.orderId));
+              if (!osnap.exists()) {
+                setData({ available: false, unavailableItems: [] });
+                return;
+              }
+              const items: any[] = osnap.data().items || [];
+              const unavailableItems: any[] = [];
+              for (const item of items) {
+                const vsnap = await getDocs(query(
+                  collection(db, 'variants'),
+                  where('productId', '==', item.productId),
+                  where('title', '==', item.variant),
+                  limit(1)
+                ));
+                const available = vsnap.empty ? 0 : (vsnap.docs[0].data().inventoryQuantity || 0);
+                if (available < item.quantity) {
+                  unavailableItems.push({
+                    productTitle: item.productTitle,
+                    variant: item.variant,
+                    requested: item.quantity,
+                    available,
+                  });
+                }
+              }
+              setData({ available: unavailableItems.length === 0, unavailableItems });
+            })();
+          }
         }
         else if (path === 'coupons.getActiveCoupons' || path === 'coupons.getAllCoupons') {
           let q = query(collection(db, 'coupons'));
@@ -740,7 +769,91 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'cod.isCodAvailable') {
-          setData(true);
+          (async () => {
+            const cartItems: any[] = Array.isArray(args?.cartItems) ? args.cartItems : [];
+            const totalAmount: number = args?.totalAmount ?? 0;
+
+            const ssnap = await getDocs(query(collection(db, 'codSettings'), limit(1)));
+            const s: any = ssnap.empty ? null : ssnap.docs[0].data();
+            const deny = (reason: string, isMixedCart = false) => setData({
+              available: false, codFee: 0, prepaidAmount: 0, codAmount: 0,
+              reason, isMixedCart, showOption: s?.showCodOnPaymentPage ?? true,
+            });
+
+            if (!s || !s.enabled) {
+              deny("COD is not enabled");
+              return;
+            }
+
+            const productIdsOn = s.productIdsEnabled && (s.productIds?.length ?? 0) > 0;
+            const collectionIdsOn = s.collectionIdsEnabled && (s.collectionIds?.length ?? 0) > 0;
+            const variantIdsOn = s.variantIdsEnabled && (s.variantIds?.length ?? 0) > 0;
+            const hasItemLevelConditions = productIdsOn || collectionIdsOn || variantIdsOn;
+
+            const eligibility = await Promise.all(cartItems.map(async (item) => {
+              const checks: boolean[] = [];
+              if (productIdsOn) checks.push(s.productIds.includes(item.productId));
+              if (collectionIdsOn) {
+                const p = await getDoc(doc(db, 'products', item.productId));
+                const pdata: any = p.exists() ? p.data() : null;
+                if (!pdata) {
+                  checks.push(false);
+                } else if (pdata.collectionId && s.collectionIds.includes(pdata.collectionId)) {
+                  checks.push(true);
+                } else {
+                  const cp = await getDocs(query(collection(db, 'collectionProducts'),
+                    where('productId', '==', item.productId)));
+                  checks.push(cp.docs.some(d => s.collectionIds.includes(d.data().collectionId)));
+                }
+              }
+              if (variantIdsOn) {
+                const v = await getDocs(query(collection(db, 'variants'),
+                  where('productId', '==', item.productId), where('title', '==', item.variant), limit(1)));
+                checks.push(!v.empty && s.variantIds.includes(v.docs[0].id));
+              }
+              if (checks.length === 0) return true;
+              return s.matchMode === "ALL" ? checks.every(Boolean) : checks.some(Boolean);
+            }));
+
+            const eligibleCount = eligibility.filter(Boolean).length;
+            const isMixedCart = eligibleCount > 0 && eligibleCount < cartItems.length;
+            if (isMixedCart && !s.allowMixedCartCod) {
+              deny("COD not available for mixed product orders", true);
+              return;
+            }
+
+            const totalProductCount = cartItems.reduce((n, i) => n + (i.quantity || 0), 0);
+            const conditions: boolean[] = [];
+            if (s.minOrderAmountEnabled) conditions.push(totalAmount >= s.minOrderAmount);
+            if (s.maxOrderAmountEnabled) conditions.push(totalAmount <= s.maxOrderAmount);
+            if (s.minProductCountEnabled) conditions.push(totalProductCount >= s.minProductCount);
+            if (s.maxProductCountEnabled) conditions.push(totalProductCount <= s.maxProductCount);
+
+            let passed: boolean;
+            if (conditions.length === 0 && eligibleCount === 0 && !hasItemLevelConditions) passed = true;
+            else if (hasItemLevelConditions && eligibleCount === 0) passed = false;
+            else if (eligibleCount === 0) passed = conditions.every(Boolean);
+            else passed = conditions.length === 0 ? true : conditions.every(Boolean);
+
+            if (!passed) {
+              let reason = "Order does not meet COD eligibility criteria";
+              if (hasItemLevelConditions && eligibleCount === 0) reason = "COD not available for the selected products";
+              else if (s.minOrderAmountEnabled && totalAmount < s.minOrderAmount) reason = `Minimum order amount ₹${s.minOrderAmount} required for COD`;
+              else if (s.maxOrderAmountEnabled && totalAmount > s.maxOrderAmount) reason = `Maximum order amount ₹${s.maxOrderAmount} exceeded for COD`;
+              deny(reason, isMixedCart);
+              return;
+            }
+
+            const codFee = s.codFeeType === "fixed" ? (s.codFeeValue || 0) : (totalAmount * (s.codFeeValue || 0)) / 100;
+            let prepaidAmount = 0;
+            let codAmount = totalAmount + codFee;
+            if (s.partialCodEnabled) {
+              prepaidAmount = s.prepaidType === "fixed" ? (s.prepaidValue || 0) : (totalAmount * (s.prepaidValue || 0)) / 100;
+              codAmount = totalAmount + codFee - prepaidAmount;
+            }
+
+            setData({ available: true, codFee, prepaidAmount, codAmount, reason: "", isMixedCart, showOption: true });
+          })();
         }
         else if (path === 'wallet.calculateMaxWalletUsage') {
           setData(0);
@@ -756,13 +869,39 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'cart.checkCartItemsStock') {
-          // Provide basic mocked stock status array structure expected by the cart page
-          setData(args?.cartItems?.map((item: any) => ({
-            productId: item.productId,
-            variant: item.variant,
-            isOutOfStock: false,
-            availableQuantity: 99
-          })) || []);
+          const cartItems: any[] = Array.isArray(args?.cartItems) ? args.cartItems : [];
+          if (cartItems.length === 0) {
+            setData([]);
+          } else {
+            (async () => {
+              const status = await Promise.all(cartItems.map(async (item) => {
+                try {
+                  const vsnap = await getDocs(query(
+                    collection(db, 'variants'),
+                    where('productId', '==', item.productId),
+                    where('title', '==', item.variant),
+                    limit(1)
+                  ));
+                  if (vsnap.empty) {
+                    return { productId: item.productId, variant: item.variant, isOutOfStock: true, availableQuantity: 0 };
+                  }
+                  const available = vsnap.docs[0].data().inventoryQuantity || 0;
+                  return {
+                    productId: item.productId,
+                    variant: item.variant,
+                    isOutOfStock: available <= 0 || available < item.quantity,
+                    availableQuantity: available,
+                    requestedQuantity: item.quantity,
+                  };
+                } catch (e) {
+                  console.error(`stock check failed for ${item.productId}:`, e);
+                  // Never block checkout because the lookup itself failed
+                  return { productId: item.productId, variant: item.variant, isOutOfStock: false, availableQuantity: 999 };
+                }
+              }));
+              setData(status);
+            })();
+          }
         }
         else if (path === 'products.getProductVariants') {
           if (!args?.productId) {
