@@ -13,6 +13,25 @@ const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
 
+// Mockups for 28 models (every iPhone before the 17, plus Nothing Phone 3/3A and
+// CMF Phone 1) were lost with the Cloudinary account, so those rows carry a dead
+// cloudinaryUrl and no r2Key. Those models fall back to the hero model's mockup
+// for the same design rather than rendering a broken image.
+const HERO_MOCKUP_BRAND = "Apple";
+const HERO_MOCKUP_MODEL = "iPhone 17 Pro Max";
+
+// Only r2Key-backed rows are usable; a bare cloudinaryUrl no longer resolves.
+const mockupUrlFrom = (m: any): string | null =>
+  m?.r2Key ? `${R2_PUBLIC_DOMAIN}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}` : null;
+
+// SKUs differ by suffix between catalogs, e.g. R-01 vs R-01-PH.
+const skuMatches = (mockupSku: string, target: string): boolean => {
+  const a = (mockupSku || "").toUpperCase();
+  const b = (target || "").toUpperCase();
+  if (!a || !b) return false;
+  return a === b || a.startsWith(b + "-") || b.startsWith(a + "-");
+};
+
 // The mockups collection holds ~100k docs, so unique-SKU counting reads a
 // bounded sample rather than the whole collection (mirrors the Convex original).
 const MOCKUP_SAMPLE_LIMIT = 15000;
@@ -760,11 +779,6 @@ export function useQuery(apiRef: any, args?: any) {
             setData(null);
           } else {
             (async () => {
-              const urlFor = (m: any): string | null => {
-                if (m.r2Key) return `${R2_PUBLIC_DOMAIN}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}`;
-                return m.cloudinaryUrl ?? null;
-              };
-
               const exact = await getDocs(query(
                 collection(db, 'mockups'),
                 where('brand', '==', args.brand),
@@ -772,8 +786,9 @@ export function useQuery(apiRef: any, args?: any) {
                 where('sku', '==', args.sku),
                 limit(1)
               ));
-              if (!exact.empty) {
-                setData(urlFor(exact.docs[0].data()));
+              const exactUrl = exact.empty ? null : mockupUrlFrom(exact.docs[0].data());
+              if (exactUrl) {
+                setData(exactUrl);
                 return;
               }
 
@@ -786,8 +801,22 @@ export function useQuery(apiRef: any, args?: any) {
                 where('sku', '==', args.sku),
                 limit(500)
               ));
-              const hit = bySku.docs.find(d => normalizeModelName(d.data().model || "").toLowerCase() === wanted);
-              setData(hit ? urlFor(hit.data()) : null);
+              const hit = bySku.docs.find(d =>
+                normalizeModelName(d.data().model || "").toLowerCase() === wanted && mockupUrlFrom(d.data())
+              );
+              if (hit) {
+                setData(mockupUrlFrom(hit.data()));
+                return;
+              }
+
+              const hero = await getDocs(query(
+                collection(db, 'mockups'),
+                where('brand', '==', HERO_MOCKUP_BRAND),
+                where('model', '==', HERO_MOCKUP_MODEL),
+                where('sku', '==', args.sku),
+                limit(1)
+              ));
+              setData(hero.empty ? null : mockupUrlFrom(hero.docs[0].data()));
             })();
           }
         }
@@ -1543,22 +1572,32 @@ export function useQuery(apiRef: any, args?: any) {
               where('brand', '==', args.brand),
               where('model', '==', args.model)
             );
-            unsubscribe = onSnapshot(q, (snap) => {
+            unsubscribe = onSnapshot(q, async (snap) => {
               const result: Record<string, string> = {};
-              snap.docs.forEach(d => {
-                const m: any = d.data();
-                const mockupSku = (m.sku || "").toUpperCase();
-                if (!mockupSku) return;
-                for (const target of requestedSkus) {
-                  const t = target.toUpperCase();
-                  // Bidirectional prefix match: R-01 <-> R-01-PH
-                  if (mockupSku !== t && !mockupSku.startsWith(t + "-") && !t.startsWith(mockupSku + "-")) continue;
-                  const url = m.r2Key
-                    ? `${R2_PUBLIC_DOMAIN}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}`
-                    : m.cloudinaryUrl;
-                  if (url) result[target] = url;
-                }
-              });
+              const collect = (docs: any[]) => {
+                docs.forEach(d => {
+                  const m: any = d.data();
+                  const url = mockupUrlFrom(m);
+                  if (!url) return;
+                  for (const target of requestedSkus) {
+                    if (!result[target] && skuMatches(m.sku, target)) result[target] = url;
+                  }
+                });
+              };
+
+              collect(snap.docs);
+
+              const unresolved = requestedSkus.filter(s => !result[s]);
+              if (unresolved.length > 0 &&
+                  !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
+                const heroSnap = await getDocs(query(
+                  collection(db, 'mockups'),
+                  where('brand', '==', HERO_MOCKUP_BRAND),
+                  where('model', '==', HERO_MOCKUP_MODEL)
+                ));
+                collect(heroSnap.docs);
+              }
+
               setData({ mockups: result, cursor: "", isDone: true });
             });
           }
