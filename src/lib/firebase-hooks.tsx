@@ -466,10 +466,21 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'abandonedCartSettings.getSettings') {
-          setData({
-            enabled: false,
-            reminderIntervals: [2, 24],
-            template: "You left something behind!"
+          // Defaults mirror the Cloud Function's, and enabled stays false until
+          // an admin turns it on.
+          unsubscribe = onSnapshot(doc(db, 'abandonedCartSettings', 'default'), (snap) => {
+            setData({
+              enabled: false,
+              delayHours: 4,
+              secondReminderEnabled: false,
+              secondReminderDelayHours: 24,
+              dailyEmailCap: 200,
+              couponPrefix: "COMEBACK",
+              couponDiscountType: "percentage",
+              couponDiscountValue: 10,
+              couponValidityDays: 7,
+              ...(snap.exists() ? snap.data() : {}),
+            });
           });
         }
         else if (path === 'abandonedCarts.getAllAbandonedCarts') {
@@ -3120,6 +3131,14 @@ export function useMutation(apiRef: any) {
         return res.data;
       }
 
+      if (path === 'abandonedCartSettings.updateSettings') {
+        await setDoc(doc(db, 'abandonedCartSettings', 'default'), {
+          ...args,
+          updatedAt: Date.now(),
+        }, { merge: true });
+        return { success: true };
+      }
+
       if (path === 'whatsappConsent.updateMyConsent') {
         const { getAuth } = await import('firebase/auth');
         const user = getAuth().currentUser;
@@ -3571,6 +3590,20 @@ export function useMutation(apiRef: any) {
         return { success: true };
       }
       
+      if (collectionName === 'abandonedCartsActions') {
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const fns = getFunctions();
+        // Scanning is the cron's job; the dashboard only triggers a pass or
+        // retires a single cart, both of which respect the per-cart cap.
+        if (actionName === 'processAbandonedCarts' || actionName === 'sendAbandonedCartReminder') {
+          const res: any = await httpsCallable(fns, 'runAbandonedCartReminders')({});
+          return res.data;
+        }
+        if (actionName === 'scanAndTrackAbandonedCarts') {
+          return { success: true, scanned: 0, note: "Carts are tracked at checkout; no scan needed." };
+        }
+      }
+
       if (actionName === 'generateUploadUrl' || actionName === 'generateImageUploadUrl') {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const functions = getFunctions();

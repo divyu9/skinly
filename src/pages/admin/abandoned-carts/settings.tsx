@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select.tsx";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { SettingsIcon, ClockIcon, TicketIcon, CalendarIcon } from "lucide-react";
 
 export function AbandonedCartSettings() {
@@ -22,6 +23,10 @@ export function AbandonedCartSettings() {
   const [saving, setSaving] = useState(false);
 
   // Local form state
+  const [enabled, setEnabled] = useState<boolean>(false);
+  const [secondReminderEnabled, setSecondReminderEnabled] = useState<boolean>(false);
+  const [secondReminderDelayHours, setSecondReminderDelayHours] = useState<number>(24);
+  const [dailyEmailCap, setDailyEmailCap] = useState<number>(200);
   const [delayHours, setDelayHours] = useState<number>(1);
   const [couponDiscountType, setCouponDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [couponDiscountValue, setCouponDiscountValue] = useState<number>(15);
@@ -31,6 +36,10 @@ export function AbandonedCartSettings() {
   // Initialize form when settings load
   useEffect(() => {
     if (settings) {
+      setEnabled(settings.enabled ?? false);
+      setSecondReminderEnabled(settings.secondReminderEnabled ?? false);
+      setSecondReminderDelayHours(settings.secondReminderDelayHours ?? 24);
+      setDailyEmailCap(settings.dailyEmailCap ?? 200);
       setDelayHours(settings.delayHours);
       setCouponDiscountType(settings.couponDiscountType as "percentage" | "fixed");
       setCouponDiscountValue(settings.couponDiscountValue);
@@ -43,6 +52,10 @@ export function AbandonedCartSettings() {
     setSaving(true);
     try {
       await updateSettings({
+        enabled,
+        secondReminderEnabled,
+        secondReminderDelayHours,
+        dailyEmailCap,
         delayHours,
         couponDiscountType,
         couponDiscountValue,
@@ -108,6 +121,75 @@ export function AbandonedCartSettings() {
               />
               <p className="text-xs text-muted-foreground">
                 Wait {delayHours} hour{delayHours !== 1 ? "s" : ""} after cart abandonment before sending reminder
+              </p>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="secondReminderEnabled">Send a second reminder</Label>
+                <p className="text-xs text-muted-foreground">
+                  A cart is emailed at most twice, ever — never again after that.
+                </p>
+              </div>
+              <Switch
+                id="secondReminderEnabled"
+                checked={secondReminderEnabled}
+                onCheckedChange={setSecondReminderEnabled}
+              />
+            </div>
+
+            {secondReminderEnabled && (
+              <div className="space-y-2">
+                <Label htmlFor="secondReminderDelayHours">Second reminder after (hours)</Label>
+                <Input
+                  id="secondReminderDelayHours"
+                  type="number"
+                  min={1}
+                  max={336}
+                  value={secondReminderDelayHours}
+                  onChange={(e) => setSecondReminderDelayHours(Number(e.target.value))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Counted from when the first reminder was actually sent, not from abandonment
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <SettingsIcon className="h-5 w-5" />
+              Sending
+            </CardTitle>
+            <CardDescription>
+              Reminders stay off until you switch them on here
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+              <div className="space-y-1">
+                <Label htmlFor="enabled">Abandoned cart emails</Label>
+                <p className="text-xs text-muted-foreground">
+                  Turning this off stops all sending immediately
+                </p>
+              </div>
+              <Switch id="enabled" checked={enabled} onCheckedChange={setEnabled} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dailyEmailCap">Daily email cap</Label>
+              <Input
+                id="dailyEmailCap"
+                type="number"
+                min={1}
+                max={5000}
+                value={dailyEmailCap}
+                onChange={(e) => setDailyEmailCap(Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Hard ceiling across all carts per day, as a safety net
               </p>
             </div>
           </CardContent>
