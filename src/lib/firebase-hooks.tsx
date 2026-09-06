@@ -1623,6 +1623,247 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'rollsManagement.getStockLevels') {
           setData([]);
         }
+        else if (path === 'modelRequests.getAllModelRequests') {
+          unsubscribe = onSnapshot(collection(db, 'modelRequests'), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any))
+              .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0))));
+        }
+        else if (path === 'homepage.getAllCategoryDisplaySettings') {
+          unsubscribe = onSnapshot(collection(db, 'categoryDisplaySettings'), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any))
+              .sort((a, b) => (a.order || 0) - (b.order || 0))));
+        }
+        else if (path === 'products.getAllVariants') {
+          unsubscribe = onSnapshot(query(collection(db, 'variants'), limit(2000)), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
+        }
+        else if (path === 'whatsapp.getAllTemplates') {
+          unsubscribe = onSnapshot(collection(db, 'whatsappTemplates'), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
+        }
+        else if (path === 'uploadJobs.getAllUploadJobs' || path === 'uploadJobs.getActiveUploadJobs') {
+          unsubscribe = onSnapshot(collection(db, 'uploadJobs'), (snap) => {
+            let jobs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            if (path === 'uploadJobs.getActiveUploadJobs') {
+              jobs = jobs.filter(j => j.status === 'pending' || j.status === 'processing');
+            }
+            setData(jobs.sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0)));
+          });
+        }
+        else if (path === 'googleDriveImportPublic.getAllImportJobs' || path === 'googleDriveImportPublic.getActiveImportJobs') {
+          unsubscribe = onSnapshot(collection(db, 'googleDriveImportJobs'), (snap) => {
+            let jobs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            if (path.endsWith('getActiveImportJobs')) {
+              jobs = jobs.filter(j => j.status === 'pending' || j.status === 'processing');
+            }
+            setData(jobs.sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0)));
+          });
+        }
+        else if (path === 'collections.getCollectionProducts' || path === 'collections.previewCollectionProducts') {
+          if (!args?.collectionId) {
+            setData([]);
+          } else {
+            (async () => {
+              const links = await getDocs(query(collection(db, 'collectionProducts'),
+                where('collectionId', '==', args.collectionId)));
+              const ids = links.docs.map(d => d.data().productId);
+              const products = await Promise.all(ids.map(async (id: string) => {
+                const p = await getDoc(doc(db, 'products', id));
+                return p.exists() ? { _id: p.id, ...p.data() } : null;
+              }));
+              setData(products.filter(Boolean));
+            })();
+          }
+        }
+        else if (path === 'coupons.getEligibleProducts') {
+          unsubscribe = onSnapshot(query(collection(db, 'products'), where('status', '==', 'active')), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
+        }
+        else if (path === 'migrateGst.getOrdersWithoutGst') {
+          unsubscribe = onSnapshot(query(collection(db, 'orders'), limit(500)), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any))
+              .filter(o => o.gstAmount === undefined || o.gstAmount === null)));
+        }
+        else if (path === 'whatsappDebugLogs.getErrorTypes' || path === 'whatsappDebugLogs.getUsecasesWithLogs') {
+          const field = path.endsWith('getErrorTypes') ? 'errorType' : 'usecaseId';
+          unsubscribe = onSnapshot(collection(db, 'whatsappDebugLogs'), (snap) => {
+            const values = new Set<string>();
+            snap.docs.forEach(d => {
+              const v = (d.data() as any)[field];
+              if (v) values.add(v);
+            });
+            setData(Array.from(values).sort());
+          });
+        }
+        else if (path === 'mockups.getMockupsCount') {
+          (async () => {
+            const c = await getCountFromServer(collection(db, 'mockups'));
+            setData(c.data().count);
+          })();
+        }
+        else if (path === 'mockups.getRecentMockups') {
+          unsubscribe = onSnapshot(collection(db, 'mockups'), (snap) => {
+            setData(snap.docs
+              .map(d => ({ _id: d.id, ...d.data() } as any))
+              .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0))
+              .slice(0, args?.limit || 20));
+          });
+        }
+        else if (path === 'mockups.getMissingMockupsStats' || path === 'mockups.getMissingMockups') {
+          const category = args?.category || "phone";
+          (async () => {
+            const models = (await getDocs(query(collection(db, 'supportedModels'),
+              where('category', '==', category)))).docs
+              .map(d => ({ _id: d.id, ...d.data() } as any))
+              .filter(m => m.isActive);
+
+            const msnap = await getDocs(query(collection(db, 'mockups'), limit(3000)));
+            const byModelId = new Set<string>();
+            const byBrandModel = new Set<string>();
+            msnap.docs.forEach(d => {
+              const m: any = d.data();
+              if (m.supportedModelId) byModelId.add(m.supportedModelId);
+              if (m.brand && m.model) byBrandModel.add(`${m.brand}|${m.model}`);
+            });
+
+            const without = models.filter(m =>
+              !byModelId.has(m._id) && !byBrandModel.has(`${m.brandName}|${m.modelName}`));
+
+            if (path === 'mockups.getMissingMockupsStats') {
+              setData({
+                totalMissingCombinations: without.length,
+                modelsAffected: models.length,
+                brandsAffected: new Set(models.map(m => m.brandName)).size,
+                modelsWithMockups: models.length - without.length,
+                modelsWithoutMockups: without.length,
+                totalSKUs: models.length - without.length,
+              });
+            } else {
+              const pageSize = args?.limit || 100;
+              setData({
+                results: without.slice(0, pageSize),
+                totalAvailable: without.length,
+                hasMore: without.length > pageSize,
+              });
+            }
+          })();
+        }
+        else if (path === 'cod.getCodSettings') {
+          unsubscribe = onSnapshot(collection(db, 'codSettings'), (snap) => {
+            setData(snap.empty
+              ? {
+                  enabled: false, codFeeType: "fixed", codFeeValue: 0,
+                  partialCodEnabled: false, prepaidType: "fixed", prepaidValue: 0,
+                  minOrderAmountEnabled: false, minOrderAmount: 0,
+                  maxOrderAmountEnabled: false, maxOrderAmount: 0,
+                  minProductCountEnabled: false, minProductCount: 0,
+                  maxProductCountEnabled: false, maxProductCount: 0,
+                  productIdsEnabled: false, productIds: [],
+                  collectionIdsEnabled: false, collectionIds: [],
+                  variantIdsEnabled: false, variantIds: [],
+                  matchMode: "ALL", allowMixedCartCod: false,
+                  showCodOnPaymentPage: true, hideWhenIneligible: false, displayRules: [],
+                }
+              : { _id: snap.docs[0].id, ...snap.docs[0].data() });
+          });
+        }
+        else if (path === 'coupons.getCouponUsageStats') {
+          unsubscribe = onSnapshot(
+            query(collection(db, 'couponUsage'), where('couponId', '==', args?.couponId ?? '')),
+            (snap) => {
+              const usages = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+              setData({
+                totalUsages: usages.length,
+                uniqueUsers: new Set(usages.map(u => u.userId).filter(Boolean)).size,
+                totalDiscount: usages.reduce((n, u) => n + (u.discountAmount || 0), 0),
+                recentUsages: usages
+                  .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0))
+                  .slice(0, 10),
+              });
+            }
+          );
+        }
+        else if (path === 'migrateCloudinaryToR2.getMigrationStatus') {
+          (async () => {
+            const onR2 = (list: any[], field: string) =>
+              list.filter(x => typeof x[field] === 'string' && x[field].includes('r2.dev')).length;
+            const [p, m, ml] = await Promise.all([
+              getDocs(query(collection(db, 'products'), limit(2000))),
+              getDocs(query(collection(db, 'mockups'), limit(3000))),
+              getDocs(collection(db, 'mediaLibrary')),
+            ]);
+            const products = p.docs.map(d => d.data() as any);
+            setData({
+              products: {
+                total: products.length,
+                migrated: products.filter(x => (x.images || []).some((i: any) => (i.url || "").includes('r2.dev'))).length,
+              },
+              mockups: {
+                total: m.size,
+                migrated: m.docs.filter(d => !!d.data().r2Key).length,
+              },
+              mediaLibrary: {
+                total: ml.size,
+                migrated: onR2(ml.docs.map(d => d.data() as any), 'url'),
+              },
+              siteAssets: { total: 0, migrated: 0 },
+            });
+          })();
+        }
+        else if (path === 'wallet.getUserWalletDetails') {
+          if (!args?.userId) {
+            setData(null);
+          } else {
+            (async () => {
+              const u = await getDoc(doc(db, 'users', args.userId));
+              const t = await getDocs(query(collection(db, 'walletTransactions'), where('userId', '==', args.userId)));
+              const txns = t.docs
+                .map(d => ({ _id: d.id, ...d.data() } as any))
+                .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0));
+              setData({
+                user: u.exists() ? { _id: u.id, ...u.data() } : null,
+                stats: {
+                  totalCredited: txns.filter(x => x.amount > 0).reduce((n, x) => n + x.amount, 0),
+                  totalDebited: txns.filter(x => x.amount < 0).reduce((n, x) => n + Math.abs(x.amount), 0),
+                  transactionCount: txns.length,
+                },
+                recentTransactions: txns.slice(0, 20),
+              });
+            })();
+          }
+        }
+        else if (path === 'whatsapp.getUsecaseWithTemplate') {
+          (async () => {
+            const u = args?.usecaseId ? await getDoc(doc(db, 'whatsappUsecases', args.usecaseId)) : null;
+            const usecase = u?.exists() ? { _id: u.id, ...u.data() } as any : null;
+            let template = null;
+            if (usecase?.templateId) {
+              const t = await getDoc(doc(db, 'whatsappTemplates', usecase.templateId));
+              if (t.exists()) template = { _id: t.id, ...t.data() };
+            }
+            setData({ usecase, template });
+          })();
+        }
+        else if (path === 'whatsappDebugLogs.getDebugLog') {
+          if (!args?.logId) {
+            setData({ log: null });
+          } else {
+            unsubscribe = onSnapshot(doc(db, 'whatsappDebugLogs', args.logId), (snap) =>
+              setData({ log: snap.exists() ? { _id: snap.id, ...snap.data() } : null }));
+          }
+        }
+        else if (path === 'whatsappDebugLogs.getDebugStats') {
+          unsubscribe = onSnapshot(collection(db, 'whatsappDebugLogs'), (snap) => {
+            const logs = snap.docs.map(d => d.data() as any);
+            const success = logs.filter(l => l.success === true || l.status === 'success').length;
+            setData({
+              totalLogs: logs.length,
+              successLogs: success,
+              failedLogs: logs.length - success,
+              successRate: logs.length ? Math.round((success / logs.length) * 100) : 0,
+            });
+          });
+        }
         else if (path === 'rollsManagement.getGadgetConsumption') {
           unsubscribe = onSnapshot(collection(db, 'gadgetConsumption'), (snap) =>
             setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
