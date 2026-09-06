@@ -47,10 +47,17 @@ const resolveUserDocId = async (user: { uid: string; email: string | null }): Pr
   if (cached) return cached;
 
   let resolved = user.uid;
-  const byUid = await getDoc(doc(db, 'users', user.uid));
-  if (!byUid.exists() && user.email) {
-    const byEmail = await getDocs(query(collection(db, 'users'), where('email', '==', user.email), limit(1)));
-    if (!byEmail.empty) resolved = byEmail.docs[0].id;
+  try {
+    const byUid = await getDoc(doc(db, 'users', user.uid));
+    if (!byUid.exists() && user.email) {
+      // Rules only let a user read their own document, so this collection query
+      // is denied for non-admins. Falling back to the auth uid is correct there
+      // — never let it take the page down.
+      const byEmail = await getDocs(query(collection(db, 'users'), where('email', '==', user.email), limit(1)));
+      if (!byEmail.empty) resolved = byEmail.docs[0].id;
+    }
+  } catch {
+    resolved = user.uid;
   }
   userDocIdCache.set(user.uid, resolved);
   return resolved;
@@ -1733,7 +1740,16 @@ export function useQuery(apiRef: any, args?: any) {
           setData([]);
         }
         else if (path === 'productCategories.getCategoryStats') {
-          setData({ total: 0, byCategory: {} });
+          // Flat map: the page indexes it by category slug and reads .uncategorized.
+          unsubscribe = onSnapshot(collection(db, 'products'), (snap) => {
+            const stats: Record<string, number> = { total: snap.size, uncategorized: 0 };
+            snap.docs.forEach(d => {
+              const slug = d.data().productCategory;
+              if (!slug) stats.uncategorized++;
+              else stats[slug] = (stats[slug] || 0) + 1;
+            });
+            setData(stats);
+          });
         }
         else if (path === 'supportedModels.getModelInfo') {
           const q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brand), where('modelName', '==', args.model), limit(1));
