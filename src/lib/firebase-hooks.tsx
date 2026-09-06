@@ -1905,7 +1905,10 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'rollsManagement.getLowStockAlerts') {
           const ROLL_WIDTH_CM = 29.5;
-          unsubscribe = onSnapshot(collection(db, 'rollInventory'), async (snap) => {
+          // Gadget consumption is edited on the same tab and feeds the estimate,
+          // so alerts have to recompute when either side changes.
+          const recompute = async () => {
+            const snap = await getDocs(collection(db, 'rollInventory'));
             const gsnap = await getDocs(collection(db, 'gadgetConsumption'));
             const phone = gsnap.docs
               .map(d => d.data() as any)
@@ -1932,7 +1935,11 @@ export function useQuery(apiRef: any, args?: any) {
               .sort((a, b) => a.estimatedUnits - b.estimatedUnits);
 
             setData(alerts);
-          });
+          };
+
+          const unsubRolls = onSnapshot(collection(db, 'rollInventory'), () => { void recompute(); });
+          const unsubGadgets = onSnapshot(collection(db, 'gadgetConsumption'), () => { void recompute(); });
+          unsubscribe = () => { unsubRolls(); unsubGadgets(); };
         }
         else if (path === 'products.getProduct' || path === 'products.getProductBySlug') {
           const fetchProduct = async () => {
@@ -1974,7 +1981,10 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'productCategories.listAllCategories') {
           // Returns an object with per-category counts, not a plain list.
-          unsubscribe = onSnapshot(collection(db, 'productCategoriesConfig'), async (snap) => {
+          // Assigning a product to a category changes products, not the config,
+          // so both sides have to refresh the counts.
+          const recompute = async () => {
+            const snap = await getDocs(collection(db, 'productCategoriesConfig'));
             const configs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
             const products = await getDocs(collection(db, 'products'));
 
@@ -1997,7 +2007,11 @@ export function useQuery(apiRef: any, args?: any) {
               uncategorizedCount: counts["uncategorized"] || 0,
               totalProducts: products.size,
             });
-          });
+          };
+
+          const unsubConfigs = onSnapshot(collection(db, 'productCategoriesConfig'), () => { void recompute(); });
+          const unsubProducts = onSnapshot(collection(db, 'products'), () => { void recompute(); });
+          unsubscribe = () => { unsubConfigs(); unsubProducts(); };
         }
         else if (path === 'productCategories.listAllWithCounts' || path === 'productCategories.listAll' || path === 'productCategories.listActive') {
           const q = query(collection(db, 'productCategoriesConfig'));
@@ -2039,9 +2053,11 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'productClassification.getClassificationStats') {
-          unsubscribe = onSnapshot(
-            query(collection(db, 'products'), where('status', '==', 'active')),
-            async (snap) => {
+          // Finish types are edited on this same page, so a change there has to
+          // refresh the cards too — watch both sides, not just products.
+          const recompute = async () => {
+            const snap = await getDocs(query(collection(db, 'products'), where('status', '==', 'active')));
+            {
               const products = snap.docs.map(d => d.data() as any);
               const classified = products.filter(p => p.gadgetCategory && p.finishTypeId).length;
 
@@ -2068,7 +2084,11 @@ export function useQuery(apiRef: any, args?: any) {
                 totalFinishTypes: fsnap.size,
               });
             }
-          );
+          };
+
+          const unsubProducts = onSnapshot(collection(db, 'products'), () => { void recompute(); });
+          const unsubFinishes = onSnapshot(collection(db, 'finishTypes'), () => { void recompute(); });
+          unsubscribe = () => { unsubProducts(); unsubFinishes(); };
         }
         else if (path === 'productClassification.previewAutoClassification') {
           setData({ results: [] });
@@ -2714,17 +2734,17 @@ export function useQuery(apiRef: any, args?: any) {
           }
         }
         else if (path === 'variantConsumptionPresets.listAll') {
-          const q = query(collection(db, 'gadgetTypes'));
-          unsubscribe = onSnapshot(q, async (snap) => {
-            const gadgetTypes = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            const presetsSnap = await getDocs(collection(db, 'variantConsumptionPresets'));
-            const presets = presetsSnap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            
-            const result = gadgetTypes.map(gt => ({
-              gadgetType: gt,
-              presets: presets.filter((p: any) => p.gadgetTypeId === gt._id)
+          // Watch the presets, not the gadget types: presets are what this page
+          // edits, and a listener on the unchanging side never re-fires, so the
+          // toggle wrote successfully but the row kept rendering the old value.
+          unsubscribe = onSnapshot(collection(db, 'variantConsumptionPresets'), async (snap) => {
+            const presets = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            const gadgetSnap = await getDocs(collection(db, 'gadgetTypes'));
+
+            setData(gadgetSnap.docs.map(d => {
+              const gt = { _id: d.id, ...d.data() };
+              return { gadgetType: gt, presets: presets.filter((p: any) => p.gadgetTypeId === gt._id) };
             }));
-            setData(result);
           });
         }
         else if (path === 'phoneCollectionsQueries.getPhoneCollectionsWithCounts') {
