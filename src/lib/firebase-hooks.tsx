@@ -1623,6 +1623,76 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'rollsManagement.getStockLevels') {
           setData([]);
         }
+        else if (path === 'rollsManagement.getGadgetConsumption') {
+          unsubscribe = onSnapshot(collection(db, 'gadgetConsumption'), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
+        }
+        else if (path === 'rollsManagement.getRollInventory') {
+          unsubscribe = onSnapshot(collection(db, 'rollInventory'), (snap) =>
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
+        }
+        else if (path === 'rollsManagement.getProductsByRNumber') {
+          // {groups, unmapped} — the tab reads Object.keys(groups) directly, so
+          // an array here takes the whole page down.
+          unsubscribe = onSnapshot(collection(db, 'variants'), async (vsnap) => {
+            const psnap = await getDocs(collection(db, 'products'));
+            const products = new Map(psnap.docs.map(d => [d.id, d.data() as any]));
+
+            const groups: Record<string, any[]> = {};
+            const unmapped: any[] = [];
+            vsnap.docs.forEach(d => {
+              const v: any = d.data();
+              const product = products.get(v.productId);
+              if (!product) return;
+              const item = {
+                variantId: d.id,
+                productId: v.productId,
+                productTitle: product.title,
+                sku: v.sku,
+                variantTitle: v.title,
+                isManual: !!v.rNumber,
+                materialMultiplier: v.materialMultiplier ?? 1,
+              };
+              if (v.rNumber) {
+                (groups[v.rNumber] ||= []).push(item);
+              } else {
+                unmapped.push(item);
+              }
+            });
+            setData({ groups, unmapped });
+          });
+        }
+        else if (path === 'rollsManagement.getLowStockAlerts') {
+          const ROLL_WIDTH_CM = 29.5;
+          unsubscribe = onSnapshot(collection(db, 'rollInventory'), async (snap) => {
+            const gsnap = await getDocs(collection(db, 'gadgetConsumption'));
+            const phone = gsnap.docs
+              .map(d => d.data() as any)
+              .find(g => (g.categoryName || "").toLowerCase() === "phone skin");
+            if (!phone) { setData([]); return; }
+
+            const alerts = snap.docs
+              .map(d => d.data() as any)
+              .filter(roll => roll.metersAvailable > 0)
+              .map(roll => {
+                const lengthCm = roll.metersAvailable * 100;
+                const estimatedUnits = roll.isContinuous
+                  ? Math.floor((ROLL_WIDTH_CM * lengthCm) / (phone.lengthCm * phone.widthCm))
+                  : Math.floor(ROLL_WIDTH_CM / phone.widthCm) * Math.floor(lengthCm / phone.lengthCm);
+                return {
+                  rNumber: roll.rNumber,
+                  designName: roll.designName,
+                  metersAvailable: roll.metersAvailable,
+                  estimatedUnits,
+                  categories: ["Phone Skin"],
+                };
+              })
+              .filter(a => a.estimatedUnits < 10 || a.metersAvailable < 1)
+              .sort((a, b) => a.estimatedUnits - b.estimatedUnits);
+
+            setData(alerts);
+          });
+        }
         else if (path === 'products.getProduct' || path === 'products.getProductBySlug') {
           const fetchProduct = async () => {
             try {
@@ -1728,7 +1798,36 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'productClassification.getClassificationStats') {
-          setData({ total: 0, classified: 0, unclassified: 0, byGadget: {}, totalFinishTypes: 0, byFinish: {} });
+          unsubscribe = onSnapshot(
+            query(collection(db, 'products'), where('status', '==', 'active')),
+            async (snap) => {
+              const products = snap.docs.map(d => d.data() as any);
+              const classified = products.filter(p => p.gadgetCategory && p.finishTypeId).length;
+
+              const byGadget: Record<string, number> = {};
+              products.forEach(p => {
+                if (p.gadgetCategory) byGadget[p.gadgetCategory] = (byGadget[p.gadgetCategory] || 0) + 1;
+              });
+
+              const fsnap = await getDocs(collection(db, 'finishTypes'));
+              const byFinish: Record<string, number> = {};
+              fsnap.docs.forEach(f => {
+                const count = products.filter(p => p.finishTypeId === f.id).length;
+                if (count > 0) byFinish[f.data().displayName || f.data().name] = count;
+              });
+
+              setData({
+                total: products.length,
+                classified,
+                unclassified: products.length - classified,
+                partiallyClassified: products.filter(p =>
+                  (p.gadgetCategory && !p.finishTypeId) || (!p.gadgetCategory && p.finishTypeId)).length,
+                byGadget,
+                byFinish,
+                totalFinishTypes: fsnap.size,
+              });
+            }
+          );
         }
         else if (path === 'productClassification.previewAutoClassification') {
           setData({ results: [] });
