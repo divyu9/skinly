@@ -40,11 +40,27 @@ export const requireAdmin = async (request: any) => {
     return { uid };
   }
 
-  const snap = await admin.firestore().collection("users").doc(uid).get();
+  const db = admin.firestore();
+
+  const snap = await db.collection("users").doc(uid).get();
   if (snap.exists && snap.data()?.isAdmin === true) {
     return { uid };
   }
 
-  throw new HttpsError("permission-denied", "UNAUTHENTICATED");
+  // User documents were imported from the previous backend keyed by its own
+  // ids, so users/{authUid} does not exist for anyone who predates the move.
+  // Fall back to matching on the email the token already proves they own.
+  if (email) {
+    const byEmail = await db
+      .collection("users")
+      .where("email", "==", email)
+      .limit(1)
+      .get();
+    if (!byEmail.empty && byEmail.docs[0].data()?.isAdmin === true) {
+      return { uid };
+    }
+  }
+
+  throw new HttpsError("permission-denied", "Your account is not an admin");
 };
 
