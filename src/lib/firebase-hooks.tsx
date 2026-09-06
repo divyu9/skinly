@@ -36,6 +36,26 @@ const skuMatches = (mockupSku: string, target: string): boolean => {
 // bounded sample rather than the whole collection (mirrors the Convex original).
 const MOCKUP_SAMPLE_LIMIT = 15000;
 
+// User documents were imported from the previous backend under its own ids, so
+// users/{authUid} does not exist for anyone who predates the move — their
+// balance, name and admin flag live on a document keyed by the old id. Resolve
+// via the email the account already proves, falling back to the auth uid so new
+// signups still get a document.
+const userDocIdCache = new Map<string, string>();
+const resolveUserDocId = async (user: { uid: string; email: string | null }): Promise<string> => {
+  const cached = userDocIdCache.get(user.uid);
+  if (cached) return cached;
+
+  let resolved = user.uid;
+  const byUid = await getDoc(doc(db, 'users', user.uid));
+  if (!byUid.exists() && user.email) {
+    const byEmail = await getDocs(query(collection(db, 'users'), where('email', '==', user.email), limit(1)));
+    if (!byEmail.empty) resolved = byEmail.docs[0].id;
+  }
+  userDocIdCache.set(user.uid, resolved);
+  return resolved;
+};
+
 // Helper to resolve the string path from the proxy
 const getPath = (apiRef: any) => String(apiRef);
 
@@ -233,7 +253,7 @@ export function useQuery(apiRef: any, args?: any) {
           const auth = getAuth();
           
           // Helper to subscribe to auth changes
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData(0);
               return;
@@ -255,7 +275,7 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData([]);
               return;
@@ -280,7 +300,7 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             // Clear existing listener when user changes
             innerUnsubscribe();
             
@@ -328,7 +348,7 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData(null);
               return;
@@ -628,7 +648,7 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData({ 
                 currentBalance: 0, 
@@ -642,7 +662,7 @@ export function useQuery(apiRef: any, args?: any) {
               return;
             }
 
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), async (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), async (snap) => {
               const userData = snap.exists() ? snap.data() : {};
               
               // Now fetch transactions to calculate stats
@@ -684,7 +704,7 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData([]);
               return;
@@ -704,13 +724,13 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData({ balance: 0 });
               return;
             }
 
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
               setData(snap.exists() ? { balance: snap.data().walletBalance || 0, userId: user.uid } : { balance: 0, userId: user.uid });
             });
           });
@@ -720,13 +740,13 @@ export function useQuery(apiRef: any, args?: any) {
           let innerUnsubscribe = () => {};
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             innerUnsubscribe();
             if (!user) {
               setData({ consentType: "none", hasConsent: false, consented: false, optInDate: null, phoneNumber: "" });
               return;
             }
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
               const u: any = snap.exists() ? snap.data() : {};
               const consentType = u.whatsappConsentType || "none";
               setData({
@@ -744,13 +764,13 @@ export function useQuery(apiRef: any, args?: any) {
           let innerUnsubscribe = () => {};
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             innerUnsubscribe();
             if (!user) {
               setData({ verified: false, phoneNumber: null });
               return;
             }
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
               const u: any = snap.exists() ? snap.data() : {};
               // Firebase Auth owns phone verification; the user doc only mirrors it.
               const phoneNumber = user.phoneNumber || u.phoneNumber || null;
@@ -764,13 +784,13 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData({ totalEarned: 0, successfulReferrals: 0, referralCode: '' });
               return;
             }
             
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
               if (snap.exists()) {
                 const data = snap.data();
                 setData({
@@ -905,13 +925,13 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
 
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             innerUnsubscribe();
             if (!user) {
               setData({ maxUsage: 0, currentBalance: 0, canUseWallet: false });
               return;
             }
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), async (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), async (snap) => {
               const currentBalance = snap.exists() ? (snap.data().walletBalance || 0) : 0;
               const ssnap = await getDocs(query(collection(db, 'walletSettings'), limit(1)));
               const s: any = ssnap.empty ? null : ssnap.docs[0].data();
@@ -1626,7 +1646,34 @@ export function useQuery(apiRef: any, args?: any) {
           fetchProduct();
           unsubscribe = () => {};
         }
-        else if (path === 'productCategories.listAllWithCounts' || path === 'productCategories.listAll' || path === 'productCategories.listActive' || path === 'productCategories.listAllCategories') {
+        else if (path === 'productCategories.listAllCategories') {
+          // Returns an object with per-category counts, not a plain list.
+          unsubscribe = onSnapshot(collection(db, 'productCategoriesConfig'), async (snap) => {
+            const configs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            const products = await getDocs(collection(db, 'products'));
+
+            const counts: Record<string, number> = {};
+            products.docs.forEach(d => {
+              const c = d.data().productCategory || "uncategorized";
+              counts[c] = (counts[c] || 0) + 1;
+            });
+
+            setData({
+              categories: configs
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map(c => ({
+                  id: c.slug,
+                  name: c.name,
+                  count: counts[c.slug] || 0,
+                  isActive: c.isActive,
+                  icon: c.icon,
+                })),
+              uncategorizedCount: counts["uncategorized"] || 0,
+              totalProducts: products.size,
+            });
+          });
+        }
+        else if (path === 'productCategories.listAllWithCounts' || path === 'productCategories.listAll' || path === 'productCategories.listActive') {
           const q = query(collection(db, 'productCategoriesConfig'));
           unsubscribe = onSnapshot(q, (snap) => {
             let data = snap.docs.map(d => {
@@ -2242,7 +2289,7 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData({ isAdmin: false, isAuthenticated: false });
               return;
@@ -2254,7 +2301,7 @@ export function useQuery(apiRef: any, args?: any) {
             }
 
             // Check firestore user doc
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
               if (snap.exists() && snap.data().isAdmin) {
                 setData({ isAdmin: true, isAuthenticated: true });
               } else {
@@ -2269,13 +2316,13 @@ export function useQuery(apiRef: any, args?: any) {
           const { getAuth } = await import('firebase/auth');
           const auth = getAuth();
           
-          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
             if (!user) {
               setData(null);
               return;
             }
 
-            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
               const userData = snap.exists() ? snap.data() : {};
               const isAdmin = user.email === 'chandan1992@gmail.com' || userData.isAdmin;
               setData({
@@ -2497,7 +2544,7 @@ export function useMutation(apiRef: any) {
         const { getAuth } = await import('firebase/auth');
         const user = getAuth().currentUser;
         if (!user) throw new Error("Please sign in to update your preferences");
-        await setDoc(doc(db, 'users', user.uid), {
+        await setDoc(doc(db, 'users', await resolveUserDocId(user)), {
           whatsappConsentType: args.consentType,
           whatsappConsentAt: Date.now(),
         }, { merge: true });
@@ -2511,7 +2558,7 @@ export function useMutation(apiRef: any) {
         if (user) {
           // Remove undefined values to avoid Firebase errors
           const cleanArgs = Object.fromEntries(Object.entries(args).filter(([_, v]) => v !== undefined));
-          await setDoc(doc(db, 'users', user.uid), cleanArgs, { merge: true });
+          await setDoc(doc(db, 'users', await resolveUserDocId(user)), cleanArgs, { merge: true });
         }
         return { success: true };
       }
@@ -3346,7 +3393,7 @@ export function useMutation(apiRef: any) {
           const code = args.code.toUpperCase();
           if (code === 'WELCOME50' || code === 'SKINLY50') {
             const amount = 50;
-            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            const userDoc = await getDoc(doc(db, 'users', await resolveUserDocId(user)));
             const currentBalance = userDoc.exists() ? (userDoc.data().walletBalance || 0) : 0;
             
             // Log transaction
@@ -3361,7 +3408,7 @@ export function useMutation(apiRef: any) {
             });
             
             // Update balance
-            await updateDoc(doc(db, 'users', user.uid), { walletBalance: currentBalance + amount });
+            await updateDoc(doc(db, 'users', await resolveUserDocId(user)), { walletBalance: currentBalance + amount });
             return { success: true, message: "Coupon redeemed successfully", creditAmount: amount };
           }
           
