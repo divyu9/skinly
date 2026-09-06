@@ -3955,6 +3955,28 @@ export function useMutation(apiRef: any) {
       }
       // ── end seoPages ──
 
+      // Variants live under api.products.* but are their own collection; without
+      // this the generic writer would create variants as product documents.
+      if (collectionName === 'products' && actionName.toLowerCase().includes('variant')) {
+        if (actionName === 'createVariant') {
+          const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+          const ref = await addDoc(collection(db, 'variants'), clean);
+          return ref.id;
+        }
+        if (actionName === 'updateVariant') {
+          const { variantId, ...rest } = args;
+          if (!variantId) throw new Error("variantId is required");
+          const clean = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+          await updateDoc(doc(db, 'variants', variantId), clean);
+          return variantId;
+        }
+        if (actionName === 'deleteVariant') {
+          if (!args?.variantId) throw new Error("variantId is required");
+          await deleteDoc(doc(db, 'variants', args.variantId));
+          return { success: true };
+        }
+      }
+
       let targetCollection = collectionName;
       if (actionName.toLowerCase().includes('heroslide')) targetCollection = 'heroSlides';
       else if (actionName.toLowerCase().includes('featurebanner')) targetCollection = 'featureBanners';
@@ -3965,7 +3987,8 @@ export function useMutation(apiRef: any) {
 
       // Generic add/update
       if (actionName.includes('create') || actionName.includes('add') || actionName.includes('insert')) {
-        const docRef = await addDoc(collection(db, targetCollection), args);
+        const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        const docRef = await addDoc(collection(db, targetCollection), clean);
         return docRef.id;
       }
       
@@ -4028,9 +4051,23 @@ export function useMutation(apiRef: any) {
           throw new Error("Invalid or expired coupon code");
         }
 
-        const targetId = args.id || args.ruleId || args.sectionId || args.slideId || args.bannerId || args.videoId;
-        if (!targetId) throw new Error(`ID required for update (${actionName})`);
-        const { id, ruleId, sectionId, slideId, bannerId, videoId, ...data } = args;
+        // Note collectionId is absent on purpose — on a product that is a real
+        // field (which collection it belongs to), not the document id.
+        const ID_KEYS = [
+          'id', 'ruleId', 'sectionId', 'slideId', 'bannerId', 'videoId',
+          'productId', 'variantId', 'couponId', 'orderId', 'pageId', 'templateId',
+          'presetId', 'usecaseId', 'jobId', 'mockupId', 'modelId', 'categoryId',
+        ];
+        const idKey = ID_KEYS.find(k => args[k]);
+        if (!idKey) throw new Error(`ID required for update (${actionName})`);
+        const targetId = args[idKey];
+
+        // Firestore rejects undefined outright, and these payloads are full of
+        // `value || undefined` for cleared optional fields.
+        const data = Object.fromEntries(
+          Object.entries(args).filter(([k, v]) => !ID_KEYS.includes(k) && v !== undefined)
+        );
+
         await updateDoc(doc(db, targetCollection, targetId), data);
         return targetId;
       }

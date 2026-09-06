@@ -293,7 +293,8 @@ function EditProductPageInner() {
       toast.success("Product updated successfully");
       navigate("/backend-skinly/products");
     } catch (error) {
-      toast.error("Failed to update product");
+      console.error("Product update failed:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to update product");
     } finally {
       setIsSubmitting(false);
     }
