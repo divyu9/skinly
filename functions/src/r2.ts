@@ -1,4 +1,4 @@
-import { onCall } from "firebase-functions/v1/https";
+import { onCall, HttpsError } from "firebase-functions/v1/https";
 import { S3Client, PutObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAdmin } from "./auth";
@@ -12,7 +12,7 @@ const getR2Config = () => {
   const publicUrl = process.env.R2_PUBLIC_URL || "https://cdn.goskinly.com";
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error("R2 credentials not configured.");
+    throw new HttpsError("failed-precondition", "R2 credentials are not configured");
   }
 
   return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
@@ -31,14 +31,22 @@ const getAllowedOrigins = () => {
   return Array.from(new Set(origins));
 };
 
+// Validates the shape of the object key rather than listing folders. The old
+// fixed prefix list rejected the folders actually in use ("banners",
+// "media-library") and every new folder an admin creates, and it also rejected
+// mockup keys, which contain spaces (mockups/Apple/iPhone 17 Pro Max/M-1.webp).
+// Callers are already admin-only and rate limited; what matters here is that a
+// key cannot escape the bucket layout or land at its root.
 const validateKey = (key: string) => {
-  if (!key) throw new Error("Missing fileName");
-  if (key.includes("..")) throw new Error("Invalid fileName");
-  if (key.startsWith("/")) throw new Error("Invalid fileName");
-  if (!/^[a-zA-Z0-9/_\-.]+$/.test(key)) throw new Error("Invalid fileName");
-  const allowedPrefixes = ["general/", "homepage/", "products/", "mockups/", "seo/"];
-  if (!allowedPrefixes.some((p) => key.startsWith(p))) {
-    throw new Error("Invalid fileName");
+  if (!key) throw new HttpsError("invalid-argument", "Missing fileName");
+  if (key.length > 512) throw new HttpsError("invalid-argument", "fileName is too long");
+  if (key.startsWith("/") || key.endsWith("/")) throw new HttpsError("invalid-argument", "fileName must not start or end with /");
+  if (!/^[a-zA-Z0-9 /_\-.()]+$/.test(key)) throw new HttpsError("invalid-argument", "fileName has unsupported characters");
+
+  const segments = key.split("/");
+  if (segments.length < 2) throw new HttpsError("invalid-argument", "fileName must include a folder");
+  if (segments.some((s) => s === "" || s === "." || s === "..")) {
+    throw new HttpsError("invalid-argument", "fileName has an invalid path segment");
   }
 };
 
@@ -88,10 +96,10 @@ export const generateUploadUrl = onCall(async (data: any, context: any) => {
 
   const { fileName, contentType } = data;
   if (!fileName || !contentType) {
-    throw new Error("Missing file details");
+    throw new HttpsError("invalid-argument", "Missing file details");
   }
-  if (typeof contentType !== "string" || !contentType.startsWith("image/")) {
-    throw new Error("Invalid contentType");
+  if (typeof contentType !== "string" || !/^(image|video)\//.test(contentType)) {
+    throw new HttpsError("invalid-argument", `Unsupported content type: ${contentType}`);
   }
   validateKey(fileName);
 
@@ -121,6 +129,7 @@ export const generateUploadUrl = onCall(async (data: any, context: any) => {
       publicUrl: `${config.publicUrl}/${fileName}`
     };
   } catch (error: any) {
-    throw new Error(error.message || "URL generation failed");
+    console.error("generateUploadUrl presign failed:", error);
+    throw new HttpsError("internal", error?.message || "Could not create the upload URL");
   }
 });
