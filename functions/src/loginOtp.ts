@@ -8,9 +8,17 @@ const OTP_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 
-// Stored hashed so a leaked document cannot be used to verify.
-const hashOtp = (otp: string, phone: string) =>
-  crypto.createHash("sha256").update(`${otp}:${phone}:${process.env.OTP_PEPPER || ""}`).digest("hex");
+// The catch-all Firestore rule grants public read, so these documents are
+// reachable from a browser. A six digit code is trivially brute-forced against
+// an unsalted hash, so the pepper is what actually protects it — refuse to run
+// without one rather than write a code that can be reversed.
+const hashOtp = (otp: string, phone: string) => {
+  const pepper = process.env.OTP_PEPPER || "";
+  if (pepper.length < 16) {
+    throw new HttpsError("failed-precondition", "OTP_PEPPER is not configured");
+  }
+  return crypto.createHash("sha256").update(`${otp}:${phone}:${pepper}`).digest("hex");
+};
 
 const normalizePhone = (raw: unknown): string => {
   if (typeof raw !== "string") throw new HttpsError("invalid-argument", "Invalid phone number");
