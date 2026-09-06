@@ -717,10 +717,47 @@ export function useQuery(apiRef: any, args?: any) {
           unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'whatsappConsent.getMyConsent') {
-          setData({ consented: false, optInDate: null, consentType: "none" });
+          let innerUnsubscribe = () => {};
+          const { getAuth } = await import('firebase/auth');
+          const auth = getAuth();
+          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+            innerUnsubscribe();
+            if (!user) {
+              setData({ consentType: "none", hasConsent: false, consented: false, optInDate: null, phoneNumber: "" });
+              return;
+            }
+            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+              const u: any = snap.exists() ? snap.data() : {};
+              const consentType = u.whatsappConsentType || "none";
+              setData({
+                consentType,
+                hasConsent: consentType !== "none",
+                consented: consentType !== "none",
+                optInDate: u.whatsappConsentAt ?? null,
+                phoneNumber: u.phoneNumber || user.phoneNumber || "",
+              });
+            });
+          });
+          unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'loginOtp.checkPhoneVerified') {
-          setData({ verified: false, phoneNumber: null });
+          let innerUnsubscribe = () => {};
+          const { getAuth } = await import('firebase/auth');
+          const auth = getAuth();
+          const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+            innerUnsubscribe();
+            if (!user) {
+              setData({ verified: false, phoneNumber: null });
+              return;
+            }
+            innerUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snap) => {
+              const u: any = snap.exists() ? snap.data() : {};
+              // Firebase Auth owns phone verification; the user doc only mirrors it.
+              const phoneNumber = user.phoneNumber || u.phoneNumber || null;
+              setData({ verified: Boolean(user.phoneNumber || u.phoneVerified), phoneNumber });
+            });
+          });
+          unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
         else if (path === 'referrals.getReferralStats') {
           let innerUnsubscribe = () => {};
@@ -2448,6 +2485,17 @@ export function useMutation(apiRef: any) {
       
       const collectionName = path.split('.')[0];
       const actionName = path.split('.')[1];
+
+      if (path === 'whatsappConsent.updateMyConsent') {
+        const { getAuth } = await import('firebase/auth');
+        const user = getAuth().currentUser;
+        if (!user) throw new Error("Please sign in to update your preferences");
+        await setDoc(doc(db, 'users', user.uid), {
+          whatsappConsentType: args.consentType,
+          whatsappConsentAt: Date.now(),
+        }, { merge: true });
+        return { success: true };
+      }
 
       if (path === 'users.updateCurrentUser') {
         const { getAuth } = await import('firebase/auth');
