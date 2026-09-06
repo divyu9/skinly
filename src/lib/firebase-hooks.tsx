@@ -1736,6 +1736,161 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'migrateProductCategory.previewProductCategoryMigration') {
           setData({ stats: { total: 0, willChange: 0 }, preview: [] });
         }
+        else if (path === 'modelRequests.findSimilarModels') {
+          const search = (args?.modelName || "").toLowerCase().trim();
+          if (search.length < 2) {
+            setData([]);
+          } else {
+            const brandSearch = args?.brandName?.toLowerCase().trim();
+            const keywords = search.split(/\s+/).filter((k: string) => k.length > 1);
+            unsubscribe = onSnapshot(
+              query(collection(db, 'supportedModels'), where('isActive', '==', true)),
+              (snap) => {
+                const matches = snap.docs
+                  .map(d => ({ _id: d.id, ...d.data() } as any))
+                  .filter(m => {
+                    if (args?.category && m.category !== args.category) return false;
+                    if (brandSearch && (m.brandName || "").toLowerCase() !== brandSearch) return false;
+                    const name = (m.modelName || "").toLowerCase();
+                    return keywords.every((k: string) => name.includes(k));
+                  })
+                  .slice(0, 5);
+                setData(matches.map(m => ({
+                  _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category,
+                })));
+              }
+            );
+          }
+        }
+        else if (path === 'cashbackHelpers.getProductCashbackInfo') {
+          if (!args?.productId) {
+            setData({ hasCashback: false, displayText: null });
+          } else {
+            (async () => {
+              const rsnap = await getDocs(query(collection(db, 'cashbackRules'), where('isActive', '==', true)));
+              const rules = rsnap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+
+              const best = (list: any[]) =>
+                list.reduce((b, c) => (c.cashbackValue > b.cashbackValue ? c : b));
+
+              const productRules = rules.filter(r => r.targetType === "product" && r.targetId === args.productId);
+              if (productRules.length > 0) {
+                const r = best(productRules);
+                setData({
+                  hasCashback: true,
+                  cashbackType: r.cashbackType,
+                  cashbackValue: r.cashbackValue,
+                  displayText: r.cashbackType === "fixed" ? `₹${r.cashbackValue}` : `${r.cashbackValue}%`,
+                });
+                return;
+              }
+
+              const cp = await getDocs(query(collection(db, 'collectionProducts'), where('productId', '==', args.productId)));
+              const collectionIds = cp.docs.map(d => d.data().collectionId);
+              const other = rules.filter(r =>
+                (r.targetType === "variant") ||
+                (r.targetType === "collection" && collectionIds.includes(r.targetId))
+              );
+              if (other.length === 0) { setData({ hasCashback: false, displayText: null }); return; }
+
+              const r = best(other);
+              setData({
+                hasCashback: true,
+                cashbackType: r.cashbackType,
+                cashbackValue: r.cashbackValue,
+                displayText: r.cashbackType === "fixed" ? `up to ₹${r.cashbackValue}` : `up to ${r.cashbackValue}%`,
+              });
+            })();
+          }
+        }
+        else if (path === 'coupons.getCouponsForProduct') {
+          unsubscribe = onSnapshot(
+            query(collection(db, 'coupons'), where('isActive', '==', true)),
+            (snap) => {
+              const now = Date.now();
+              setData(snap.docs
+                .map(d => ({ _id: d.id, ...d.data() } as any))
+                .filter(c => (!c.expiresAt || c.expiresAt > now) &&
+                             (!c.usageLimit || (c.usageCount || 0) < c.usageLimit) &&
+                             c.isPublic !== false));
+            }
+          );
+        }
+        else if (path === 'productSections.getProductSectionContent') {
+          if (!args?.productId) {
+            setData([]);
+          } else {
+            (async () => {
+              const p = await getDoc(doc(db, 'products', args.productId));
+              if (!p.exists()) { setData([]); return; }
+
+              const active = (docs: any[]) => docs
+                .map(d => ({ _id: d.id, ...d.data() } as any))
+                .filter(s => s.isActive)
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+              const byProduct = await getDocs(query(collection(db, 'productSectionContent'),
+                where('productId', '==', args.productId)));
+              const own = active(byProduct.docs);
+              if (own.length > 0) { setData(own); return; }
+
+              const category = p.data().productCategory;
+              if (!category) { setData([]); return; }
+              const byCategory = await getDocs(query(collection(db, 'productSectionContent'),
+                where('productCategorySlug', '==', category)));
+              setData(active(byCategory.docs));
+            })();
+          }
+        }
+        else if (path === 'productSections.getSuggestedProducts' || path === 'productSections.getTrendingProducts') {
+          const configCollection = path.endsWith('getSuggestedProducts')
+            ? 'suggestedProductsConfig'
+            : 'trendingProductsConfig';
+          if (!args?.productId) {
+            setData({ config: null, products: [] });
+          } else {
+            (async () => {
+              const psnap = await getDoc(doc(db, 'products', args.productId));
+              if (!psnap.exists()) { setData({ config: null, products: [] }); return; }
+              const product: any = psnap.data();
+
+              // Product-specific config wins, otherwise the category default.
+              const pick = async (field: string, value: string) => {
+                const s = await getDocs(query(collection(db, configCollection), where(field, '==', value), limit(1)));
+                return s.empty ? null : ({ _id: s.docs[0].id, ...s.docs[0].data() } as any);
+              };
+              let config = await pick('productId', args.productId);
+              if ((!config || !config.isActive) && product.productCategory) {
+                config = await pick('productCategorySlug', product.productCategory);
+              }
+              if (!config || !config.isActive) { setData({ config: null, products: [] }); return; }
+
+              const all = await getDocs(query(collection(db, 'products'), where('status', '==', 'active')));
+              const candidates = all.docs
+                .map(d => ({ _id: d.id, ...d.data() } as any))
+                .filter(p => p._id !== args.productId);
+
+              let picked: any[] = [];
+              if (config.sourceType === 'manual' && config.manualProductIds?.length) {
+                const wanted = new Set(config.manualProductIds);
+                picked = candidates.filter(p => wanted.has(p._id));
+              } else if (config.sourceType === 'same-category' && product.productCategory) {
+                picked = candidates.filter(p => p.productCategory === product.productCategory);
+              } else if (config.sourceType === 'tag-based' && config.filterTags?.length) {
+                picked = candidates.filter(p => p.tags?.some((t: string) => config.filterTags.includes(t)));
+              }
+              picked = picked.slice(0, config.maxProducts || 8);
+
+              // The cards read product.variants for price and stock.
+              const withVariants = await Promise.all(picked.map(async p => {
+                const v = await getDocs(query(collection(db, 'variants'), where('productId', '==', p._id)));
+                return { ...p, variants: v.docs.map(d => ({ _id: d.id, ...d.data() })) };
+              }));
+
+              setData({ config, products: withVariants });
+            })();
+          }
+        }
         else if (path === 'productCategories.getProductsByCategory') {
           // Returns {products,total,hasMore}. Without a handler this fell through
           // to the generic fallback, which answers with a plain array — the page
@@ -1796,7 +1951,7 @@ export function useQuery(apiRef: any, args?: any) {
             }
           });
         }
-        else if (path === 'gadgetTypes.getActive' || path === 'gadgetTypes.listAllActive' || path === 'gadgetTypes.list') {
+        else if (path === 'gadgetTypes.getActive' || path === 'gadgetTypes.listAllActive' || path === 'gadgetTypes.listActive' || path === 'gadgetTypes.list') {
           const q = query(collection(db, 'gadgetTypes'));
           unsubscribe = onSnapshot(q, (snap) => {
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
@@ -1807,7 +1962,7 @@ export function useQuery(apiRef: any, args?: any) {
             setData(data);
           });
         }
-        else if (path === 'finishTypes.getActive' || path === 'finishTypes.listAllActive' || path === 'finishTypes.list') {
+        else if (path === 'finishTypes.getActive' || path === 'finishTypes.listAllActive' || path === 'finishTypes.listActive' || path === 'finishTypes.list') {
           const q = query(collection(db, 'finishTypes'));
           unsubscribe = onSnapshot(q, (snap) => {
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
@@ -2205,6 +2360,18 @@ export function useQuery(apiRef: any, args?: any) {
               mockups: mockups
             });
           });
+        }
+        else if (path === 'variantConsumptionPresets.listByGadgetType') {
+          if (!args?.gadgetTypeId) {
+            setData([]);
+          } else {
+            unsubscribe = onSnapshot(
+              query(collection(db, 'variantConsumptionPresets'),
+                where('gadgetTypeId', '==', args.gadgetTypeId),
+                where('isActive', '==', true)),
+              (snap) => setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })))
+            );
+          }
         }
         else if (path === 'variantConsumptionPresets.listAll') {
           const q = query(collection(db, 'gadgetTypes'));
