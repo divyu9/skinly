@@ -2486,6 +2486,13 @@ export function useMutation(apiRef: any) {
       const collectionName = path.split('.')[0];
       const actionName = path.split('.')[1];
 
+      if (path === 'loginOtp.generateLoginOtp' || path === 'loginOtp.verifyLoginOtp') {
+        // OTP is generated and checked server-side; the browser never sees the code.
+        const fn = httpsCallable(functions, path.split('.')[1]);
+        const res: any = await fn(args);
+        return res.data;
+      }
+
       if (path === 'whatsappConsent.updateMyConsent') {
         const { getAuth } = await import('firebase/auth');
         const user = getAuth().currentUser;

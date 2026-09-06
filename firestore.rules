@@ -25,6 +25,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // OTP records must never be reachable from a browser — a readable code
+    // would let anyone verify a phone without receiving the message.
+    // Only the Cloud Functions (Admin SDK) touch this collection.
+    match /loginOtps/{docId} {
+      allow read, write: if false;
+    }
+
     // 3. User Profiles & Wallet
     match /users/{userId} {
       // Users can read/write their own profile

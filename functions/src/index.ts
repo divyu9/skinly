@@ -10,3 +10,4 @@ export * from "./whatsapp";
 export * from "./seo";
 export * from "./r2";
 export * from "./orders";
+export * from "./loginOtp";
