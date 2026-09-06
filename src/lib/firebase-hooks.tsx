@@ -56,6 +56,14 @@ const resolveUserDocId = async (user: { uid: string; email: string | null }): Pr
   return resolved;
 };
 
+// Rows created before the move reference the old user id, rows created since
+// reference the auth uid, so anything owned by a user has to be looked up under
+// both or their history silently starts at the migration date.
+const userIdCandidates = async (user: { uid: string; email: string | null }): Promise<string[]> => {
+  const resolved = await resolveUserDocId(user);
+  return resolved === user.uid ? [user.uid] : [user.uid, resolved];
+};
+
 // Helper to resolve the string path from the proxy
 const getPath = (apiRef: any) => String(apiRef);
 
@@ -258,7 +266,7 @@ export function useQuery(apiRef: any, args?: any) {
               setData(0);
               return;
             }
-            const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
+            const q = query(collection(db, 'cart'), where('userId', 'in', await userIdCandidates(user)));
             innerUnsubscribe = onSnapshot(q, (snap) => {
               const count = snap.docs.reduce((acc, doc) => acc + (doc.data().quantity || 1), 0);
               setData(count);
@@ -282,7 +290,7 @@ export function useQuery(apiRef: any, args?: any) {
             }
             // Removed orderBy('addedAt', 'desc') from the query to avoid requiring a composite index.
             // Sorting will be done in-memory.
-            const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
+            const q = query(collection(db, 'cart'), where('userId', 'in', await userIdCandidates(user)));
             innerUnsubscribe = onSnapshot(q, (snap) => {
               let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
               docs.sort((a: any, b: any) => (b.addedAt || 0) - (a.addedAt || 0));
@@ -311,7 +319,7 @@ export function useQuery(apiRef: any, args?: any) {
             
             // Removed orderBy('createdAt', 'desc') to avoid requiring a composite index.
             // Sorting is done in-memory.
-            const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
+            const q = query(collection(db, 'orders'), where('userId', 'in', await userIdCandidates(user)));
             
             innerUnsubscribe = onSnapshot(q, (snap) => {
               let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
@@ -353,7 +361,7 @@ export function useQuery(apiRef: any, args?: any) {
               setData(null);
               return;
             }
-            const q = query(collection(db, 'orders'), where('userId', '==', user.uid), limit(1));
+            const q = query(collection(db, 'orders'), where('userId', 'in', await userIdCandidates(user)), limit(1));
             innerUnsubscribe = onSnapshot(q, (snap) => {
               if (snap.empty) {
                 setData(null);
@@ -666,7 +674,7 @@ export function useQuery(apiRef: any, args?: any) {
               const userData = snap.exists() ? snap.data() : {};
               
               // Now fetch transactions to calculate stats
-              const q = query(collection(db, 'walletTransactions'), where('userId', '==', user.uid));
+              const q = query(collection(db, 'walletTransactions'), where('userId', 'in', await userIdCandidates(user)));
               const txSnap = await getDocs(q);
               
               let currentBalance = userData.walletBalance || 0;
@@ -710,7 +718,7 @@ export function useQuery(apiRef: any, args?: any) {
               return;
             }
 
-            const q = query(collection(db, 'walletTransactions'), where('userId', '==', user.uid));
+            const q = query(collection(db, 'walletTransactions'), where('userId', 'in', await userIdCandidates(user)));
             innerUnsubscribe = onSnapshot(q, (snap) => {
               const docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
               docs.sort((a: any, b: any) => (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
@@ -2893,7 +2901,7 @@ export function useMutation(apiRef: any) {
         }
         if (actionName === 'clearCart') {
           if (user) {
-            const q = query(collection(db, 'cart'), where('userId', '==', user.uid));
+            const q = query(collection(db, 'cart'), where('userId', 'in', await userIdCandidates(user)));
             const snap = await getDocs(q);
             const batch = writeBatch(db);
             snap.docs.forEach(d => batch.delete(d.ref));
