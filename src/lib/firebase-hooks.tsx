@@ -1736,7 +1736,32 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'migrateProductCategory.previewProductCategoryMigration') {
           setData({ stats: { total: 0, willChange: 0 }, preview: [] });
         }
-        else if (path === 'productClassification.getUnclassifiedProducts' || path === 'productClassification.getProductsByClassification' || path === 'productCategories.getUncategorizedProducts') {
+        else if (path === 'productCategories.getProductsByCategory') {
+          // Returns {products,total,hasMore}. Without a handler this fell through
+          // to the generic fallback, which answers with a plain array — the page
+          // guards on the result being present, then reads .products.length off it.
+          const pageSize = args?.limit || 50;
+          const offset = args?.offset || 0;
+          unsubscribe = onSnapshot(collection(db, 'products'), (snap) => {
+            let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            if (args?.category === "uncategorized") {
+              docs = docs.filter(p => !p.productCategory);
+            } else if (args?.category) {
+              docs = docs.filter(p => p.productCategory === args.category);
+            }
+            setData({
+              products: docs.slice(offset, offset + pageSize),
+              total: docs.length,
+              hasMore: offset + pageSize < docs.length,
+            });
+          });
+        }
+        else if (path === 'productCategories.getUncategorizedProducts') {
+          unsubscribe = onSnapshot(collection(db, 'products'), (snap) => {
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any)).filter(p => !p.productCategory));
+          });
+        }
+        else if (path === 'productClassification.getUnclassifiedProducts' || path === 'productClassification.getProductsByClassification') {
           setData([]);
         }
         else if (path === 'productCategories.getCategoryStats') {
@@ -2527,6 +2552,10 @@ export function useQuery(apiRef: any, args?: any) {
               enabled: false, byBrand: {}, byCategory: {}
             });
           } else {
+            // Guessing a collection from the namespace answers with an array
+            // whatever the caller expected, which reads as data rather than as a
+            // gap — say so, so the next missing handler is obvious.
+            console.warn(`[firebase-hooks] no handler for "${path}" — falling back to a raw ${collectionName} read`);
             const q = query(collection(db, collectionName), limit(50));
             unsubscribe = onSnapshot(q, (snap) => {
               setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
