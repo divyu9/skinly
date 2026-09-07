@@ -4067,6 +4067,186 @@ export function useMutation(apiRef: any) {
         return ref.id;
       }
 
+      if (path === 'bulkProductCreator.createBulkProducts') {
+        const rows: any[] = args?.products || [];
+        const success: any[] = [];
+        const failed: any[] = [];
+
+        for (const row of rows) {
+          try {
+            const slug = String(row.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            const productRef = await addDoc(collection(db, 'products'), Object.fromEntries(
+              Object.entries({
+                title: row.title,
+                slug,
+                description: row.customDescription || "",
+                status: row.status || "active",
+                productCategory: row.productCategory,
+                gadgetTypeId: row.gadgetTypeId,
+                finishTypeId: row.finishTypeId,
+                gadgetCategory: row.gadgetCategory,
+                images: (row.images || []).map((url: string) => ({ url, alt: row.title })),
+                tags: [],
+                hasMultipleVariants: false,
+                _creationTime: Date.now(),
+              }).filter(([, v]) => v !== undefined)
+            ));
+
+            // A product with no variant has no price and cannot be bought.
+            await addDoc(collection(db, 'variants'), Object.fromEntries(
+              Object.entries({
+                productId: productRef.id,
+                sku: row.sku,
+                title: "Default Title",
+                price: row.price,
+                compareAtPrice: row.compareAtPrice,
+                inventoryQuantity: row.inventoryQuantity ?? 0,
+                isDefaultVariant: true,
+                _creationTime: Date.now(),
+              }).filter(([, v]) => v !== undefined)
+            ));
+
+            success.push({ title: row.title, productId: productRef.id });
+          } catch (e: any) {
+            failed.push({ title: row.title, error: e?.message || "Failed to create" });
+          }
+        }
+        return { success, failed };
+      }
+
+      if (path === 'mockupsUpload.storeMockupFile') {
+        // Filenames arrive as Brand_Model_SKU or Model_SKU.
+        const base = String(args?.filename || "").replace(/\.(jpg|jpeg|png|webp)$/i, "");
+        const parts = base.split("_").filter(Boolean);
+        if (parts.length < 2) throw new Error(`Invalid filename: ${args?.filename} — expected Brand_Model_SKU`);
+
+        const sku = parts[parts.length - 1];
+        const brand = parts.length >= 3 ? parts[0] : "";
+        const model = (parts.length >= 3 ? parts.slice(1, -1) : parts.slice(0, -1)).join(" ");
+
+        const existing = await getDocs(query(collection(db, 'mockups'),
+          where('brand', '==', brand), where('model', '==', model), where('sku', '==', sku), limit(1)));
+
+        const payload = {
+          brand, model, sku,
+          r2Key: args.r2Key || `mockups/${brand}/${model}/${sku}.webp`,
+          r2Bucket: 'skinly',
+          storageProvider: 'r2',
+        };
+
+        if (existing.empty) {
+          await addDoc(collection(db, 'mockups'), { ...payload, _creationTime: Date.now() });
+          return { action: "created", brand, model, sku };
+        }
+        await updateDoc(existing.docs[0].ref, payload);
+        return { action: "updated", brand, model, sku };
+      }
+
+      if (path === 'whatsappSeed.checkSeeded') {
+        const [t, u] = await Promise.all([
+          getDocs(collection(db, 'whatsappTemplates')),
+          getDocs(collection(db, 'whatsappUsecases')),
+        ]);
+        return { seeded: !t.empty && !u.empty, templates: t.size, usecases: u.size };
+      }
+
+      if (path === 'whatsappSeed.seedTemplates' || path === 'whatsappSeed.seedUsecases' || path === 'emailSeed.seedEmailUsecases') {
+        // Config was rebuilt from the messages that actually sent; re-seeding
+        // would only overwrite it with guesses.
+        const coll = path === 'whatsappSeed.seedTemplates' ? 'whatsappTemplates'
+          : path === 'whatsappSeed.seedUsecases' ? 'whatsappUsecases'
+          : 'emailUsecaseTemplates';
+        const snap = await getDocs(collection(db, coll));
+        return { skipped: true, existing: snap.size, message: `${snap.size} already configured — nothing to seed` };
+      }
+
+      if (collectionName === 'googleDriveImportPublic' || collectionName === 'googleDriveImport') {
+        const JOB_STATUS: Record<string, string> = {
+          pauseImportJob: 'paused',
+          resumeImportJob: 'pending',
+          cancelImportJob: 'cancelled',
+        };
+        if (JOB_STATUS[actionName]) {
+          if (!args?.jobId) throw new Error("jobId is required");
+          await updateDoc(doc(db, 'googleDriveImportJobs', args.jobId), {
+            status: JOB_STATUS[actionName], updatedAt: Date.now(),
+          });
+          return { success: true };
+        }
+        if (actionName === 'deleteImportJob') {
+          if (!args?.jobId) throw new Error("jobId is required");
+          await deleteDoc(doc(db, 'googleDriveImportJobs', args.jobId));
+          return { success: true };
+        }
+        if (actionName === 'retryFailedFiles') {
+          if (!args?.jobId) throw new Error("jobId is required");
+          const snap = await getDoc(doc(db, 'googleDriveImportJobs', args.jobId));
+          const failed = (snap.exists() ? (snap.data() as any).failedFiles : []) || [];
+          await updateDoc(doc(db, 'googleDriveImportJobs', args.jobId), {
+            status: 'pending', failedFiles: [], retryCount: ((snap.data() as any)?.retryCount || 0) + 1,
+            updatedAt: Date.now(),
+          });
+          return { retried: failed.length };
+        }
+        if (actionName === 'checkApiKeyStatus') {
+          const s = await getDocs(query(collection(db, 'settings'), where('key', '==', 'googleDriveApiKey'), limit(1)));
+          return { configured: !s.empty && !!s.docs[0].data().value };
+        }
+        if (actionName === 'startGoogleDriveImport') {
+          // Listing a Drive folder, pulling each file and turning it into a
+          // product needs a server-side runner with Drive credentials; there
+          // isn't one, and pretending to start would leave a job stuck forever.
+          throw new Error("Google Drive import is not connected yet — no Drive credentials are configured for this project");
+        }
+      }
+
+      if (path === 'stockNotificationsActions.sendRestockNotifications') {
+        if (!args?.variantId) throw new Error("variantId is required");
+
+        // Queued rather than sent here — the worker owns delivery, so these get
+        // the same claim, retry cap and daily ceiling as everything else.
+        const uc = await getDocs(query(collection(db, 'whatsappUsecases'),
+          where('usecaseKey', '==', 'back_in_stock'), limit(1)));
+        if (uc.empty) {
+          throw new Error('No "back_in_stock" WhatsApp template is set up yet — add one under WhatsApp → Usecases first');
+        }
+        if (uc.docs[0].data().enabled !== true) {
+          throw new Error('The "back_in_stock" usecase is switched off — enable it under WhatsApp → Usecases');
+        }
+        const usecase: any = uc.docs[0].data();
+
+        const waiting = await getDocs(query(collection(db, 'stockNotifications'),
+          where('variantId', '==', args.variantId), where('status', '==', 'waiting')));
+        if (waiting.empty) return { queued: 0 };
+
+        const batch = writeBatch(db);
+        waiting.docs.forEach(d => {
+          const n: any = d.data();
+          const msgRef = doc(collection(db, 'whatsappMessages'));
+          batch.set(msgRef, {
+            usecaseKey: 'back_in_stock',
+            templateName: usecase.templateName,
+            providerTemplateId: usecase.providerTemplateId,
+            recipientPhone: n.phoneNumber,
+            recipientUserId: n.userId || null,
+            variables: { product_name: n.productTitle || "", variant_name: n.variantTitle || "" },
+            status: 'pending',
+            retryCount: 0,
+            createdAt: Date.now(),
+          });
+          batch.set(doc(collection(db, 'whatsappQueue')), {
+            messageId: msgRef.id,
+            status: 'pending',
+            attempts: 0,
+            priority: 'normal',
+            scheduledFor: Date.now(),
+          });
+          batch.update(d.ref, { status: 'notified', notifiedAt: Date.now() });
+        });
+        await batch.commit();
+        return { queued: waiting.size };
+      }
+
       if (path === 'whatsappMessaging.triggerWorker' || path === 'whatsappActions.testTemplate') {
         const fn = httpsCallable(functions,
           path === 'whatsappActions.testTemplate' ? 'testWhatsAppTemplate' : 'triggerWhatsAppWorker');
