@@ -4067,6 +4067,34 @@ export function useMutation(apiRef: any) {
         return ref.id;
       }
 
+      if (path === 'whatsappMessaging.triggerWorker' || path === 'whatsappActions.testTemplate') {
+        const fn = httpsCallable(functions,
+          path === 'whatsappActions.testTemplate' ? 'testWhatsAppTemplate' : 'triggerWhatsAppWorker');
+        const res: any = await fn(args || {});
+        return res.data;
+      }
+
+      if (path === 'whatsappAutoFix.autoLinkTemplates') {
+        // Point each usecase at the template it last actually sent with.
+        const [usecases, templates] = await Promise.all([
+          getDocs(collection(db, 'whatsappUsecases')),
+          getDocs(collection(db, 'whatsappTemplates')),
+        ]);
+        const byName = new Map(templates.docs.map(d => [d.data().templateName, d.data()]));
+        const batch = writeBatch(db);
+        let linked = 0;
+        usecases.docs.forEach(d => {
+          const u: any = d.data();
+          const t: any = byName.get(u.templateName);
+          if (t && u.providerTemplateId !== t.providerTemplateId) {
+            batch.update(d.ref, { providerTemplateId: t.providerTemplateId, lastUpdatedAt: Date.now() });
+            linked++;
+          }
+        });
+        if (linked) await batch.commit();
+        return { linked };
+      }
+
       if (path === 'whatsappAutoFix.clearStuckQueue') {
         // Anything left processing is from a worker run that never finished.
         const stuck = await getDocs(query(collection(db, 'whatsappQueue'), where('status', '==', 'processing')));

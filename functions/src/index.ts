@@ -13,3 +13,4 @@ export * from "./orders";
 export * from "./loginOtp";
 export * from "./abandonedCarts";
 export * from "./collectionSync";
+export * from "./whatsappWorker";
