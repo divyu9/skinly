@@ -3,7 +3,7 @@ import { db, functions } from './firebase';
 import { 
   collection, query, where, getDocs, onSnapshot, doc, getDoc,
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
-  writeBatch, DocumentSnapshot, QuerySnapshot, documentId, getCountFromServer, deleteField
+  writeBatch, DocumentSnapshot, QuerySnapshot, documentId, getCountFromServer, deleteField, runTransaction
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
@@ -4065,6 +4065,64 @@ export function useMutation(apiRef: any) {
         const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
         await setDoc(ref, { ...clean, updatedAt: Date.now() }, { merge: true });
         return ref.id;
+      }
+
+      if (path === 'whatsappAutoFix.clearStuckQueue') {
+        // Anything left processing is from a worker run that never finished.
+        const stuck = await getDocs(query(collection(db, 'whatsappQueue'), where('status', '==', 'processing')));
+        const batch = writeBatch(db);
+        stuck.docs.forEach(d => batch.update(d.ref, { status: 'pending', lastAttemptAt: Date.now() }));
+        if (!stuck.empty) await batch.commit();
+        return { cleared: stuck.size };
+      }
+
+      if (path === 'whatsappMessaging.retryMessage') {
+        if (!args?.messageId) throw new Error("messageId is required");
+        await updateDoc(doc(db, 'whatsappMessages', args.messageId), {
+          status: 'pending', retryCount: (args.retryCount || 0) + 1, lastAttemptAt: Date.now(),
+        });
+        const queued = await getDocs(query(collection(db, 'whatsappQueue'), where('messageId', '==', args.messageId), limit(1)));
+        if (!queued.empty) {
+          await updateDoc(queued.docs[0].ref, { status: 'pending', scheduledFor: Date.now() });
+        }
+        return { success: true };
+      }
+
+      if (path === 'wallet.adminCreditWallet' || path === 'wallet.adminDebitWallet') {
+        const isCredit = path.endsWith('adminCreditWallet');
+        const amount = Number(args?.amount);
+        if (!args?.userId) throw new Error("userId is required");
+        if (!(amount > 0)) throw new Error("Amount must be greater than 0");
+
+        const { getAuth } = await import('firebase/auth');
+        const adminEmail = getAuth().currentUser?.email || null;
+        const userRef = doc(db, 'users', args.userId);
+
+        // Balance and ledger row must move together, or the two disagree.
+        const result = await runTransaction(db, async (tx) => {
+          const snap = await tx.get(userRef);
+          if (!snap.exists()) throw new Error("User not found");
+
+          const before = snap.data().walletBalance || 0;
+          if (!isCredit && before < amount) throw new Error(`Insufficient balance (₹${before})`);
+          const after = isCredit ? before + amount : before - amount;
+
+          tx.update(userRef, { walletBalance: after });
+          tx.set(doc(collection(db, 'walletTransactions')), {
+            userId: args.userId,
+            transactionType: isCredit ? "credit" : "debit",
+            amount,
+            source: isCredit ? "admin_credit" : "admin_debit",
+            balanceBefore: before,
+            balanceAfter: after,
+            description: args.description || "",
+            adminEmail,
+            createdAt: Date.now(),
+          });
+          return after;
+        });
+
+        return { success: true, newBalance: result };
       }
 
       if (collectionName === 'rollsManagement') {
