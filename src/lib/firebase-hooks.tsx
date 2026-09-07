@@ -3,7 +3,7 @@ import { db, functions } from './firebase';
 import { 
   collection, query, where, getDocs, onSnapshot, doc, getDoc,
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
-  writeBatch, DocumentSnapshot, QuerySnapshot, documentId, getCountFromServer
+  writeBatch, DocumentSnapshot, QuerySnapshot, documentId, getCountFromServer, deleteField
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
@@ -3966,6 +3966,33 @@ export function useMutation(apiRef: any) {
       }
       // ── end seoPages ──
 
+      if (path === 'homepage.bulkUpdateCategoryDisplaySettings') {
+        // Rows are keyed by categoryName, not by a document id, and the payload
+        // is a whole array — the generic writer has nothing to aim at.
+        const incoming: any[] = args?.categories || [];
+        const existing = await getDocs(collection(db, 'categoryDisplaySettings'));
+        const byName = new Map(existing.docs.map(d => [d.data().categoryName, d.id]));
+
+        const { getAuth } = await import('firebase/auth');
+        const editor = getAuth().currentUser?.email || null;
+
+        for (let i = 0; i < incoming.length; i += 400) {
+          const batch = writeBatch(db);
+          incoming.slice(i, i + 400).forEach(cat => {
+            const clean = Object.fromEntries(Object.entries(cat).filter(([, v]) => v !== undefined));
+            const payload = { ...clean, updatedAt: Date.now(), ...(editor ? { updatedBy: editor } : {}) };
+            const id = byName.get(cat.categoryName);
+            batch.set(
+              id ? doc(db, 'categoryDisplaySettings', id) : doc(collection(db, 'categoryDisplaySettings')),
+              payload,
+              { merge: true }
+            );
+          });
+          await batch.commit();
+        }
+        return { success: true, updated: incoming.length };
+      }
+
       // These namespaces have no collection of their own — they edit products in
       // bulk, so the generic writer would aim at a collection that
       // does not exist (and they carry no single document id anyway).
@@ -4023,8 +4050,68 @@ export function useMutation(apiRef: any) {
         }
       }
 
+      // Settings that live as a single document. The generic writer needs an id
+      // and these payloads have none, so it rejected every save.
+      const SINGLETON = {
+        'cod.updateCodSettings': 'codSettings',
+        'cod.initializeCodSettings': 'codSettings',
+        'wallet.saveWalletSettings': 'walletSettings',
+        'shipping.updateShippingSettings': 'shippingSettings',
+        'codDisplayRules.updateDisplaySettings': 'codSettings',
+      }[path];
+      if (SINGLETON) {
+        const existing = await getDocs(query(collection(db, SINGLETON), limit(1)));
+        const ref = existing.empty ? doc(collection(db, SINGLETON)) : doc(db, SINGLETON, existing.docs[0].id);
+        const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        await setDoc(ref, { ...clean, updatedAt: Date.now() }, { merge: true });
+        return ref.id;
+      }
+
+      if (collectionName === 'rollsManagement') {
+        // R-numbers and multipliers live on variants, not on a rollsManagement
+        // collection — there isn't one.
+        if (actionName === 'assignRNumber') {
+          await updateDoc(doc(db, 'variants', args.variantId), { rNumber: args.rNumber });
+          return { success: true };
+        }
+        if (actionName === 'removeRNumberAssignment') {
+          await updateDoc(doc(db, 'variants', args.variantId), { rNumber: deleteField() });
+          return { success: true };
+        }
+        if (actionName === 'updateMaterialMultiplier') {
+          await updateDoc(doc(db, 'variants', args.variantId), { materialMultiplier: args.multiplier });
+          return { success: true };
+        }
+        if (actionName === 'bulkAssignRNumber') {
+          const ids: string[] = args.productIds || [];
+          let updated = 0;
+          for (const pid of ids) {
+            const vs = await getDocs(query(collection(db, 'variants'), where('productId', '==', pid)));
+            const batch = writeBatch(db);
+            vs.docs.forEach(v => { batch.update(v.ref, { rNumber: args.rNumber }); updated++; });
+            if (!vs.empty) await batch.commit();
+          }
+          return { success: true, updated };
+        }
+      }
+
+      if (path === 'settings.updateSetting') {
+        await setDoc(doc(db, 'settings', args.key), { ...args, updatedAt: Date.now() }, { merge: true });
+        return args.key;
+      }
+
       let targetCollection = collectionName;
-      if (actionName.toLowerCase().includes('heroslide')) targetCollection = 'heroSlides';
+      // These namespaces cover more than one collection, so the target depends on
+      // the action rather than the namespace.
+      const byAction = actionName.toLowerCase();
+      if (byAction.includes('rollinventory')) targetCollection = 'rollInventory';
+      else if (byAction.includes('gadgetconsumption')) targetCollection = 'gadgetConsumption';
+      else if (byAction.includes('suggestedproducts')) targetCollection = 'suggestedProductsConfig';
+      else if (byAction.includes('trendingproducts')) targetCollection = 'trendingProductsConfig';
+      else if (byAction.includes('sectioncontent')) targetCollection = 'productSectionContent';
+      else if (collectionName === 'cashback') targetCollection = 'cashbackRules';
+      else if (collectionName === 'whatsapp' && byAction.includes('template')) targetCollection = 'whatsappTemplates';
+      else if (actionName.toLowerCase().includes('heroslide')) targetCollection = 'heroSlides';
       else if (actionName.toLowerCase().includes('featurebanner')) targetCollection = 'featureBanners';
       else if (actionName.toLowerCase().includes('ugcvideo')) targetCollection = 'ugcVideos';
       else if (actionName === 'updateHomepageSettings') targetCollection = 'homepageSettings';
