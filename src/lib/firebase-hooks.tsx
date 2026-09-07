@@ -3327,7 +3327,7 @@ export function useMutation(apiRef: any) {
               h1Pattern: "{Keyword} - Best Quality at GoSkinly",
               introLength: "3-4 paragraphs",
               includeSections: ["benefits", "features", "comparison", "why-goskinly", "installation"],
-              keywordsToInclude: ["best", "premium", "quality", "goskinly", "noida"],
+              keywordsToInclude: ["best", "premium", "quality", "goskinly", "agra"],
             },
           },
         ]);

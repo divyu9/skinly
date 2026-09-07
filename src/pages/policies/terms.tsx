@@ -129,7 +129,7 @@ export default function TermsOfService() {
               <p className="mb-4">If you have any questions about these Terms, please contact us:</p>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="font-semibold mb-2">Mad House Media</p>
-                <p className="mb-1">GT-06, 2nd Floor, Sector 117, Noida - 201304</p>
+                <p className="mb-1">G-2, Ganpati Vilas, Khandari Road, Agra 282002</p>
                 <p className="mb-1">Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></p>
                 <p>WhatsApp: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></p>
               </div>

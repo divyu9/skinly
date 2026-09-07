@@ -53,7 +53,7 @@ export default function PrivacyPolicy() {
             <section className="mb-8">
               <h2 className="text-2xl font-bold mb-4">Who We Are</h2>
               <p className="mb-4">Our website address is: <a href="https://goskinly.com" className="text-primary hover:underline">https://goskinly.com</a></p>
-              <p className="mb-4">Skinly is operated by Mad House Media, located at: GT-06, 2nd Floor, Sector 117, Noida - 201304, India</p>
+              <p className="mb-4">Skinly is operated by Mad House Media, located at: G-2, Ganpati Vilas, Khandari Road, Agra 282002, India</p>
               <p className="mb-4">For privacy-related inquiries or support, you can reach us at:</p>
               <ul className="list-disc pl-6 mb-4">
                 <li>Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></li>
@@ -139,7 +139,7 @@ export default function PrivacyPolicy() {
               <p className="mb-4">For any questions about this Privacy Policy, please contact us:</p>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="font-semibold mb-2">Mad House Media</p>
-                <p className="mb-1">GT-06, 2nd Floor, Sector 117, Noida - 201304</p>
+                <p className="mb-1">G-2, Ganpati Vilas, Khandari Road, Agra 282002</p>
                 <p className="mb-1">Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></p>
                 <p>WhatsApp: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></p>
               </div>
