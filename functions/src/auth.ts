@@ -1,4 +1,3 @@
-import * as admin from "firebase-admin";
 import { HttpsError } from "firebase-functions/v1/https";
 
 export const getCaller = (request: any) => {
@@ -24,6 +23,12 @@ const parseAllowlist = (value: string | undefined) => {
     .filter(Boolean);
 };
 
+/**
+ * Admin is proven by a custom claim on the ID token, or by an email on the
+ * server-side allowlist. It is deliberately NOT read from users/{uid}.isAdmin
+ * any more: that document is writable by the user it belongs to, so trusting a
+ * field in it let any customer grant themselves every admin function.
+ */
 export const requireAdmin = async (request: any) => {
   const { uid, token } = getCaller(request);
   if (!uid) {
@@ -36,31 +41,11 @@ export const requireAdmin = async (request: any) => {
 
   const allowlist = parseAllowlist(process.env.ADMIN_EMAIL_ALLOWLIST);
   const email = (token?.email || "").toLowerCase();
-  if (email && allowlist.includes(email)) {
+  // email_verified guards against a provider that lets an address be claimed
+  // without proving it.
+  if (email && token?.email_verified !== false && allowlist.includes(email)) {
     return { uid };
-  }
-
-  const db = admin.firestore();
-
-  const snap = await db.collection("users").doc(uid).get();
-  if (snap.exists && snap.data()?.isAdmin === true) {
-    return { uid };
-  }
-
-  // User documents were imported from the previous backend keyed by its own
-  // ids, so users/{authUid} does not exist for anyone who predates the move.
-  // Fall back to matching on the email the token already proves they own.
-  if (email) {
-    const byEmail = await db
-      .collection("users")
-      .where("email", "==", email)
-      .limit(1)
-      .get();
-    if (!byEmail.empty && byEmail.docs[0].data()?.isAdmin === true) {
-      return { uid };
-    }
   }
 
   throw new HttpsError("permission-denied", "Your account is not an admin");
 };
-

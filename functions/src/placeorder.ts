@@ -49,7 +49,10 @@ export const placeOrder = functions
     const { uid } = getCaller(context);
     const db = admin.firestore();
 
-    const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId, customerPhone } = data;
+    const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems,
+            sessionId: reqSessionId, customerPhone, couponId, walletAmount } = data;
+    // Note: couponDiscount / prepaidAmount / amount also arrive from the client.
+    // They are deliberately ignored — every figure below is re-derived here.
 
     // ── 1. Kick off order number reservation immediately (runs in background) ──
     // Cart fetch + variant query take ~500ms. The counter transaction takes ~800-1200ms.
@@ -95,14 +98,73 @@ export const placeOrder = functions
       }
     }
 
-    const calculatedTotal = orderItems.reduce((sum, item) => {
-      const qty = Number(item?.quantity || 1);
-      if (item?.productId && item?.variant) {
-        const dbPrice = priceMap.get(`${String(item.productId)}::${String(item.variant)}`);
-        if (typeof dbPrice === "number") return sum + dbPrice * qty;
+    // Price comes from the variant document, always. The old fallback to
+    // `item.price` meant a cart line naming a variant that does not exist was
+    // billed at whatever the caller claimed — send variant "zzz" with price 1
+    // and a ₹5,000 order became ₹1.
+    const itemsTotal = orderItems.reduce((sum, item) => {
+      const qty = Math.max(1, Math.floor(Number(item?.quantity || 1)));
+      const dbPrice = item?.productId && item?.variant
+        ? priceMap.get(`${String(item.productId)}::${String(item.variant)}`)
+        : undefined;
+      if (typeof dbPrice !== "number") {
+        throw new HttpsError(
+          "failed-precondition",
+          `No such variant "${item?.variant}" for product ${item?.productId}`
+        );
       }
-      return sum + Number(item?.price || 0) * qty;
+      return sum + dbPrice * qty;
     }, 0);
+
+    // ── 3b. Re-derive every discount server-side ──────────────────────────────
+    let couponDiscount = 0;
+    if (couponId && typeof couponId === "string") {
+      const cSnap = await db.collection("coupons").doc(couponId).get();
+      const c = cSnap.exists ? (cSnap.data() as any) : null;
+      if (c && c.isActive === true && itemsTotal >= Number(c.minPurchaseAmount || 0)) {
+        if (c.discountType === "percentage") {
+          couponDiscount = Math.floor(itemsTotal * (Number(c.discountValue || 0) / 100));
+          if (c.maxDiscountAmount) couponDiscount = Math.min(couponDiscount, Number(c.maxDiscountAmount));
+        } else {
+          couponDiscount = Math.min(itemsTotal, Number(c.discountValue || 0));
+        }
+        // A wallet-credit coupon pays out afterwards; it is not money off now.
+        if (c.isWalletCredit === true) couponDiscount = 0;
+      }
+    }
+
+    // Wallet is capped by the balance the server can see, never by the request.
+    let walletUsed = 0;
+    if (uid && Number(walletAmount) > 0) {
+      const uSnap = await db.collection("users").doc(uid).get();
+      const balance = Number(uSnap.exists ? (uSnap.data() as any)?.walletBalance || 0 : 0);
+      walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal - couponDiscount));
+    }
+
+    // COD fee and the prepaid split come from codSettings, same formula the
+    // storefront shows.
+    let codFee = 0;
+    let prepaidAmount = 0;
+    if (paymentMethod === "cod") {
+      const cs = await db.collection("codSettings").limit(1).get();
+      const st = cs.empty ? {} : (cs.docs[0].data() as any);
+      const base = itemsTotal - couponDiscount - walletUsed;
+      codFee = st.codFeeType === "fixed"
+        ? Number(st.codFeeValue || 0)
+        : (base * Number(st.codFeeValue || 0)) / 100;
+      if (st.partialCodEnabled === true) {
+        prepaidAmount = st.prepaidType === "fixed"
+          ? Number(st.prepaidValue || 0)
+          : (base * Number(st.prepaidValue || 0)) / 100;
+      }
+    }
+
+    const calculatedTotal = Math.max(0, itemsTotal - couponDiscount - walletUsed + codFee);
+    // What PhonePe must collect right now: the whole thing for prepaid, only
+    // the prepaid slice for partial COD.
+    const amountPayable = paymentMethod === "cod"
+      ? Math.max(0, Math.min(prepaidAmount, calculatedTotal))
+      : calculatedTotal;
 
     // ── 4. Write order ────────────────────────────────────────────────────────
     // Collect the order number now — by this point cart+variants took ~500ms,
@@ -119,7 +181,15 @@ export const placeOrder = functions
       paymentMethod: paymentMethod || "prepaid",
       status: "pending",
       paymentStatus: "pending",
+      itemsTotal,
+      couponId: couponId || null,
+      couponDiscount,
+      walletUsed,
+      codFee,
+      prepaidAmount,
       total: calculatedTotal,
+      // The only figure any payment step may charge.
+      amountPayable,
       items: orderItems,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -133,7 +203,7 @@ export const placeOrder = functions
 
       const config = getPhonePeConfig();
       const merchantTransactionId = `${orderNumber.replace("#", "")}-${Date.now().toString().slice(-6)}`;
-      const amountInPaise = Math.max(Math.round(calculatedTotal * 100), 100);
+      const amountInPaise = Math.max(Math.round(amountPayable * 100), 100);
       const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
       const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
 

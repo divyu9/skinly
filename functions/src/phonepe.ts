@@ -34,9 +34,12 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
   const { uid } = getCaller(context);
   await enforceDailyRateLimit({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
 
-  const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
+  // `amount` is accepted for backward compatibility and then ignored — what
+  // gets charged is read off the order below. Trusting the caller's figure let
+  // anyone pay ₹1 for any order.
+  const { orderId, customerPhone, orderNumber, sessionId } = data;
 
-  if (!orderId || !amount || !customerPhone) {
+  if (!orderId || !customerPhone) {
     throw new HttpsError("invalid-argument", "Missing required fields");
   }
   if (typeof orderId !== "string" || orderId.length > 128) {
@@ -49,10 +52,6 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
   if (!/^[0-9]{10}$/.test(phoneDigits)) {
     throw new HttpsError("invalid-argument", "Invalid phone number");
   }
-  if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
-    throw new HttpsError("invalid-argument", "Invalid amount");
-  }
-
   const config = getPhonePeConfig();
 
   const orderRef = admin.firestore().collection("orders").doc(orderId);
@@ -88,12 +87,21 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
     }
   }
 
+  // The single source of truth for what this order costs.
+  const payable = Number(order.amountPayable ?? order.total);
+  if (!Number.isFinite(payable) || payable <= 0) {
+    throw new HttpsError("failed-precondition", "Order has no payable amount");
+  }
+  if (order.paymentStatus === "success") {
+    throw new HttpsError("failed-precondition", "Order is already paid");
+  }
+
   const timestamp = Date.now();
   const last6 = timestamp.toString().slice(-6);
   const orderRefSuffix = orderNumber || orderId.slice(-8);
   const merchantTransactionId = `${orderRefSuffix}-${last6}`;
 
-  const amountInPaise = Math.max(Math.round(amount * 100), 100);
+  const amountInPaise = Math.max(Math.round(payable * 100), 100);
   const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
   // callbackUrl must be the Firebase Function endpoint so PhonePe can POST to a real server
   const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
@@ -247,9 +255,31 @@ export const checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSe
         .get();
 
       if (!ordersSnap.empty) {
-        await ordersSnap.docs[0].ref.update({
+        const orderDoc = ordersSnap.docs[0];
+        const o = orderDoc.data() as any;
+
+        // PhonePe reporting COMPLETED is not the same as PhonePe having
+        // collected the right amount. Without this check an underpayment still
+        // moved the order to `processing`.
+        const expectedPaise = Math.max(Math.round(Number(o.amountPayable ?? o.total) * 100), 100);
+        const paidPaise = Number(responseData.data?.amount);
+
+        if (!Number.isFinite(paidPaise) || paidPaise < expectedPaise) {
+          console.error("PhonePe amount mismatch", {
+            merchantTransactionId, orderId: orderDoc.id, paidPaise, expectedPaise,
+          });
+          await orderDoc.ref.update({
+            paymentStatus: "underpaid",
+            paymentAmountPaise: Number.isFinite(paidPaise) ? paidPaise : null,
+            updatedAt: Date.now(),
+          });
+          throw new HttpsError("failed-precondition", "Payment amount does not match the order");
+        }
+
+        await orderDoc.ref.update({
           paymentStatus: "success",
           status: "processing",
+          paymentAmountPaise: paidPaise,
           updatedAt: Date.now()
         });
       }

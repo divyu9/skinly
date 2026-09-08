@@ -1,74 +1,176 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 1. Utility Functions
-    function isAuthenticated() {
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Rules combine with OR: a narrower `allow ... if false` can never revoke a
+    // broader `allow ... if true` declared elsewhere. So there is no catch-all
+    // grant here — every collection states its own access, and anything not
+    // listed is denied.
+    //
+    // Admin is proven by a custom claim on the ID token, which only the Admin
+    // SDK can mint. It must never be read from a document the user can write:
+    // users/{uid} is self-writable, so an `isAdmin` field there would let any
+    // customer grant themselves the whole database.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.email == 'chandan1992@gmail.com' ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Fields a customer must never set on their own user document.
+    function noPrivilegedFields() {
+      return !request.resource.data.diff(resource.data)
+                .affectedKeys()
+                .hasAny(['isAdmin', 'walletBalance', 'role', 'permissions']);
+    }
+
+    // ── Public catalogue ──────────────────────────────────────────────────────
+    // Read-only to the world; written by admins through the dashboard.
+    match /products/{id}                 { allow read: if true; allow write: if isAdmin(); }
+    match /variants/{id}                 { allow read: if true; allow write: if isAdmin(); }
+    match /collections/{id}              { allow read: if true; allow write: if isAdmin(); }
+    match /collectionProducts/{id}       { allow read: if true; allow write: if isAdmin(); }
+    match /phoneCollections/{id}         { allow read: if true; allow write: if isAdmin(); }
+    match /mockups/{id}                  { allow read: if true; allow write: if isAdmin(); }
+    match /modelMetadata/{id}            { allow read: if true; allow write: if isAdmin(); }
+    match /supportedModels/{id}          { allow read: if true; allow write: if isAdmin(); }
+    match /gadgetTypes/{id}              { allow read: if true; allow write: if isAdmin(); }
+    match /finishTypes/{id}              { allow read: if true; allow write: if isAdmin(); }
+    match /productSectionContent/{id}    { allow read: if true; allow write: if isAdmin(); }
+    match /productCategoriesConfig/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /categoryDisplaySettings/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /trendingProductsConfig/{id}   { allow read: if true; allow write: if isAdmin(); }
+    match /suggestedProductsConfig/{id}  { allow read: if true; allow write: if isAdmin(); }
+    match /checkoutUpsells/{id}          { allow read: if true; allow write: if isAdmin(); }
+    match /homepageSettings/{id}         { allow read: if true; allow write: if isAdmin(); }
+    match /homepageSections/{id}         { allow read: if true; allow write: if isAdmin(); }
+    match /homepageSectionCards/{id}     { allow read: if true; allow write: if isAdmin(); }
+    match /heroSlides/{id}               { allow read: if true; allow write: if isAdmin(); }
+    match /featureBanners/{id}           { allow read: if true; allow write: if isAdmin(); }
+    match /ugcVideos/{id}                { allow read: if true; allow write: if isAdmin(); }
+    match /seoPages/{id}                 { allow read: if true; allow write: if isAdmin(); }
+    match /seoPageTemplates/{id}         { allow read: if true; allow write: if isAdmin(); }
+    match /settings/{id}                 { allow read: if true; allow write: if isAdmin(); }
+    match /walletSettings/{id}           { allow read: if true; allow write: if isAdmin(); }
+    match /codSettings/{id}              { allow read: if true; allow write: if isAdmin(); }
+    match /cashbackRules/{id}            { allow read: if true; allow write: if isAdmin(); }
+
+    // Coupons are validated in the browser, so the codes have to be readable.
+    // The discount is recomputed server-side in placeOrder, so a tampered
+    // client cannot turn a readable code into a cheaper order.
+    match /coupons/{id}                  { allow read: if true; allow write: if isAdmin(); }
+
+    // Reviews are public to read; a signed-in customer may add one.
+    match /reviews/{id} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── User profiles ─────────────────────────────────────────────────────────
+    // Documents were imported from the previous backend keyed by ITS ids, so
+    // users/{docId} is almost never the caller's auth uid — the uid lives in
+    // `clerkId`. Ownership has to be matched on the fields, not the key, or
+    // every customer loses their own profile and wallet.
+    function ownsUserDoc(userId) {
+      return isSignedIn() && (
+        request.auth.uid == userId ||
+        resource.data.clerkId == request.auth.uid ||
+        (request.auth.token.email != null && resource.data.email == request.auth.token.email)
       );
     }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
 
-    // 2. Global Public Reads (Products, Pages, Mockups, etc)
-    // Allows your public catalog to render without authentication
-    match /{document=**} {
-      allow read: if true; 
-      // By default, no one can write anywhere unless explicitly allowed below
-      allow write: if isAdmin();
-    }
-
-    // Only the Cloud Functions (Admin SDK) should touch OTP records.
-    // NOTE: this block is currently inert — rules combine with OR, so the
-    // catch-all `allow read: if true` above still grants read here. It becomes
-    // effective only once that catch-all is narrowed. Until then the codes are
-    // protected by being stored as a peppered hash, never in plaintext.
-    match /loginOtps/{docId} {
-      allow read, write: if false;
-    }
-
-    // 3. User Profiles & Wallet
     match /users/{userId} {
-      // Users can read/write their own profile
-      allow read, write: if isOwner(userId) || isAdmin();
-    }
-    
-    match /walletTransactions/{txnId} {
-      // Users can see their own wallet transactions
-      allow read: if isOwner(resource.data.userId) || isAdmin();
-      // Only admins (or backend cloud functions) can create/update transactions
-      allow write: if isAdmin();
+      allow get: if isAdmin() || ownsUserDoc(userId);
+      // The app resolves a legacy doc with where('email','==',myEmail). This
+      // rule makes exactly that query legal and nothing wider.
+      allow list: if isAdmin()
+                  || (isSignedIn() && request.auth.token.email != null
+                      && resource.data.email == request.auth.token.email);
+      allow create: if isOwner(userId)
+                    && !request.resource.data.keys().hasAny(['isAdmin', 'walletBalance', 'role', 'permissions']);
+      allow update: if isAdmin() || (ownsUserDoc(userId) && noPrivilegedFields());
+      allow delete: if isAdmin();
     }
 
-    // 4. Orders
+    // ── Orders ────────────────────────────────────────────────────────────────
+    // One order is fetchable by anyone holding its document id — that is how
+    // guest tracking works, and the ids are unguessable. Listing now needs a
+    // signed-in caller, which ends the anonymous dump of the whole order book.
+    //
+    // Deliberately not yet scoped to the caller's own orders: `userId` on live
+    // data is a mix of auth uids, legacy user-doc ids, session ids and nulls, so
+    // `resource.data.userId == request.auth.uid` would hide 48 real orders from
+    // the customers who placed them. Tightening needs the userId backfill.
     match /orders/{orderId} {
-      // Users can read their own orders. Guests can read if they have the tracking token (handled by app logic/backend)
-      allow read: if isOwner(resource.data.userId) || resource.data.userId == 'guest' || isAdmin();
-      // NO DIRECT CLIENT WRITES! 
-      // Orders are created/updated exclusively by the secure Cloud Function
+      allow get: if true;
+      allow list: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // 5. Cart
+    // ── Cart ──────────────────────────────────────────────────────────────────
+    // Guest carts are keyed by a sessionId rules cannot verify, so those rows
+    // stay open. Rows owned by a signed-in customer are locked to them, which
+    // stops anyone planting priced items in someone else's cart.
     match /cart/{cartId} {
-      // Anyone (even guests) can read/write to the cart. 
-      // The application relies on `userId` or `sessionId` to filter carts.
-      allow read, write: if true;
+      allow create: if true;
+      allow read, update, delete: if isAdmin()
+                                  || !('userId' in resource.data)
+                                  || resource.data.userId == null
+                                  || isOwner(resource.data.userId);
     }
 
-    // 6. Settings & Sensitive Configs
-    match /settings/{settingId} {
-      // Public can read basic settings (like logo URLs)
-      allow read: if true;
-      // Only admins can modify settings
+    // ── Money ─────────────────────────────────────────────────────────────────
+    match /walletTransactions/{txnId} {
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      // Same legacy-id caveat as orders: rows still carry the old user-doc id.
+      allow list: if isSignedIn();
       allow write: if isAdmin();
     }
+
+    match /couponUsage/{id} {
+      allow get, list: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Customer-submitted forms ──────────────────────────────────────────────
+    // Anyone may submit; only admins may read them back.
+    match /bugReports/{id}        { allow create: if true; allow read, update, delete: if isAdmin(); }
+    match /bugAttachments/{id}    { allow create: if true; allow read, update, delete: if isAdmin(); }
+    match /modelRequests/{id}     { allow create: if true; allow read, update, delete: if isAdmin(); }
+    match /stockNotifications/{id}{ allow create: if true; allow read, update, delete: if isAdmin(); }
+
+    // ── Login codes ───────────────────────────────────────────────────────────
+    // Only the Admin SDK inside Cloud Functions touches these. With the
+    // catch-all gone, this denial is finally effective.
+    match /loginOtps/{id}         { allow read, write: if false; }
+    match /rateLimits/{id}        { allow read, write: if false; }
+
+    // ── Admin-only back office ────────────────────────────────────────────────
+    match /abandonedCarts/{id}          { allow read, write: if isAdmin(); }
+    match /abandonedCartSettings/{id}   { allow read, write: if isAdmin(); }
+    match /whatsappMessages/{id}        { allow read, write: if isAdmin(); }
+    match /whatsappQueue/{id}           { allow read, write: if isAdmin(); }
+    match /whatsappTemplates/{id}       { allow read, write: if isAdmin(); }
+    match /whatsappUsecases/{id}        { allow read, write: if isAdmin(); }
+    match /whatsappSettings/{id}        { allow read, write: if isAdmin(); }
+    match /whatsappDebugLogs/{id}       { allow read, write: if isAdmin(); }
+    match /emailUsecaseTemplates/{id}   { allow read, write: if isAdmin(); }
+    match /mediaLibrary/{id}            { allow read, write: if isAdmin(); }
+    match /uploadJobs/{id}              { allow read, write: if isAdmin(); }
+    match /googleDriveImportJobs/{id}   { allow read, write: if isAdmin(); }
+    match /rollInventory/{id}           { allow read, write: if isAdmin(); }
+    match /gadgetConsumption/{id}       { allow read, write: if isAdmin(); }
+    match /variantConsumptionPresets/{id} { allow read, write: if isAdmin(); }
   }
 }
