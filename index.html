@@ -224,6 +224,10 @@
     
     <!-- Critical CSS - Inlined for above-the-fold content -->
     <style>
+      /* Cascade layers: unlayered rules outrank every @layer, so this block
+         must sit in `base` or its reset would beat Tailwind's utilities and
+         strip the border off every element in the app. */
+      @layer base {
       /* Critical layout and base styles */
       *,::before,::after{box-sizing:border-box;border:0 solid}html{-webkit-text-size-adjust:100%;tab-size:4;font-family:ui-sans-serif,system-ui,sans-serif}body{margin:0;line-height:inherit}
       
@@ -245,6 +249,7 @@
       
       /* Hide content during load to prevent FOUC */
       #root{min-height:100vh}
+      }
     </style>
     
     <!-- Load full CSS and fonts asynchronously -->
