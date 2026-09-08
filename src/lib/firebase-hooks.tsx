@@ -1518,7 +1518,8 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'products.getAllProducts' || path === 'products.getAllProductsBasic') {
           const q = query(collection(db, 'products'));
           unsubscribe = onSnapshot(q, async (snap) => {
-            // Fetch all variants in one batch, build both a SKUs map and a full variants map
+            // One pass over variants builds every per-product summary the admin
+            // table reads: SKU list, the row's editable variant, and stock totals.
             const variantsSnap = await getDocs(collection(db, 'variants'));
             const variantSkusMap: Record<string, string[]> = {};
             const variantsMap: Record<string, any[]> = {};
@@ -1533,6 +1534,21 @@ export function useQuery(apiRef: any, args?: any) {
               variantsMap[vData.productId].push({ _id: vDoc.id, ...vData });
             });
 
+            // Products carry no collectionId of their own — membership lives in
+            // the collectionProducts join, so resolve it here.
+            const collectionIdsMap: Record<string, string[]> = {};
+            try {
+              const linksSnap = await getDocs(collection(db, 'collectionProducts'));
+              linksSnap.docs.forEach(l => {
+                const { productId, collectionId } = l.data() as any;
+                if (!productId || !collectionId) return;
+                if (!collectionIdsMap[productId]) collectionIdsMap[productId] = [];
+                collectionIdsMap[productId].push(collectionId);
+              });
+            } catch (err) {
+              console.error('[firebase-hooks] could not read collectionProducts:', err);
+            }
+
             let docs = snap.docs.map(d => {
               const data = d.data();
               const normalizedTags = Array.isArray(data.tags)
@@ -1540,16 +1556,36 @@ export function useQuery(apiRef: any, args?: any) {
                 : typeof data.tags === "string"
                   ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
                   : [];
+              const variants = variantsMap[d.id] || [];
+              const collectionIds = collectionIdsMap[d.id] || [];
               return {
                 _id: d.id,
                 ...data,
                 title: data.title || "",
                 description: data.description || "",
                 slug: data.slug || "",
+                status: data.status || "draft",
+                images: Array.isArray(data.images) ? data.images : [],
                 tags: normalizedTags,
                 variantSkus: data.variantSkus || variantSkusMap[d.id] || [],
-                variants: variantsMap[d.id] || [],
+                variants,
+                variantCount: variants.length,
+                firstVariant: variants[0] || null,
+                totalInventory: variants.reduce(
+                  (sum: number, v: any) => sum + (Number(v.inventoryQuantity) || 0), 0),
+                collectionIds,
+                collectionId: data.collectionId || collectionIds[0] || null,
               };
+            });
+
+            const sortBy = args?.sortBy || 'latest';
+            docs.sort((a: any, b: any) => {
+              switch (sortBy) {
+                case 'oldest': return (a._creationTime || 0) - (b._creationTime || 0);
+                case 'title_asc': return a.title.localeCompare(b.title);
+                case 'title_desc': return b.title.localeCompare(a.title);
+                default: return (b._creationTime || 0) - (a._creationTime || 0);
+              }
             });
             setData(docs);
           });
@@ -1643,7 +1679,101 @@ export function useQuery(apiRef: any, args?: any) {
           fetchExportData();
         }
         else if (path === 'rollsManagement.getStockLevels') {
-          setData([]);
+          // How many units each variant can still be cut from its vinyl roll.
+          // A variant with no R-number is not made from roll material at all
+          // (accessories), so it is reported as unlimited rather than zero.
+          const ROLL_WIDTH_CM = 29.5;
+          const UNLIMITED = 999999;
+
+          const computeStockLevels = async () => {
+            try {
+              const [vSnap, pSnap, rSnap, gSnap] = await Promise.all([
+                getDocs(collection(db, 'variants')),
+                getDocs(collection(db, 'products')),
+                getDocs(collection(db, 'rollInventory')),
+                getDocs(collection(db, 'gadgetConsumption')),
+              ]);
+
+              const productsMap: Record<string, any> = {};
+              pSnap.docs.forEach(d => { productsMap[d.id] = d.data(); });
+
+              const rollsMap: Record<string, any> = {};
+              rSnap.docs.forEach(d => {
+                const r = d.data() as any;
+                if (r.rNumber) rollsMap[r.rNumber] = r;
+              });
+
+              // Consumption rows are keyed by gadget type, which products carry
+              // directly; the category name is only a fallback for older rows.
+              const gadgetByTypeId: Record<string, any> = {};
+              const gadgetByName: Record<string, any> = {};
+              gSnap.docs.forEach(d => {
+                const g = d.data() as any;
+                if (g.gadgetTypeId) gadgetByTypeId[g.gadgetTypeId] = g;
+                if (g.categoryName) gadgetByName[String(g.categoryName).toLowerCase()] = g;
+              });
+
+              const levels = vSnap.docs.map(vDoc => {
+                const variant = vDoc.data() as any;
+                const product = productsMap[variant.productId];
+                if (!product) return null;
+
+                const rNumber = variant.rNumber || null;
+                if (!rNumber) {
+                  return { variantId: vDoc.id, availableUnits: UNLIMITED, rollMeters: 0, rNumber: null, designName: null };
+                }
+
+                const roll = rollsMap[rNumber];
+                if (!roll || !(Number(roll.metersAvailable) > 0)) {
+                  return {
+                    variantId: vDoc.id, availableUnits: 0, rollMeters: 0,
+                    rNumber, designName: roll?.designName || null,
+                  };
+                }
+
+                const rollMeters = Number(roll.metersAvailable);
+                const gadget = gadgetByTypeId[product.gadgetTypeId]
+                  || gadgetByName[String(product.gadgetCategory || '').toLowerCase()];
+                if (!gadget || !(gadget.lengthCm > 0) || !(gadget.widthCm > 0)) {
+                  // Nothing to measure against — do not claim it is out of stock.
+                  return { variantId: vDoc.id, availableUnits: UNLIMITED, rollMeters, rNumber, designName: roll.designName || null };
+                }
+
+                const rollLengthCm = rollMeters * 100;
+                const multiplier = Number(variant.materialMultiplier) || 1;
+                let availableUnits: number;
+
+                if (roll.isContinuous) {
+                  const totalAreaCm2 = ROLL_WIDTH_CM * rollLengthCm;
+                  availableUnits = Math.floor(totalAreaCm2 / (gadget.lengthCm * gadget.widthCm * multiplier));
+                } else {
+                  // Non-continuous prints cannot be rotated freely, so count
+                  // whole pieces in each orientation and keep the better one.
+                  const effLength = gadget.lengthCm * Math.sqrt(multiplier);
+                  const effWidth = gadget.widthCm * Math.sqrt(multiplier);
+                  const units1 = Math.floor(ROLL_WIDTH_CM / effWidth) * Math.floor(rollLengthCm / effLength);
+                  const units2 = effLength <= ROLL_WIDTH_CM
+                    ? Math.floor(ROLL_WIDTH_CM / effLength) * Math.floor(rollLengthCm / effWidth)
+                    : 0;
+                  availableUnits = Math.max(units1, units2);
+                }
+
+                return {
+                  variantId: vDoc.id,
+                  availableUnits: Number.isFinite(availableUnits) ? Math.max(0, availableUnits) : 0,
+                  rollMeters,
+                  rNumber,
+                  designName: roll.designName || null,
+                };
+              }).filter(Boolean);
+
+              setData(levels);
+            } catch (err) {
+              console.error('[firebase-hooks] getStockLevels failed:', err);
+              setData([]);
+            }
+          };
+          computeStockLevels();
         }
         else if (path === 'modelRequests.getAllModelRequests') {
           unsubscribe = onSnapshot(collection(db, 'modelRequests'), (snap) =>

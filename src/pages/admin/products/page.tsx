@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon, SlidersHorizontalIcon, XIcon, LayersIcon, CheckCircle2Icon, FileEditIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
@@ -12,7 +12,7 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { toast } from "sonner";
 import type { Id } from "@/lib/firebase-api";
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, Fragment } from "react";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Dialog,
@@ -37,6 +37,115 @@ import { RollsManagement } from "./_components/rolls-management.tsx";
 import { TagManagerDialog } from "./_components/tag-manager-dialog.tsx";
 
 // Module refresh - Force recompilation v788
+const GADGET_CATEGORIES = [
+  { value: "all", label: "All" },
+  { value: "phone", label: "Phone" },
+  { value: "laptop", label: "Laptop" },
+  { value: "tablet", label: "Tablet" },
+  { value: "camera", label: "Camera" },
+  { value: "lens", label: "Lens" },
+  { value: "console", label: "Console" },
+  { value: "drone", label: "Drone" },
+  { value: "mac-mini", label: "Mac Mini" },
+  { value: "charger", label: "Charger" },
+] as const;
+
+type StockLevel = { availableUnits: number; rNumber: string | null; designName: string | null } | undefined;
+
+/** Units still cuttable from the roll. `null` R-number means the item isn't roll-based. */
+function MaterialStock({ stock }: { stock: StockLevel }) {
+  if (!stock) return <span className="text-sm text-muted-foreground">—</span>;
+  if (stock.rNumber === null) return <span className="text-sm text-muted-foreground">N/A</span>;
+
+  const { availableUnits } = stock;
+  if (availableUnits >= 999999) {
+    return <span className="text-sm text-muted-foreground">∞</span>;
+  }
+
+  const isOut = availableUnits === 0;
+  const isLow = availableUnits > 0 && availableUnits <= 10;
+  return (
+    <div className="flex items-center gap-1.5">
+      <span
+        className={`text-sm font-medium tabular-nums ${
+          isOut ? "text-destructive" : isLow ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+        }`}
+      >
+        {availableUnits}
+      </span>
+      {isOut && <Badge variant="destructive" className="px-1 py-0 text-[10px]">Out</Badge>}
+      {isLow && (
+        <Badge variant="outline" className="border-amber-500 px-1 py-0 text-[10px] text-amber-600 dark:text-amber-400">
+          Low
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function StatPill({
+  icon,
+  label,
+  value,
+  tone = "default",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+  tone?: "default" | "success" | "warning";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "warning"
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-muted-foreground";
+  return (
+    <div className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2 shadow-sm">
+      <span className={toneClass}>{icon}</span>
+      <div className="leading-tight">
+        <div className="text-base font-semibold tabular-nums">{value.toLocaleString()}</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-20 shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
+      {children}
+    </div>
+  );
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+        active
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 // Inline editable cell component
 function EditableCell({
   variantId,
@@ -99,9 +208,18 @@ function EditableCell({
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="text-left hover:bg-muted/50 px-2 py-1 rounded transition-colors w-full"
+        title="Click to edit"
+        className="-mx-1.5 w-full rounded px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-foreground/5 hover:ring-1 hover:ring-border"
       >
-        {type === "number" && field === "price" ? `₹${value}` : value}
+        {value === "" || value === null || value === undefined ? (
+          <span className="text-muted-foreground">—</span>
+        ) : type === "number" && field === "price" ? (
+          <span className="tabular-nums">₹{value}</span>
+        ) : type === "number" ? (
+          <span className="tabular-nums">{value}</span>
+        ) : (
+          value
+        )}
       </button>
     );
   }
@@ -162,11 +280,10 @@ function AdminProductsPageInner() {
   } | null>(null);
 
   // State for active tab
-  const [activeTab, setActiveTab] = useState<"products" | "rolls">("products");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 100;
+  const [itemsPerPage, setItemsPerPage] = useState(50);
 
   // Inventory sorting state
   const [inventorySortOrder, setInventorySortOrder] = useState<"asc" | "desc">("desc");
@@ -178,11 +295,9 @@ function AdminProductsPageInner() {
   // Queries and mutations
   const products = useQuery(api.products.getAllProductsBasic, { sortBy: backendSortBy });
   const collections = useQuery(api.collections.getAllCollections, {});
-  // Only load stock levels when Rolls Management tab is active
-  const stockLevelsArray = useQuery(
-    api.rollsManagement.getStockLevels, 
-    activeTab === "rolls" ? {} : "skip"
-  );
+  // Both tabs need this: Rolls Management lists it, and the products table
+  // shows a Material Stock column per row.
+  const stockLevelsArray = useQuery(api.rollsManagement.getStockLevels, {});
   const exportData = useQuery(api.products.exportProductsForBulkEdit, 
     selectedProducts.length > 0 ? { productIds: selectedProducts } : "skip"
   );
@@ -625,7 +740,7 @@ function AdminProductsPageInner() {
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter]);
+  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, itemsPerPage]);
 
   // Paginate filtered products
   const paginatedProducts = useMemo(() => {
@@ -635,6 +750,57 @@ function AdminProductsPageInner() {
   }, [filteredProducts, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
+  const resetAllFilters = () => {
+    setSkuLetterFilter("all");
+    setSkuSortOrder("asc");
+    setGadgetCategoryFilter("all");
+    setSkuFilterValue("");
+    setProductNameValue("");
+    setStatusFilter("all");
+    setActiveSortColumn(null);
+    setInventorySortOrder("desc");
+    setBackendSortBy("latest");
+    setSearchQuery("");
+  };
+
+  // One removable chip per filter that is actually narrowing the list.
+  const activeFilterChips = useMemo(() => {
+    const chips: { label: string; clear: () => void }[] = [];
+    if (searchQuery.trim()) chips.push({ label: `Search: "${searchQuery.trim()}"`, clear: () => setSearchQuery("") });
+    if (statusFilter !== "all") chips.push({ label: `Status: ${statusFilter}`, clear: () => setStatusFilter("all") });
+    if (gadgetCategoryFilter !== "all") {
+      const label = GADGET_CATEGORIES.find((c) => c.value === gadgetCategoryFilter)?.label ?? gadgetCategoryFilter;
+      chips.push({ label: `Category: ${label}`, clear: () => setGadgetCategoryFilter("all") });
+    }
+    if (skuLetterFilter !== "all") chips.push({ label: `SKU prefix: ${skuLetterFilter}`, clear: () => setSkuLetterFilter("all") });
+    if (skuFilterValue.trim()) {
+      chips.push({
+        label: `SKU ${skuFilterCondition === "starts-with" ? "starts with" : "contains"}: ${skuFilterValue.trim()}`,
+        clear: () => setSkuFilterValue(""),
+      });
+    }
+    if (productNameValue.trim()) {
+      chips.push({
+        label: `Name ${productNameCondition === "starts-with" ? "starts with" : "contains"}: ${productNameValue.trim()}`,
+        clear: () => setProductNameValue(""),
+      });
+    }
+    return chips;
+  }, [searchQuery, statusFilter, gadgetCategoryFilter, skuLetterFilter, skuFilterValue, skuFilterCondition, productNameValue, productNameCondition]);
+
+  const activeFilterCount = activeFilterChips.length;
+
+  // Headline counts, computed off the unfiltered list so they stay stable.
+  const stats = useMemo(() => {
+    if (!products) return { total: 0, active: 0, draft: 0, variants: 0 };
+    return {
+      total: products.length,
+      active: products.filter((p) => p.status === "active").length,
+      draft: products.filter((p) => p.status === "draft").length,
+      variants: products.reduce((sum, p) => sum + (p.variantCount || 0), 0),
+    };
+  }, [products]);
 
   // Build collections map
   const collectionsMap = useMemo(() => {
@@ -654,409 +820,235 @@ function AdminProductsPageInner() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Products</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your product catalog and vinyl rolls inventory
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Products</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Manage your product catalog and vinyl rolls inventory
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <StatPill icon={<PackageIcon className="size-4" />} label="Products" value={stats.total} />
+          <StatPill icon={<CheckCircle2Icon className="size-4" />} label="Active" value={stats.active} tone="success" />
+          <StatPill icon={<FileEditIcon className="size-4" />} label="Draft" value={stats.draft} tone="warning" />
+          <StatPill icon={<LayersIcon className="size-4" />} label="Variants" value={stats.variants} />
+        </div>
       </div>
 
-      <Tabs defaultValue="products" className="space-y-6" onValueChange={(value) => setActiveTab(value as "products" | "rolls")}>
+      <Tabs defaultValue="products" className="space-y-6">
         <TabsList>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="rolls">Rolls Management</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="products" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              {searchQuery || skuLetterFilter !== "all" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all"
-                ? `${filteredProducts.length} of ${products.length} products`
-                : `${products.length} products`}
-              {selectedProducts.length > 0 && ` • ${selectedProducts.length} selected`}
-              {skuLetterFilter !== "all" && ` • SKU: ${skuLetterFilter}`}
-              {gadgetCategoryFilter !== "all" && ` • Category: ${gadgetCategoryFilter.charAt(0).toUpperCase() + gadgetCategoryFilter.slice(1).replace("-", " ")}`}
-              {skuFilterValue.trim() && ` • SKU ${skuFilterCondition === "starts-with" ? "starts with" : "contains"}: "${skuFilterValue}"`}
-              {productNameValue.trim() && ` • Name ${productNameCondition === "starts-with" ? "starts with" : "contains"}: "${productNameValue}"`}
-              {statusFilter !== "all" && ` • Status: ${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}`}
-            </p>
+        <TabsContent value="products" className="space-y-4">
+          {/* Toolbar: search, sort, filter toggle, and the primary actions */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-1 items-center gap-2 min-w-0">
+              <div className="relative flex-1 min-w-0 max-w-md">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search by title, SKU, tag..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9 bg-card"
+                />
+              </div>
+              <Select value={backendSortBy} onValueChange={(v) => setBackendSortBy(v as typeof backendSortBy)}>
+                <SelectTrigger className="h-9 w-40 bg-card">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="latest">Newest first</SelectItem>
+                  <SelectItem value="oldest">Oldest first</SelectItem>
+                  <SelectItem value="title_asc">Title A–Z</SelectItem>
+                  <SelectItem value="title_desc">Title Z–A</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                variant={showAdvancedFilters ? "secondary" : "outline"}
+                size="sm"
+                className="h-9 shrink-0"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+              >
+                <SlidersHorizontalIcon className="size-4 mr-2" />
+                Filters
+                {activeFilterCount > 0 && (
+                  <Badge className="ml-2 h-5 min-w-5 justify-center px-1 text-[11px]">
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </Button>
+            </div>
+
             <div className="flex items-center gap-2">
-          {selectedProducts.length > 0 && (
-            <>
-              <Button
-                variant="outline"
-                onClick={handleExport}
-                disabled={isExporting}
-              >
-                <FileSpreadsheetIcon className="size-4 mr-2" />
-                {isExporting ? "Exporting..." : "Export CSV"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleImport}
-                disabled={isImporting}
-              >
-                <UploadIcon className="size-4 mr-2" />
-                {isImporting ? "Importing..." : "Import CSV"}
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </>
-          )}
-          {products && products.length > 0 && (
-            <>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <MoreVerticalIcon className="size-4 mr-2" />
-                    Bulk Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowBulkPriceEdit(true)}>
-                    <DollarSignIcon className="size-4 mr-2" />
-                    Bulk Edit Prices
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="outline"
-                onClick={handleClearAll}
-                disabled={isDeleting}
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <TrashIcon className="size-4 mr-2" />
-                {isDeleting ? "Clearing..." : "Clear All"}
-              </Button>
-            </>
-          )}
-          <Link to="/backend-skinly/products/bulk">
-            <Button variant="secondary">
-              <FileSpreadsheetIcon className="size-4 mr-2" />
-              Bulk Create
-            </Button>
-          </Link>
-          <Link to="/backend-skinly/products/new">
-            <Button>
-              <PlusIcon className="size-4 mr-2" />
-              Add Product
-            </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Search Bar */}
-      {products.length > 0 && (
-        <div className="max-w-md">
-          <div className="relative">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search products by title, description, SKU, tags..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* SKU Filters */}
-      {products.length > 0 && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="space-y-4">
-              {/* Sort By and SKU Filters */}
-              <div className="flex items-center gap-6 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Sort By:</span>
-                  <Select value={backendSortBy} onValueChange={(v) => setBackendSortBy(v as typeof backendSortBy)}>
-                    <SelectTrigger className="w-44">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="latest">Latest First</SelectItem>
-                      <SelectItem value="oldest">Oldest First</SelectItem>
-                      <SelectItem value="title_asc">Title A-Z</SelectItem>
-                      <SelectItem value="title_desc">Title Z-A</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">SKU Filter:</span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant={skuLetterFilter === "all" ? "default" : "outline"}
-                      onClick={() => setSkuLetterFilter("all")}
-                    >
-                      All
+              {products.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9">
+                      <MoreVerticalIcon className="size-4 mr-2" />
+                      Bulk actions
                     </Button>
-                    <Button
-                      size="sm"
-                      variant={skuLetterFilter === "M" ? "default" : "outline"}
-                      onClick={() => setSkuLetterFilter("M")}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowBulkPriceEdit(true)}>
+                      <DollarSignIcon className="size-4 mr-2" />
+                      Bulk edit prices
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleClearAll}
+                      disabled={isDeleting}
+                      className="text-destructive focus:text-destructive"
                     >
-                      M
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={skuLetterFilter === "L" ? "default" : "outline"}
-                      onClick={() => setSkuLetterFilter("L")}
-                    >
-                      L
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={skuLetterFilter === "T" ? "default" : "outline"}
-                      onClick={() => setSkuLetterFilter("T")}
-                    >
-                      T
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={skuLetterFilter === "R" ? "default" : "outline"}
-                      onClick={() => setSkuLetterFilter("R")}
-                    >
-                      R
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-muted-foreground">Sort Order:</span>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant={skuSortOrder === "asc" ? "default" : "outline"}
-                      onClick={() => setSkuSortOrder("asc")}
-                    >
-                      Ascending ↑
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={skuSortOrder === "desc" ? "default" : "outline"}
-                      onClick={() => setSkuSortOrder("desc")}
-                    >
-                      Descending ↓
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm font-medium text-muted-foreground">Status:</span>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant={statusFilter === "all" ? "default" : "outline"}
-                    onClick={() => setStatusFilter("all")}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={statusFilter === "active" ? "default" : "outline"}
-                    onClick={() => setStatusFilter("active")}
-                  >
-                    Active
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={statusFilter === "draft" ? "default" : "outline"}
-                    onClick={() => setStatusFilter("draft")}
-                  >
-                    Draft
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={statusFilter === "archived" ? "default" : "outline"}
-                    onClick={() => setStatusFilter("archived")}
-                  >
-                    Archived
-                  </Button>
-                </div>
-              </div>
-
-              {/* Category Filter */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm font-medium text-muted-foreground">Category:</span>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "all" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("all")}
-                  >
-                    All
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "phone" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("phone")}
-                  >
-                    Phone
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "laptop" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("laptop")}
-                  >
-                    Laptop
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "camera" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("camera")}
-                  >
-                    Camera
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "mac-mini" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("mac-mini")}
-                  >
-                    Mac Mini
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "tablet" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("tablet")}
-                  >
-                    Tablet
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "console" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("console")}
-                  >
-                    Console
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "lens" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("lens")}
-                  >
-                    Lens
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "drone" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("drone")}
-                  >
-                    Drone
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={gadgetCategoryFilter === "charger" ? "default" : "outline"}
-                    onClick={() => setGadgetCategoryFilter("charger")}
-                  >
-                    Charger
-                  </Button>
-                </div>
-              </div>
-
-              {/* Advanced Filters Toggle */}
-              <div className="flex items-center justify-between pt-2 border-t">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  {showAdvancedFilters ? (
-                    <>
-                      <ChevronUpIcon className="size-4 mr-2" />
-                      Hide Advanced Filters
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDownIcon className="size-4 mr-2" />
-                      Show Advanced Filters
-                    </>
-                  )}
+                      <TrashIcon className="size-4 mr-2" />
+                      {isDeleting ? "Clearing..." : "Delete all products"}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              <Link to="/backend-skinly/products/bulk">
+                <Button variant="outline" size="sm" className="h-9">
+                  <FileSpreadsheetIcon className="size-4 mr-2" />
+                  Bulk create
                 </Button>
-              </div>
+              </Link>
+              <Link to="/backend-skinly/products/new">
+                <Button size="sm" className="h-9">
+                  <PlusIcon className="size-4 mr-2" />
+                  Add product
+                </Button>
+              </Link>
+            </div>
+          </div>
 
-              {/* Advanced Filters - Only render when expanded */}
-              {showAdvancedFilters && (
-                <>
-                  {/* Advanced SKU Filter */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground w-32">SKU Filter:</span>
+          {/* Filter panel */}
+          {showAdvancedFilters && products.length > 0 && (
+            <Card className="border-dashed">
+              <CardContent className="p-4 space-y-4">
+                <FilterRow label="Status">
+                  {(["all", "active", "draft", "archived"] as const).map((v) => (
+                    <FilterChip key={v} active={statusFilter === v} onClick={() => setStatusFilter(v)}>
+                      {v === "all" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
+                    </FilterChip>
+                  ))}
+                </FilterRow>
+
+                <FilterRow label="Category">
+                  {GADGET_CATEGORIES.map(({ value, label }) => (
+                    <FilterChip
+                      key={value}
+                      active={gadgetCategoryFilter === value}
+                      onClick={() => setGadgetCategoryFilter(value)}
+                    >
+                      {label}
+                    </FilterChip>
+                  ))}
+                </FilterRow>
+
+                <FilterRow label="SKU prefix">
+                  {(["all", "M", "L", "T", "R"] as const).map((v) => (
+                    <FilterChip key={v} active={skuLetterFilter === v} onClick={() => setSkuLetterFilter(v)}>
+                      {v === "all" ? "All" : v}
+                    </FilterChip>
+                  ))}
+                </FilterRow>
+
+                <div className="grid gap-3 sm:grid-cols-2 pt-1">
+                  <div className="flex items-center gap-2">
                     <Select value={skuFilterCondition} onValueChange={(v) => setSkuFilterCondition(v as "starts-with" | "contains")}>
-                      <SelectTrigger className="w-36">
+                      <SelectTrigger className="h-9 w-36 shrink-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="starts-with">Starts with</SelectItem>
-                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="starts-with">SKU starts</SelectItem>
+                        <SelectItem value="contains">SKU contains</SelectItem>
                       </SelectContent>
                     </Select>
                     <Input
-                      placeholder="Enter SKU value..."
+                      placeholder="e.g. M-102"
                       value={skuFilterValue}
                       onChange={(e) => setSkuFilterValue(e.target.value)}
-                      className="max-w-xs"
+                      className="h-9"
                     />
                   </div>
-
-                  {/* Advanced Product Name Filter */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-muted-foreground w-32">Product Name:</span>
+                  <div className="flex items-center gap-2">
                     <Select value={productNameCondition} onValueChange={(v) => setProductNameCondition(v as "starts-with" | "contains")}>
-                      <SelectTrigger className="w-36">
+                      <SelectTrigger className="h-9 w-36 shrink-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="starts-with">Starts with</SelectItem>
-                        <SelectItem value="contains">Contains</SelectItem>
+                        <SelectItem value="starts-with">Name starts</SelectItem>
+                        <SelectItem value="contains">Name contains</SelectItem>
                       </SelectContent>
                     </Select>
                     <Input
-                      placeholder="Enter product name..."
+                      placeholder="e.g. Aurora"
                       value={productNameValue}
                       onChange={(e) => setProductNameValue(e.target.value)}
-                      className="max-w-xs"
+                      className="h-9"
                     />
                   </div>
-                </>
-              )}
-
-              {/* Reset Button */}
-              {(skuLetterFilter !== "all" || skuSortOrder !== "asc" || gadgetCategoryFilter !== "all" || skuFilterValue.trim() || productNameValue.trim() || statusFilter !== "all" || activeSortColumn !== null || backendSortBy !== "latest") && (
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSkuLetterFilter("all");
-                      setSkuSortOrder("asc");
-                      setGadgetCategoryFilter("all");
-                      setSkuFilterValue("");
-                      setProductNameValue("");
-                      setStatusFilter("all");
-                      setShowAdvancedFilters(false);
-                      setActiveSortColumn(null);
-                      setInventorySortOrder("desc");
-                      setBackendSortBy("latest");
-                    }}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Reset All Filters
-                  </Button>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          )}
 
+          {/* Result count, active filters, and the selection action bar */}
+          <div className="flex flex-wrap items-center gap-2 min-h-9">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">{filteredProducts.length.toLocaleString()}</span>
+              {filteredProducts.length !== products.length && ` of ${products.length.toLocaleString()}`}
+              {" "}products
+            </p>
+
+            {activeFilterChips.map((chip) => (
+              <Badge
+                key={chip.label}
+                variant="secondary"
+                className="gap-1 pl-2 pr-1 font-normal"
+              >
+                {chip.label}
+                <button
+                  onClick={chip.clear}
+                  className="rounded-sm p-0.5 hover:bg-foreground/10"
+                  aria-label={`Clear ${chip.label}`}
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </Badge>
+            ))}
+            {activeFilterCount > 0 && (
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={resetAllFilters}>
+                Clear all
+              </Button>
+            )}
+
+            {selectedProducts.length > 0 && (
+              <div className="ml-auto flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 shadow-sm">
+                <span className="text-sm font-medium">{selectedProducts.length} selected</span>
+                <div className="h-4 w-px bg-border" />
+                <Button size="sm" variant="ghost" className="h-7" onClick={handleExport} disabled={isExporting}>
+                  <FileSpreadsheetIcon className="size-3.5 mr-1.5" />
+                  {isExporting ? "Exporting..." : "Export"}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7" onClick={handleImport} disabled={isImporting}>
+                  <UploadIcon className="size-3.5 mr-1.5" />
+                  {isImporting ? "Importing..." : "Import"}
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7" onClick={() => setSelectedProducts([])}>
+                  <XIcon className="size-3.5" />
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+            )}
+          </div>
       {products.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -1093,21 +1085,21 @@ function AdminProductsPageInner() {
           </EmptyContent>
         </Empty>
       ) : (
-        <Card>
+        <Card className="overflow-hidden py-0">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b bg-muted/50">
+              <table className="w-full border-separate border-spacing-0">
+                <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur supports-[backdrop-filter]:bg-muted/60">
                   <tr>
-                    <th className="p-3 text-left text-sm font-medium w-12">
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-12">
                       <Checkbox
                         checked={paginatedProducts.length > 0 && paginatedProducts.every((p) => selectedProducts.includes(p._id))}
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
-                    <th className="p-3 text-left text-sm font-medium w-16">Image</th>
-                    <th className="p-3 text-left text-sm font-medium">Product Name</th>
-                    <th className="p-3 text-left text-sm font-medium w-32">
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-16">Image</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Product Name</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-32">
                       <button
                         onClick={() => handleSortColumn("sku")}
                         className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -1127,8 +1119,8 @@ function AdminProductsPageInner() {
                         )}
                       </button>
                     </th>
-                    <th className="p-3 text-left text-sm font-medium w-28">Price</th>
-                    <th className="p-3 text-left text-sm font-medium w-24">
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-28">Price</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-24">
                       <button
                         onClick={() => handleSortColumn("inventory")}
                         className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -1148,29 +1140,33 @@ function AdminProductsPageInner() {
                         )}
                       </button>
                     </th>
-                    <th className="p-3 text-left text-sm font-medium w-28">Material Stock</th>
-                    <th className="p-3 text-left text-sm font-medium w-32">Collection</th>
-                    <th className="p-3 text-left text-sm font-medium w-32">Tags</th>
-                    <th className="p-3 text-left text-sm font-medium w-28">Status</th>
-                    <th className="p-3 text-left text-sm font-medium w-40">Actions</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-28">Material Stock</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-32">Collection</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-32">Tags</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-28">Status</th>
+                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-40">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedProducts.map((product) => {
                     const firstVariant = product.firstVariant;
                     const totalInventory = product.totalInventory;
-                    const collection = product.collectionId
-                      ? collectionsMap.get(product.collectionId)
-                      : null;
+                    const productCollections = (product.collectionIds || [])
+                      .map((id: string) => collectionsMap.get(id))
+                      .filter(Boolean);
                     const isSelected = selectedProducts.includes(product._id);
 
                     const isExpanded = expandedProducts.has(product._id);
                     const hasMultipleVariants = product.variantCount > 1;
 
                     return (
-                      <>
-                      <tr key={product._id} className="border-b hover:bg-muted/30 transition-colors">
-                        <td className="p-3">
+                      <Fragment key={product._id}>
+                      <tr
+                        className={`group transition-colors ${
+                          isSelected ? "bg-primary/5" : "odd:bg-muted/20"
+                        } hover:bg-accent/60`}
+                      >
+                        <td className="border-b px-3 py-2.5 align-middle">
                           <div className="flex items-center gap-2">
                             {hasMultipleVariants ? (
                               <button
@@ -1200,12 +1196,12 @@ function AdminProductsPageInner() {
                             />
                           </div>
                         </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           <div className="relative">
                             {product.images.length > 0 ? (
                               <button
                                 onClick={() => setSelectedImage(product.images[0].url)}
-                                className="size-12 bg-muted rounded overflow-hidden hover:ring-2 hover:ring-primary transition-all"
+                                className="size-11 bg-muted rounded-md overflow-hidden ring-1 ring-border hover:ring-2 hover:ring-primary transition-all"
                               >
                                 <img
                                   src={product.images[0].url}
@@ -1214,7 +1210,7 @@ function AdminProductsPageInner() {
                                 />
                               </button>
                             ) : (
-                              <div className="size-12 bg-muted rounded flex items-center justify-center">
+                              <div className="size-11 bg-muted rounded-md ring-1 ring-border flex items-center justify-center">
                                 <ImageIcon className="size-5 text-muted-foreground" />
                               </div>
                             )}
@@ -1228,17 +1224,21 @@ function AdminProductsPageInner() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3">
-                          <div>
-                            <p className="font-medium">{product.title}</p>
-                            {product.variantCount > 1 && (
-                              <p className="text-xs text-muted-foreground">
-                                {product.variantCount} variants
-                              </p>
-                            )}
+                        <td className="border-b px-3 py-2.5 align-middle">
+                          <div className="min-w-0">
+                            <Link
+                              to={`/backend-skinly/products/${product._id}`}
+                              className="font-medium hover:text-primary hover:underline underline-offset-2"
+                            >
+                              {product.title}
+                            </Link>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {product.variantCount > 1 && `${product.variantCount} variants · `}
+                              /{product.slug}
+                            </p>
                           </div>
                         </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           {firstVariant ? (
                             <div>
                               <EditableCell
@@ -1247,17 +1247,13 @@ function AdminProductsPageInner() {
                                 type="text"
                                 field="sku"
                               />
-                              {product.variantCount > 1 && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  +{product.variantCount - 1} more
-                                </p>
-                              )}
+
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           {firstVariant ? (
                             <div>
                               <EditableCell
@@ -1266,17 +1262,13 @@ function AdminProductsPageInner() {
                                 type="number"
                                 field="price"
                               />
-                              {product.variantCount > 1 && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  +{product.variantCount - 1} more
-                                </p>
-                              )}
+
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           {firstVariant ? (
                             <div>
                               <EditableCell
@@ -1286,8 +1278,8 @@ function AdminProductsPageInner() {
                                 field="inventoryQuantity"
                               />
                               {product.variantCount > 1 && (
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Total: {totalInventory}
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {totalInventory} total
                                 </p>
                               )}
                             </div>
@@ -1295,53 +1287,28 @@ function AdminProductsPageInner() {
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </td>
-                        <td className="p-3">
-                          {firstVariant && stockLevels ? (
-                            (() => {
-                              const stock = stockLevels[firstVariant._id];
-                              if (!stock) return <span className="text-muted-foreground text-sm">-</span>;
-                              
-                              if (stock.rNumber === null) {
-                                // No R-number = accessories with no material tracking
-                                return <span className="text-muted-foreground text-sm">N/A</span>;
-                              }
-                              
-                              const { availableUnits } = stock;
-                              const isLowStock = availableUnits <= 10 && availableUnits > 0;
-                              const isOutOfStock = availableUnits === 0;
-                              
-                              return (
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-sm font-medium ${
-                                    isOutOfStock ? "text-destructive" : 
-                                    isLowStock ? "text-orange-600" : 
-                                    "text-foreground"
-                                  }`}>
-                                    {availableUnits >= 999999 ? "∞" : availableUnits}
-                                  </span>
-                                  {isOutOfStock && (
-                                    <Badge variant="destructive" className="text-[10px] px-1 py-0">
-                                      Out
-                                    </Badge>
-                                  )}
-                                  {isLowStock && (
-                                    <Badge variant="outline" className="text-[10px] px-1 py-0 border-orange-600 text-orange-600">
-                                      Low
-                                    </Badge>
-                                  )}
-                                </div>
-                              );
-                            })()
+                        <td className="border-b px-3 py-2.5 align-middle">
+                          <MaterialStock stock={firstVariant ? stockLevels?.[firstVariant._id] : undefined} />
+                        </td>
+                        <td className="border-b px-3 py-2.5 align-middle">
+                          {productCollections.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {productCollections.slice(0, 2).map((c: any) => (
+                                <Badge key={c._id} variant="outline" className="text-xs font-normal">
+                                  {c.name}
+                                </Badge>
+                              ))}
+                              {productCollections.length > 2 && (
+                                <Badge variant="outline" className="text-xs font-normal">
+                                  +{productCollections.length - 2}
+                                </Badge>
+                              )}
+                            </div>
                           ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
+                            <span className="text-sm text-muted-foreground">—</span>
                           )}
                         </td>
-                        <td className="p-3">
-                          <span className="text-sm">
-                            {collection ? collection.name : "-"}
-                          </span>
-                        </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           <div className="flex items-center gap-2">
                             {product.tags.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
@@ -1374,7 +1341,7 @@ function AdminProductsPageInner() {
                             </Button>
                           </div>
                         </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           <Select
                             value={product.status}
                             onValueChange={(value: "active" | "draft" | "archived") =>
@@ -1393,7 +1360,7 @@ function AdminProductsPageInner() {
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="p-3">
+                        <td className="border-b px-3 py-2.5 align-middle">
                           <div className="flex items-center gap-1">
                             <Button
                               size="sm"
@@ -1443,10 +1410,47 @@ function AdminProductsPageInner() {
                           </div>
                         </td>
                       </tr>
-                      </>
-                    );
 
-                      {/* TODO: Add back expandable variant rows - fetch variants on demand */}
+                      {/* Variant breakdown, opened from the chevron */}
+                      {isExpanded && product.variants.map((variant: any) => {
+                        const stock = stockLevels?.[variant._id];
+                        return (
+                          <tr key={variant._id} className="bg-muted/40 text-sm">
+                            <td className="border-b px-3 py-2" />
+                            <td className="border-b px-3 py-2" />
+                            <td className="border-b px-3 py-2 text-muted-foreground">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="text-muted-foreground/60">└</span>
+                                {variant.title || "Default"}
+                              </span>
+                            </td>
+                            <td className="border-b px-3 py-2">
+                              <EditableCell variantId={variant._id} value={variant.sku ?? ""} type="text" field="sku" />
+                            </td>
+                            <td className="border-b px-3 py-2">
+                              <EditableCell variantId={variant._id} value={variant.price ?? 0} type="number" field="price" />
+                            </td>
+                            <td className="border-b px-3 py-2">
+                              <EditableCell
+                                variantId={variant._id}
+                                value={variant.inventoryQuantity ?? 0}
+                                type="number"
+                                field="inventoryQuantity"
+                              />
+                            </td>
+                            <td className="border-b px-3 py-2">
+                              <MaterialStock stock={stock} />
+                            </td>
+                            <td className="border-b px-3 py-2" colSpan={4}>
+                              {variant.rNumber && (
+                                <span className="text-xs text-muted-foreground">Roll {variant.rNumber}</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      </Fragment>
+                    );
                   })}
                 </tbody>
               </table>
@@ -1458,9 +1462,22 @@ function AdminProductsPageInner() {
       {/* Pagination Controls */}
       {filteredProducts.length > itemsPerPage && (
         <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground">
+              {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length.toLocaleString()}
+            </p>
+            <Select value={String(itemsPerPage)} onValueChange={(v) => { setItemsPerPage(Number(v)); setCurrentPage(1); }}>
+              <SelectTrigger className="h-8 w-28 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25 / page</SelectItem>
+                <SelectItem value="50">50 / page</SelectItem>
+                <SelectItem value="100">100 / page</SelectItem>
+                <SelectItem value="200">200 / page</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
