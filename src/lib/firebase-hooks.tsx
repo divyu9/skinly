@@ -1516,50 +1516,34 @@ export function useQuery(apiRef: any, args?: any) {
           fetchVariants();
         }
         else if (path === 'products.getAllProducts' || path === 'products.getAllProductsBasic') {
-          const q = query(collection(db, 'products'));
-          unsubscribe = onSnapshot(q, async (snap) => {
-            // One pass over variants builds every per-product summary the admin
-            // table reads: SKU list, the row's editable variant, and stock totals.
-            const variantsSnap = await getDocs(collection(db, 'variants'));
+          // Products and variants each get their own listener, recombined on
+          // every tick. Watching products alone left the table stale after an
+          // inline SKU/price/inventory edit — those writes land in `variants`,
+          // which the products listener never hears about.
+          let productDocs: any[] | null = null;
+          let variantDocs: any[] | null = null;
+          let collectionIdsMap: Record<string, string[]> = {};
+
+          const emit = () => {
+            if (!productDocs || !variantDocs) return;
+
             const variantSkusMap: Record<string, string[]> = {};
             const variantsMap: Record<string, any[]> = {};
-            variantsSnap.docs.forEach(vDoc => {
-              const vData = vDoc.data();
-              if (!vData.productId) return;
-              if (vData.sku) {
-                if (!variantSkusMap[vData.productId]) variantSkusMap[vData.productId] = [];
-                variantSkusMap[vData.productId].push(vData.sku);
-              }
-              if (!variantsMap[vData.productId]) variantsMap[vData.productId] = [];
-              variantsMap[vData.productId].push({ _id: vDoc.id, ...vData });
-            });
-
-            // Products carry no collectionId of their own — membership lives in
-            // the collectionProducts join, so resolve it here.
-            const collectionIdsMap: Record<string, string[]> = {};
-            try {
-              const linksSnap = await getDocs(collection(db, 'collectionProducts'));
-              linksSnap.docs.forEach(l => {
-                const { productId, collectionId } = l.data() as any;
-                if (!productId || !collectionId) return;
-                if (!collectionIdsMap[productId]) collectionIdsMap[productId] = [];
-                collectionIdsMap[productId].push(collectionId);
-              });
-            } catch (err) {
-              console.error('[firebase-hooks] could not read collectionProducts:', err);
+            for (const v of variantDocs) {
+              if (!v.productId) continue;
+              if (v.sku) (variantSkusMap[v.productId] ||= []).push(v.sku);
+              (variantsMap[v.productId] ||= []).push(v);
             }
 
-            let docs = snap.docs.map(d => {
-              const data = d.data();
+            const docs = productDocs.map(data => {
               const normalizedTags = Array.isArray(data.tags)
                 ? data.tags
                 : typeof data.tags === "string"
                   ? data.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
                   : [];
-              const variants = variantsMap[d.id] || [];
-              const collectionIds = collectionIdsMap[d.id] || [];
+              const variants = variantsMap[data._id] || [];
+              const collectionIds = collectionIdsMap[data._id] || [];
               return {
-                _id: d.id,
                 ...data,
                 title: data.title || "",
                 description: data.description || "",
@@ -1567,7 +1551,7 @@ export function useQuery(apiRef: any, args?: any) {
                 status: data.status || "draft",
                 images: Array.isArray(data.images) ? data.images : [],
                 tags: normalizedTags,
-                variantSkus: data.variantSkus || variantSkusMap[d.id] || [],
+                variantSkus: data.variantSkus || variantSkusMap[data._id] || [],
                 variants,
                 variantCount: variants.length,
                 firstVariant: variants[0] || null,
@@ -1588,7 +1572,32 @@ export function useQuery(apiRef: any, args?: any) {
               }
             });
             setData(docs);
+          };
+
+          // Products carry no collectionId of their own — membership lives in
+          // the collectionProducts join, so resolve it once up front.
+          const loadCollectionLinks = getDocs(collection(db, 'collectionProducts'))
+            .then(linksSnap => {
+              const map: Record<string, string[]> = {};
+              linksSnap.docs.forEach(l => {
+                const { productId, collectionId } = l.data() as any;
+                if (productId && collectionId) (map[productId] ||= []).push(collectionId);
+              });
+              collectionIdsMap = map;
+              emit();
+            })
+            .catch(err => console.error('[firebase-hooks] could not read collectionProducts:', err));
+          void loadCollectionLinks;
+
+          const unsubProducts = onSnapshot(collection(db, 'products'), snap => {
+            productDocs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            emit();
           });
+          const unsubVariants = onSnapshot(collection(db, 'variants'), snap => {
+            variantDocs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            emit();
+          });
+          unsubscribe = () => { unsubProducts(); unsubVariants(); };
         }
         else if (path === 'products.getAllProductsPaginated') {
           const q = query(collection(db, 'products'), limit(args?.paginationOpts?.numItems || 50));

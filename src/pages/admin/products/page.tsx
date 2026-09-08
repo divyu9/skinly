@@ -157,51 +157,61 @@ function EditableCell({
   const updateVariant = useMutation(api.products.updateVariant);
   const [isSaving, setIsSaving] = useState(false);
 
+  const cancel = () => {
+    setEditValue(String(value));
+    setIsEditing(false);
+  };
+
   const handleSave = async () => {
+    const raw = editValue.trim();
+
+    // Clicking away without changing anything shouldn't cost a write.
+    if (raw === String(value).trim()) {
+      setIsEditing(false);
+      return;
+    }
+
+    let update: Record<string, string | number>;
     if (type === "number") {
-      const numValue = parseFloat(editValue);
+      const numValue = parseFloat(raw);
       if (isNaN(numValue) || numValue < 0) {
-        toast.error(`Please enter a valid ${field === "price" ? "price" : "quantity"}`);
+        toast.error(`Enter a valid ${field === "price" ? "price" : "quantity"}`);
+        cancel();
         return;
       }
-      setIsSaving(true);
-      try {
-        await updateVariant({
-          variantId,
-          [field]: numValue,
-        });
-        toast.success("Updated successfully");
-        setIsEditing(false);
-      } catch (error) {
-        toast.error("Failed to update");
-      } finally {
-        setIsSaving(false);
-      }
+      update = { [field]: numValue };
     } else {
-      if (!editValue.trim()) {
+      if (!raw) {
         toast.error("SKU cannot be empty");
+        cancel();
         return;
       }
-      setIsSaving(true);
-      try {
-        await updateVariant({
-          variantId,
-          sku: editValue.trim(),
-        });
-        toast.success("SKU updated successfully");
-        setIsEditing(false);
-      } catch (error) {
-        toast.error("Failed to update SKU");
-      } finally {
-        setIsSaving(false);
-      }
+      update = { sku: raw };
+    }
+
+    setIsSaving(true);
+    try {
+      await updateVariant({ variantId, ...update });
+      toast.success(field === "sku" ? "SKU updated" : "Updated");
+      setIsEditing(false);
+    } catch (error) {
+      // Surface what actually failed instead of a generic message.
+      toast.error(error instanceof Error ? error.message : "Failed to update");
+      cancel();
+    } finally {
+      setIsSaving(false);
     }
   };
 
   if (!isEditing) {
     return (
       <button
-        onClick={() => setIsEditing(true)}
+        onClick={() => {
+          // Seed from the current value, not the one this cell mounted with —
+          // the row may have changed under it (bulk price edit, another tab).
+          setEditValue(String(value));
+          setIsEditing(true);
+        }}
         title="Click to edit"
         className="-mx-1.5 w-full rounded px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-foreground/5 hover:ring-1 hover:ring-border"
       >
@@ -232,8 +242,7 @@ function EditableCell({
           if (e.key === "Enter") {
             handleSave();
           } else if (e.key === "Escape") {
-            setEditValue(String(value));
-            setIsEditing(false);
+            cancel();
           }
         }}
         autoFocus
@@ -256,7 +265,7 @@ function AdminProductsPageInner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T" | "R">("all");
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
-  const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<"all" | "phone" | "laptop" | "camera" | "mac-mini" | "tablet" | "console" | "lens" | "drone" | "charger">("all");
+  const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<string>("all");
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
   const [skuFilterCondition, setSkuFilterCondition] = useState<"starts-with" | "contains">("starts-with");
   const [skuFilterValue, setSkuFilterValue] = useState("");
