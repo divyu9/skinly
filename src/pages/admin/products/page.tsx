@@ -37,18 +37,7 @@ import { RollsManagement } from "./_components/rolls-management.tsx";
 import { TagManagerDialog } from "./_components/tag-manager-dialog.tsx";
 
 // Module refresh - Force recompilation v788
-const GADGET_CATEGORIES = [
-  { value: "all", label: "All" },
-  { value: "phone", label: "Phone" },
-  { value: "laptop", label: "Laptop" },
-  { value: "tablet", label: "Tablet" },
-  { value: "camera", label: "Camera" },
-  { value: "lens", label: "Lens" },
-  { value: "console", label: "Console" },
-  { value: "drone", label: "Drone" },
-  { value: "mac-mini", label: "Mac Mini" },
-  { value: "charger", label: "Charger" },
-] as const;
+
 
 type StockLevel = { availableUnits: number; rNumber: string | null; designName: string | null } | undefined;
 
@@ -68,14 +57,18 @@ function MaterialStock({ stock }: { stock: StockLevel }) {
     <div className="flex items-center gap-1.5">
       <span
         className={`text-sm font-medium tabular-nums ${
-          isOut ? "text-destructive" : isLow ? "text-amber-600 dark:text-amber-400" : "text-foreground"
+          isOut
+            ? "text-rose-600 dark:text-rose-400"
+            : isLow
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-emerald-700 dark:text-emerald-400"
         }`}
       >
         {availableUnits}
       </span>
-      {isOut && <Badge variant="destructive" className="px-1 py-0 text-[10px]">Out</Badge>}
+      {isOut && <Badge className="border-rose-200 bg-rose-100 px-1 py-0 text-[10px] text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">Out</Badge>}
       {isLow && (
-        <Badge variant="outline" className="border-amber-500 px-1 py-0 text-[10px] text-amber-600 dark:text-amber-400">
+        <Badge className="border-amber-200 bg-amber-100 px-1 py-0 text-[10px] text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
           Low
         </Badge>
       )}
@@ -83,29 +76,30 @@ function MaterialStock({ stock }: { stock: StockLevel }) {
   );
 }
 
+const STAT_TONES = {
+  indigo: "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-300",
+  emerald: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300",
+  amber: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300",
+  sky: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300",
+} as const;
+
 function StatPill({
   icon,
   label,
   value,
-  tone = "default",
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
-  tone?: "default" | "success" | "warning";
+  tone: keyof typeof STAT_TONES;
 }) {
-  const toneClass =
-    tone === "success"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : tone === "warning"
-        ? "text-amber-600 dark:text-amber-400"
-        : "text-muted-foreground";
   return (
-    <div className="flex items-center gap-2.5 rounded-lg border bg-card px-3 py-2 shadow-sm">
-      <span className={toneClass}>{icon}</span>
+    <div className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-2 shadow-sm ${STAT_TONES[tone]}`}>
+      <span className="opacity-80">{icon}</span>
       <div className="leading-tight">
         <div className="text-base font-semibold tabular-nums">{value.toLocaleString()}</div>
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-[11px] font-medium uppercase tracking-wide opacity-70">{label}</div>
       </div>
     </div>
   );
@@ -137,8 +131,8 @@ function FilterChip({
       onClick={onClick}
       className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "border-primary bg-primary text-primary-foreground"
-          : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+          ? "border-indigo-600 bg-indigo-600 text-white shadow-sm"
+          : "border-border bg-card text-muted-foreground hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 dark:hover:bg-indigo-950/40 dark:hover:text-indigo-300"
       }`}
     >
       {children}
@@ -214,7 +208,7 @@ function EditableCell({
         {value === "" || value === null || value === undefined ? (
           <span className="text-muted-foreground">—</span>
         ) : type === "number" && field === "price" ? (
-          <span className="tabular-nums">₹{value}</span>
+          <span className="font-medium tabular-nums text-emerald-700 dark:text-emerald-400">₹{value}</span>
         ) : type === "number" ? (
           <span className="tabular-nums">{value}</span>
         ) : (
@@ -295,6 +289,7 @@ function AdminProductsPageInner() {
   // Queries and mutations
   const products = useQuery(api.products.getAllProductsBasic, { sortBy: backendSortBy });
   const collections = useQuery(api.collections.getAllCollections, {});
+  const gadgetTypes = useQuery(api.gadgetTypes.list, {});
   // Both tabs need this: Rolls Management lists it, and the products table
   // shows a Material Stock column per row.
   const stockLevelsArray = useQuery(api.rollsManagement.getStockLevels, {});
@@ -392,11 +387,11 @@ function AdminProductsPageInner() {
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-green-500/10 text-green-500 border-green-500/20";
+        return "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300";
       case "draft":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
+        return "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-300";
       case "archived":
-        return "bg-gray-500/10 text-gray-500 border-gray-500/20";
+        return "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400";
       default:
         return "";
     }
@@ -606,22 +601,6 @@ function AdminProductsPageInner() {
     return { letter: "", number: 0 };
   };
 
-  // Helper function to detect gadget category from product title
-  const detectGadgetCategory = (title: string): string | null => {
-    const lowerTitle = title.toLowerCase();
-    
-    if (lowerTitle.includes("phone")) return "phone";
-    if (lowerTitle.includes("laptop")) return "laptop";
-    if (lowerTitle.includes("camera")) return "camera";
-    if (lowerTitle.includes("mac mini")) return "mac-mini";
-    if (lowerTitle.includes("tablet")) return "tablet";
-    if (lowerTitle.includes("console") || lowerTitle.includes("playstation") || lowerTitle.includes("xbox")) return "console";
-    if (lowerTitle.includes("lens")) return "lens";
-    if (lowerTitle.includes("drone")) return "drone";
-    if (lowerTitle.includes("charger")) return "charger";
-    
-    return null;
-  };
 
   // Handle column sort toggle
   const handleSortColumn = (column: "sku" | "inventory") => {
@@ -637,6 +616,25 @@ function AdminProductsPageInner() {
       setActiveSortColumn(column);
     }
   };
+
+  const gadgetTypeNameById = useMemo(
+    () => new Map<string, string>((gadgetTypes || []).map((g: any) => [g._id, g.name])),
+    [gadgetTypes]
+  );
+
+  // Only offer categories that actually have products behind them.
+  const gadgetCategoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const product of products || []) {
+      const name = gadgetTypeNameById.get(product.gadgetTypeId);
+      if (name) counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    const options = (gadgetTypes || [])
+      .filter((g: any) => counts.has(g.name))
+      .map((g: any) => ({ value: g.name, label: g.displayName || g.name, count: counts.get(g.name)! }))
+      .sort((a, b) => b.count - a.count);
+    return [{ value: "all", label: "All", count: products?.length ?? 0 }, ...options];
+  }, [products, gadgetTypes, gadgetTypeNameById]);
 
   // Filter products based on search query, SKU letter filter, and sort order
   const filteredProducts = useMemo(() => {
@@ -668,12 +666,13 @@ function AdminProductsPageInner() {
       });
     }
 
-    // Apply gadget category filter
+    // Apply gadget category filter. Products carry gadgetTypeId, so match on
+    // that rather than guessing from the title — most skin titles never name
+    // the device ("Rage Of Naruto PS 5 3D Finish Skin" is a phone skin).
     if (gadgetCategoryFilter !== "all") {
-      filtered = filtered.filter((product) => {
-        const category = detectGadgetCategory(product.title);
-        return category === gadgetCategoryFilter;
-      });
+      filtered = filtered.filter(
+        (product) => gadgetTypeNameById.get(product.gadgetTypeId) === gadgetCategoryFilter
+      );
     }
 
     // Apply advanced SKU filter
@@ -735,7 +734,7 @@ function AdminProductsPageInner() {
     });
 
     return sorted;
-  }, [products, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, activeSortColumn, inventorySortOrder]);
+  }, [products, gadgetTypeNameById, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, activeSortColumn, inventorySortOrder]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -770,7 +769,7 @@ function AdminProductsPageInner() {
     if (searchQuery.trim()) chips.push({ label: `Search: "${searchQuery.trim()}"`, clear: () => setSearchQuery("") });
     if (statusFilter !== "all") chips.push({ label: `Status: ${statusFilter}`, clear: () => setStatusFilter("all") });
     if (gadgetCategoryFilter !== "all") {
-      const label = GADGET_CATEGORIES.find((c) => c.value === gadgetCategoryFilter)?.label ?? gadgetCategoryFilter;
+      const label = gadgetCategoryOptions.find((c) => c.value === gadgetCategoryFilter)?.label ?? gadgetCategoryFilter;
       chips.push({ label: `Category: ${label}`, clear: () => setGadgetCategoryFilter("all") });
     }
     if (skuLetterFilter !== "all") chips.push({ label: `SKU prefix: ${skuLetterFilter}`, clear: () => setSkuLetterFilter("all") });
@@ -828,10 +827,10 @@ function AdminProductsPageInner() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatPill icon={<PackageIcon className="size-4" />} label="Products" value={stats.total} />
-          <StatPill icon={<CheckCircle2Icon className="size-4" />} label="Active" value={stats.active} tone="success" />
-          <StatPill icon={<FileEditIcon className="size-4" />} label="Draft" value={stats.draft} tone="warning" />
-          <StatPill icon={<LayersIcon className="size-4" />} label="Variants" value={stats.variants} />
+          <StatPill icon={<PackageIcon className="size-4" />} label="Products" value={stats.total} tone="indigo" />
+          <StatPill icon={<CheckCircle2Icon className="size-4" />} label="Active" value={stats.active} tone="emerald" />
+          <StatPill icon={<FileEditIcon className="size-4" />} label="Draft" value={stats.draft} tone="amber" />
+          <StatPill icon={<LayersIcon className="size-4" />} label="Variants" value={stats.variants} tone="sky" />
         </div>
       </div>
 
@@ -867,15 +866,19 @@ function AdminProductsPageInner() {
                 </SelectContent>
               </Select>
               <Button
-                variant={showAdvancedFilters ? "secondary" : "outline"}
+                variant="outline"
                 size="sm"
-                className="h-9 shrink-0"
+                className={`h-9 shrink-0 ${
+                  showAdvancedFilters || activeFilterCount > 0
+                    ? "border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300"
+                    : ""
+                }`}
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
               >
                 <SlidersHorizontalIcon className="size-4 mr-2" />
                 Filters
                 {activeFilterCount > 0 && (
-                  <Badge className="ml-2 h-5 min-w-5 justify-center px-1 text-[11px]">
+                  <Badge className="ml-2 h-5 min-w-5 justify-center bg-indigo-600 px-1 text-[11px] text-white">
                     {activeFilterCount}
                   </Badge>
                 )}
@@ -924,7 +927,7 @@ function AdminProductsPageInner() {
 
           {/* Filter panel */}
           {showAdvancedFilters && products.length > 0 && (
-            <Card className="border-dashed">
+            <Card className="border-dashed border-indigo-200 bg-indigo-50/30 dark:border-indigo-900 dark:bg-indigo-950/20">
               <CardContent className="p-4 space-y-4">
                 <FilterRow label="Status">
                   {(["all", "active", "draft", "archived"] as const).map((v) => (
@@ -935,13 +938,14 @@ function AdminProductsPageInner() {
                 </FilterRow>
 
                 <FilterRow label="Category">
-                  {GADGET_CATEGORIES.map(({ value, label }) => (
+                  {gadgetCategoryOptions.map(({ value, label, count }) => (
                     <FilterChip
                       key={value}
                       active={gadgetCategoryFilter === value}
                       onClick={() => setGadgetCategoryFilter(value)}
                     >
                       {label}
+                      <span className="ml-1.5 opacity-60 tabular-nums">{count}</span>
                     </FilterChip>
                   ))}
                 </FilterRow>
@@ -1005,13 +1009,12 @@ function AdminProductsPageInner() {
             {activeFilterChips.map((chip) => (
               <Badge
                 key={chip.label}
-                variant="secondary"
-                className="gap-1 pl-2 pr-1 font-normal"
+                className="gap-1 border-indigo-200 bg-indigo-50 pl-2 pr-1 font-normal text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/50 dark:text-indigo-300"
               >
                 {chip.label}
                 <button
                   onClick={chip.clear}
-                  className="rounded-sm p-0.5 hover:bg-foreground/10"
+                  className="rounded-sm p-0.5 hover:bg-indigo-200/60 dark:hover:bg-indigo-800/60"
                   aria-label={`Clear ${chip.label}`}
                 >
                   <XIcon className="size-3" />
@@ -1025,9 +1028,9 @@ function AdminProductsPageInner() {
             )}
 
             {selectedProducts.length > 0 && (
-              <div className="ml-auto flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5 shadow-sm">
-                <span className="text-sm font-medium">{selectedProducts.length} selected</span>
-                <div className="h-4 w-px bg-border" />
+              <div className="ml-auto flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 shadow-sm dark:border-indigo-800 dark:bg-indigo-950/50">
+                <span className="text-sm font-medium text-indigo-700 dark:text-indigo-300">{selectedProducts.length} selected</span>
+                <div className="h-4 w-px bg-indigo-300 dark:bg-indigo-700" />
                 <Button size="sm" variant="ghost" className="h-7" onClick={handleExport} disabled={isExporting}>
                   <FileSpreadsheetIcon className="size-3.5 mr-1.5" />
                   {isExporting ? "Exporting..." : "Export"}
@@ -1089,17 +1092,17 @@ function AdminProductsPageInner() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full border-separate border-spacing-0">
-                <thead className="sticky top-0 z-10 bg-muted/70 backdrop-blur supports-[backdrop-filter]:bg-muted/60">
+                <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900/80 backdrop-blur">
                   <tr>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-12">
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-12">
                       <Checkbox
                         checked={paginatedProducts.length > 0 && paginatedProducts.every((p) => selectedProducts.includes(p._id))}
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-16">Image</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Product Name</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-32">
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-16">Image</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Product Name</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-32">
                       <button
                         onClick={() => handleSortColumn("sku")}
                         className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -1119,8 +1122,8 @@ function AdminProductsPageInner() {
                         )}
                       </button>
                     </th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-28">Price</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-24">
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-28">Price</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-24">
                       <button
                         onClick={() => handleSortColumn("inventory")}
                         className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -1140,11 +1143,11 @@ function AdminProductsPageInner() {
                         )}
                       </button>
                     </th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-28">Material Stock</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-32">Collection</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-32">Tags</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-28">Status</th>
-                    <th className="border-b px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground w-40">Actions</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-28">Material Stock</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-32">Collection</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-32">Tags</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-28">Status</th>
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-40">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1163,8 +1166,10 @@ function AdminProductsPageInner() {
                       <Fragment key={product._id}>
                       <tr
                         className={`group transition-colors ${
-                          isSelected ? "bg-primary/5" : "odd:bg-muted/20"
-                        } hover:bg-accent/60`}
+                          isSelected
+                            ? "bg-indigo-50/80 dark:bg-indigo-950/30"
+                            : "odd:bg-slate-50/60 dark:odd:bg-slate-900/20"
+                        } hover:bg-indigo-50 dark:hover:bg-indigo-950/40`}
                       >
                         <td className="border-b px-3 py-2.5 align-middle">
                           <div className="flex items-center gap-2">
@@ -1224,11 +1229,12 @@ function AdminProductsPageInner() {
                             )}
                           </div>
                         </td>
-                        <td className="border-b px-3 py-2.5 align-middle">
+                        <td className="border-b px-3 py-2.5 align-middle max-w-[280px]">
                           <div className="min-w-0">
                             <Link
                               to={`/backend-skinly/products/${product._id}`}
-                              className="font-medium hover:text-primary hover:underline underline-offset-2"
+                              className="block truncate font-medium text-slate-900 dark:text-slate-100 hover:text-indigo-600 dark:hover:text-indigo-400 hover:underline underline-offset-2"
+                              title={product.title}
                             >
                               {product.title}
                             </Link>
@@ -1292,15 +1298,24 @@ function AdminProductsPageInner() {
                         </td>
                         <td className="border-b px-3 py-2.5 align-middle">
                           {productCollections.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {productCollections.slice(0, 2).map((c: any) => (
-                                <Badge key={c._id} variant="outline" className="text-xs font-normal">
+                            <div
+                              className="flex items-center gap-1"
+                              title={productCollections.map((c: any) => c.name).join(", ")}
+                            >
+                              {productCollections.slice(0, 1).map((c: any) => (
+                                <Badge
+                                  key={c._id}
+                                  className="max-w-[112px] truncate border-violet-200 bg-violet-50 text-xs font-normal text-violet-700 dark:border-violet-900 dark:bg-violet-950/50 dark:text-violet-300"
+                                >
                                   {c.name}
                                 </Badge>
                               ))}
-                              {productCollections.length > 2 && (
-                                <Badge variant="outline" className="text-xs font-normal">
-                                  +{productCollections.length - 2}
+                              {productCollections.length > 1 && (
+                                <Badge
+                                  variant="outline"
+                                  className="shrink-0 border-violet-200 text-xs font-normal text-violet-600 dark:border-violet-900 dark:text-violet-400"
+                                >
+                                  +{productCollections.length - 1}
                                 </Badge>
                               )}
                             </div>
@@ -1311,15 +1326,21 @@ function AdminProductsPageInner() {
                         <td className="border-b px-3 py-2.5 align-middle">
                           <div className="flex items-center gap-2">
                             {product.tags.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
-                                {product.tags.slice(0, 2).map((tag) => (
-                                  <Badge key={tag} variant="secondary" className="text-xs">
+                              <div className="flex items-center gap-1" title={product.tags.join(", ")}>
+                                {product.tags.slice(0, 1).map((tag) => (
+                                  <Badge
+                                    key={tag}
+                                    className="max-w-[112px] truncate border-sky-200 bg-sky-50 text-xs font-normal text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300"
+                                  >
                                     {tag}
                                   </Badge>
                                 ))}
-                                {product.tags.length > 2 && (
-                                  <Badge variant="outline" className="text-xs">
-                                    +{product.tags.length - 2}
+                                {product.tags.length > 1 && (
+                                  <Badge
+                                    variant="outline"
+                                    className="shrink-0 border-sky-200 text-xs font-normal text-sky-600 dark:border-sky-900 dark:text-sky-400"
+                                  >
+                                    +{product.tags.length - 1}
                                   </Badge>
                                 )}
                               </div>
@@ -1415,7 +1436,7 @@ function AdminProductsPageInner() {
                       {isExpanded && product.variants.map((variant: any) => {
                         const stock = stockLevels?.[variant._id];
                         return (
-                          <tr key={variant._id} className="bg-muted/40 text-sm">
+                          <tr key={variant._id} className="bg-indigo-50/40 text-sm dark:bg-indigo-950/20">
                             <td className="border-b px-3 py-2" />
                             <td className="border-b px-3 py-2" />
                             <td className="border-b px-3 py-2 text-muted-foreground">
