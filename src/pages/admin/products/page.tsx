@@ -1111,7 +1111,7 @@ function AdminProductsPageInner() {
                     </th>
                     <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-16">Image</th>
                     <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Product Name</th>
-                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-32">
+                    <th className="border-b border-slate-200 dark:border-slate-800 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400 w-32 min-w-[104px]">
                       <button
                         onClick={() => handleSortColumn("sku")}
                         className="flex items-center gap-1 hover:text-foreground transition-colors"
@@ -1253,7 +1253,7 @@ function AdminProductsPageInner() {
                             </p>
                           </div>
                         </td>
-                        <td className="border-b px-3 py-2.5 align-middle">
+                        <td className="border-b px-3 py-2.5 align-middle min-w-[104px] break-words">
                           {firstVariant ? (
                             <div>
                               <EditableCell
@@ -1454,7 +1454,7 @@ function AdminProductsPageInner() {
                                 {variant.title || "Default"}
                               </span>
                             </td>
-                            <td className="border-b px-3 py-2">
+                            <td className="border-b px-3 py-2 min-w-[104px] break-words">
                               <EditableCell variantId={variant._id} value={variant.sku ?? ""} type="text" field="sku" />
                             </td>
                             <td className="border-b px-3 py-2">
