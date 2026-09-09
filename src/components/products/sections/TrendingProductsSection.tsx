@@ -3,8 +3,9 @@ import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { StarIcon, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import { ProductThumb } from "@/components/product-thumb.tsx";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 import type { Id } from "@/lib/firebase-api";
 
@@ -53,7 +54,7 @@ export function TrendingProductsSection({ productId }: TrendingProductsSectionPr
             id="trending-products-scroll"
             className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory"
           >
-            {products.map((product) => {
+            {products.map((product, index) => {
             const firstVariant = product.variants && product.variants[0];
             const isOutOfStock = firstVariant?.inventoryQuantity === 0 || firstVariant?.inventory_quantity === 0;
             const price = firstVariant?.price || 0;
@@ -78,18 +79,12 @@ export function TrendingProductsSection({ productId }: TrendingProductsSectionPr
                     <CardContent className="p-0">
                       {/* Image */}
                       <div className="relative aspect-square overflow-hidden bg-muted">
-                        {product.images?.[0] && (
-                          <img
-                            src={product.images[0].url}
-                            alt={product.title}
-                            loading="lazy"
-                            decoding="async"
-                            className={cn(
-                              "w-full h-full object-cover transition-transform group-hover:scale-110",
-                              isOutOfStock && "opacity-30"
-                            )}
-                          />
-                        )}
+                        <ProductThumb
+                          src={product.images?.[0]?.url}
+                          alt={product.title}
+                          className="transition-transform group-hover:scale-110"
+                          dimmed={isOutOfStock}
+                        />
 
                         {/* Badges */}
                         <div className="absolute top-2 left-2 flex flex-col gap-1">
@@ -128,19 +123,6 @@ export function TrendingProductsSection({ productId }: TrendingProductsSectionPr
                           )}
                         </div>
 
-                        {/* Rating placeholder */}
-                        <div className="flex items-center gap-0.5">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <StarIcon
-                              key={i}
-                              className={cn(
-                                "size-3",
-                                i < 4 ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                              )}
-                            />
-                          ))}
-                          <span className="text-xs text-muted-foreground ml-1">(4.0)</span>
-                        </div>
                       </div>
                     </CardContent>
                   </Card>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -18,6 +19,28 @@ interface ExploreByBrandProps {
     desktopCardWidth?: string;
     desktopCardHeight?: string;
   };
+}
+
+function BrandMark({ src, name }: { src?: string; name?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return (
+      <div className="flex h-[120px] w-full items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10">
+        <span className="px-3 text-center text-xl font-bold tracking-tight text-foreground/70">
+          {name || "Brand"}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={name || "Brand"}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="max-h-[120px] max-w-full object-contain transition-transform group-hover:scale-110"
+    />
+  );
 }
 
 export function ExploreByBrand({ sectionId, config }: ExploreByBrandProps) {
@@ -84,12 +107,10 @@ export function ExploreByBrand({ sectionId, config }: ExploreByBrandProps) {
             >
               {/* Brand Logo */}
               <div className="p-6 flex flex-col items-center justify-center gap-3">
-                <img
-                  src={card.imageUrl}
-                  alt={card.title || "Brand"}
-                  loading="lazy"
-                  className="max-w-full max-h-[120px] object-contain transition-transform group-hover:scale-110"
-                />
+                {/* The old Cloudinary account was deleted, so a share of these
+                    logo URLs 404. A broken-image icon on every other brand made
+                    the row look dead — fall back to the brand's own name. */}
+                <BrandMark src={card.imageUrl} name={card.title} />
                 {card.title && (
                   <h3 className="font-semibold text-lg text-center">{card.title}</h3>
                 )}

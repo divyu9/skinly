@@ -15,6 +15,8 @@ import {
   ChevronUpIcon,
   InfoIcon,
   MessageCircleIcon,
+  ScissorsIcon,
+  SmartphoneIcon,
 } from "lucide-react";
 
 // Layout Components
@@ -271,8 +273,15 @@ export default function ProductDetailPage() {
       <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
 
       {/* Product Detail Section */}
-      <section className="pt-24 pb-12 px-4">
-        <div className="container mx-auto max-w-6xl">
+      <section className="relative pt-24 pb-12 px-4">
+        {/* Aurora wash — colour without competing with the artwork */}
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[560px] overflow-hidden">
+          <div className="absolute -left-24 top-8 size-[380px] rounded-full bg-violet-500/25 blur-[100px]" />
+          <div className="absolute right-0 top-0 size-[340px] rounded-full bg-fuchsia-500/20 blur-[100px]" />
+          <div className="absolute left-1/3 top-40 size-[320px] rounded-full bg-sky-400/20 blur-[110px]" />
+        </div>
+
+        <div className="relative z-10 container mx-auto max-w-6xl">
           {/* Back Button */}
           <Button variant="ghost" size="sm" asChild className="mb-4">
             <Link to="/products">
@@ -281,15 +290,20 @@ export default function ProductDetailPage() {
             </Link>
           </Button>
 
-          {/* Reference Message Banner */}
+          {/* This used to be an amber warning telling the buyer the photo is not
+              what they get — the first sentence on the page. Same fact, told as
+              the reason the product is worth buying. */}
           {isSkinProduct && (
-            <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-              <div className="flex items-start gap-2 text-sm">
-                <InfoIcon className="size-4 text-amber-600 shrink-0 mt-0.5" />
-                <span className="text-foreground">
-                  Model images are for reference only - You will receive the skin for your selected model
+            <div className="mb-5 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/10 to-amber-400/10 p-3.5 ring-1 ring-violet-500/20">
+              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-sm shadow-fuchsia-600/30">
+                <ScissorsIcon className="size-[18px]" strokeWidth={2.2} />
+              </span>
+              <p className="text-[13px] leading-snug sm:text-sm">
+                <span className="font-semibold text-foreground">Cut to fit your exact model.</span>{" "}
+                <span className="text-muted-foreground">
+                  Pick your device and we print and cut this design for it — the photo shows the design, not your model.
                 </span>
-              </div>
+              </p>
             </div>
           )}
 
@@ -307,10 +321,10 @@ export default function ProductDetailPage() {
 
             {/* Product Info */}
             <div className="space-y-6">
-              {/* Title and Share */}
+              {/* Title, price, proof */}
               <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h1 className="text-2xl md:text-3xl font-bold flex-1">
+                <div className="mb-2 flex items-start justify-between gap-3">
+                  <h1 className="flex-1 text-[26px] font-bold leading-[1.15] tracking-tight md:text-4xl">
                     {productData.title}
                   </h1>
                   <ProductShareButton
@@ -318,25 +332,32 @@ export default function ProductDetailPage() {
                     productUrl={productUrl}
                   />
                 </div>
-                
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="text-2xl font-bold text-primary">{priceDisplay}</div>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <div className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
+                    {priceDisplay}
+                  </div>
+                  <span className="rounded-full bg-emerald-500/12 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-300">
+                    Inclusive of all taxes
+                  </span>
+
+                  {/* Only shown when reviews actually exist — no placeholder stars. */}
                   {reviewStats && reviewStats.totalReviews > 0 && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <div className="flex items-center">
                         {[...Array(5)].map((_, i) => (
                           <StarIcon
                             key={i}
                             className={`size-4 ${
                               i < Math.round(reviewStats.averageRating)
-                                ? "fill-yellow-400 text-yellow-400"
+                                ? "fill-amber-400 text-amber-400"
                                 : "fill-muted text-muted"
                             }`}
                           />
                         ))}
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        {reviewStats.averageRating} ({reviewStats.totalReviews} reviews)
+                        {reviewStats.averageRating} ({reviewStats.totalReviews})
                       </span>
                     </div>
                   )}
@@ -346,27 +367,32 @@ export default function ProductDetailPage() {
               {/* USPs */}
               <ProductUSPs show={isSkinProduct} />
 
-              {/* Description */}
+              {/* Description — the first lines carry the "matte finish / 3M vinyl"
+                  detail that justifies the price, so it starts open. */}
               {productData.description && (
-                <div className="border border-border rounded-lg p-4">
-                  <button
-                    onClick={() => updateProductState({ 
-                      showFullDescription: !productState.showFullDescription 
-                    })}
-                    className="flex items-center justify-between w-full text-left"
+                <div className="rounded-2xl bg-card p-4 ring-1 ring-border/70">
+                  <div
+                    className={
+                      productState.showFullDescription
+                        ? ""
+                        : "relative max-h-[4.5rem] overflow-hidden after:absolute after:inset-x-0 after:bottom-0 after:h-8 after:bg-gradient-to-t after:from-card after:to-transparent"
+                    }
                   >
-                    <h3 className="font-semibold text-sm">Product Description</h3>
+                    <FormattedDescription description={productData.description} />
+                  </div>
+                  <button
+                    onClick={() =>
+                      updateProductState({ showFullDescription: !productState.showFullDescription })
+                    }
+                    className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                  >
+                    {productState.showFullDescription ? "Show less" : "Read more"}
                     {productState.showFullDescription ? (
                       <ChevronUpIcon className="size-4" />
                     ) : (
                       <ChevronDownIcon className="size-4" />
                     )}
                   </button>
-                  {productState.showFullDescription && (
-                    <div className="mt-3">
-                      <FormattedDescription description={productData.description} />
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -398,36 +424,54 @@ export default function ProductDetailPage() {
                 />
               )}
               
-              {/* Add to Cart / Buy Now Buttons */}
+              {/* A dead grey primary button was the last thing a visitor saw
+                  before leaving. When no model is picked the CTA is live and
+                  says what to do; it only becomes Buy Now once we can sell. */}
               {isInStock ? (
-                <div className="flex gap-3">
-                  <Button
-                    className="flex-1 !border-2 !border-foreground"
-                    size="lg"
-                    variant="outline"
-                    onClick={handleAddToCartClick}
-                    disabled={isAdding || isBuyingNow || isButtonDisabled}
-                  >
-                    <ShoppingCartIcon className="size-5 mr-2" />
-                    {isAdding ? "Adding..." : "Add to Cart"}
-                  </Button>
-                  <Button
-                    className="flex-1 animate-shake border-2 border-primary"
-                    size="lg"
-                    onClick={handleBuyNow}
-                    disabled={isAdding || isBuyingNow || isButtonDisabled}
-                  >
-                    <ZapIcon className="size-5 mr-2" />
-                    {isBuyingNow ? "Processing..." : "Buy Now"}
-                  </Button>
-                </div>
+                isButtonDisabled ? (
+                  <div className="space-y-2">
+                    <Button
+                      size="lg"
+                      onClick={openSelector}
+                      className="h-14 w-full rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 text-base font-semibold text-white shadow-lg shadow-fuchsia-600/25 transition-all hover:shadow-xl hover:shadow-fuchsia-600/35 hover:brightness-110"
+                    >
+                      <SmartphoneIcon className="mr-2 size-5" />
+                      Select your device
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground">
+                      953 models supported — we cut this design for yours
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={handleAddToCartClick}
+                      disabled={isAdding || isBuyingNow}
+                      className="h-14 flex-1 rounded-2xl border-2 text-base font-semibold"
+                    >
+                      <ShoppingCartIcon className="mr-2 size-5" />
+                      {isAdding ? "Adding..." : "Add to Cart"}
+                    </Button>
+                    <Button
+                      size="lg"
+                      onClick={handleBuyNow}
+                      disabled={isAdding || isBuyingNow}
+                      className="h-14 flex-[1.3] rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 text-base font-semibold text-white shadow-lg shadow-fuchsia-600/25 transition-all hover:shadow-xl hover:shadow-fuchsia-600/35 hover:brightness-110"
+                    >
+                      <ZapIcon className="mr-2 size-5" />
+                      {isBuyingNow ? "Processing..." : "Buy Now"}
+                    </Button>
+                  </div>
+                )
               ) : productData.variants && productData.variants.length > 0 ? (
                 <StockNotification
                   variantId={productData.variants[productState.selectedVariant]?._id}
                   variantTitle={productData.variants[productState.selectedVariant]?.title}
                 />
               ) : null}
-              
+
               {/* Delivery Info */}
               <DeliveryInfo isSkinProduct={isSkinProduct} />
               
@@ -437,16 +481,14 @@ export default function ProductDetailPage() {
                 cashbackInfo={cashbackInfo}
               />
               
-              {/* WhatsApp Support Button */}
-              <Button
-                variant="outline"
-                className="w-full !border-2 !border-[#25D366] text-[#25D366] hover:bg-[#25D366]/10"
-                size="lg"
+              {/* Support — deliberately quiet so it doesn't compete with Buy Now */}
+              <button
                 onClick={handleWhatsAppSupport}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-card py-3 text-[13px] font-medium text-muted-foreground ring-1 ring-border/70 transition-colors hover:text-foreground"
               >
-                <MessageCircleIcon className="size-5 mr-2" />
-                WhatsApp Support
-              </Button>
+                <MessageCircleIcon className="size-4 text-[#25D366]" />
+                Questions? Chat with us on WhatsApp
+              </button>
             </div>
           </div>
 
@@ -516,7 +558,8 @@ export default function ProductDetailPage() {
       <StickyBottomBar
         price={priceDisplay}
         onBuyNow={handleBuyNow}
-        disabled={isButtonDisabled}
+        onSelectDevice={openSelector}
+        needsDevice={isButtonDisabled}
         isLoading={isBuyingNow}
         show={productState.showStickyBar}
       />

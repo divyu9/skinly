@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { StarIcon, ShoppingCartIcon } from "lucide-react";
+import { ShoppingCartIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
@@ -168,21 +168,6 @@ export function TopPicks({
                             )}
                           </div>
 
-                          {/* Rating (placeholder) */}
-                          <div className="flex items-center gap-1">
-                            {Array.from({ length: 5 }).map((_, i) => (
-                              <StarIcon
-                                key={i}
-                                className={cn(
-                                  "size-3",
-                                  i < 4 ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-                                )}
-                              />
-                            ))}
-                            <span className="text-xs text-muted-foreground ml-1">
-                              (4.0)
-                            </span>
-                          </div>
                         </div>
                       </CardContent>
                     </Card>
