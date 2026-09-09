@@ -8,6 +8,7 @@ import {
 import { httpsCallable } from 'firebase/functions';
 import { useAuth } from '@/hooks/use-auth';
 import { normalizeModelName } from '@/lib/mockups';
+import { normalizeImageForUpload, withExtension } from '@/lib/image-processing';
 
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
@@ -4813,10 +4814,27 @@ export function useAction(apiRef: any) {
         if (!r2Key && args.filename) {
           const sanitizedFilename = args.filename.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9-_]/g, "_");
           const folder = args.folder || "general";
-          r2Key = `${folder}/${sanitizedFilename}_${Date.now()}.webp`;
+          r2Key = `${folder}/${sanitizedFilename}_${Date.now()}`;
         }
-        
-        const contentType = args.contentType || (args.mediaType === 'video' ? 'video/mp4' : 'image/webp');
+
+        // Every R2 upload in the app funnels through here, so this is the one
+        // place worth compressing at. Callers used to pick the extension and the
+        // Content-Type themselves and several of them simply hardcoded `.webp`
+        // — the homepage banners were 2 MB PNGs wearing WebP filenames. The
+        // normaliser re-encodes what it can and, either way, returns a type and
+        // extension that actually describe the bytes.
+        const declaredContentType =
+          args.contentType || (args.mediaType === 'video' ? 'video/mp4' : undefined);
+        const normalized = await normalizeImageForUpload(fileBase64, declaredContentType);
+        const contentType = normalized.contentType;
+        if (normalized.extension) r2Key = withExtension(r2Key, normalized.extension);
+
+        if (normalized.converted) {
+          console.log(
+            `Converted upload to WebP: ${(normalized.originalSize / 1024).toFixed(0)}KB -> ` +
+            `${(normalized.bytes.byteLength / 1024).toFixed(0)}KB (${normalized.width}x${normalized.height})`
+          );
+        }
         
         const res: any = await callable({
           fileName: r2Key,
@@ -4824,20 +4842,7 @@ export function useAction(apiRef: any) {
         });
         
         if (res.data && res.data.success) {
-          // Extract clean base64 data
-          let base64Data = fileBase64;
-          if (base64Data.includes(",")) {
-            base64Data = base64Data.split(",")[1];
-          }
-          
-          // Robust conversion from base64 to Blob to avoid URL length limits
-          const byteString = atob(base64Data);
-          const ab = new ArrayBuffer(byteString.length);
-          const ia = new Uint8Array(ab);
-          for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-          }
-          const blob = new Blob([ab], { type: contentType });
+          const blob = new Blob([normalized.bytes as BlobPart], { type: contentType });
           
           // Upload directly to R2 using the presigned URL
           // Make sure not to send any extra headers that aren't signed
@@ -4861,7 +4866,6 @@ export function useAction(apiRef: any) {
                 const db = getFirestore();
                 const auth = getAuth();
                 
-                const estimatedBytes = Math.floor((base64Data.length * 3) / 4);
                 
                 await addDoc(collection(db, 'mediaLibrary'), {
                   cloudinaryUrl: finalPublicUrl, // Use the computed fallback URL
@@ -4869,10 +4873,10 @@ export function useAction(apiRef: any) {
                   filename: args.filename || r2Key.split('/').pop(),
                   folder: args.folder || "general",
                   mediaType: args.mediaType || "image",
-                  format: "webp",
-                  width: 0,
-                  height: 0,
-                  bytes: estimatedBytes,
+                  format: normalized.extension,
+                  width: normalized.width,
+                  height: normalized.height,
+                  bytes: normalized.bytes.byteLength,
                   tags: args.tags || [],
                   uploadedBy: auth.currentUser?.email || "system",
                   createdAt: Date.now()
