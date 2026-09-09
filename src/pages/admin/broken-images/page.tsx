@@ -19,6 +19,9 @@ import {
   RefreshCwIcon,
   ImagesIcon,
 } from "lucide-react";
+import { AdminLayout } from "@/components/admin-layout.tsx";
+import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
+import { SignInButton } from "@/components/ui/signin.tsx";
 import { MediaPickerDialog } from "../products/_components/media-picker-dialog.tsx";
 import { isDeadImageUrl } from "@/lib/image-fallback.ts";
 
@@ -34,6 +37,33 @@ const PAGE_SIZE = 40;
  * the replacement straight onto the product.
  */
 export default function AdminBrokenImagesPage() {
+  return (
+    <AdminLayout>
+      <AuthLoading>
+        <div className="space-y-4">
+          <Skeleton className="h-9 w-64" />
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
+        </div>
+      </AuthLoading>
+      <Unauthenticated>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <div className="space-y-4 text-center">
+            <h2 className="text-xl font-semibold">Sign in required</h2>
+            <p className="text-muted-foreground">Please sign in to manage product images.</p>
+            <SignInButton />
+          </div>
+        </div>
+      </Unauthenticated>
+      <Authenticated>
+        <BrokenImagesContent />
+      </Authenticated>
+    </AdminLayout>
+  );
+}
+
+function BrokenImagesContent() {
   const products = useQuery(api.products.getAllProductsBasic, { sortBy: "title_asc" });
   const gadgetTypes = useQuery(api.gadgetTypes.list, {});
   const updateProduct = useMutation(api.products.updateProduct);
