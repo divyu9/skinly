@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils.ts";
 
 interface SlideFormData {
   imageUrl: string;
+  mobileImageUrl: string;
   heading: string;
   subheading: string;
   ctaText: string;
@@ -44,6 +45,7 @@ export function HeroSlidesTab() {
   const [editingSlide, setEditingSlide] = useState<Id<"heroSlides"> | null>(null);
   const [formData, setFormData] = useState<SlideFormData>({
     imageUrl: "",
+    mobileImageUrl: "",
     heading: "",
     subheading: "",
     ctaText: "",
@@ -51,7 +53,7 @@ export function HeroSlidesTab() {
     isActive: true,
     order: 0,
     mobileWidth: "90vw",
-    mobileHeight: "110vw",
+    mobileHeight: "60vw",
     desktopWidth: "600px",
     desktopHeight: "400px",
   });
@@ -64,6 +66,7 @@ export function HeroSlidesTab() {
         setEditingSlide(slideId);
         setFormData({
           imageUrl: slide.imageUrl,
+          mobileImageUrl: slide.mobileImageUrl || "",
           heading: slide.heading || "",
           subheading: slide.subheading || "",
           ctaText: slide.ctaText || "",
@@ -71,7 +74,7 @@ export function HeroSlidesTab() {
           isActive: slide.isActive,
           order: slide.order,
           mobileWidth: slide.mobileWidth || "90vw",
-          mobileHeight: slide.mobileHeight || "110vw",
+          mobileHeight: slide.mobileHeight || "60vw",
           desktopWidth: slide.desktopWidth || "600px",
           desktopHeight: slide.desktopHeight || "400px",
         });
@@ -80,6 +83,7 @@ export function HeroSlidesTab() {
       setEditingSlide(null);
       setFormData({
         imageUrl: "",
+        mobileImageUrl: "",
         heading: "",
         subheading: "",
         ctaText: "",
@@ -87,7 +91,7 @@ export function HeroSlidesTab() {
         isActive: true,
         order: slides ? slides.length : 0,
         mobileWidth: "90vw",
-        mobileHeight: "110vw",
+        mobileHeight: "60vw",
         desktopWidth: "600px",
         desktopHeight: "400px",
       });
@@ -112,6 +116,7 @@ export function HeroSlidesTab() {
         await updateSlide({
           slideId: editingSlide,
           imageUrl: formData.imageUrl,
+          mobileImageUrl: formData.mobileImageUrl,
           heading: formData.heading || undefined,
           subheading: formData.subheading || undefined,
           ctaText: formData.ctaText || undefined,
@@ -127,6 +132,7 @@ export function HeroSlidesTab() {
       } else {
         await createSlide({
           imageUrl: formData.imageUrl,
+          mobileImageUrl: formData.mobileImageUrl,
           heading: formData.heading || undefined,
           subheading: formData.subheading || undefined,
           ctaText: formData.ctaText || undefined,
@@ -278,6 +284,27 @@ export function HeroSlidesTab() {
                 onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                 placeholder="https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/..."
               />
+              <p className="text-xs text-muted-foreground">
+                Design at <strong>1200 &times; 800</strong> (3:2). Export as real WebP under
+                200&nbsp;KB &mdash; this is the first image on the homepage, so its weight is
+                the load time people feel.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="mobile-image-url">Mobile Image URL</Label>
+              <Input
+                id="mobile-image-url"
+                value={formData.mobileImageUrl}
+                onChange={(e) => setFormData({ ...formData, mobileImageUrl: e.target.value })}
+                placeholder="Optional — leave blank to reuse the image above"
+              />
+              <p className="text-xs text-muted-foreground">
+                Only needed for a portrait mobile banner. Point this at a{" "}
+                <strong>1080 &times; 1350</strong> (4:5) artwork <em>and</em> set the mobile
+                height below to <code>112.5vw</code>. Leave both alone and the landscape
+                banner is used on mobile uncropped.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -359,7 +386,7 @@ export function HeroSlidesTab() {
                       id="mobile-height"
                       value={formData.mobileHeight}
                       onChange={(e) => setFormData({ ...formData, mobileHeight: e.target.value })}
-                      placeholder="110vw"
+                      placeholder="60vw"
                       className="h-9 text-sm"
                     />
                   </div>

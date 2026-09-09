@@ -20,19 +20,29 @@ export function HeroSlider() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Get dimensions for a slide
-  const getSlideDimensions = useCallback((slide: NonNullable<typeof heroSlides>[0]) => {
+  // Frame size, and which artwork fills it.
+  //
+  // The default frame is 3:2 on both breakpoints because that is the shape the
+  // banners are actually drawn in. It used to be 90vw x 110vw on mobile — a 0.82
+  // portrait box — so `object-cover` threw away 45% of every landscape banner,
+  // taking the headline and the Shop Now button with it.
+  //
+  // A slide can still opt into a taller mobile frame by setting mobileHeight,
+  // but then it needs mobileImageUrl too: one piece of art cannot survive both
+  // a portrait and a landscape crop.
+  const getSlideLayout = useCallback((slide: NonNullable<typeof heroSlides>[0]) => {
     if (isMobile) {
       return {
         width: slide.mobileWidth || "90vw",
-        height: slide.mobileHeight || "110vw",
-      };
-    } else {
-      return {
-        width: slide.desktopWidth || "600px",
-        height: slide.desktopHeight || "400px",
+        height: slide.mobileHeight || "60vw",
+        src: slide.mobileImageUrl || slide.imageUrl,
       };
     }
+    return {
+      width: slide.desktopWidth || "600px",
+      height: slide.desktopHeight || "400px",
+      src: slide.imageUrl,
+    };
   }, [isMobile]);
 
   // Track scroll position to update active dot
@@ -65,7 +75,7 @@ export function HeroSlider() {
               className="flex-shrink-0 rounded-2xl" 
               style={{ 
                 width: isMobile ? "90vw" : "600px",
-                height: isMobile ? "110vw" : "400px"
+                height: isMobile ? "60vw" : "400px"
               }}
             />
           ))}
@@ -92,15 +102,15 @@ export function HeroSlider() {
         }}
       >
         {heroSlides.map((slide) => {
-          const dimensions = getSlideDimensions(slide);
+          const layout = getSlideLayout(slide);
           
           return (
             <div
               key={slide._id}
               className="hero-slide flex-shrink-0 snap-start"
               style={{
-                width: dimensions.width,
-                height: dimensions.height,
+                width: layout.width,
+                height: layout.height,
                 contain: 'layout style paint',
               }}
             >
@@ -114,13 +124,13 @@ export function HeroSlider() {
             >
               {/* Background Image - Simplified for better performance */}
               <img
-                src={slide.imageUrl}
+                src={layout.src}
                 alt={slide.heading || "Hero slide"}
                 loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
                 fetchpriority={slide._id === heroSlides[0]._id ? "high" : "auto"}
                 decoding={slide._id === heroSlides[0]._id ? "sync" : "async"}
                 width="1200"
-                height="1320"
+                height="800"
                 className="w-full h-full object-cover object-center transition-transform duration-300 group-active:scale-95"
               />
 
