@@ -25,6 +25,8 @@ export function ProductCategoryHeader({
   // Get product categories, gadget types, and finish types
   const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
+  // Counts behind each chip, so we never offer a filter with nothing behind it.
+  const facets = useQuery(api.products.getFilterFacets, { productCategory });
   const finishTypes = useQuery(api.finishTypes.listAllActive, {});
 
   const categoryConfig = {
@@ -111,6 +113,7 @@ export function ProductCategoryHeader({
                     </button>
                     {gadgetTypes
                       .filter((gt) => gt.name !== 'accessory' && gt.name !== 'cover')
+                      .filter((gt) => !facets || (facets.byGadget?.[gt._id] ?? 0) > 0)
                       .map((gadgetType) => (
                         <button
                           key={gadgetType._id}
@@ -118,6 +121,9 @@ export function ProductCategoryHeader({
                           className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium text-xs sm:text-sm whitespace-nowrap border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm transition-all duration-200"
                         >
                           {gadgetType.displayName}
+                          {facets?.byGadget?.[gadgetType._id] ? (
+                            <span className="ml-1 opacity-60">{facets.byGadget[gadgetType._id]}</span>
+                          ) : null}
                         </button>
                       ))}
                   </>
@@ -143,10 +149,12 @@ export function ProductCategoryHeader({
                   <>
                     {/* Left side - Selected Gadget (30% width on mobile) */}
                     <button
-                      onClick={onDeviceSelectorClick}
+                      onClick={() => onUpdateFilters({ gadget: null, finish: null })}
+                      title="Change device category"
                       className="w-[30%] sm:w-auto px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-black dark:bg-white text-white dark:text-black font-semibold text-[10px] sm:text-xs truncate flex-shrink-0 hover:shadow-md transition-all duration-200 border border-black dark:border-white"
                     >
                       {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
+                      <span className="ml-1 opacity-70">✕</span>
                     </button>
 
                     {/* Right side - Finish Selector (70% width on mobile) */}
@@ -161,7 +169,13 @@ export function ProductCategoryHeader({
                       >
                         All
                       </button>
-                      {finishTypes.map((finishType) => (
+                      {finishTypes
+                        .filter((ft) => {
+                          const g = gadgetTypes?.find(gt => gt.name === gadgetFilter)?._id;
+                          if (!facets || !g) return true;
+                          return (facets.finishByGadget?.[g]?.[ft._id] ?? 0) > 0;
+                        })
+                        .map((finishType) => (
                         <button
                           key={finishType._id}
                           onClick={() => onUpdateFilters({ finish: finishType.name })}
@@ -172,6 +186,11 @@ export function ProductCategoryHeader({
                           }`}
                         >
                           {finishType.displayName}
+                          {(() => {
+                            const g = gadgetTypes?.find(gt => gt.name === gadgetFilter)?._id;
+                            const n = g ? facets?.finishByGadget?.[g]?.[finishType._id] : undefined;
+                            return n ? <span className="ml-1 opacity-60">{n}</span> : null;
+                          })()}
                         </button>
                       ))}
                     </div>

@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card.tsx";
+import { ProductThumb } from "@/components/product-thumb.tsx";
 import { PackageIcon, BellIcon, Sparkles } from "lucide-react";
 import type { Product } from "@/hooks/useProductsData";
 
@@ -73,18 +74,11 @@ export const ProductCard = memo(function ProductCard({
           )}
           
           {/* Product Image */}
-          {displayImageUrl ? (
-            <img
-              src={displayImageUrl}
-              alt={mainImage?.alt || product.title}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <PackageIcon className="size-8 sm:size-16 text-muted-foreground" />
-            </div>
-          )}
+          <ProductThumb
+            src={displayImageUrl}
+            alt={mainImage?.alt || product.title}
+            className="group-hover:scale-110 transition-transform duration-300"
+          />
         </div>
         
         {/* Product Info */}

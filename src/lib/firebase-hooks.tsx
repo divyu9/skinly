@@ -1599,6 +1599,31 @@ export function useQuery(apiRef: any, args?: any) {
           });
           unsubscribe = () => { unsubProducts(); unsubVariants(); };
         }
+        else if (path === 'products.getFilterFacets') {
+          // How many active products exist per gadget, and per gadget+finish.
+          // The category bar used to offer every finish for every gadget, but
+          // most pairs have nothing behind them — picking Console then
+          // Transparent led to a guaranteed empty grid.
+          unsubscribe = onSnapshot(query(collection(db, 'products'), where('status', '==', 'active')), (snap) => {
+            const byGadget: Record<string, number> = {};
+            const byCategory: Record<string, number> = {};
+            const finishByGadget: Record<string, Record<string, number>> = {};
+
+            snap.docs.forEach(d => {
+              const p = d.data() as any;
+              if (args?.productCategory && p.productCategory !== args.productCategory) return;
+              const g = p.gadgetTypeId;
+              const f = p.finishTypeId;
+              if (p.productCategory) byCategory[p.productCategory] = (byCategory[p.productCategory] || 0) + 1;
+              if (!g) return;
+              byGadget[g] = (byGadget[g] || 0) + 1;
+              if (!f) return;
+              (finishByGadget[g] ||= {})[f] = (finishByGadget[g][f] || 0) + 1;
+            });
+
+            setData({ byGadget, byCategory, finishByGadget });
+          });
+        }
         else if (path === 'products.getAllProductsPaginated') {
           const q = query(collection(db, 'products'), limit(args?.paginationOpts?.numItems || 50));
           unsubscribe = onSnapshot(q, async (snap) => {

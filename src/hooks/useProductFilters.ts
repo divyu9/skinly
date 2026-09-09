@@ -113,7 +113,14 @@ export function useProductFilters() {
   // Update filters with URL sync
   const updateFilters = useCallback((updates: Partial<FilterState>) => {
     setFilters(prev => {
-      const newState = { ...prev, ...updates };
+      // Spreading a key whose value is undefined still overwrites it, which
+      // silently cleared filters the caller never meant to touch. Only keys
+      // carrying a real value (including an explicit null, which means clear)
+      // are applied.
+      const provided = Object.fromEntries(
+        Object.entries(updates).filter(([, v]) => v !== undefined)
+      ) as Partial<FilterState>;
+      const newState = { ...prev, ...provided };
       
       // Clear dependent filters when category changes
       if (updates.productCategory !== undefined && updates.productCategory !== prev.productCategory) {

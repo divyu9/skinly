@@ -162,16 +162,24 @@ export default function ProductsPage() {
     updateFilters({ collectionParam: collectionName || "" });
   }, [updateFilters]);
   
+  // Only forward the keys the caller actually sent. Passing all three meant an
+  // object like { productCategory: undefined, gadgetFilter: 'console',
+  // finishFilter: undefined }, and `{ ...prev, ...updates }` overwrites a key
+  // even when its value is undefined — so picking a gadget silently wiped the
+  // product category, and picking a finish wiped the gadget. The URL kept every
+  // param, the in-memory filters kept only the last click, and the grid showed
+  // the wrong products: ?gadget=console&finish=transparent returned the 24
+  // transparent phone and laptop skins.
   const handleFilterUpdate = useCallback((updates: {
     productType?: string | null;
     gadget?: string | null;
     finish?: string | null;
   }) => {
-    updateFilters({
-      productCategory: updates.productType as any,
-      gadgetFilter: updates.gadget,
-      finishFilter: updates.finish,
-    });
+    const next: Record<string, unknown> = {};
+    if ("productType" in updates) next.productCategory = updates.productType;
+    if ("gadget" in updates) next.gadgetFilter = updates.gadget;
+    if ("finish" in updates) next.finishFilter = updates.finish;
+    updateFilters(next as any);
   }, [updateFilters]);
   
   // ============================================
