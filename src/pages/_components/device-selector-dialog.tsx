@@ -20,6 +20,9 @@ import {
   PackageIcon,
   MonitorIcon,
   GamepadIcon,
+  JoystickIcon,
+  VideoIcon,
+  HeadphonesIcon,
   ChevronRightIcon
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -49,7 +52,11 @@ const gadgetIcons: Record<string, LucideIcon> = {
   "drone": PlaneIcon,
   "charger": CableIcon,
   "cover": BoxIcon,
-  "accessory": PackageIcon,
+  // These three fell through to the generic box, so half the grid showed the
+  // same icon.
+  "controller": JoystickIcon,
+  "gimbals": VideoIcon,
+  "accessory": HeadphonesIcon,
 };
 
 export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, onRequestModel }: DeviceSelectorDialogProps) {
@@ -148,6 +155,15 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
     return gadgetIcons[name] || PackageIcon; // Default icon
   };
 
+  // "128 models" under each type is the detail that makes the picker feel
+  // considered rather than decorative.
+  const modelCountFor = (name: string): number | null => {
+    if (!metadata) return null;
+    const key = name === "mac-mini" ? "macMini" : name;
+    const c = (metadata.byCategory as any)?.[key]?.count;
+    return typeof c === "number" && c > 0 ? c : null;
+  };
+
   // Get selected gadget display name
   const selectedGadgetDisplayName = useMemo(() => {
     if (!selectedDeviceType || !gadgetTypes) return "";
@@ -157,10 +173,10 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="flex max-h-[86vh] max-w-2xl flex-col overflow-hidden rounded-2xl p-6">
         <DialogHeader className="space-y-3">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold">
+            <DialogTitle className="text-[22px] font-semibold tracking-tight">
               {step === 1 && "Choose Device Type"}
               {step === 2 && `Select ${selectedGadgetDisplayName} Brand`}
               {step === 3 && `Select ${selectedBrand} Model`}
@@ -194,20 +210,25 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                   <p className="text-muted-foreground">No device types available</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {gadgetTypes.map((gadget) => {
                     const Icon = getGadgetIcon(gadget.name);
+                    const count = modelCountFor(gadget.name);
                     return (
                       <button
                         key={gadget._id}
                         onClick={() => handleDeviceTypeSelect(gadget.name)}
-                        className="group relative p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 flex flex-col items-center gap-2"
+                        className="group rounded-2xl border border-border/60 bg-card p-4 text-left transition-all duration-200 hover:-translate-y-px hover:border-foreground/25 hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.18)]"
                       >
-                        <div className="size-12 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                          <Icon className="size-6 text-muted-foreground group-hover:text-primary transition-colors" />
-                        </div>
-                        <span className="text-sm font-medium text-center leading-tight">{gadget.displayName}</span>
-                        <ChevronRightIcon className="absolute top-2 right-2 size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className="mb-3 inline-flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors duration-200 group-hover:bg-foreground group-hover:text-background">
+                          <Icon className="size-5" strokeWidth={1.75} />
+                        </span>
+                        <p className="text-[15px] font-semibold leading-tight tracking-tight">
+                          {gadget.displayName}
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {count ? `${count} models` : "Browse designs"}
+                        </p>
                       </button>
                     );
                   })}
@@ -234,30 +255,24 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                   {availableBrands.map(brand => (
                     <button
                       key={brand}
                       onClick={() => handleBrandSelect(brand)}
-                      className="group relative p-4 rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 flex flex-col items-center gap-2"
+                      className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 text-left transition-all duration-200 hover:-translate-y-px hover:border-foreground/25 hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.18)]"
                     >
                       {brandLogos[brand] ? (
-                        <div className="size-12 rounded-full bg-background border border-border flex items-center justify-center overflow-hidden group-hover:border-primary transition-colors">
-                          <img 
-                            src={brandLogos[brand]} 
-                            alt={brand}
-                            className="w-10 h-10 object-contain"
-                          />
-                        </div>
+                        <span className="inline-flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
+                          <img src={brandLogos[brand]} alt={brand} className="size-8 object-contain" />
+                        </span>
                       ) : (
-                        <div className="size-12 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                          <span className="text-xl font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                            {brand[0]}
-                          </span>
-                        </div>
+                        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-[15px] font-semibold text-muted-foreground transition-colors duration-200 group-hover:bg-foreground group-hover:text-background">
+                          {brand[0].toUpperCase()}
+                        </span>
                       )}
-                      <span className="text-sm font-medium text-center leading-tight">{brand}</span>
-                      <ChevronRightIcon className="absolute top-2 right-2 size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <span className="min-w-0 flex-1 truncate text-[15px] font-medium tracking-tight">{brand}</span>
+                      <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground/50 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
                     </button>
                   ))}
                 </div>
@@ -317,10 +332,10 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                       <button
                         key={idx}
                         onClick={() => handleModelSelect(model)}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all duration-200 text-left group"
+                        className="group flex w-full items-center justify-between rounded-xl border border-border/60 bg-card px-4 py-3 text-left transition-all duration-200 hover:border-foreground/25 hover:shadow-[0_4px_14px_-8px_rgb(0_0_0/0.2)]"
                       >
-                        <span className="text-sm font-medium">{model}</span>
-                        <ChevronRightIcon className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                        <span className="text-[15px] font-medium tracking-tight">{model}</span>
+                        <ChevronRightIcon className="size-4 text-muted-foreground/50 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
                       </button>
                     ))}
                     {/* Request Your Model button at the bottom */}

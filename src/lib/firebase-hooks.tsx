@@ -2504,7 +2504,21 @@ export function useQuery(apiRef: any, args?: any) {
             if (path !== 'gadgetTypes.list') {
               data = data.filter((d: any) => d.isActive === true);
             }
-            data = data.sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+            // No gadgetType document carries an `order`, so sorting by
+            // `(a.order || 0)` left every one of them at 0 and the list came out
+            // in Firestore id order — which is why the picker opened on
+            // Controller. Fall back to the order customers actually shop in.
+            const RANK: Record<string, number> = {
+              phone: 1, laptop: 2, 'mac-mini': 3, camera: 4, tablet: 5,
+              console: 6, lens: 7, drone: 8, controller: 9, charger: 10,
+              gimbals: 11, accessory: 12,
+            };
+            data = data.sort((a: any, b: any) => {
+              const ao = Number.isFinite(a.order) ? a.order : (RANK[a.name] ?? 99);
+              const bo = Number.isFinite(b.order) ? b.order : (RANK[b.name] ?? 99);
+              if (ao !== bo) return ao - bo;
+              return String(a.displayName || '').localeCompare(String(b.displayName || ''));
+            });
             setData(data);
           });
         }
