@@ -191,11 +191,13 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   return (
     <>
       {/* Main Header */}
-      <header 
-        className="fixed left-0 right-0 z-40 bg-background border-b border-border transition-all duration-300 h-16"
+      <header
+        className="fixed left-0 right-0 z-40 h-16 bg-background/80 backdrop-blur-xl transition-all duration-300 supports-[backdrop-filter]:bg-background/70"
         style={{ top: `${announcementHeight}px` }}
       >
-        <div className="h-full px-4 flex items-center justify-between gap-3">
+        {/* Gradient hairline instead of a flat grey border */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-violet-500/40 to-transparent" />
+        <div className="flex h-full items-center gap-2 px-3">
           {isSearchExpanded ? (
             // Expanded Search Header
             <>
@@ -233,60 +235,55 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
           ) : (
             // Normal Header
             <>
-              {/* Left: Menu Icon */}
               <button
                 onClick={onMenuClick}
-                className="flex-shrink-0 p-2 -ml-2 hover:bg-muted rounded-full transition-colors"
+                className="-ml-1 flex-shrink-0 rounded-xl p-2 transition-colors hover:bg-muted"
                 aria-label="Open menu"
               >
-                <MenuIcon className="size-6 text-foreground" />
+                <MenuIcon className="size-[22px] text-foreground" />
               </button>
 
-              {/* Left: Search Icon (conditional) */}
+              <Link to="/" className="flex-shrink-0" aria-label="Skinly home">
+                <BrandLogo type="header" imgClassName="h-7" />
+              </Link>
+
+              {/* The search used to hide behind an icon. It is the single most
+                  used control in every marketplace header, so it now sits in
+                  the bar as a real target. */}
               {showSearch && (
                 <button
                   onClick={handleSearchToggle}
-                  className="flex-shrink-0 p-2 hover:bg-muted rounded-full transition-colors"
+                  className="group flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full bg-muted/70 px-3 text-left ring-1 ring-border/60 transition-colors hover:bg-muted"
                   aria-label="Search"
                 >
-                  <SearchIcon className="size-5 text-foreground" />
+                  <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-[13px] text-muted-foreground">Search skins</span>
                 </button>
               )}
 
-              {/* Center: Logo - LCP Element */}
-              <div className="flex-1 flex items-center justify-center">
-                <BrandLogo type="header" imgClassName="h-8 md:h-10" />
-              </div>
+              {isLoaded && !isSignedIn ? (
+                <button onClick={handleSignIn} type="button" className="flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted" aria-label="Sign In">
+                  <UserIcon className="size-[21px] text-foreground" />
+                </button>
+              ) : isLoaded && isSignedIn ? (
+                <button
+                  type="button"
+                  className="flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted"
+                  aria-label="Account"
+                  onClick={() => navigate("/account")}
+                >
+                  <UserIcon className="size-[21px] text-foreground" />
+                </button>
+              ) : null}
 
-
-              {/* Right: Auth UI */}
-              <div className="flex items-center gap-1">
-                {/* Guests see SignIn modal, signed-in users go to /account. No navigation for guests! */}
-                {isLoaded && !isSignedIn ? (
-                  <button onClick={handleSignIn} type="button" className="p-2 rounded-full hover:bg-primary/10 transition-colors" aria-label="Sign In">
-                    <UserIcon className="size-5 text-foreground" />
-                  </button>
-                ) : isLoaded && isSignedIn ? (
-                  <button
-                    type="button"
-                    className="p-2 rounded-full hover:bg-primary/10 transition-colors"
-                    aria-label="Account"
-                    onClick={() => navigate("/account")}
-                  >
-                    <UserIcon className="size-5 text-foreground" />
-                  </button>
-                ) : null}
-              </div>
-
-              {/* Right: Cart Icon with Badge */}
               <button
                 onClick={() => navigate("/cart")}
-                className="flex-shrink-0 p-2 -mr-2 hover:bg-muted rounded-full transition-colors relative"
+                className="relative -mr-1 flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted"
                 aria-label="Cart"
               >
-                <ShoppingCartIcon className="size-5 text-foreground" />
+                <ShoppingCartIcon className="size-[21px] text-foreground" />
                 {displayCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 size-5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white ring-2 ring-background">
                     {displayCount > 9 ? "9+" : displayCount}
                   </span>
                 )}

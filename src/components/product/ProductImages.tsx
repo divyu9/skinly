@@ -78,7 +78,7 @@ export function ProductImages({
         className="aspect-square overflow-hidden rounded-xl bg-muted border border-border relative select-none"
         {...swipeHandlers}
       >
-        {selectedImage ? (
+        {selectedImage && !failedImages.has(selectedImage) ? (
           <>
             <img
               src={selectedImage}
@@ -115,8 +115,11 @@ export function ProductImages({
             )}
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <PackageIcon className="size-12 text-muted-foreground" />
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-muted to-muted/40">
+            <PackageIcon className="size-10 text-muted-foreground/50" />
+            <p className="px-6 text-center text-xs text-muted-foreground">
+              Photo coming soon — this design is printed to order
+            </p>
           </div>
         )}
       </div>

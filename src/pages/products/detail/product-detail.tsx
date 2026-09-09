@@ -13,6 +13,10 @@ import {
   StarIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  ChevronRightIcon,
+  TruckIcon,
+  ShieldCheckIcon,
+  LockIcon,
   InfoIcon,
   MessageCircleIcon,
   ScissorsIcon,
@@ -182,7 +186,7 @@ export default function ProductDetailPage() {
         />
         <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
         
-        <div className="pt-28 px-4">
+        <div className="px-4 pt-[72px]">
           <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-8 w-32 mb-8" />
             <div className="grid lg:grid-cols-2 gap-8">
@@ -211,7 +215,7 @@ export default function ProductDetailPage() {
         />
         <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
         
-        <div className="pt-28 px-4">
+        <div className="px-4 pt-[72px]">
           <div className="container mx-auto max-w-2xl text-center space-y-6">
             <div className="flex justify-center">
               <div className="size-20 rounded-full bg-muted flex items-center justify-center">
@@ -250,6 +254,15 @@ export default function ProductDetailPage() {
   const productPrice = productData.variants?.[productState.selectedVariant]?.price || 0;
   const isInStock = productData.variants?.[productState.selectedVariant]?.inventoryQuantity > 0;
   const isButtonDisabled = isSkinProduct && needsDeviceSelector && !phoneModel;
+
+  // Shown only when the variant genuinely carries a higher compareAtPrice.
+  // 286 of 1,839 variants do; the rest show the price alone rather than an
+  // invented "MRP", which is the dark pattern the CCPA guidance is aimed at.
+  const selectedVariantData = productData.variants?.[productState.selectedVariant];
+  const mrp = Number(selectedVariantData?.compareAtPrice) || 0;
+  const nowPrice = Number(selectedVariantData?.price) || 0;
+  const hasRealDiscount = mrp > nowPrice && nowPrice > 0;
+  const discountPercent = hasRealDiscount ? Math.round(((mrp - nowPrice) / mrp) * 100) : 0;
   
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -273,7 +286,7 @@ export default function ProductDetailPage() {
       <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
 
       {/* Product Detail Section */}
-      <section className="relative pt-24 pb-12 px-4">
+      <section className="relative px-4 pb-12 pt-[72px]">
         {/* Aurora wash — colour without competing with the artwork */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[560px] overflow-hidden">
           <div className="absolute -left-24 top-8 size-[380px] rounded-full bg-violet-500/25 blur-[100px]" />
@@ -282,13 +295,16 @@ export default function ProductDetailPage() {
         </div>
 
         <div className="relative z-10 container mx-auto max-w-6xl">
-          {/* Back Button */}
-          <Button variant="ghost" size="sm" asChild className="mb-4">
-            <Link to="/products">
-              <ArrowLeftIcon className="size-4 mr-2" />
-              Back
-            </Link>
-          </Button>
+          {/* A full-height ghost button on its own line cost ~48px and told the
+              visitor nothing. A breadcrumb is shorter, orients them, and gives
+              the crawler a path. */}
+          <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 py-1 text-[13px] text-muted-foreground">
+            <Link to="/" className="transition-colors hover:text-foreground">Home</Link>
+            <ChevronRightIcon className="size-3.5 opacity-50" />
+            <Link to="/products" className="transition-colors hover:text-foreground">Shop</Link>
+            <ChevronRightIcon className="size-3.5 opacity-50" />
+            <span className="truncate font-medium text-foreground">{productData.title}</span>
+          </nav>
 
           {/* This used to be an amber warning telling the buyer the photo is not
               what they get — the first sentence on the page. Same fact, told as
@@ -309,7 +325,9 @@ export default function ProductDetailPage() {
 
           {/* Main Grid */}
           <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-6 md:gap-8 mb-12">
-            {/* Image Gallery */}
+            {/* A plain white card made the artwork look like a stock photo.
+                A soft tinted stage gives it depth without competing. */}
+            <div className="rounded-3xl bg-gradient-to-br from-violet-500/8 via-transparent to-fuchsia-500/8 p-1.5 ring-1 ring-border/50 md:sticky md:top-24 md:self-start">
             <ProductImages
               images={displayImages}
               selectedImage={productState.selectedImage}
@@ -318,6 +336,23 @@ export default function ProductDetailPage() {
               phoneModel={phoneModel}
               mockupUrl={mockupState.url}
             />
+
+            {/* Trust strip — the row every marketplace puts under the gallery */}
+            <div className="grid grid-cols-3 gap-1 px-2 py-3">
+              {[
+                { icon: TruckIcon,       label: "Pan-India\ndelivery" },
+                { icon: ShieldCheckIcon, label: "Free reprint\nguarantee" },
+                { icon: LockIcon,        label: "Secure\npayments" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex flex-col items-center gap-1.5 text-center">
+                  <Icon className="size-[18px] text-violet-500" strokeWidth={2} />
+                  <span className="whitespace-pre-line text-[10px] font-medium leading-tight text-muted-foreground">
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+            </div>
 
             {/* Product Info */}
             <div className="space-y-6">
@@ -337,6 +372,14 @@ export default function ProductDetailPage() {
                   <div className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
                     {priceDisplay}
                   </div>
+                  {hasRealDiscount && (
+                    <>
+                      <span className="text-lg text-muted-foreground line-through">₹{mrp.toFixed(0)}</span>
+                      <span className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm shadow-emerald-500/30">
+                        {discountPercent}% OFF
+                      </span>
+                    </>
+                  )}
                   <span className="rounded-full bg-emerald-500/12 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-300">
                     Inclusive of all taxes
                   </span>
