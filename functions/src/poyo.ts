@@ -66,7 +66,12 @@ const poyoRequest = async (path: string, init: RequestInit) => {
   }
 
   if (!res.ok) {
-    const detail = body?.message || body?.error || text.slice(0, 300);
+    // PoYo returns `error` as an object about as often as a string, and
+    // "[object Object]" is useless at 2am when a batch is failing.
+    const asText = (v: any): string =>
+      typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
+    const detail =
+      asText(body?.message) || asText(body?.error) || asText(body?.data) || text.slice(0, 300);
     throw new HttpsError(
       res.status === 401 || res.status === 403 ? "permission-denied" : "internal",
       `PoYo ${res.status}: ${detail || "request failed"}`
