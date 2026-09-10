@@ -52,12 +52,17 @@ const MODELS = [
 const RESOLUTIONS = ["1K", "2K", "4K"];
 const QUALITIES = ["low", "medium", "high", "xhigh", "max"];
 
-const poyoRequest = async (path: string, init: RequestInit) => {
+const poyoRequest = async (path: string, init: RequestInit, attempt = 0): Promise<any> => {
   let res: Response;
   try {
     res = await fetch(`${POYO_BASE}${path}`, init);
   } catch (e: any) {
     throw new HttpsError("unavailable", `Could not reach PoYo: ${e?.message || e}`);
+  }
+
+  if (res.status === 429 && attempt < 2) {
+    await new Promise((r) => setTimeout(r, 2200));
+    return poyoRequest(path, init, attempt + 1);
   }
 
   const text = await res.text();
@@ -156,7 +161,19 @@ export const poyoSubmit = onCall(async (data: any, context: any) => {
   return { success: true, taskId };
 });
 
-/** Polls one task. `status` is "finished" when `files` is populated. */
+/**
+ * Polls one task, and hands back the image in the same breath.
+ *
+ * PoYo allows one request per task per two seconds. Checking the status and
+ * then fetching the result were two calls milliseconds apart against the same
+ * task, which tripped that limit every single time a job finished. With
+ * `withImage` the bytes come back on the poll that first sees "finished", so a
+ * task is only ever asked about once.
+ *
+ * Relaying the bytes also keeps CORS out of it and puts them through the same
+ * WebP normaliser as every other upload. The result URL is read from PoYo's own
+ * response, so nothing client-supplied is ever fetched.
+ */
 export const poyoStatus = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
 
@@ -172,65 +189,32 @@ export const poyoStatus = onCall(async (data: any, context: any) => {
 
   const d = body?.data || {};
   const files = Array.isArray(d.files) ? d.files : [];
-  return {
+  const fileUrl = files.find((f: any) => f?.file_type === "image")?.file_url || files[0]?.file_url || null;
+
+  const out: Record<string, unknown> = {
     success: true,
     status: d.status || "unknown",
     progress: typeof d.progress === "number" ? d.progress : null,
     error: d.error_message || null,
-    fileUrl: files.find((f: any) => f?.file_type === "image")?.file_url || files[0]?.file_url || null,
+    fileUrl,
   };
-});
 
-/**
- * Downloads a finished image and hands it back as base64.
- *
- * The caller passes a task id, not a URL. The URL is read back from PoYo here,
- * so the only thing this will ever fetch is something PoYo itself just told us
- * it produced — no host allowlist to keep current, and no way to point it at an
- * arbitrary address. PoYo serves results from a CDN of its choosing
- * (cdn.doculator.org today), which an allowlist got wrong.
- *
- * Relaying through here also keeps CORS out of it, and puts the bytes through
- * the same WebP normaliser as every other upload.
- */
-export const poyoFetchImage = onCall(async (data: any, context: any) => {
-  await requireAdmin(context);
+  if (data?.withImage && fileUrl && /^https:\/\//.test(String(fileUrl))) {
+    let img: Response;
+    try {
+      img = await fetch(fileUrl);
+    } catch (e: any) {
+      throw new HttpsError("unavailable", `Could not download image: ${e?.message || e}`);
+    }
+    if (!img.ok) throw new HttpsError("internal", `Image download failed: ${img.status}`);
 
-  const taskId = data?.taskId;
-  if (typeof taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
-    throw new HttpsError("invalid-argument", "A valid taskId is required");
+    const buf = Buffer.from(await img.arrayBuffer());
+    if (buf.byteLength > 9 * 1024 * 1024) {
+      throw new HttpsError("resource-exhausted", "Generated image is too large to relay");
+    }
+    out.contentType = img.headers.get("content-type") || "image/png";
+    out.base64 = buf.toString("base64");
   }
 
-  const body = await poyoRequest(`/api/generate/status/${taskId}`, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${getKey()}` },
-  });
-
-  const d = body?.data || {};
-  const files = Array.isArray(d.files) ? d.files : [];
-  const url = files.find((f: any) => f?.file_type === "image")?.file_url || files[0]?.file_url;
-  if (!url) {
-    throw new HttpsError("failed-precondition", `Task ${taskId} has no image yet (status: ${d.status || "unknown"})`);
-  }
-  if (!/^https:\/\//.test(String(url))) {
-    throw new HttpsError("internal", "PoYo returned a non-https result url");
-  }
-
-  let res: Response;
-  try {
-    res = await fetch(url);
-  } catch (e: any) {
-    throw new HttpsError("unavailable", `Could not download image: ${e?.message || e}`);
-  }
-  if (!res.ok) {
-    throw new HttpsError("internal", `Image download failed: ${res.status}`);
-  }
-
-  const contentType = res.headers.get("content-type") || "image/png";
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (buf.byteLength > 9 * 1024 * 1024) {
-    throw new HttpsError("resource-exhausted", "Generated image is too large to relay");
-  }
-
-  return { success: true, contentType, base64: buf.toString("base64") };
+  return out;
 });

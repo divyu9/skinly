@@ -1188,7 +1188,6 @@ function JobCard({ job, onApprove, onReject, onRedo, onRetryDownload, busy }: {
  */
 function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
   const status = useAction(api.poyo.poyoStatus);
-  const fetchImage = useAction(api.poyo.poyoFetchImage);
   const stageUpload = useAction(api.r2.uploadToR2);
   const inFlight = useRef<Set<string>>(new Set());
 
@@ -1197,15 +1196,15 @@ function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
     for (const job of pending) {
       inFlight.current.add(job._id);
       try {
-        const res: any = await status({ taskId: job.taskId });
+        // withImage: the bytes ride back on the poll that first sees "finished".
+        // Asking separately was a second request against the same task inside
+        // PoYo's one-per-two-seconds window, and failed every time.
+        const res: any = await status({ taskId: job.taskId, withImage: true });
         if (res.status === "failed" || res.error) {
           await updateJob({ mockupId: job._id, status: "failed", error: res.error || "Generation failed" });
-        } else if (res.status === "finished" && res.fileUrl) {
+        } else if (res.status === "finished" && res.base64) {
           const stem = mockupFileStem(job.rNumber, job.suffix, job.attempt || 1);
-          // Relayed through the function because storage.poyo.ai is not
-          // CORS-open; going via base64 also puts the bytes through the same
-          // WebP normaliser as every other upload.
-          const img: any = await fetchImage({ taskId: job.taskId });
+          const img = { base64: res.base64, contentType: res.contentType };
           // Staged, not published. Nothing reaches the media library until a
           // human has looked at it — an AI mockup that quietly went live with a
           // wrong pattern is the failure this whole tool guards against.
@@ -1229,7 +1228,7 @@ function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
         inFlight.current.delete(job._id);
       }
     }
-  }, [jobs, status, fetchImage, stageUpload, updateJob]);
+  }, [jobs, status, stageUpload, updateJob]);
 
   useEffect(() => {
     if (!jobs.some((j) => j.status === "running")) return;
