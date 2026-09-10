@@ -111,23 +111,23 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
       + "{{staging}}",
   },
   {
-    label: "Open — lid + keyboard deck",
+    label: "Keyboard deck — top down",
     gadget: "laptop",
     suffix: "laptop-open",
     skuCodes: ["LPK"],
     order: 1,
     isActive: true,
     prompt:
-      "A modern 14-inch MacBook-style aluminium laptop open at about 110 degrees on a light oak desk, "
-      + "photographed from a three-quarter front angle so both the outer lid and the keyboard deck are clearly "
-      + "visible. A vinyl skin covers the outer lid, and a matching skin covers the palm rest area around the "
-      + "keyboard. {{fidelity}} "
-      + "The skin is die-cut to the exact silhouette of the Apple logo: the vinyl pattern runs continuously "
-      + "across the entire lid and stops only at the outline of the logo itself, leaving just that apple shape "
-      + "as bare aluminium. There is no circle, no ring, no disc, no rounded plate and no border of any kind "
-      + "around the logo \u2014 the pattern touches the logo outline directly on every side. "
-      + "The keys, trackpad and hinge stay uncovered, and the screen is off and dark. "
-      + "Around the laptop, a few softly out-of-focus props placed off to the sides \u2014 a small green plant, "
+      "A modern 14-inch MacBook-style aluminium laptop open on a light oak desk, photographed straight down "
+      + "from directly above the keyboard, camera parallel to the desk, so the keyboard deck and palm rest fill "
+      + "the frame and the open screen is foreshortened along the top edge of the picture. "
+      + "A vinyl skin covers the whole keyboard deck: the palm rest, the area around the trackpad, and the flat "
+      + "surface between and around every single key, so the pattern reads as one continuous design running "
+      + "through the gaps in the keyboard. {{fidelity}} "
+      + "The keycaps themselves stay bare with their normal legends, and the trackpad, the speaker grilles on "
+      + "either side of the keyboard and the power button stay completely uncovered \u2014 the vinyl stops "
+      + "cleanly at their edges. "
+      + "Around the laptop, a few softly out-of-focus props at the edges of the frame \u2014 a small green plant, "
       + "a closed notebook, a ceramic mug \u2014 muted and low-contrast so they frame the laptop without "
       + "competing with the design. "
       + "{{staging}}",
