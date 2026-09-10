@@ -18,9 +18,11 @@ import {
   CheckCircle2Icon, AlertCircleIcon, Loader2Icon, ImageIcon, RotateCcwIcon, WandSparklesIcon,
 } from "lucide-react";
 import { MOCKUP_SHOTS, SHOT_BY_KEY, mockupFileStem, type MockupShot } from "@/lib/ai-mockup-shots.ts";
+import {
+  IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, resolveSize, USD_TO_INR,
+} from "@/lib/ai-mockup-models.ts";
 
-const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
-const MODELS = ["nano-banana-edit", "nano-banana", "seedream-4", "gpt-4o-image", "gpt-image-1-5"];
+const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
 const POLL_MS = 4000;
 
 type Job = {
@@ -35,6 +37,9 @@ type Job = {
   r2Key?: string;
   error?: string;
   attempt?: number;
+  modelId?: string;
+  modelLabel?: string;
+  costInr?: number;
   createdAt: number;
 };
 
@@ -69,6 +74,7 @@ function AiMockupsContent() {
   // and losing your place every time you tweak a prompt is maddening.
   const [selectedRollId, setSelectedRollId] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>(["laptop-top"]);
+  const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
 
   return (
     <div className="space-y-6">
@@ -103,6 +109,8 @@ function AiMockupsContent() {
           setSelectedRollId={setSelectedRollId}
           picked={picked}
           setPicked={setPicked}
+          modelId={modelId}
+          setModelId={setModelId}
         />
       ) : (
         <PromptsEditor />
@@ -121,7 +129,7 @@ function useResolvedShots(): (MockupShot & { promptId?: string; isOverride: bool
     return MOCKUP_SHOTS.map((shot) => {
       const o = byKey.get(shot.key);
       return o
-        ? { ...shot, prompt: o.prompt ?? shot.prompt, model: o.model ?? shot.model, size: o.size ?? shot.size, promptId: o._id, isOverride: true }
+        ? { ...shot, prompt: o.prompt ?? shot.prompt, size: o.size ?? shot.size, promptId: o._id, isOverride: true }
         : { ...shot, isOverride: false };
     });
   }, [overrides]);
@@ -132,13 +140,13 @@ function PromptsEditor() {
   const createPrompt = useMutation(api.aiMockups.createMockupPrompt);
   const updatePrompt = useMutation(api.aiMockups.updateMockupPrompt);
   const deletePrompt = useMutation(api.aiMockups.deleteMockupPrompt);
-  const [draft, setDraft] = useState<Record<string, { prompt: string; model: string; size: string }>>({});
+  const [draft, setDraft] = useState<Record<string, { prompt: string; size: string }>>({});
   const [saving, setSaving] = useState<string | null>(null);
 
-  const valueFor = (s: (typeof shots)[0]) => draft[s.key] ?? { prompt: s.prompt, model: s.model, size: s.size };
-  const edit = (key: string, patch: Partial<{ prompt: string; model: string; size: string }>) => {
+  const valueFor = (s: (typeof shots)[0]) => draft[s.key] ?? { prompt: s.prompt, size: s.size };
+  const edit = (key: string, patch: Partial<{ prompt: string; size: string }>) => {
     const s = shots.find((x) => x.key === key)!;
-    setDraft((d) => ({ ...d, [key]: { ...(d[key] ?? { prompt: s.prompt, model: s.model, size: s.size }), ...patch } }));
+    setDraft((d) => ({ ...d, [key]: { ...(d[key] ?? { prompt: s.prompt, size: s.size }), ...patch } }));
   };
 
   return (
@@ -151,7 +159,7 @@ function PromptsEditor() {
 
       {shots.map((shot) => {
         const v = valueFor(shot);
-        const dirty = !!draft[shot.key] && (v.prompt !== shot.prompt || v.model !== shot.model || v.size !== shot.size);
+        const dirty = !!draft[shot.key] && (v.prompt !== shot.prompt || v.size !== shot.size);
         return (
           <Card key={shot.key}>
             <CardContent className="space-y-3 p-4">
@@ -163,10 +171,7 @@ function PromptsEditor() {
                   {shot.isOverride && <Badge className="bg-violet-600 text-[10px]">edited</Badge>}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Select value={v.model} onValueChange={(x) => edit(shot.key, { model: x })}>
-                    <SelectTrigger className="h-8 w-[170px] text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>{MODELS.map((m) => <SelectItem key={m} value={m} className="text-xs">{m}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <span className="text-[11px] text-muted-foreground">aspect</span>
                   <Select value={v.size} onValueChange={(x) => edit(shot.key, { size: x })}>
                     <SelectTrigger className="h-8 w-[80px] text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>{SIZES.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
@@ -231,11 +236,13 @@ function PromptsEditor() {
 
 /* ------------------------------------------------------------------- studio */
 
-function Studio({ selectedRollId, setSelectedRollId, picked, setPicked }: {
+function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId, setModelId }: {
   selectedRollId: string | null;
   setSelectedRollId: (v: string | null) => void;
   picked: string[];
   setPicked: (v: string[]) => void;
+  modelId: string;
+  setModelId: (v: string) => void;
 }) {
   const rolls = useQuery(api.rollsManagement.getRollInventory) as any[] | undefined;
   const jobs = useQuery(api.aiMockups.getJobs, { take: 300 }) as Job[] | undefined;
@@ -308,6 +315,8 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked }: {
           shots={shots}
           picked={picked}
           setPicked={setPicked}
+          modelId={modelId}
+          setModelId={setModelId}
           jobs={jobsForRoll}
         />
       ) : (
@@ -319,13 +328,16 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked }: {
   );
 }
 
-function RollPanel({ roll, shots, picked, setPicked, jobs }: {
+function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }: {
   roll: any;
   shots: ReturnType<typeof useResolvedShots>;
   picked: string[];
   setPicked: (v: string[]) => void;
+  modelId: string;
+  setModelId: (v: string) => void;
   jobs: Job[];
 }) {
+  const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
   const uploadToLibrary = useAction(api.mediaLibrary.uploadAndAddToLibrary);
   const updateRoll = useMutation(api.rollsManagement.updateRollInventory);
   const createJob = useMutation(api.aiMockups.createDesignMockup);
@@ -385,6 +397,9 @@ function RollPanel({ roll, shots, picked, setPicked, jobs }: {
           shotKey: key,
           gadget: shot.gadget,
           suffix: shot.suffix,
+          modelId: model.id,
+          modelLabel: model.label,
+          costInr: Number((model.usd * USD_TO_INR).toFixed(2)),
           sourceUrl: roll.rawImageUrl,
           status: "queued",
           attempt,
@@ -392,8 +407,10 @@ function RollPanel({ roll, shots, picked, setPicked, jobs }: {
         })) as string;
 
         const res: any = await submit({
-          model: shot.model,
-          size: shot.size,
+          model: model.apiModel,
+          size: resolveSize(model, shot.size),
+          resolution: model.resolution,
+          quality: model.quality,
           prompt: shot.prompt,
           imageUrls: [roll.rawImageUrl],
         });
@@ -475,10 +492,43 @@ function RollPanel({ roll, shots, picked, setPicked, jobs }: {
               );
             })}
           </div>
+          <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Label className="text-xs">Model</Label>
+              <Select value={modelId} onValueChange={setModelId}>
+                <SelectTrigger className="h-9 w-[290px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {IMAGE_MODELS.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <span className="flex w-full items-center justify-between gap-4">
+                        <span>{m.label}</span>
+                        <span className="tabular-nums text-muted-foreground">{formatInr(m.usd)}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {formatInr(model.usd)} &times; {picked.length} ={" "}
+                <strong className="text-foreground">{formatInr(model.usd * picked.length)}</strong>
+              </span>
+            </div>
+            {model.note && <p className="text-[11px] text-muted-foreground">{model.note}</p>}
+            {picked.some((k) => {
+              const sh = shots.find((x) => x.key === k);
+              return sh && resolveSize(model, sh.size) !== sh.size;
+            }) && (
+              <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                This model does not take every shot&rsquo;s preferred aspect ratio; the closest one it
+                accepts will be used.
+              </p>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={generate} disabled={starting || !roll.rawImageUrl || !picked.length}>
               {starting ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <SparklesIcon className="mr-1.5 size-4" />}
-              Generate {picked.length} image{picked.length === 1 ? "" : "s"}
+              Generate {picked.length} image{picked.length === 1 ? "" : "s"} &middot; {formatInr(model.usd * picked.length)}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setPicked(MOCKUP_SHOTS.map((s) => s.key))}>Select all</Button>
             <Button size="sm" variant="ghost" onClick={() => setPicked([])}>Clear</Button>
@@ -519,6 +569,12 @@ function JobCard({ job }: { job: Job }) {
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-xs font-medium">{shot?.label || job.shotKey}</p>
+            {job.modelLabel && (
+              <p className="truncate text-[10px] text-muted-foreground">
+                {job.modelLabel}
+                {typeof job.costInr === "number" ? ` · ₹${job.costInr.toFixed(2)}` : ""}
+              </p>
+            )}
             <code className="text-[10px] text-muted-foreground">
               {mockupFileStem(job.rNumber, job.gadget === "laptop" ? shot?.suffix || job.shotKey : shot?.suffix || job.shotKey, job.attempt || 1)}
             </code>

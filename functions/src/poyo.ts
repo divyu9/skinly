@@ -29,8 +29,25 @@ const getKey = () => {
 /** Aspect ratios PoYo accepts. Anything else is rejected upstream with a 4xx. */
 const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"];
 
-/** Models this endpoint is willing to bill against. */
-const MODELS = ["nano-banana", "nano-banana-edit", "seedream-4", "gpt-4o-image", "gpt-image-1-5"];
+/**
+ * Models this endpoint is willing to bill against.
+ *
+ * Only the -edit variants, deliberately: the studio always sends the roll photo
+ * as a reference, and a text-to-image model would quietly ignore it and invent
+ * a pattern. The client-side registry in ai-mockup-models.ts must stay a subset
+ * of this list.
+ */
+const MODELS = [
+  "gpt-image-2-edit",
+  "gpt-4o-image-edit",
+  "nano-banana-edit",
+  "seedream-4.5-edit",
+  "seedream-5.0-lite-edit",
+  "nano-banana-pro-edit",
+];
+
+const RESOLUTIONS = ["1K", "2K", "4K"];
+const QUALITIES = ["low", "medium", "high"];
 
 const poyoRequest = async (path: string, init: RequestInit) => {
   let res: Response;
@@ -71,7 +88,7 @@ export const poyoSubmit = onCall(async (data: any, context: any) => {
     limit: Number(process.env.POYO_DAILY_LIMIT || 500),
   });
 
-  const { model, prompt, imageUrls, size } = data || {};
+  const { model, prompt, imageUrls, size, resolution, quality } = data || {};
 
   if (typeof prompt !== "string" || prompt.trim().length < 10) {
     throw new HttpsError("invalid-argument", "A prompt of at least 10 characters is required");
@@ -85,9 +102,18 @@ export const poyoSubmit = onCall(async (data: any, context: any) => {
   if (size && !SIZES.includes(size)) {
     throw new HttpsError("invalid-argument", `Unsupported size: ${size}`);
   }
+  if (resolution && !RESOLUTIONS.includes(resolution)) {
+    throw new HttpsError("invalid-argument", `Unsupported resolution: ${resolution}`);
+  }
+  if (quality && !QUALITIES.includes(quality)) {
+    throw new HttpsError("invalid-argument", `Unsupported quality: ${quality}`);
+  }
 
   const input: Record<string, unknown> = { prompt: prompt.trim() };
   if (size) input.size = size;
+  // Only sent when the model family defines them; PoYo rejects strays.
+  if (resolution) input.resolution = resolution;
+  if (quality) input.quality = quality;
 
   if (Array.isArray(imageUrls) && imageUrls.length) {
     if (imageUrls.length > 6) {
@@ -99,6 +125,11 @@ export const poyoSubmit = onCall(async (data: any, context: any) => {
       }
     }
     input.image_urls = imageUrls;
+  } else {
+    throw new HttpsError(
+      "invalid-argument",
+      `${model} is an edit model and needs a reference image; none was supplied`
+    );
   }
 
   const body = await poyoRequest("/api/generate/submit", {

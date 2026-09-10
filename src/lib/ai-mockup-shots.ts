@@ -6,10 +6,11 @@
  * editable from the admin without a deploy. Editing writes an override; the
  * "Reset" button deletes it and this text comes back.
  *
- * Every prompt is written for `nano-banana-edit`, which takes the raw design
- * photo as a reference image. The wording leans hard on reproducing the supplied
+ * Every prompt is written for an image *edit* model, which takes the raw design
+ * photo as a reference. The wording leans hard on reproducing the supplied
  * pattern exactly, because the customer receives the printed design and any
- * drift between the listing and the product is a return.
+ * drift between the listing and the product is a return. Which model runs is
+ * chosen per generation in the studio — see ai-mockup-models.ts.
  */
 
 export interface MockupShot {
@@ -19,7 +20,7 @@ export interface MockupShot {
   gadget: string;
   /** Appended to the R2 filename after the roll number: R-01-laptop-top.webp */
   suffix: string;
-  model: string;
+  /** Preferred aspect ratio; mapped to the nearest one the chosen model takes. */
   size: string;
   prompt: string;
 }
@@ -42,7 +43,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "Laptop — lid only",
     gadget: "laptop",
     suffix: "laptop-top",
-    model: "nano-banana-edit",
     size: "4:3",
     prompt:
       "A closed modern 14-inch laptop photographed straight down from directly above, lid facing the camera and filling most of the frame. " +
@@ -56,7 +56,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "Laptop — open, lid + keyboard deck",
     gadget: "laptop",
     suffix: "laptop-open",
-    model: "nano-banana-edit",
     size: "4:3",
     prompt:
       "A modern 14-inch laptop open at roughly 110 degrees, shot from a three-quarter front angle so both the outer lid and the keyboard deck are visible. " +
@@ -70,7 +69,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "Lens — Sony telephoto",
     gadget: "lens",
     suffix: "lens",
-    model: "nano-banana-edit",
     size: "1:1",
     prompt:
       "A Sony full-frame camera lens standing upright, photographed from the front three-quarter angle. " +
@@ -85,7 +83,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "Camera — Sony A7 IV body",
     gadget: "camera",
     suffix: "camera",
-    model: "nano-banana-edit",
     size: "4:3",
     prompt:
       "A Sony A7 IV mirrorless camera body without a lens attached, photographed from a front three-quarter angle. " +
@@ -100,7 +97,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "PlayStation 5 console",
     gadget: "console",
     suffix: "ps5",
-    model: "nano-banana-edit",
     size: "4:3",
     prompt:
       "A PlayStation 5 console standing vertically, photographed from a front three-quarter angle. " +
@@ -115,7 +111,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "iPad — back",
     gadget: "tablet",
     suffix: "ipad",
-    model: "nano-banana-edit",
     size: "3:4",
     prompt:
       "An 11-inch tablet lying face down, photographed straight down from directly above so the whole back panel fills the frame. " +
@@ -129,7 +124,6 @@ export const MOCKUP_SHOTS: MockupShot[] = [
     label: "Charger — Apple 20W USB-C",
     gadget: "charger",
     suffix: "charger",
-    model: "nano-banana-edit",
     size: "1:1",
     prompt:
       "A small square white 20W USB-C power adapter standing upright, photographed from a front three-quarter angle, filling most of the frame. " +
