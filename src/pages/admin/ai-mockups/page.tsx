@@ -11,13 +11,17 @@ import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import {
-  SparklesIcon, UploadIcon, SearchIcon, RefreshCwIcon, ExternalLinkIcon,
-  CheckCircle2Icon, AlertCircleIcon, Loader2Icon, ImageIcon, RotateCcwIcon, WandSparklesIcon,
+  SparklesIcon, UploadIcon, SearchIcon, ExternalLinkIcon, PlusIcon, TrashIcon,
+  CheckCircle2Icon, AlertCircleIcon, Loader2Icon, ImageIcon, CopyIcon, WandSparklesIcon,
 } from "lucide-react";
-import { MOCKUP_SHOTS, SHOT_BY_KEY, mockupFileStem, type MockupShot } from "@/lib/ai-mockup-shots.ts";
+import {
+  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem,
+  type MockupShot, type SharedBlocks,
+} from "@/lib/ai-mockup-shots.ts";
 import {
   IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, resolveSize, USD_TO_INR,
 } from "@/lib/ai-mockup-models.ts";
@@ -28,16 +32,16 @@ const POLL_MS = 4000;
 type Job = {
   _id: string;
   rNumber: string;
-  designName?: string;
-  shotKey: string;
+  shotId?: string;
+  shotLabel?: string;
   gadget: string;
+  suffix: string;
   status: "queued" | "running" | "done" | "failed";
   taskId?: string;
   url?: string;
   r2Key?: string;
   error?: string;
   attempt?: number;
-  modelId?: string;
   modelLabel?: string;
   costInr?: number;
   createdAt: number;
@@ -68,12 +72,31 @@ export default function AdminAiMockupsPage() {
   );
 }
 
+/** Shots and shared blocks, straight from Firestore. */
+function useShotLibrary() {
+  const shots = useQuery(api.aiMockups.getPrompts) as MockupShot[] | undefined;
+  const settings = useQuery(api.aiMockups.getSettings) as { blocks?: SharedBlocks } | null | undefined;
+  const blocks: SharedBlocks = { ...DEFAULT_BLOCKS, ...(settings?.blocks || {}) };
+  const loading = shots === undefined || settings === undefined;
+  return { shots: shots || [], blocks, loading };
+}
+
+function groupByGadget<T extends { gadget: string }>(rows: T[]): [string, T[]][] {
+  const map = new Map<string, T[]>();
+  for (const r of rows) {
+    const g = r.gadget || "other";
+    if (!map.has(g)) map.set(g, []);
+    map.get(g)!.push(r);
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
 function AiMockupsContent() {
-  const [tab, setTab] = useState<"studio" | "prompts">("studio");
-  // Held here rather than inside Studio: switching to Prompts unmounts Studio,
-  // and losing your place every time you tweak a prompt is maddening.
+  const [tab, setTab] = useState<"studio" | "shots">("studio");
+  // Held above the tabs: switching to Shots unmounts Studio, and losing your
+  // place every time you tweak a prompt is maddening.
   const [selectedRollId, setSelectedRollId] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string[]>(["laptop-top"]);
+  const [picked, setPicked] = useState<string[]>([]);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
 
   return (
@@ -89,7 +112,7 @@ function AiMockupsContent() {
           </p>
         </div>
         <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
-          {(["studio", "prompts"] as const).map((t) => (
+          {(["studio", "shots"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -97,7 +120,7 @@ function AiMockupsContent() {
                 tab === t ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t}
+              {t === "shots" ? "Gadgets & prompts" : t}
             </button>
           ))}
         </div>
@@ -111,144 +134,296 @@ function AiMockupsContent() {
           setPicked={setPicked}
           modelId={modelId}
           setModelId={setModelId}
+          onManageShots={() => setTab("shots")}
         />
       ) : (
-        <PromptsEditor />
+        <ShotLibrary />
       )}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------ prompts */
+/* --------------------------------------------------- gadgets & prompts tab */
 
-/** Default text from code, with any saved override merged over the top. */
-function useResolvedShots(): (MockupShot & { promptId?: string; isOverride: boolean })[] {
-  const overrides = useQuery(api.aiMockups.getPrompts) as any[] | undefined;
-  return useMemo(() => {
-    const byKey = new Map((overrides || []).map((o) => [o.key, o]));
-    return MOCKUP_SHOTS.map((shot) => {
-      const o = byKey.get(shot.key);
-      return o
-        ? { ...shot, prompt: o.prompt ?? shot.prompt, size: o.size ?? shot.size, promptId: o._id, isOverride: true }
-        : { ...shot, isOverride: false };
+function ShotLibrary() {
+  const { shots, blocks, loading } = useShotLibrary();
+  const gadgetTypes = useQuery(api.gadgetTypes.list) as any[] | undefined;
+  const createShot = useMutation(api.aiMockups.createMockupPrompt);
+  const updateShot = useMutation(api.aiMockups.updateMockupPrompt);
+  const deleteShot = useMutation(api.aiMockups.deleteMockupPrompt);
+  const saveSettings = useMutation(api.aiMockups.updateMockupSettings);
+
+  const [seeding, setSeeding] = useState(false);
+  const [newGadget, setNewGadget] = useState("");
+
+  const grouped = groupByGadget(shots);
+  const usedGadgets = new Set(shots.map((s) => s.gadget));
+  const availableGadgets = (gadgetTypes || [])
+    .map((g) => String(g.name || "").trim())
+    .filter(Boolean)
+    .sort();
+
+  const addShot = async (gadget: string, gadgetTypeId?: string) => {
+    const siblings = shots.filter((s) => s.gadget === gadget);
+    await createShot({
+      label: siblings.length ? `Angle ${siblings.length + 1}` : "Main shot",
+      gadget,
+      gadgetTypeId: gadgetTypeId || (gadgetTypes || []).find((g) => g.name === gadget)?._id || "",
+      suffix: siblings.length ? `${gadget}-${siblings.length + 1}` : gadget,
+      size: "4:3",
+      order: siblings.length,
+      isActive: true,
+      prompt:
+        `A <describe the device> photographed from <describe the angle>, filling most of the frame. ` +
+        `A vinyl skin covers <describe which surface>. {{fidelity}} {{staging}}`,
+      createdAt: Date.now(),
     });
-  }, [overrides]);
-}
-
-function PromptsEditor() {
-  const shots = useResolvedShots();
-  const createPrompt = useMutation(api.aiMockups.createMockupPrompt);
-  const updatePrompt = useMutation(api.aiMockups.updateMockupPrompt);
-  const deletePrompt = useMutation(api.aiMockups.deleteMockupPrompt);
-  const [draft, setDraft] = useState<Record<string, { prompt: string; size: string }>>({});
-  const [saving, setSaving] = useState<string | null>(null);
-
-  const valueFor = (s: (typeof shots)[0]) => draft[s.key] ?? { prompt: s.prompt, size: s.size };
-  const edit = (key: string, patch: Partial<{ prompt: string; size: string }>) => {
-    const s = shots.find((x) => x.key === key)!;
-    setDraft((d) => ({ ...d, [key]: { ...(d[key] ?? { prompt: s.prompt, size: s.size }), ...patch } }));
+    toast.success(`Shot added to ${gadget}`);
   };
 
+  if (loading) {
+    return <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}</div>;
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-        Every prompt tells the model to copy the reference artwork exactly rather than reinterpret it. Keep that
-        instruction when you edit &mdash; the customer receives the printed design, so a listing that shows a
-        different pattern becomes a return.
+    <div className="space-y-5">
+      <SharedBlocksEditor blocks={blocks} onSave={(b) => saveSettings({ blocks: b })} />
+
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border p-3">
+        <Label className="text-sm">Add a gadget</Label>
+        <Select value={newGadget} onValueChange={setNewGadget}>
+          <SelectTrigger className="h-9 w-[220px]"><SelectValue placeholder="Pick a gadget type" /></SelectTrigger>
+          <SelectContent>
+            {availableGadgets.map((g) => (
+              <SelectItem key={g} value={g}>
+                {g}{usedGadgets.has(g) ? " · already has shots" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          size="sm"
+          disabled={!newGadget}
+          onClick={async () => { await addShot(newGadget); setNewGadget(""); }}
+        >
+          <PlusIcon className="mr-1 size-3.5" />
+          Add shot
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          The list comes from your gadget types, so a new gadget added there — drone, GoPro, action
+          camera — shows up here without a code change.
+        </p>
       </div>
 
-      {shots.map((shot) => {
-        const v = valueFor(shot);
-        const dirty = !!draft[shot.key] && (v.prompt !== shot.prompt || v.size !== shot.size);
-        return (
-          <Card key={shot.key}>
-            <CardContent className="space-y-3 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{shot.label}</span>
-                  <Badge variant="outline" className="text-[10px]">{shot.gadget}</Badge>
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">…-{shot.suffix}</code>
-                  {shot.isOverride && <Badge className="bg-violet-600 text-[10px]">edited</Badge>}
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground">aspect</span>
-                  <Select value={v.size} onValueChange={(x) => edit(shot.key, { size: x })}>
-                    <SelectTrigger className="h-8 w-[80px] text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>{SIZES.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-              </div>
+      {shots.length === 0 && (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
+            <ImageIcon className="size-8 text-muted-foreground/40" />
+            <p className="text-muted-foreground">No shots defined yet.</p>
+            <Button
+              disabled={seeding}
+              onClick={async () => {
+                setSeeding(true);
+                try {
+                  for (const s of STARTER_SHOTS) {
+                    const gt = (gadgetTypes || []).find((g) => g.name === s.gadget);
+                    await createShot({ ...s, gadgetTypeId: gt?._id || "", createdAt: Date.now() });
+                  }
+                  toast.success(`${STARTER_SHOTS.length} starter shots added`);
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Could not seed");
+                } finally { setSeeding(false); }
+              }}
+            >
+              {seeding ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <SparklesIcon className="mr-1.5 size-4" />}
+              Load the 7 starter shots
+            </Button>
+            <p className="max-w-md text-xs text-muted-foreground">
+              Laptop (lid and open), lens, camera body, PS5, iPad and charger. They become ordinary
+              rows you can edit, duplicate or delete.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-              <Textarea
-                value={v.prompt}
-                onChange={(e) => edit(shot.key, { prompt: e.target.value })}
-                rows={6}
-                className="font-mono text-xs leading-relaxed"
-              />
-
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  disabled={!dirty || saving === shot.key}
-                  onClick={async () => {
-                    setSaving(shot.key);
-                    try {
-                      const payload = { key: shot.key, label: shot.label, gadget: shot.gadget, ...v, updatedAt: Date.now() };
-                      if (shot.promptId) await updatePrompt({ promptId: shot.promptId, ...payload });
-                      else await createPrompt(payload);
-                      setDraft((d) => { const n = { ...d }; delete n[shot.key]; return n; });
-                      toast.success("Prompt saved");
-                    } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Could not save");
-                    } finally { setSaving(null); }
-                  }}
-                >
-                  {saving === shot.key ? <Loader2Icon className="mr-1 size-3.5 animate-spin" /> : null}
-                  Save
-                </Button>
-                {dirty && (
-                  <Button size="sm" variant="ghost" onClick={() => setDraft((d) => { const n = { ...d }; delete n[shot.key]; return n; })}>
-                    Discard
-                  </Button>
-                )}
-                {shot.isOverride && !dirty && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => {
-                      if (!confirm("Reset this prompt to the built-in default?")) return;
-                      await deletePrompt({ promptId: shot.promptId });
-                      toast.success("Reset to default");
-                    }}
-                  >
-                    <RotateCcwIcon className="mr-1 size-3.5" />
-                    Reset to default
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {grouped.map(([gadget, rows]) => (
+        <div key={gadget} className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold capitalize">{gadget}</h3>
+            <Badge variant="outline" className="text-[10px]">{rows.length} image{rows.length === 1 ? "" : "s"} per design</Badge>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => addShot(gadget)}>
+              <PlusIcon className="mr-1 size-3" />
+              Add another angle
+            </Button>
+          </div>
+          {rows.map((shot) => (
+            <ShotCard
+              key={shot._id}
+              shot={shot}
+              onSave={(patch) => updateShot({ promptId: shot._id, ...patch })}
+              onDelete={() => deleteShot({ promptId: shot._id })}
+              onDuplicate={() =>
+                createShot({
+                  ...shot, _id: undefined,
+                  label: `${shot.label} (copy)`,
+                  suffix: `${shot.suffix}-2`,
+                  order: (shot.order || 0) + 1,
+                  createdAt: Date.now(),
+                })
+              }
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
 
-/* ------------------------------------------------------------------- studio */
+function SharedBlocksEditor({ blocks, onSave }: { blocks: SharedBlocks; onSave: (b: SharedBlocks) => Promise<any> }) {
+  const [draft, setDraft] = useState<SharedBlocks | null>(null);
+  const [saving, setSaving] = useState(false);
+  const v = draft ?? blocks;
+  const dirty = !!draft && (draft.fidelity !== blocks.fidelity || draft.staging !== blocks.staging);
 
-function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId, setModelId }: {
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-4">
+        <div>
+          <h3 className="text-sm font-semibold">Shared prompt blocks</h3>
+          <p className="text-xs text-muted-foreground">
+            Written once and pulled into any prompt with <code className="rounded bg-muted px-1">{"{{fidelity}}"}</code> and{" "}
+            <code className="rounded bg-muted px-1">{"{{staging}}"}</code>. Editing here changes every shot at once
+            &mdash; which is the point: the fidelity block is what stops the model inventing a pattern, and it
+            must not drift shot by shot.
+          </p>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {(["fidelity", "staging"] as const).map((k) => (
+            <div key={k} className="space-y-1">
+              <Label className="text-xs capitalize">{k}</Label>
+              <Textarea
+                rows={5}
+                className="font-mono text-[11px] leading-relaxed"
+                value={v[k]}
+                onChange={(e) => setDraft({ ...v, [k]: e.target.value })}
+              />
+            </div>
+          ))}
+        </div>
+        {dirty && (
+          <div className="flex gap-2">
+            <Button size="sm" disabled={saving} onClick={async () => {
+              setSaving(true);
+              try { await onSave(v); setDraft(null); toast.success("Shared blocks saved"); }
+              catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
+              finally { setSaving(false); }
+            }}>
+              {saving && <Loader2Icon className="mr-1 size-3.5 animate-spin" />}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>Discard</Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
+  shot: MockupShot;
+  onSave: (patch: Partial<MockupShot>) => Promise<any>;
+  onDelete: () => Promise<any>;
+  onDuplicate: () => Promise<any>;
+}) {
+  const [draft, setDraft] = useState<Partial<MockupShot> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const v = { ...shot, ...(draft || {}) };
+  const dirty = !!draft && Object.entries(draft).some(([k, val]) => (shot as any)[k] !== val);
+  const edit = (patch: Partial<MockupShot>) => setDraft({ ...(draft || {}), ...patch });
+
+  return (
+    <Card className={v.isActive ? "" : "opacity-60"}>
+      <CardContent className="space-y-3 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={v.label}
+            onChange={(e) => edit({ label: e.target.value })}
+            className="h-8 w-[220px] font-medium"
+            placeholder="Shot name"
+          />
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">file</span>
+            <Input
+              value={v.suffix}
+              onChange={(e) => edit({ suffix: e.target.value })}
+              className="h-8 w-[150px] font-mono text-xs"
+              placeholder="laptop-top"
+            />
+          </div>
+          <Select value={v.size} onValueChange={(x) => edit({ size: x })}>
+            <SelectTrigger className="h-8 w-[80px] text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>{SIZES.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+          </Select>
+          <div className="ml-auto flex items-center gap-2">
+            <Switch checked={v.isActive !== false} onCheckedChange={(c) => edit({ isActive: c })} />
+            <Button size="sm" variant="ghost" className="h-8 px-2" onClick={onDuplicate} title="Duplicate">
+              <CopyIcon className="size-3.5" />
+            </Button>
+            <Button
+              size="sm" variant="ghost" className="h-8 px-2 text-rose-600" title="Delete"
+              onClick={async () => { if (confirm(`Delete "${shot.label}"?`)) { await onDelete(); toast.success("Shot deleted"); } }}
+            >
+              <TrashIcon className="size-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        <Textarea
+          rows={5}
+          value={v.prompt}
+          onChange={(e) => edit({ prompt: e.target.value })}
+          className="font-mono text-xs leading-relaxed"
+        />
+        <p className="text-[11px] text-muted-foreground">
+          Placeholders: {PLACEHOLDERS.map((p) => <code key={p} className="mr-1 rounded bg-muted px-1">{`{{${p}}}`}</code>)}
+        </p>
+
+        {dirty && (
+          <div className="flex gap-2">
+            <Button size="sm" disabled={saving} onClick={async () => {
+              setSaving(true);
+              try { await onSave(draft!); setDraft(null); toast.success("Saved"); }
+              catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
+              finally { setSaving(false); }
+            }}>
+              {saving && <Loader2Icon className="mr-1 size-3.5 animate-spin" />}
+              Save
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setDraft(null)}>Discard</Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/* ------------------------------------------------------------- studio tab */
+
+function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId, setModelId, onManageShots }: {
   selectedRollId: string | null;
   setSelectedRollId: (v: string | null) => void;
   picked: string[];
   setPicked: (v: string[]) => void;
   modelId: string;
   setModelId: (v: string) => void;
+  onManageShots: () => void;
 }) {
   const rolls = useQuery(api.rollsManagement.getRollInventory) as any[] | undefined;
   const jobs = useQuery(api.aiMockups.getJobs, { take: 300 }) as Job[] | undefined;
-  const shots = useResolvedShots();
-
+  const { shots, blocks, loading } = useShotLibrary();
   const [search, setSearch] = useState("");
+
+  const activeShots = shots.filter((s) => s.isActive !== false);
 
   const sortedRolls = useMemo(() => {
     const list = (rolls || []).map((r) => ({ ...r, rNumber: String(r.rNumber || "").trim() }));
@@ -264,7 +439,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
     [jobs, selected]
   );
 
-  if (rolls === undefined) {
+  if (rolls === undefined || loading) {
     return <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
   }
 
@@ -288,11 +463,8 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
                 }`}
               >
                 <div className="size-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                  {r.rawImageUrl ? (
-                    <img src={r.rawImageUrl} alt="" className="size-full object-cover" />
-                  ) : (
-                    <div className="flex size-full items-center justify-center"><ImageIcon className="size-4 text-muted-foreground/40" /></div>
-                  )}
+                  {r.rawImageUrl ? <img src={r.rawImageUrl} alt="" className="size-full object-cover" />
+                    : <div className="flex size-full items-center justify-center"><ImageIcon className="size-4 text-muted-foreground/40" /></div>}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
@@ -312,12 +484,14 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
         <RollPanel
           key={selected._id}
           roll={selected}
-          shots={shots}
+          shots={activeShots}
+          blocks={blocks}
           picked={picked}
           setPicked={setPicked}
           modelId={modelId}
           setModelId={setModelId}
           jobs={jobsForRoll}
+          onManageShots={onManageShots}
         />
       ) : (
         <Card><CardContent className="flex min-h-[300px] items-center justify-center text-muted-foreground">
@@ -328,27 +502,31 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
   );
 }
 
-function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }: {
+function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId, jobs, onManageShots }: {
   roll: any;
-  shots: ReturnType<typeof useResolvedShots>;
+  shots: MockupShot[];
+  blocks: SharedBlocks;
   picked: string[];
   setPicked: (v: string[]) => void;
   modelId: string;
   setModelId: (v: string) => void;
   jobs: Job[];
+  onManageShots: () => void;
 }) {
-  const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
   const uploadToLibrary = useAction(api.mediaLibrary.uploadAndAddToLibrary);
   const updateRoll = useMutation(api.rollsManagement.updateRollInventory);
   const createJob = useMutation(api.aiMockups.createDesignMockup);
   const updateJob = useMutation(api.aiMockups.updateDesignMockup);
   const submit = useAction(api.poyo.poyoSubmit);
+  const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [starting, setStarting] = useState(false);
 
   useJobPoller(jobs, updateJob, uploadToLibrary);
+
+  const grouped = groupByGadget(shots);
 
   const onUploadRaw = async (file: File) => {
     setUploading(true);
@@ -382,27 +560,27 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
 
   const generate = async () => {
     if (!roll.rawImageUrl) return toast.error("Upload the raw design photo first");
-    if (!picked.length) return toast.error("Pick at least one gadget");
+    if (!picked.length) return toast.error("Pick at least one shot");
     setStarting(true);
     let started = 0;
-    for (const key of picked) {
-      const shot = shots.find((s) => s.key === key);
+    for (const shotId of picked) {
+      const shot = shots.find((s) => s._id === shotId);
       if (!shot) continue;
-      const attempt = jobs.filter((j) => j.shotKey === key).length + 1;
+      const attempt = jobs.filter((j) => j.shotId === shotId).length + 1;
       let jobId: string | null = null;
       try {
         jobId = (await createJob({
           rNumber: String(roll.rNumber).trim(),
           designName: roll.designName || "",
-          shotKey: key,
+          shotId,
+          shotLabel: shot.label,
           gadget: shot.gadget,
           suffix: shot.suffix,
-          modelId: model.id,
-          modelLabel: model.label,
-          costInr: Number((model.usd * USD_TO_INR).toFixed(2)),
           sourceUrl: roll.rawImageUrl,
           status: "queued",
           attempt,
+          modelLabel: model.label,
+          costInr: Number((model.usd * USD_TO_INR).toFixed(2)),
           createdAt: Date.now(),
         })) as string;
 
@@ -411,7 +589,7 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
           size: resolveSize(model, shot.size),
           resolution: model.resolution,
           quality: model.quality,
-          prompt: shot.prompt,
+          prompt: expandPrompt(shot.prompt, blocks, { rNumber: roll.rNumber, designName: roll.designName }),
           imageUrls: [roll.rawImageUrl],
         });
         await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
@@ -426,19 +604,20 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
     if (started) toast.success(`${started} image${started > 1 ? "s" : ""} generating…`);
   };
 
+  const ratioMismatch = picked.some((id) => {
+    const s = shots.find((x) => x._id === id);
+    return s && resolveSize(model, s.size) !== s.size;
+  });
+
   return (
     <div className="space-y-5">
       <Card>
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
           <div className="size-40 shrink-0 overflow-hidden rounded-xl border bg-muted">
-            {roll.rawImageUrl ? (
-              <img src={roll.rawImageUrl} alt="Raw design" className="size-full object-cover" />
-            ) : (
-              <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground/50">
-                <ImageIcon className="size-7" />
-                <span className="text-[11px]">No raw photo</span>
-              </div>
-            )}
+            {roll.rawImageUrl ? <img src={roll.rawImageUrl} alt="Raw design" className="size-full object-cover" />
+              : <div className="flex size-full flex-col items-center justify-center gap-1 text-muted-foreground/50">
+                  <ImageIcon className="size-7" /><span className="text-[11px]">No raw photo</span>
+                </div>}
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-center gap-2">
@@ -450,13 +629,8 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
               This photo is sent to the model as the reference. Shoot the roll flat, straight down, in soft
               daylight with no flash &mdash; glare is what the model copies worst.
             </p>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadRaw(f); }}
-            />
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadRaw(f); }} />
             <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
               {uploading ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <UploadIcon className="mr-1.5 size-3.5" />}
               {roll.rawImageUrl ? "Replace raw photo" : "Upload raw photo"}
@@ -467,31 +641,65 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
 
       <Card>
         <CardContent className="space-y-4 p-4">
-          <Label>Which images should we make?</Label>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {shots.map((s) => {
-              const on = picked.includes(s.key);
-              return (
-                <button
-                  key={s.key}
-                  onClick={() => setPicked(on ? picked.filter((k) => k !== s.key) : [...picked, s.key])}
-                  className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left text-sm transition ${
-                    on ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40" : "hover:bg-muted/60"
-                  }`}
-                >
-                  <span className={`flex size-4 shrink-0 items-center justify-center rounded border ${on ? "border-violet-600 bg-violet-600 text-white" : "border-muted-foreground/40"}`}>
-                    {on && <CheckCircle2Icon className="size-3" />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{s.label}</span>
-                    <code className="text-[10px] text-muted-foreground">
-                      {mockupFileStem(String(roll.rNumber), s.suffix)}.webp
-                    </code>
-                  </span>
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label>Which images should we make?</Label>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onManageShots}>
+              Manage gadgets &amp; prompts
+            </Button>
           </div>
+
+          {shots.length === 0 ? (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No shots defined yet.{" "}
+              <button className="font-medium text-violet-600 underline" onClick={onManageShots}>
+                Add a gadget and its prompts
+              </button>{" "}
+              to start.
+            </div>
+          ) : (
+            grouped.map(([gadget, rows]) => (
+              <div key={gadget} className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{gadget}</span>
+                  <button
+                    className="text-[11px] text-violet-600 hover:underline"
+                    onClick={() => {
+                      const ids = rows.map((r) => r._id);
+                      const allOn = ids.every((id) => picked.includes(id));
+                      setPicked(allOn ? picked.filter((p) => !ids.includes(p)) : [...new Set([...picked, ...ids])]);
+                    }}
+                  >
+                    toggle all
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {rows.map((s) => {
+                    const on = picked.includes(s._id);
+                    return (
+                      <button
+                        key={s._id}
+                        onClick={() => setPicked(on ? picked.filter((k) => k !== s._id) : [...picked, s._id])}
+                        className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left text-sm transition ${
+                          on ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40" : "hover:bg-muted/60"
+                        }`}
+                      >
+                        <span className={`flex size-4 shrink-0 items-center justify-center rounded border ${on ? "border-violet-600 bg-violet-600 text-white" : "border-muted-foreground/40"}`}>
+                          {on && <CheckCircle2Icon className="size-3" />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{s.label}</span>
+                          <code className="text-[10px] text-muted-foreground">
+                            {mockupFileStem(String(roll.rNumber), s.suffix)}.webp
+                          </code>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+
           <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <Label className="text-xs">Model</Label>
@@ -514,10 +722,7 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
               </span>
             </div>
             {model.note && <p className="text-[11px] text-muted-foreground">{model.note}</p>}
-            {picked.some((k) => {
-              const sh = shots.find((x) => x.key === k);
-              return sh && resolveSize(model, sh.size) !== sh.size;
-            }) && (
+            {ratioMismatch && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400">
                 This model does not take every shot&rsquo;s preferred aspect ratio; the closest one it
                 accepts will be used.
@@ -530,7 +735,7 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
               {starting ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <SparklesIcon className="mr-1.5 size-4" />}
               Generate {picked.length} image{picked.length === 1 ? "" : "s"} &middot; {formatInr(model.usd * picked.length)}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setPicked(MOCKUP_SHOTS.map((s) => s.key))}>Select all</Button>
+            <Button size="sm" variant="ghost" onClick={() => setPicked(shots.map((s) => s._id))}>Select all</Button>
             <Button size="sm" variant="ghost" onClick={() => setPicked([])}>Clear</Button>
           </div>
         </CardContent>
@@ -549,13 +754,12 @@ function RollPanel({ roll, shots, picked, setPicked, modelId, setModelId, jobs }
 }
 
 function JobCard({ job }: { job: Job }) {
-  const shot = SHOT_BY_KEY[job.shotKey];
   return (
     <Card>
       <CardContent className="space-y-2 p-3">
         <div className="aspect-square overflow-hidden rounded-lg bg-muted">
           {job.url ? (
-            <img src={job.url} alt={job.shotKey} className="size-full object-cover" />
+            <img src={job.url} alt={job.shotLabel || job.suffix} className="size-full object-cover" />
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
               {job.status === "failed" ? (
@@ -566,18 +770,17 @@ function JobCard({ job }: { job: Job }) {
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium">{shot?.label || job.shotKey}</p>
+            <p className="truncate text-xs font-medium">{job.shotLabel || job.suffix}</p>
+            <code className="block truncate text-[10px] text-muted-foreground">
+              {mockupFileStem(job.rNumber, job.suffix, job.attempt || 1)}
+            </code>
             {job.modelLabel && (
               <p className="truncate text-[10px] text-muted-foreground">
-                {job.modelLabel}
-                {typeof job.costInr === "number" ? ` · ₹${job.costInr.toFixed(2)}` : ""}
+                {job.modelLabel}{typeof job.costInr === "number" ? ` · ₹${job.costInr.toFixed(2)}` : ""}
               </p>
             )}
-            <code className="text-[10px] text-muted-foreground">
-              {mockupFileStem(job.rNumber, job.gadget === "laptop" ? shot?.suffix || job.shotKey : shot?.suffix || job.shotKey, job.attempt || 1)}
-            </code>
           </div>
           {job.url && (
             <a href={job.url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground">
@@ -615,8 +818,7 @@ function useJobPoller(
         if (res.status === "failed" || res.error) {
           await updateJob({ mockupId: job._id, status: "failed", error: res.error || "Generation failed" });
         } else if (res.status === "finished" && res.fileUrl) {
-          const shot = SHOT_BY_KEY[job.shotKey];
-          const stem = mockupFileStem(job.rNumber, shot?.suffix || job.shotKey, job.attempt || 1);
+          const stem = mockupFileStem(job.rNumber, job.suffix, job.attempt || 1);
           // Relayed through the function because storage.poyo.ai is not
           // CORS-open; going via base64 also puts the bytes through the same
           // WebP normaliser as every other upload.

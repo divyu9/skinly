@@ -158,11 +158,23 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'aiMockups.getPrompts') {
-          // Prompt overrides only. The seven shots themselves are defined in
-          // src/lib/ai-mockup-shots.ts so the studio works before anything has
-          // been edited; a doc here replaces the default for its key.
+          // The shot list itself. Gadgets and angles both grow over time, so
+          // this collection is the source of truth rather than a set of
+          // overrides on top of something fixed in code.
           unsubscribe = onSnapshot(collection(db, 'gadgetMockupPrompts'), (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+            const rows = snap.docs.map(d => ({ _id: d.id, ...d.data() })) as any[];
+            rows.sort((a, b) =>
+              String(a.gadget || '').localeCompare(String(b.gadget || '')) ||
+              (a.order || 0) - (b.order || 0) ||
+              String(a.label || '').localeCompare(String(b.label || ''))
+            );
+            setData(rows);
+          });
+        }
+        else if (path === 'aiMockups.getSettings') {
+          // Single doc holding the prompt fragments every shot shares.
+          unsubscribe = onSnapshot(doc(db, 'gadgetMockupSettings', 'default'), (snap) => {
+            setData(snap.exists() ? { _id: snap.id, ...snap.data() } : null);
           });
         }
         else if (path === 'aiMockups.getJobs') {
@@ -4552,6 +4564,11 @@ export function useMutation(apiRef: any) {
           }
           return { success: true, updated };
         }
+      }
+
+      if (path === 'aiMockups.updateMockupSettings') {
+        await setDoc(doc(db, 'gadgetMockupSettings', 'default'), { ...args, updatedAt: Date.now() }, { merge: true });
+        return 'default';
       }
 
       if (path === 'settings.updateSetting') {
