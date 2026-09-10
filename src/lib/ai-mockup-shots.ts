@@ -17,6 +17,15 @@ export interface MockupShot {
   gadget: string;
   /** Filename tail: R-01-<suffix>.webp */
   suffix: string;
+  /**
+   * Variant SKU tails this shot is the picture for.
+   *
+   * A variant SKU is `<design code>-<view code>`: R-29-LP is "Only Top" and
+   * R-29-LPK is "Top + Keyboard Area", both on the same laptop product. On
+   * approval the image is linked to the products behind these codes. Matching
+   * ignores case, because the catalogue holds both IPAD and iPAD.
+   */
+  skuCodes: string[];
   prompt: string;
   order: number;
   isActive: boolean;
@@ -81,6 +90,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Lid only",
     gadget: "laptop",
     suffix: "laptop-top",
+    skuCodes: ["LP", "LPT", "LAP"],
     order: 0,
     isActive: true,
     prompt:
@@ -92,6 +102,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Open — lid + keyboard deck",
     gadget: "laptop",
     suffix: "laptop-open",
+    skuCodes: ["LPK"],
     order: 1,
     isActive: true,
     prompt:
@@ -103,6 +114,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Sony telephoto",
     gadget: "lens",
     suffix: "lens",
+    skuCodes: ["LENS", "LS"],
     order: 0,
     isActive: true,
     prompt:
@@ -115,6 +127,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Sony A7 IV body",
     gadget: "camera",
     suffix: "camera",
+    skuCodes: ["CAM", "CAO"],
     order: 0,
     isActive: true,
     prompt:
@@ -127,6 +140,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "PlayStation 5",
     gadget: "console",
     suffix: "ps5",
+    skuCodes: ["PS5"],
     order: 0,
     isActive: true,
     prompt:
@@ -139,6 +153,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "iPad — back",
     gadget: "tablet",
     suffix: "ipad",
+    skuCodes: ["IPAD", "TAB"],
     order: 0,
     isActive: true,
     prompt:
@@ -150,6 +165,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Apple 20W USB-C",
     gadget: "charger",
     suffix: "charger",
+    skuCodes: ["CH"],
     order: 0,
     isActive: true,
     prompt:

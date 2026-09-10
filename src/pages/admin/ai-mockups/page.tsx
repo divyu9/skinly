@@ -49,6 +49,8 @@ type Job = {
   pendingKey?: string;
   pendingUrl?: string;
   rejectedTo?: string;
+  skuCodes?: string[];
+  linkedCount?: number;
   error?: string;
   attempt?: number;
   modelLabel?: string;
@@ -183,6 +185,7 @@ function ShotLibrary() {
       gadget,
       gadgetTypeId: gadgetTypeId || (gadgetTypes || []).find((g) => g.name === gadget)?._id || "",
       suffix: siblings.length ? `${gadget}-${siblings.length + 1}` : gadget,
+      skuCodes: [],
       order: siblings.length,
       isActive: true,
       prompt:
@@ -372,6 +375,15 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
               placeholder="laptop-top"
             />
           </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">SKU</span>
+            <Input
+              value={(v.skuCodes || []).join(", ")}
+              onChange={(e) => edit({ skuCodes: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })}
+              className="h-8 w-[170px] font-mono text-xs"
+              placeholder="LP, LPT"
+            />
+          </div>
           <div className="ml-auto flex items-center gap-2">
             <Switch checked={v.isActive !== false} onCheckedChange={(c) => edit({ isActive: c })} />
             <Button size="sm" variant="ghost" className="h-8 px-2" onClick={onDuplicate} title="Duplicate">
@@ -394,6 +406,12 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
         />
         <p className="text-[11px] text-muted-foreground">
           Placeholders: {PLACEHOLDERS.map((p) => <code key={p} className="mr-1 rounded bg-muted px-1">{`{{${p}}}`}</code>)}
+        </p>
+        <p className="text-[11px] text-muted-foreground">
+          On approval this image is attached to every product whose variant SKU ends{" "}
+          {(v.skuCodes || []).length
+            ? (v.skuCodes || []).map((c) => <code key={c} className="mr-1 rounded bg-muted px-1">-{c}</code>)
+            : <span className="text-amber-600">— no SKU codes set, so it will not link to anything</span>}
         </p>
 
         {dirty && (
@@ -536,6 +554,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const getObject = useAction(api.r2.getR2Object);
   const deleteObject = useAction(api.r2.deleteR2Object);
   const addMediaItem = useMutation(api.mediaLibrary.createMediaItem);
+  const linkToProducts = useMutation(api.aiMockups.linkMockupToProducts);
   const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
   // One ratio for the whole run, and it wins: a shot no longer carries its own.
   // The model still gets the last word, because a ratio it does not accept is a
@@ -598,6 +617,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         shotLabel: shot.label,
         gadget: shot.gadget,
         suffix: shot.suffix,
+        skuCodes: shot.skuCodes || [],
         sourceUrl: roll.rawImageUrl,
         status: "queued",
         attempt,
@@ -663,9 +683,26 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         tags: ["ai-mockup", job.rNumber, job.gadget],
         createdAt: Date.now(),
       });
-      await updateJob({ mockupId: job._id, status: "approved", url, r2Key: finalKey, pendingKey: "" });
+      // Link before marking approved, so a failure here does not leave a job
+      // claiming to be done when nothing was attached to a product.
+      let linked = 0;
+      if ((job.skuCodes || []).length) {
+        const res: any = await linkToProducts({
+          rNumber: job.rNumber,
+          skuCodes: job.skuCodes,
+          gadget: job.gadget,
+          url,
+          alt: job.designName || job.shotLabel || "",
+        });
+        linked = res?.linked ?? 0;
+      }
+      await updateJob({ mockupId: job._id, status: "approved", url, r2Key: finalKey, pendingKey: "", linkedCount: linked });
       void deleteObject({ key: job.pendingKey }).catch(() => {});
-      toast.success("Approved and added to the media library");
+      toast.success(
+        linked
+          ? `Approved · added to the media library and ${linked} product${linked > 1 ? "s" : ""}`
+          : "Approved and added to the media library"
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not approve");
     } finally { setBusyJob(null); }
@@ -1039,6 +1076,16 @@ function JobCard({ job, onApprove, onReject, onRedo, busy }: {
             )}
             {job.status === "rejected" && job.rejectedTo && (
               <p className="truncate text-[10px] text-muted-foreground">saved to {job.rejectedTo}</p>
+            )}
+            {job.status === "approved" && (
+              <p className="truncate text-[10px] text-emerald-600">
+                {job.linkedCount ? `linked to ${job.linkedCount} product${job.linkedCount > 1 ? "s" : ""}` : "media library only"}
+              </p>
+            )}
+            {job.status === "review" && (job.skuCodes || []).length > 0 && (
+              <p className="truncate text-[10px] text-muted-foreground">
+                will link {(job.skuCodes || []).map((c) => `${job.rNumber}-${c}`).join(", ")}
+              </p>
             )}
           </div>
           {preview && (

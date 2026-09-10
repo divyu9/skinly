@@ -4566,6 +4566,70 @@ export function useMutation(apiRef: any) {
         }
       }
 
+      if (path === 'aiMockups.linkMockupToProducts') {
+        // A variant SKU is `<design code>-<view code>`, so every variant for a
+        // design sits in one contiguous key range. The range is tight: "R-290-LP"
+        // sorts above "R-29-\uf8ff" because '0' > '-', so a longer design code
+        // cannot leak in.
+        const design = String(args.rNumber || '').trim();
+        const codes = (args.skuCodes || []).map((c: string) => String(c).trim().toUpperCase()).filter(Boolean);
+        if (!design || !codes.length) return { success: false, linked: 0, reason: 'No design code or SKU codes' };
+
+        const snap = await getDocs(query(
+          collection(db, 'variants'),
+          where('sku', '>=', `${design}-`),
+          where('sku', '<', `${design}-\uf8ff`)
+        ));
+
+        const productIds = new Set<string>();
+        const matchedSkus: string[] = [];
+        snap.docs.forEach((d) => {
+          const data: any = d.data();
+          const sku = String(data.sku || '');
+          // Case-insensitive on the tail only: the catalogue holds IPAD and iPAD.
+          const tail = sku.slice(design.length + 1).toUpperCase();
+          if (codes.includes(tail) && data.productId) {
+            productIds.add(data.productId);
+            matchedSkus.push(sku);
+          }
+        });
+
+        // The view code alone is not unique across the catalogue: PS5 is both a
+        // console SKU (R-20-PS5) and a controller SKU (R-18-PS5, "Play Station
+        // 5"). Without this the console shot would also land on the controller
+        // product. When the shot names a gadget, the product must agree.
+        let allowedTypeIds: Set<string> | null = null;
+        if (args.gadget) {
+          const gts = await getDocs(collection(db, 'gadgetTypes'));
+          allowedTypeIds = new Set(
+            gts.docs
+              .filter((g) => String((g.data() as any).name || '').toLowerCase() === String(args.gadget).toLowerCase())
+              .map((g) => g.id)
+          );
+          if (!allowedTypeIds.size) allowedTypeIds = null;
+        }
+
+        let linked = 0, alreadyThere = 0, wrongGadget = 0;
+        for (const pid of productIds) {
+          const pref = doc(db, 'products', pid);
+          const psnap = await getDoc(pref);
+          if (!psnap.exists()) continue;
+          const pdata: any = psnap.data();
+          if (allowedTypeIds) {
+            const gt = pdata.gadgetTypeId || pdata.gadgetType;
+            if (!allowedTypeIds.has(gt)) { wrongGadget++; continue; }
+          }
+          const images = Array.isArray(pdata.images) ? pdata.images : [];
+          if (images.some((i: any) => (typeof i === 'string' ? i : i?.url) === args.url)) { alreadyThere++; continue; }
+          await updateDoc(pref, {
+            images: [...images, { url: args.url, alt: args.alt || pdata.title || '' }],
+            updatedAt: Date.now(),
+          });
+          linked++;
+        }
+        return { success: true, linked, alreadyThere, wrongGadget, matchedSkus, productIds: [...productIds] };
+      }
+
       if (path === 'aiMockups.updateMockupSettings') {
         await setDoc(doc(db, 'gadgetMockupSettings', 'default'), { ...args, updatedAt: Date.now() }, { merge: true });
         return 'default';
