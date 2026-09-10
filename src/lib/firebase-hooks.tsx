@@ -157,6 +157,20 @@ export function useQuery(apiRef: any, args?: any) {
             setData(data);
           });
         }
+        else if (path === 'aiMockups.getPrompts') {
+          // Prompt overrides only. The seven shots themselves are defined in
+          // src/lib/ai-mockup-shots.ts so the studio works before anything has
+          // been edited; a doc here replaces the default for its key.
+          unsubscribe = onSnapshot(collection(db, 'gadgetMockupPrompts'), (snap) => {
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+          });
+        }
+        else if (path === 'aiMockups.getJobs') {
+          const q = query(collection(db, 'designMockups'), orderBy('createdAt', 'desc'), limit(args?.take || 200));
+          unsubscribe = onSnapshot(q, (snap) => {
+            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+          });
+        }
         else if (path === 'homepage.getActiveHeroSlides') {
           const q = query(collection(db, 'heroSlides'));
           unsubscribe = onSnapshot(q, (snap) => {
@@ -4550,6 +4564,8 @@ export function useMutation(apiRef: any) {
       // the action rather than the namespace.
       const byAction = actionName.toLowerCase();
       if (byAction.includes('rollinventory')) targetCollection = 'rollInventory';
+      else if (byAction.includes('mockupprompt')) targetCollection = 'gadgetMockupPrompts';
+      else if (byAction.includes('designmockup')) targetCollection = 'designMockups';
       else if (byAction.includes('gadgetconsumption')) targetCollection = 'gadgetConsumption';
       else if (byAction.includes('suggestedproducts')) targetCollection = 'suggestedProductsConfig';
       else if (byAction.includes('trendingproducts')) targetCollection = 'trendingProductsConfig';
@@ -4641,6 +4657,8 @@ export function useMutation(apiRef: any) {
           homepageSections: 'sectionId',
           homepageSectionCards: 'cardId',
           heroSlides: 'slideId',
+          gadgetMockupPrompts: 'promptId',
+          designMockups: 'mockupId',
           featureBanners: 'bannerId',
           ugcVideos: 'videoId',
           seoPages: 'pageId',
@@ -4648,7 +4666,7 @@ export function useMutation(apiRef: any) {
           variantConsumptionPresets: 'presetId',
         };
         const FALLBACK_ID_KEYS = [
-          'id', 'cardId', 'ruleId', 'bugReportId', 'requestId', 'reviewId', 'slideId', 'bannerId', 'videoId', 'productId',
+          'id', 'promptId', 'mockupId', 'cardId', 'ruleId', 'bugReportId', 'requestId', 'reviewId', 'slideId', 'bannerId', 'videoId', 'productId',
           'variantId', 'couponId', 'orderId', 'pageId', 'templateId', 'presetId',
           'usecaseId', 'jobId', 'mockupId', 'modelId', 'categoryId',
         ];
@@ -4715,8 +4733,8 @@ export function useMutation(apiRef: any) {
             return { success: true };
           }
 
-          if (!args.id && !args.couponId && !args.ruleId && !args.pageId && !args.slideId && !args.bannerId && !args.videoId && !args.reviewId) throw new Error(`ID required for delete (${actionName})`);
-          const targetId = args.id || args.couponId || args.ruleId || args.pageId || args.slideId || args.bannerId || args.videoId || args.reviewId;
+          const targetId = args.id || args.couponId || args.ruleId || args.pageId || args.slideId || args.bannerId || args.videoId || args.reviewId || args.promptId || args.mockupId;
+          if (!targetId) throw new Error(`ID required for delete (${actionName})`);
           await deleteDoc(doc(db, targetCollection, targetId));
           return targetId;
         }

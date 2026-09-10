@@ -14,3 +14,4 @@ export * from "./loginOtp";
 export * from "./abandonedCarts";
 export * from "./collectionSync";
 export * from "./whatsappWorker";
+export * from "./poyo";

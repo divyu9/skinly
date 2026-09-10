@@ -170,6 +170,10 @@ service cloud.firestore {
     match /uploadJobs/{id}              { allow read, write: if isAdmin(); }
     match /googleDriveImportJobs/{id}   { allow read, write: if isAdmin(); }
     match /rollInventory/{id}           { allow read, write: if isAdmin(); }
+    // AI mockup studio: prompt overrides and generation jobs. Admin-only both
+    // ways — the prompts steer a billed API and the jobs carry task ids.
+    match /gadgetMockupPrompts/{id}     { allow read, write: if isAdmin(); }
+    match /designMockups/{id}           { allow read, write: if isAdmin(); }
     match /gadgetConsumption/{id}       { allow read, write: if isAdmin(); }
     match /variantConsumptionPresets/{id} { allow read, write: if isAdmin(); }
   }
