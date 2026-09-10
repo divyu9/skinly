@@ -759,6 +759,15 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     }
   };
 
+  /** The task already finished and was paid for; only the ingest broke. */
+  const retryDownload = async (job: Job) => {
+    setBusyJob(job._id);
+    try {
+      await updateJob({ mockupId: job._id, status: "running", error: "" });
+      toast.success("Collecting the image again…");
+    } finally { setBusyJob(null); }
+  };
+
   const ratioCoerced = effectiveSize !== aspect;
   const reviewCount = jobs.filter((j) => j.status === "review").length;
 
@@ -945,6 +954,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 busy={busyJob === j._id}
                 onApprove={approve}
                 onReject={reject}
+                onRetryDownload={retryDownload}
                 onRedo={(job) => setRedoJob(job)}
               />
             ))}
@@ -1056,11 +1066,12 @@ function LinkTargets({ titles }: { titles: string[] | null }) {
   );
 }
 
-function JobCard({ job, onApprove, onReject, onRedo, busy }: {
+function JobCard({ job, onApprove, onReject, onRedo, onRetryDownload, busy }: {
   job: Job;
   onApprove: (job: Job) => Promise<void>;
   onReject: (job: Job) => Promise<void>;
   onRedo: (job: Job) => void;
+  onRetryDownload: (job: Job) => Promise<void>;
   busy: boolean;
 }) {
   const preview = job.url || job.pendingUrl;
@@ -1143,9 +1154,18 @@ function JobCard({ job, onApprove, onReject, onRedo, busy }: {
         )}
 
         {job.status === "failed" && (
-          <Button size="sm" variant="outline" className="h-8 w-full text-xs" onClick={() => onRedo(job)}>
-            <RefreshCwIcon className="mr-1 size-3.5" />Try again
-          </Button>
+          <div className="grid gap-1.5">
+            {job.taskId && (
+              <Button size="sm" variant="outline" disabled={busy} className="h-8 w-full text-xs"
+                onClick={() => void onRetryDownload(job)}>
+                {busy ? <Loader2Icon className="mr-1 size-3.5 animate-spin" /> : <RefreshCwIcon className="mr-1 size-3.5" />}
+                Retry download &mdash; free
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="h-8 w-full text-xs" onClick={() => onRedo(job)}>
+              Generate again
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -1178,7 +1198,7 @@ function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
           // Relayed through the function because storage.poyo.ai is not
           // CORS-open; going via base64 also puts the bytes through the same
           // WebP normaliser as every other upload.
-          const img: any = await fetchImage({ url: res.fileUrl });
+          const img: any = await fetchImage({ taskId: job.taskId });
           // Staged, not published. Nothing reaches the media library until a
           // human has looked at it — an AI mockup that quietly went live with a
           // wrong pattern is the failure this whole tool guards against.

@@ -181,27 +181,36 @@ export const poyoStatus = onCall(async (data: any, context: any) => {
 /**
  * Downloads a finished image and hands it back as base64.
  *
- * The browser cannot fetch storage.poyo.ai directly, and routing the bytes
- * through here also means the result goes through the same WebP normaliser as
- * every other upload rather than landing in R2 as a 2 MB PNG.
+ * The caller passes a task id, not a URL. The URL is read back from PoYo here,
+ * so the only thing this will ever fetch is something PoYo itself just told us
+ * it produced — no host allowlist to keep current, and no way to point it at an
+ * arbitrary address. PoYo serves results from a CDN of its choosing
+ * (cdn.doculator.org today), which an allowlist got wrong.
+ *
+ * Relaying through here also keeps CORS out of it, and puts the bytes through
+ * the same WebP normaliser as every other upload.
  */
 export const poyoFetchImage = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
 
-  const url = data?.url;
-  if (typeof url !== "string" || !/^https:\/\//.test(url)) {
-    throw new HttpsError("invalid-argument", "A https url is required");
+  const taskId = data?.taskId;
+  if (typeof taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
+    throw new HttpsError("invalid-argument", "A valid taskId is required");
   }
-  // Only PoYo's own hosts, so this cannot be used as an open fetch proxy.
-  const host = (() => {
-    try {
-      return new URL(url).hostname;
-    } catch {
-      return "";
-    }
-  })();
-  if (!/(^|\.)poyo\.ai$/.test(host)) {
-    throw new HttpsError("permission-denied", `Refusing to fetch from ${host || "an unparseable url"}`);
+
+  const body = await poyoRequest(`/api/generate/status/${taskId}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${getKey()}` },
+  });
+
+  const d = body?.data || {};
+  const files = Array.isArray(d.files) ? d.files : [];
+  const url = files.find((f: any) => f?.file_type === "image")?.file_url || files[0]?.file_url;
+  if (!url) {
+    throw new HttpsError("failed-precondition", `Task ${taskId} has no image yet (status: ${d.status || "unknown"})`);
+  }
+  if (!/^https:\/\//.test(String(url))) {
+    throw new HttpsError("internal", "PoYo returned a non-https result url");
   }
 
   let res: Response;
