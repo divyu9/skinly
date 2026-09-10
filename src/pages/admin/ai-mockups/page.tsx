@@ -27,6 +27,7 @@ import {
 } from "@/lib/ai-mockup-models.ts";
 
 const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
+const DEFAULT_ASPECT = "4:3";
 const POLL_MS = 4000;
 
 type Job = {
@@ -43,6 +44,7 @@ type Job = {
   error?: string;
   attempt?: number;
   modelLabel?: string;
+  aspect?: string;
   costInr?: number;
   createdAt: number;
 };
@@ -98,6 +100,7 @@ function AiMockupsContent() {
   const [selectedRollId, setSelectedRollId] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [modelId, setModelId] = useState<string>(DEFAULT_MODEL_ID);
+  const [aspect, setAspect] = useState<string>(DEFAULT_ASPECT);
 
   return (
     <div className="space-y-6">
@@ -134,6 +137,8 @@ function AiMockupsContent() {
           setPicked={setPicked}
           modelId={modelId}
           setModelId={setModelId}
+          aspect={aspect}
+          setAspect={setAspect}
           onManageShots={() => setTab("shots")}
         />
       ) : (
@@ -170,7 +175,6 @@ function ShotLibrary() {
       gadget,
       gadgetTypeId: gadgetTypeId || (gadgetTypes || []).find((g) => g.name === gadget)?._id || "",
       suffix: siblings.length ? `${gadget}-${siblings.length + 1}` : gadget,
-      size: "4:3",
       order: siblings.length,
       isActive: true,
       prompt:
@@ -360,10 +364,6 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
               placeholder="laptop-top"
             />
           </div>
-          <Select value={v.size} onValueChange={(x) => edit({ size: x })}>
-            <SelectTrigger className="h-8 w-[80px] text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>{SIZES.map((s) => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
-          </Select>
           <div className="ml-auto flex items-center gap-2">
             <Switch checked={v.isActive !== false} onCheckedChange={(c) => edit({ isActive: c })} />
             <Button size="sm" variant="ghost" className="h-8 px-2" onClick={onDuplicate} title="Duplicate">
@@ -409,13 +409,15 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
 
 /* ------------------------------------------------------------- studio tab */
 
-function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId, setModelId, onManageShots }: {
+function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId, setModelId, aspect, setAspect, onManageShots }: {
   selectedRollId: string | null;
   setSelectedRollId: (v: string | null) => void;
   picked: string[];
   setPicked: (v: string[]) => void;
   modelId: string;
   setModelId: (v: string) => void;
+  aspect: string;
+  setAspect: (v: string) => void;
   onManageShots: () => void;
 }) {
   const rolls = useQuery(api.rollsManagement.getRollInventory) as any[] | undefined;
@@ -490,6 +492,8 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
           setPicked={setPicked}
           modelId={modelId}
           setModelId={setModelId}
+          aspect={aspect}
+          setAspect={setAspect}
           jobs={jobsForRoll}
           onManageShots={onManageShots}
         />
@@ -502,7 +506,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
   );
 }
 
-function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId, jobs, onManageShots }: {
+function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId, aspect, setAspect, jobs, onManageShots }: {
   roll: any;
   shots: MockupShot[];
   blocks: SharedBlocks;
@@ -510,6 +514,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   setPicked: (v: string[]) => void;
   modelId: string;
   setModelId: (v: string) => void;
+  aspect: string;
+  setAspect: (v: string) => void;
   jobs: Job[];
   onManageShots: () => void;
 }) {
@@ -519,6 +525,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const updateJob = useMutation(api.aiMockups.updateDesignMockup);
   const submit = useAction(api.poyo.poyoSubmit);
   const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
+  // One ratio for the whole run, and it wins: a shot no longer carries its own.
+  // The model still gets the last word, because a ratio it does not accept is a
+  // 400 rather than a preference.
+  const effectiveSize = resolveSize(model, aspect);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -580,13 +590,14 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           status: "queued",
           attempt,
           modelLabel: model.label,
+          aspect: effectiveSize,
           costInr: Number((model.usd * USD_TO_INR).toFixed(2)),
           createdAt: Date.now(),
         })) as string;
 
         const res: any = await submit({
           model: model.apiModel,
-          size: resolveSize(model, shot.size),
+          size: effectiveSize,
           resolution: model.resolution,
           quality: model.quality,
           prompt: expandPrompt(shot.prompt, blocks, { rNumber: roll.rNumber, designName: roll.designName }),
@@ -604,10 +615,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     if (started) toast.success(`${started} image${started > 1 ? "s" : ""} generating…`);
   };
 
-  const ratioMismatch = picked.some((id) => {
-    const s = shots.find((x) => x._id === id);
-    return s && resolveSize(model, s.size) !== s.size;
-  });
+  const ratioCoerced = effectiveSize !== aspect;
 
   return (
     <div className="space-y-5">
@@ -716,16 +724,25 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   ))}
                 </SelectContent>
               </Select>
+              <Label className="ml-2 text-xs">Aspect</Label>
+              <Select value={aspect} onValueChange={setAspect}>
+                <SelectTrigger className="h-9 w-[110px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SIZES.map((sz) => <SelectItem key={sz} value={sz}>{sz}</SelectItem>)}
+                </SelectContent>
+              </Select>
               <span className="text-xs text-muted-foreground">
                 {formatInr(model.usd)} &times; {picked.length} ={" "}
                 <strong className="text-foreground">{formatInr(model.usd * picked.length)}</strong>
               </span>
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Every image in this run is generated at {effectiveSize}, whatever the shot says.
+            </p>
             {model.note && <p className="text-[11px] text-muted-foreground">{model.note}</p>}
-            {ratioMismatch && (
+            {ratioCoerced && (
               <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                This model does not take every shot&rsquo;s preferred aspect ratio; the closest one it
-                accepts will be used.
+                {model.label} does not accept {aspect}; {effectiveSize} will be used instead.
               </p>
             )}
           </div>
@@ -778,7 +795,7 @@ function JobCard({ job }: { job: Job }) {
             </code>
             {job.modelLabel && (
               <p className="truncate text-[10px] text-muted-foreground">
-                {job.modelLabel}{typeof job.costInr === "number" ? ` · ₹${job.costInr.toFixed(2)}` : ""}
+                {job.modelLabel}{job.aspect ? ` · ${job.aspect}` : ""}{typeof job.costInr === "number" ? ` · ₹${job.costInr.toFixed(2)}` : ""}
               </p>
             )}
           </div>

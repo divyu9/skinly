@@ -17,8 +17,6 @@ export interface MockupShot {
   gadget: string;
   /** Filename tail: R-01-<suffix>.webp */
   suffix: string;
-  /** Preferred aspect ratio; mapped to the nearest the chosen model accepts. */
-  size: string;
   prompt: string;
   order: number;
   isActive: boolean;
@@ -83,7 +81,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Lid only",
     gadget: "laptop",
     suffix: "laptop-top",
-    size: "4:3",
     order: 0,
     isActive: true,
     prompt:
@@ -95,7 +92,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Open — lid + keyboard deck",
     gadget: "laptop",
     suffix: "laptop-open",
-    size: "4:3",
     order: 1,
     isActive: true,
     prompt:
@@ -107,7 +103,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Sony telephoto",
     gadget: "lens",
     suffix: "lens",
-    size: "1:1",
     order: 0,
     isActive: true,
     prompt:
@@ -120,7 +115,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Sony A7 IV body",
     gadget: "camera",
     suffix: "camera",
-    size: "4:3",
     order: 0,
     isActive: true,
     prompt:
@@ -133,7 +127,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "PlayStation 5",
     gadget: "console",
     suffix: "ps5",
-    size: "4:3",
     order: 0,
     isActive: true,
     prompt:
@@ -146,7 +139,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "iPad — back",
     gadget: "tablet",
     suffix: "ipad",
-    size: "3:4",
     order: 0,
     isActive: true,
     prompt:
@@ -158,7 +150,6 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Apple 20W USB-C",
     gadget: "charger",
     suffix: "charger",
-    size: "1:1",
     order: 0,
     isActive: true,
     prompt:
