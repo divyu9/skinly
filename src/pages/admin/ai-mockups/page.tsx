@@ -65,6 +65,10 @@ export default function AdminAiMockupsPage() {
 
 function AiMockupsContent() {
   const [tab, setTab] = useState<"studio" | "prompts">("studio");
+  // Held here rather than inside Studio: switching to Prompts unmounts Studio,
+  // and losing your place every time you tweak a prompt is maddening.
+  const [selectedRollId, setSelectedRollId] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>(["laptop-top"]);
 
   return (
     <div className="space-y-6">
@@ -93,7 +97,16 @@ function AiMockupsContent() {
         </div>
       </div>
 
-      {tab === "studio" ? <Studio /> : <PromptsEditor />}
+      {tab === "studio" ? (
+        <Studio
+          selectedRollId={selectedRollId}
+          setSelectedRollId={setSelectedRollId}
+          picked={picked}
+          setPicked={setPicked}
+        />
+      ) : (
+        <PromptsEditor />
+      )}
     </div>
   );
 }
@@ -218,14 +231,17 @@ function PromptsEditor() {
 
 /* ------------------------------------------------------------------- studio */
 
-function Studio() {
+function Studio({ selectedRollId, setSelectedRollId, picked, setPicked }: {
+  selectedRollId: string | null;
+  setSelectedRollId: (v: string | null) => void;
+  picked: string[];
+  setPicked: (v: string[]) => void;
+}) {
   const rolls = useQuery(api.rollsManagement.getRollInventory) as any[] | undefined;
   const jobs = useQuery(api.aiMockups.getJobs, { take: 300 }) as Job[] | undefined;
   const shots = useResolvedShots();
 
   const [search, setSearch] = useState("");
-  const [selectedRollId, setSelectedRollId] = useState<string | null>(null);
-  const [picked, setPicked] = useState<string[]>(["laptop-top"]);
 
   const sortedRolls = useMemo(() => {
     const list = (rolls || []).map((r) => ({ ...r, rNumber: String(r.rNumber || "").trim() }));
