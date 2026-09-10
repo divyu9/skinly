@@ -38,7 +38,10 @@ const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", 
  * of this list.
  */
 const MODELS = [
-  "gpt-image-2-edit",
+  // gpt-image-2.5-flare has no separate -edit id: a non-empty image_urls picks
+  // editing. It is still only ever called with a reference, enforced below.
+  "gpt-image-2.5-flare",
+  "gpt-image-2.5-sunburst",
   "gpt-4o-image-edit",
   "nano-banana-edit",
   "seedream-4.5-edit",
@@ -47,7 +50,7 @@ const MODELS = [
 ];
 
 const RESOLUTIONS = ["1K", "2K", "4K"];
-const QUALITIES = ["low", "medium", "high"];
+const QUALITIES = ["low", "medium", "high", "xhigh", "max"];
 
 const poyoRequest = async (path: string, init: RequestInit) => {
   let res: Response;
@@ -133,7 +136,7 @@ export const poyoSubmit = onCall(async (data: any, context: any) => {
   } else {
     throw new HttpsError(
       "invalid-argument",
-      `${model} is an edit model and needs a reference image; none was supplied`
+      `${model} must be called with a reference image; none was supplied`
     );
   }
 

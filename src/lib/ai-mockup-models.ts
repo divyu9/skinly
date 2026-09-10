@@ -34,15 +34,26 @@ const RATIOS = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
 
 export const IMAGE_MODELS: ImageModel[] = [
   {
-    id: "gpt-image-2-medium-1k",
+    id: "gpt-image-2-5-low-1k",
+    label: "GPT Image 2.5 — low, 1K",
+    apiModel: "gpt-image-2.5-flare",
+    credits: 1.31,
+    usd: 0.0066,
+    sizes: RATIOS,
+    quality: "low",
+    resolution: "1K",
+    note: "Cheapest by a distance. Good for checking framing before you care about detail.",
+  },
+  {
+    id: "gpt-image-2-5-medium-1k",
     label: "GPT Image 2.5 — medium, 1K",
-    apiModel: "gpt-image-2-edit",
+    apiModel: "gpt-image-2.5-flare",
     credits: 2.95,
     usd: 0.015,
     sizes: RATIOS,
     quality: "medium",
     resolution: "1K",
-    note: "Cheapest. Good first pass while you tune a prompt.",
+    note: "The everyday choice while tuning a prompt.",
   },
   {
     id: "gpt-4o-image",
@@ -79,9 +90,9 @@ export const IMAGE_MODELS: ImageModel[] = [
     sizes: RATIOS,
   },
   {
-    id: "gpt-image-2-medium-2k",
+    id: "gpt-image-2-5-medium-2k",
     label: "GPT Image 2.5 — medium, 2K",
-    apiModel: "gpt-image-2-edit",
+    apiModel: "gpt-image-2.5-flare",
     credits: 5.99,
     usd: 0.03,
     sizes: RATIOS,
@@ -90,18 +101,18 @@ export const IMAGE_MODELS: ImageModel[] = [
   },
   {
     id: "nano-banana-pro-1k",
-    label: "Nano Banana Pro — 1K/2K",
+    label: "Nano Banana Pro — 1K",
     apiModel: "nano-banana-pro-edit",
     credits: 8,
     usd: 0.04,
     sizes: RATIOS,
     resolution: "1K",
-    note: "Dearest, and usually the most faithful. Worth it for the final run.",
+    note: "Dearest here, and usually the most faithful on fine detail. Worth it for the final run.",
   },
 ];
 
 export const MODEL_BY_ID = Object.fromEntries(IMAGE_MODELS.map((m) => [m.id, m]));
-export const DEFAULT_MODEL_ID = "seedream-4-5";
+export const DEFAULT_MODEL_ID = "gpt-image-2-5-medium-1k";
 
 export function inr(usd: number): number {
   return usd * USD_TO_INR;
@@ -110,6 +121,16 @@ export function inr(usd: number): number {
 /** "₹2.38" — two decimals, because the whole point is comparing small numbers. */
 export function formatInr(usd: number): string {
   return `₹${inr(usd).toFixed(2)}`;
+}
+
+/**
+ * "2.95 cr" — PoYo's own unit.
+ *
+ * The dashboard bills in credits, so showing them here is the only way to
+ * reconcile what this page promised against what was actually charged.
+ */
+export function formatCredits(credits: number): string {
+  return `${Number(credits.toFixed(2))} cr`;
 }
 
 const ratioOf = (s: string): number | null => {

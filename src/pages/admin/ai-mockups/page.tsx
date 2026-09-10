@@ -27,7 +27,7 @@ import {
   type MockupShot, type SharedBlocks,
 } from "@/lib/ai-mockup-shots.ts";
 import {
-  IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, resolveSize, USD_TO_INR,
+  IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, formatCredits, resolveSize, USD_TO_INR,
 } from "@/lib/ai-mockup-models.ts";
 
 const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
@@ -55,6 +55,7 @@ type Job = {
   attempt?: number;
   modelLabel?: string;
   aspect?: string;
+  credits?: number;
   costInr?: number;
   createdAt: number;
 };
@@ -637,6 +638,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         attempt,
         modelLabel: useModel.label,
         aspect: useSize,
+        credits: useModel.credits,
         costInr: Number((useModel.usd * USD_TO_INR).toFixed(2)),
         createdAt: Date.now(),
       })) as string;
@@ -873,7 +875,9 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                     <SelectItem key={m.id} value={m.id}>
                       <span className="flex w-full items-center justify-between gap-4">
                         <span>{m.label}</span>
-                        <span className="tabular-nums text-muted-foreground">{formatInr(m.usd)}</span>
+                        <span className="tabular-nums text-muted-foreground">
+                          {formatInr(m.usd)} · {formatCredits(m.credits)}
+                        </span>
                       </span>
                     </SelectItem>
                   ))}
@@ -889,6 +893,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               <span className="text-xs text-muted-foreground">
                 {formatInr(model.usd)} &times; {picked.length} ={" "}
                 <strong className="text-foreground">{formatInr(model.usd * picked.length)}</strong>
+                <span className="ml-1 opacity-70">({formatCredits(model.credits * picked.length)})</span>
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
@@ -1008,7 +1013,9 @@ function RedoDialog({ job, defaultModelId, defaultAspect, onCancel, onConfirm }:
                   <SelectItem key={x.id} value={x.id}>
                     <span className="flex w-full items-center justify-between gap-4">
                       <span>{x.label}</span>
-                      <span className="tabular-nums text-muted-foreground">{formatInr(x.usd)}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {formatInr(x.usd)} · {formatCredits(x.credits)}
+                      </span>
                     </span>
                   </SelectItem>
                 ))}
@@ -1113,7 +1120,7 @@ function JobCard({ job, onApprove, onReject, onRedo, onRetryDownload, busy }: {
             </code>
             {job.modelLabel && (
               <p className="truncate text-[10px] text-muted-foreground">
-                {job.modelLabel}{job.aspect ? ` \u00b7 ${job.aspect}` : ""}{typeof job.costInr === "number" ? ` \u00b7 \u20b9${job.costInr.toFixed(2)}` : ""}
+                {job.modelLabel}{job.aspect ? ` \u00b7 ${job.aspect}` : ""}{typeof job.costInr === "number" ? ` \u00b7 \u20b9${job.costInr.toFixed(2)}` : ""}{typeof job.credits === "number" ? ` \u00b7 ${job.credits} cr` : ""}
               </p>
             )}
             {job.status === "rejected" && job.rejectedTo && (
