@@ -17,7 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   SparklesIcon, UploadIcon, SearchIcon, ExternalLinkIcon, PlusIcon, TrashIcon,
   CheckCircle2Icon, AlertCircleIcon, Loader2Icon, ImageIcon, CopyIcon, WandSparklesIcon,
+  ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon, FolderIcon,
 } from "lucide-react";
+import {
+  saveLocally, chooseBackupFolder, getBackupFolder, supportsDirectoryPicker,
+} from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem,
   type MockupShot, type SharedBlocks,
@@ -37,10 +41,14 @@ type Job = {
   shotLabel?: string;
   gadget: string;
   suffix: string;
-  status: "queued" | "running" | "done" | "failed";
+  status: "queued" | "running" | "review" | "approved" | "rejected" | "failed";
   taskId?: string;
   url?: string;
   r2Key?: string;
+  /** Staged object, before a human has decided anything. */
+  pendingKey?: string;
+  pendingUrl?: string;
+  rejectedTo?: string;
   error?: string;
   attempt?: number;
   modelLabel?: string;
@@ -455,7 +463,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
         <p className="text-xs text-muted-foreground">{sortedRolls.length} rolls</p>
         <div className="max-h-[70vh] space-y-1.5 overflow-y-auto pr-1">
           {sortedRolls.map((r) => {
-            const done = (jobs || []).filter((j) => j.rNumber === r.rNumber && j.status === "done").length;
+            const done = (jobs || []).filter((j) => j.rNumber === r.rNumber && j.status === "approved").length;
             return (
               <button
                 key={r._id}
@@ -524,6 +532,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const createJob = useMutation(api.aiMockups.createDesignMockup);
   const updateJob = useMutation(api.aiMockups.updateDesignMockup);
   const submit = useAction(api.poyo.poyoSubmit);
+  const copyObject = useAction(api.r2.copyR2Object);
+  const getObject = useAction(api.r2.getR2Object);
+  const deleteObject = useAction(api.r2.deleteR2Object);
+  const addMediaItem = useMutation(api.mediaLibrary.createMediaItem);
   const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
   // One ratio for the whole run, and it wins: a shot no longer carries its own.
   // The model still gets the last word, because a ratio it does not accept is a
@@ -533,8 +545,15 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [busyJob, setBusyJob] = useState<string | null>(null);
+  const [redoJob, setRedoJob] = useState<Job | null>(null);
+  const [backupFolder, setBackupFolder] = useState<string | null>(null);
 
-  useJobPoller(jobs, updateJob, uploadToLibrary);
+  useEffect(() => {
+    void getBackupFolder().then((h: any) => setBackupFolder(h?.name ?? null));
+  }, []);
+
+  useJobPoller(jobs, updateJob);
 
   const grouped = groupByGadget(shots);
 
@@ -568,6 +587,44 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     }
   };
 
+  const runShot = async (shot: MockupShot, useModel: typeof model, useSize: string) => {
+    const attempt = jobs.filter((j) => j.shotId === shot._id).length + 1;
+    let jobId: string | null = null;
+    try {
+      jobId = (await createJob({
+        rNumber: String(roll.rNumber).trim(),
+        designName: roll.designName || "",
+        shotId: shot._id,
+        shotLabel: shot.label,
+        gadget: shot.gadget,
+        suffix: shot.suffix,
+        sourceUrl: roll.rawImageUrl,
+        status: "queued",
+        attempt,
+        modelLabel: useModel.label,
+        aspect: useSize,
+        costInr: Number((useModel.usd * USD_TO_INR).toFixed(2)),
+        createdAt: Date.now(),
+      })) as string;
+
+      const res: any = await submit({
+        model: useModel.apiModel,
+        size: useSize,
+        resolution: useModel.resolution,
+        quality: useModel.quality,
+        prompt: expandPrompt(shot.prompt, blocks, { rNumber: roll.rNumber, designName: roll.designName }),
+        imageUrls: [roll.rawImageUrl],
+      });
+      await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Submit failed";
+      if (jobId) await updateJob({ mockupId: jobId, status: "failed", error: msg });
+      toast.error(`${shot.label}: ${msg}`);
+      return false;
+    }
+  };
+
   const generate = async () => {
     if (!roll.rawImageUrl) return toast.error("Upload the raw design photo first");
     if (!picked.length) return toast.error("Pick at least one shot");
@@ -576,46 +633,83 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     for (const shotId of picked) {
       const shot = shots.find((s) => s._id === shotId);
       if (!shot) continue;
-      const attempt = jobs.filter((j) => j.shotId === shotId).length + 1;
-      let jobId: string | null = null;
-      try {
-        jobId = (await createJob({
-          rNumber: String(roll.rNumber).trim(),
-          designName: roll.designName || "",
-          shotId,
-          shotLabel: shot.label,
-          gadget: shot.gadget,
-          suffix: shot.suffix,
-          sourceUrl: roll.rawImageUrl,
-          status: "queued",
-          attempt,
-          modelLabel: model.label,
-          aspect: effectiveSize,
-          costInr: Number((model.usd * USD_TO_INR).toFixed(2)),
-          createdAt: Date.now(),
-        })) as string;
-
-        const res: any = await submit({
-          model: model.apiModel,
-          size: effectiveSize,
-          resolution: model.resolution,
-          quality: model.quality,
-          prompt: expandPrompt(shot.prompt, blocks, { rNumber: roll.rNumber, designName: roll.designName }),
-          imageUrls: [roll.rawImageUrl],
-        });
-        await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
-        started++;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Submit failed";
-        if (jobId) await updateJob({ mockupId: jobId, status: "failed", error: msg });
-        toast.error(`${shot.label}: ${msg}`);
-      }
+      if (await runShot(shot, model, effectiveSize)) started++;
     }
     setStarting(false);
     if (started) toast.success(`${started} image${started > 1 ? "s" : ""} generating…`);
   };
 
+  const approve = async (job: Job) => {
+    if (!job.pendingKey) return;
+    setBusyJob(job._id);
+    try {
+      const stem = mockupFileStem(job.rNumber, job.suffix, job.attempt || 1);
+      const finalKey = `ai-mockups/${stem}.webp`;
+      // Copied server-side; there is no reason to pull a megabyte through the
+      // browser just to push it back.
+      const copied: any = await copyObject({ fromKey: job.pendingKey, toKey: finalKey, contentType: "image/webp" });
+      const url = copied?.url;
+      if (!url) throw new Error("Copy failed");
+      await addMediaItem({
+        cloudinaryUrl: url,
+        cloudinaryPublicId: finalKey,
+        filename: `${stem}.webp`,
+        folder: "ai-mockups",
+        mediaType: "image",
+        format: "webp",
+        width: 0,
+        height: 0,
+        bytes: 0,
+        tags: ["ai-mockup", job.rNumber, job.gadget],
+        createdAt: Date.now(),
+      });
+      await updateJob({ mockupId: job._id, status: "approved", url, r2Key: finalKey, pendingKey: "" });
+      void deleteObject({ key: job.pendingKey }).catch(() => {});
+      toast.success("Approved and added to the media library");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not approve");
+    } finally { setBusyJob(null); }
+  };
+
+  const reject = async (job: Job) => {
+    if (!job.pendingKey) return;
+    setBusyJob(job._id);
+    try {
+      const stem = mockupFileStem(job.rNumber, job.suffix, job.attempt || 1);
+      const obj: any = await getObject({ key: job.pendingKey });
+      const saved = await saveLocally(obj.base64, `${stem}.webp`, obj.contentType || "image/webp");
+      await updateJob({
+        mockupId: job._id,
+        status: "rejected",
+        rejectedTo: saved.where === "folder" ? (backupFolder || "backup folder") : "Downloads",
+        pendingKey: "",
+        pendingUrl: "",
+      });
+      void deleteObject({ key: job.pendingKey }).catch(() => {});
+      toast.success(saved.where === "folder" ? `Saved to ${backupFolder}` : "Saved to Downloads");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the reject");
+    } finally { setBusyJob(null); }
+  };
+
+  const redo = async (job: Job, useModelId: string, useAspect: string) => {
+    const shot = shots.find((x) => x._id === job.shotId);
+    if (!shot) return toast.error("That shot no longer exists");
+    const m = MODEL_BY_ID[useModelId] ?? model;
+    setBusyJob(job._id);
+    try {
+      if (job.pendingKey) void deleteObject({ key: job.pendingKey }).catch(() => {});
+      await updateJob({ mockupId: job._id, status: "rejected", rejectedTo: "discarded on redo", pendingKey: "", pendingUrl: "" });
+      const ok = await runShot(shot, m, resolveSize(m, useAspect));
+      if (ok) toast.success(`Regenerating with ${m.label}`);
+    } finally {
+      setBusyJob(null);
+      setRedoJob(null);
+    }
+  };
+
   const ratioCoerced = effectiveSize !== aspect;
+  const reviewCount = jobs.filter((j) => j.status === "review").length;
 
   return (
     <div className="space-y-5">
@@ -760,23 +854,162 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 
       {jobs.length > 0 && (
         <div className="space-y-2">
-          <Label>Generated ({jobs.length})</Label>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label>
+              Generated ({jobs.length})
+              {reviewCount > 0 && (
+                <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                  {reviewCount} awaiting review
+                </span>
+              )}
+            </Label>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <FolderIcon className="size-3.5" />
+              {backupFolder ? (
+                <>Rejects go to <strong className="text-foreground">{backupFolder}</strong></>
+              ) : supportsDirectoryPicker() ? (
+                <>Rejects go to Downloads</>
+              ) : (
+                <>Rejects download (this browser cannot write to a folder)</>
+              )}
+              {supportsDirectoryPicker() && (
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs"
+                  onClick={async () => {
+                    try {
+                      const h: any = await chooseBackupFolder();
+                      if (h) { setBackupFolder(h.name); toast.success(`Rejects will be saved to ${h.name}`); }
+                    } catch { /* the picker was dismissed */ }
+                  }}>
+                  {backupFolder ? "Change folder" : "Choose folder"}
+                </Button>
+              )}
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {jobs.map((j) => <JobCard key={j._id} job={j} />)}
+            {jobs.map((j) => (
+              <JobCard
+                key={j._id}
+                job={j}
+                busy={busyJob === j._id}
+                onApprove={approve}
+                onReject={reject}
+                onRedo={(job) => setRedoJob(job)}
+              />
+            ))}
           </div>
         </div>
+      )}
+
+      {redoJob && (
+        <RedoDialog
+          job={redoJob}
+          defaultModelId={modelId}
+          defaultAspect={aspect}
+          onCancel={() => setRedoJob(null)}
+          onConfirm={(m, a) => void redo(redoJob, m, a)}
+        />
       )}
     </div>
   );
 }
 
-function JobCard({ job }: { job: Job }) {
+/** Redo asks which model to spend on this time, rather than silently repeating. */
+function RedoDialog({ job, defaultModelId, defaultAspect, onCancel, onConfirm }: {
+  job: Job;
+  defaultModelId: string;
+  defaultAspect: string;
+  onCancel: () => void;
+  onConfirm: (modelId: string, aspect: string) => void;
+}) {
+  const [m, setM] = useState(defaultModelId);
+  const [a, setA] = useState(defaultAspect);
+  const model = MODEL_BY_ID[m];
+  const coerced = resolveSize(model, a);
+
   return (
-    <Card>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onCancel}>
+      <Card className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <CardContent className="space-y-4 p-5">
+          <div>
+            <h3 className="font-semibold">Generate again</h3>
+            <p className="text-sm text-muted-foreground">
+              {job.shotLabel || job.suffix} for {job.rNumber}. The current image is discarded.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Model</Label>
+            <Select value={m} onValueChange={setM}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {IMAGE_MODELS.map((x) => (
+                  <SelectItem key={x.id} value={x.id}>
+                    <span className="flex w-full items-center justify-between gap-4">
+                      <span>{x.label}</span>
+                      <span className="tabular-nums text-muted-foreground">{formatInr(x.usd)}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {job.modelLabel && (
+              <p className="text-[11px] text-muted-foreground">Last time: {job.modelLabel}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Aspect</Label>
+            <Select value={a} onValueChange={setA}>
+              <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+              <SelectContent>{SIZES.map((sz) => <SelectItem key={sz} value={sz}>{sz}</SelectItem>)}</SelectContent>
+            </Select>
+            {coerced !== a && (
+              <p className="text-[11px] text-amber-600">{model.label} does not accept {a}; {coerced} will be used.</p>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={onCancel}>Cancel</Button>
+            <Button className="flex-1" onClick={() => onConfirm(m, a)}>
+              <RefreshCwIcon className="mr-1.5 size-4" />
+              Generate · {formatInr(model.usd)}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * One generated image and its verdict.
+ *
+ * Approve promotes the staged object into the media library, reject writes it
+ * to the admin's machine and clears the staging copy, redo throws it away and
+ * generates again with a model you pick at that moment.
+ */
+function JobCard({ job, onApprove, onReject, onRedo, busy }: {
+  job: Job;
+  onApprove: (job: Job) => Promise<void>;
+  onReject: (job: Job) => Promise<void>;
+  onRedo: (job: Job) => void;
+  busy: boolean;
+}) {
+  const preview = job.url || job.pendingUrl;
+  const inReview = job.status === "review";
+
+  const badge =
+    job.status === "approved" ? { text: "Approved", cls: "bg-emerald-600" }
+    : job.status === "rejected" ? { text: "Rejected", cls: "bg-rose-600" }
+    : job.status === "review" ? { text: "Needs review", cls: "bg-amber-500" }
+    : null;
+
+  return (
+    <Card className={job.status === "rejected" ? "opacity-70" : ""}>
       <CardContent className="space-y-2 p-3">
-        <div className="aspect-square overflow-hidden rounded-lg bg-muted">
-          {job.url ? (
-            <img src={job.url} alt={job.shotLabel || job.suffix} className="size-full object-cover" />
+        <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
+          {preview ? (
+            <img src={preview} alt={job.shotLabel || job.suffix} className="size-full object-cover" />
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
               {job.status === "failed" ? (
@@ -786,7 +1019,13 @@ function JobCard({ job }: { job: Job }) {
               )}
             </div>
           )}
+          {badge && (
+            <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white ${badge.cls}`}>
+              {badge.text}
+            </span>
+          )}
         </div>
+
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-xs font-medium">{job.shotLabel || job.suffix}</p>
@@ -795,16 +1034,41 @@ function JobCard({ job }: { job: Job }) {
             </code>
             {job.modelLabel && (
               <p className="truncate text-[10px] text-muted-foreground">
-                {job.modelLabel}{job.aspect ? ` · ${job.aspect}` : ""}{typeof job.costInr === "number" ? ` · ₹${job.costInr.toFixed(2)}` : ""}
+                {job.modelLabel}{job.aspect ? ` \u00b7 ${job.aspect}` : ""}{typeof job.costInr === "number" ? ` \u00b7 \u20b9${job.costInr.toFixed(2)}` : ""}
               </p>
             )}
+            {job.status === "rejected" && job.rejectedTo && (
+              <p className="truncate text-[10px] text-muted-foreground">saved to {job.rejectedTo}</p>
+            )}
           </div>
-          {job.url && (
-            <a href={job.url} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground">
+          {preview && (
+            <a href={preview} target="_blank" rel="noreferrer" className="shrink-0 text-muted-foreground hover:text-foreground">
               <ExternalLinkIcon className="size-3.5" />
             </a>
           )}
         </div>
+
+        {inReview && (
+          <div className="grid grid-cols-3 gap-1.5">
+            <Button size="sm" disabled={busy} onClick={() => void onApprove(job)}
+              className="h-8 bg-emerald-600 px-0 text-xs hover:bg-emerald-700">
+              {busy ? <Loader2Icon className="size-3.5 animate-spin" /> : <><ThumbsUpIcon className="mr-1 size-3.5" />Approve</>}
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => onRedo(job)} className="h-8 px-0 text-xs">
+              <RefreshCwIcon className="mr-1 size-3.5" />Redo
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void onReject(job)}
+              className="h-8 px-0 text-xs text-rose-600 hover:text-rose-700">
+              <ThumbsDownIcon className="mr-1 size-3.5" />Reject
+            </Button>
+          </div>
+        )}
+
+        {job.status === "failed" && (
+          <Button size="sm" variant="outline" className="h-8 w-full text-xs" onClick={() => onRedo(job)}>
+            <RefreshCwIcon className="mr-1 size-3.5" />Try again
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -817,13 +1081,10 @@ function JobCard({ job }: { job: Job }) {
  * rather than component state so that closing the tab mid-generation loses
  * nothing: reopening the page picks the same jobs back up.
  */
-function useJobPoller(
-  jobs: Job[],
-  updateJob: (a: any) => Promise<any>,
-  uploadToLibrary: (a: any) => Promise<any>
-) {
+function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
   const status = useAction(api.poyo.poyoStatus);
   const fetchImage = useAction(api.poyo.poyoFetchImage);
+  const stageUpload = useAction(api.r2.uploadToR2);
   const inFlight = useRef<Set<string>>(new Set());
 
   const tick = useCallback(async () => {
@@ -840,17 +1101,18 @@ function useJobPoller(
           // CORS-open; going via base64 also puts the bytes through the same
           // WebP normaliser as every other upload.
           const img: any = await fetchImage({ url: res.fileUrl });
-          const uploaded: any = await uploadToLibrary({
+          // Staged, not published. Nothing reaches the media library until a
+          // human has looked at it — an AI mockup that quietly went live with a
+          // wrong pattern is the failure this whole tool guards against.
+          const pendingKey = `ai-mockups-pending/${stem}.webp`;
+          const staged: any = await stageUpload({
             fileBase64: img.base64,
-            key: `ai-mockups/${stem}.webp`,
-            filename: `${stem}.webp`,
-            folder: "ai-mockups",
+            key: pendingKey,
             contentType: img.contentType,
-            tags: ["ai-mockup", job.rNumber, job.gadget],
           });
-          const url = uploaded?.url || uploaded?.publicUrl;
-          if (!url) throw new Error(uploaded?.error || "Upload to media library failed");
-          await updateJob({ mockupId: job._id, status: "done", url, r2Key: uploaded?.key || `ai-mockups/${stem}.webp` });
+          const url = staged?.url || staged?.publicUrl;
+          if (!url) throw new Error(staged?.error || "Could not stage the image");
+          await updateJob({ mockupId: job._id, status: "review", pendingKey: staged?.key || pendingKey, pendingUrl: url });
         }
       } catch (e) {
         await updateJob({
@@ -862,7 +1124,7 @@ function useJobPoller(
         inFlight.current.delete(job._id);
       }
     }
-  }, [jobs, status, fetchImage, updateJob, uploadToLibrary]);
+  }, [jobs, status, fetchImage, stageUpload, updateJob]);
 
   useEffect(() => {
     if (!jobs.some((j) => j.status === "running")) return;

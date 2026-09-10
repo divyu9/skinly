@@ -1,5 +1,8 @@
 import { onCall, HttpsError } from "firebase-functions/v1/https";
-import { S3Client, PutObjectCommand, PutBucketCorsCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client, PutObjectCommand, PutBucketCorsCommand,
+  CopyObjectCommand, GetObjectCommand, DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
@@ -132,4 +135,87 @@ export const generateUploadUrl = onCall(async (data: any, context: any) => {
     console.error("generateUploadUrl presign failed:", error);
     throw new HttpsError("internal", error?.message || "Could not create the upload URL");
   }
+});
+
+
+/* -------------------------------------------------------------------------- *
+ * Object moves, for the AI mockup review queue
+ *
+ * Generated images are staged under a pending prefix and only promoted once a
+ * human has looked at them. Approving copies server-side rather than pushing
+ * megabytes back through the browser; rejecting needs the bytes locally, so
+ * that one does come through, then deletes the staged object.
+ * -------------------------------------------------------------------------- */
+
+const r2Client = () => {
+  const config = getR2Config();
+  return {
+    config,
+    s3: new S3Client({
+      region: "auto",
+      endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      },
+    }),
+  };
+};
+
+export const copyR2Object = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  await enforceDailyRateLimit({ key: `copyR2Object_${uid}`, limit: Number(process.env.R2_COPY_DAILY_LIMIT || 2000) });
+
+  const { fromKey, toKey, contentType } = data || {};
+  validateKey(fromKey);
+  validateKey(toKey);
+
+  const { s3, config } = r2Client();
+  await s3.send(new CopyObjectCommand({
+    Bucket: config.bucketName,
+    // CopySource is a path, so the source key needs encoding but the slashes do not.
+    CopySource: `${config.bucketName}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
+    Key: toKey,
+    ContentType: typeof contentType === "string" ? contentType : undefined,
+    MetadataDirective: contentType ? "REPLACE" : "COPY",
+  }));
+
+  return { success: true, key: toKey, url: `${config.publicUrl.replace(/\/$/, "")}/${toKey}` };
+});
+
+export const getR2Object = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+
+  const { key } = data || {};
+  validateKey(key);
+
+  const { s3, config } = r2Client();
+  const res = await s3.send(new GetObjectCommand({ Bucket: config.bucketName, Key: key }));
+  const body = res.Body as any;
+  if (!body) throw new HttpsError("not-found", `No object at ${key}`);
+
+  const chunks: Buffer[] = [];
+  for await (const chunk of body) chunks.push(Buffer.from(chunk));
+  const buf = Buffer.concat(chunks);
+  if (buf.byteLength > 9 * 1024 * 1024) {
+    throw new HttpsError("resource-exhausted", "Object is too large to relay");
+  }
+
+  return {
+    success: true,
+    contentType: res.ContentType || "application/octet-stream",
+    base64: buf.toString("base64"),
+  };
+});
+
+export const deleteR2Object = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  await enforceDailyRateLimit({ key: `deleteR2Object_${uid}`, limit: Number(process.env.R2_DELETE_DAILY_LIMIT || 2000) });
+
+  const { key } = data || {};
+  validateKey(key);
+
+  const { s3, config } = r2Client();
+  await s3.send(new DeleteObjectCommand({ Bucket: config.bucketName, Key: key }));
+  return { success: true };
 });
