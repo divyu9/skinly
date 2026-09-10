@@ -52,9 +52,10 @@ export const DEFAULT_BLOCKS: SharedBlocks = {
     "Ignore the lighting, glare, shadows, background, curl and perspective of the reference photo — " +
     "extract only the flat artwork from it and apply it cleanly to the device.",
   staging:
-    "Photorealistic commercial product photograph. Soft, even studio lighting, gentle contact shadow, " +
-    "clean uncluttered light neutral background. Sharp focus, true-to-life colour, no text, no watermark, " +
-    "no logos other than those naturally on the device, no people, no hands.",
+    "Photorealistic commercial product photograph shot on a full-frame camera with an 85mm lens. " +
+    "Soft directional daylight from the left, gentle contact shadow under the device, shallow depth of " +
+    "field so the device is razor sharp and everything behind it falls away. True-to-life colour, natural " +
+    "reflections on the metal, no text, no watermark, no people, no hands.",
 };
 
 /** Placeholders a prompt may use. Unknown ones are left alone, not blanked. */
@@ -94,9 +95,18 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     order: 0,
     isActive: true,
     prompt:
-      "A closed modern 14-inch laptop photographed straight down from directly above, lid facing the camera and filling most of the frame. " +
-      "The entire lid is covered edge to edge with a vinyl skin. {{fidelity}} " +
-      "The skin follows the lid's rounded corners and stops cleanly at the edges. {{staging}}",
+      "A modern 14-inch MacBook-style aluminium laptop resting on a light oak desk, opened just far enough "
+      + "\u2014 about 20 degrees \u2014 that the hinge and the edge of the screen are visible, photographed from "
+      + "slightly above and in front so the whole outer lid faces the camera and fills most of the frame while "
+      + "still reading unmistakably as a laptop: visible chassis thickness, rounded corners, hinge and a sliver "
+      + "of the dark screen. The entire outer lid is covered edge to edge with a vinyl skin. {{fidelity}} "
+      + "A small circular cutout in the centre of the lid leaves the aluminium Apple logo beneath uncovered, "
+      + "exactly as a die-cut skin does. "
+      + "The skin follows the lid rounded corners and stops cleanly at the edges. "
+      + "Around the laptop, a few softly out-of-focus props placed off to the sides \u2014 a small green plant, "
+      + "a closed notebook, a ceramic mug \u2014 muted and low-contrast so they frame the laptop without "
+      + "competing with the design. "
+      + "{{staging}}",
   },
   {
     label: "Open — lid + keyboard deck",
@@ -106,9 +116,17 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     order: 1,
     isActive: true,
     prompt:
-      "A modern 14-inch laptop open at roughly 110 degrees, shot from a three-quarter front angle so both the outer lid and the keyboard deck are visible. " +
-      "A vinyl skin covers the outer lid and a matching skin covers the palm rest area around the keyboard. {{fidelity}} " +
-      "Keys and trackpad stay uncovered and clearly visible. The screen is off and dark. {{staging}}",
+      "A modern 14-inch MacBook-style aluminium laptop open at about 110 degrees on a light oak desk, "
+      + "photographed from a three-quarter front angle so both the outer lid and the keyboard deck are clearly "
+      + "visible. A vinyl skin covers the outer lid, and a matching skin covers the palm rest area around the "
+      + "keyboard. {{fidelity}} "
+      + "A small circular cutout in the centre of the lid leaves the aluminium Apple logo beneath uncovered, "
+      + "exactly as a die-cut skin does. "
+      + "The keys, trackpad and hinge stay uncovered, and the screen is off and dark. "
+      + "Around the laptop, a few softly out-of-focus props placed off to the sides \u2014 a small green plant, "
+      + "a closed notebook, a ceramic mug \u2014 muted and low-contrast so they frame the laptop without "
+      + "competing with the design. "
+      + "{{staging}}",
   },
   {
     label: "Sony telephoto",
