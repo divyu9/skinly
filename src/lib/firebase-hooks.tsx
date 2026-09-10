@@ -171,6 +171,39 @@ export function useQuery(apiRef: any, args?: any) {
             setData(rows);
           });
         }
+        else if (path === 'aiMockups.getLinkTargets') {
+          // Everything a design's SKUs point at, so the studio can say where an
+          // image will land before any money is spent on generating it.
+          const design = String(args?.rNumber || '').trim();
+          if (!design) { setData([]); return; }
+          (async () => {
+            const snap = await getDocs(query(
+              collection(db, 'variants'),
+              where('sku', '>=', `${design}-`),
+              where('sku', '<', `${design}-\uf8ff`)
+            ));
+            const gts = await getDocs(collection(db, 'gadgetTypes'));
+            const gadgetById: Record<string, string> = {};
+            gts.docs.forEach((g) => { gadgetById[g.id] = String((g.data() as any).name || '').toLowerCase(); });
+
+            const rows: any[] = [];
+            for (const d of snap.docs) {
+              const v: any = d.data();
+              if (!v.productId) continue;
+              const psnap = await getDoc(doc(db, 'products', v.productId));
+              if (!psnap.exists()) continue;
+              const pd: any = psnap.data();
+              rows.push({
+                sku: String(v.sku || ''),
+                code: String(v.sku || '').slice(design.length + 1).toUpperCase(),
+                productId: v.productId,
+                productTitle: pd.title || '',
+                gadget: gadgetById[pd.gadgetTypeId || pd.gadgetType] || '',
+              });
+            }
+            setData(rows);
+          })().catch(() => setData([]));
+        }
         else if (path === 'aiMockups.getSettings') {
           // Single doc holding the prompt fragments every shot shares.
           unsubscribe = onSnapshot(doc(db, 'gadgetMockupSettings', 'default'), (snap) => {

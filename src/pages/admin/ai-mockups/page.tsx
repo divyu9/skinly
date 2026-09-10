@@ -550,6 +550,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const createJob = useMutation(api.aiMockups.createDesignMockup);
   const updateJob = useMutation(api.aiMockups.updateDesignMockup);
   const submit = useAction(api.poyo.poyoSubmit);
+  const linkTargets = useQuery(api.aiMockups.getLinkTargets, { rNumber: String(roll.rNumber).trim() }) as any[] | undefined;
   const copyObject = useAction(api.r2.copyR2Object);
   const getObject = useAction(api.r2.getR2Object);
   const deleteObject = useAction(api.r2.deleteR2Object);
@@ -575,6 +576,19 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   useJobPoller(jobs, updateJob);
 
   const grouped = groupByGadget(shots);
+
+  /** Products a shot's image would attach to for this design, right now. */
+  const targetsFor = useCallback((shot: MockupShot) => {
+    if (!linkTargets) return null;
+    const codes = (shot.skuCodes || []).map((c) => c.toUpperCase());
+    const seen = new Map<string, string>();
+    for (const t of linkTargets) {
+      if (codes.includes(t.code) && t.gadget === String(shot.gadget).toLowerCase()) {
+        seen.set(t.productId, t.productTitle);
+      }
+    }
+    return [...seen.values()];
+  }, [linkTargets]);
 
   const onUploadRaw = async (file: File) => {
     setUploading(true);
@@ -827,9 +841,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{s.label}</span>
-                          <code className="text-[10px] text-muted-foreground">
+                          <code className="block truncate text-[10px] text-muted-foreground">
                             {mockupFileStem(String(roll.rNumber), s.suffix)}.webp
                           </code>
+                          <LinkTargets titles={targetsFor(s)} />
                         </span>
                       </button>
                     );
@@ -1025,6 +1040,22 @@ function RedoDialog({ job, defaultModelId, defaultAspect, onCancel, onConfirm }:
  * to the admin's machine and clears the staging copy, redo throws it away and
  * generates again with a model you pick at that moment.
  */
+/** Says where an approved image would land, before anything is generated. */
+function LinkTargets({ titles }: { titles: string[] | null }) {
+  if (titles === null) return <span className="text-[10px] text-muted-foreground">checking listings…</span>;
+  if (!titles.length) {
+    return <span className="block text-[10px] text-amber-600">no listing for this design — will not link</span>;
+  }
+  if (titles.length === 1) {
+    return <span className="block truncate text-[10px] text-emerald-600" title={titles[0]}>→ {titles[0]}</span>;
+  }
+  return (
+    <span className="block truncate text-[10px] text-amber-600" title={titles.join(" · ")}>
+      → {titles.length} listings share this SKU: {titles.join(" · ")}
+    </span>
+  );
+}
+
 function JobCard({ job, onApprove, onReject, onRedo, busy }: {
   job: Job;
   onApprove: (job: Job) => Promise<void>;
