@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { normalizeModelName } from '@/lib/mockups';
 import { normalizeImageForUpload, withExtension } from '@/lib/image-processing';
 
+import { normalizeOrder } from "./normalize-order.ts";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
@@ -108,49 +109,6 @@ export function useQuery(apiRef: any, args?: any) {
     let unsubscribe = () => {};
 
     const fetchData = async () => {
-        const toMillis = (value: any): number => {
-          if (!value) return 0;
-          if (typeof value === 'number') return value;
-          if (typeof value?.toMillis === 'function') return value.toMillis();
-          if (typeof value?.seconds === 'number') return value.seconds * 1000;
-          return 0;
-        };
-
-        const normalizePaymentStatus = (value: any) => {
-          const v = String(value || '').toLowerCase();
-          if (v === 'paid') return 'success';
-          if (v === 'success') return 'success';
-          if (v === 'pending') return 'pending';
-          if (v === 'failed') return 'failed';
-          if (v === 'pending_payment') return 'pending';
-          return value;
-        };
-
-        const normalizeOrderStatus = (value: any, paymentStatus?: string) => {
-          const v = String(value || '').toLowerCase();
-          if (paymentStatus === 'success' && (v === '' || v === 'pending' || v === 'pending_payment')) return 'processing';
-          if (v === 'pending') return 'pending_payment';
-          if (v === 'pending_payment') return 'pending_payment';
-          if (v === 'processing') return 'processing';
-          if (v === 'shipped') return 'shipped';
-          if (v === 'delivered') return 'delivered';
-          if (v === 'cancelled') return 'cancelled';
-          if (v === 'rto') return 'rto';
-          if (v === 'failed') return 'failed';
-          return value;
-        };
-
-        const normalizeOrder = (order: any) => {
-          const paymentStatus = normalizePaymentStatus(order?.paymentStatus || order?.paymentInfo?.status);
-          const status = normalizeOrderStatus(order?.status, paymentStatus);
-          const createdAt = toMillis(order?.createdAt) || toMillis(order?._creationTime) || 0;
-          return {
-            ...order,
-            paymentStatus,
-            status,
-            _creationTime: createdAt,
-          };
-        };
         try {
           if (path === 'homepage.getActiveHomepageSections') {
           const q = query(collection(db, 'homepageSections'));
