@@ -4432,16 +4432,36 @@ export function useMutation(apiRef: any) {
 
       // Settings that live as a single document. The generic writer needs an id
       // and these payloads have none, so it rejected every save.
-      const SINGLETON = {
-        'cod.updateCodSettings': 'codSettings',
-        'cod.initializeCodSettings': 'codSettings',
-        'wallet.saveWalletSettings': 'walletSettings',
-        'shipping.updateShippingSettings': 'shippingSettings',
-        'codDisplayRules.updateDisplaySettings': 'codSettings',
-      }[path];
-      if (SINGLETON) {
-        const existing = await getDocs(query(collection(db, SINGLETON), limit(1)));
-        const ref = existing.empty ? doc(collection(db, SINGLETON)) : doc(db, SINGLETON, existing.docs[0].id);
+      //
+      // Where each one is written has to match where it is read, and for two of
+      // them it did not. Shipping was written into a `shippingSettings`
+      // collection that no security rule allows — so the save was denied
+      // outright — while the reader, and checkout, look at `settings/shipping`.
+      // Wallet was written to an auto-id document while its reader asks for
+      // `walletSettings/default`, so a save could succeed and still never be
+      // seen. Both now name the document the reader uses.
+      //
+      // COD keeps reuse-the-existing-document: its reader takes whatever is in
+      // the collection, and there is already a live row there with a generated
+      // id. Pinning an id would write a second one beside it.
+      const SINGLETON: Record<string, { collection: string; docId?: string }> = {
+        'cod.updateCodSettings': { collection: 'codSettings' },
+        'cod.initializeCodSettings': { collection: 'codSettings' },
+        'codDisplayRules.updateDisplaySettings': { collection: 'codSettings' },
+        'wallet.saveWalletSettings': { collection: 'walletSettings', docId: 'default' },
+        'shipping.updateShippingSettings': { collection: 'settings', docId: 'shipping' },
+      };
+      const singleton = SINGLETON[path];
+      if (singleton) {
+        let ref;
+        if (singleton.docId) {
+          ref = doc(db, singleton.collection, singleton.docId);
+        } else {
+          const existing = await getDocs(query(collection(db, singleton.collection), limit(1)));
+          ref = existing.empty
+            ? doc(collection(db, singleton.collection))
+            : doc(db, singleton.collection, existing.docs[0].id);
+        }
         const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
         await setDoc(ref, { ...clean, updatedAt: Date.now() }, { merge: true });
         return ref.id;
