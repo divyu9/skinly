@@ -53,7 +53,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     sizes: RATIOS,
     quality: "medium",
     resolution: "1K",
-    note: "The everyday choice while tuning a prompt.",
+    note: "Everyday choice for patterns. Its filter refuses weapons and licensed characters, reference photo included.",
   },
   {
     id: "gpt-4o-image",
@@ -79,7 +79,7 @@ export const IMAGE_MODELS: ImageModel[] = [
     credits: 5,
     usd: 0.025,
     sizes: RATIOS,
-    note: "Strong at holding a reference pattern.",
+    note: "Strong on patterns. On characters it passes the filter but softens detail and mangles the laptop.",
   },
   {
     id: "seedream-5-0-lite",
@@ -88,6 +88,10 @@ export const IMAGE_MODELS: ImageModel[] = [
     credits: 5,
     usd: 0.025,
     sizes: RATIOS,
+    // Measured on the Joker cutout, which GPT Image refused outright: this one
+    // produced it whole, kept the rifle rather than softening it, and carried
+    // the 3D relief through so the texture reads as the printed sheet does.
+    note: "Best on character cutouts — it passes where GPT Image refuses, and holds 3D texture.",
   },
   {
     id: "gpt-image-2-5-medium-2k",
