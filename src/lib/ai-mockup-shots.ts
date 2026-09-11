@@ -273,6 +273,163 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "melted or warped edges. No people and no hands anywhere in the frame. {{staging}} ",
   },
   {
+    label: "Series X \u2014 console",
+    gadget: "console",
+    suffix: "xbox-x",
+    skuCodes: ["XBX"],
+    order: 3,
+    isActive: true,
+    prompt:
+      "A matte black Xbox Series X console standing upright on a low wooden media unit, photographed "
+        + "from a front three-quarter angle at console height so the tall rectangular tower dominates the "
+        + "frame. A vinyl skin covers the four flat outer side faces. {{fidelity}} The vinyl is a thin "
+        + "die-cut sheet on the outward-facing flat surfaces only. It does not wrap around edges or into "
+        + "recesses, which stay factory colour, and a crisp cut edge is visible where it ends. The black "
+        + "circular ventilation grille on the top with its green interior, the disc slot, the front USB "
+        + "port, the power button and the rubber foot all stay uncovered. Behind, dim and far out of "
+        + "focus, a dark living-room wall with warm lamp light. Real manufactured product, correct "
+        + "real-world proportions, crisp geometry, no melted or warped edges. No people and no hands "
+        + "anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "Series X + controllers",
+    gadget: "console",
+    suffix: "xbox-x-set",
+    skuCodes: ["XBXC", "XBXC1", "XBXC2"],
+    order: 4,
+    isActive: true,
+    prompt:
+      "A matte black Xbox Series X console standing upright with two matching Xbox wireless "
+        + "controllers in front of it, one on each side, against a clean white studio background, "
+        + "photographed straight on so the group reads as one matching set and fills the frame. A "
+        + "matching vinyl skin covers the console's four flat outer side faces and the outer shell of "
+        + "both controllers. {{fidelity}} The pattern reads as the same design across all three pieces. "
+        + "The vinyl is a thin die-cut sheet on the outward-facing flat surfaces only. It does not wrap "
+        + "around edges or into recesses, which stay factory colour, and a crisp cut edge is visible "
+        + "where it ends. On each controller the vinyl covers only the outer shell of the top face and "
+        + "the two grips. The thumbsticks, the D-pad, the A/B/X/Y buttons, the triggers, the bumpers and "
+        + "the centre Xbox button all stay bare, with the vinyl stopping cleanly around them. The "
+        + "console's top ventilation grille, disc slot and ports stay uncovered. Real manufactured "
+        + "product, correct real-world proportions, crisp geometry, no melted or warped edges. No people "
+        + "and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "Series S \u2014 console",
+    gadget: "console",
+    suffix: "xbox-s",
+    skuCodes: ["XBXS"],
+    order: 5,
+    isActive: true,
+    prompt:
+      "A white Xbox Series S console lying flat and horizontal on a low wooden media unit, "
+        + "photographed from a front three-quarter angle slightly above so the wide flat body and the "
+        + "large black circular grille on its top face both read clearly and the console dominates the "
+        + "frame. A vinyl skin covers the flat white outer faces around the grille. {{fidelity}} The "
+        + "vinyl is a thin die-cut sheet on the outward-facing flat surfaces only. It does not wrap "
+        + "around edges or into recesses, which stay factory colour, and a crisp cut edge is visible "
+        + "where it ends. The black circular grille, the front USB port, the power button and the rear "
+        + "ports all stay uncovered, with the vinyl cut cleanly around the grille. Behind, dim and far "
+        + "out of focus, a dark living-room wall with warm lamp light. Real manufactured product, correct "
+        + "real-world proportions, crisp geometry, no melted or warped edges. No people and no hands "
+        + "anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "Series S + controllers",
+    gadget: "console",
+    suffix: "xbox-s-set",
+    skuCodes: ["XBXSC", "XBXSC1", "XBXSC2", "XBXSCL1", "XBXSCL2"],
+    order: 6,
+    isActive: true,
+    prompt:
+      "A white Xbox Series S console lying flat with two matching Xbox wireless controllers arranged "
+        + "in front of it, one on each side, against a clean white studio background, photographed from "
+        + "slightly above so the group reads as one matching set and fills the frame. A matching vinyl "
+        + "skin covers the console's flat outer faces and the outer shell of both controllers. "
+        + "{{fidelity}} The pattern reads as the same design across all three pieces. The vinyl is a thin "
+        + "die-cut sheet on the outward-facing flat surfaces only. It does not wrap around edges or into "
+        + "recesses, which stay factory colour, and a crisp cut edge is visible where it ends. On each "
+        + "controller the vinyl covers only the outer shell of the top face and the two grips. The "
+        + "thumbsticks, the D-pad, the A/B/X/Y buttons, the triggers, the bumpers and the centre Xbox "
+        + "button all stay bare, with the vinyl stopping cleanly around them. The console's black "
+        + "circular grille and its ports stay uncovered, with the vinyl cut cleanly around the grille. "
+        + "Real manufactured product, correct real-world proportions, crisp geometry, no melted or warped "
+        + "edges. No people and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "Xbox controller",
+    gadget: "controller",
+    suffix: "controller-xbox",
+    skuCodes: ["CLX", "CLS", "CLO"],
+    order: 0,
+    isActive: true,
+    prompt:
+      "An Xbox wireless controller lying flat on a dark wooden surface, photographed from directly "
+        + "above with the camera square to the surface so the controller is straight in frame with no "
+        + "tilt and fills it. A vinyl skin covers the outer shell of the top face and the two grips. "
+        + "{{fidelity}} The vinyl is a thin die-cut sheet on the outward-facing flat surfaces only. It "
+        + "does not wrap around edges or into recesses, which stay factory colour, and a crisp cut edge "
+        + "is visible where it ends. On each controller the vinyl covers only the outer shell of the top "
+        + "face and the two grips. The thumbsticks, the D-pad, the A/B/X/Y buttons, the triggers, the "
+        + "bumpers and the centre Xbox button all stay bare, with the vinyl stopping cleanly around them. "
+        + "Real manufactured product, correct real-world proportions, crisp geometry, no melted or warped "
+        + "edges. No people and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "DualSense controller",
+    gadget: "controller",
+    suffix: "controller-ps5",
+    skuCodes: ["PS5"],
+    order: 1,
+    isActive: true,
+    prompt:
+      "A PlayStation 5 DualSense controller lying flat on a dark wooden surface, photographed from "
+        + "directly above with the camera square to the surface so the controller is straight in frame "
+        + "with no tilt and fills it. A vinyl skin covers the outer shell of the two curved grips and the "
+        + "outer top shoulders. {{fidelity}} The vinyl is a thin die-cut sheet on the outward-facing flat "
+        + "surfaces only. It does not wrap around edges or into recesses, which stay factory colour, and "
+        + "a crisp cut edge is visible where it ends. The white front plate around the touchpad stays "
+        + "bare, as do the D-pad, the face buttons, the thumbsticks, the touchpad, the light bar and the "
+        + "triggers \u2014 the vinyl stops with a clean edge where the white plate begins. Real manufactured "
+        + "product, correct real-world proportions, crisp geometry, no melted or warped edges. No people "
+        + "and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "DualShock 4 controller",
+    gadget: "controller",
+    suffix: "controller-ps4",
+    skuCodes: ["PS4"],
+    order: 2,
+    isActive: true,
+    prompt:
+      "A PlayStation 4 DualShock 4 controller lying flat on a dark wooden surface, photographed from "
+        + "directly above with the camera square to the surface so the controller is straight in frame "
+        + "with no tilt and fills it. A vinyl skin covers the outer shell of the top face and the two "
+        + "grips. {{fidelity}} The vinyl is a thin die-cut sheet on the outward-facing flat surfaces "
+        + "only. It does not wrap around edges or into recesses, which stay factory colour, and a crisp "
+        + "cut edge is visible where it ends. The touchpad, the D-pad, the face buttons, the thumbsticks "
+        + "and the light bar stay bare, with the vinyl stopping cleanly around them. Real manufactured "
+        + "product, correct real-world proportions, crisp geometry, no melted or warped edges. No people "
+        + "and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "DualShock 3 controller",
+    gadget: "controller",
+    suffix: "controller-ps3",
+    skuCodes: ["PS3"],
+    order: 3,
+    isActive: true,
+    prompt:
+      "A PlayStation 3 DualShock 3 controller lying flat on a dark wooden surface, photographed from "
+        + "directly above with the camera square to the surface so the controller is straight in frame "
+        + "with no tilt and fills it. A vinyl skin covers the outer shell of the top face and the two "
+        + "grips. {{fidelity}} The vinyl is a thin die-cut sheet on the outward-facing flat surfaces "
+        + "only. It does not wrap around edges or into recesses, which stay factory colour, and a crisp "
+        + "cut edge is visible where it ends. The D-pad, the face buttons, the thumbsticks and the centre "
+        + "PS button stay bare, with the vinyl stopping cleanly around them. Real manufactured product, "
+        + "correct real-world proportions, crisp geometry, no melted or warped edges. No people and no "
+        + "hands anywhere in the frame. {{staging}} ",
+  },
+  {
     label: "Drone only",
     gadget: "drone",
     suffix: "drone",
@@ -469,6 +626,47 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "the barrel and compresses towards the top and bottom edges the way a wrap on a cylinder does. "
         + "The front glass, the focus and zoom ring markings and the metal mount stay uncovered. "
         + "{{staging}} ",
+  },
+  {
+    label: "Mac Mini \u2014 top",
+    gadget: "mac-mini",
+    suffix: "macmini",
+    skuCodes: ["MM"],
+    order: 0,
+    isActive: true,
+    prompt:
+      "An Apple Mac Mini sitting on a light oak desk, photographed from a front three-quarter angle "
+        + "slightly above so the flat square top face and one aluminium side both read clearly and the "
+        + "unit dominates the frame. It is a small flat square aluminium box with heavily rounded "
+        + "corners. A vinyl skin covers the flat top face. {{fidelity}} The vinyl is a thin die-cut sheet "
+        + "on the outward-facing flat surfaces only. It does not wrap around edges or into recesses, "
+        + "which stay factory colour, and a crisp cut edge is visible where it ends. The skin is die-cut "
+        + "to the exact silhouette of the Apple logo in the centre of the top: the pattern runs "
+        + "continuously and stops only at the outline of the logo, leaving just that apple shape as bare "
+        + "aluminium, with no circle, ring, disc, plate or border around it. The aluminium sides, the "
+        + "rear ports, the power light and the round base stay uncovered. Beside it, softly out of focus, "
+        + "a keyboard edge and a ceramic mug. Real manufactured product, correct real-world proportions, "
+        + "crisp geometry, no melted or warped edges. No people and no hands anywhere in the frame. "
+        + "{{staging}} ",
+  },
+  {
+    label: "Mac Mini \u2014 held",
+    gadget: "mac-mini",
+    suffix: "macmini-hand",
+    skuCodes: ["MM"],
+    order: 1,
+    isActive: true,
+    prompt:
+      "An Apple Mac Mini held flat on the open palm of one hand against a softly blurred indoor "
+        + "background, photographed from slightly above so the skinned top face is towards the camera and "
+        + "the unit dominates the frame, its real size against the hand obvious. A single adult hand, "
+        + "cropped at the wrist, skin tone neutral, nails plain and short. A vinyl skin covers the flat "
+        + "top face. {{fidelity}} The vinyl is a thin die-cut sheet on the outward-facing flat surfaces "
+        + "only. It does not wrap around edges or into recesses, which stay factory colour, and a crisp "
+        + "cut edge is visible where it ends. The skin is die-cut to the exact silhouette of the Apple "
+        + "logo, leaving just that shape bare, with no circle or border around it. The aluminium sides "
+        + "and the ports stay uncovered. Real manufactured product, correct real-world proportions, crisp "
+        + "geometry, no melted or warped edges. {{staging}} ",
   },
   {
     label: "iPad \u2014 back",
