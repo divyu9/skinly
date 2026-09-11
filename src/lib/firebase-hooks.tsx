@@ -5428,11 +5428,6 @@ export function useMutation(apiRef: any) {
         return reviewDoc.id;
       }
 
-      if (actionName === 'autoGenerateBrandCards' || actionName === 'autoGenerateGadgetCards') {
-        // Mock implementation for generating cards
-        return { success: true };
-      }
-
       // Default: try calling a cloud function
       console.log(`Unmapped action ${actionName}, trying cloud function...`);
       const callable = httpsCallable(functions, actionName);

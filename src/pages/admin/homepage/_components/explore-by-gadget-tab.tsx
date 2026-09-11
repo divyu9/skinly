@@ -15,7 +15,6 @@ import {
   EditIcon, 
   TrashIcon, 
   SmartphoneIcon,
-  SparklesIcon,
   GripVerticalIcon,
   SaveIcon
 } from "lucide-react";
@@ -109,7 +108,6 @@ export function ExploreByGadgetTab() {
   const createCard = useMutation(api.homepageSectionCards.createSectionCard);
   const updateCard = useMutation(api.homepageSectionCards.updateSectionCard);
   const deleteCard = useMutation(api.homepageSectionCards.deleteSectionCard);
-  const autoGenerateCards = useMutation(api.homepageSectionCards.autoGenerateGadgetCards);
   const bulkReorder = useMutation(api.homepageSectionCards.bulkReorderSectionCards);
   const updateSection = useMutation(api.homepage.updateHomepageSection);
 
@@ -124,7 +122,6 @@ export function ExploreByGadgetTab() {
     order: 0,
   });
   const [isSaving, setIsSaving] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [localCards, setLocalCards] = useState<typeof cards>([]);
   
   // Section config state
@@ -184,22 +181,6 @@ export function ExploreByGadgetTab() {
     }
   };
 
-  const handleAutoGenerate = async () => {
-    if (!section || !confirm("This will replace all existing gadget cards with auto-generated ones from your Product Classification (Gadget Types). Continue?")) {
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const result = await autoGenerateCards({ sectionId: section._id });
-      toast.success(`Generated ${result.count} gadget cards! Update images to customize.`);
-    } catch (error) {
-      toast.error("Failed to auto-generate cards");
-      console.error(error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleSaveConfig = async () => {
     if (!section) return;
@@ -469,10 +450,6 @@ export function ExploreByGadgetTab() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button onClick={handleAutoGenerate} disabled={isGenerating} variant="outline">
-                <SparklesIcon className="w-4 h-4 mr-2" />
-                {isGenerating ? "Generating..." : "Auto-Generate"}
-              </Button>
               <Button onClick={() => handleOpenDialog()}>
                 <PlusIcon className="w-4 h-4 mr-2" />
                 Add Card
