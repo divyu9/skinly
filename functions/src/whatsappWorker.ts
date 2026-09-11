@@ -15,7 +15,11 @@ import { enforceDailyRateLimit } from "./rate-limit";
  * failure mid-send costs one message rather than re-sending it every run.
  */
 
-const AUTHKEY_URL = "https://api.authkey.io/request";
+// The WhatsApp endpoint, not the SMS one. api.authkey.io/request with `sid`
+// is Authkey's SMS API: it answered every send with {"success":{"sms":false},
+// "message":{"sms":"Invalid Template"}} — keyed by "sms", because that is what
+// it thought we were sending. WhatsApp wants this host and `wid`.
+const AUTHKEY_URL = "https://console.authkey.io/restapi/request.php";
 const MAX_PER_RUN = 40;
 const MAX_ATTEMPTS = 3;
 
@@ -42,7 +46,20 @@ export function readAuthkeyResult(status: number, body: string): { sent: boolean
   let hasLogId = false;
   try {
     const j = JSON.parse(text);
-    message = String(j.Message ?? j.message ?? text);
+    // This endpoint answers per channel: {"success":{"whatsapp":true},
+    // "message":{"whatsapp":"..."}}. A nested false is a refusal however
+    // cheerful the surrounding JSON looks.
+    const flat = (v: any): string =>
+      v && typeof v === "object" ? Object.values(v).map(String).join(" ") : String(v ?? "");
+    message = flat(j.message ?? j.Message ?? text);
+    if (j.success && typeof j.success === "object") {
+      const flags = Object.values(j.success);
+      if (flags.length && flags.every((f) => f === false)) {
+        return { sent: false, reason: message.slice(0, 240) || "provider reported failure" };
+      }
+      if (flags.some((f) => f === true)) return { sent: true, reason: "" };
+    }
+    if (j.success === false) return { sent: false, reason: message.slice(0, 240) };
     hasLogId = Boolean(j.LogID ?? j.log_id ?? j.logid ?? j.MessageID ?? j.message_id);
   } catch {
     // Not JSON; judge the raw text instead.
@@ -119,12 +136,31 @@ const sendOne = async (queueRow: any): Promise<boolean> => {
     return false;
   }
 
+  const wid = String(msg.providerTemplateId || uc.docs[0].data().providerTemplateId || "");
+  if (!wid) {
+    await queueRef.update({ status: "failed", failureReason: "no providerTemplateId on the usecase" });
+    await msgSnap.ref.update({ status: "failed" });
+    return false;
+  }
+
+  // Authkey takes variables positionally, as 1, 2, 3…, in the order the
+  // template declares them — not by name. Sent by name they are simply
+  // dropped and the message arrives with empty placeholders.
+  const tpl = await db.collection("whatsappTemplates")
+    .where("providerTemplateId", "==", wid).limit(1).get();
+  const order: string[] = tpl.empty ? [] : (tpl.docs[0].data().variables || []);
+  const numbered: Record<string, string> = {};
+  order.forEach((name, i) => {
+    const v = (msg.variables || {})[name];
+    if (v !== undefined) numbered[String(i + 1)] = String(v);
+  });
+
   const params = new URLSearchParams({
     authkey,
     mobile: phone,
     country_code: "91",
-    sid: String(msg.providerTemplateId || uc.docs[0].data().providerTemplateId || ""),
-    ...(msg.variables || {}),
+    wid,
+    ...numbered,
   });
 
   const fetch = require("node-fetch");

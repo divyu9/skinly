@@ -39,7 +39,11 @@ const rate_limit_1 = require("./rate-limit");
  * A row is claimed inside a transaction before the request goes out, so a
  * failure mid-send costs one message rather than re-sending it every run.
  */
-const AUTHKEY_URL = "https://api.authkey.io/request";
+// The WhatsApp endpoint, not the SMS one. api.authkey.io/request with `sid`
+// is Authkey's SMS API: it answered every send with {"success":{"sms":false},
+// "message":{"sms":"Invalid Template"}} — keyed by "sms", because that is what
+// it thought we were sending. WhatsApp wants this host and `wid`.
+const AUTHKEY_URL = "https://console.authkey.io/restapi/request.php";
 const MAX_PER_RUN = 40;
 const MAX_ATTEMPTS = 3;
 /**
@@ -66,7 +70,21 @@ function readAuthkeyResult(status, body) {
     let hasLogId = false;
     try {
         const j = JSON.parse(text);
-        message = String((_b = (_a = j.Message) !== null && _a !== void 0 ? _a : j.message) !== null && _b !== void 0 ? _b : text);
+        // This endpoint answers per channel: {"success":{"whatsapp":true},
+        // "message":{"whatsapp":"..."}}. A nested false is a refusal however
+        // cheerful the surrounding JSON looks.
+        const flat = (v) => v && typeof v === "object" ? Object.values(v).map(String).join(" ") : String(v !== null && v !== void 0 ? v : "");
+        message = flat((_b = (_a = j.message) !== null && _a !== void 0 ? _a : j.Message) !== null && _b !== void 0 ? _b : text);
+        if (j.success && typeof j.success === "object") {
+            const flags = Object.values(j.success);
+            if (flags.length && flags.every((f) => f === false)) {
+                return { sent: false, reason: message.slice(0, 240) || "provider reported failure" };
+            }
+            if (flags.some((f) => f === true))
+                return { sent: true, reason: "" };
+        }
+        if (j.success === false)
+            return { sent: false, reason: message.slice(0, 240) };
         hasLogId = Boolean((_f = (_e = (_d = (_c = j.LogID) !== null && _c !== void 0 ? _c : j.log_id) !== null && _d !== void 0 ? _d : j.logid) !== null && _e !== void 0 ? _e : j.MessageID) !== null && _f !== void 0 ? _f : j.message_id);
     }
     catch (_g) {
@@ -138,7 +156,25 @@ const sendOne = async (queueRow) => {
         await msgSnap.ref.update({ status: "failed" });
         return false;
     }
-    const params = new URLSearchParams(Object.assign({ authkey, mobile: phone, country_code: "91", sid: String(msg.providerTemplateId || uc.docs[0].data().providerTemplateId || "") }, (msg.variables || {})));
+    const wid = String(msg.providerTemplateId || uc.docs[0].data().providerTemplateId || "");
+    if (!wid) {
+        await queueRef.update({ status: "failed", failureReason: "no providerTemplateId on the usecase" });
+        await msgSnap.ref.update({ status: "failed" });
+        return false;
+    }
+    // Authkey takes variables positionally, as 1, 2, 3…, in the order the
+    // template declares them — not by name. Sent by name they are simply
+    // dropped and the message arrives with empty placeholders.
+    const tpl = await db.collection("whatsappTemplates")
+        .where("providerTemplateId", "==", wid).limit(1).get();
+    const order = tpl.empty ? [] : (tpl.docs[0].data().variables || []);
+    const numbered = {};
+    order.forEach((name, i) => {
+        const v = (msg.variables || {})[name];
+        if (v !== undefined)
+            numbered[String(i + 1)] = String(v);
+    });
+    const params = new URLSearchParams(Object.assign({ authkey, mobile: phone, country_code: "91", wid }, numbered));
     const fetch = require("node-fetch");
     const res = await fetch(`${AUTHKEY_URL}?${params.toString()}`, { method: "GET" });
     const body = await res.text();
