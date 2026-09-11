@@ -15,22 +15,40 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog.tsx";
+import {
   SparklesIcon, UploadIcon, SearchIcon, ExternalLinkIcon, PlusIcon, TrashIcon,
   CheckCircle2Icon, AlertCircleIcon, Loader2Icon, ImageIcon, CopyIcon, WandSparklesIcon,
   ThumbsUpIcon, ThumbsDownIcon, RefreshCwIcon, FolderIcon,
+  RotateCwIcon, RotateCcwIcon, FilePlus2Icon,
 } from "lucide-react";
 import {
   saveLocally, chooseBackupFolder, getBackupFolder, supportsDirectoryPicker,
 } from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem,
-  type MockupShot, type SharedBlocks, type DesignSource,
+  type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
+import { rotateImageDataUrl } from "@/lib/image-processing.ts";
 import {
   IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, formatCredits, resolveSize, USD_TO_INR,
 } from "@/lib/ai-mockup-models.ts";
 
 const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
+
+/**
+ * What a design is printed on, in the words the prompt expander tests for.
+ *
+ * `match` is how an already-recorded finish is mapped back onto one of these
+ * three — the catalogue holds "3D Textured", "Matte Finish" and blanks.
+ */
+const FINISHES = [
+  // "Matte Membrane" is a Tranzy, not a matte, so the matte test excludes it.
+  { value: "Matte", label: "Matte", match: /^matte(?!.*membrane)/i },
+  { value: "3D Textured", label: "3D Textured / Embossed", match: /3d|textur|emboss/i },
+  { value: "Tranzy (transparent)", label: "Tranzy — transparent film", match: /tranz|transparent|membrane/i },
+];
 const DEFAULT_ASPECT = "4:3";
 const POLL_MS = 4000;
 
@@ -474,7 +492,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
   const designs = useMemo<Design[]>(() => {
     const fromRolls: Design[] = (rolls || []).map((r) => ({
       _id: r._id, source: "roll", code: String(r.rNumber || "").trim(), name: r.designName || "",
-      rawImageUrl: r.rawImageUrl, stock: r.metersAvailable,
+      rawImageUrl: r.rawImageUrl, finish: r.finish, stock: r.metersAvailable,
       stockLabel: `${r.metersAvailable ?? 0} m`,
     }));
     const fromCutouts: Design[] = (cutouts || []).map((c) => ({
@@ -597,6 +615,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const updateJob = useMutation(api.aiMockups.updateDesignMockup);
   const submit = useAction(api.poyo.poyoSubmit);
   const linkTargets = useQuery(api.aiMockups.getLinkTargets, { rNumber: roll.code }) as any[] | undefined;
+  const getTemplate = useAction(api.listings.getListingTemplate);
+  const createListing = useAction(api.listings.createListingForDesign);
   const copyObject = useAction(api.r2.copyR2Object);
   const getObject = useAction(api.r2.getR2Object);
   const deleteObject = useAction(api.r2.deleteR2Object);
@@ -610,9 +630,20 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  // The photo is held here, unsent, until the admin has turned it the right way
+  // up. Which way up the design sits is the one thing the model copies
+  // literally, so guessing costs a whole run.
+  const [staged, setStaged] = useState<{ dataUrl: string; turns: number } | null>(null);
+  // Phones are cut out of the roll either along the web or across it, and the
+  // two give completely different skins from one design.
+  const [cutOrientation, setCutOrientation] = useState<CutOrientation | "both">("lengthwise");
   const [starting, setStarting] = useState(false);
   const [busyJob, setBusyJob] = useState<string | null>(null);
   const [redoJob, setRedoJob] = useState<Job | null>(null);
+  // A listing made in this session will not show up in linkTargets until that
+  // query re-runs, so remember it here and let the row say so straight away.
+  const [newListing, setNewListing] = useState<MockupShot | null>(null);
+  const [justCreated, setJustCreated] = useState<Record<string, string>>({});
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
 
   useEffect(() => {
@@ -625,6 +656,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 
   /** Products a shot's image would attach to for this design, right now. */
   const targetsFor = useCallback((shot: MockupShot) => {
+    const fresh = justCreated[String(shot.gadget).toLowerCase()];
+    if (fresh) return [fresh];
     if (!linkTargets) return null;
     const codes = (shot.skuCodes || []).map((c) => c.toUpperCase());
     // "Default" says nothing about which view a variant is, and appears on
@@ -632,41 +665,73 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     const titles = (shot.variantTitles || [])
       .map((t) => t.trim().toLowerCase())
       .filter((t) => t && t !== "default" && t !== "default title");
-    const seen = new Map<string, string>();
+    // Grouped by product, because the single-variant rule is about the product
+    // and not the row: the linker will claim a one-variant product whose SKU
+    // carries no view code, and the preview has to say the same thing or the
+    // admin is told there is nowhere to put an image that in fact has one.
+    const gadget = String(shot.gadget).toLowerCase();
+    const byProduct = new Map<string, { title: string; rows: any[] }>();
     for (const t of linkTargets) {
-      const hit =
+      if (t.gadget !== gadget) continue;
+      const entry = byProduct.get(t.productId) || { title: t.productTitle, rows: [] };
+      entry.rows.push(t);
+      byProduct.set(t.productId, entry);
+    }
+
+    const seen = new Map<string, string>();
+    for (const [productId, { title, rows }] of byProduct) {
+      const hit = rows.some((t) =>
         codes.includes(t.code) ||
         codes.includes(t.codeHead) ||
-        titles.includes(String(t.variantTitle || "").toLowerCase());
-      if (hit && t.gadget === String(shot.gadget).toLowerCase()) {
-        seen.set(t.productId, t.productTitle);
-      }
+        titles.includes(String(t.variantTitle || "").toLowerCase())
+      );
+      if (hit || (shot.matchSingleVariant && rows.length === 1)) seen.set(productId, title);
     }
     return [...seen.values()];
-  }, [linkTargets]);
+  }, [linkTargets, justCreated]);
 
-  const onUploadRaw = async (file: File) => {
+  const saveFinish = async (finish: string) => {
+    try {
+      const save = roll.source === "cutout" ? updateCutout : updateRoll;
+      await save({ id: roll._id, finish });
+      toast.success(`${roll.code}: ${finish}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save the finish");
+    }
+  };
+
+  const onPickRaw = async (file: File) => {
+    const base64 = await new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    setStaged({ dataUrl: base64, turns: 0 });
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onUploadRaw = async () => {
+    if (!staged) return;
     setUploading(true);
     try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
+      const base64 = staged.turns
+        ? await rotateImageDataUrl(staged.dataUrl, staged.turns * 90)
+        : staged.dataUrl;
       const stem = roll.code.toUpperCase().replace(/[^A-Z0-9-]/g, "");
       const result: any = await uploadToLibrary({
         fileBase64: base64,
         key: `design-raw/${stem}.webp`,
         filename: `${stem}.webp`,
         folder: "design-raw",
-        contentType: file.type || "image/jpeg",
+        contentType: staged.turns ? "image/webp" : (/data:([^;,]+)/.exec(base64)?.[1] || "image/jpeg"),
         tags: ["raw-design", stem],
       });
       const url = result?.url || result?.publicUrl;
       if (!url) throw new Error(result?.error || "Upload failed");
       const save = roll.source === "cutout" ? updateCutout : updateRoll;
       await save({ id: roll._id, rawImageUrl: url });
+      setStaged(null);
       toast.success("Raw design saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
@@ -676,8 +741,17 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     }
   };
 
-  const runShot = async (shot: MockupShot, useModel: typeof model, useSize: string) => {
+  const runShot = async (
+    shot: MockupShot,
+    useModel: typeof model,
+    useSize: string,
+    orientation?: CutOrientation
+  ) => {
     const attempt = jobs.filter((j) => j.shotId === shot._id).length + 1;
+    // Two cuts of one design are two different pictures, so they need two
+    // filenames; without the tail the second would overwrite the first.
+    const suffix = orientation ? `${shot.suffix}-${orientation === "widthwise" ? "wid" : "len"}` : shot.suffix;
+    const label = orientation ? `${shot.label} · ${orientation === "widthwise" ? "across" : "along"} the roll` : shot.label;
     let jobId: string | null = null;
     try {
       jobId = (await createJob({
@@ -685,9 +759,9 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         designName: roll.name || "",
         designSource: roll.source,
         shotId: shot._id,
-        shotLabel: shot.label,
+        shotLabel: label,
         gadget: shot.gadget,
-        suffix: shot.suffix,
+        suffix,
         skuCodes: shot.skuCodes || [],
         variantTitles: shot.variantTitles || [],
         matchSingleVariant: shot.matchSingleVariant || false,
@@ -711,6 +785,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           designName: roll.name,
           source: roll.source,
           finish: roll.finish,
+          cutOrientation: orientation,
         }),
         imageUrls: [roll.rawImageUrl],
       });
@@ -724,15 +799,31 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     }
   };
 
+  /** How many images a pick actually costs, once cut orientations are counted. */
+  const orientationsFor = useCallback(
+    (shot: MockupShot): Array<CutOrientation | undefined> => {
+      if (!shot.askCutOrientation || roll.source !== "roll") return [undefined];
+      return cutOrientation === "both" ? ["lengthwise", "widthwise"] : [cutOrientation];
+    },
+    [cutOrientation, roll.source]
+  );
+
+  const pickedShots = useMemo(
+    () => picked.map((id) => shots.find((s) => s._id === id)).filter((s): s is MockupShot => !!s),
+    [picked, shots]
+  );
+  const imageCount = pickedShots.reduce((n, s) => n + orientationsFor(s).length, 0);
+  const asksOrientation = pickedShots.some((s) => s.askCutOrientation) && roll.source === "roll";
+
   const generate = async () => {
     if (!roll.rawImageUrl) return toast.error("Upload the raw design photo first");
     if (!picked.length) return toast.error("Pick at least one shot");
     setStarting(true);
     let started = 0;
-    for (const shotId of picked) {
-      const shot = shots.find((s) => s._id === shotId);
-      if (!shot) continue;
-      if (await runShot(shot, model, effectiveSize)) started++;
+    for (const shot of pickedShots) {
+      for (const orientation of orientationsFor(shot)) {
+        if (await runShot(shot, model, effectiveSize, orientation)) started++;
+      }
     }
     setStarting(false);
     if (started) toast.success(`${started} image${started > 1 ? "s" : ""} generating…`);
@@ -818,7 +909,12 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     try {
       if (job.pendingKey) void deleteObject({ key: job.pendingKey }).catch(() => {});
       await updateJob({ mockupId: job._id, status: "rejected", rejectedTo: "discarded on redo", pendingKey: "", pendingUrl: "" });
-      const ok = await runShot(shot, m, resolveSize(m, useAspect));
+      const wasWidth = /-wid$/.test(job.suffix);
+      const wasLength = /-len$/.test(job.suffix);
+      const ok = await runShot(
+        shot, m, resolveSize(m, useAspect),
+        wasWidth ? "widthwise" : wasLength ? "lengthwise" : undefined
+      );
       if (ok) toast.success(`Regenerating with ${m.label}`);
     } finally {
       setBusyJob(null);
@@ -840,6 +936,16 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 
   return (
     <div className="space-y-5">
+      {newListing && (
+        <CreateListingDialog
+          shot={newListing}
+          design={roll}
+          getTemplate={getTemplate}
+          createListing={createListing}
+          onClose={() => setNewListing(null)}
+          onCreated={(gadget, title) => setJustCreated((p) => ({ ...p, [gadget]: title }))}
+        />
+      )}
       <Card>
         <CardContent className="flex flex-col gap-4 p-4 sm:flex-row">
           <div className="size-40 shrink-0 overflow-hidden rounded-xl border bg-muted">
@@ -849,12 +955,29 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 </div>}
           </div>
           <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-lg font-bold">{roll.code}</span>
               <Badge variant="outline">{roll.stockLabel}</Badge>
-              {roll.source === "cutout" && (
-                <Badge className="bg-sky-600">cutout{roll.finish ? ` · ${roll.finish}` : ""}</Badge>
-              )}
+              {roll.source === "cutout" && <Badge className="bg-sky-600">cutout</Badge>}
+              {/*
+                The finish is not decoration. A Tranzy design is printed on clear
+                film, so the white in the reference photo is backing paper that
+                gets peeled off — told nothing, the model paints it onto the
+                laptop and the result is a white sticker instead of a silhouette
+                on bare metal. Almost no roll has a finish recorded, so it is set
+                here, where the run is about to happen.
+              */}
+              <Select
+                value={FINISHES.find((f) => f.match.test(roll.finish || ""))?.value || ""}
+                onValueChange={(v) => void saveFinish(v)}
+              >
+                <SelectTrigger className="h-7 w-[190px] text-xs">
+                  <SelectValue placeholder="Finish — not set" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FINISHES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <p className="text-muted-foreground">{roll.name || "Untitled design"}</p>
             <p className="text-xs text-muted-foreground">
@@ -863,11 +986,49 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               {roll.source === "cutout" && " Get the whole sheet in frame: a cutout is one fixed artwork and the model is told to place it whole, so anything cropped out here is lost."}
             </p>
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadRaw(f); }} />
-            <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
-              {uploading ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <UploadIcon className="mr-1.5 size-3.5" />}
-              {roll.rawImageUrl ? "Replace raw photo" : "Upload raw photo"}
-            </Button>
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPickRaw(f); }} />
+            {staged ? (
+              <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="size-28 shrink-0 overflow-hidden rounded-lg border bg-background">
+                    <img
+                      src={staged.dataUrl}
+                      alt="New raw design"
+                      className="size-full object-contain transition-transform"
+                      style={{ transform: `rotate(${staged.turns * 90}deg)` }}
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Turn it until the design is the right way up. The model copies this
+                      orientation exactly.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setStaged({ ...staged, turns: staged.turns - 1 })}>
+                        <RotateCcwIcon className="mr-1.5 size-3.5" />
+                        Left
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setStaged({ ...staged, turns: staged.turns + 1 })}>
+                        <RotateCwIcon className="mr-1.5 size-3.5" />
+                        Right
+                      </Button>
+                      <Button size="sm" disabled={uploading} onClick={() => void onUploadRaw()}>
+                        {uploading ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <UploadIcon className="mr-1.5 size-3.5" />}
+                        Save this photo
+                      </Button>
+                      <Button size="sm" variant="ghost" disabled={uploading} onClick={() => setStaged(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                <UploadIcon className="mr-1.5 size-3.5" />
+                {roll.rawImageUrl ? "Replace raw photo" : "Upload raw photo"}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -924,7 +1085,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                           <code className="block truncate text-[10px] text-muted-foreground">
                             {mockupFileStem(roll.code, s.suffix)}.webp
                           </code>
-                          <LinkTargets titles={targetsFor(s)} />
+                          <LinkTargets titles={targetsFor(s)} onCreate={() => setNewListing(s)} />
                         </span>
                       </button>
                     );
@@ -960,11 +1121,28 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 </SelectContent>
               </Select>
               <span className="text-xs text-muted-foreground">
-                {formatInr(model.usd)} &times; {picked.length} ={" "}
-                <strong className="text-foreground">{formatInr(model.usd * picked.length)}</strong>
-                <span className="ml-1 opacity-70">({formatCredits(model.credits * picked.length)})</span>
+                {formatInr(model.usd)} &times; {imageCount} ={" "}
+                <strong className="text-foreground">{formatInr(model.usd * imageCount)}</strong>
+                <span className="ml-1 opacity-70">({formatCredits(model.credits * imageCount)})</span>
               </span>
             </div>
+            {asksOrientation && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-background p-2">
+                <Label className="text-xs">Phone cut</Label>
+                <Select value={cutOrientation} onValueChange={(v) => setCutOrientation(v as CutOrientation | "both")}>
+                  <SelectTrigger className="h-9 w-[260px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="lengthwise">Lengthwise — design stands upright</SelectItem>
+                    <SelectItem value="widthwise">Widthwise — design reads sideways</SelectItem>
+                    <SelectItem value="both">Both — one image of each</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-[11px] text-muted-foreground">
+                  A phone skin is cut out of the 29.5 cm roll either along the web or across it, and
+                  the two look nothing alike. Picking <em>Both</em> doubles the phone shots.
+                </span>
+              </div>
+            )}
             <p className="text-[11px] text-muted-foreground">
               Every image in this run is generated at {effectiveSize}, whatever the shot says.
             </p>
@@ -979,7 +1157,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={generate} disabled={starting || !roll.rawImageUrl || !picked.length}>
               {starting ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <SparklesIcon className="mr-1.5 size-4" />}
-              Generate {picked.length} image{picked.length === 1 ? "" : "s"} &middot; {formatInr(model.usd * picked.length)}
+              Generate {imageCount} image{imageCount === 1 ? "" : "s"} &middot; {formatInr(model.usd * imageCount)}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setPicked(shots.map((s) => s._id))}>Select all</Button>
             <Button size="sm" variant="ghost" onClick={() => setPicked([])}>Clear</Button>
@@ -1126,11 +1304,158 @@ function RedoDialog({ job, defaultModelId, defaultAspect, onCancel, onConfirm }:
  * to the admin's machine and clears the staging copy, redo throws it away and
  * generates again with a model you pick at that moment.
  */
+/**
+ * Builds the listing a design is missing for one gadget.
+ *
+ * The variant shape is not asked for — it is read off the catalogue, because
+ * the answer already exists 103 times over and typing it again is how two
+ * conventions start. The admin sets prices and nothing else; the words are
+ * generated.
+ */
+function CreateListingDialog({ shot, design, onClose, onCreated, getTemplate, createListing }: {
+  shot: MockupShot;
+  design: Design;
+  onClose: () => void;
+  onCreated: (gadget: string, title: string, productId: string) => void;
+  getTemplate: (args: any) => Promise<any>;
+  createListing: (args: any) => Promise<any>;
+}) {
+  const [rows, setRows] = useState<Array<{ skuTail: string; title: string; price: string; materialMultiplier: number }> | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const res: any = await getTemplate({
+          gadgetTypeId: shot.gadgetTypeId || "",
+          gadget: shot.gadget,
+          finish: design.finish || "",
+        });
+        if (!live) return;
+        setRows((res?.variants || []).map((v: any) => ({
+          skuTail: String(v.skuTail || ""),
+          title: String(v.title || "Default Title"),
+          price: String(v.price ?? ""),
+          materialMultiplier: Number(v.materialMultiplier) || 1,
+        })));
+      } catch (e) {
+        if (live) setLoadError(e instanceof Error ? e.message : "Could not read the template");
+      }
+    })();
+    return () => { live = false; };
+  }, [shot._id]);
+
+  const submit = async () => {
+    if (!rows?.length) return;
+    if (rows.some((r) => !(Number(r.price) > 0))) return toast.error("Every variant needs a price");
+    setBusy(true);
+    try {
+      const res: any = await createListing({
+        designCode: design.code,
+        designName: design.name || "",
+        gadgetTypeId: shot.gadgetTypeId || "",
+        gadget: shot.gadget,
+        finish: design.finish || "",
+        source: design.source,
+        imageUrl: design.rawImageUrl || "",
+        variants: rows.map((r) => ({
+          skuTail: r.skuTail,
+          title: r.title,
+          price: Number(r.price),
+          materialMultiplier: r.materialMultiplier,
+        })),
+      });
+      onCreated(String(shot.gadget).toLowerCase(), res.title, res.productId);
+      // A new window, so the studio keeps its queue and the admin can check the
+      // generated copy side by side.
+      window.open(`/backend-skinly/products/${res.productId}`, "_blank", "noopener");
+      toast.success(`Created ${res.skus.join(", ")} · in ${res.collections} collection${res.collections === 1 ? "" : "s"}`);
+      onClose();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create the listing");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Create the {shot.gadget} listing for {design.code}</DialogTitle>
+          <DialogDescription>
+            The variants below are the shape this gadget's other listings already use. Set the
+            prices; the title, slug, description, meta tags and collections are written for you.
+          </DialogDescription>
+        </DialogHeader>
+
+        {loadError ? (
+          <p className="text-sm text-rose-600">{loadError}</p>
+        ) : !rows ? (
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {rows.map((r, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-lg border p-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{r.title}</p>
+                  <code className="text-[10px] text-muted-foreground">
+                    {design.code}{r.skuTail ? `-${r.skuTail}` : ""}
+                    {r.materialMultiplier !== 1 && ` · uses ${r.materialMultiplier}×`}
+                  </code>
+                </div>
+                <span className="text-sm text-muted-foreground">₹</span>
+                <Input
+                  className="w-24"
+                  inputMode="numeric"
+                  value={r.price}
+                  onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))}
+                />
+              </div>
+            ))}
+            <p className="text-[11px] text-muted-foreground">
+              Stock starts from the design's own shelf — {design.stockLabel} — as soon as the listing
+              exists.
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={() => void submit()} disabled={busy || !rows?.length}>
+            {busy ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <FilePlus2Icon className="mr-1.5 size-4" />}
+            Create and open
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /** Says where an approved image would land, before anything is generated. */
-function LinkTargets({ titles }: { titles: string[] | null }) {
+function LinkTargets({ titles, onCreate }: { titles: string[] | null; onCreate?: () => void }) {
   if (titles === null) return <span className="text-[10px] text-muted-foreground">checking listings…</span>;
   if (!titles.length) {
-    return <span className="block text-[10px] text-amber-600">no listing for this design — will not link</span>;
+    return (
+      <span className="mt-0.5 flex items-center gap-1.5">
+        <span className="text-[10px] text-amber-600">no listing for this design</span>
+        {onCreate && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onCreate(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onCreate(); } }}
+            className="inline-flex cursor-pointer items-center gap-1 rounded border border-violet-300 bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300"
+          >
+            <FilePlus2Icon className="size-3" />
+            Create listing
+          </span>
+        )}
+      </span>
+    );
   }
   if (titles.length === 1) {
     return <span className="block truncate text-[10px] text-emerald-600" title={titles[0]}>→ {titles[0]}</span>;

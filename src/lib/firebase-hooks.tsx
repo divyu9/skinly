@@ -75,6 +75,25 @@ const userIdCandidates = async (user: { uid: string; email: string | null }): Pr
 // Helper to resolve the string path from the proxy
 const getPath = (apiRef: any) => String(apiRef);
 
+/**
+ * Firestore rejects `undefined` at any depth, not just at the top level.
+ *
+ * Objects lose the undefined keys; arrays keep every element (dropping one
+ * would silently reorder an image gallery) but each element is cleaned.
+ */
+function stripUndefinedDeep(value: any): any {
+  if (Array.isArray(value)) return value.map(stripUndefinedDeep);
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, stripUndefinedDeep(v)])
+    );
+  }
+  return value;
+}
+
+
 export function useQuery(apiRef: any, args?: any) {
   const [data, setData] = useState<any>(undefined);
   const [error, setError] = useState<Error | null>(null);
@@ -177,17 +196,25 @@ export function useQuery(apiRef: any, args?: any) {
           const design = String(args?.rNumber || '').trim();
           if (!design) { setData([]); return; }
           (async () => {
-            const snap = await getDocs(query(
-              collection(db, 'variants'),
-              where('sku', '>=', `${design}-`),
-              where('sku', '<', `${design}-\uf8ff`)
-            ));
+            const [snap, wholeSnap] = await Promise.all([
+              getDocs(query(
+                collection(db, 'variants'),
+                where('sku', '>=', `${design}-`),
+                where('sku', '<', `${design}-\uf8ff`)
+              )),
+              // Phones, lenses and chargers are sold as one thing, and their SKU
+              // is the bare design code with no view suffix — invisible to the
+              // range query, which is why the studio used to claim a design had
+              // no phone listing while one sat right there. The linker has
+              // always looked here; the preview has to agree with it.
+              getDocs(query(collection(db, 'variants'), where('sku', '==', design))),
+            ]);
             const gts = await getDocs(collection(db, 'gadgetTypes'));
             const gadgetById: Record<string, string> = {};
             gts.docs.forEach((g) => { gadgetById[g.id] = String((g.data() as any).name || '').toLowerCase(); });
 
             const rows: any[] = [];
-            for (const d of snap.docs) {
+            for (const d of [...snap.docs, ...wholeSnap.docs]) {
               const v: any = d.data();
               if (!v.productId) continue;
               const psnap = await getDoc(doc(db, 'products', v.productId));
@@ -4770,6 +4797,15 @@ export function useMutation(apiRef: any) {
         return args.key;
       }
 
+      // Listings are built server-side, where the OpenAI key lives. The name
+      // contains "create", so without this the generic writer below would put a
+      // junk document into a `listings` collection that does not exist.
+      if (collectionName === 'listings') {
+        const fn = httpsCallable(functions, actionName);
+        const res: any = await fn(args);
+        return res.data;
+      }
+
       let targetCollection = collectionName;
       // These namespaces cover more than one collection, so the target depends on
       // the action rather than the namespace.
@@ -4890,8 +4926,15 @@ export function useMutation(apiRef: any) {
 
         // Strip only the id being written to — every other key is real data, and
         // Firestore rejects undefined, which these payloads use for cleared fields.
+        //
+        // The strip has to go all the way down. A product's images arrive as
+        // `{ url, alt }` and `alt` is undefined on anything uploaded without one,
+        // which Firestore rejects from inside the array with an error naming the
+        // document but not the field.
         const data = Object.fromEntries(
-          Object.entries(args).filter(([k, v]) => k !== idKey && v !== undefined)
+          Object.entries(args)
+            .filter(([k, v]) => k !== idKey && v !== undefined)
+            .map(([k, v]) => [k, stripUndefinedDeep(v)])
         );
 
         await updateDoc(doc(db, targetCollection, targetId), data);

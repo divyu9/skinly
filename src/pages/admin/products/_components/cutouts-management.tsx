@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
+import { rotateImageDataUrl } from "@/lib/image-processing.ts";
 import {
   ScissorsIcon, SearchIcon, ImageIcon, UploadIcon, PlusIcon, TrashIcon,
-  Loader2Icon, AlertTriangleIcon,
+  Loader2Icon, AlertTriangleIcon, RotateCwIcon, RotateCcwIcon,
 } from "lucide-react";
 
 /**
@@ -40,6 +41,7 @@ export function CutoutsManagement() {
 
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [staged, setStaged] = useState<{ id: string; dataUrl: string; turns: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({ cutoutNumber: "", designName: "", sheetsAvailable: "0", finish: "3D Textured", aliases: "" });
   const uploadFor = useRef<string | null>(null);
@@ -93,27 +95,39 @@ export function CutoutsManagement() {
   const onPickFile = async (file: File) => {
     const id = uploadFor.current;
     if (!id) return;
+    // Held, not sent. Which way up the sheet sits is what the mockup model
+    // copies literally, and a phone photo of a sheet on a table lands in
+    // whatever orientation the phone decided.
+    const dataUrl = await new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    setStaged({ id, dataUrl, turns: 0 });
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const commitPhoto = async () => {
+    if (!staged) return;
+    const { id, dataUrl, turns } = staged;
     const cutout = (cutouts || []).find((c) => c._id === id);
     setBusy(id);
     try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
+      const base64 = turns ? await rotateImageDataUrl(dataUrl, turns * 90) : dataUrl;
       const stem = String(cutout?.cutoutNumber || id).toUpperCase().replace(/[^A-Z0-9-]/g, "");
       const result: any = await uploadToLibrary({
         fileBase64: base64,
         key: `design-raw/${stem}.webp`,
         filename: `${stem}.webp`,
         folder: "design-raw",
-        contentType: file.type || "image/jpeg",
+        contentType: /data:([^;,]+)/.exec(base64)?.[1] || "image/jpeg",
         tags: ["raw-design", "cutout", stem],
       });
       const url = result?.url || result?.publicUrl;
       if (!url) throw new Error(result?.error || "Upload failed");
       await updateCutout({ id, rawImageUrl: url });
+      setStaged(null);
       toast.success("Design photo saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
@@ -160,6 +174,47 @@ export function CutoutsManagement() {
 
       <input ref={fileRef} type="file" accept="image/*" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPickFile(f); }} />
+
+      {staged && (
+        <Dialog open onOpenChange={(o) => { if (!o && !busy) setStaged(null); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Which way up is this design?</DialogTitle>
+            </DialogHeader>
+            <div className="flex justify-center rounded-lg border bg-muted/30 p-3">
+              <img
+                src={staged.dataUrl}
+                alt="Design photo"
+                className="max-h-64 object-contain"
+                style={{ transform: `rotate(${staged.turns * 90}deg)` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The mockup studio copies this orientation exactly, so turn it until the design reads
+              the right way up.
+            </p>
+            <DialogFooter className="sm:justify-between">
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setStaged({ ...staged, turns: staged.turns - 1 })}>
+                  <RotateCcwIcon className="mr-1.5 size-3.5" />
+                  Left
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setStaged({ ...staged, turns: staged.turns + 1 })}>
+                  <RotateCwIcon className="mr-1.5 size-3.5" />
+                  Right
+                </Button>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" disabled={!!busy} onClick={() => setStaged(null)}>Cancel</Button>
+                <Button size="sm" disabled={!!busy} onClick={() => void commitPhoto()}>
+                  {busy ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <UploadIcon className="mr-1.5 size-3.5" />}
+                  Save photo
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <div className="space-y-2">
         {rows.map((c) => {
@@ -220,7 +275,15 @@ export function CutoutsManagement() {
                       // change stops at this table.
                       try {
                         const r: any = await recalcStock({ codes });
-                        toast.success(`${c.cutoutNumber}: ${next} sheets · ${r?.updated ?? 0} variants restocked`);
+                        // Report what the sheet count now feeds, not how many rows happened to
+                        // change: "0 variants restocked" reads as a failure when the real
+                        // answer is that the listings already agreed with the shelf.
+                        const fed = r?.matched ?? r?.updated ?? 0;
+                        toast.success(
+                          fed
+                            ? `${c.cutoutNumber}: ${next} sheet${next === 1 ? "" : "s"} · ${fed} variant${fed === 1 ? "" : "s"} now stocked from it`
+                            : `${c.cutoutNumber}: ${next} sheet${next === 1 ? "" : "s"} · no listing uses this design yet`
+                        );
                       } catch {
                         toast.warning(`${c.cutoutNumber}: ${next} sheets saved, but restocking the variants failed`);
                       }

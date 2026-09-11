@@ -266,7 +266,12 @@ function EditProductPageInner() {
         collectionId: formData.collectionId ? (formData.collectionId as Id<"collections">) : undefined,
         status: formData.status,
         // Strip 'id' field before sending to Convex
-        images: formData.images.filter((img) => img.url).map(({ url, alt }) => ({ url, alt })),
+        // `alt` is optional and an image added from the media picker or the
+        // mockup studio arrives without one. Sending `alt: undefined` inside the
+        // array is what Firestore refuses.
+        images: formData.images
+          .filter((img) => img.url)
+          .map(({ url, alt }) => (alt ? { url, alt } : { url })),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
         length: parseFloat(formData.length),
         breadth: parseFloat(formData.breadth),

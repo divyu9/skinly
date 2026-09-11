@@ -190,8 +190,9 @@ async function reserveMaterialForOrder(db, orderRef, items) {
     // figures out to every variant sharing the design.
     try {
         const resynced = await syncStockForDesign(db, taken.map((t) => t.code));
-        if (resynced.length)
-            console.log("reserveMaterial: restocked variants", { order: orderRef.id, count: resynced.length });
+        const moved = resynced.filter((r) => r.changed).length;
+        if (moved)
+            console.log("reserveMaterial: restocked variants", { order: orderRef.id, count: moved });
     }
     catch (e) {
         console.error("reserveMaterial: stock sync failed", { order: orderRef.id, error: (e === null || e === void 0 ? void 0 : e.message) || e });
@@ -255,7 +256,7 @@ async function syncStockForDesign(db, codes) {
         const whole = String((v === null || v === void 0 ? void 0 : v.sku) || "").trim().toUpperCase();
         return stock.has(whole) ? whole : null;
     };
-    const writes = [];
+    const matched = [];
     for (const d of variantSnap.docs) {
         const v = d.data();
         const code = codeOf(v);
@@ -275,16 +276,23 @@ async function syncStockForDesign(db, codes) {
             const areaPerUnit = Number(gadget.lengthCm) * Number(gadget.widthCm) * multiplier;
             units = Math.floor((ROLL_WIDTH_CM * entry.amount * 100) / areaPerUnit);
         }
-        if (Number(v.inventoryQuantity) !== units) {
-            writes.push({ ref: d.ref, units, sku: String(v.sku || "") });
-        }
+        // Every variant the design backs is reported, changed or not. Reporting
+        // only the writes read as "nothing happened" whenever the shelf already
+        // agreed with the listing, which is the normal case and not a failure.
+        matched.push({
+            ref: d.ref,
+            units,
+            sku: String(v.sku || ""),
+            changed: Number(v.inventoryQuantity) !== units,
+        });
     }
+    const writes = matched.filter((m) => m.changed);
     for (let i = 0; i < writes.length; i += 450) {
         const batch = db.batch();
         writes.slice(i, i + 450).forEach((w) => batch.update(w.ref, { inventoryQuantity: w.units, stockFromMaterialAt: Date.now() }));
         await batch.commit();
     }
-    return writes.map((w) => ({ sku: w.sku, units: w.units }));
+    return matched.map((m) => ({ sku: m.sku, units: m.units, changed: m.changed }));
 }
 exports.syncStockForDesign = syncStockForDesign;
 /** Admin-triggered recalculation, used after editing sheets or metres. */
@@ -293,7 +301,12 @@ exports.recalcMaterialStock = (0, https_1.onCall)(async (data, context) => {
     const codes = Array.isArray(data === null || data === void 0 ? void 0 : data.codes) ? data.codes : (data === null || data === void 0 ? void 0 : data.code) ? [data.code] : [];
     if (!codes.length)
         throw new https_1.HttpsError("invalid-argument", "A design code is required");
-    const updated = await syncStockForDesign(admin.firestore(), codes);
-    return { success: true, updated: updated.length, variants: updated.slice(0, 50) };
+    const matched = await syncStockForDesign(admin.firestore(), codes);
+    return {
+        success: true,
+        matched: matched.length,
+        updated: matched.filter((m) => m.changed).length,
+        variants: matched.slice(0, 50),
+    };
 });
 //# sourceMappingURL=materials.js.map

@@ -259,3 +259,40 @@ export async function normalizeImageForUpload(
 export function withExtension(key: string, extension: string): string {
   return key.replace(/\.[^/.]+$/, "") + "." + extension;
 }
+
+/**
+ * Turns a picture a quarter or half turn, as a data URL.
+ *
+ * Raw design photos are shot on a phone over a table and land in whatever
+ * orientation the phone decided. Which way up the design sits is the one thing
+ * the mockup model copies literally, so the admin has to be able to fix it
+ * before the photo is sent — and fixing it here, once, beats re-shooting.
+ */
+export async function rotateImageDataUrl(dataUrl: string, degrees: number): Promise<string> {
+  const turns = ((Math.round(degrees / 90) % 4) + 4) % 4;
+  if (!turns) return dataUrl;
+
+  const comma = dataUrl.indexOf(",");
+  const meta = dataUrl.slice(0, comma);
+  const declared = /data:([^;,]+)/.exec(meta)?.[1] || "image/jpeg";
+  const bytes = base64ToBytes(dataUrl.slice(comma + 1));
+  const source = await decode(new Blob([bytes as BlobPart], { type: declared }));
+
+  const w = "width" in source ? source.width : (source as HTMLImageElement).naturalWidth;
+  const h = "height" in source ? source.height : (source as HTMLImageElement).naturalHeight;
+  const swap = turns % 2 === 1;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = swap ? h : w;
+  canvas.height = swap ? w : h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not rotate the image");
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((turns * Math.PI) / 2);
+  ctx.drawImage(source as CanvasImageSource, -w / 2, -h / 2);
+  if ("close" in source) (source as ImageBitmap).close();
+
+  // WebP out regardless of what came in: this result goes straight to the
+  // uploader, which would re-encode it anyway.
+  return canvas.toDataURL("image/webp", 0.9);
+}
