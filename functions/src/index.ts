@@ -6,6 +6,7 @@ admin.initializeApp();
 export * from "./phonepe";
 export * from "./placeorder";
 export * from "./rapidshyp";
+export * from "./rapidshypWebhook";
 export * from "./whatsapp";
 export * from "./seo";
 export * from "./r2";

@@ -33,6 +33,7 @@ admin.initializeApp();
 __exportStar(require("./phonepe"), exports);
 __exportStar(require("./placeorder"), exports);
 __exportStar(require("./rapidshyp"), exports);
+__exportStar(require("./rapidshypWebhook"), exports);
 __exportStar(require("./whatsapp"), exports);
 __exportStar(require("./seo"), exports);
 __exportStar(require("./r2"), exports);
