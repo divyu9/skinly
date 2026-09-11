@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.testWhatsAppTemplate = exports.triggerWhatsAppWorker = exports.whatsappQueueWorker = void 0;
+exports.testWhatsAppTemplate = exports.triggerWhatsAppWorker = exports.whatsappQueueWorker = exports.readAuthkeyResult = void 0;
 const functionsV1 = __importStar(require("firebase-functions/v1"));
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
@@ -42,6 +42,45 @@ const rate_limit_1 = require("./rate-limit");
 const AUTHKEY_URL = "https://api.authkey.io/request";
 const MAX_PER_RUN = 40;
 const MAX_ATTEMPTS = 3;
+/**
+ * Decides whether Authkey actually sent the message.
+ *
+ * It does not answer the way the old check assumed. A refusal comes back as
+ * HTTP 203 with `{"Message": "Invalid authkey or insufficient balance"}` — a
+ * 2xx, so `res.ok` was true, and the word "error" never appears, so the
+ * substring test missed it too. Every rejected message was recorded as sent,
+ * which is the worst outcome available: the queue drains, the admin reads
+ * "sent", and the customer hears nothing.
+ *
+ * So the rule is inverted. A send counts only on a recognised success signal;
+ * anything unrecognised is a failure that keeps the body for diagnosis. A
+ * message wrongly marked failed is retried, which costs little. A message
+ * wrongly marked sent is simply gone.
+ */
+function readAuthkeyResult(status, body) {
+    var _a, _b, _c, _d, _e, _f;
+    const text = String(body || "").trim();
+    if (status !== 200)
+        return { sent: false, reason: `HTTP ${status}: ${text.slice(0, 240)}` };
+    let message = text;
+    let hasLogId = false;
+    try {
+        const j = JSON.parse(text);
+        message = String((_b = (_a = j.Message) !== null && _a !== void 0 ? _a : j.message) !== null && _b !== void 0 ? _b : text);
+        hasLogId = Boolean((_f = (_e = (_d = (_c = j.LogID) !== null && _c !== void 0 ? _c : j.log_id) !== null && _d !== void 0 ? _d : j.logid) !== null && _e !== void 0 ? _e : j.MessageID) !== null && _f !== void 0 ? _f : j.message_id);
+    }
+    catch (_g) {
+        // Not JSON; judge the raw text instead.
+    }
+    if (/invalid|insufficient|unauthor|denied|fail|error|missing|not found|blocked/i.test(message)) {
+        return { sent: false, reason: message.slice(0, 240) };
+    }
+    if (hasLogId || /success|submitted|queued|accepted/i.test(message)) {
+        return { sent: true, reason: "" };
+    }
+    return { sent: false, reason: `Unrecognised Authkey response: ${text.slice(0, 240)}` };
+}
+exports.readAuthkeyResult = readAuthkeyResult;
 const isSendableStatus = (s) => s === "pending" || s === "queued";
 /** Claims one queue row, or returns null if another run already has it. */
 const claim = async (queueId) => {
@@ -103,10 +142,11 @@ const sendOne = async (queueRow) => {
     const fetch = require("node-fetch");
     const res = await fetch(`${AUTHKEY_URL}?${params.toString()}`, { method: "GET" });
     const body = await res.text();
-    if (!res.ok || /error/i.test(body)) {
-        console.error("authkey send failed:", body.slice(0, 300));
-        await queueRef.update({ status: "pending", failureReason: body.slice(0, 300) });
-        await msgSnap.ref.update({ status: "failed", failureReason: body.slice(0, 300) });
+    const verdict = readAuthkeyResult(res.status, body);
+    if (!verdict.sent) {
+        console.error("authkey send failed:", { status: res.status, body: body.slice(0, 300) });
+        await queueRef.update({ status: "pending", failureReason: verdict.reason });
+        await msgSnap.ref.update({ status: "failed", failureReason: verdict.reason });
         return false;
     }
     await queueRef.update({ status: "sent", sentAt: Date.now(), failureReason: admin.firestore.FieldValue.delete() });

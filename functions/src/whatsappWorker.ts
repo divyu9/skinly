@@ -19,6 +19,44 @@ const AUTHKEY_URL = "https://api.authkey.io/request";
 const MAX_PER_RUN = 40;
 const MAX_ATTEMPTS = 3;
 
+/**
+ * Decides whether Authkey actually sent the message.
+ *
+ * It does not answer the way the old check assumed. A refusal comes back as
+ * HTTP 203 with `{"Message": "Invalid authkey or insufficient balance"}` — a
+ * 2xx, so `res.ok` was true, and the word "error" never appears, so the
+ * substring test missed it too. Every rejected message was recorded as sent,
+ * which is the worst outcome available: the queue drains, the admin reads
+ * "sent", and the customer hears nothing.
+ *
+ * So the rule is inverted. A send counts only on a recognised success signal;
+ * anything unrecognised is a failure that keeps the body for diagnosis. A
+ * message wrongly marked failed is retried, which costs little. A message
+ * wrongly marked sent is simply gone.
+ */
+export function readAuthkeyResult(status: number, body: string): { sent: boolean; reason: string } {
+  const text = String(body || "").trim();
+  if (status !== 200) return { sent: false, reason: `HTTP ${status}: ${text.slice(0, 240)}` };
+
+  let message = text;
+  let hasLogId = false;
+  try {
+    const j = JSON.parse(text);
+    message = String(j.Message ?? j.message ?? text);
+    hasLogId = Boolean(j.LogID ?? j.log_id ?? j.logid ?? j.MessageID ?? j.message_id);
+  } catch {
+    // Not JSON; judge the raw text instead.
+  }
+
+  if (/invalid|insufficient|unauthor|denied|fail|error|missing|not found|blocked/i.test(message)) {
+    return { sent: false, reason: message.slice(0, 240) };
+  }
+  if (hasLogId || /success|submitted|queued|accepted/i.test(message)) {
+    return { sent: true, reason: "" };
+  }
+  return { sent: false, reason: `Unrecognised Authkey response: ${text.slice(0, 240)}` };
+}
+
 const isSendableStatus = (s: string) => s === "pending" || s === "queued";
 
 /** Claims one queue row, or returns null if another run already has it. */
@@ -93,10 +131,11 @@ const sendOne = async (queueRow: any): Promise<boolean> => {
   const res = await fetch(`${AUTHKEY_URL}?${params.toString()}`, { method: "GET" });
   const body = await res.text();
 
-  if (!res.ok || /error/i.test(body)) {
-    console.error("authkey send failed:", body.slice(0, 300));
-    await queueRef.update({ status: "pending", failureReason: body.slice(0, 300) });
-    await msgSnap.ref.update({ status: "failed", failureReason: body.slice(0, 300) });
+  const verdict = readAuthkeyResult(res.status, body);
+  if (!verdict.sent) {
+    console.error("authkey send failed:", { status: res.status, body: body.slice(0, 300) });
+    await queueRef.update({ status: "pending", failureReason: verdict.reason });
+    await msgSnap.ref.update({ status: "failed", failureReason: verdict.reason });
     return false;
   }
 

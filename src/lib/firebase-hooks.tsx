@@ -5029,9 +5029,13 @@ export function useMutation(apiRef: any) {
           // providers were configured separately and neither accepts the
           // other's names. Authkey drops what it does not recognise, so a
           // wrong name is a blank in the message, not an error.
+          // order_received's template declares order_total as well; Authkey
+          // drops any name it does not recognise, so a missing one is a blank
+          // in the delivered message rather than an error.
           variables: {
             customer_name: order.shippingAddress?.fullName || order.customerName || 'Customer',
             order_number: String(order.orderNumber || order.failedOrderNumber || 'Pending'),
+            order_total: String(Number(order.total ?? order.amountPayable ?? 0).toFixed(2)),
             product_name: (Array.isArray(order.items) ? order.items : [])
               .map((i: any) => i?.productTitle).filter(Boolean).join(', '),
           },

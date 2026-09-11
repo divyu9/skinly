@@ -135,9 +135,13 @@ async function notifyOrderPlaced(db, orderId) {
     const total = Number((_b = order.total) !== null && _b !== void 0 ? _b : order.amountPayable) || 0;
     const productNames = items.map((i) => i === null || i === void 0 ? void 0 : i.productTitle).filter(Boolean).join(", ");
     const results = await Promise.allSettled([
+        // Names come from each usecase's own variableMapping, not from guesswork:
+        // order_received declares order_total, admin_new_order declares
+        // order_amount, and Authkey drops anything it does not recognise.
         queueWhatsApp(db, "order_received", ((_c = order.shippingAddress) === null || _c === void 0 ? void 0 : _c.phone) || order.phone || "", {
             customer_name: name,
             order_number: orderNumber,
+            order_total: total.toFixed(2),
             product_name: productNames,
         }, orderId),
         (async () => {
@@ -151,7 +155,7 @@ async function notifyOrderPlaced(db, orderId) {
             const mode = String(order.paymentMethod || "").toLowerCase() === "cod" ? "COD" : "Prepaid";
             return queueWhatsApp(db, "admin_new_order", adminPhone, {
                 order_number: orderNumber,
-                amount: total.toFixed(2),
+                order_amount: total.toFixed(2),
                 customer_name: name,
                 number_of_products: String(items.length),
                 payment_mode: mode,
