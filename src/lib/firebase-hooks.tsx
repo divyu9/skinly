@@ -208,6 +208,16 @@ export function useQuery(apiRef: any, args?: any) {
             setData(rows);
           })().catch(() => setData([]));
         }
+        else if (path === 'aiMockups.getCutouts') {
+          // The second design source. A cutout is one printed artwork on a
+          // sheet rather than a pattern sold by the metre, so it has a piece
+          // count and a size limit instead of meters.
+          unsubscribe = onSnapshot(collection(db, 'cutoutInventory'), (snap) => {
+            const rows = snap.docs.map(d => ({ _id: d.id, ...d.data() })) as any[];
+            rows.sort((a, b) => String(a.cutoutNumber || '').localeCompare(String(b.cutoutNumber || ''), undefined, { numeric: true }));
+            setData(rows);
+          });
+        }
         else if (path === 'aiMockups.getSettings') {
           // Single doc holding the prompt fragments every shot shares.
           unsubscribe = onSnapshot(doc(db, 'gadgetMockupSettings', 'default'), (snap) => {
@@ -4697,6 +4707,7 @@ export function useMutation(apiRef: any) {
       // the action rather than the namespace.
       const byAction = actionName.toLowerCase();
       if (byAction.includes('rollinventory')) targetCollection = 'rollInventory';
+      else if (byAction.includes('cutoutinventory')) targetCollection = 'cutoutInventory';
       else if (byAction.includes('mockupprompt')) targetCollection = 'gadgetMockupPrompts';
       else if (byAction.includes('designmockup')) targetCollection = 'designMockups';
       else if (byAction.includes('gadgetconsumption')) targetCollection = 'gadgetConsumption';

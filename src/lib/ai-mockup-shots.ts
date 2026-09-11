@@ -55,11 +55,27 @@ export interface MockupShot {
  * quietly shipping a wrong design, so prompts reference it instead.
  */
 export interface SharedBlocks {
+  /** For rolls: printed by the metre, a pattern that repeats. */
   fidelity: string;
+  /**
+   * For cutouts: one fixed artwork on a sheet, not a repeat.
+   *
+   * A roll prompt tells the model to hold "scale and spacing", which is exactly
+   * the wrong instruction for a Joker or a Lambo — that has to land whole and
+   * centred, never tiled or cropped into.
+   */
+  fidelityCutout: string;
   staging: string;
 }
 
 export const DEFAULT_BLOCKS: SharedBlocks = {
+  fidelityCutout:
+    "The supplied reference image is a photograph of a printed cutout sheet: one fixed artwork, not a repeating "
+    + "pattern. Reproduce that exact artwork on the skin — same composition, same subject, same colours, at the "
+    + "same proportions. Do not tile it, do not repeat it, do not crop into it, and do not extend or invent "
+    + "anything beyond its edges. Place the whole artwork on the device's main face, centred and filling it. "
+    + "Ignore the lighting, glare, shadows, background and perspective of the reference photo, and any surface it "
+    + "is resting on. ",
   fidelity:
     "The supplied reference image is a photograph of the printed vinyl design. Reproduce that exact "
       + "artwork on the skin: same colours, same motifs, same scale and spacing. Do not invent, "
@@ -79,10 +95,20 @@ export const DEFAULT_BLOCKS: SharedBlocks = {
 export function expandPrompt(
   prompt: string,
   blocks: SharedBlocks,
-  vars: { rNumber?: string; designName?: string } = {}
+  vars: { rNumber?: string; designName?: string; source?: DesignSource; finish?: string } = {}
 ): string {
+  // {{fidelity}} resolves differently per design source, so one set of shot
+  // prompts serves both rolls and cutouts.
+  const fidelity =
+    vars.source === "cutout"
+      ? blocks.fidelityCutout +
+        (/3d|textur|emboss/i.test(vars.finish || "")
+          ? " The skin has a raised 3D textured finish: the artwork carries a fine tactile relief that catches the "
+            + "light across its raised areas, subtle and even, never glossy. "
+          : "")
+      : blocks.fidelity;
   const table: Record<string, string> = {
-    fidelity: blocks.fidelity,
+    fidelity,
     staging: blocks.staging,
     rNumber: vars.rNumber ?? "",
     designName: vars.designName ?? "",
@@ -93,6 +119,9 @@ export function expandPrompt(
 }
 
 export const PLACEHOLDERS = ["fidelity", "staging", "rNumber", "designName"];
+
+/** Where a design comes from. Rolls repeat; cutouts are one fixed artwork. */
+export type DesignSource = "roll" | "cutout";
 
 /** R-01 + laptop-top -> R-01-laptop-top. Kept ASCII-safe for use as an R2 key. */
 export function mockupFileStem(rNumber: string, suffix: string, attempt = 1): string {

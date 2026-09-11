@@ -175,6 +175,7 @@ service cloud.firestore {
     match /gadgetMockupPrompts/{id}     { allow read, write: if isAdmin(); }
     match /designMockups/{id}           { allow read, write: if isAdmin(); }
     match /gadgetMockupSettings/{id}    { allow read, write: if isAdmin(); }
+    match /cutoutInventory/{id}         { allow read, write: if isAdmin(); }
     match /gadgetConsumption/{id}       { allow read, write: if isAdmin(); }
     match /variantConsumptionPresets/{id} { allow read, write: if isAdmin(); }
   }

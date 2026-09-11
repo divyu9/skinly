@@ -24,7 +24,7 @@ import {
 } from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem,
-  type MockupShot, type SharedBlocks,
+  type MockupShot, type SharedBlocks, type DesignSource,
 } from "@/lib/ai-mockup-shots.ts";
 import {
   IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, formatCredits, resolveSize, USD_TO_INR,
@@ -54,6 +54,7 @@ type Job = {
   linkedCount?: number;
   error?: string;
   attempt?: number;
+  designSource?: DesignSource;
   modelLabel?: string;
   aspect?: string;
   credits?: number;
@@ -93,6 +94,18 @@ function useShotLibrary() {
   const blocks: SharedBlocks = { ...DEFAULT_BLOCKS, ...(settings?.blocks || {}) };
   const loading = shots === undefined || settings === undefined;
   return { shots: shots || [], blocks, loading };
+}
+
+interface Design {
+  _id: string;
+  source: DesignSource;
+  code: string;
+  name: string;
+  rawImageUrl?: string;
+  finish?: string;
+  /** Metres for a roll, pieces for a cutout. */
+  stock?: number;
+  stockLabel: string;
 }
 
 function groupByGadget<T extends { gadget: string }>(rows: T[]): [string, T[]][] {
@@ -449,27 +462,40 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
   onManageShots: () => void;
 }) {
   const rolls = useQuery(api.rollsManagement.getRollInventory) as any[] | undefined;
+  const cutouts = useQuery(api.aiMockups.getCutouts) as any[] | undefined;
   const jobs = useQuery(api.aiMockups.getJobs, { take: 300 }) as Job[] | undefined;
   const { shots, blocks, loading } = useShotLibrary();
   const [search, setSearch] = useState("");
+  const [source, setSource] = useState<DesignSource | "all">("all");
 
   const activeShots = shots.filter((s) => s.isActive !== false);
 
-  const sortedRolls = useMemo(() => {
-    const list = (rolls || []).map((r) => ({ ...r, rNumber: String(r.rNumber || "").trim() }));
+  const designs = useMemo<Design[]>(() => {
+    const fromRolls: Design[] = (rolls || []).map((r) => ({
+      _id: r._id, source: "roll", code: String(r.rNumber || "").trim(), name: r.designName || "",
+      rawImageUrl: r.rawImageUrl, stock: r.metersAvailable,
+      stockLabel: `${r.metersAvailable ?? 0} m`,
+    }));
+    const fromCutouts: Design[] = (cutouts || []).map((c) => ({
+      _id: c._id, source: "cutout", code: String(c.cutoutNumber || "").trim(), name: c.designName || "",
+      rawImageUrl: c.rawImageUrl, finish: c.finish, stock: c.piecesAvailable,
+      stockLabel: c.piecesAvailable != null ? `${c.piecesAvailable} pcs` : "cutout",
+    }));
     const q = search.trim().toLowerCase();
-    return list
-      .filter((r) => !q || r.rNumber.toLowerCase().includes(q) || String(r.designName || "").toLowerCase().includes(q))
-      .sort((a, b) => a.rNumber.localeCompare(b.rNumber, undefined, { numeric: true }));
-  }, [rolls, search]);
+    return [...fromRolls, ...fromCutouts]
+      .filter((d) => d.code)
+      .filter((d) => source === "all" || d.source === source)
+      .filter((d) => !q || d.code.toLowerCase().includes(q) || d.name.toLowerCase().includes(q))
+      .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
+  }, [rolls, cutouts, search, source]);
 
-  const selected = sortedRolls.find((r) => r._id === selectedRollId) || null;
+  const selected = designs.find((d) => d._id === selectedRollId) || null;
   const jobsForRoll = useMemo(
-    () => (jobs || []).filter((j) => selected && j.rNumber === selected.rNumber),
+    () => (jobs || []).filter((j) => selected && j.rNumber === selected.code),
     [jobs, selected]
   );
 
-  if (rolls === undefined || loading) {
+  if (rolls === undefined || cutouts === undefined || loading) {
     return <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
   }
 
@@ -478,32 +504,48 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
       <div className="space-y-3">
         <div className="relative">
           <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search R-number or design" className="pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or design" className="pl-9" />
         </div>
-        <p className="text-xs text-muted-foreground">{sortedRolls.length} rolls</p>
+        <div className="flex gap-1 rounded-lg border bg-muted/40 p-1 text-xs">
+          {([["all", "All"], ["roll", "Rolls"], ["cutout", "Cutouts"]] as const).map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setSource(k)}
+              className={`flex-1 rounded-md px-2 py-1 font-medium transition ${
+                source === k ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">{designs.length} designs</p>
         <div className="max-h-[70vh] space-y-1.5 overflow-y-auto pr-1">
-          {sortedRolls.map((r) => {
-            const done = (jobs || []).filter((j) => j.rNumber === r.rNumber && j.status === "approved").length;
+          {designs.map((d) => {
+            const done = (jobs || []).filter((j) => j.rNumber === d.code && j.status === "approved").length;
             return (
               <button
-                key={r._id}
-                onClick={() => setSelectedRollId(r._id)}
+                key={d._id}
+                onClick={() => setSelectedRollId(d._id)}
                 className={`flex w-full items-center gap-2.5 rounded-lg border p-2 text-left transition ${
-                  selectedRollId === r._id ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40" : "hover:bg-muted/60"
+                  selectedRollId === d._id ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40" : "hover:bg-muted/60"
                 }`}
               >
                 <div className="size-10 shrink-0 overflow-hidden rounded-md bg-muted">
-                  {r.rawImageUrl ? <img src={r.rawImageUrl} alt="" className="size-full object-cover" />
+                  {d.rawImageUrl ? <img src={d.rawImageUrl} alt="" className="size-full object-cover" />
                     : <div className="flex size-full items-center justify-center"><ImageIcon className="size-4 text-muted-foreground/40" /></div>}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs font-semibold">{r.rNumber}</span>
+                    <span className="font-mono text-xs font-semibold">{d.code}</span>
+                    {d.source === "cutout" && (
+                      <span className="rounded bg-sky-100 px-1 text-[9px] font-semibold text-sky-700 dark:bg-sky-950 dark:text-sky-300">cut</span>
+                    )}
                     {done > 0 && <Badge variant="outline" className="h-4 px-1 text-[10px]">{done}</Badge>}
                   </div>
-                  <p className="truncate text-xs text-muted-foreground">{r.designName || "Untitled"}</p>
+                  <p className="truncate text-xs text-muted-foreground">{d.name || "Untitled"}</p>
                 </div>
-                {!r.rawImageUrl && <span className="shrink-0 text-[10px] text-amber-600">no photo</span>}
+                {!d.rawImageUrl && <span className="shrink-0 text-[10px] text-amber-600">no photo</span>}
               </button>
             );
           })}
@@ -535,7 +577,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
 }
 
 function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId, aspect, setAspect, jobs, onManageShots }: {
-  roll: any;
+  roll: Design;
   shots: MockupShot[];
   blocks: SharedBlocks;
   picked: string[];
@@ -549,10 +591,11 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 }) {
   const uploadToLibrary = useAction(api.mediaLibrary.uploadAndAddToLibrary);
   const updateRoll = useMutation(api.rollsManagement.updateRollInventory);
+  const updateCutout = useMutation(api.aiMockups.updateCutoutInventory);
   const createJob = useMutation(api.aiMockups.createDesignMockup);
   const updateJob = useMutation(api.aiMockups.updateDesignMockup);
   const submit = useAction(api.poyo.poyoSubmit);
-  const linkTargets = useQuery(api.aiMockups.getLinkTargets, { rNumber: String(roll.rNumber).trim() }) as any[] | undefined;
+  const linkTargets = useQuery(api.aiMockups.getLinkTargets, { rNumber: roll.code }) as any[] | undefined;
   const copyObject = useAction(api.r2.copyR2Object);
   const getObject = useAction(api.r2.getR2Object);
   const deleteObject = useAction(api.r2.deleteR2Object);
@@ -610,7 +653,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         r.onerror = rej;
         r.readAsDataURL(file);
       });
-      const stem = String(roll.rNumber).trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+      const stem = roll.code.toUpperCase().replace(/[^A-Z0-9-]/g, "");
       const result: any = await uploadToLibrary({
         fileBase64: base64,
         key: `design-raw/${stem}.webp`,
@@ -621,7 +664,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
       });
       const url = result?.url || result?.publicUrl;
       if (!url) throw new Error(result?.error || "Upload failed");
-      await updateRoll({ id: roll._id, rawImageUrl: url });
+      const save = roll.source === "cutout" ? updateCutout : updateRoll;
+      await save({ id: roll._id, rawImageUrl: url });
       toast.success("Raw design saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
@@ -636,8 +680,9 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     let jobId: string | null = null;
     try {
       jobId = (await createJob({
-        rNumber: String(roll.rNumber).trim(),
-        designName: roll.designName || "",
+        rNumber: roll.code,
+        designName: roll.name || "",
+        designSource: roll.source,
         shotId: shot._id,
         shotLabel: shot.label,
         gadget: shot.gadget,
@@ -659,7 +704,12 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         size: useSize,
         resolution: useModel.resolution,
         quality: useModel.quality,
-        prompt: expandPrompt(shot.prompt, blocks, { rNumber: roll.rNumber, designName: roll.designName }),
+        prompt: expandPrompt(shot.prompt, blocks, {
+          rNumber: roll.code,
+          designName: roll.name,
+          source: roll.source,
+          finish: roll.finish,
+        }),
         imageUrls: [roll.rawImageUrl],
       });
       await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
@@ -797,13 +847,17 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-lg font-bold">{roll.rNumber}</span>
-              <Badge variant="outline">{roll.metersAvailable ?? 0} m left</Badge>
+              <span className="font-mono text-lg font-bold">{roll.code}</span>
+              <Badge variant="outline">{roll.stockLabel}</Badge>
+              {roll.source === "cutout" && (
+                <Badge className="bg-sky-600">cutout{roll.finish ? ` · ${roll.finish}` : ""}</Badge>
+              )}
             </div>
-            <p className="text-muted-foreground">{roll.designName || "Untitled design"}</p>
+            <p className="text-muted-foreground">{roll.name || "Untitled design"}</p>
             <p className="text-xs text-muted-foreground">
-              This photo is sent to the model as the reference. Shoot the roll flat, straight down, in soft
-              daylight with no flash &mdash; glare is what the model copies worst.
+              This photo is sent to the model as the reference. Shoot it flat, straight down, in soft daylight
+              with no flash &mdash; glare is what the model copies worst.
+              {roll.source === "cutout" && " Get the whole sheet in frame: a cutout is one fixed artwork and the model is told to place it whole, so anything cropped out here is lost."}
             </p>
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUploadRaw(f); }} />
@@ -865,7 +919,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{s.label}</span>
                           <code className="block truncate text-[10px] text-muted-foreground">
-                            {mockupFileStem(String(roll.rNumber), s.suffix)}.webp
+                            {mockupFileStem(roll.code, s.suffix)}.webp
                           </code>
                           <LinkTargets titles={targetsFor(s)} />
                         </span>
