@@ -15,3 +15,4 @@ export * from "./abandonedCarts";
 export * from "./collectionSync";
 export * from "./whatsappWorker";
 export * from "./poyo";
+export * from "./materials";

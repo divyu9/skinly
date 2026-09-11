@@ -36,6 +36,7 @@ export function CutoutsManagement() {
   const updateCutout = useMutation(api.aiMockups.updateCutoutInventory);
   const deleteCutout = useMutation(api.aiMockups.deleteCutoutInventory);
   const uploadToLibrary = useAction(api.mediaLibrary.uploadAndAddToLibrary);
+  const recalcStock = useAction(api.materials.recalcMaterialStock);
 
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -210,9 +211,19 @@ export function CutoutsManagement() {
                     type="number" min="0" step="1"
                     className="h-8 w-20 text-sm"
                     defaultValue={sheets}
-                    onBlur={(e) => {
+                    onBlur={async (e) => {
                       const next = Math.max(0, parseInt(e.target.value) || 0);
-                      if (next !== sheets) void updateCutout({ id: c._id, sheetsAvailable: next }).then(() => toast.success(`${c.cutoutNumber}: ${next} sheets`));
+                      if (next === sheets) return;
+                      await updateCutout({ id: c._id, sheetsAvailable: next });
+                      // Sheets are the shelf; inventoryQuantity is what the
+                      // storefront gates on. Push the new figure through or the
+                      // change stops at this table.
+                      try {
+                        const r: any = await recalcStock({ codes });
+                        toast.success(`${c.cutoutNumber}: ${next} sheets · ${r?.updated ?? 0} variants restocked`);
+                      } catch {
+                        toast.warning(`${c.cutoutNumber}: ${next} sheets saved, but restocking the variants failed`);
+                      }
                     }}
                   />
                 </div>

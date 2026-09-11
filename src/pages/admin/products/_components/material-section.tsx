@@ -34,8 +34,27 @@ export interface MaterialDesign {
 
 export interface VariantLine {
   title: string;
+  sku?: string;
   consumptionPresetId?: string;
   customMultiplier?: string;
+}
+
+/**
+ * The design a SKU names, when nobody assigned one explicitly.
+ *
+ * LP-26-LPK was never given an rNumber but says LP-26 plainly enough. The
+ * search runs right to left and stops at the first hit, because design codes
+ * open with LP and LC — themselves view codes — and going the other way would
+ * match the wrong half of the SKU.
+ */
+export function inferDesignCode(sku: string, designs: MaterialDesign[]): string {
+  const known = new Map(designs.map((d) => [d.code.toUpperCase(), d.code]));
+  const parts = String(sku || "").split("-");
+  for (let k = parts.length; k >= 1; k--) {
+    const hit = known.get(parts.slice(0, k).join("-").toUpperCase());
+    if (hit) return hit;
+  }
+  return "";
 }
 
 /** Rolls and cutouts in one list — the code already says which kind it is. */
@@ -106,7 +125,18 @@ export function MaterialSection({
     [consumption, gadgetTypeId]
   );
   const forGadget = presets || [];
-  const selected = (designs || []).find((d) => d.code.toUpperCase() === designCode.trim().toUpperCase());
+  // Fall back to what the SKUs already say, so a product nobody formally
+  // assigned still shows its material instead of an empty prompt.
+  const inferred = useMemo(() => {
+    if (designCode.trim() || !designs) return "";
+    for (const v of variants) {
+      const hit = inferDesignCode(v.sku || "", designs);
+      if (hit) return hit;
+    }
+    return "";
+  }, [designCode, designs, variants]);
+  const effectiveCode = designCode.trim() || inferred;
+  const selected = (designs || []).find((d) => d.code.toUpperCase() === effectiveCode.toUpperCase());
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -153,7 +183,12 @@ export function MaterialSection({
             <div className="text-sm font-semibold tabular-nums">{selected.stock}</div>
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{selected.unit} in stock</div>
           </div>
-          <Button type="button" size="sm" variant="ghost" onClick={() => setPicking((p) => !p)}>Change</Button>
+          <div className="flex shrink-0 flex-col items-end">
+            {!designCode.trim() && inferred && (
+              <span className="text-[10px] text-muted-foreground">read from SKU</span>
+            )}
+            <Button type="button" size="sm" variant="ghost" onClick={() => setPicking((p) => !p)}>Change</Button>
+          </div>
         </div>
       ) : (
         <button
@@ -162,9 +197,9 @@ export function MaterialSection({
           className="flex w-full items-center gap-2 rounded-lg border border-dashed p-3 text-left text-sm text-muted-foreground hover:bg-muted/40"
         >
           <ImageIcon className="size-4" />
-          {designCode.trim()
+          {effectiveCode
             ? <span className="text-amber-600">
-                <strong className="font-mono">{designCode}</strong> is not in roll or cutout inventory — stock will never move for it
+                <strong className="font-mono">{effectiveCode}</strong> is not in roll or cutout inventory — stock will never move for it
               </span>
             : "Pick the roll or cutout this product is printed from"}
         </button>

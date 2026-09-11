@@ -1,5 +1,5 @@
 import { useAction, useQuery, useMutation } from "@/lib/firebase-hooks";
-import { MaterialSection } from "../_components/material-section.tsx";
+import { MaterialSection, useMaterialDesigns, inferDesignCode } from "../_components/material-section.tsx";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -92,6 +92,7 @@ function EditProductPageInner() {
   // One design per product: every variant is printed from the same roll or
   // cutout, and the stock maths keys off it.
   const [designCode, setDesignCode] = useState("");
+  const materialDesigns = useMaterialDesigns();
 
   // Get presets for selected gadget type
   const variantPresets = useQuery(
@@ -295,7 +296,7 @@ function EditProductPageInner() {
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
             consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
             customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
-            rNumber: designCode.trim() || undefined,
+            rNumber: designCode.trim() || inferDesignCode(variant.sku, materialDesigns || []) || undefined,
             materialMultiplier: resolveMultiplier(variant),
           });
         } else {
@@ -310,7 +311,7 @@ function EditProductPageInner() {
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
             consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
             customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
-            rNumber: designCode.trim() || undefined,
+            rNumber: designCode.trim() || inferDesignCode(variant.sku, materialDesigns || []) || undefined,
             materialMultiplier: resolveMultiplier(variant),
           });
         }
@@ -622,7 +623,7 @@ function EditProductPageInner() {
                 gadgetTypeId={formData.gadgetTypeId || undefined}
                 designCode={designCode}
                 onDesignChange={setDesignCode}
-                variants={variants}
+                variants={variants.map((v) => ({ title: v.title, sku: v.sku, consumptionPresetId: v.consumptionPresetId, customMultiplier: v.customMultiplier }))}
                 onVariantChange={(i, field, value) => updateVariantLocal(i, field, value)}
               />
             </CardContent>

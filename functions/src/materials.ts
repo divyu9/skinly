@@ -1,4 +1,6 @@
 import * as admin from "firebase-admin";
+import { onCall, HttpsError } from "firebase-functions/v1/https";
+import { requireAdmin } from "./auth";
 
 /**
  * Draws down design stock when an order is placed.
@@ -167,4 +169,116 @@ export async function reserveMaterialForOrder(
   if (unresolved.length) console.warn("reserveMaterial: unresolved lines", { order: orderRef.id, unresolved });
 
   await orderRef.update({ materialConsumed: taken, materialReservedAt: Date.now() });
+
+  // Selling one view changes what the others can still make, so push the new
+  // figures out to every variant sharing the design.
+  try {
+    const resynced = await syncStockForDesign(db, taken.map((t) => t.code));
+    if (resynced.length) console.log("reserveMaterial: restocked variants", { order: orderRef.id, count: resynced.length });
+  } catch (e: any) {
+    console.error("reserveMaterial: stock sync failed", { order: orderRef.id, error: e?.message || e });
+  }
 }
+
+
+/**
+ * Pushes material availability into the number the storefront actually reads.
+ *
+ * Sheets and metres are what the shelf holds; `inventoryQuantity` is what the
+ * product page, the cart and the trending rails gate on. They were unrelated —
+ * a design could have two sheets while every variant made from it sat at zero,
+ * because someone had typed zero months ago.
+ *
+ * So whenever stock moves, every variant backed by that design is rewritten
+ * from it: a two-sheet cutout becomes two lids and one lid-plus-keyboard, and
+ * selling either re-runs this and moves the other.
+ */
+export async function syncStockForDesign(
+  db: admin.firestore.Firestore,
+  codes: string[]
+): Promise<Array<{ sku: string; units: number }>> {
+  const wanted = new Set(codes.map((c) => String(c).trim().toUpperCase()).filter(Boolean));
+  if (!wanted.size) return [];
+
+  const [rollSnap, cutoutSnap, gadgetSnap, variantSnap, productSnap] = await Promise.all([
+    db.collection("rollInventory").get(),
+    db.collection("cutoutInventory").get(),
+    db.collection("gadgetConsumption").get(),
+    db.collection("variants").get(),
+    db.collection("products").get(),
+  ]);
+
+  const stock = new Map<string, { kind: "roll" | "cutout"; amount: number }>();
+  rollSnap.docs.forEach((d) => {
+    const r = d.data() as any;
+    if (r.rNumber) stock.set(String(r.rNumber).trim().toUpperCase(), { kind: "roll", amount: Number(r.metersAvailable) || 0 });
+  });
+  cutoutSnap.docs.forEach((d) => {
+    const c = d.data() as any;
+    for (const code of [c.cutoutNumber, ...(c.aliases || [])]) {
+      if (code) stock.set(String(code).trim().toUpperCase(), { kind: "cutout", amount: Number(c.sheetsAvailable) || 0 });
+    }
+  });
+  const products = new Map(productSnap.docs.map((d) => [d.id, d.data() as any]));
+  const gadgets = new Map<string, any>();
+  gadgetSnap.docs.forEach((d) => {
+    const g = d.data() as any;
+    if (g.gadgetTypeId) gadgets.set(g.gadgetTypeId, g);
+  });
+
+  /** rNumber, else the leading segments of the SKU. */
+  const codeOf = (v: any): string | null => {
+    const rn = String(v?.rNumber || "").trim().toUpperCase();
+    if (rn && stock.has(rn)) return rn;
+    const parts = String(v?.sku || "").split("-");
+    for (let k = parts.length - 1; k >= 1; k--) {
+      const code = parts.slice(0, k).join("-").toUpperCase();
+      if (stock.has(code)) return code;
+    }
+    const whole = String(v?.sku || "").trim().toUpperCase();
+    return stock.has(whole) ? whole : null;
+  };
+
+  const writes: Array<{ ref: admin.firestore.DocumentReference; units: number; sku: string }> = [];
+  for (const d of variantSnap.docs) {
+    const v = d.data() as any;
+    const code = codeOf(v);
+    if (!code || !wanted.has(code)) continue;
+
+    const entry = stock.get(code)!;
+    const multiplier = Math.max(Number(v.materialMultiplier) || 1, 0.01);
+    let units: number;
+
+    if (entry.kind === "cutout") {
+      units = Math.floor(entry.amount / multiplier);
+    } else {
+      const product = products.get(v.productId);
+      const gadget = product ? gadgets.get(product.gadgetTypeId) : null;
+      if (!gadget || !(gadget.lengthCm > 0) || !(gadget.widthCm > 0)) continue;
+      const areaPerUnit = Number(gadget.lengthCm) * Number(gadget.widthCm) * multiplier;
+      units = Math.floor((ROLL_WIDTH_CM * entry.amount * 100) / areaPerUnit);
+    }
+
+    if (Number(v.inventoryQuantity) !== units) {
+      writes.push({ ref: d.ref, units, sku: String(v.sku || "") });
+    }
+  }
+
+  for (let i = 0; i < writes.length; i += 450) {
+    const batch = db.batch();
+    writes.slice(i, i + 450).forEach((w) =>
+      batch.update(w.ref, { inventoryQuantity: w.units, stockFromMaterialAt: Date.now() })
+    );
+    await batch.commit();
+  }
+  return writes.map((w) => ({ sku: w.sku, units: w.units }));
+}
+
+/** Admin-triggered recalculation, used after editing sheets or metres. */
+export const recalcMaterialStock = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const codes: string[] = Array.isArray(data?.codes) ? data.codes : data?.code ? [data.code] : [];
+  if (!codes.length) throw new HttpsError("invalid-argument", "A design code is required");
+  const updated = await syncStockForDesign(admin.firestore(), codes);
+  return { success: true, updated: updated.length, variants: updated.slice(0, 50) };
+});
