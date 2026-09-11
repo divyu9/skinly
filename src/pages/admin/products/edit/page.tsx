@@ -1,4 +1,5 @@
 import { useAction, useQuery, useMutation } from "@/lib/firebase-hooks";
+import { MaterialSection } from "../_components/material-section.tsx";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -23,6 +24,7 @@ import { ProductImageUploader } from "../_components/product-image-uploader.tsx"
 
 interface Variant {
   _id?: Id<"variants">;
+  rNumber?: string;
   sku: string;
   title: string;
   price: string;
@@ -87,6 +89,10 @@ function EditProductPageInner() {
   const [variants, setVariants] = useState<Variant[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // One design per product: every variant is printed from the same roll or
+  // cutout, and the stock maths keys off it.
+  const [designCode, setDesignCode] = useState("");
+
   // Get presets for selected gadget type
   const variantPresets = useQuery(
     api.variantConsumptionPresets.listByGadgetType,
@@ -138,15 +144,31 @@ function EditProductPageInner() {
           price: v.price.toString(),
           compareAtPrice: v.compareAtPrice?.toString() || "",
           inventoryQuantity: v.inventoryQuantity.toString(),
+          rNumber: v.rNumber || "",
           consumptionPresetId: v.consumptionPresetId || "",
           customMultiplier: v.customMultiplier?.toString() || "",
         }))
       );
+      // Variants all share one design; take the first that names one.
+      setDesignCode(product.variants.find((v) => v.rNumber)?.rNumber || "");
     }
   }, [product]);
 
+  /**
+   * What the stock maths actually reads.
+   *
+   * A custom figure wins, then the preset's, then one. Writing it here is what
+   * makes the dropdown on this page affect availability — until now it only
+   * stored a preset id that nothing downstream looked at.
+   */
+  const resolveMultiplier = (variant: Variant): number => {
+    if (variant.customMultiplier) return parseFloat(variant.customMultiplier) || 1;
+    const preset = variantPresets?.find((p: any) => p._id === variant.consumptionPresetId);
+    return Number(preset?.multiplier) || 1;
+  };
+
   const addVariant = () => {
-    setVariants([...variants, { sku: "", title: "", price: "", compareAtPrice: "", inventoryQuantity: "0", consumptionPresetId: "", customMultiplier: "" }]);
+    setVariants([...variants, { sku: "", title: "", price: "", compareAtPrice: "", inventoryQuantity: "0", rNumber: designCode, consumptionPresetId: "", customMultiplier: "" }]);
   };
 
   const removeVariant = async (index: number) => {
@@ -273,6 +295,8 @@ function EditProductPageInner() {
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
             consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
             customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
+            rNumber: designCode.trim() || undefined,
+            materialMultiplier: resolveMultiplier(variant),
           });
         } else {
           // Create new variant
@@ -286,6 +310,8 @@ function EditProductPageInner() {
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
             consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
             customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
+            rNumber: designCode.trim() || undefined,
+            materialMultiplier: resolveMultiplier(variant),
           });
         }
       }
@@ -583,50 +609,6 @@ function EditProductPageInner() {
                       />
                     </div>
                   </div>
-                  {/* Roll consumption settings */}
-                  {formData.gadgetTypeId && (
-                    <div className="pt-3 border-t space-y-3">
-                      <h5 className="text-sm font-medium text-muted-foreground">Roll Consumption (Optional)</h5>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label>Consumption Preset</Label>
-                          <Select
-                            value={variant.consumptionPresetId || "none"}
-                            onValueChange={(value) => updateVariantLocal(index, "consumptionPresetId", value === "none" ? "" : value)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="None" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {variantPresets?.map((preset) => (
-                                <SelectItem key={preset._id} value={preset._id}>
-                                  {preset.name} ({preset.multiplier}x)
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Preset multipliers for roll material
-                          </p>
-                        </div>
-                        <div>
-                          <Label>Custom Multiplier</Label>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            placeholder="e.g., 1.5"
-                            value={variant.customMultiplier}
-                            onChange={(e) => updateVariantLocal(index, "customMultiplier", e.target.value)}
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Overrides preset if set
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
               {formData.hasMultipleVariants && (
@@ -635,6 +617,14 @@ function EditProductPageInner() {
                   Add Variant
                 </Button>
               )}
+
+              <MaterialSection
+                gadgetTypeId={formData.gadgetTypeId || undefined}
+                designCode={designCode}
+                onDesignChange={setDesignCode}
+                variants={variants}
+                onVariantChange={(i, field, value) => updateVariantLocal(i, field, value)}
+              />
             </CardContent>
           </Card>
         </div>
