@@ -47,8 +47,12 @@ export interface MockupShot {
    * Phones, lenses, chargers and the Tranzy laptops are sold as one thing with
    * one variant — no view code in the SKU, and a title of "Default Title" or
    * "Only Top" that decides nothing. With one variant there is no question
-   * which view it is, so the gadget's primary shot can say it takes them. Set
-   * on one shot per gadget only, or two will both claim it.
+   * which view it is, so a shot can say it takes them.
+   *
+   * Two shots on the same gadget may both set it where both pictures belong on
+   * that one listing — the iPhone and the Samsung are two photographs of one
+   * phone skin. Do not set it on shots that show different products, or each
+   * will attach its image to the other's listing.
    */
   matchSingleVariant?: boolean;
   prompt: string;
@@ -916,6 +920,10 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "phone",
     suffix: "phone-samsung",
     skuCodes: ["PH", "SAM"],
+    // A phone design is one listing with one variant whose SKU is the bare
+    // design code, so neither a view code nor a title can find it — and both
+    // phone pictures belong on that same listing.
+    matchSingleVariant: true,
     askCutOrientation: true,
     order: 1,
     isActive: true,
