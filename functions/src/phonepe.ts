@@ -176,7 +176,11 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
   const amountInPaise = Math.max(Math.round(payable * 100), 100);
   const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
   // callbackUrl must be the Firebase Function endpoint so PhonePe can POST to a real server
-  const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
+  // Must be the function, not the SPA route. The default used to be
+  // `${siteUrl}/payment/callback`, which is a React page: PhonePe POSTed its
+  // result there, got 200 and a lump of HTML, and the order stayed pending.
+  const callbackFnUrl = process.env.CALLBACK_FN_URL
+    || `https://us-central1-${process.env.GCLOUD_PROJECT || "skinly-3003b"}.cloudfunctions.net/paymentCallback`;
 
   const paymentPayload = {
     merchantId: config.merchantId,

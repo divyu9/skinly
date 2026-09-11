@@ -213,7 +213,9 @@ export const placeOrder = functions
       const merchantTransactionId = `${orderNumber.replace("#", "")}-${Date.now().toString().slice(-6)}`;
       const amountInPaise = Math.max(Math.round(amountPayable * 100), 100);
       const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
-      const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
+      // The function, not the SPA route — see the note in phonepe.ts.
+      const callbackFnUrl = process.env.CALLBACK_FN_URL
+        || `https://us-central1-${process.env.GCLOUD_PROJECT || "skinly-3003b"}.cloudfunctions.net/paymentCallback`;
 
       const paymentPayload = {
         merchantId: config.merchantId,

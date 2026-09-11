@@ -1,30 +1,6 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.requireAdmin = exports.requireAuth = exports.getCaller = void 0;
-const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v1/https");
 const getCaller = (request) => {
     const auth = request === null || request === void 0 ? void 0 : request.auth;
@@ -49,8 +25,13 @@ const parseAllowlist = (value) => {
         .map((s) => s.trim().toLowerCase())
         .filter(Boolean);
 };
+/**
+ * Admin is proven by a custom claim on the ID token, or by an email on the
+ * server-side allowlist. It is deliberately NOT read from users/{uid}.isAdmin
+ * any more: that document is writable by the user it belongs to, so trusting a
+ * field in it let any customer grant themselves every admin function.
+ */
 const requireAdmin = async (request) => {
-    var _a;
     const { uid, token } = (0, exports.getCaller)(request);
     if (!uid) {
         throw new https_1.HttpsError("unauthenticated", "UNAUTHENTICATED");
@@ -60,14 +41,12 @@ const requireAdmin = async (request) => {
     }
     const allowlist = parseAllowlist(process.env.ADMIN_EMAIL_ALLOWLIST);
     const email = ((token === null || token === void 0 ? void 0 : token.email) || "").toLowerCase();
-    if (email && allowlist.includes(email)) {
+    // email_verified guards against a provider that lets an address be claimed
+    // without proving it.
+    if (email && (token === null || token === void 0 ? void 0 : token.email_verified) !== false && allowlist.includes(email)) {
         return { uid };
     }
-    const snap = await admin.firestore().collection("users").doc(uid).get();
-    if (snap.exists && ((_a = snap.data()) === null || _a === void 0 ? void 0 : _a.isAdmin) === true) {
-        return { uid };
-    }
-    throw new https_1.HttpsError("permission-denied", "UNAUTHENTICATED");
+    throw new https_1.HttpsError("permission-denied", "Your account is not an admin");
 };
 exports.requireAdmin = requireAdmin;
 //# sourceMappingURL=auth.js.map

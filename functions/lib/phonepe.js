@@ -49,12 +49,75 @@ const generateXVerify = (base64Payload, endpoint, saltKey, saltIndex) => {
     const sha256Hash = crypto.createHash("sha256").update(stringToHash).digest("hex");
     return `${sha256Hash}###${saltIndex}`;
 };
+/**
+ * Applies a PhonePe result to the order it belongs to.
+ *
+ * Shared by the status check and the server-to-server callback, because they
+ * are the same decision reached by two routes and they must not drift. The
+ * callback is the one that matters: the status check only runs while the
+ * customer's browser is still on our page, and plenty of them never come back.
+ *
+ * Idempotent — PhonePe retries its callback, and a settled order stays settled.
+ */
+const applyPaymentResult = async (merchantTransactionId, state, paidPaise, source) => {
+    var _a;
+    const paymentStatus = state === "COMPLETED" ? "success" : state === "FAILED" ? "failed" : "pending";
+    const snap = await admin.firestore().collection("orders")
+        .where("paymentTransactionId", "==", merchantTransactionId)
+        .limit(1)
+        .get();
+    if (snap.empty) {
+        console.warn("PhonePe result for an unknown transaction", { merchantTransactionId, state, source });
+        return { paymentStatus, orderId: null, changed: false };
+    }
+    const doc = snap.docs[0];
+    const order = doc.data();
+    // Never walk a settled order backwards: a late callback for a transaction
+    // that already succeeded must not reopen it.
+    if (order.paymentStatus === "success" && paymentStatus !== "success") {
+        console.warn("Ignoring a later non-success for a paid order", { orderId: doc.id, state, source });
+        return { paymentStatus: "success", orderId: doc.id, changed: false };
+    }
+    if (paymentStatus === "pending")
+        return { paymentStatus, orderId: doc.id, changed: false };
+    if (paymentStatus === "failed") {
+        if (order.paymentStatus === "failed")
+            return { paymentStatus, orderId: doc.id, changed: false };
+        await doc.ref.update({ paymentStatus: "failed", updatedAt: Date.now(), paymentFailedVia: source });
+        return { paymentStatus, orderId: doc.id, changed: true };
+    }
+    // COMPLETED is not the same as PhonePe having collected the right amount.
+    const expectedPaise = Math.max(Math.round(Number((_a = order.amountPayable) !== null && _a !== void 0 ? _a : order.total) * 100), 100);
+    const paid = Number(paidPaise);
+    if (!Number.isFinite(paid) || paid < expectedPaise) {
+        console.error("PhonePe amount mismatch", { merchantTransactionId, orderId: doc.id, paid, expectedPaise, source });
+        await doc.ref.update({
+            paymentStatus: "underpaid",
+            paymentAmountPaise: Number.isFinite(paid) ? paid : null,
+            updatedAt: Date.now(),
+        });
+        return { paymentStatus: "underpaid", orderId: doc.id, changed: true };
+    }
+    if (order.paymentStatus === "success")
+        return { paymentStatus, orderId: doc.id, changed: false };
+    await doc.ref.update({
+        paymentStatus: "success",
+        status: "processing",
+        paymentAmountPaise: paid,
+        paymentConfirmedVia: source,
+        updatedAt: Date.now(),
+    });
+    return { paymentStatus, orderId: doc.id, changed: true };
+};
 exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data, context) => {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const { uid } = (0, auth_1.getCaller)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `initiatePayment_${uid || "guest"}`, limit: Number(process.env.PHONEPE_INIT_DAILY_LIMIT || 2000) });
-    const { orderId, amount, customerPhone, orderNumber, sessionId } = data;
-    if (!orderId || !amount || !customerPhone) {
+    // `amount` is accepted for backward compatibility and then ignored — what
+    // gets charged is read off the order below. Trusting the caller's figure let
+    // anyone pay ₹1 for any order.
+    const { orderId, customerPhone, orderNumber, sessionId } = data;
+    if (!orderId || !customerPhone) {
         throw new https_1.HttpsError("invalid-argument", "Missing required fields");
     }
     if (typeof orderId !== "string" || orderId.length > 128) {
@@ -66,9 +129,6 @@ exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 6
     }
     if (!/^[0-9]{10}$/.test(phoneDigits)) {
         throw new https_1.HttpsError("invalid-argument", "Invalid phone number");
-    }
-    if (typeof amount !== "number" || !Number.isFinite(amount) || amount <= 0) {
-        throw new https_1.HttpsError("invalid-argument", "Invalid amount");
     }
     const config = getPhonePeConfig();
     const orderRef = admin.firestore().collection("orders").doc(orderId);
@@ -102,14 +162,26 @@ exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 6
             throw new https_1.HttpsError("permission-denied", "Unauthorized");
         }
     }
+    // The single source of truth for what this order costs.
+    const payable = Number((_a = order.amountPayable) !== null && _a !== void 0 ? _a : order.total);
+    if (!Number.isFinite(payable) || payable <= 0) {
+        throw new https_1.HttpsError("failed-precondition", "Order has no payable amount");
+    }
+    if (order.paymentStatus === "success") {
+        throw new https_1.HttpsError("failed-precondition", "Order is already paid");
+    }
     const timestamp = Date.now();
     const last6 = timestamp.toString().slice(-6);
     const orderRefSuffix = orderNumber || orderId.slice(-8);
     const merchantTransactionId = `${orderRefSuffix}-${last6}`;
-    const amountInPaise = Math.max(Math.round(amount * 100), 100);
+    const amountInPaise = Math.max(Math.round(payable * 100), 100);
     const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
     // callbackUrl must be the Firebase Function endpoint so PhonePe can POST to a real server
-    const callbackFnUrl = process.env.CALLBACK_FN_URL || `${siteUrl}/payment/callback`;
+    // Must be the function, not the SPA route. The default used to be
+    // `${siteUrl}/payment/callback`, which is a React page: PhonePe POSTed its
+    // result there, got 200 and a lump of HTML, and the order stayed pending.
+    const callbackFnUrl = process.env.CALLBACK_FN_URL
+        || `https://us-central1-${process.env.GCLOUD_PROJECT || "skinly-3003b"}.cloudfunctions.net/paymentCallback`;
     const paymentPayload = {
         merchantId: config.merchantId,
         merchantTransactionId: merchantTransactionId,
@@ -150,7 +222,7 @@ exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 6
         try {
             responseData = JSON.parse(responseText);
         }
-        catch (_d) {
+        catch (_e) {
             console.error("PhonePe non-JSON response", { status: response.status, body: responseText.slice(0, 500) });
             throw new https_1.HttpsError("unavailable", `PhonePe returned non-JSON response (HTTP ${response.status})`);
         }
@@ -160,7 +232,7 @@ exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 6
             console.error("PhonePe Initiation Failed", responseData);
             throw new https_1.HttpsError("unavailable", errMsg);
         }
-        const paymentUrl = (_c = (_b = (_a = responseData.data) === null || _a === void 0 ? void 0 : _a.instrumentResponse) === null || _b === void 0 ? void 0 : _b.redirectInfo) === null || _c === void 0 ? void 0 : _c.url;
+        const paymentUrl = (_d = (_c = (_b = responseData.data) === null || _b === void 0 ? void 0 : _b.instrumentResponse) === null || _c === void 0 ? void 0 : _c.redirectInfo) === null || _d === void 0 ? void 0 : _d.url;
         if (!paymentUrl) {
             throw new https_1.HttpsError("unavailable", "PhonePe returned no payment URL");
         }
@@ -185,7 +257,7 @@ exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 6
     }
 });
 exports.checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data, context) => {
-    var _a;
+    var _a, _b;
     const { uid } = (0, auth_1.getCaller)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `checkPaymentStatus_${uid || "guest"}`, limit: Number(process.env.PHONEPE_STATUS_DAILY_LIMIT || 4000) });
     const { merchantTransactionId, orderId, sessionId } = data;
@@ -239,24 +311,12 @@ exports.checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds
             throw new https_1.HttpsError("internal", responseData.message || "Payment status check failed");
         }
         const state = (_a = responseData.data) === null || _a === void 0 ? void 0 : _a.state;
-        let paymentStatus = "pending";
-        if (state === "COMPLETED")
-            paymentStatus = "success";
-        else if (state === "FAILED")
-            paymentStatus = "failed";
-        if (paymentStatus === "success") {
-            const ordersSnap = await admin.firestore().collection("orders")
-                .where("paymentTransactionId", "==", merchantTransactionId)
-                .limit(1)
-                .get();
-            if (!ordersSnap.empty) {
-                await ordersSnap.docs[0].ref.update({
-                    paymentStatus: "success",
-                    status: "processing",
-                    updatedAt: Date.now()
-                });
-            }
+        // One decision, one implementation — the callback reaches the same place.
+        const applied = await applyPaymentResult(merchantTransactionId, state, (_b = responseData.data) === null || _b === void 0 ? void 0 : _b.amount, "status-check");
+        if (applied.paymentStatus === "underpaid") {
+            throw new https_1.HttpsError("failed-precondition", "Payment amount does not match the order");
         }
+        const paymentStatus = applied.paymentStatus;
         return {
             success: true,
             paymentStatus,
@@ -271,7 +331,63 @@ exports.checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds
         throw new https_1.HttpsError("internal", (error === null || error === void 0 ? void 0 : error.message) || "Status check error");
     }
 });
+/**
+ * PhonePe's server-to-server result.
+ *
+ * This is the only path that does not depend on the customer's browser coming
+ * back to us, which is why it matters: a closed tab, a dropped connection or a
+ * UPI app that never redirects all end here and nowhere else. It used to reply
+ * "OK" and discard the body, so those orders stayed pending for ever.
+ *
+ * PhonePe signs the callback the same way it signs a response: the header is
+ * sha256(base64Payload + saltKey) + "###" + saltIndex. An unsigned or wrongly
+ * signed POST is refused — this endpoint is public, and without the check
+ * anyone could mark any order paid.
+ */
 exports.paymentCallback = (0, https_1.onRequest)(async (req, res) => {
-    res.status(200).send("OK");
+    var _a;
+    try {
+        if (req.method !== "POST") {
+            res.status(405).send("Method not allowed");
+            return;
+        }
+        const header = String(req.get("X-VERIFY") || req.get("x-verify") || "");
+        const encoded = (_a = req.body) === null || _a === void 0 ? void 0 : _a.response;
+        if (!header || typeof encoded !== "string" || !encoded) {
+            console.error("PhonePe callback missing signature or body");
+            res.status(400).send("Bad request");
+            return;
+        }
+        const config = getPhonePeConfig();
+        const expected = crypto.createHash("sha256").update(encoded + config.saltKey).digest("hex");
+        const [got] = header.split("###");
+        const a = Buffer.from(String(got), "utf8");
+        const b = Buffer.from(expected, "utf8");
+        if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+            console.error("PhonePe callback signature rejected");
+            res.status(401).send("Unauthorized");
+            return;
+        }
+        const payload = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
+        const d = (payload === null || payload === void 0 ? void 0 : payload.data) || {};
+        const merchantTransactionId = d.merchantTransactionId || d.merchantOrderId || d.transactionId;
+        if (!merchantTransactionId) {
+            console.error("PhonePe callback carried no transaction id", { code: payload === null || payload === void 0 ? void 0 : payload.code });
+            res.status(400).send("Bad request");
+            return;
+        }
+        const state = d.state || ((payload === null || payload === void 0 ? void 0 : payload.code) === "PAYMENT_SUCCESS" ? "COMPLETED"
+            : (payload === null || payload === void 0 ? void 0 : payload.code) === "PAYMENT_ERROR" ? "FAILED" : undefined);
+        const applied = await applyPaymentResult(merchantTransactionId, state, d.amount, "callback");
+        console.log("PhonePe callback applied", Object.assign({ merchantTransactionId, state, code: payload === null || payload === void 0 ? void 0 : payload.code }, applied));
+        // Always 200 once the signature checks out: a non-2xx makes PhonePe retry,
+        // and a transaction we cannot match will not match on the retry either.
+        res.status(200).send("OK");
+    }
+    catch (e) {
+        console.error("PhonePe callback failed", (e === null || e === void 0 ? void 0 : e.message) || e);
+        // 500 so PhonePe retries — this one may well succeed next time.
+        res.status(500).send("Error");
+    }
 });
 //# sourceMappingURL=phonepe.js.map
