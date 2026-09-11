@@ -130,89 +130,110 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "dials and rear screen stay uncovered. {{staging}} ",
   },
   {
-    label: "20W charger \u2014 front + angle",
+    label: "20W charger \u2014 two angles",
     gadget: "charger",
     suffix: "charger",
     skuCodes: ["CH"],
     order: 0,
     isActive: true,
     prompt:
-      "Two views of the same small white Apple 20W USB-C power adapter arranged side by side in one "
-        + "photograph on a light oak desk: on the left the flat front face square to the camera, on the "
-        + "right the same adapter turned to a three-quarter angle so a side face and the two round "
-        + "Indian-standard pins are visible. Shot close so the pair fills the frame. A vinyl skin covers "
-        + "the front face and the visible side faces of both. {{fidelity}} The artwork bends around the "
-        + "rounded edges and stays sharp at this close distance. The USB-C port and the two round metal "
-        + "pins stay uncovered, with the vinyl stopping cleanly at their edges. Behind, well out of "
-        + "focus, a loosely coiled white cable. No people and no hands anywhere in the frame. {{staging}} ",
+      "Two Apple 20W USB-C power adapters on a light oak desk, the same product shown from two "
+        + "different sides: one in front turned to a three-quarter angle so its flat front face with the "
+        + "single oval USB-C port is towards the camera, and one behind it, smaller in frame and rotated "
+        + "away, showing its top face with the two round Indian-standard pins standing up. Each is a "
+        + "small glossy white rounded-rectangle brick roughly the size of a matchbox. A vinyl skin covers "
+        + "the large flat front and back faces. {{fidelity}} The skin is a thin die-cut vinyl sheet "
+        + "applied only to the flat faces. It does not wrap over the rounded corners or the curved edges, "
+        + "which stay bare glossy white plastic, and a clean straight cut edge is visible where the vinyl "
+        + "ends. Real manufactured product, correct real-world proportions, crisp geometry, no melted or "
+        + "warped edges, no smeared detail, nothing duplicated or mirrored. The USB-C port and the two "
+        + "round metal pins stay completely uncovered. The two adapters sit at different distances with "
+        + "their own separate shadows so they read as two photographs of one product, not a copy-paste. "
+        + "No people and no hands anywhere in the frame. {{staging}} ",
   },
   {
-    label: "MacBook charger \u2014 front + angle",
+    label: "MacBook charger \u2014 two angles",
     gadget: "charger",
     suffix: "charger-macbook",
     skuCodes: ["CH"],
     order: 1,
     isActive: true,
     prompt:
-      "Two views of the same large square white Apple MacBook USB-C power adapter arranged side by "
-        + "side in one photograph on a light oak desk: on the left the flat front face square to the "
-        + "camera, on the right the same adapter turned to a three-quarter angle so a side face and the "
-        + "folded Indian-standard pin attachment are visible. Shot so the pair fills the frame. A vinyl "
-        + "skin covers the front face and the visible side faces of both. {{fidelity}} The skin is "
-        + "die-cut to the exact silhouette of the Apple logo: the vinyl pattern runs continuously across "
-        + "the whole panel and stops only at the outline of the logo itself, leaving just that apple "
-        + "shape as bare metal. There is no circle, no ring, no disc, no rounded plate and no border of "
-        + "any kind around the logo \u2014 the pattern touches the logo outline directly on every side. The "
-        + "USB-C port and the metal pins stay uncovered, with the vinyl stopping cleanly at their edges. "
-        + "Behind, well out of focus, a coiled white USB-C cable. No people and no hands anywhere in the "
-        + "frame. {{staging}} ",
+      "Two Apple MacBook USB-C power adapters on a light oak desk, the same product shown from two "
+        + "different sides: one in front turned to a three-quarter angle showing its large flat square "
+        + "face, and one behind it, smaller in frame and rotated away, showing the side with the "
+        + "detachable Indian-standard pin head fitted. Each is a thick glossy white square brick with "
+        + "softly rounded corners, roughly the size of a coaster. A vinyl skin covers the large flat "
+        + "square faces. {{fidelity}} The skin is die-cut to the exact silhouette of the Apple logo: the "
+        + "vinyl runs continuously across the face and stops only at the outline of the logo, leaving "
+        + "just that apple shape bare. There is no circle, no ring, no disc, no plate and no border of "
+        + "any kind around it. The skin is a thin die-cut vinyl sheet applied only to the flat faces. It "
+        + "does not wrap over the rounded corners or the curved edges, which stay bare glossy white "
+        + "plastic, and a clean straight cut edge is visible where the vinyl ends. Real manufactured "
+        + "product, correct real-world proportions, crisp geometry, no melted or warped edges, no smeared "
+        + "detail, nothing duplicated or mirrored. The USB-C port and the metal pins stay completely "
+        + "uncovered. The two adapters sit at different distances with their own separate shadows so they "
+        + "read as two photographs of one product, not a copy-paste. No people and no hands anywhere in "
+        + "the frame. {{staging}} ",
   },
   {
-    label: "Held in fingers",
+    label: "20W charger \u2014 held",
     gadget: "charger",
     suffix: "charger-hand",
     skuCodes: ["CH"],
     order: 2,
     isActive: true,
     prompt:
-      "A small white Apple 20W USB-C power adapter held between the thumb and forefinger of one hand "
-        + "against a softly blurred indoor background, photographed close up so the adapter dominates the "
-        + "frame and its real size against the fingers is obvious. A single adult hand holds the device, "
+      "A single Apple 20W USB-C power adapter held upright between the thumb and forefinger of one "
+        + "hand against a softly blurred indoor background, shot close so its real size against the "
+        + "fingers is obvious. It is a small glossy white rounded-rectangle brick with one oval USB-C "
+        + "port on the front face and two round Indian-standard pins on top. A vinyl skin covers the flat "
+        + "front face. {{fidelity}} The skin is a thin die-cut vinyl sheet applied only to the flat "
+        + "faces. It does not wrap over the rounded corners or the curved edges, which stay bare glossy "
+        + "white plastic, and a clean straight cut edge is visible where the vinyl ends. Real "
+        + "manufactured product, correct real-world proportions, crisp geometry, no melted or warped "
+        + "edges, no smeared detail, nothing duplicated or mirrored. A single adult hand holds it, "
         + "cropped at the wrist, skin tone neutral, nails plain and short, fingers placed so they cover "
-        + "as little of the design as possible. A vinyl skin covers the front and visible side faces. "
-        + "{{fidelity}} The USB-C port and the two round Indian-standard pins stay uncovered. {{staging}} ",
+        + "as little of the design as possible. The USB-C port and the two round pins stay completely "
+        + "uncovered. {{staging}} ",
   },
   {
-    label: "PlayStation 5",
+    label: "PS5 \u2014 standing",
     gadget: "console",
     suffix: "ps5",
     skuCodes: ["PS5"],
     order: 0,
     isActive: true,
     prompt:
-      "A PlayStation 5 console standing vertically on a low wooden media unit, photographed from a "
-        + "front three-quarter angle at console height so the console dominates the frame. Vinyl skins "
-        + "cover both outer side panels. {{fidelity}} The artwork follows the curved contour of the "
-        + "panels and the pattern bends with them. The central black body, the disc slot, the ports and "
-        + "the base stand all stay uncovered, with the vinyl stopping cleanly at their edges. Behind it, "
-        + "dim and far out of focus, a dark living-room wall with a hint of warm lamp light and a "
-        + "controller resting on the unit. {{staging}} ",
+      "A PlayStation 5 console standing vertically on its round base on a low wooden media unit, "
+        + "photographed from a front three-quarter angle at console height so one faceplate faces the "
+        + "camera and the other is foreshortened. A vinyl skin covers the two curved white outer "
+        + "faceplates. {{fidelity}} The artwork follows the curve of each faceplate. Only the two "
+        + "removable outer faceplates carry vinyl. The inner black chassis between them is never skinned "
+        + "and stays matte black, as do the disc slot, every port, the power and eject buttons and the "
+        + "base stand \u2014 the vinyl stops at the faceplate seam with a clean visible edge. Behind it, dim "
+        + "and far out of focus, a dark living-room wall with a hint of warm lamp light. No people and no "
+        + "hands anywhere in the frame. {{staging}} ",
   },
   {
-    label: "Angled \u2014 side panel detail",
+    label: "PS5 Slim \u2014 gaming setup",
     gadget: "console",
     suffix: "ps5-angle",
     skuCodes: ["PS5"],
     order: 1,
     isActive: true,
     prompt:
-      "A PlayStation 5 console standing vertically on a low wooden media unit, photographed from a "
-        + "low side three-quarter angle close to the console so one skinned side panel sweeps across the "
-        + "frame and its curve and the texture of the vinyl are clearly visible. A vinyl skin covers the "
-        + "outer side panel. {{fidelity}} The artwork follows the curve of the panel. The central black "
-        + "body, the disc slot and the ports stay uncovered, with the vinyl stopping cleanly at their "
-        + "edges. Behind, dim and far out of focus, a dark living-room wall with warm lamp light. No "
-        + "people and no hands anywhere in the frame. {{staging}} ",
+      "A PlayStation 5 Slim console lying flat and horizontal on a TV media unit below a large "
+        + "wall-mounted screen, photographed from a low front angle from the opposite side of the room so "
+        + "the whole gaming corner is readable and the console still dominates the frame. The Slim is the "
+        + "shorter, squarer console with a split faceplate and a straight profile rather than the tall "
+        + "curved original. A vinyl skin covers its outer faceplates. {{fidelity}} Only the two removable "
+        + "outer faceplates carry vinyl. The inner black chassis between them is never skinned and stays "
+        + "matte black, as do the disc slot, every port, the power and eject buttons and the base stand \u2014 "
+        + "the vinyl stops at the faceplate seam with a clean visible edge. The room is evening-dark: the "
+        + "TV glows faintly, a strip of blue and purple LED light runs behind the unit, and a controller "
+        + "lies beside the console, all well out of focus. No people and no hands anywhere in the frame. "
+        + "{{staging}} ",
   },
   {
     label: "Drone only",
@@ -222,46 +243,99 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     order: 0,
     isActive: true,
     prompt:
-      "A compact folding camera drone sitting on a light concrete surface with its arms unfolded, "
-        + "photographed from a front three-quarter angle slightly above so the top of the body, the arms "
-        + "and the gimbal camera all read clearly and the drone dominates the frame. A vinyl skin covers "
-        + "the top shell of the body and the top of each arm. {{fidelity}} The artwork follows the curve "
-        + "of the shell and continues onto the arms as one design. The gimbal camera and its lens, the "
-        + "propellers, the sensors underneath and the battery release stay uncovered, with the vinyl "
-        + "stopping cleanly at their edges. Behind it, far out of focus, an open sky and a hint of green "
-        + "landscape. No people and no hands anywhere in the frame. {{staging}} ",
+      "A compact grey folding DJI camera drone on a light concrete surface with its four arms "
+        + "unfolded, photographed from a front three-quarter angle slightly above so the top shell, the "
+        + "arms and the gimbal camera all read clearly and the drone dominates the frame. A vinyl skin "
+        + "covers the top shell of the body and the top of each arm. {{fidelity}} The artwork follows the "
+        + "curve of the shell and continues onto the arms as one design. The skin is die-cut to the exact "
+        + "shape of the DJI wordmark: the vinyl runs continuously across the shell and stops only at the "
+        + "letterforms, leaving the bare DJI lettering showing through. There is no rectangle, no plate, "
+        + "no panel and no border around the wordmark \u2014 the pattern touches the letters directly. The "
+        + "gimbal camera and its lens, the propellers, the sensors underneath and the battery release "
+        + "stay uncovered, with the vinyl stopping cleanly at their edges. Behind it, far out of focus, "
+        + "open sky and a hint of green landscape. No people and no hands anywhere in the frame. "
+        + "{{staging}} ",
   },
   {
-    label: "Drone + RC controller",
+    label: "Drone + controller \u2014 combo",
     gadget: "drone",
     suffix: "drone-rc",
     skuCodes: ["DRC", "DROC"],
     order: 1,
     isActive: true,
     prompt:
-      "A compact folding camera drone and its matching remote controller arranged together on a light "
-        + "concrete surface, the drone behind with arms unfolded and the controller in front, "
-        + "photographed from a front three-quarter angle slightly above so both fill the frame as one "
-        + "group. A matching vinyl skin covers the top shell of the drone and the back of the controller. "
-        + "{{fidelity}} The pattern reads as the same design across both pieces. The gimbal camera, the "
-        + "propellers, the controller sticks, its screen and its buttons stay uncovered, with the vinyl "
-        + "stopping cleanly at their edges. Behind, far out of focus, open sky. No people and no hands "
-        + "anywhere in the frame. {{staging}} ",
+      "A compact grey folding DJI camera drone with its arms unfolded, and its remote controller, "
+        + "arranged together on a light concrete surface \u2014 the drone behind, the controller in front and "
+        + "slightly angled \u2014 photographed from a front three-quarter angle slightly above so the pair "
+        + "fills the frame as one group. A matching vinyl skin covers the drone top shell and the flat "
+        + "back panel of the controller. {{fidelity}} The pattern reads as the same design across both "
+        + "pieces. The skin is die-cut to the exact shape of the DJI wordmark: the vinyl runs "
+        + "continuously across the shell and stops only at the letterforms, leaving the bare DJI "
+        + "lettering showing through. There is no rectangle, no plate, no panel and no border around the "
+        + "wordmark \u2014 the pattern touches the letters directly. The gimbal camera, the propellers, the "
+        + "controller's two removable control sticks, its front face, its screen and all its buttons stay "
+        + "uncovered. Behind, far out of focus, open sky. No people and no hands anywhere in the frame. "
+        + "{{staging}} ",
   },
   {
-    label: "Held in hand",
+    label: "Controller \u2014 no display",
     gadget: "drone",
-    suffix: "drone-hand",
-    skuCodes: ["DRO", "DRON"],
+    suffix: "drone-rc-nodisplay",
+    skuCodes: ["DRC", "DROC"],
     order: 2,
     isActive: true,
     prompt:
-      "A compact folding camera drone held in one hand with its arms folded, against a softly blurred "
-        + "outdoor background, photographed so the skinned top shell faces the camera and the drone "
-        + "dominates the frame. A single adult hand holds the device, cropped at the wrist, skin tone "
-        + "neutral, nails plain and short, fingers placed so they cover as little of the design as "
-        + "possible. A vinyl skin covers the top shell and the top of each folded arm. {{fidelity}} The "
-        + "gimbal camera and the propellers stay uncovered. {{staging}} ",
+      "A DJI RC-N series remote controller lying flat on a light concrete surface, photographed from "
+        + "directly above, camera square to the surface so the controller is straight in frame with no "
+        + "tilt. This is the controller without a built-in screen: a wide grey rounded body with two "
+        + "removable control sticks, a small DJI wordmark in the centre, a row of status LEDs, a power "
+        + "button and a flight-mode switch, and folding clamp arms on top that hold a phone. A vinyl skin "
+        + "covers the flat grey front face around the controls. {{fidelity}} The skin is die-cut to the "
+        + "exact shape of the DJI wordmark: the vinyl runs continuously across the shell and stops only "
+        + "at the letterforms, leaving the bare DJI lettering showing through. There is no rectangle, no "
+        + "plate, no panel and no border around the wordmark \u2014 the pattern touches the letters directly. "
+        + "The two control sticks, the buttons, the switch, the LEDs and the folding phone clamp stay "
+        + "completely uncovered, with the vinyl stopping cleanly at their edges. No people and no hands "
+        + "anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "Controller \u2014 with display",
+    gadget: "drone",
+    suffix: "drone-rc-display",
+    skuCodes: ["DRC", "DROC"],
+    order: 3,
+    isActive: true,
+    prompt:
+      "A DJI RC remote controller with a built-in screen, lying flat on a light concrete surface, "
+        + "photographed from directly above, camera square to the surface so the controller is straight "
+        + "in frame with no tilt. This is the controller with an integrated display: a wide grey rounded "
+        + "body whose lower two thirds is a large dark glossy touchscreen, with two removable control "
+        + "sticks above it, a power button, a flight-mode switch and a carry handle along the top edge. A "
+        + "vinyl skin covers only the grey face above and around the screen. {{fidelity}} The skin is "
+        + "die-cut to the exact shape of the DJI wordmark: the vinyl runs continuously across the shell "
+        + "and stops only at the letterforms, leaving the bare DJI lettering showing through. There is no "
+        + "rectangle, no plate, no panel and no border around the wordmark \u2014 the pattern touches the "
+        + "letters directly. The screen stays completely bare and dark, and the control sticks, buttons, "
+        + "switch and carry handle stay uncovered, with the vinyl stopping cleanly at the screen bezel. "
+        + "No people and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "Drone \u2014 held",
+    gadget: "drone",
+    suffix: "drone-hand",
+    skuCodes: ["DRO", "DRON"],
+    order: 4,
+    isActive: true,
+    prompt:
+      "A compact grey folding DJI camera drone held in one hand with its arms folded against the "
+        + "body, against a softly blurred outdoor background, photographed so the skinned top shell faces "
+        + "the camera and the drone dominates the frame. A vinyl skin covers the top shell and the top of "
+        + "each folded arm. {{fidelity}} The skin is die-cut to the exact shape of the DJI wordmark: the "
+        + "vinyl runs continuously across the shell and stops only at the letterforms, leaving the bare "
+        + "DJI lettering showing through. There is no rectangle, no plate, no panel and no border around "
+        + "the wordmark \u2014 the pattern touches the letters directly. A single adult hand holds it, cropped "
+        + "at the wrist, skin tone neutral, nails plain and short, fingers placed so they cover as little "
+        + "of the design as possible. The gimbal camera and the propellers stay uncovered. {{staging}} ",
   },
   {
     label: "Lid only",
