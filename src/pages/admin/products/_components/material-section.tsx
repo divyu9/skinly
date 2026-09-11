@@ -219,13 +219,13 @@ export function MaterialSection({
             const mult = multiplierOf(v);
             const units = selected ? unitsFrom(selected, mult, gadget) : null;
             return (
-              <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
-                <span className="min-w-[7rem] flex-1 truncate text-sm font-medium">{v.title || `Variant ${i + 1}`}</span>
+              <div key={i} className="flex items-center gap-2 rounded-lg border p-2">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{v.title || `Variant ${i + 1}`}</span>
                 <Select
                   value={v.consumptionPresetId || "none"}
                   onValueChange={(value) => onVariantChange(i, "consumptionPresetId", value === "none" ? "" : value)}
                 >
-                  <SelectTrigger className="h-8 w-[190px] text-xs"><SelectValue placeholder="Pick the view" /></SelectTrigger>
+                  <SelectTrigger className="h-8 w-[170px] shrink-0 text-xs"><SelectValue placeholder="Pick the view" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Not set (counts as 1)</SelectItem>
                     {forGadget.map((p) => (
@@ -233,18 +233,19 @@ export function MaterialSection({
                     ))}
                   </SelectContent>
                 </Select>
-                <span className="text-xs tabular-nums text-muted-foreground">
+                <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-muted-foreground">
                   {selected ? costLabel(selected, mult, gadget) : `${Number(mult.toFixed(2))}×`}
                 </span>
                 {selected && (
-                  <Badge variant="outline" className="tabular-nums">
+                  <Badge variant="outline" className="shrink-0 tabular-nums">
                     {units === null ? "no size set" : `makes ${units}`}
                   </Badge>
                 )}
                 <Input
                   type="number" step="0.1" min="0"
-                  className="h-8 w-[5.5rem] text-xs"
-                  placeholder="override"
+                  className="h-8 w-14 shrink-0 px-2 text-xs"
+                  placeholder="1×"
+                  title="Override the preset for this variant only"
                   value={v.customMultiplier || ""}
                   onChange={(e) => onVariantChange(i, "customMultiplier", e.target.value)}
                 />
