@@ -4745,6 +4745,468 @@ export function useMutation(apiRef: any) {
         return { success: true, linked, alreadyThere, wrongGadget, matchedSkus, productIds: [...productIds] };
       }
 
+      // ---------------------------------------------------------------------
+      // Actions the Convex migration left without an implementation.
+      //
+      // These are plain Firestore writes the signed-in user is already allowed
+      // to make, so they live here with the other two hundred rather than
+      // becoming Cloud Functions. The three that could not — moving money,
+      // holding the MSG91 key, deciding what is still owed — did become
+      // functions, in functions/src/ordersAdmin.ts.
+      // ---------------------------------------------------------------------
+
+      if (path === 'stockNotifications.subscribeToNotification') {
+        const { getAuth } = await import('firebase/auth');
+        const user = getAuth().currentUser;
+        const phone = String(args.phoneNumber || '').replace(/\D/g, '').slice(-10);
+        if (!/^[6-9]\d{9}$/.test(phone)) throw new Error('Please enter a valid 10-digit mobile number');
+        if (!args.variantId) throw new Error('Missing variant');
+
+        // One subscription per person per variant, or a restock texts them
+        // once for every time they pressed the button.
+        const dupe = await getDocs(query(
+          collection(db, 'stockNotifications'),
+          where('variantId', '==', args.variantId),
+          where('phoneNumber', '==', phone),
+          where('status', '==', 'waiting'),
+          limit(1)
+        ));
+        if (!dupe.empty) return { success: true, alreadySubscribed: true };
+
+        await addDoc(collection(db, 'stockNotifications'), {
+          variantId: args.variantId,
+          productId: args.productId || '',
+          phoneNumber: phone,
+          userId: user?.uid || '',
+          status: 'waiting',
+          createdAt: Date.now(),
+        });
+        return { success: true, alreadySubscribed: false };
+      }
+
+      if (path === 'bugReports.submitBugReport') {
+        const { getAuth } = await import('firebase/auth');
+        const user = getAuth().currentUser;
+        const details = String(args.bugDetails || '').trim();
+        if (!details) throw new Error('Please describe the problem');
+
+        // A short human-readable id, so a customer can quote it back.
+        const bugId = `BUG-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+        const ref = await addDoc(collection(db, 'bugReports'), {
+          bugId,
+          userEmail: String(args.userEmail || user?.email || ''),
+          userPhone: String(args.userPhone || ''),
+          bugDetails: details,
+          userId: user?.uid || '',
+          status: 'open',
+          pageUrl: typeof window !== 'undefined' ? window.location.href : '',
+          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          createdAt: Date.now(),
+        });
+        return { success: true, bugReportId: ref.id, bugId };
+      }
+
+      if (path === 'bugReports.attachFileToBug') {
+        if (!args.bugReportId) throw new Error('Missing bug report');
+        await addDoc(collection(db, 'bugAttachments'), {
+          bugReportId: args.bugReportId,
+          fileId: args.fileId || '',
+          fileName: args.fileName || '',
+          fileSize: Number(args.fileSize) || 0,
+          fileType: args.fileType || '',
+          createdAt: Date.now(),
+        });
+        return { success: true };
+      }
+
+      if (path === 'admin.orders.restockInventory') {
+        const list = Array.isArray(args.itemsToRestock) ? args.itemsToRestock : [];
+        const results: any[] = [];
+        for (const line of list) {
+          const sku = String(line?.variant || '');
+          const qty = Number(line?.quantity) || 0;
+          try {
+            if (!sku) throw new Error('no SKU on this line');
+            const found = await getDocs(query(collection(db, 'variants'), where('sku', '==', sku), limit(1)));
+            if (found.empty) throw new Error('variant not found');
+            const vref = found.docs[0].ref;
+            const current = Number((found.docs[0].data() as any).inventoryQuantity) || 0;
+            await updateDoc(vref, { inventoryQuantity: current + qty, restockedAt: Date.now() });
+            results.push({ sku, success: true, from: current, to: current + qty });
+          } catch (e: any) {
+            results.push({ sku, success: false, error: e?.message || 'failed' });
+          }
+        }
+        const failed = results.filter(r => !r.success);
+        if (args.orderId) {
+          // Kept on the order so a second click is visibly a second restock.
+          const oref = doc(db, 'orders', args.orderId);
+          const osnap = await getDoc(oref);
+          const history = Array.isArray((osnap.data() as any)?.restockingHistory) ? (osnap.data() as any).restockingHistory : [];
+          await updateDoc(oref, {
+            restockingHistory: [...history, { at: Date.now(), items: results }],
+            updatedAt: Date.now(),
+          });
+        }
+        return { success: failed.length === 0, results };
+      }
+
+      if (path === 'admin.orders.recordRtoAction') {
+        if (!args.orderId) throw new Error('Missing orderId');
+        const oref = doc(db, 'orders', args.orderId);
+        const osnap = await getDoc(oref);
+        if (!osnap.exists()) throw new Error('Order not found');
+        const prior = Array.isArray((osnap.data() as any).rtoActions) ? (osnap.data() as any).rtoActions : [];
+        const entry = {
+          at: Date.now(),
+          actionType: args.actionType || 'resolved',
+          ...(args.notes ? { notes: String(args.notes) } : {}),
+          ...(args.newOrderNumber ? { newOrderNumber: String(args.newOrderNumber) } : {}),
+        };
+        await updateDoc(oref, { rtoActions: [...prior, entry], updatedAt: Date.now() });
+        return { success: true, actionType: entry.actionType };
+      }
+
+      if (path === 'admin.manualTracking.saveManualTracking') {
+        if (!args.orderId) throw new Error('Missing orderId');
+        const trackingNumber = String(args.trackingNumber || '').trim();
+        const courierCompany = String(args.courierCompany || '').trim();
+        if (!trackingNumber) throw new Error('Tracking number is required');
+
+        const oref = doc(db, 'orders', args.orderId);
+        const osnap = await getDoc(oref);
+        if (!osnap.exists()) throw new Error('Order not found');
+        const current = String((osnap.data() as any).status || '');
+        // A tracking number means it has left the building, so move a
+        // still-processing order along with it.
+        const statusUpdated = current === 'processing' || current === 'pending_payment';
+
+        await updateDoc(oref, {
+          manualTrackingNumber: trackingNumber,
+          manualCourierCompany: courierCompany,
+          shippingStatus: 'Shipped (manual)',
+          ...(statusUpdated ? { status: 'shipped' } : {}),
+          updatedAt: Date.now(),
+        });
+        return { success: true, statusUpdated };
+      }
+
+      if (path === 'admin.orders.restoreOrders') {
+        const ids: string[] = Array.isArray(args.orderIds) ? args.orderIds : args.orderId ? [args.orderId] : [];
+        if (!ids.length) throw new Error('No orders selected');
+        const batch = writeBatch(db);
+        ids.forEach((id) => batch.update(doc(db, 'orders', id), { isDeleted: false, updatedAt: Date.now() }));
+        await batch.commit();
+        return { success: true, restored: ids.length };
+      }
+
+      if (path === 'admin.orders.sendOrderStatusWhatsApp') {
+        if (!args.orderId) throw new Error('Missing orderId');
+        const osnap = await getDoc(doc(db, 'orders', args.orderId));
+        if (!osnap.exists()) throw new Error('Order not found');
+        const order: any = osnap.data();
+        const phone = String(order.shippingAddress?.phone || order.phone || '').replace(/\D/g, '').slice(-10);
+        if (!/^[6-9]\d{9}$/.test(phone)) throw new Error('This order has no usable mobile number');
+
+        // Map the admin's email-type vocabulary onto the usecase keys the
+        // worker knows. Anything unmapped is refused rather than queued into
+        // a usecase that does not exist.
+        const USECASE: Record<string, string> = {
+          order_confirmed: 'order_received',
+          order_dispatched: 'order_dispatched',
+          order_delivered: 'order_delivered',
+          order_cancelled: 'order_cancelled',
+        };
+        const usecaseKey = USECASE[String(args.whatsappType || 'order_confirmed')];
+        if (!usecaseKey) throw new Error(`No WhatsApp usecase for "${args.whatsappType}"`);
+
+        const uc = await getDocs(query(collection(db, 'whatsappUsecases'), where('usecaseKey', '==', usecaseKey), limit(1)));
+        if (uc.empty) throw new Error(`WhatsApp usecase "${usecaseKey}" does not exist`);
+        if ((uc.docs[0].data() as any).enabled !== true) throw new Error(`The "${usecaseKey}" WhatsApp message is switched off`);
+
+        const msg = await addDoc(collection(db, 'whatsappMessages'), {
+          usecaseKey,
+          recipientPhone: phone,
+          recipientName: order.customerName || order.shippingAddress?.fullName || '',
+          relatedOrderId: args.orderId,
+          variables: {
+            customer_name: order.customerName || order.shippingAddress?.fullName || 'there',
+            order_number: String(order.orderNumber || args.orderId),
+            order_total: String(order.total ?? ''),
+            tracking_number: String(order.awbNumber || order.manualTrackingNumber || ''),
+          },
+          status: 'pending',
+          createdAt: Date.now(),
+        });
+        await addDoc(collection(db, 'whatsappQueue'), {
+          messageId: msg.id,
+          status: 'pending',
+          attempts: 0,
+          scheduledFor: Date.now(),
+          createdAt: Date.now(),
+        });
+        return { success: true, queued: true };
+      }
+
+      if (path === 'products.cloneProduct') {
+        if (!args.productId) throw new Error('Missing productId');
+        const psnap = await getDoc(doc(db, 'products', args.productId));
+        if (!psnap.exists()) throw new Error('Product not found');
+        const p: any = psnap.data();
+
+        // Slug and SKU are unique keys; a clone that reuses either would
+        // shadow the original on the storefront.
+        const stamp = Date.now().toString(36).slice(-4);
+        const clone = await addDoc(collection(db, 'products'), {
+          ...p,
+          title: `${p.title} (copy)`,
+          slug: `${p.slug}-copy-${stamp}`,
+          status: 'draft',
+          _creationTime: Date.now(),
+          createdAt: Date.now(),
+        });
+        const vs = await getDocs(query(collection(db, 'variants'), where('productId', '==', args.productId)));
+        const batch = writeBatch(db);
+        vs.docs.forEach((d) => {
+          const v: any = d.data();
+          batch.set(doc(collection(db, 'variants')), {
+            ...v,
+            productId: clone.id,
+            sku: `${v.sku}-C${stamp}`,
+            inventoryQuantity: 0,
+            _creationTime: Date.now(),
+          });
+        });
+        await batch.commit();
+        return { success: true, productId: clone.id, variants: vs.size };
+      }
+
+      if (path === 'products.reorderProductImages') {
+        if (!args.productId) throw new Error('Missing productId');
+        const images = Array.isArray(args.images) ? args.images : [];
+        await updateDoc(doc(db, 'products', args.productId), {
+          images: images.map((i: any) => (typeof i === 'string' ? { url: i } : (i.alt ? { url: i.url, alt: i.alt } : { url: i.url }))),
+          updatedAt: Date.now(),
+        });
+        return { success: true };
+      }
+
+      if (path === 'cashback.toggleCashbackRule') {
+        if (!args.ruleId) throw new Error('Missing ruleId');
+        await updateDoc(doc(db, 'cashbackRules', args.ruleId), { isActive: args.isActive === true, updatedAt: Date.now() });
+        return { success: true };
+      }
+
+      if (path === 'collections.syncAutoCollectionProducts') {
+        // Same rules the scheduled resync uses, for one collection on demand.
+        const fn = httpsCallable(functions, 'syncProductCollections');
+        const res: any = await fn({ collectionId: args.collectionId });
+        return { success: true, synced: res?.data?.synced ?? res?.data?.updated ?? 0 };
+      }
+
+      if (path === 'productCategories.reorder') {
+        const ids: string[] = Array.isArray(args.categoryIds) ? args.categoryIds : [];
+        const batch = writeBatch(db);
+        ids.forEach((id, i) => batch.update(doc(db, 'productCategoriesConfig', id), { order: i, updatedAt: Date.now() }));
+        await batch.commit();
+        return { success: true, reordered: ids.length };
+      }
+
+      if (path === 'supportedModels.renameBrand') {
+        const oldName = String(args.oldName || '');
+        const newName = String(args.newName || '').trim();
+        if (!oldName || !newName) throw new Error('Both the old and new brand name are required');
+        const hits = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', oldName)));
+        for (let i = 0; i < hits.docs.length; i += 450) {
+          const batch = writeBatch(db);
+          hits.docs.slice(i, i + 450).forEach((d) => batch.update(d.ref, { brandName: newName }));
+          await batch.commit();
+        }
+        return hits.size;
+      }
+
+      if (path === 'supportedModels.mergeBrands') {
+        const sources: string[] = Array.isArray(args.sourceNames) ? args.sourceNames : [];
+        const target = String(args.targetName || '').trim();
+        if (!sources.length || !target) throw new Error('Pick the brands to merge and a target name');
+        let moved = 0;
+        for (const name of sources) {
+          if (name === target) continue;
+          const hits = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', name)));
+          for (let i = 0; i < hits.docs.length; i += 450) {
+            const batch = writeBatch(db);
+            hits.docs.slice(i, i + 450).forEach((d) => batch.update(d.ref, { brandName: target }));
+            await batch.commit();
+          }
+          moved += hits.size;
+        }
+        return moved;
+      }
+
+      if (path === 'modelRequests.approveModelRequests') {
+        const ids: string[] = Array.isArray(args.requestIds) ? args.requestIds : [];
+        let successCount = 0;
+        const errors: string[] = [];
+        for (const id of ids) {
+          try {
+            const rsnap = await getDoc(doc(db, 'modelRequests', id));
+            if (!rsnap.exists()) throw new Error('request not found');
+            const r: any = rsnap.data();
+            const brandName = String(r.brandName || r.brand || '').trim();
+            const modelName = String(r.modelName || r.model || '').trim();
+            if (!brandName || !modelName) throw new Error('request has no brand or model');
+
+            // Approving the same model twice would put a duplicate in the
+            // picker, so an existing row just gets reactivated.
+            const existing = await getDocs(query(
+              collection(db, 'supportedModels'),
+              where('brandName', '==', brandName),
+              where('modelName', '==', modelName),
+              limit(1)
+            ));
+            if (existing.empty) {
+              await addDoc(collection(db, 'supportedModels'), {
+                brandName, modelName, isActive: true, createdAt: Date.now(),
+              });
+            } else {
+              await updateDoc(existing.docs[0].ref, { isActive: true });
+            }
+            await updateDoc(rsnap.ref, { status: 'approved', approvedAt: Date.now() });
+            successCount++;
+          } catch (e: any) {
+            errors.push(`${id}: ${e?.message || 'failed'}`);
+          }
+        }
+        return { success: errors.length === 0, successCount, errors };
+      }
+
+      if (path === 'modelRequests.rejectModelRequest') {
+        if (!args.requestId) throw new Error('Missing requestId');
+        await updateDoc(doc(db, 'modelRequests', args.requestId), {
+          status: 'rejected',
+          rejectedAt: Date.now(),
+          ...(args.reason ? { rejectionReason: String(args.reason) } : {}),
+        });
+        return { success: true };
+      }
+
+      if (path === 'rollsManagement.syncInventoryFromRolls') {
+        // The real sum lives server-side; this is the same recalculation the
+        // cutouts tab runs, over one roll or all of them.
+        const codes: string[] = [];
+        if (args.syncAll) {
+          const rolls = await getDocs(collection(db, 'rollInventory'));
+          rolls.docs.forEach((d) => { const r: any = d.data(); if (r.rNumber) codes.push(String(r.rNumber)); });
+        } else if (args.rNumber) {
+          codes.push(String(args.rNumber));
+        }
+        if (!codes.length) throw new Error('Nothing to sync');
+        const fn = httpsCallable(functions, 'recalcMaterialStock');
+        let syncedCount = 0;
+        // Chunked: one call with 64 codes reads every variant 64 times.
+        for (let i = 0; i < codes.length; i += 25) {
+          const res: any = await fn({ codes: codes.slice(i, i + 25) });
+          syncedCount += Number(res?.data?.updated) || 0;
+        }
+        return { success: true, syncedCount };
+      }
+
+      if (path === 'mockups.bulkImportMockups') {
+        const rows: any[] = Array.isArray(args.mockups) ? args.mockups : [];
+        let imported = 0, updated = 0, skipped = 0;
+        for (const row of rows) {
+          const sku = String(row?.sku || '').trim();
+          const model = String(row?.model || '').trim();
+          if (!sku || !model) { skipped++; continue; }
+          const existing = await getDocs(query(
+            collection(db, 'mockups'),
+            where('sku', '==', sku),
+            where('model', '==', model),
+            limit(1)
+          ));
+          const payload = {
+            brand: String(row?.brand || ''),
+            model, sku,
+            fileId: String(row?.fileId || ''),
+            updatedAt: Date.now(),
+          };
+          if (existing.empty) { await addDoc(collection(db, 'mockups'), { ...payload, createdAt: Date.now() }); imported++; }
+          else { await updateDoc(existing.docs[0].ref, payload); updated++; }
+        }
+        return { success: true, imported, updated, skipped };
+      }
+
+      if (path === 'mockups.clearAllMockups') {
+        const all = await getDocs(collection(db, 'mockups'));
+        for (let i = 0; i < all.docs.length; i += 450) {
+          const batch = writeBatch(db);
+          all.docs.slice(i, i + 450).forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+        }
+        return { success: true, deleted: all.size };
+      }
+
+      if (path === 'uploadJobs.pauseUploadJob' || path === 'uploadJobs.resumeUploadJob' || path === 'uploadJobs.cancelUploadJob') {
+        if (!args.jobId) throw new Error('Missing jobId');
+        const status = path.endsWith('pauseUploadJob') ? 'paused'
+          : path.endsWith('resumeUploadJob') ? 'running' : 'cancelled';
+        await updateDoc(doc(db, 'uploadJobs', args.jobId), { status, updatedAt: Date.now() });
+        return { success: true, status };
+      }
+
+      if (path === 'googleDriveImportPublic.pauseImportJob' || path === 'googleDriveImportPublic.resumeImportJob' || path === 'googleDriveImportPublic.cancelImportJob') {
+        if (!args.jobId) throw new Error('Missing jobId');
+        const status = path.endsWith('pauseImportJob') ? 'paused'
+          : path.endsWith('resumeImportJob') ? 'running' : 'cancelled';
+        await updateDoc(doc(db, 'googleDriveImportJobs', args.jobId), { status, updatedAt: Date.now() });
+        return { success: true, status };
+      }
+
+      if (path === 'whatsapp.syncTemplateLinks') {
+        // A usecase points at a template by name; an approved template that no
+        // usecase names is what silently stops a message going out.
+        const [ucs, tpls] = await Promise.all([
+          getDocs(collection(db, 'whatsappUsecases')),
+          getDocs(collection(db, 'whatsappTemplates')),
+        ]);
+        const byName = new Map<string, any>();
+        tpls.docs.forEach((d) => { const t: any = d.data(); if (t.templateName) byName.set(String(t.templateName), { id: d.id, ...t }); });
+        let linked = 0;
+        const orphans: string[] = [];
+        for (const d of ucs.docs) {
+          const u: any = d.data();
+          const t = u.templateName ? byName.get(String(u.templateName)) : null;
+          if (!t) { orphans.push(String(u.usecaseKey || d.id)); continue; }
+          if (u.templateId !== t.id) { await updateDoc(d.ref, { templateId: t.id, updatedAt: Date.now() }); linked++; }
+        }
+        return {
+          success: orphans.length === 0,
+          linked,
+          orphans,
+          message: orphans.length
+            ? `Linked ${linked}. No approved template for: ${orphans.join(', ')}`
+            : `Linked ${linked} usecase${linked === 1 ? '' : 's'} to their templates`,
+        };
+      }
+
+      if (path === 'whatsappAutoFix.enableTransactionalUsecases') {
+        // Only the transactional ones. Marketing stays off unless someone
+        // deliberately turns it on.
+        const TRANSACTIONAL = ['order_received', 'admin_new_order', 'cod_otp_verification', 'order_dispatched', 'order_delivered'];
+        const ucs = await getDocs(collection(db, 'whatsappUsecases'));
+        let enabled = 0;
+        const batch = writeBatch(db);
+        ucs.docs.forEach((d) => {
+          const u: any = d.data();
+          if (TRANSACTIONAL.includes(String(u.usecaseKey)) && u.enabled !== true) {
+            batch.update(d.ref, { enabled: true, updatedAt: Date.now() });
+            enabled++;
+          }
+        });
+        if (enabled) await batch.commit();
+        return { success: true, enabled, message: `Enabled ${enabled} transactional usecase${enabled === 1 ? '' : 's'}` };
+      }
+
       if (path === 'aiMockups.updateMockupSettings') {
         await setDoc(doc(db, 'gadgetMockupSettings', 'default'), { ...args, updatedAt: Date.now() }, { merge: true });
         return 'default';

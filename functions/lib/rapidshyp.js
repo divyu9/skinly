@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.cancelShipment = exports.createShipment = void 0;
+exports.bulkFetchLabels = exports.cancelShipment = exports.createShipment = void 0;
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
@@ -284,5 +284,49 @@ exports.cancelShipment = (0, https_1.onCall)(async (data, context) => {
         updatedAt: Date.now(),
     });
     return { success: true, message: "Shipment cancelled successfully", orderNumber: order.orderNumber };
+});
+/**
+ * Pulls the shipping labels for a batch of orders as base64 PDFs.
+ *
+ * The fetch happens here rather than in the browser because the label lives on
+ * a RapidShyp host that sends no CORS headers — the page can neither read the
+ * bytes nor lay them out four-to-a-sheet.
+ */
+exports.bulkFetchLabels = (0, https_1.onCall)(async (data, context) => {
+    await (0, auth_1.requireAdmin)(context);
+    const orderIds = Array.isArray(data === null || data === void 0 ? void 0 : data.orderIds) ? data.orderIds : [];
+    if (!orderIds.length)
+        throw new https_1.HttpsError("invalid-argument", "No orders selected");
+    if (orderIds.length > 100)
+        throw new https_1.HttpsError("invalid-argument", "At most 100 labels at a time");
+    const db = admin.firestore();
+    const labels = [];
+    const errors = [];
+    const docs = await db.getAll(...orderIds.map((id) => db.collection("orders").doc(id)));
+    for (const snap of docs) {
+        const order = snap.exists ? snap.data() : null;
+        const label = String((order === null || order === void 0 ? void 0 : order.orderNumber) || (order === null || order === void 0 ? void 0 : order.failedOrderNumber) || "Pending");
+        if (!order) {
+            errors.push({ orderId: snap.id, orderNumber: label, error: "Order not found" });
+            continue;
+        }
+        if (!order.labelUrl) {
+            errors.push({ orderId: snap.id, orderNumber: label, error: "No label URL found" });
+            continue;
+        }
+        try {
+            const res = await fetch(String(order.labelUrl), { redirect: "follow" });
+            if (!res.ok)
+                throw new Error(`HTTP ${res.status} ${res.statusText}`);
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (!buf.byteLength)
+                throw new Error("Empty PDF file");
+            labels.push({ orderId: snap.id, orderNumber: label, pdfBase64: buf.toString("base64") });
+        }
+        catch (e) {
+            errors.push({ orderId: snap.id, orderNumber: label, error: (e === null || e === void 0 ? void 0 : e.message) || "Fetch failed" });
+        }
+    }
+    return { success: errors.length === 0, labels, errors };
 });
 //# sourceMappingURL=rapidshyp.js.map

@@ -296,3 +296,40 @@ export const cancelShipment = onCall(async (data: any, context: any) => {
 
   return { success: true, message: "Shipment cancelled successfully", orderNumber: order.orderNumber };
 });
+
+/**
+ * Pulls the shipping labels for a batch of orders as base64 PDFs.
+ *
+ * The fetch happens here rather than in the browser because the label lives on
+ * a RapidShyp host that sends no CORS headers — the page can neither read the
+ * bytes nor lay them out four-to-a-sheet.
+ */
+export const bulkFetchLabels = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const orderIds: string[] = Array.isArray(data?.orderIds) ? data.orderIds : [];
+  if (!orderIds.length) throw new HttpsError("invalid-argument", "No orders selected");
+  if (orderIds.length > 100) throw new HttpsError("invalid-argument", "At most 100 labels at a time");
+
+  const db = admin.firestore();
+  const labels: any[] = [];
+  const errors: any[] = [];
+
+  const docs = await db.getAll(...orderIds.map((id) => db.collection("orders").doc(id)));
+  for (const snap of docs) {
+    const order: any = snap.exists ? snap.data() : null;
+    const label = String(order?.orderNumber || order?.failedOrderNumber || "Pending");
+    if (!order) { errors.push({ orderId: snap.id, orderNumber: label, error: "Order not found" }); continue; }
+    if (!order.labelUrl) { errors.push({ orderId: snap.id, orderNumber: label, error: "No label URL found" }); continue; }
+    try {
+      const res = await fetch(String(order.labelUrl), { redirect: "follow" });
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (!buf.byteLength) throw new Error("Empty PDF file");
+      labels.push({ orderId: snap.id, orderNumber: label, pdfBase64: buf.toString("base64") });
+    } catch (e: any) {
+      errors.push({ orderId: snap.id, orderNumber: label, error: e?.message || "Fetch failed" });
+    }
+  }
+
+  return { success: errors.length === 0, labels, errors };
+});

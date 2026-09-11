@@ -11,6 +11,7 @@ export * from "./whatsapp";
 export * from "./seo";
 export * from "./r2";
 export * from "./orders";
+export * from "./ordersAdmin";
 export * from "./loginOtp";
 export * from "./abandonedCarts";
 export * from "./collectionSync";
