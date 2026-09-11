@@ -10,22 +10,16 @@ import { toast } from "sonner";
 import { Loader2, Key, BarChart3, Database, Image as ImageIcon, UploadIcon, XIcon } from "lucide-react";
 
 export default function SettingsPage() {
-  const openAIKeySetting = useQuery(api.settings.getSetting, { key: "OPENAI_API_KEY" });
-  const oldKeySetting = useQuery(api.settings.getSetting, { key: "openaiApiKey" });
   const metaPixelSetting = useQuery(api.settings.getSetting, { key: "META_PIXEL_ID" });
   const updateSetting = useMutation(api.settings.updateSetting);
-  const migrateKey = useMutation(api.migrateOpenAIKey.migrateOpenAIKey);
   const setupR2Cors = useAction(api.r2.setupR2Cors);
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const updateHomepageSettings = useMutation(api.homepage.updateHomepageSettings);
   const uploadToR2 = useAction(api.r2.uploadToR2);
   
-  const [apiKey, setApiKey] = useState("");
   const [metaPixelId, setMetaPixelId] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isSettingUpCors, setIsSettingUpCors] = useState(false);
   const [isSavingPixel, setIsSavingPixel] = useState(false);
-  const [isMigrating, setIsMigrating] = useState(false);
 
   // Logo Settings
   const [logoImageUrl, setLogoImageUrl] = useState("");
@@ -96,44 +90,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = async () => {
-    if (!apiKey.trim()) {
-      toast.error("Please enter an API key");
-      return;
-    }
 
-    setIsSaving(true);
-    try {
-      await updateSetting({
-        key: "OPENAI_API_KEY",
-        value: apiKey.trim(),
-      });
-      toast.success("OpenAI API key saved successfully!");
-      setApiKey("");
-    } catch (error) {
-      toast.error("Failed to save API key");
-      console.error(error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleMigrate = async () => {
-    setIsMigrating(true);
-    try {
-      const result = await migrateKey({});
-      if (result.success) {
-        toast.success(result.message);
-      } else {
-        toast.error(result.message);
-      }
-    } catch (error) {
-      toast.error("Failed to migrate API key");
-      console.error(error);
-    } finally {
-      setIsMigrating(false);
-    }
-  };
 
   const handleSavePixel = async () => {
     if (!metaPixelId.trim()) {
@@ -174,8 +131,7 @@ export default function SettingsPage() {
     }
   };
 
-  const isLoading = openAIKeySetting === undefined || metaPixelSetting === undefined;
-  const hasKey = openAIKeySetting?.value;
+  const isLoading = metaPixelSetting === undefined;
   const hasPixel = metaPixelSetting?.value;
 
   return (
@@ -280,6 +236,16 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+      {/*
+        The key is not editable here, and must not be.
+
+        It used to be saved into `settings`, a collection whose rule is
+        `read: if true` — so the key was downloadable by anyone who knew the
+        project id, and the SEO generator then shipped it to the browser to call
+        OpenAI from the page. It now lives only in the functions environment,
+        and a write rule refuses anything credential-shaped, so this form could
+        no longer save even if it were kept.
+      */}
       <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -287,73 +253,29 @@ export default function SettingsPage() {
               OpenAI API Key
             </CardTitle>
             <CardDescription>
-              Required for AI-powered SEO content generation. Get your API key from{" "}
+              Used for SEO content and the AI listing generator.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                This key is held on the server, not here. Anything stored on this page is
+                readable by the public storefront, so a secret cannot live on it.
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              To change it, set <code className="rounded bg-muted px-1 py-0.5">OPENAI_API_KEY</code> in{" "}
+              <code className="rounded bg-muted px-1 py-0.5">functions/.env</code> and redeploy the
+              functions. Get a key from{" "}
               <a
                 href="https://platform.openai.com/api-keys"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-primary hover:underline"
               >
-                OpenAI Platform
-              </a>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading...
-              </div>
-            ) : (
-              <>
-                {oldKeySetting && !hasKey && (
-                  <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 p-4 space-y-3">
-                    <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
-                      ⚠️ API Key Migration Required
-                    </p>
-                    <p className="text-sm text-amber-700 dark:text-amber-300">
-                      Your API key was saved with an old key name. Click the button below to migrate it to the new format.
-                    </p>
-                    <Button 
-                      onClick={handleMigrate} 
-                      disabled={isMigrating}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {isMigrating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Migrate API Key
-                    </Button>
-                  </div>
-                )}
-                
-                {hasKey && (
-                  <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3">
-                    <p className="text-sm text-green-800 dark:text-green-200">
-                      ✓ API key is configured (ends with: ...{String(hasKey).slice(-4)})
-                    </p>
-                  </div>
-                )}
-                
-                <div className="space-y-2">
-                  <Label htmlFor="apiKey">
-                    {hasKey ? "Update API Key" : "Enter API Key"}
-                  </Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="sk-proj-..."
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    disabled={isSaving}
-                  />
-                </div>
-
-                <Button onClick={handleSave} disabled={isSaving || !apiKey.trim()}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {hasKey ? "Update Key" : "Save Key"}
-                </Button>
-              </>
-            )}
+                the OpenAI platform
+              </a>.
+            </p>
           </CardContent>
         </Card>
 

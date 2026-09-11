@@ -5331,6 +5331,184 @@ export function useMutation(apiRef: any) {
         return { success: true, enabled, message: `Enabled ${enabled} transactional usecase${enabled === 1 ? '' : 's'}` };
       }
 
+      // ---------------------------------------------------------------------
+      // Catalogue maintenance.
+      //
+      // These were written off as spent migrations, but the data says
+      // otherwise: every gadget and finish count had drifted from the truth
+      // (phone stored 438 against 480 actual), 223 products carry no
+      // gadgetCategory and 201 no finishTypeId. They are recurring repairs, so
+      // each one is idempotent and safe to press twice.
+      // ---------------------------------------------------------------------
+
+      /** Everything these repairs need, read once. */
+      const loadCatalogue = async () => {
+        const [products, gadgetTypes, finishTypes] = await Promise.all([
+          getDocs(collection(db, 'products')),
+          getDocs(collection(db, 'gadgetTypes')),
+          getDocs(collection(db, 'finishTypes')),
+        ]);
+        return { products, gadgetTypes, finishTypes };
+      };
+
+      const commitAll = async (writes: Array<{ ref: any; data: any }>) => {
+        for (let i = 0; i < writes.length; i += 450) {
+          const batch = writeBatch(db);
+          writes.slice(i, i + 450).forEach((w) => batch.update(w.ref, w.data));
+          await batch.commit();
+        }
+      };
+
+      if (path === 'gadgetTypes.recalculateProductCounts' || path === 'finishTypes.recalculateAllCounts') {
+        const isGadget = path.startsWith('gadgetTypes');
+        const { products, gadgetTypes, finishTypes } = await loadCatalogue();
+        const types = isGadget ? gadgetTypes : finishTypes;
+        const field = isGadget ? 'gadgetTypeId' : 'finishTypeId';
+
+        const counts = new Map<string, number>();
+        products.docs.forEach((d) => {
+          const id = (d.data() as any)[field];
+          if (id) counts.set(id, (counts.get(id) || 0) + 1);
+        });
+
+        const writes = types.docs
+          .filter((d) => Number((d.data() as any).productCount || 0) !== (counts.get(d.id) || 0))
+          .map((d) => ({ ref: d.ref, data: { productCount: counts.get(d.id) || 0 } }));
+        await commitAll(writes);
+        return {
+          success: true,
+          updated: writes.length,
+          message: writes.length
+            ? `Recounted ${writes.length} of ${types.size} ${isGadget ? 'gadget' : 'finish'} types`
+            : 'All counts already correct',
+        };
+      }
+
+      if (path === 'gadgetTypes.migrateProductGadgetTypes' || path === 'productClassification.applyAutoClassification') {
+        const { products, gadgetTypes, finishTypes } = await loadCatalogue();
+        const gadgetByName = new Map<string, string>();
+        gadgetTypes.docs.forEach((d) => gadgetByName.set(String((d.data() as any).name || '').toLowerCase(), d.id));
+        const gadgetNameById = new Map<string, string>();
+        gadgetTypes.docs.forEach((d) => gadgetNameById.set(d.id, String((d.data() as any).name || '')));
+        const finishByName = new Map<string, string>();
+        finishTypes.docs.forEach((d) => finishByName.set(String((d.data() as any).name || '').toLowerCase(), d.id));
+
+        // Title wording is the last resort, and only where the field is blank —
+        // nothing already set is ever overwritten.
+        const guessGadget = (title: string): string | null => {
+          const t = title.toLowerCase();
+          for (const [needle, name] of [
+            ['laptop', 'laptop'], ['macbook', 'laptop'], ['mac mini', 'mac-mini'], ['ipad', 'tablet'],
+            ['tablet', 'tablet'], ['lens', 'lens'], ['camera', 'camera'], ['drone', 'drone'],
+            ['controller', 'controller'], ['play station', 'console'], ['playstation', 'console'],
+            ['ps5', 'console'], ['xbox', 'console'], ['charger', 'charger'], ['gimbal', 'gimbals'],
+            ['phone', 'phone'],
+          ] as Array<[string, string]>) {
+            if (t.includes(needle)) return gadgetByName.get(name) || null;
+          }
+          return null;
+        };
+        const guessFinish = (title: string, finishType?: string): string | null => {
+          const t = `${finishType || ''} ${title}`.toLowerCase();
+          if (/tranz|transparent|membrane/.test(t)) return finishByName.get('transparent') || null;
+          if (/3d|emboss|textur/.test(t)) return finishByName.get('embossed') || null;
+          if (/matte/.test(t)) return finishByName.get('matte') || null;
+          return null;
+        };
+
+        const writes: Array<{ ref: any; data: any }> = [];
+        products.docs.forEach((d) => {
+          const p: any = d.data();
+          const patch: any = {};
+          const gadgetTypeId = p.gadgetTypeId || (p.gadgetCategory ? gadgetByName.get(String(p.gadgetCategory).toLowerCase()) : null) || guessGadget(String(p.title || ''));
+          if (!p.gadgetTypeId && gadgetTypeId) patch.gadgetTypeId = gadgetTypeId;
+          // gadgetCategory is the denormalised name; derive it from the id.
+          const name = gadgetNameById.get(gadgetTypeId || p.gadgetTypeId);
+          if (!p.gadgetCategory && name) patch.gadgetCategory = name;
+          if (!p.finishTypeId) {
+            const f = guessFinish(String(p.title || ''), p.finishType);
+            if (f) patch.finishTypeId = f;
+          }
+          if (Object.keys(patch).length) writes.push({ ref: d.ref, data: patch });
+        });
+        await commitAll(writes);
+        return {
+          success: true,
+          classified: writes.length,
+          updated: writes.length,
+          message: writes.length
+            ? `Filled missing fields on ${writes.length} product${writes.length === 1 ? '' : 's'}`
+            : 'Every product is already classified',
+        };
+      }
+
+      if (path === 'migrateProductCategory.migrateProductsToProductCategory') {
+        const products = await getDocs(collection(db, 'products'));
+        const writes = products.docs
+          .filter((d) => !(d.data() as any).productCategory)
+          .map((d) => ({ ref: d.ref, data: { productCategory: 'skin' } }));
+        await commitAll(writes);
+        return {
+          success: true,
+          updated: writes.length,
+          message: writes.length ? `Set a product category on ${writes.length} product(s)` : 'Every product already has a category',
+        };
+      }
+
+      if (path === 'migrateModelsToGadgetTypes.migrateModelsToGadgetTypes') {
+        const [models, gadgetTypes] = await Promise.all([
+          getDocs(collection(db, 'supportedModels')),
+          getDocs(collection(db, 'gadgetTypes')),
+        ]);
+        const phoneId = gadgetTypes.docs.find((d) => String((d.data() as any).name).toLowerCase() === 'phone')?.id;
+        if (!phoneId) throw new Error('No "phone" gadget type to assign');
+        const writes = models.docs
+          .filter((d) => !(d.data() as any).gadgetTypeId)
+          .map((d) => ({ ref: d.ref, data: { gadgetTypeId: phoneId } }));
+        await commitAll(writes);
+        return {
+          success: true,
+          updated: writes.length,
+          message: writes.length ? `Linked ${writes.length} model(s) to a gadget type` : 'Every model is already linked',
+        };
+      }
+
+      if (path === 'gadgetTypes.seed' || path === 'finishTypes.seedInitialFinishTypes' || path === 'productCategories.seedDefaults') {
+        // Idempotent: an existing row is left exactly as it is, so pressing
+        // these cannot disturb a catalogue that is already set up.
+        const spec = path === 'gadgetTypes.seed'
+          ? { col: 'gadgetTypes', key: 'name', rows: [
+              ['phone','Phone'],['laptop','Laptop'],['tablet','Tablet'],['camera','Camera'],['lens','Lens'],
+              ['console','Console'],['controller','Controller'],['drone','Drone'],['charger','Charger'],
+              ['mac-mini','Mac Mini'],['gimbals','Gimbals'],['accessory','Accessory'],
+            ] }
+          : path === 'finishTypes.seedInitialFinishTypes'
+          ? { col: 'finishTypes', key: 'name', rows: [
+              ['matte','Matte'],['embossed','3D (Embossed)'],['transparent','Transparent'],
+              ['protectors','Protectors/Membranes'],['premium-leather','Premium Leather'],
+            ] }
+          : { col: 'productCategoriesConfig', key: 'name', rows: [
+              ['Skins','Skins'],['Cases & Covers','Cases & Covers'],['Screen Protectors','Screen Protectors'],
+              ['Camera Rings','Camera Rings'],['Magneto X','Magneto X'],['Accessories','Accessories'],
+            ] };
+
+        const existing = await getDocs(collection(db, spec.col));
+        const have = new Set(existing.docs.map((d) => String((d.data() as any)[spec.key] || '').toLowerCase()));
+        let added = 0;
+        for (const [name, displayName] of spec.rows) {
+          if (have.has(name.toLowerCase())) continue;
+          await addDoc(collection(db, spec.col), {
+            [spec.key]: name, displayName, isActive: true, productCount: 0, createdAt: Date.now(),
+          });
+          added++;
+        }
+        return {
+          success: true,
+          added,
+          message: added ? `Added ${added} missing row(s)` : 'Everything is already present — nothing added',
+        };
+      }
+
       if (path === 'aiMockups.updateMockupSettings') {
         await setDoc(doc(db, 'gadgetMockupSettings', 'default'), { ...args, updatedAt: Date.now() }, { merge: true });
         return 'default';

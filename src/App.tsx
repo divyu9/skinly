@@ -50,12 +50,7 @@ const AdminMockupsMissingPage = lazyWithReload(() => import("./pages/admin/mocku
 const AdminMockupsAdvancedPage = lazyWithReload(() => import("./pages/admin/mockups-advanced.tsx"), "./pages/admin/mockups-advanced.tsx");
 const AdminGoogleDriveImportPage = lazyWithReload(() => import("./pages/admin/google-drive-import.tsx"), "./pages/admin/google-drive-import.tsx");
 const AdminModelsPage = lazyWithReload(() => import("./pages/admin/models/page.tsx"), "./pages/admin/models/page.tsx");
-const AdminSeedModelsPage = lazyWithReload(() => import("./pages/admin/seed-models/page.tsx"), "./pages/admin/seed-models/page.tsx");
 const AdminPhoneCollectionsPage = lazyWithReload(() => import("./pages/admin/phone-collections.tsx"), "./pages/admin/phone-collections.tsx");
-const AdminProductFieldsMigrationPage = lazyWithReload(() => import("./pages/admin/product-fields-migration.tsx"), "./pages/admin/product-fields-migration.tsx");
-const AdminVariantModeMigrationPage = lazyWithReload(() => import("./pages/admin/variant-mode-migration.tsx"), "./pages/admin/variant-mode-migration.tsx");
-const AdminGadgetConsumptionMigrationPage = lazyWithReload(() => import("./pages/admin/gadget-consumption-migration.tsx"), "./pages/admin/gadget-consumption-migration.tsx");
-const AdminVariantPresetsMigrationPage = lazyWithReload(() => import("./pages/admin/variant-presets-migration.tsx"), "./pages/admin/variant-presets-migration.tsx");
 const AdminVariantPresetsPage = lazyWithReload(() => import("./pages/admin/variant-presets.tsx"), "./pages/admin/variant-presets.tsx");
 const AdminVariantPresetsAutoAssignPage = lazyWithReload(() => import("./pages/admin/variant-presets-auto-assign.tsx"), "./pages/admin/variant-presets-auto-assign.tsx");
 const AdminCODPage = lazyWithReload(() => import("./pages/admin/cod.tsx"), "./pages/admin/cod.tsx");
@@ -74,7 +69,6 @@ const AdminSEOPagesNewPage = lazyWithReload(() => import("./pages/admin/seo-page
 const AdminSEOPagesEditPage = lazyWithReload(() => import("./pages/admin/seo-pages/edit.tsx"), "./pages/admin/seo-pages/edit.tsx");
 const AdminSEOPagesAutoGeneratePage = lazyWithReload(() => import("./pages/admin/seo-pages/auto-generate.tsx"), "./pages/admin/seo-pages/auto-generate.tsx");
 const AdminSettingsPage = lazyWithReload(() => import("./pages/admin/settings/page.tsx"), "./pages/admin/settings/page.tsx");
-const AdminMigrationPage = lazyWithReload(() => import("./pages/admin/migration.tsx"), "./pages/admin/migration.tsx");
 const AdminSitemapGeneratorPage = lazyWithReload(() => import("./pages/admin/sitemap-generator.tsx"), "./pages/admin/sitemap-generator.tsx");
 const AdminSEOGeneratorPage = lazyWithReload(() => import("./pages/admin/seo-generator/page.tsx"), "./pages/admin/seo-generator/page.tsx");
 const AdminShippingPage = lazyWithReload(() => import("./pages/admin/shipping.tsx"), "./pages/admin/shipping.tsx");
@@ -84,9 +78,7 @@ const AdminHomepagePage = lazyWithReload(() => import("./pages/admin/homepage/pa
 const AdminProductSectionsPage = lazyWithReload(() => import("./pages/admin/product-sections/page.tsx"), "./pages/admin/product-sections/page.tsx");
 const AdminMediaLibraryPage = lazyWithReload(() => import("./pages/admin/media/page.tsx"), "./pages/admin/media/page.tsx");
 const AdminUnauthorizedPage = lazyWithReload(() => import("./pages/admin/unauthorized.tsx"), "./pages/admin/unauthorized.tsx");
-const GstMigrationPage = lazyWithReload(() => import("./pages/admin/gst-migration.tsx"), "./pages/admin/gst-migration.tsx");
 const TaxExportPage = lazyWithReload(() => import("./pages/admin/tax-export.tsx"), "./pages/admin/tax-export.tsx");
-const FixCollectionsPage = lazyWithReload(() => import("./pages/admin/fix-collections.tsx"), "./pages/admin/fix-collections.tsx");
 const MockPaymentPage = lazyWithReload(() => import("./pages/mock-payment/page.tsx"), "./pages/mock-payment/page.tsx");
 
 // Loading fallback for lazy-loaded routes
@@ -162,18 +154,10 @@ export default function App() {
             <Route path="/backend-skinly/mockups-advanced" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsAdvancedPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/google-drive-import" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminModelsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/seed-models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSeedModelsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/phone-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/product-fields-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductFieldsMigrationPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/variant-mode-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantModeMigrationPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/gadget-consumption-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGadgetConsumptionMigrationPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/variant-presets-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsMigrationPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/variant-presets" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/variant-presets-auto-assign" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsAutoAssignPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/gst-migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><GstMigrationPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/fix-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><FixCollectionsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/migration" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMigrationPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/sitemap" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/product-classification" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper></Suspense>} />

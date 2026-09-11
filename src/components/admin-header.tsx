@@ -14,7 +14,6 @@ export function AdminHeader() {
     { path: "/admin/products", label: "Products" },
     { path: "/admin/collections", label: "Collections" },
     { path: "/admin/phone-collections", label: "Phone Collections" },
-    { path: "/admin/product-fields-migration", label: "Fields Migration" },
     { path: "/admin/orders", label: "Orders" },
     { path: "/admin/coupons", label: "Coupons" },
     { path: "/admin/reviews", label: "Reviews" },
@@ -23,7 +22,6 @@ export function AdminHeader() {
     { path: "/admin/cod", label: "COD Settings" },
     { path: "/admin/whatsapp", label: "WhatsApp" },
     { path: "/admin/models", label: "Models" },
-    { path: "/admin/seed-models", label: "Seed DB" },
     { path: "/admin/oos", label: "OOS Settings" },
     { path: "/admin/mockups", label: "Mockups" },
   ];
