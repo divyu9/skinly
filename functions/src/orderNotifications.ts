@@ -19,6 +19,27 @@ import { describeItems } from "./ordersAdmin";
 
 const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
 
+/** Where "View Your Order" should point. */
+function orderLinkFor(orderId: string): string {
+  const site = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
+  return `${site}/orders/${orderId}`;
+}
+
+/**
+ * The image the mail should show, or nothing.
+ *
+ * 55 of 144 orders carry a res.cloudinary.com image, and that account was
+ * wiped — every one of those URLs now answers 401. The template wraps the
+ * picture in {{#if productImage}}, so sending an empty string drops the block
+ * entirely and the mail looks deliberate, where a dead URL would show a broken
+ * image icon next to "Here's what you picked — looking good!".
+ */
+function usableImage(items: any[]): string {
+  const url = String(items?.[0]?.productImage || "");
+  if (!url || url.includes("res.cloudinary.com")) return "";
+  return url;
+}
+
 /** Queues one WhatsApp message, if that usecase is switched on. */
 async function queueWhatsApp(
   db: admin.firestore.Firestore,
@@ -84,7 +105,8 @@ async function sendConfirmationEmail(
           orderNumber: String(order.orderNumber || "Pending"),
           productName: describeItems(items),
           amount: `₹${total.toFixed(2)}`,
-          productImage: String(items[0]?.productImage || ""),
+          productImage: usableImage(items),
+          orderLink: orderLinkFor(orderId),
         },
       }],
       from: { email: "noreply@mail.goskinly.com", name: "Skinly" },

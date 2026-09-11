@@ -18,6 +18,27 @@ const ordersAdmin_1 = require("./ordersAdmin");
  * lost, because a message could not go out.
  */
 const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
+/** Where "View Your Order" should point. */
+function orderLinkFor(orderId) {
+    const site = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
+    return `${site}/orders/${orderId}`;
+}
+/**
+ * The image the mail should show, or nothing.
+ *
+ * 55 of 144 orders carry a res.cloudinary.com image, and that account was
+ * wiped — every one of those URLs now answers 401. The template wraps the
+ * picture in {{#if productImage}}, so sending an empty string drops the block
+ * entirely and the mail looks deliberate, where a dead URL would show a broken
+ * image icon next to "Here's what you picked — looking good!".
+ */
+function usableImage(items) {
+    var _a;
+    const url = String(((_a = items === null || items === void 0 ? void 0 : items[0]) === null || _a === void 0 ? void 0 : _a.productImage) || "");
+    if (!url || url.includes("res.cloudinary.com"))
+        return "";
+    return url;
+}
 /** Queues one WhatsApp message, if that usecase is switched on. */
 async function queueWhatsApp(db, usecaseKey, phone, variables, orderId) {
     const digits = String(phone || "").replace(/\D/g, "").slice(-10);
@@ -45,7 +66,7 @@ async function queueWhatsApp(db, usecaseKey, phone, variables, orderId) {
 }
 /** Sends the order-confirmed mail, if the key and template allow it. */
 async function sendConfirmationEmail(db, order, orderId) {
-    var _a, _b, _c;
+    var _a, _b;
     const authkey = process.env.MSG91_AUTH_TOKEN || "";
     if (!authkey)
         return false;
@@ -72,7 +93,8 @@ async function sendConfirmationEmail(db, order, orderId) {
                         orderNumber: String(order.orderNumber || "Pending"),
                         productName: (0, ordersAdmin_1.describeItems)(items),
                         amount: `₹${total.toFixed(2)}`,
-                        productImage: String(((_c = items[0]) === null || _c === void 0 ? void 0 : _c.productImage) || ""),
+                        productImage: usableImage(items),
+                        orderLink: orderLinkFor(orderId),
                     },
                 }],
             from: { email: "noreply@mail.goskinly.com", name: "Skinly" },

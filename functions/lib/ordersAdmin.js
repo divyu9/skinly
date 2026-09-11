@@ -183,7 +183,7 @@ const EMAIL_USECASE = {
     order_cancelled: "order_cancelled",
 };
 exports.sendOrderStatusEmail = (0, https_1.onCall)(async (data, context) => {
-    var _a, _b;
+    var _a, _b, _c;
     await (0, auth_1.requireAdmin)(context);
     const orderId = String((data === null || data === void 0 ? void 0 : data.orderId) || "");
     const emailType = String((data === null || data === void 0 ? void 0 : data.emailType) || "order_confirmed");
@@ -228,7 +228,12 @@ exports.sendOrderStatusEmail = (0, https_1.onCall)(async (data, context) => {
                     orderNumber: String(order.orderNumber || order.failedOrderNumber || "Pending"),
                     productName: describeItems(items),
                     amount: `₹${(num(order.total) || num(order.amountPayable)).toFixed(2)}`,
-                    productImage: String(((_b = items[0]) === null || _b === void 0 ? void 0 : _b.productImage) || ""),
+                    // Blank rather than a dead Cloudinary URL: the template's
+                    // {{#if productImage}} then drops the block instead of drawing a
+                    // broken image.
+                    productImage: String(((_b = items[0]) === null || _b === void 0 ? void 0 : _b.productImage) || "").includes("res.cloudinary.com")
+                        ? "" : String(((_c = items[0]) === null || _c === void 0 ? void 0 : _c.productImage) || ""),
+                    orderLink: `${(process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "")}/orders/${orderId}`,
                 },
             }],
         from: { email: "noreply@mail.goskinly.com", name: "Skinly" },

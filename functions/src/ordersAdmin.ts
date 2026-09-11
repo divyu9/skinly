@@ -216,7 +216,12 @@ export const sendOrderStatusEmail = onCall(async (data: any, context: any) => {
         orderNumber: String(order.orderNumber || order.failedOrderNumber || "Pending"),
         productName: describeItems(items),
         amount: `₹${(num(order.total) || num(order.amountPayable)).toFixed(2)}`,
-        productImage: String(items[0]?.productImage || ""),
+        // Blank rather than a dead Cloudinary URL: the template's
+        // {{#if productImage}} then drops the block instead of drawing a
+        // broken image.
+        productImage: String(items[0]?.productImage || "").includes("res.cloudinary.com")
+          ? "" : String(items[0]?.productImage || ""),
+        orderLink: `${(process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "")}/orders/${orderId}`,
       },
     }],
     from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
