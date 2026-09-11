@@ -295,7 +295,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Series X + controllers",
     gadget: "console",
     suffix: "xbox-x-set",
-    skuCodes: ["XBXC", "XBXC1", "XBXC2"],
+    skuCodes: ["XBXC", "XBXC1", "XBXC2", "XBXCL1", "XBXCL2"],
     order: 4,
     isActive: true,
     prompt:
@@ -317,7 +317,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "Series S \u2014 console",
     gadget: "console",
     suffix: "xbox-s",
-    skuCodes: ["XBXS"],
+    skuCodes: ["XBXS", "XBS"],
     order: 5,
     isActive: true,
     prompt:
@@ -672,7 +672,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     label: "iPad \u2014 back",
     gadget: "tablet",
     suffix: "ipad",
-    skuCodes: ["IPAD", "TAB"],
+    skuCodes: ["IPAD", "TAB", "TAB."],
     order: 0,
     isActive: true,
     prompt:

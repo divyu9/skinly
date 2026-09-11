@@ -193,9 +193,12 @@ export function useQuery(apiRef: any, args?: any) {
               const psnap = await getDoc(doc(db, 'products', v.productId));
               if (!psnap.exists()) continue;
               const pd: any = psnap.data();
+              const tail = String(v.sku || '').slice(design.length + 1).toUpperCase();
               rows.push({
                 sku: String(v.sku || ''),
-                code: String(v.sku || '').slice(design.length + 1).toUpperCase(),
+                code: tail,
+                // Same batch-suffix allowance as the linker.
+                codeHead: tail.split('-')[0],
                 productId: v.productId,
                 productTitle: pd.title || '',
                 gadget: gadgetById[pd.gadgetTypeId || pd.gadgetType] || '',
@@ -4620,8 +4623,13 @@ export function useMutation(apiRef: any) {
           const data: any = d.data();
           const sku = String(data.sku || '');
           // Case-insensitive on the tail only: the catalogue holds IPAD and iPAD.
+          // Some SKUs carry a batch suffix after the view code — R-06-LPK-2,
+          // R-10-DRC-F12 — so the code is either the whole tail or its first
+          // segment. Matching is never attempted further left than that: design
+          // codes start with things like LP and LC, which are themselves view
+          // codes, and scanning would match the wrong half of the SKU.
           const tail = sku.slice(design.length + 1).toUpperCase();
-          if (codes.includes(tail) && data.productId) {
+          if ((codes.includes(tail) || codes.includes(tail.split('-')[0])) && data.productId) {
             productIds.add(data.productId);
             matchedSkus.push(sku);
           }

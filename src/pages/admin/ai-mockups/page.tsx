@@ -584,7 +584,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     const codes = (shot.skuCodes || []).map((c) => c.toUpperCase());
     const seen = new Map<string, string>();
     for (const t of linkTargets) {
-      if (codes.includes(t.code) && t.gadget === String(shot.gadget).toLowerCase()) {
+      const hit = codes.includes(t.code) || codes.includes(t.codeHead);
+      if (hit && t.gadget === String(shot.gadget).toLowerCase()) {
         seen.set(t.productId, t.productTitle);
       }
     }
