@@ -51,6 +51,7 @@ type Job = {
   rejectedTo?: string;
   skuCodes?: string[];
   variantTitles?: string[];
+  matchSingleVariant?: boolean;
   linkedCount?: number;
   error?: string;
   attempt?: number;
@@ -689,6 +690,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         suffix: shot.suffix,
         skuCodes: shot.skuCodes || [],
         variantTitles: shot.variantTitles || [],
+        matchSingleVariant: shot.matchSingleVariant || false,
         sourceUrl: roll.rawImageUrl,
         status: "queued",
         attempt,
@@ -768,6 +770,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           rNumber: job.rNumber,
           skuCodes: job.skuCodes,
           variantTitles: job.variantTitles,
+          matchSingleVariant: job.matchSingleVariant,
           gadget: job.gadget,
           url,
           alt: job.designName || job.shotLabel || "",

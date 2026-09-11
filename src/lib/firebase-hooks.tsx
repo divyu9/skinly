@@ -1815,10 +1815,17 @@ export function useQuery(apiRef: any, args?: any) {
               // Cutouts are stocked as whole sheets rather than by the metre,
               // so one unit costs `multiplier` sheets and no geometry is
               // involved: a laptop lid is one sheet, lid plus keyboard is two.
+              // One cutout carries more than one SKU code: a design is sold as
+              // "Only Top" and "Top + Keyboard Area" under consecutive numbers
+              // (LP-3D-05 and L-3D-06 are both Naruto sunset Forest). They are
+              // one sheet pile, so every code points at the same record.
               const cutoutsMap: Record<string, any> = {};
               cSnap.docs.forEach(d => {
                 const c = d.data() as any;
-                if (c.cutoutNumber) cutoutsMap[String(c.cutoutNumber).trim().toUpperCase()] = { _id: d.id, ...c };
+                const entry = { _id: d.id, ...c };
+                for (const code of [c.cutoutNumber, ...(c.aliases || [])]) {
+                  if (code) cutoutsMap[String(code).trim().toUpperCase()] = entry;
+                }
               });
 
               // A variant names its design in rNumber, or failing that in the
@@ -4670,15 +4677,22 @@ export function useMutation(apiRef: any) {
           return { success: false, linked: 0, reason: 'No design code, SKU codes or variant titles' };
         }
 
-        const snap = await getDocs(query(
-          collection(db, 'variants'),
-          where('sku', '>=', `${design}-`),
-          where('sku', '<', `${design}-\uf8ff`)
-        ));
+        const [snap, wholeSnap] = await Promise.all([
+          getDocs(query(
+            collection(db, 'variants'),
+            where('sku', '>=', `${design}-`),
+            where('sku', '<', `${design}-\uf8ff`)
+          )),
+          // A single-variant product's SKU may be the bare design code with no
+          // view suffix at all, so the range query above never sees it.
+          getDocs(query(collection(db, 'variants'), where('sku', '==', design))),
+        ]);
+        const allDocs = [...snap.docs, ...wholeSnap.docs];
 
         const productIds = new Set<string>();
         const matchedSkus: string[] = [];
-        snap.docs.forEach((d) => {
+        const unmatched: any[] = [];
+        allDocs.forEach((d) => {
           const data: any = d.data();
           const sku = String(data.sku || '');
           // Case-insensitive on the tail only: the catalogue holds IPAD and iPAD.
@@ -4693,8 +4707,22 @@ export function useMutation(apiRef: any) {
           if ((byCode || byTitle) && data.productId) {
             productIds.add(data.productId);
             matchedSkus.push(sku);
+          } else if (data.productId) {
+            unmatched.push(data);
           }
         });
+
+        // Last resort, and only where the shot asked for it: a product with one
+        // variant has only one view, so there is nothing to disambiguate.
+        if (args.matchSingleVariant) {
+          const byProduct: Record<string, any[]> = {};
+          unmatched.forEach((v) => { (byProduct[v.productId] ||= []).push(v); });
+          for (const [pid, vs] of Object.entries(byProduct)) {
+            if (productIds.has(pid) || vs.length !== 1) continue;
+            const all = await getDocs(query(collection(db, 'variants'), where('productId', '==', pid)));
+            if (all.size === 1) { productIds.add(pid); matchedSkus.push(String(vs[0].sku || '')); }
+          }
+        }
 
         // The view code alone is not unique across the catalogue: PS5 is both a
         // console SKU (R-20-PS5) and a controller SKU (R-18-PS5, "Play Station

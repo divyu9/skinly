@@ -41,6 +41,15 @@ export interface MockupShot {
    * "Console + 1 Controller" whether it is a Series X or a Series S.
    */
   variantTitles?: string[];
+  /**
+   * Claim a product that has exactly one variant and matched nothing else.
+   *
+   * The Tranzy laptops and the licensed PS5 designs each have a single variant
+   * titled "Default Title" — no view code, no usable title. With one variant
+   * there is no question which view it is, so the gadget's primary shot can say
+   * it takes them. Set on one shot per gadget only, or two will both claim it.
+   */
+  matchSingleVariant?: boolean;
   prompt: string;
   order: number;
   isActive: boolean;
@@ -269,6 +278,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "console",
     suffix: "ps5",
     skuCodes: ["PS5"],
+    matchSingleVariant: true,
     order: 0,
     isActive: true,
     prompt:
@@ -607,6 +617,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     suffix: "laptop-top",
     skuCodes: ["LP", "LPT", "LAP"],
     variantTitles: ["Only Top"],
+    matchSingleVariant: true,
     order: 0,
     isActive: true,
     prompt:

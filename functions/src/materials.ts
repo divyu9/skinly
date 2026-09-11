@@ -64,10 +64,15 @@ export async function reserveMaterialForOrder(
     const r = d.data() as any;
     if (r.rNumber) rolls.set(String(r.rNumber).trim().toUpperCase(), { id: d.id, data: r });
   });
+  // A cutout answers to every code its views are sold under: LP-3D-05 and
+  // L-3D-06 are two views of one design and draw on one pile of sheets.
   const cutouts = new Map<string, { id: string; data: any }>();
   cutoutSnap.docs.forEach((d) => {
     const c = d.data() as any;
-    if (c.cutoutNumber) cutouts.set(String(c.cutoutNumber).trim().toUpperCase(), { id: d.id, data: c });
+    const entry = { id: d.id, data: c };
+    for (const code of [c.cutoutNumber, ...(c.aliases || [])]) {
+      if (code) cutouts.set(String(code).trim().toUpperCase(), entry);
+    }
   });
   const gadgets = new Map<string, any>();
   gadgetSnap.docs.forEach((d) => {
