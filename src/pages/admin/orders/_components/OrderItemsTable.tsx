@@ -40,7 +40,16 @@ export interface ItemFormEntry {
 }
 
 interface OrderItemsTableProps {
-  items: OrderItem[];
+  /**
+   * Optional, because it genuinely is.
+   *
+   * Five orders in the catalogue have no `items` field at all — abandoned
+   * pre-payment writes that never got their lines. Typed as required, they
+   * crashed the whole detail page on `items.length` before anything rendered,
+   * so the one screen that could explain what is wrong with the order was the
+   * screen you could not open.
+   */
+  items?: OrderItem[] | null;
   // Edit items dialog
   showEditItemsDialog: boolean;
   itemsForm: ItemFormEntry[];
@@ -51,7 +60,7 @@ interface OrderItemsTableProps {
 }
 
 export function OrderItemsTable({
-  items,
+  items: itemsProp,
   showEditItemsDialog,
   itemsForm,
   onOpenEditItems,
@@ -59,6 +68,8 @@ export function OrderItemsTable({
   onItemsFormChange,
   onSaveItems,
 }: OrderItemsTableProps) {
+  const items = Array.isArray(itemsProp) ? itemsProp : [];
+  const missing = !Array.isArray(itemsProp);
   return (
     <>
       <Card>
@@ -72,6 +83,12 @@ export function OrderItemsTable({
           </div>
         </CardHeader>
         <CardContent>
+          {missing && (
+            <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              This order has no items recorded. It was most likely abandoned before
+              payment, so its lines were never written.
+            </p>
+          )}
           <div className="space-y-4">
             {items.map((item, idx) => (
               <div
@@ -135,8 +152,8 @@ export function OrderItemsTable({
                     </p>
                   </div>
                   <p className="font-medium">
-                    ₹{item.price.toFixed(0)} × {item.quantity} = ₹
-                    {(item.quantity * item.price).toFixed(0)}
+                    ₹{(Number(item.price) || 0).toFixed(0)} × {Number(item.quantity) || 0} = ₹
+                    {((Number(item.quantity) || 0) * (Number(item.price) || 0)).toFixed(0)}
                   </p>
                 </div>
               </div>
@@ -192,7 +209,7 @@ export function OrderItemsTable({
                     </div>
                   </div>
                   <p className="text-sm font-medium">
-                    Subtotal: ₹{(item.price * item.quantity).toFixed(0)}
+                    Subtotal: ₹{((Number(item.price) || 0) * (Number(item.quantity) || 0)).toFixed(0)}
                   </p>
                 </div>
                 <Button

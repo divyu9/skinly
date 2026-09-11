@@ -279,7 +279,7 @@ function OrderDetailPageInner() {
   };
 
   const handleSelectAllItems = (checked: boolean) => {
-    if (checked && order) setSelectedItems(new Set(order.items.map((i) => i.variant)));
+    if (checked && order) setSelectedItems(new Set((order.items ?? []).map((i: any) => i.variant)));
     else setSelectedItems(new Set());
   };
 
@@ -293,9 +293,9 @@ function OrderDetailPageInner() {
     if (!orderId || !order) return;
     setIsRestocking(true);
     try {
-      const itemsToRestock = order.items
-        .filter((item) => selectedItems.has(item.variant))
-        .map((item) => ({ variant: item.variant, quantity: item.quantity }));
+      const itemsToRestock = (order.items ?? [])
+        .filter((item: any) => selectedItems.has(item.variant))
+        .map((item: any) => ({ variant: item.variant, quantity: item.quantity }));
       const result = await restockInventory({ orderId: orderId as Id<"orders">, itemsToRestock });
       if (result.success) {
         toast.success(`Successfully restocked ${itemsToRestock.length} item(s)`);
@@ -491,7 +491,7 @@ function OrderDetailPageInner() {
             items={order.items as any}
             showEditItemsDialog={showEditItemsDialog}
             itemsForm={itemsForm}
-            onOpenEditItems={() => { setItemsForm([...order.items]); setShowEditItemsDialog(true); }}
+            onOpenEditItems={() => { setItemsForm([...(order.items ?? [])]); setShowEditItemsDialog(true); }}
             onCloseEditItems={() => setShowEditItemsDialog(false)}
             onItemsFormChange={setItemsForm}
             onSaveItems={handleUpdateOrderItems}
@@ -547,7 +547,7 @@ function OrderDetailPageInner() {
             showRestockDialog={showRestockDialog}
             selectedItems={selectedItems}
             isRestocking={isRestocking}
-            onOpenRestock={() => { setSelectedItems(new Set(order.items.map((i) => i.variant))); setShowRestockDialog(true); }}
+            onOpenRestock={() => { setSelectedItems(new Set((order.items ?? []).map((i: any) => i.variant))); setShowRestockDialog(true); }}
             onCloseRestock={() => { setShowRestockDialog(false); setSelectedItems(new Set()); }}
             onSelectAll={handleSelectAllItems}
             onSelectItem={handleSelectItem}
