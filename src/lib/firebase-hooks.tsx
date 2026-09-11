@@ -3144,17 +3144,113 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'whatsappHealthCheck.getSystemHealth') {
-          const q = query(collection(db, 'whatsappUsecases'));
-          unsubscribe = onSnapshot(q, (snap) => {
-            const usecases = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            const enabledUsecases = usecases.filter((u: any) => u.isActive).length;
-            setData({
-              overallStatus: "healthy",
-              provider: { configured: true, active: true, provider: "authkey", hasCredentials: true },
-              queue: { pending: 0, processing: 0, failed: 0, stuck: 0 },
-              stats: { messages24h: 0, successRate: 100, enabledUsecases, totalUsecases: usecases.length },
-              usecases
-            });
+          // A health page that reports hardcoded zeros is worse than no health
+          // page: this one claimed "healthy, 0 stuck, 100% success" no matter
+          // what the queue held, counted enabled usecases off a field that does
+          // not exist (isActive, where the data says enabled), and never set
+          // `issues` — which the table dereferences, so the page crashed before
+          // it could draw. Every number below is now read.
+          unsubscribe = onSnapshot(collection(db, 'whatsappUsecases'), async (snap) => {
+            try {
+              const [tplSnap, queueSnap, msgSnap, providerSnap] = await Promise.all([
+                getDocs(collection(db, 'whatsappTemplates')),
+                getDocs(collection(db, 'whatsappQueue')),
+                getDocs(collection(db, 'whatsappMessages')),
+                getDoc(doc(db, 'whatsappSettings', 'provider')),
+              ]);
+
+              const templates = tplSnap.docs.map(d => ({ _id: d.id, ...(d.data() as any) }));
+              const approved = new Set(
+                templates.filter(t => String(t.status || '').toLowerCase() === 'approved')
+                  .map(t => String(t.templateName || ''))
+              );
+              const knownTemplate = new Set(templates.map(t => String(t.templateName || '')));
+
+              const queue = { pending: 0, processing: 0, failed: 0, stuck: 0 };
+              const STUCK_AFTER = 15 * 60 * 1000;
+              queueSnap.docs.forEach((d) => {
+                const r: any = d.data();
+                const st = String(r.status || '');
+                if (st === 'pending' || st === 'queued') queue.pending++;
+                else if (st === 'processing') {
+                  queue.processing++;
+                  // Claimed but never finished: the run that took it died.
+                  if (Date.now() - Number(r.lastAttemptAt || r.createdAt || 0) > STUCK_AFTER) queue.stuck++;
+                } else if (st === 'failed') queue.failed++;
+              });
+
+              const messages = msgSnap.docs.map(d => d.data() as any);
+              const since24h = Date.now() - 24 * 60 * 60 * 1000;
+              const since7d = Date.now() - 7 * 24 * 60 * 60 * 1000;
+              const recent = messages.filter(m => Number(m.createdAt || 0) >= since24h);
+              const ok = (m: any) => ['sent', 'delivered', 'read'].includes(String(m.status || ''));
+              const rate = (list: any[]) =>
+                list.length ? Math.round((list.filter(ok).length / list.length) * 100) : 0;
+
+              const usecases = snap.docs.map((d) => {
+                const u: any = { _id: d.id, ...(d.data() as any) };
+                const key = String(u.usecaseKey || '');
+                const tplName = String(u.templateName || '');
+                const mine = messages.filter(m => String(m.usecaseKey) === key && Number(m.createdAt || 0) >= since7d);
+                const lastSent = messages
+                  .filter(m => String(m.usecaseKey) === key && m.sentAt)
+                  .reduce((max, m) => Math.max(max, Number(m.sentAt || 0)), 0);
+
+                const issues: string[] = [];
+                if (!tplName) issues.push('No template linked');
+                else if (!knownTemplate.has(tplName)) issues.push(`Template "${tplName}" not found`);
+                else if (!approved.has(tplName)) issues.push(`Template "${tplName}" not approved`);
+                if (u.enabled !== true) issues.push('Disabled');
+
+                return {
+                  ...u,
+                  displayName: u.displayName || key.replace(/_/g, ' '),
+                  enabled: u.enabled === true,
+                  isTransactional: u.isTransactional ?? /order|otp|cod|payment|delivery/.test(key),
+                  messageCount: mine.length,
+                  successRate: mine.length ? rate(mine) : null,
+                  lastSent: lastSent || null,
+                  issues,
+                  status: issues.length === 0 ? 'healthy' : (u.enabled === true ? 'warning' : 'disabled'),
+                };
+              });
+
+              const provider: any = providerSnap.exists() ? providerSnap.data() : null;
+              const enabledUsecases = usecases.filter(u => u.enabled).length;
+              const broken = usecases.filter(u => u.enabled && u.issues.length > 0).length;
+
+              setData({
+                overallStatus: queue.stuck > 0 || broken > 0 ? 'warning'
+                  : enabledUsecases === 0 ? 'warning' : 'healthy',
+                provider: {
+                  configured: !!provider?.providerName,
+                  active: !!provider?.providerName,
+                  provider: provider?.providerName || 'not configured',
+                  // The key the worker sends with lives in the functions
+                  // environment, which the browser cannot see. Saying "yes"
+                  // here would be a guess, so it reports what it can check.
+                  hasCredentials: !!provider?.authKeyHint || !!provider?.authKey,
+                },
+                queue,
+                stats: {
+                  messages: recent.length,
+                  messages24h: recent.length,
+                  successRate: rate(recent),
+                  enabledUsecases,
+                  totalUsecases: usecases.length,
+                },
+                usecases,
+              });
+            } catch (err) {
+              console.error('getSystemHealth failed:', err);
+              setData({
+                overallStatus: 'warning',
+                provider: { configured: false, active: false, provider: 'unknown', hasCredentials: false },
+                queue: { pending: 0, processing: 0, failed: 0, stuck: 0 },
+                stats: { messages: 0, messages24h: 0, successRate: 0, enabledUsecases: 0, totalUsecases: 0 },
+                usecases: [],
+              });
+            }
           });
         }
         else if (path === 'emailManagement.getAllUsecases') {
@@ -5261,8 +5357,30 @@ export function useMutation(apiRef: any) {
         const docId = actionName === 'saveWhatsAppProviderSettings' ? 'provider' : 'adminNotifications';
         // Firestore rejects undefined, and these forms send it for every field
         // the admin left blank.
-        const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
-        await setDoc(doc(db, 'whatsappSettings', docId), { ...clean, lastUpdatedAt: Date.now() }, { merge: true });
+        const clean: any = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+
+        // The auth key never lands in Firestore.
+        //
+        // The worker sends with process.env.WHATSAPP_AUTHKEY and has never read
+        // this document, so storing the secret here bought nothing — while
+        // costing a plaintext copy in the database, in the Firebase console,
+        // and back down the wire into every admin's browser, where the dialog
+        // refilled the input with it. Only a hint is kept, enough for the UI to
+        // say a key is set.
+        if ('authKey' in clean) {
+          const key = String(clean.authKey || '');
+          delete clean.authKey;
+          if (key) {
+            clean.authKeyHint = `••••${key.slice(-4)}`;
+            clean.authKeySetAt = Date.now();
+          }
+        }
+        // Any plaintext key written before this change goes now.
+        await setDoc(doc(db, 'whatsappSettings', docId), {
+          ...clean,
+          ...(docId === 'provider' ? { authKey: deleteField() } : {}),
+          lastUpdatedAt: Date.now(),
+        }, { merge: true });
         return docId;
       }
 

@@ -34,7 +34,8 @@ const PROVIDERS = [
 
 interface ProviderConfig {
   providerName: string;
-  authKey: string;
+  /** Last four characters only. The key itself is never stored here. */
+  authKeyHint?: string;
   apiEndpoint: string;
   senderPhone: string;
   lastUpdatedAt: number;
@@ -61,7 +62,7 @@ export function ProviderSettings() {
     if (isOpen && providerSettings) {
       setFormData({
         providerName: providerSettings.providerName,
-        authKey: providerSettings.authKey,
+        authKey: "",
         apiEndpoint: providerSettings.apiEndpoint,
         senderPhone: providerSettings.senderPhone,
       });
@@ -147,7 +148,12 @@ export function ProviderSettings() {
                 {/* Auth Key */}
                 <div className="space-y-2">
                   <Label htmlFor="authKey">
-                    Auth Key / API Key <span className="text-destructive">*</span>
+                    Auth Key / API Key
+                    {providerSettings?.authKeyHint && (
+                      <span className="ml-2 font-normal text-muted-foreground">
+                        currently {providerSettings.authKeyHint}
+                      </span>
+                    )}
                   </Label>
                   <div className="relative">
                     <Input
@@ -155,8 +161,7 @@ export function ProviderSettings() {
                       type={showAuthKey ? "text" : "password"}
                       value={formData.authKey}
                       onChange={(e) => setFormData({ ...formData, authKey: e.target.value })}
-                      placeholder="Enter your API key"
-                      required
+                      placeholder={providerSettings?.authKeyHint ? "Leave blank to keep the current key" : "Enter your API key"}
                       className="pr-10"
                     />
                     <button
@@ -172,7 +177,10 @@ export function ProviderSettings() {
                     </button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Your API authentication key from the provider
+                    Only the last four characters are stored here. Messages are sent
+                    with <code>WHATSAPP_AUTHKEY</code> from the server environment, which
+                    the browser never sees &mdash; update that to change the key that
+                    actually sends.
                   </p>
                 </div>
 
