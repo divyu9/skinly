@@ -50,6 +50,7 @@ type Job = {
   pendingUrl?: string;
   rejectedTo?: string;
   skuCodes?: string[];
+  variantTitles?: string[];
   linkedCount?: number;
   error?: string;
   attempt?: number;
@@ -582,9 +583,17 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const targetsFor = useCallback((shot: MockupShot) => {
     if (!linkTargets) return null;
     const codes = (shot.skuCodes || []).map((c) => c.toUpperCase());
+    // "Default" says nothing about which view a variant is, and appears on
+    // every gadget, so it is never allowed to match.
+    const titles = (shot.variantTitles || [])
+      .map((t) => t.trim().toLowerCase())
+      .filter((t) => t && t !== "default" && t !== "default title");
     const seen = new Map<string, string>();
     for (const t of linkTargets) {
-      const hit = codes.includes(t.code) || codes.includes(t.codeHead);
+      const hit =
+        codes.includes(t.code) ||
+        codes.includes(t.codeHead) ||
+        titles.includes(String(t.variantTitle || "").toLowerCase());
       if (hit && t.gadget === String(shot.gadget).toLowerCase()) {
         seen.set(t.productId, t.productTitle);
       }
@@ -634,6 +643,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         gadget: shot.gadget,
         suffix: shot.suffix,
         skuCodes: shot.skuCodes || [],
+        variantTitles: shot.variantTitles || [],
         sourceUrl: roll.rawImageUrl,
         status: "queued",
         attempt,
@@ -707,6 +717,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         const res: any = await linkToProducts({
           rNumber: job.rNumber,
           skuCodes: job.skuCodes,
+          variantTitles: job.variantTitles,
           gadget: job.gadget,
           url,
           alt: job.designName || job.shotLabel || "",

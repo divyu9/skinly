@@ -199,6 +199,7 @@ export function useQuery(apiRef: any, args?: any) {
                 code: tail,
                 // Same batch-suffix allowance as the linker.
                 codeHead: tail.split('-')[0],
+                variantTitle: String(v.title || '').trim(),
                 productId: v.productId,
                 productTitle: pd.title || '',
                 gadget: gadgetById[pd.gadgetTypeId || pd.gadgetType] || '',
@@ -4609,7 +4610,15 @@ export function useMutation(apiRef: any) {
         // cannot leak in.
         const design = String(args.rNumber || '').trim();
         const codes = (args.skuCodes || []).map((c: string) => String(c).trim().toUpperCase()).filter(Boolean);
-        if (!design || !codes.length) return { success: false, linked: 0, reason: 'No design code or SKU codes' };
+        // Titles are the fallback for SKUs with no view code. "Default" and
+        // "Default Title" are excluded: they appear across every gadget and say
+        // nothing about which view a variant is.
+        const titles = (args.variantTitles || [])
+          .map((t: string) => String(t).trim().toLowerCase())
+          .filter((t: string) => t && t !== 'default' && t !== 'default title');
+        if (!design || (!codes.length && !titles.length)) {
+          return { success: false, linked: 0, reason: 'No design code, SKU codes or variant titles' };
+        }
 
         const snap = await getDocs(query(
           collection(db, 'variants'),
@@ -4629,7 +4638,9 @@ export function useMutation(apiRef: any) {
           // codes start with things like LP and LC, which are themselves view
           // codes, and scanning would match the wrong half of the SKU.
           const tail = sku.slice(design.length + 1).toUpperCase();
-          if ((codes.includes(tail) || codes.includes(tail.split('-')[0])) && data.productId) {
+          const byCode = codes.includes(tail) || codes.includes(tail.split('-')[0]);
+          const byTitle = titles.includes(String(data.title || '').trim().toLowerCase());
+          if ((byCode || byTitle) && data.productId) {
             productIds.add(data.productId);
             matchedSkus.push(sku);
           }

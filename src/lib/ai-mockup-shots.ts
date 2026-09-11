@@ -26,6 +26,21 @@ export interface MockupShot {
    * ignores case, because the catalogue holds both IPAD and iPAD.
    */
   skuCodes: string[];
+  /**
+   * Variant titles this shot is the picture for, as a fallback when the SKU
+   * carries no view code.
+   *
+   * Some laptop SKUs encode the view in the number rather than a suffix —
+   * LP-3d-07 is "Only Top" and LP-3d-08 is "Top + Keyboard Area", odd and even
+   * in consecutive pairs — and the LP/L prefix contradicts that on three of
+   * them. Renaming production SKUs to suit this tool would be the tail wagging
+   * the dog, so the title is read instead; it is correct on every one of those
+   * rows.
+   *
+   * Leave empty where the title cannot decide: every Xbox variant says
+   * "Console + 1 Controller" whether it is a Series X or a Series S.
+   */
+  variantTitles?: string[];
   prompt: string;
   order: number;
   isActive: boolean;
@@ -94,6 +109,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "camera",
     suffix: "camera",
     skuCodes: ["CAM", "CAO"],
+    variantTitles: ["Without Lens"],
     order: 0,
     isActive: true,
     prompt:
@@ -115,6 +131,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "camera",
     suffix: "camera-hand",
     skuCodes: ["CAM", "CAO"],
+    variantTitles: ["Without Lens"],
     order: 1,
     isActive: true,
     prompt:
@@ -128,6 +145,27 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "letterforms, leaving the raised SONY lettering bare. There is no rectangle, no plate, no panel "
         + "and no border around the wordmark \u2014 the pattern touches the letters directly. The lens mount, "
         + "dials and rear screen stay uncovered. {{staging}} ",
+  },
+  {
+    label: "Sony A7 + lens",
+    gadget: "camera",
+    suffix: "camera-lens",
+    skuCodes: ["CAML", "CALS"],
+    variantTitles: ["With Lens"],
+    order: 2,
+    isActive: true,
+    prompt:
+      "A Sony Alpha mirrorless camera body with a telephoto lens mounted, standing on a dark walnut "
+        + "desk, photographed from a front three-quarter angle slightly above so the skinned body, the "
+        + "raised viewfinder hump and the wrapped lens barrel all read clearly and the pair dominates the "
+        + "frame. A matching vinyl skin covers the camera's front and top plate and is wrapped around the "
+        + "lens barrel. {{fidelity}} The pattern reads as the same design across body and lens, curving "
+        + "around the barrel and compressing towards its edges the way a wrap on a cylinder does. The "
+        + "skin is die-cut to the exact shape of the SONY wordmark on the viewfinder hump, leaving the "
+        + "raised lettering bare with no plate or border around it. The front glass, the focus and zoom "
+        + "ring markings, the shutter button, the dials and the rear screen stay uncovered. Behind, "
+        + "softly out of focus, a lens cap and an open notebook. No people and no hands anywhere in the "
+        + "frame. {{staging}} ",
   },
   {
     label: "20W charger \u2014 two angles",
@@ -434,6 +472,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "drone",
     suffix: "drone",
     skuCodes: ["DRO", "DRON"],
+    variantTitles: ["Drone Only"],
     order: 0,
     isActive: true,
     prompt:
@@ -455,6 +494,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "drone",
     suffix: "drone-rc",
     skuCodes: ["DRC", "DROC"],
+    variantTitles: ["Drone + RC"],
     order: 1,
     isActive: true,
     prompt:
@@ -518,6 +558,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "drone",
     suffix: "drone-hand",
     skuCodes: ["DRO", "DRON"],
+    variantTitles: ["Drone Only"],
     order: 4,
     isActive: true,
     prompt:
@@ -536,6 +577,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "laptop",
     suffix: "laptop-top",
     skuCodes: ["LP", "LPT", "LAP"],
+    variantTitles: ["Only Top"],
     order: 0,
     isActive: true,
     prompt:
@@ -558,6 +600,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "laptop",
     suffix: "laptop-open",
     skuCodes: ["LPK"],
+    variantTitles: ["Top + Keyboard Area", "Top+Keyboard", "Top + Keyboad Area"],
     order: 1,
     isActive: true,
     prompt:
@@ -578,6 +621,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "laptop",
     suffix: "laptop-hand",
     skuCodes: ["LP", "LPT", "LAP"],
+    variantTitles: ["Only Top"],
     order: 2,
     isActive: true,
     prompt:
@@ -673,6 +717,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "tablet",
     suffix: "ipad",
     skuCodes: ["IPAD", "TAB", "TAB."],
+    variantTitles: ["Only Back"],
     order: 0,
     isActive: true,
     prompt:
@@ -694,6 +739,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     gadget: "tablet",
     suffix: "ipad-hand",
     skuCodes: ["IPAD", "TAB"],
+    variantTitles: ["Only Back"],
     order: 1,
     isActive: true,
     prompt:
