@@ -170,12 +170,18 @@ export function expandPrompt(
 ): string {
   // {{fidelity}} resolves differently per design source, so one set of shot
   // prompts serves both rolls and cutouts.
-  const isTranzy = /tranz|transparent|membrane/i.test(vars.finish || "");
+  //
+  // Only cutouts come in Tranzy. Rolls are printed on opaque vinyl, so the
+  // clause about white being peel-off backing is not merely unnecessary there —
+  // it would tell the model to punch holes through a design that has none.
+  // Relief applies to both: a roll can be 3D embossed just as a sheet can.
+  const isCutout = vars.source === "cutout";
+  const isTranzy = isCutout && /tranz|transparent|membrane/i.test(vars.finish || "");
   const isRelief = /3d|textur|emboss/i.test(vars.finish || "");
   const fidelity =
-    vars.source === "cutout"
-      ? blocks.fidelityCutout + (isTranzy ? TRANZY_CLAUSE : "") + (isRelief ? RELIEF_CLAUSE : "")
-      : blocks.fidelity + (isTranzy ? TRANZY_CLAUSE : "");
+    (isCutout ? blocks.fidelityCutout : blocks.fidelity)
+    + (isTranzy ? TRANZY_CLAUSE : "")
+    + (isRelief ? RELIEF_CLAUSE : "");
   const table: Record<string, string> = {
     fidelity,
     staging: blocks.staging,

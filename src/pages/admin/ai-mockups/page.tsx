@@ -40,14 +40,18 @@ const SIZES = ["1:1", "2:3", "3:2", "3:4", "4:3", "9:16", "16:9", "21:9"];
 /**
  * What a design is printed on, in the words the prompt expander tests for.
  *
- * `match` is how an already-recorded finish is mapped back onto one of these
- * three — the catalogue holds "3D Textured", "Matte Finish" and blanks.
+ * `match` is how an already-recorded finish is mapped back onto one of these —
+ * the catalogue holds "3D Textured", "Matte Finish" and a great many blanks.
+ *
+ * Tranzy is a cutout-only option: rolls are printed on opaque vinyl and never
+ * come as clear film, so offering it against a roll could only ever be a
+ * mis-click that turns the design's light areas transparent.
  */
 const FINISHES = [
   // "Matte Membrane" is a Tranzy, not a matte, so the matte test excludes it.
-  { value: "Matte", label: "Matte", match: /^matte(?!.*membrane)/i },
-  { value: "3D Textured", label: "3D Textured / Embossed", match: /3d|textur|emboss/i },
-  { value: "Tranzy (transparent)", label: "Tranzy — transparent film", match: /tranz|transparent|membrane/i },
+  { value: "Matte", label: "Matte", match: /^matte(?!.*membrane)/i, cutoutOnly: false },
+  { value: "3D Textured", label: "3D Textured / Embossed", match: /3d|textur|emboss/i, cutoutOnly: false },
+  { value: "Tranzy (transparent)", label: "Tranzy — transparent film", match: /tranz|transparent|membrane/i, cutoutOnly: true },
 ];
 const DEFAULT_ASPECT = "4:3";
 const POLL_MS = 4000;
@@ -960,12 +964,13 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               <Badge variant="outline">{roll.stockLabel}</Badge>
               {roll.source === "cutout" && <Badge className="bg-sky-600">cutout</Badge>}
               {/*
-                The finish is not decoration. A Tranzy design is printed on clear
-                film, so the white in the reference photo is backing paper that
-                gets peeled off — told nothing, the model paints it onto the
-                laptop and the result is a white sticker instead of a silhouette
-                on bare metal. Almost no roll has a finish recorded, so it is set
-                here, where the run is about to happen.
+                The finish is not decoration. On a cutout, Tranzy means the white
+                in the reference photo is backing paper that gets peeled off —
+                told nothing, the model paints it onto the laptop and the result
+                is a white sticker instead of a silhouette on bare metal. On
+                either source, 3D Textured adds the relief. Almost nothing has a
+                finish recorded, so it is set here, where the run is about to
+                happen.
               */}
               <Select
                 value={FINISHES.find((f) => f.match.test(roll.finish || ""))?.value || ""}
@@ -975,7 +980,9 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   <SelectValue placeholder="Finish — not set" />
                 </SelectTrigger>
                 <SelectContent>
-                  {FINISHES.map((f) => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
+                  {FINISHES.filter((f) => !f.cutoutOnly || roll.source === "cutout").map((f) => (
+                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
