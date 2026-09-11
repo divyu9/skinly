@@ -5251,6 +5251,21 @@ export function useMutation(apiRef: any) {
       else if (actionName.toLowerCase().includes('homepagesection')) targetCollection = 'homepageSections';
       else if (collectionName === 'admin') targetCollection = path.split('.')[1];
 
+      // These two were written inside the `includes('update') || includes('edit')`
+      // block below, and neither name contains either word — so they were
+      // unreachable, fell through to the callable fallback, and failed with
+      // "internal" because no such Cloud Function exists. That is why the
+      // WhatsApp provider settings would not save and whatsappSettings/provider
+      // never existed.
+      if (actionName === 'saveWhatsAppProviderSettings' || actionName === 'saveAdminNotificationSettings') {
+        const docId = actionName === 'saveWhatsAppProviderSettings' ? 'provider' : 'adminNotifications';
+        // Firestore rejects undefined, and these forms send it for every field
+        // the admin left blank.
+        const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        await setDoc(doc(db, 'whatsappSettings', docId), { ...clean, lastUpdatedAt: Date.now() }, { merge: true });
+        return docId;
+      }
+
       // Generic add/update
       if (actionName.includes('create') || actionName.includes('add') || actionName.includes('insert')) {
         const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
@@ -5262,14 +5277,6 @@ export function useMutation(apiRef: any) {
         if (actionName === 'updateHomepageSettings') {
           await setDoc(doc(db, targetCollection, 'default'), args, { merge: true });
           return 'default';
-        }
-        if (actionName === 'saveWhatsAppProviderSettings') {
-          await setDoc(doc(db, 'whatsappSettings', 'provider'), { ...args, lastUpdatedAt: Date.now() }, { merge: true });
-          return 'provider';
-        }
-        if (actionName === 'saveAdminNotificationSettings') {
-          await setDoc(doc(db, 'whatsappSettings', 'adminNotifications'), { ...args, lastUpdatedAt: Date.now() }, { merge: true });
-          return 'adminNotifications';
         }
         
         if (actionName === 'updateUsecase') {
