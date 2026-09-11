@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import { reserveMaterialForOrder } from "./materials";
+import { notifyOrderPlaced } from "./orderNotifications";
 import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
@@ -202,6 +203,16 @@ export const placeOrder = functions
     reserveMaterialForOrder(db, docRef, orderItems).catch((e) =>
       console.error("reserveMaterial failed", { order: docRef.id, error: e?.message || e })
     );
+
+    // ── 4c. Tell the customer ─────────────────────────────────────────────────
+    // COD only. An online order is notified once PhonePe confirms the money,
+    // from applyPaymentResult — "we've got your order" before payment is worse
+    // than silence. Non-blocking for the same reason as the stock draw-down.
+    if (paymentMethod !== "phonepe") {
+      notifyOrderPlaced(db, docRef.id).catch((e) =>
+        console.error("notifyOrderPlaced failed", { order: docRef.id, error: e?.message || e })
+      );
+    }
 
     // ── 5. Initiate PhonePe (same function call, no second round-trip) ──────────
     if (paymentMethod === "phonepe" && calculatedTotal > 0 && customerPhone) {

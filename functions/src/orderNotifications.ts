@@ -1,0 +1,171 @@
+import * as admin from "firebase-admin";
+import { describeItems } from "./ordersAdmin";
+
+/**
+ * Tells the customer, and you, that an order exists.
+ *
+ * Nothing did this. `placeOrder` wrote the order and stopped, so an order
+ * placed on a fully working site with a valid MSG91 key and every usecase
+ * enabled still reached nobody. The two orders placed since the site came back
+ * both produced zero messages, which is how the gap showed up.
+ *
+ * Timing follows the original: a COD order notifies the moment it is placed,
+ * an online order only once PhonePe confirms the money. Telling someone "we've
+ * got your order" before they have paid is worse than saying nothing.
+ *
+ * Everything here is best-effort and guarded. An order must never fail, or be
+ * lost, because a message could not go out.
+ */
+
+const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
+
+/** Queues one WhatsApp message, if that usecase is switched on. */
+async function queueWhatsApp(
+  db: admin.firestore.Firestore,
+  usecaseKey: string,
+  phone: string,
+  variables: Record<string, string>,
+  orderId: string
+): Promise<boolean> {
+  const digits = String(phone || "").replace(/\D/g, "").slice(-10);
+  if (!/^[6-9]\d{9}$/.test(digits)) return false;
+
+  const uc = await db.collection("whatsappUsecases").where("usecaseKey", "==", usecaseKey).limit(1).get();
+  if (uc.empty || uc.docs[0].data().enabled !== true) return false;
+
+  const msg = await db.collection("whatsappMessages").add({
+    usecaseKey,
+    recipientPhone: digits,
+    relatedOrderId: orderId,
+    variables,
+    status: "pending",
+    createdAt: Date.now(),
+  });
+  await db.collection("whatsappQueue").add({
+    messageId: msg.id,
+    status: "pending",
+    attempts: 0,
+    scheduledFor: Date.now(),
+    createdAt: Date.now(),
+  });
+  return true;
+}
+
+/** Sends the order-confirmed mail, if the key and template allow it. */
+async function sendConfirmationEmail(
+  db: admin.firestore.Firestore,
+  order: any,
+  orderId: string
+): Promise<boolean> {
+  const authkey = process.env.MSG91_AUTH_TOKEN || "";
+  if (!authkey) return false;
+
+  const to = String(order.email || order.customerEmail || order.guestEmail || "");
+  if (!to) return false;
+
+  const tpl = await db.collection("emailUsecaseTemplates")
+    .where("usecaseKey", "==", "order_confirmed").limit(1).get();
+  if (tpl.empty || tpl.docs[0].data().enabled !== true) return false;
+  const t = tpl.docs[0].data();
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const name = order.shippingAddress?.fullName || order.customerName || "Customer";
+  const total = Number(order.total ?? order.amountPayable) || 0;
+
+  const res = await fetch(MSG91_EMAIL_ENDPOINT, {
+    method: "POST",
+    headers: { authkey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      template_id: t.msg91TemplateId,
+      recipients: [{
+        to: [{ email: to, name }],
+        variables: {
+          customerName: name,
+          orderNumber: String(order.orderNumber || "Pending"),
+          productName: describeItems(items),
+          amount: `₹${total.toFixed(2)}`,
+          productImage: String(items[0]?.productImage || ""),
+        },
+      }],
+      from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
+      domain: "mail.goskinly.com",
+    }),
+  });
+
+  const text = await res.text();
+  await db.collection("emailMessages").add({
+    createdAt: Date.now(),
+    recipientEmail: to,
+    recipientUserId: order.userId || null,
+    usecaseKey: "order_confirmed",
+    templateName: t.templateName || "order confirmed",
+    msg91TemplateId: t.msg91TemplateId,
+    relatedOrderId: orderId,
+    status: res.ok ? "sent" : "failed",
+    ...(res.ok ? {} : { errorMessage: text.slice(0, 500) }),
+    retryCount: 0,
+  });
+  if (!res.ok) console.error("order_confirmed email failed", { orderId, status: res.status, text });
+  return res.ok;
+}
+
+/**
+ * Fires every notification an order should produce, exactly once.
+ *
+ * The `orderNotifiedAt` flag is set first and checked in a transaction: a COD
+ * order and a late PhonePe callback can both arrive at this, and two "we've got
+ * your order" messages for one order is the kind of thing customers screenshot.
+ */
+export async function notifyOrderPlaced(
+  db: admin.firestore.Firestore,
+  orderId: string
+): Promise<void> {
+  const ref = db.collection("orders").doc(orderId);
+
+  const order = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return null;
+    const data = snap.data() as any;
+    if (data.orderNotifiedAt) return null;
+    tx.update(ref, { orderNotifiedAt: Date.now() });
+    return data;
+  });
+  if (!order) return;
+
+  const items = Array.isArray(order.items) ? order.items : [];
+  const name = order.shippingAddress?.fullName || order.customerName || "Customer";
+  const orderNumber = String(order.orderNumber || "Pending");
+  const total = Number(order.total ?? order.amountPayable) || 0;
+  const productNames = items.map((i: any) => i?.productTitle).filter(Boolean).join(", ");
+
+  const results = await Promise.allSettled([
+    queueWhatsApp(db, "order_received", order.shippingAddress?.phone || order.phone || "", {
+      customer_name: name,
+      order_number: orderNumber,
+      product_name: productNames,
+    }, orderId),
+
+    (async () => {
+      // The admin's own number is configuration, not customer data, so it is
+      // read fresh rather than baked into the order.
+      const cfg = await db.doc("whatsappSettings/adminNotifications").get();
+      const adminPhone = cfg.exists ? String((cfg.data() as any)?.adminPhone || "") : "";
+      if (!adminPhone) return false;
+      const mode = String(order.paymentMethod || "").toLowerCase() === "cod" ? "COD" : "Prepaid";
+      return queueWhatsApp(db, "admin_new_order", adminPhone, {
+        order_number: orderNumber,
+        amount: total.toFixed(2),
+        customer_name: name,
+        number_of_products: String(items.length),
+        payment_mode: mode,
+      }, orderId);
+    })(),
+
+    sendConfirmationEmail(db, order, orderId),
+  ]);
+
+  const [customerWa, adminWa, mail] = results.map((r) =>
+    r.status === "fulfilled" ? r.value : false
+  );
+  console.log("notifyOrderPlaced", { orderId, orderNumber, customerWa, adminWa, mail });
+}

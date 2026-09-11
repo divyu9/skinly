@@ -13,6 +13,19 @@ import { requireAdmin } from "./auth";
  * throwing "function not found" ever since.
  */
 
+/** "Midnight Card Skin (iPhone 17 - Full Body Wrap) x 1, …" — one line for the mail. */
+export function describeItems(items: any[]): string {
+  return (items || [])
+    .map((item) => {
+      const coverage = item?.coverage === "full_body_wrap" ? "Full Body Wrap"
+        : item?.coverage === "only_back" ? "Only Back" : "";
+      const model = item?.phoneModel || "";
+      const detail = coverage && model ? `${model} - ${coverage}` : coverage || model;
+      return `${item?.productTitle || "Item"}${detail ? ` (${detail})` : ""} x ${item?.quantity ?? 1}`;
+    })
+    .join(", ");
+}
+
 const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
 
 const num = (v: any): number => {
@@ -189,18 +202,21 @@ export const sendOrderStatusEmail = onCall(async (data: any, context: any) => {
   if (t.enabled !== true) throw new HttpsError("failed-precondition", `The "${usecaseKey}" email is switched off`);
 
   const items = Array.isArray(order.items) ? order.items : [];
+  const name = order.shippingAddress?.fullName || order.customerName || "Customer";
   const body = {
     template_id: t.msg91TemplateId,
     recipients: [{
-      to: [{ email: to, name: order.customerName || order.shippingAddress?.fullName || "" }],
+      to: [{ email: to, name }],
+      // These five names are what the MSG91 templates were built against, and
+      // the API silently drops anything it does not recognise — which is why a
+      // test mail arrived with "Thanks, — we've got your order!" and an empty
+      // Order/Product/Amount table. All four order templates take the same set.
       variables: {
-        customer_name: order.customerName || order.shippingAddress?.fullName || "there",
-        order_number: String(order.orderNumber || orderId),
-        order_total: String(num(order.total) || num(order.amountPayable)),
-        item_count: String(items.length),
-        tracking_number: String(order.awbNumber || order.manualTrackingNumber || ""),
-        tracking_url: String(order.trackingUrl || ""),
-        courier_name: String(order.courierName || order.manualCourierCompany || ""),
+        customerName: name,
+        orderNumber: String(order.orderNumber || order.failedOrderNumber || "Pending"),
+        productName: describeItems(items),
+        amount: `₹${(num(order.total) || num(order.amountPayable)).toFixed(2)}`,
+        productImage: String(items[0]?.productImage || ""),
       },
     }],
     from: { email: "noreply@mail.goskinly.com", name: "Skinly" },

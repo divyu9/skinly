@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions/v1";
 import { onRequest, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import { notifyOrderPlaced } from "./orderNotifications";
 import * as crypto from "crypto";
 import { requireAuth, getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
@@ -99,6 +100,15 @@ const applyPaymentResult = async (
     paymentConfirmedVia: source,
     updatedAt: Date.now(),
   });
+
+  // The money is in, so now the customer hears about it. Not before: an
+  // online order that never gets paid should produce no confirmation at all.
+  // Non-blocking, and guarded by its own once-only flag, because the status
+  // check and the callback both reach this for the same payment.
+  notifyOrderPlaced(admin.firestore(), doc.id).catch((e) =>
+    console.error("notifyOrderPlaced failed", { order: doc.id, error: e?.message || e })
+  );
+
   return { paymentStatus, orderId: doc.id, changed: true };
 };
 

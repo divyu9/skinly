@@ -26,6 +26,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.placeOrder = void 0;
 const functions = __importStar(require("firebase-functions/v1"));
 const materials_1 = require("./materials");
+const orderNotifications_1 = require("./orderNotifications");
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const crypto = __importStar(require("crypto"));
@@ -209,6 +210,13 @@ exports.placeOrder = functions
     // After the order is safely written, and deliberately not blocking on it:
     // an order must never be lost because the stock ledger had a bad row.
     (0, materials_1.reserveMaterialForOrder)(db, docRef, orderItems).catch((e) => console.error("reserveMaterial failed", { order: docRef.id, error: (e === null || e === void 0 ? void 0 : e.message) || e }));
+    // ── 4c. Tell the customer ─────────────────────────────────────────────────
+    // COD only. An online order is notified once PhonePe confirms the money,
+    // from applyPaymentResult — "we've got your order" before payment is worse
+    // than silence. Non-blocking for the same reason as the stock draw-down.
+    if (paymentMethod !== "phonepe") {
+        (0, orderNotifications_1.notifyOrderPlaced)(db, docRef.id).catch((e) => console.error("notifyOrderPlaced failed", { order: docRef.id, error: (e === null || e === void 0 ? void 0 : e.message) || e }));
+    }
     // ── 5. Initiate PhonePe (same function call, no second round-trip) ──────────
     if (paymentMethod === "phonepe" && calculatedTotal > 0 && customerPhone) {
         let phoneDigits = String(customerPhone).replace(/\D/g, "");

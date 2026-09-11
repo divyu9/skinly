@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendOrderStatusEmail = exports.refundToWallet = exports.retryPayment = void 0;
+exports.sendOrderStatusEmail = exports.refundToWallet = exports.retryPayment = exports.describeItems = void 0;
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
 const auth_1 = require("./auth");
@@ -37,6 +37,20 @@ const auth_1 = require("./auth");
  * Each was left unimplemented by the Convex migration, so the buttons have been
  * throwing "function not found" ever since.
  */
+/** "Midnight Card Skin (iPhone 17 - Full Body Wrap) x 1, …" — one line for the mail. */
+function describeItems(items) {
+    return (items || [])
+        .map((item) => {
+        var _a;
+        const coverage = (item === null || item === void 0 ? void 0 : item.coverage) === "full_body_wrap" ? "Full Body Wrap"
+            : (item === null || item === void 0 ? void 0 : item.coverage) === "only_back" ? "Only Back" : "";
+        const model = (item === null || item === void 0 ? void 0 : item.phoneModel) || "";
+        const detail = coverage && model ? `${model} - ${coverage}` : coverage || model;
+        return `${(item === null || item === void 0 ? void 0 : item.productTitle) || "Item"}${detail ? ` (${detail})` : ""} x ${(_a = item === null || item === void 0 ? void 0 : item.quantity) !== null && _a !== void 0 ? _a : 1}`;
+    })
+        .join(", ");
+}
+exports.describeItems = describeItems;
 const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
 const num = (v) => {
     const n = Number(v);
@@ -200,18 +214,21 @@ exports.sendOrderStatusEmail = (0, https_1.onCall)(async (data, context) => {
     if (t.enabled !== true)
         throw new https_1.HttpsError("failed-precondition", `The "${usecaseKey}" email is switched off`);
     const items = Array.isArray(order.items) ? order.items : [];
+    const name = ((_a = order.shippingAddress) === null || _a === void 0 ? void 0 : _a.fullName) || order.customerName || "Customer";
     const body = {
         template_id: t.msg91TemplateId,
         recipients: [{
-                to: [{ email: to, name: order.customerName || ((_a = order.shippingAddress) === null || _a === void 0 ? void 0 : _a.fullName) || "" }],
+                to: [{ email: to, name }],
+                // These five names are what the MSG91 templates were built against, and
+                // the API silently drops anything it does not recognise — which is why a
+                // test mail arrived with "Thanks, — we've got your order!" and an empty
+                // Order/Product/Amount table. All four order templates take the same set.
                 variables: {
-                    customer_name: order.customerName || ((_b = order.shippingAddress) === null || _b === void 0 ? void 0 : _b.fullName) || "there",
-                    order_number: String(order.orderNumber || orderId),
-                    order_total: String(num(order.total) || num(order.amountPayable)),
-                    item_count: String(items.length),
-                    tracking_number: String(order.awbNumber || order.manualTrackingNumber || ""),
-                    tracking_url: String(order.trackingUrl || ""),
-                    courier_name: String(order.courierName || order.manualCourierCompany || ""),
+                    customerName: name,
+                    orderNumber: String(order.orderNumber || order.failedOrderNumber || "Pending"),
+                    productName: describeItems(items),
+                    amount: `₹${(num(order.total) || num(order.amountPayable)).toFixed(2)}`,
+                    productImage: String(((_b = items[0]) === null || _b === void 0 ? void 0 : _b.productImage) || ""),
                 },
             }],
         from: { email: "noreply@mail.goskinly.com", name: "Skinly" },

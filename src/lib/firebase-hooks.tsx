@@ -4929,11 +4929,15 @@ export function useMutation(apiRef: any) {
           recipientPhone: phone,
           recipientName: order.customerName || order.shippingAddress?.fullName || '',
           relatedOrderId: args.orderId,
+          // Snake_case here, camelCase in the email templates — the two
+          // providers were configured separately and neither accepts the
+          // other's names. Authkey drops what it does not recognise, so a
+          // wrong name is a blank in the message, not an error.
           variables: {
-            customer_name: order.customerName || order.shippingAddress?.fullName || 'there',
-            order_number: String(order.orderNumber || args.orderId),
-            order_total: String(order.total ?? ''),
-            tracking_number: String(order.awbNumber || order.manualTrackingNumber || ''),
+            customer_name: order.shippingAddress?.fullName || order.customerName || 'Customer',
+            order_number: String(order.orderNumber || order.failedOrderNumber || 'Pending'),
+            product_name: (Array.isArray(order.items) ? order.items : [])
+              .map((i: any) => i?.productTitle).filter(Boolean).join(', '),
           },
           status: 'pending',
           createdAt: Date.now(),

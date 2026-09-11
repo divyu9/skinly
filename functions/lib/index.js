@@ -39,6 +39,7 @@ __exportStar(require("./seo"), exports);
 __exportStar(require("./r2"), exports);
 __exportStar(require("./orders"), exports);
 __exportStar(require("./ordersAdmin"), exports);
+__exportStar(require("./orderNotifications"), exports);
 __exportStar(require("./loginOtp"), exports);
 __exportStar(require("./abandonedCarts"), exports);
 __exportStar(require("./collectionSync"), exports);

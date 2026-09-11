@@ -27,6 +27,7 @@ exports.paymentCallback = exports.checkPaymentStatus = exports.initiatePayment =
 const functions = __importStar(require("firebase-functions/v1"));
 const https_1 = require("firebase-functions/v1/https");
 const admin = __importStar(require("firebase-admin"));
+const orderNotifications_1 = require("./orderNotifications");
 const crypto = __importStar(require("crypto"));
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
@@ -107,6 +108,11 @@ const applyPaymentResult = async (merchantTransactionId, state, paidPaise, sourc
         paymentConfirmedVia: source,
         updatedAt: Date.now(),
     });
+    // The money is in, so now the customer hears about it. Not before: an
+    // online order that never gets paid should produce no confirmation at all.
+    // Non-blocking, and guarded by its own once-only flag, because the status
+    // check and the callback both reach this for the same payment.
+    (0, orderNotifications_1.notifyOrderPlaced)(admin.firestore(), doc.id).catch((e) => console.error("notifyOrderPlaced failed", { order: doc.id, error: (e === null || e === void 0 ? void 0 : e.message) || e }));
     return { paymentStatus, orderId: doc.id, changed: true };
 };
 exports.initiatePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data, context) => {
