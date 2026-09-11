@@ -207,13 +207,20 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     prompt:
       "A PlayStation 5 console standing vertically on its round base on a low wooden media unit, "
         + "photographed from a front three-quarter angle at console height so one faceplate faces the "
-        + "camera and the other is foreshortened. A vinyl skin covers the two curved white outer "
-        + "faceplates. {{fidelity}} The artwork follows the curve of each faceplate. Only the two "
-        + "removable outer faceplates carry vinyl. The inner black chassis between them is never skinned "
-        + "and stays matte black, as do the disc slot, every port, the power and eject buttons and the "
-        + "base stand \u2014 the vinyl stops at the faceplate seam with a clean visible edge. Behind it, dim "
-        + "and far out of focus, a dark living-room wall with a hint of warm lamp light. No people and no "
-        + "hands anywhere in the frame. {{staging}} ",
+        + "camera, the black centre column is visible down the middle and the other plate is "
+        + "foreshortened. A vinyl skin covers the two curved outer faceplates. {{fidelity}} The artwork "
+        + "follows the curve of each plate. The skin is die-cut to the exact shape of the PlayStation "
+        + "logo on the upper faceplate: the pattern runs continuously and stops only at the letterform, "
+        + "leaving it bare, with no circle, plate or border around it. The vinyl covers only the "
+        + "outward-facing surface of the two removable faceplates. It does not wrap around their edges: "
+        + "the inward-facing inner side of each faceplate stays bare factory white, showing as a clean "
+        + "white strip along both sides of the centre column, and a crisp cut edge is visible where the "
+        + "vinyl ends. The black centre chassis between the plates is never skinned, and neither are the "
+        + "blue light strip, the disc slot, the ports, the power and eject buttons, the SONY and "
+        + "PlayStation lettering or the base stand. Real manufactured product, correct real-world "
+        + "proportions, crisp geometry, no melted or warped edges. Behind it, dim and far out of focus, a "
+        + "dark living-room wall with a hint of warm lamp light. No people and no hands anywhere in the "
+        + "frame. {{staging}} ",
   },
   {
     label: "PS5 Slim \u2014 gaming setup",
@@ -224,16 +231,46 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     isActive: true,
     prompt:
       "A PlayStation 5 Slim console lying flat and horizontal on a TV media unit below a large "
-        + "wall-mounted screen, photographed from a low front angle from the opposite side of the room so "
-        + "the whole gaming corner is readable and the console still dominates the frame. The Slim is the "
-        + "shorter, squarer console with a split faceplate and a straight profile rather than the tall "
-        + "curved original. A vinyl skin covers its outer faceplates. {{fidelity}} Only the two removable "
-        + "outer faceplates carry vinyl. The inner black chassis between them is never skinned and stays "
-        + "matte black, as do the disc slot, every port, the power and eject buttons and the base stand \u2014 "
-        + "the vinyl stops at the faceplate seam with a clean visible edge. The room is evening-dark: the "
-        + "TV glows faintly, a strip of blue and purple LED light runs behind the unit, and a controller "
-        + "lies beside the console, all well out of focus. No people and no hands anywhere in the frame. "
-        + "{{staging}} ",
+        + "wall-mounted screen, photographed from a low front three-quarter angle so the gaming corner is "
+        + "readable and the console still dominates the frame. The Slim is the shorter, squarer console "
+        + "with a split faceplate and a straight profile rather than the tall curved original. A vinyl "
+        + "skin covers its outer faceplates. {{fidelity}} The vinyl covers only the outward-facing "
+        + "surface of the two removable faceplates. It does not wrap around their edges: the "
+        + "inward-facing inner side of each faceplate stays bare factory white, showing as a clean white "
+        + "strip along both sides of the centre column, and a crisp cut edge is visible where the vinyl "
+        + "ends. The black centre chassis between the plates is never skinned, and neither are the blue "
+        + "light strip, the disc slot, the ports, the power and eject buttons, the SONY and PlayStation "
+        + "lettering or the base stand. Real manufactured product, correct real-world proportions, crisp "
+        + "geometry, no melted or warped edges. The room is evening-dark: the TV glows faintly, a strip "
+        + "of blue and purple LED light runs behind the unit, and a DualSense controller lies beside the "
+        + "console, all well out of focus. No people and no hands anywhere in the frame. {{staging}} ",
+  },
+  {
+    label: "PS5 + controller \u2014 set",
+    gadget: "console",
+    suffix: "ps5-set",
+    skuCodes: ["PS5"],
+    order: 2,
+    isActive: true,
+    prompt:
+      "A PlayStation 5 console standing vertically beside its DualSense controller, both facing the "
+        + "camera against a clean white studio background, photographed straight on so the console fills "
+        + "the left of the frame and the controller sits to its right at the lower third, the pair "
+        + "reading as one matching set. A matching vinyl skin covers the console's two outer faceplates "
+        + "and the two curved outer grips of the controller. {{fidelity}} The pattern reads as the same "
+        + "design across both. The skin is die-cut to the exact shape of the PlayStation logo on the "
+        + "upper faceplate: the pattern runs continuously and stops only at the letterform, leaving it "
+        + "bare, with no circle, plate or border around it. The vinyl covers only the outward-facing "
+        + "surface of the two removable faceplates. It does not wrap around their edges: the "
+        + "inward-facing inner side of each faceplate stays bare factory white, showing as a clean white "
+        + "strip along both sides of the centre column, and a crisp cut edge is visible where the vinyl "
+        + "ends. The black centre chassis between the plates is never skinned, and neither are the blue "
+        + "light strip, the disc slot, the ports, the power and eject buttons, the SONY and PlayStation "
+        + "lettering or the base stand. On the controller the white front plate around the touchpad stays "
+        + "bare, as do the D-pad, the face buttons, the thumbsticks, the touchpad and the light bar \u2014 the "
+        + "vinyl covers only the outer shell of the two grips and stops with a clean edge where the white "
+        + "plate begins. Real manufactured product, correct real-world proportions, crisp geometry, no "
+        + "melted or warped edges. No people and no hands anywhere in the frame. {{staging}} ",
   },
   {
     label: "Drone only",
