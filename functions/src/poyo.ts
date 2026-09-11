@@ -80,6 +80,20 @@ const poyoRequest = async (path: string, init: RequestInit, attempt = 0): Promis
       typeof v === "string" ? v : v == null ? "" : JSON.stringify(v);
     const detail =
       asText(body?.message) || asText(body?.error) || asText(body?.data) || text.slice(0, 300);
+
+    // The model refused the job, not the request. Say which half it objected to
+    // and what actually helps, because "does not comply with the platform
+    // regulations" reads like our bug and is not one.
+    if (/comply|policy|regulation|content.{0,12}(filter|violat)|safety|moderat/i.test(detail)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "The model refused this design. Its safety filter reads the reference photo as well as the prompt, " +
+        "so artwork with weapons, gore or a recognisable licensed character is often rejected. " +
+        "Try Redo with a different model — the filters differ — and if every model refuses it, " +
+        "that design needs a photograph rather than a generation. " +
+        `(upstream: ${detail.slice(0, 160)})`
+      );
+    }
     throw new HttpsError(
       res.status === 401 || res.status === 403 ? "permission-denied" : "internal",
       `PoYo ${res.status}: ${detail || "request failed"}`

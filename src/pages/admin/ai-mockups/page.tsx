@@ -1168,7 +1168,17 @@ function JobCard({ job, onApprove, onReject, onRedo, onRetryDownload, busy }: {
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-2 text-muted-foreground">
               {job.status === "failed" ? (
-                <><AlertCircleIcon className="size-6 text-rose-500" /><span className="px-2 text-center text-[11px] text-rose-600">{job.error || "Failed"}</span></>
+                <>
+                  <AlertCircleIcon className="size-6 text-rose-500" />
+                  <span className="px-2 text-center text-[11px] leading-snug text-rose-600">
+                    {/refused this design/.test(job.error || "") ? "Refused by the model's safety filter" : job.error || "Failed"}
+                  </span>
+                  {/refused this design/.test(job.error || "") && (
+                    <span className="px-3 text-center text-[10px] leading-snug text-muted-foreground">
+                      It reads the reference photo too. Redo with a different model, or shoot this one.
+                    </span>
+                  )}
+                </>
               ) : (
                 <><Loader2Icon className="size-6 animate-spin" /><span className="text-[11px] capitalize">{job.status}</span></>
               )}
