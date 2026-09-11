@@ -1795,11 +1795,12 @@ export function useQuery(apiRef: any, args?: any) {
 
           const computeStockLevels = async () => {
             try {
-              const [vSnap, pSnap, rSnap, gSnap] = await Promise.all([
+              const [vSnap, pSnap, rSnap, gSnap, cSnap] = await Promise.all([
                 getDocs(collection(db, 'variants')),
                 getDocs(collection(db, 'products')),
                 getDocs(collection(db, 'rollInventory')),
                 getDocs(collection(db, 'gadgetConsumption')),
+                getDocs(collection(db, 'cutoutInventory')),
               ]);
 
               const productsMap: Record<string, any> = {};
@@ -1808,8 +1809,32 @@ export function useQuery(apiRef: any, args?: any) {
               const rollsMap: Record<string, any> = {};
               rSnap.docs.forEach(d => {
                 const r = d.data() as any;
-                if (r.rNumber) rollsMap[r.rNumber] = r;
+                if (r.rNumber) rollsMap[String(r.rNumber).trim().toUpperCase()] = r;
               });
+
+              // Cutouts are stocked as whole sheets rather than by the metre,
+              // so one unit costs `multiplier` sheets and no geometry is
+              // involved: a laptop lid is one sheet, lid plus keyboard is two.
+              const cutoutsMap: Record<string, any> = {};
+              cSnap.docs.forEach(d => {
+                const c = d.data() as any;
+                if (c.cutoutNumber) cutoutsMap[String(c.cutoutNumber).trim().toUpperCase()] = { _id: d.id, ...c };
+              });
+
+              // A variant names its design in rNumber, or failing that in the
+              // leading segments of its SKU: LP-3d-07-LPK is cutout LP-3d-07.
+              const designOf = (variant: any) => {
+                const rn = String(variant.rNumber || '').trim().toUpperCase();
+                if (rn && rollsMap[rn]) return { kind: 'roll' as const, code: rn, doc: rollsMap[rn] };
+                if (rn && cutoutsMap[rn]) return { kind: 'cutout' as const, code: rn, doc: cutoutsMap[rn] };
+                const parts = String(variant.sku || '').split('-');
+                for (let k = parts.length - 1; k >= 1; k--) {
+                  const code = parts.slice(0, k).join('-').toUpperCase();
+                  if (rollsMap[code]) return { kind: 'roll' as const, code, doc: rollsMap[code] };
+                  if (cutoutsMap[code]) return { kind: 'cutout' as const, code, doc: cutoutsMap[code] };
+                }
+                return null;
+              };
 
               // Consumption rows are keyed by gadget type, which products carry
               // directly; the category name is only a fallback for older rows.
@@ -1826,12 +1851,27 @@ export function useQuery(apiRef: any, args?: any) {
                 const product = productsMap[variant.productId];
                 if (!product) return null;
 
-                const rNumber = variant.rNumber || null;
-                if (!rNumber) {
+                const design = designOf(variant);
+                if (!design) {
                   return { variantId: vDoc.id, availableUnits: UNLIMITED, rollMeters: 0, rNumber: null, designName: null };
                 }
 
-                const roll = rollsMap[rNumber];
+                if (design.kind === 'cutout') {
+                  const sheets = Number(design.doc.sheetsAvailable) || 0;
+                  const multiplier = Number(variant.materialMultiplier) || 1;
+                  return {
+                    variantId: vDoc.id,
+                    availableUnits: Math.floor(sheets / Math.max(multiplier, 1)),
+                    rollMeters: 0,
+                    sheetsAvailable: sheets,
+                    source: 'cutout',
+                    rNumber: design.code,
+                    designName: design.doc.designName || null,
+                  };
+                }
+
+                const rNumber = design.code;
+                const roll = design.doc;
                 if (!roll || !(Number(roll.metersAvailable) > 0)) {
                   return {
                     variantId: vDoc.id, availableUnits: 0, rollMeters: 0,

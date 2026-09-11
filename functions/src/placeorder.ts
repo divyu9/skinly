@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions/v1";
+import { reserveMaterialForOrder } from "./materials";
 import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
@@ -194,6 +195,13 @@ export const placeOrder = functions
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+
+    // ── 4b. Draw down design stock ────────────────────────────────────────────
+    // After the order is safely written, and deliberately not blocking on it:
+    // an order must never be lost because the stock ledger had a bad row.
+    reserveMaterialForOrder(db, docRef, orderItems).catch((e) =>
+      console.error("reserveMaterial failed", { order: docRef.id, error: e?.message || e })
+    );
 
     // ── 5. Initiate PhonePe (same function call, no second round-trip) ──────────
     if (paymentMethod === "phonepe" && calculatedTotal > 0 && customerPhone) {
