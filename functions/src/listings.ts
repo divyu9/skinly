@@ -25,13 +25,12 @@ import { requireAdmin } from "./auth";
 const resolveOpenAIKey = async (): Promise<string> => {
   // .env first: that is where the key actually lives for this project. The
   // Firestore doc is the admin-settings convention the SEO tool uses.
+  // Environment only: `settings` is world-readable by rule, so a key kept there
+  // is a key anyone can download.
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-  const snap = await admin.firestore().collection("settings").doc("openaiApiKey").get();
-  const value = snap.exists ? (snap.data()?.value as string | undefined) : undefined;
-  if (value) return value;
   throw new HttpsError(
     "failed-precondition",
-    "No OpenAI key. Add it in Admin → Settings → AI Configuration, or set OPENAI_API_KEY."
+    "OPENAI_API_KEY is not set in the functions environment."
   );
 };
 

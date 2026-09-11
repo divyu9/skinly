@@ -59,7 +59,20 @@ service cloud.firestore {
     match /ugcVideos/{id}                { allow read: if true; allow write: if isAdmin(); }
     match /seoPages/{id}                 { allow read: if true; allow write: if isAdmin(); }
     match /seoPageTemplates/{id}         { allow read: if true; allow write: if isAdmin(); }
-    match /settings/{id}                 { allow read: if true; allow write: if isAdmin(); }
+    // Read is public because the storefront needs the shipping fee, the Meta
+    // pixel id and a few counters before anyone signs in. That makes this the
+    // worst place in the database for a secret — and two OpenAI keys and a
+    // WhatsApp auth key were sitting here, downloadable by anyone who knew the
+    // project id. They are gone; this stops the next one arriving.
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isAdmin() && !looksLikeASecret();
+    }
+    function looksLikeASecret() {
+      return request.resource.data.keys().hasAny(['authKey', 'apiKey', 'secret', 'password', 'token'])
+        || (request.resource.data.get('value', '') is string
+            && request.resource.data.value.matches('(sk-|sk_|key-|Bearer ).*'));
+    }
     match /walletSettings/{id}           { allow read: if true; allow write: if isAdmin(); }
     match /codSettings/{id}              { allow read: if true; allow write: if isAdmin(); }
     match /cashbackRules/{id}            { allow read: if true; allow write: if isAdmin(); }

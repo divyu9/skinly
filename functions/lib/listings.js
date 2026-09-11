@@ -47,16 +47,13 @@ const auth_1 = require("./auth");
  * only those, because those are the part with no precedent to copy.
  */
 const resolveOpenAIKey = async () => {
-    var _a;
     // .env first: that is where the key actually lives for this project. The
     // Firestore doc is the admin-settings convention the SEO tool uses.
+    // Environment only: `settings` is world-readable by rule, so a key kept there
+    // is a key anyone can download.
     if (process.env.OPENAI_API_KEY)
         return process.env.OPENAI_API_KEY;
-    const snap = await admin.firestore().collection("settings").doc("openaiApiKey").get();
-    const value = snap.exists ? (_a = snap.data()) === null || _a === void 0 ? void 0 : _a.value : undefined;
-    if (value)
-        return value;
-    throw new https_1.HttpsError("failed-precondition", "No OpenAI key. Add it in Admin → Settings → AI Configuration, or set OPENAI_API_KEY.");
+    throw new https_1.HttpsError("failed-precondition", "OPENAI_API_KEY is not set in the functions environment.");
 };
 /** The variant shape most products of this gadget already use. */
 async function templateForGadget(db, gadgetTypeId) {

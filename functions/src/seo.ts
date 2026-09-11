@@ -32,12 +32,15 @@ interface ParsedContent {
 // ---------------------------------------------------------------------------
 
 const resolveOpenAIKey = async (): Promise<string> => {
-  const snap = await admin.firestore().collection("settings").doc("openaiApiKey").get();
-  const value = snap.exists ? (snap.data()?.value as string | undefined) : undefined;
-  if (value) return value;
+  // Environment only. This used to read settings/openaiApiKey — a document in a
+  // world-readable collection, under a third spelling of the name that never
+  // existed, so SEO generation had been failing on a missing key while two
+  // live copies of the real one sat there for anyone to download. The key lives
+  // in functions/.env now, with every other secret.
+  if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
   throw new HttpsError(
     "failed-precondition",
-    "OpenAI API key not configured. Go to Admin → Settings → AI Configuration to add it."
+    "OPENAI_API_KEY is not set in the functions environment."
   );
 };
 
