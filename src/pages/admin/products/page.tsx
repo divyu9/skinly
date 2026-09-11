@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { CutoutsManagement } from "./_components/cutouts-management.tsx";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -847,6 +848,7 @@ function AdminProductsPageInner() {
         <TabsList>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="rolls">Rolls Management</TabsTrigger>
+          <TabsTrigger value="cutouts">Cutouts</TabsTrigger>
         </TabsList>
 
         <TabsContent value="products" className="space-y-4">
@@ -1570,6 +1572,10 @@ function AdminProductsPageInner() {
           </div>
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="cutouts" className="space-y-6">
+          <CutoutsManagement />
         </TabsContent>
 
         <TabsContent value="rolls" className="space-y-6">
