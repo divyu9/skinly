@@ -676,50 +676,125 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'checkoutUpsells.getUpsellsForCart') {
-          // Properly fetch upsell rules
-          const q = query(collection(db, 'checkoutUpsells'), where('isActive', '==', true));
-          unsubscribe = onSnapshot(q, async (snap) => {
-            let rules = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            rules = rules.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0));
-            
-            // For now, return all active rules and let frontend filter, or return first few
-            // Add product details to rules
-            const upsells = [];
-            for (const rule of rules) {
-              if (rule.offerProductId) {
-                const prodSnap = await getDocs(query(collection(db, 'products'), where('__name__', '==', rule.offerProductId)));
-                if (!prodSnap.empty) {
-                  const productData = prodSnap.docs[0].data();
-                  const vq = query(collection(db, 'variants'), where('productId', '==', rule.offerProductId));
-                  const vsnap = await getDocs(vq);
-                  const variants = vsnap.docs.map(v => ({ _id: v.id, ...v.data() }));
-                  
-                  upsells.push({
-                    ruleId: rule._id,
-                    productId: rule.offerProductId,
-                    productTitle: rule.title || productData.title,
-                    productImage: variants[0]?.imageUrl || productData.images?.[0],
-                    variantId: variants[0]?._id,
-                    variantTitle: variants[0]?.title || "Default",
-                    originalPrice: variants[0]?.price || 0,
-                    discountedPrice: rule.discountType === "percentage" 
-                      ? Math.floor((variants[0]?.price || 0) * (1 - rule.discountValue / 100))
-                      : Math.max(0, (variants[0]?.price || 0) - rule.discountValue),
-                    hasMultipleVariants: variants.length > 1,
-                    allVariants: variants.map(v => ({
-                      variantId: v._id,
-                      variantTitle: v.title,
-                      price: v.price,
-                      discountedPrice: rule.discountType === "percentage"
-                        ? Math.floor(v.price * (1 - rule.discountValue / 100))
-                        : Math.max(0, v.price - rule.discountValue)
-                    }))
-                  });
+          // The rule schema and this reader had nothing in common.
+          //
+          // A rule is written as { upsellProducts: [{productId, variantId,
+          // discountedPrice}], containsGadgetCategories, cartValueMin,
+          // cartValueOperator, matchLogic }. This read rule.offerProductId,
+          // rule.title, rule.discountType and rule.discountValue — none of
+          // which any rule has — so the `if (rule.offerProductId)` guard was
+          // never true and the list came back empty every time. The one
+          // configured rule has never shown, in the cart or at checkout.
+          const cartLines: any[] = Array.isArray(args?.cartItems) ? args.cartItems : [];
+          if (!cartLines.length) { setData([]); return; }
+
+          unsubscribe = onSnapshot(
+            query(collection(db, 'checkoutUpsells'), where('isActive', '==', true)),
+            async (snap) => {
+              try {
+                const rules = snap.docs
+                  .map((d) => ({ _id: d.id, ...(d.data() as any) }))
+                  .sort((a, b) => (b.priority || 0) - (a.priority || 0));
+                if (!rules.length) { setData([]); return; }
+
+                const cartValue = cartLines.reduce(
+                  (sum, i) => sum + (Number(i?.price) || 0) * (Number(i?.quantity) || 1), 0);
+                const inCart = new Set(cartLines.map((i) => String(i?.productId)));
+
+                // What is already in the basket decides which rules fire, so
+                // the cart's own products have to be read first.
+                const cartProductIds = [...inCart].filter(Boolean);
+                const cartProductSnaps = await Promise.all(
+                  cartProductIds.map((id) => getDoc(doc(db, 'products', id)))
+                );
+                const cartCategories = new Set(
+                  cartProductSnaps
+                    .filter((d) => d.exists())
+                    .map((d) => String((d.data() as any).gadgetCategory || '').toLowerCase())
+                    .filter(Boolean)
+                );
+
+                const passes = (rule: any): boolean => {
+                  const checks: boolean[] = [];
+                  if (rule.cartValueMin != null) {
+                    const min = Number(rule.cartValueMin) || 0;
+                    checks.push(rule.cartValueOperator === '<=' ? cartValue <= min : cartValue >= min);
+                  }
+                  const cats: string[] = Array.isArray(rule.containsGadgetCategories) ? rule.containsGadgetCategories : [];
+                  if (cats.length) {
+                    checks.push(cats.some((c) => cartCategories.has(String(c).toLowerCase())));
+                  }
+                  if (!checks.length) return true;
+                  return rule.matchLogic === 'any' ? checks.some(Boolean) : checks.every(Boolean);
+                };
+
+                // One entry per product: a rule lists each variant separately,
+                // and the card offers a variant picker rather than a row each.
+                const byProduct = new Map<string, { ruleId: string; variants: any[] }>();
+                for (const rule of rules) {
+                  if (!passes(rule)) continue;
+                  for (const entry of (rule.upsellProducts || [])) {
+                    const pid = String(entry?.productId || '');
+                    if (!pid || inCart.has(pid)) continue;   // never upsell what they already have
+                    if (!byProduct.has(pid)) byProduct.set(pid, { ruleId: rule._id, variants: [] });
+                    byProduct.get(pid)!.variants.push(entry);
+                  }
                 }
+                if (!byProduct.size) { setData([]); return; }
+
+                const ids = [...byProduct.keys()].slice(0, 6);
+                const [productDocs, variantSnaps] = await Promise.all([
+                  Promise.all(ids.map((id) => getDoc(doc(db, 'products', id)))),
+                  Promise.all(ids.map((id) =>
+                    getDocs(query(collection(db, 'variants'), where('productId', '==', id))))),
+                ]);
+
+                const out: any[] = [];
+                ids.forEach((pid, idx) => {
+                  const pdoc = productDocs[idx];
+                  if (!pdoc.exists()) return;
+                  const product: any = pdoc.data();
+                  const known = new Map(variantSnaps[idx].docs.map((v) => [v.id, v.data() as any]));
+                  const listed = byProduct.get(pid)!;
+
+                  const allVariants = listed.variants
+                    .map((entry) => {
+                      const v = known.get(String(entry.variantId));
+                      if (!v) return null;
+                      return {
+                        variantId: String(entry.variantId),
+                        variantTitle: String(v.title || 'Default'),
+                        price: Number(v.price) || 0,
+                        discountedPrice: Number(entry.discountedPrice) || Number(v.price) || 0,
+                      };
+                    })
+                    .filter(Boolean) as any[];
+                  if (!allVariants.length) return;
+
+                  const first = allVariants[0];
+                  const image = Array.isArray(product.images)
+                    ? (typeof product.images[0] === 'string' ? product.images[0] : product.images[0]?.url)
+                    : undefined;
+                  out.push({
+                    ruleId: listed.ruleId,
+                    productId: pid,
+                    productTitle: product.title,
+                    productImage: image,
+                    variantId: first.variantId,
+                    variantTitle: first.variantTitle,
+                    originalPrice: first.price,
+                    discountedPrice: first.discountedPrice,
+                    hasMultipleVariants: allVariants.length > 1,
+                    allVariants,
+                  });
+                });
+                setData(out);
+              } catch (err) {
+                console.error('getUpsellsForCart failed:', err);
+                setData([]);
               }
             }
-            setData(upsells.slice(0, 3)); // Max 3 upsells
-          });
+          );
         }
         else if (path === 'checkoutUpsells.listAllRules') {
           const q = query(collection(db, 'checkoutUpsells'));

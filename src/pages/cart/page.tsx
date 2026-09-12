@@ -5,7 +5,10 @@ import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
-import { MinusIcon, PlusIcon, TrashIcon, ShoppingCartIcon, ArrowLeftIcon, AlertCircleIcon } from "lucide-react";
+import {
+  MinusIcon, PlusIcon, TrashIcon, ShoppingCartIcon, ArrowLeftIcon, AlertCircleIcon,
+  ShieldCheckIcon, BanknoteIcon, TruckIcon,
+} from "lucide-react";
 import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
@@ -429,16 +432,22 @@ function AuthenticatedCartContent() {
                 </Button>
               </Link>
 
-              {/* The reasons to go through with it, at the moment of deciding. */}
+              {/* The reasons to go through with it, at the moment of deciding.
+                  Reprint moved out: it is a promise about what happens after a
+                  bad print, which raises the thought of one. COD is the
+                  objection actually being weighed here — pay when it arrives. */}
               <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
                 {[
-                  ["Secure", "payments"],
-                  ["Free", "reprint"],
-                  ["Pan-India", "delivery"],
-                ].map(([a, b]) => (
-                  <div key={a} className="text-[10px] leading-tight text-muted-foreground">
-                    <p className="font-semibold text-foreground">{a}</p>
-                    {b}
+                  { Icon: ShieldCheckIcon, a: "Secure", b: "payments" },
+                  { Icon: BanknoteIcon, a: "Cash on", b: "delivery" },
+                  { Icon: TruckIcon, a: "Pan-India", b: "delivery" },
+                ].map(({ Icon, a, b }) => (
+                  <div key={a} className="flex flex-col items-center gap-1 text-[10px] leading-tight text-muted-foreground">
+                    <Icon className="size-4 text-primary" strokeWidth={1.9} />
+                    <span>
+                      <span className="block font-semibold text-foreground">{a}</span>
+                      {b}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -451,6 +460,11 @@ function AuthenticatedCartContent() {
 }
 
 function GuestCartContent() {
+  // The signed-in branch reads this too; a guest sees the same shipping rules.
+  const shippingSettings = useQuery(api.shipping.getShippingSettings) as
+    | { freeShippingThreshold?: number; flatShippingFee?: number }
+    | null
+    | undefined;
   const navigate = useNavigate();
   const {
     guestCart,
@@ -749,16 +763,22 @@ function GuestCartContent() {
                 </Button>
               </Link>
 
-              {/* The reasons to go through with it, at the moment of deciding. */}
+              {/* The reasons to go through with it, at the moment of deciding.
+                  Reprint moved out: it is a promise about what happens after a
+                  bad print, which raises the thought of one. COD is the
+                  objection actually being weighed here — pay when it arrives. */}
               <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
                 {[
-                  ["Secure", "payments"],
-                  ["Free", "reprint"],
-                  ["Pan-India", "delivery"],
-                ].map(([a, b]) => (
-                  <div key={a} className="text-[10px] leading-tight text-muted-foreground">
-                    <p className="font-semibold text-foreground">{a}</p>
-                    {b}
+                  { Icon: ShieldCheckIcon, a: "Secure", b: "payments" },
+                  { Icon: BanknoteIcon, a: "Cash on", b: "delivery" },
+                  { Icon: TruckIcon, a: "Pan-India", b: "delivery" },
+                ].map(({ Icon, a, b }) => (
+                  <div key={a} className="flex flex-col items-center gap-1 text-[10px] leading-tight text-muted-foreground">
+                    <Icon className="size-4 text-primary" strokeWidth={1.9} />
+                    <span>
+                      <span className="block font-semibold text-foreground">{a}</span>
+                      {b}
+                    </span>
                   </div>
                 ))}
               </div>
