@@ -1,12 +1,10 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { 
   MenuIcon, 
   SearchIcon, 
-  UserIcon, 
-  ShoppingCartIcon,
   XIcon,
   Loader2Icon,
   ChevronDownIcon,
@@ -18,11 +16,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
-import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
-import { auth } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { BrandLogo } from "./brand-logo.tsx";
 
 interface MobileHeaderProps {
@@ -31,17 +26,7 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderProps) {
-  const { user, isLoaded } = useAuth();
-  const isSignedIn = !!user;
-
-  const handleSignIn = async () => {
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-    } catch (err) {
-      console.error(err);
-    }
-  };
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
@@ -51,20 +36,6 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   // Fetch homepage settings
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   
-  // Fetch cart count for authenticated users
-  const dbCartCount = useQuery(api.cart.getCartCount, user ? {} : "skip");
-  const { getGuestCartCount, guestCart } = useGuestCart();
-  const [displayCount, setDisplayCount] = useState(0);
-
-  // Update display count whenever cart data changes
-  useEffect(() => {
-    if (user && dbCartCount !== undefined) {
-      setDisplayCount(dbCartCount);
-    } else if (!user && isLoaded) {
-      setDisplayCount(getGuestCartCount());
-    }
-  }, [user, dbCartCount, guestCart, isLoaded, getGuestCartCount]);
-
   // Server-side device search
   const deviceSearchResults = useQuery(
     api.supportedModels.searchModels,
@@ -261,33 +232,12 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 </button>
               )}
 
-              {isLoaded && !isSignedIn ? (
-                <button onClick={handleSignIn} type="button" className="flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted" aria-label="Sign In">
-                  <UserIcon className="size-[21px] text-foreground" />
-                </button>
-              ) : isLoaded && isSignedIn ? (
-                <button
-                  type="button"
-                  className="flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted"
-                  aria-label="Account"
-                  onClick={() => navigate("/account")}
-                >
-                  <UserIcon className="size-[21px] text-foreground" />
-                </button>
-              ) : null}
-
-              <button
-                onClick={() => navigate("/cart")}
-                className="relative -mr-1 flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted"
-                aria-label="Cart"
-              >
-                <ShoppingCartIcon className="size-[21px] text-foreground" />
-                {displayCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-brand text-[10px] font-bold text-brand-foreground ring-2 ring-background">
-                    {displayCount > 9 ? "9+" : displayCount}
-                  </span>
-                )}
-              </button>
+              {/* Account and cart used to sit here as well as in the tab bar.
+                  The tab bar is thumb-reachable, always visible and already
+                  carries the cart count, so the duplicates are gone and the
+                  search bar takes the width they were using — with 953 models
+                  and 500-odd designs, finding something is the job this
+                  header exists to do. */}
             </>
           )}
         </div>
@@ -299,7 +249,11 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
           className="fixed inset-x-0 bottom-0 z-40 bg-background overflow-y-auto"
           style={{ top: `${announcementHeight + 64}px` }}
         >
-          <div className="container mx-auto px-4 py-4">
+          {/* The panel runs to the bottom of the viewport, but the app tab bar
+              is painted over its last 56px — which is exactly where "Can't
+              find your device?" sits. Pad the scroll content so the end of the
+              list can clear the bar instead of hiding behind it. */}
+          <div className="container mx-auto px-4 pt-4 pb-[calc(5rem+env(safe-area-inset-bottom))]">
             {debouncedQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
               // Loading state
               <div className="flex flex-col items-center justify-center py-12 gap-3">
