@@ -47,22 +47,29 @@ export function WalletSection({
             >
               Pay with Skinly Wallet
             </Label>
+            {/* The state goes here, in a sentence, and never in a badge on the
+                right. A lone "Empty" sitting where a control belongs reads as
+                something that failed to load, not as a balance of zero. */}
             <p className="text-xs text-muted-foreground">
-              ₹{walletBalance.toFixed(0)} available
-              {capped && ` · up to ₹${maxWalletUsage.toFixed(0)} on this order`}
+              {usable ? (
+                <>
+                  ₹{walletBalance.toFixed(0)} available
+                  {capped && ` · up to ₹${maxWalletUsage.toFixed(0)} on this order`}
+                </>
+              ) : walletBalance > 0 ? (
+                <>₹{walletBalance.toFixed(0)} available · not usable on this order</>
+              ) : (
+                <>Earn credits on your orders and referrals, then spend them here</>
+              )}
             </p>
           </div>
-          {usable ? (
+          {usable && (
             <Switch
               id="useWallet"
               checked={useWallet}
               onCheckedChange={onUseWalletChange}
               className="shrink-0"
             />
-          ) : (
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {walletBalance === 0 ? "Empty" : "Not usable"}
-            </span>
           )}
         </div>
 
