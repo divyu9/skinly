@@ -15,6 +15,12 @@ interface ProductImagesProps {
   productTitle: string;
   phoneModel?: string | null;
   mockupUrl?: string | null;
+  /** True while the mockup for a newly chosen device is being fetched. */
+  mockupLoading?: boolean;
+  /** The model actually pictured — not always the one the shopper chose. */
+  shownModel?: string | null;
+  /** False when the picture is a stand-in. */
+  mockupExact?: boolean;
 }
 
 export function ProductImages({
@@ -24,6 +30,9 @@ export function ProductImages({
   productTitle,
   phoneModel,
   mockupUrl,
+  mockupLoading = false,
+  shownModel,
+  mockupExact = true,
 }: ProductImagesProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
@@ -88,11 +97,38 @@ export function ProductImages({
               onError={handleImageError}
             />
             
-            {/* Mockup Badge */}
+            {/* Says which phone is pictured. It used to claim the chosen
+                model whatever was on screen, so picking a model we have no
+                shot of showed a different phone under a label promising
+                yours. When it is a stand-in it says so, and still makes the
+                point that matters: the skin is cut for what you picked. */}
             {phoneModel && isMockupImage && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 md:bottom-auto md:top-3 md:left-auto md:right-3 md:translate-x-0 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg text-center leading-tight pointer-events-none">
-                <div>Preview on {phoneModel}</div>
-                <div className="text-[10px] mt-0.5 opacity-90">Full Body Wrap</div>
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 md:bottom-auto md:top-3 md:left-auto md:right-3 md:translate-x-0 max-w-[85%] rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-semibold leading-tight text-primary-foreground shadow-lg pointer-events-none">
+                {mockupExact ? (
+                  <>
+                    <div>Preview on {phoneModel}</div>
+                    <div className="mt-0.5 text-[10px] opacity-90">Full Body Wrap</div>
+                  </>
+                ) : (
+                  <>
+                    <div>Shown on {shownModel || "another model"}</div>
+                    <div className="mt-0.5 text-[10px] opacity-90">
+                      Cut to fit your {phoneModel}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Changing device refetches the mockup, and the old picture used
+                to sit there unchanged until the new one arrived — no way to
+                tell whether anything was happening. */}
+            {mockupLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/55 backdrop-blur-[2px]">
+                <div className="flex items-center gap-2 rounded-full border-2 border-ink/15 bg-background px-3.5 py-2 text-xs font-semibold shadow-sm">
+                  <span className="size-3.5 animate-spin rounded-full border-2 border-brand border-t-transparent" />
+                  Fitting to {phoneModel}…
+                </div>
               </div>
             )}
             

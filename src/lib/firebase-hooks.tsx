@@ -19,6 +19,13 @@ const TOTAL_PHONE_SKIN_SKUS = 359;
 // CMF Phone 1) were lost with the Cloudinary account, so those rows carry a dead
 // cloudinaryUrl and no r2Key. Those models fall back to the hero model's mockup
 // for the same design rather than rendering a broken image.
+/*
+ * Mockup lookups repeat constantly — every device change and every remount
+ * asks the same brand/model/sku question. Held for the tab so re-picking a
+ * model someone already looked at costs nothing.
+ */
+const mockupLookupCache = new Map<string, any>();
+
 const HERO_MOCKUP_BRAND = "Apple";
 const HERO_MOCKUP_MODEL = "iPhone 17 Pro Max";
 
@@ -1278,10 +1285,36 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'mockups.getMockupFileId') {
+          /*
+           * Returns { url, model, exact } — which phone the picture is actually
+           * of, not just a URL.
+           *
+           * It used to return a bare string, so the caller could not tell an
+           * exact match from the fallback and captioned every one of them
+           * "Preview on <your model>". Choosing iPhone 12 on L-56, which has
+           * no iPhone 12 shot, put an iPhone 17 Pro Max on screen under a
+           * label promising an iPhone 12.
+           *
+           * The fallback is also better now. Straight to the global hero
+           * skipped over iPhone 12 Pro and iPhone 12 Pro Max, which are the
+           * same slab of glass at the same size, in favour of a phone four
+           * generations later. Siblings come first, and they cost nothing
+           * extra: they are in the brand+sku result already fetched.
+           */
           if (!args?.brand || !args?.model || !args?.sku) {
             setData(null);
           } else {
+            const cacheKey = `${args.brand}|${args.model}|${args.sku}`;
+            const cached = mockupLookupCache.get(cacheKey);
+            if (cached !== undefined) {
+              setData(cached);
+            } else {
             (async () => {
+              const finish = (value: any) => {
+                mockupLookupCache.set(cacheKey, value);
+                setData(value);
+              };
+
               const exact = await getDocs(query(
                 collection(db, 'mockups'),
                 where('brand', '==', args.brand),
@@ -1291,12 +1324,13 @@ export function useQuery(apiRef: any, args?: any) {
               ));
               const exactUrl = exact.empty ? null : mockupUrlFrom(exact.docs[0].data());
               if (exactUrl) {
-                setData(exactUrl);
+                finish({ url: exactUrl, model: args.model, exact: true });
                 return;
               }
 
-              // Model names vary in spacing/punctuation between catalogs, so retry
-              // on brand+sku and compare normalized model names.
+              // Model names vary in spacing/punctuation between catalogs, so
+              // retry on brand+sku and compare normalized model names. Narrowed
+              // by brand, so this is a handful of documents, not the catalogue.
               const wanted = normalizeModelName(args.model).toLowerCase();
               const bySku = await getDocs(query(
                 collection(db, 'mockups'),
@@ -1304,11 +1338,32 @@ export function useQuery(apiRef: any, args?: any) {
                 where('sku', '==', args.sku),
                 limit(500)
               ));
-              const hit = bySku.docs.find(d =>
-                normalizeModelName(d.data().model || "").toLowerCase() === wanted && mockupUrlFrom(d.data())
+              const usable = bySku.docs.filter(d => mockupUrlFrom(d.data()));
+
+              const hit = usable.find(d =>
+                normalizeModelName(d.data().model || "").toLowerCase() === wanted
               );
               if (hit) {
-                setData(mockupUrlFrom(hit.data()));
+                finish({ url: mockupUrlFrom(hit.data()), model: hit.data().model, exact: true });
+                return;
+              }
+
+              /*
+               * Nearest sibling: the candidate sharing the longest leading run
+               * of characters with the wanted name. "iPhone 12" picks "iPhone
+               * 12 Pro" over "iPhone 16 Pro", because they agree for nine
+               * characters rather than seven. Required to share a real prefix,
+               * so a Samsung never stands in for a Pixel.
+               */
+              let best: { doc: any; score: number } | null = null;
+              for (const d of usable) {
+                const candidate = normalizeModelName(d.data().model || "").toLowerCase();
+                let i = 0;
+                while (i < wanted.length && i < candidate.length && wanted[i] === candidate[i]) i++;
+                if (i >= 6 && (!best || i > best.score)) best = { doc: d, score: i };
+              }
+              if (best) {
+                finish({ url: mockupUrlFrom(best.doc.data()), model: best.doc.data().model, exact: false });
                 return;
               }
 
@@ -1319,8 +1374,11 @@ export function useQuery(apiRef: any, args?: any) {
                 where('sku', '==', args.sku),
                 limit(1)
               ));
-              setData(hero.empty ? null : mockupUrlFrom(hero.docs[0].data()));
+              finish(hero.empty
+                ? null
+                : { url: mockupUrlFrom(hero.docs[0].data()), model: HERO_MOCKUP_MODEL, exact: false });
             })();
+            }
           }
         }
         else if (path === 'supportedModels.getMetadata') {

@@ -344,6 +344,9 @@ export default function ProductDetailPage() {
               productTitle={productData.title}
               phoneModel={phoneModel}
               mockupUrl={mockupState.url}
+              mockupLoading={mockupState.loading}
+              shownModel={mockupState.shownModel}
+              mockupExact={mockupState.exact ?? true}
             />
 
             {/* Trust strip — the row every marketplace puts under the gallery */}

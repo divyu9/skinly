@@ -18,6 +18,10 @@ export interface ProductState {
 export interface MockupState {
   url: string | null;
   loading: boolean;
+  /** The model actually pictured, which is not always the one chosen. */
+  shownModel?: string | null;
+  /** False when the picture is a stand-in for a model we have no shot of. */
+  exact?: boolean;
 }
 
 export function useProductDetail() {
@@ -94,7 +98,7 @@ export function useProductDetail() {
   
   // Query mockup file URL from database
   // Use phoneBrand from URL params if available, otherwise try to extract from model name
-  const mockupFileUrl = useQuery(
+  const mockupLookup = useQuery(
     api.mockups.getMockupFileId,
     phoneModel && productData
       ? {
@@ -145,14 +149,21 @@ export function useProductDetail() {
       return;
     }
     
-    // If mockupFileUrl is undefined, it's still loading
-    if (mockupFileUrl === undefined) {
+    // If the lookup is undefined, it's still loading
+    if (mockupLookup === undefined) {
       setMockupState(prev => ({ ...prev, loading: true }));
       return;
     }
     
-    if (mockupFileUrl) {
-      setMockupState({ url: mockupFileUrl, loading: false });
+    if (mockupLookup?.url) {
+      setMockupState({
+        url: mockupLookup.url,
+        loading: false,
+        // Which phone is actually pictured, and whether it is the one asked
+        // for — the badge has to stop claiming a stand-in is the real thing.
+        shownModel: mockupLookup.model,
+        exact: !!mockupLookup.exact,
+      });
     } else {
       // No mockup in database, use fallback URL string without making HEAD requests
       // The old cast said `string`, which made the Promise branch below
@@ -167,7 +178,7 @@ export function useProductDetail() {
         setMockupState({ url: null, loading: false });
       }
     }
-  }, [phoneModel, productData?._id, mockupFileUrl]);
+  }, [phoneModel, productData?._id, mockupLookup]);
   
   // Default logo image URL (used as placeholder when no product images uploaded)
   const DEFAULT_LOGO_IMAGE = "/logo.webp";
@@ -232,10 +243,10 @@ export function useProductDetail() {
   
   // Auto-select full body wrap when mockup loads
   useEffect(() => {
-    if (phoneModel && mockupFileUrl) {
+    if (phoneModel && mockupLookup) {
       setProductState(prev => ({ ...prev, selectedCoverage: "full_body_wrap" }));
     }
-  }, [phoneModel, mockupFileUrl]);
+  }, [phoneModel, mockupLookup]);
   
   // Scroll listener for sticky bar
   useEffect(() => {
