@@ -557,13 +557,11 @@ export default function ProductDetailPage() {
                 coupons={applicableCoupons}
               />
               
-              {/* Support. Muted grey-on-white was quiet to the point of
-                  invisible; in the brand teal it reads as an offer of help
-                  rather than a footnote, while the outline keeps it clearly
-                  secondary to the filled Buy Now above. */}
+              {/* Support, filled like Buy Now and the pincode Check. Muted
+                  grey-on-white was quiet to the point of invisible. */}
               <button
                 onClick={handleWhatsAppSupport}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-brand/10 py-3 text-[13px] font-bold text-brand transition-colors hover:bg-brand/20"
+                className="sticker sticker-press flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 text-[13px] font-bold text-brand-foreground transition-colors hover:bg-brand/90"
               >
                 <MessageCircleIcon className="size-4" strokeWidth={2.3} />
                 Questions? Chat with us on WhatsApp
