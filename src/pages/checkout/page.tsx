@@ -367,14 +367,22 @@ function CheckoutPageInner() {
       toast.error(`Cannot proceed: Some items are out of stock (${names}). Please remove them from your cart and try again.`, { duration: 5000 });
       return;
     }
+    // Present is not the same as usable. A malformed email means the
+    // confirmation and the tracking link never arrive, and a five-digit
+    // pincode fails at the courier rather than here.
     if (!formData.fullName.trim()) { toast.error("Please enter your full name"); return; }
     if (!formData.email.trim()) { toast.error("Email is required"); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) {
+      toast.error("Please enter a valid email address"); return;
+    }
     if (!isPhoneValid) { toast.error("Please enter a valid 10-digit mobile number"); return; }
     if (!formData.addressLine1.trim()) { toast.error("Please enter address line 1"); return; }
     if (!formData.addressLine2.trim()) { toast.error("Please enter address line 2"); return; }
     if (!formData.city.trim()) { toast.error("Please enter your city"); return; }
     if (!formData.state.trim()) { toast.error("Please enter your state"); return; }
-    if (!formData.pincode.trim()) { toast.error("Please enter your pincode"); return; }
+    if (!/^[1-9]\d{5}$/.test(formData.pincode.trim())) {
+      toast.error("Please enter a valid 6-digit pincode"); return;
+    }
     if (formData.paymentMethod === "cod" && !otpVerified) { toast.error("Please verify your phone number with OTP before placing a COD order"); return; }
 
     setIsSubmitting(true); setRetryCount(0); setShowPaymentVerificationFailed(false);

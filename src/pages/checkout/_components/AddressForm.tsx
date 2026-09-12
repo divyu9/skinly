@@ -48,7 +48,7 @@ export function AddressForm({
             <Input
               id="fullName"
               required
-              placeholder="John Smith"
+              autoComplete="name"
               value={formData.fullName}
               onChange={(e) => onFieldChange("fullName", e.target.value)}
             />
@@ -60,7 +60,8 @@ export function AddressForm({
               id="email"
               type="email"
               required
-              placeholder="john@example.com"
+              autoComplete="email"
+              inputMode="email"
               value={formData.email}
               onChange={(e) => onFieldChange("email", e.target.value)}
             />
@@ -79,7 +80,8 @@ export function AddressForm({
                 id="phone"
                 type="tel"
                 required
-                placeholder="9876543210"
+                placeholder="10-digit mobile"
+                autoComplete="tel-national"
                 value={formData.phone}
                 onChange={(e) => onPhoneChange(e.target.value)}
                 disabled={otpVerified}
@@ -105,7 +107,7 @@ export function AddressForm({
             <Input
               id="addressLine1"
               required
-              placeholder="House/Flat No., Building Name"
+              autoComplete="address-line1"
               value={formData.addressLine1}
               maxLength={99}
               onChange={(e) => onFieldChange("addressLine1", e.target.value)}
@@ -120,7 +122,7 @@ export function AddressForm({
             <Input
               id="addressLine2"
               required
-              placeholder="Street, Area, Locality"
+              autoComplete="address-line2"
               value={formData.addressLine2}
               maxLength={99}
               onChange={(e) => onFieldChange("addressLine2", e.target.value)}
@@ -136,7 +138,7 @@ export function AddressForm({
               <Input
                 id="city"
                 required
-                placeholder="Mumbai"
+                autoComplete="address-level2"
                 value={formData.city}
                 onChange={(e) => onFieldChange("city", e.target.value)}
               />
@@ -147,7 +149,7 @@ export function AddressForm({
               <Input
                 id="state"
                 required
-                placeholder="Maharashtra"
+                autoComplete="address-level1"
                 value={formData.state}
                 onChange={(e) => onFieldChange("state", e.target.value)}
               />
@@ -158,7 +160,8 @@ export function AddressForm({
               <Input
                 id="pincode"
                 required
-                placeholder="400001"
+                placeholder="6 digits"
+                autoComplete="postal-code"
                 value={formData.pincode}
                 onChange={(e) => onFieldChange("pincode", e.target.value)}
               />
