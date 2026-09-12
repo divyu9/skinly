@@ -429,7 +429,7 @@ function CloseCta({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: s
 
 function StickyBuy({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: string }) {
   return (
-    <div className="mx-sticky-buy fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-[#0b0e12]/95 backdrop-blur-xl md:bottom-0">
+    <div className="mx-sticky-buy fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 border-t border-white/10 bg-[#0b0e12]/95 backdrop-blur-xl sm:bottom-0">
       <div className="container mx-auto flex items-center gap-3 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] text-white/45">Magneto X · M.2 NVMe enclosure</p>

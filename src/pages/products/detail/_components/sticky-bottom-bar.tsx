@@ -31,8 +31,17 @@ export function StickyBottomBar({
 }: StickyBottomBarProps) {
   if (!show) return null;
 
+  /*
+   * Sits on top of the app tab bar rather than under it.
+   *
+   * Both were `fixed bottom-0 z-50`, and the tab bar renders later in the
+   * tree, so it painted over the price and the Buy button — the one control
+   * this bar exists to keep reachable. The offset matches the tab bar exactly:
+   * its items are h-14 plus the home-indicator inset, and it disappears at
+   * `sm`, so this drops back to the floor at the same breakpoint.
+   */
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t-2 border-ink/20 bg-background/90 backdrop-blur-xl md:hidden">
+    <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-50 border-t-2 border-ink/20 bg-background/90 backdrop-blur-xl sm:bottom-0 md:hidden">
       <div className="container mx-auto flex items-center gap-3 px-4 py-3">
         <div className="flex-1">
           <p className="text-[11px] text-muted-foreground">Price</p>
