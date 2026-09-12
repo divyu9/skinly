@@ -142,8 +142,23 @@ export function ProductImages({
           on top of the product, so it is a caption now, and it can be a full
           sentence without a max-width fighting the artwork. */}
       {phoneModel && isMockupImage && (
-        <div className="flex items-start gap-2 rounded-xl border-2 border-ink/15 bg-card px-3 py-2">
-          <SmartphoneIcon className="mt-0.5 size-4 shrink-0 text-brand" strokeWidth={2.2} />
+        /* Tinted rather than white-on-white, and the tint carries meaning:
+           teal when the photo is the model you picked, yellow when it is a
+           stand-in — so the difference registers before the sentence is read. */
+        <div
+          className={`flex items-start gap-2.5 rounded-xl border-2 px-3 py-2.5 ${
+            mockupExact
+              ? "border-brand/40 bg-brand/10"
+              : "border-sunny bg-sunny/25"
+          }`}
+        >
+          <span
+            className={`mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full ${
+              mockupExact ? "bg-brand text-brand-foreground" : "bg-sunny text-ink"
+            }`}
+          >
+            <SmartphoneIcon className="size-3.5" strokeWidth={2.4} />
+          </span>
           <p className="text-[12px] leading-snug">
             {mockupExact ? (
               <>
