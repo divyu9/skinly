@@ -314,10 +314,20 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepage.getMarqueeModels') {
           const q = query(collection(db, 'supportedModels'), limit(args?.maxModels || 20));
           unsubscribe = onSnapshot(q, (snap) => {
-            const models = snap.docs.map(d => {
-              const data = d.data();
-              return `${data.brand} ${data.model}`;
-            });
+            // `brand`/`model` are not what these rows are called — every doc
+            // stores brandName/modelName, so the strip scrolled the words
+            // "undefined undefined" once for each model it supports.
+            const models = snap.docs
+              .map((d) => {
+                const data = d.data() as any;
+                if (data.isActive === false) return "";
+                return [data.brandName ?? data.brand, data.modelName ?? data.model]
+                  .filter(Boolean)
+                  .join(" ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+              })
+              .filter(Boolean);
             setData(models);
           });
         }
@@ -6306,16 +6316,27 @@ export function useConvex() {
         
         const coupon = snap.docs[0].data();
         
-        if (coupon.minPurchaseAmount && cartTotal < coupon.minPurchaseAmount) {
-          throw new Error(`Minimum purchase of ₹${coupon.minPurchaseAmount} required`);
+        // The minimum a coupon carries has three spellings and this checked a
+        // fourth. The admin form writes `minPurchase` (and `minCartValue` for
+        // the cart-value rule); nothing has ever written `minPurchaseAmount`,
+        // so every minimum an admin set was silently ignored at apply time —
+        // the live 5OFF is set to ₹250 and applied on a ₹1 cart.
+        const minPurchase = Number(
+          coupon.minPurchase ?? coupon.minCartValue ?? coupon.minPurchaseAmount ?? 0
+        );
+        if (minPurchase > 0 && cartTotal < minPurchase) {
+          throw new Error(`Minimum purchase of ₹${minPurchase} required`);
         }
-        
+
+        // Same story for the cap: the form writes `maxDiscount`.
+        const maxDiscount = Number(coupon.maxDiscount ?? coupon.maxDiscountAmount ?? 0);
+
         // Calculate discount
         let discountAmount = 0;
         if (coupon.discountType === "percentage") {
           discountAmount = Math.floor(cartTotal * (coupon.discountValue / 100));
-          if (coupon.maxDiscountAmount) {
-            discountAmount = Math.min(discountAmount, coupon.maxDiscountAmount);
+          if (maxDiscount > 0) {
+            discountAmount = Math.min(discountAmount, maxDiscount);
           }
         } else {
           discountAmount = Math.min(cartTotal, coupon.discountValue);

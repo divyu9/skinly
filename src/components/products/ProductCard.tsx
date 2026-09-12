@@ -60,7 +60,7 @@ export const ProductCard = memo(function ProductCard({
   
   return (
     <Link to={productUrl}>
-      <Card className="group overflow-hidden border-2 border-gray-200 hover:border-black transition-all duration-200 hover:shadow-xl p-0 cursor-pointer dark:border-gray-700 dark:hover:border-white">
+      <Card className="group cursor-pointer overflow-hidden rounded-2xl border-2 border-ink/15 p-0 transition-all duration-200 hover:border-ink hover:shadow-xl">
         {/* Product Image */}
         <div className={`relative aspect-square overflow-hidden bg-gray-50 dark:bg-gray-800 ${
           isOutOfStock && autoSortOOS ? 'opacity-30' : ''
@@ -104,13 +104,13 @@ export const ProductCard = memo(function ProductCard({
           
           {/* CTA Button */}
           {isOutOfStock && autoSortOOS ? (
-            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white shadow-lg hover:shadow-xl active:scale-[0.98]">
+            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-brand-foreground font-bold transition-all duration-200 bg-brand shadow-lg hover:shadow-xl active:scale-[0.98]">
               <BellIcon className="size-3 sm:size-4 mr-1" />
               <span className="hidden sm:inline">Request Restock</span>
               <span className="sm:hidden">Restock</span>
             </div>
           ) : (
-            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-white dark:text-black font-semibold transition-all duration-200 bg-black dark:bg-white hover:shadow-lg active:scale-[0.98]">
+            <div className="w-full text-[10px] sm:text-sm h-5 sm:h-10 px-0.5 sm:px-4 inline-flex items-center justify-center whitespace-nowrap rounded-lg text-brand-foreground font-bold transition-all duration-200 bg-brand hover:shadow-lg active:scale-[0.98]">
               <span className="hidden sm:inline">{hasDeviceSelected ? 'View Details' : 'Select Your Device'}</span>
               <span className="sm:hidden">{hasDeviceSelected ? 'View' : 'Select'}</span>
             </div>

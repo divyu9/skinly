@@ -19,9 +19,9 @@ export function ModelsMarquee() {
   // Loading state
   if (marqueeModels === undefined) {
     return (
-      <div className="w-full bg-primary/5 border-y border-primary/10 overflow-hidden">
+      <div className="halftone w-full overflow-hidden border-y-2 border-ink/15">
         <div className="py-3 flex items-center justify-center gap-2">
-          <div className="size-3 rounded-full bg-primary/40 animate-pulse" />
+          <div className="size-3 animate-pulse rounded-full bg-brand/50" />
           <span className="text-xs text-muted-foreground">Loading latest models...</span>
         </div>
       </div>
@@ -37,10 +37,10 @@ export function ModelsMarquee() {
   const modelsToShow = [...marqueeModels, ...marqueeModels, ...marqueeModels];
 
   return (
-    <div className="w-full bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-y border-primary/20 overflow-hidden">
+    <div className="w-full overflow-hidden border-y-2 border-ink/20 bg-blush/30">
       {/* Mobile: Simple centered marquee */}
       <div className="md:hidden">
-        <div className="text-center py-2 bg-gradient-to-r from-primary via-primary to-primary text-primary-foreground text-xs font-bold tracking-wide">
+        <div className="border-b-2 border-ink/20 bg-brand py-2 text-center text-xs font-extrabold tracking-wide text-brand-foreground">
           ✨ NOW SUPPORTING
         </div>
         <div className="py-3 overflow-hidden relative">
@@ -55,7 +55,7 @@ export function ModelsMarquee() {
                 >
                   <span className="text-base">{emoji}</span>
                   <span>{model}</span>
-                  <span className="text-primary/40 mx-1">•</span>
+                  <span className="mx-1 text-brand">•</span>
                 </span>
               );
             })}
@@ -65,7 +65,7 @@ export function ModelsMarquee() {
 
       {/* Desktop: Horizontal marquee with label */}
       <div className="hidden md:flex items-center gap-4 py-3">
-        <div className="flex items-center gap-2 text-sm font-bold px-6 py-2 flex-shrink-0 bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-r-full shadow-lg">
+        <div className="flex flex-shrink-0 items-center gap-2 rounded-r-full border-y-2 border-r-2 border-ink bg-brand px-6 py-2 text-sm font-extrabold text-brand-foreground">
           <span className="text-base">✨</span>
           <span className="whitespace-nowrap tracking-wide">NOW SUPPORTING:</span>
         </div>
@@ -81,7 +81,7 @@ export function ModelsMarquee() {
                 >
                   <span>{emoji}</span>
                   <span>{model}</span>
-                  <span className="text-primary/40 mx-1">•</span>
+                  <span className="mx-1 text-brand">•</span>
                 </span>
               );
             })}

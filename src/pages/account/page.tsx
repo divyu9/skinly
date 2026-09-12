@@ -199,7 +199,7 @@ function AccountPageInner() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Profile Card */}
-      <Card className="mb-4 sm:mb-6">
+      <Card className="mb-4 rounded-2xl border-2 border-ink/15 sm:mb-6">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <UserIcon className="size-5" />
@@ -208,8 +208,8 @@ function AccountPageInner() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start gap-4">
-            <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <UserIcon className="size-8 text-primary" />
+            <div className="flex size-16 items-center justify-center rounded-full border-2 border-ink/15 bg-brand/15">
+              <UserIcon className="size-8 text-brand" />
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-semibold">{currentUser?.name || "User"}</h3>
@@ -239,12 +239,12 @@ function AccountPageInner() {
       </Card>
 
       {/* Referral Program */}
-      <Card className="mb-4 sm:mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border-indigo-200 dark:border-indigo-800">
+      <Card className="mb-4 rounded-2xl border-2 border-ink/15 bg-blush/30 sm:mb-6">
         {/* One row on a phone. Stacked with a full-width button it ate 170px
             of a 812px screen to say one sentence; the wallet and the orders
             are what people came for. */}
         <CardContent className="flex items-center gap-3 p-4 sm:p-6">
-          <UserIcon className="size-5 shrink-0 text-indigo-600" />
+          <UserIcon className="size-5 shrink-0 text-heart" />
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold leading-tight">Refer &amp; Earn ₹100</h3>
             {/* Progress where there is any, the offer where there is not — a
@@ -258,7 +258,7 @@ function AccountPageInner() {
           </div>
           <Button
             size="sm"
-            className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700"
+            className="sticker-sm sticker-press shrink-0 rounded-lg bg-brand font-bold text-brand-foreground hover:bg-brand/90"
             onClick={() => void shareReferral()}
           >
             <Share2Icon className="mr-1.5 size-3.5" />
@@ -268,7 +268,7 @@ function AccountPageInner() {
       </Card>
 
       {/* Wallet Balance & Stats */}
-      <Card className="mb-4 sm:mb-6">
+      <Card className="mb-4 rounded-2xl border-2 border-ink/15 sm:mb-6">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <WalletIcon className="size-5" />
@@ -280,7 +280,7 @@ function AccountPageInner() {
         </CardHeader>
         <CardContent className="space-y-4 sm:space-y-6">
           {/* Current Balance - Prominent Display */}
-          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 p-4 text-white sm:p-6">
+          <div className="sticker relative overflow-hidden rounded-xl bg-brand p-4 text-brand-foreground sm:p-6">
             <div className="relative z-10">
               <div className="mb-1 flex items-center gap-2 sm:mb-2">
                 <CoinsIcon className="size-4 sm:size-5" />
@@ -292,7 +292,7 @@ function AccountPageInner() {
               {/* An empty wallet with no next step is just a zero. Cashback is
                   earned by ordering, so the empty state points at the shop. */}
               {!(safeWalletBalance.balance > 0) && (
-                <Button asChild size="sm" className="mt-3 bg-white text-blue-700 hover:bg-white/90">
+                <Button asChild size="sm" className="sticker-sm sticker-press mt-3 rounded-lg bg-background font-bold text-brand hover:bg-background/90">
                   <Link to="/products">Shop &amp; start earning cashback</Link>
                 </Button>
               )}
@@ -400,6 +400,7 @@ function AccountPageInner() {
               <Button
                 onClick={handleRedeemCoupon}
                 disabled={!couponCode || isRedeeming}
+                className="sticker-sm sticker-press rounded-lg bg-brand font-bold text-brand-foreground hover:bg-brand/90"
               >
                 {isRedeeming ? "Redeeming..." : "Redeem"}
               </Button>
@@ -412,7 +413,7 @@ function AccountPageInner() {
           {/* View Full History */}
           <div className="pt-4 border-t">
             <Link to="/account/wallet">
-              <Button variant="outline" className="w-full">
+              <Button variant="outline" className="sticker-sm sticker-press w-full rounded-xl border-ink font-semibold">
                 <HistoryIcon className="size-4 mr-2" />
                 View Complete Transaction History
               </Button>
@@ -422,7 +423,7 @@ function AccountPageInner() {
       </Card>
 
       {/* Phone Verification */}
-      <Card className="mb-4 sm:mb-6">
+      <Card className="mb-4 rounded-2xl border-2 border-ink/15 sm:mb-6">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <SmartphoneIcon className="size-5" />
@@ -517,7 +518,7 @@ function AccountPageInner() {
       </Card>
 
       {/* WhatsApp Notification Preferences */}
-      <Card className="mb-4 sm:mb-6">
+      <Card className="mb-4 rounded-2xl border-2 border-ink/15 sm:mb-6">
         <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <BellIcon className="size-5" />
@@ -607,7 +608,7 @@ function AccountPageInner() {
       </Card>
 
       {/* Recent Orders */}
-      <Card>
+      <Card className="rounded-2xl border-2 border-ink/15">
         <CardHeader className="pb-3 sm:pb-6">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -669,7 +670,7 @@ function AccountPageInner() {
             <div className="text-center py-8">
               <PackageIcon className="size-12 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground mb-4">No orders yet</p>
-              <Button asChild>
+              <Button asChild className="sticker sticker-press rounded-xl bg-brand font-bold text-brand-foreground hover:bg-brand/90">
                 <Link to="/products">Start Shopping</Link>
               </Button>
             </div>
@@ -682,7 +683,7 @@ function AccountPageInner() {
 
 export default function AccountPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen halftone">
       {/* Announcement Bar */}
       <AnnouncementBar />
       

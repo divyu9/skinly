@@ -256,7 +256,7 @@ export default function ProductsPage() {
 
       {/* Product Category Header - Sticky */}
       <div 
-        className="fixed left-0 right-0 z-30 bg-white dark:bg-gray-950"
+        className="fixed left-0 right-0 z-30 border-b-2 border-ink/10 bg-card"
         style={{ top: `${categoryHeaderTop}px` }}
       >
         <ProductCategoryHeader
@@ -270,7 +270,7 @@ export default function ProductsPage() {
 
       {/* Products Section */}
       <section 
-        className="pb-6 sm:pb-20 px-2 sm:px-4 bg-white dark:bg-gray-950"
+        className="halftone px-2 pb-6 sm:px-4 sm:pb-20"
         style={{ paddingTop: `${categoryHeaderTop + 120}px` }}
       >
         <div className="container mx-auto max-w-7xl">

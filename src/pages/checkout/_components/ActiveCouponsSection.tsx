@@ -40,9 +40,15 @@ export function ActiveCouponsSection({
 
   // Reachable offers first: the ones the shopper can take right now are worth
   // more than the ones they must grow the basket for, and both beat none.
+  // The admin form writes the minimum as `minPurchase`, the cart-value rule as
+  // `minCartValue`, and some older rows carry `minPurchaseAmount`. Reading only
+  // one of the three made every real coupon look like it had no minimum.
+  const minOf = (c: any) =>
+    Number(c?.minPurchase ?? c?.minCartValue ?? c?.minPurchaseAmount ?? 0) || 0;
+
   const sorted = [...activeCoupons].sort((a: any, b: any) => {
-    const aShort = Math.max(0, (Number(a.minCartValue) || 0) - cartValue);
-    const bShort = Math.max(0, (Number(b.minCartValue) || 0) - cartValue);
+    const aShort = Math.max(0, minOf(a) - cartValue);
+    const bShort = Math.max(0, minOf(b) - cartValue);
     if (aShort !== bShort) return aShort - bShort;
     return (Number(b.discountValue) || 0) - (Number(a.discountValue) || 0);
   });
@@ -71,7 +77,7 @@ export function ActiveCouponsSection({
         {visible.map((coupon: any) => {
           const isApplied = appliedCouponCode === coupon.code;
           const isWalletCredit = coupon.effectType === "wallet_credit";
-          const min = Number(coupon.minCartValue) || 0;
+          const min = minOf(coupon);
           const shortfall = Math.max(0, min - cartValue);
           const discountText =
             coupon.discountType === "percentage"

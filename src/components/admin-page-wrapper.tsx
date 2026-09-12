@@ -7,7 +7,11 @@ export function AdminPageWrapper({ children }: { children: ReactNode }) {
   return (
     <AdminAuthGuard>
       <SidebarProvider>
-        <AdminErrorBoundary>{children}</AdminErrorBoundary>
+        {/* `admin-shell` puts `--primary` back to the neutral near-black the
+            storefront now overrides with the brand green. */}
+        <div className="admin-shell">
+          <AdminErrorBoundary>{children}</AdminErrorBoundary>
+        </div>
       </SidebarProvider>
     </AdminAuthGuard>
   );

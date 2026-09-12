@@ -69,7 +69,7 @@ export function ProductCategoryHeader({
                     onClick={() => onUpdateFilters({ productType: category.id })}
                     className={`group relative flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 font-semibold whitespace-nowrap transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-lg sm:rounded-xl ${
                       productCategory === category.id
-                        ? 'bg-black text-white shadow-2xl hover:shadow-3xl dark:bg-white dark:text-black animate-pulse-strong border-4 border-yellow-400 dark:border-yellow-300'
+                        ? 'bg-brand text-brand-foreground shadow-2xl hover:shadow-3xl animate-pulse-strong border-4 border-sunny'
                         : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-xl border-3 border-purple-300 hover:border-purple-500 dark:bg-gray-800 dark:text-gray-200 dark:border-purple-600 dark:hover:bg-gray-700 dark:hover:border-purple-400'
                     }`}
                   >
@@ -107,7 +107,7 @@ export function ProductCategoryHeader({
                   <>
                     <button
                       onClick={() => onUpdateFilters({ gadget: null })}
-                      className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-black dark:bg-white text-white dark:text-black font-semibold text-xs sm:text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200"
+                      className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-brand text-brand-foreground font-semibold text-xs sm:text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200"
                     >
                       All Gadgets
                     </button>
@@ -151,7 +151,7 @@ export function ProductCategoryHeader({
                     <button
                       onClick={() => onUpdateFilters({ gadget: null, finish: null })}
                       title="Change device category"
-                      className="w-[30%] sm:w-auto px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-black dark:bg-white text-white dark:text-black font-semibold text-[10px] sm:text-xs truncate flex-shrink-0 hover:shadow-md transition-all duration-200 border border-black dark:border-white"
+                      className="w-[30%] sm:w-auto px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-brand text-brand-foreground font-semibold text-[10px] sm:text-xs truncate flex-shrink-0 hover:shadow-md transition-all duration-200 border-2 border-ink"
                     >
                       {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
                       <span className="ml-1 opacity-70">✕</span>
@@ -163,7 +163,7 @@ export function ProductCategoryHeader({
                         onClick={() => onUpdateFilters({ finish: null })}
                         className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-[10px] sm:text-xs whitespace-nowrap transition-all duration-200 ${
                           !finishFilter
-                            ? 'bg-black dark:bg-white text-white dark:text-black shadow-md hover:shadow-lg'
+                            ? 'bg-brand text-brand-foreground shadow-md hover:shadow-lg'
                             : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm'
                         }`}
                       >
@@ -181,7 +181,7 @@ export function ProductCategoryHeader({
                           onClick={() => onUpdateFilters({ finish: finishType.name })}
                           className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-[10px] sm:text-xs whitespace-nowrap transition-all duration-200 ${
                             finishFilter === finishType.name
-                              ? 'bg-black dark:bg-white text-white dark:text-black shadow-md hover:shadow-lg'
+                              ? 'bg-brand text-brand-foreground shadow-md hover:shadow-lg'
                               : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm'
                           }`}
                         >

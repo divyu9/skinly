@@ -49,7 +49,7 @@ export function CartButton() {
           )}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col overflow-hidden">
+      <SheetContent side="right" className="halftone flex w-full flex-col overflow-hidden border-l-2 border-ink/20 sm:max-w-lg">
         <SheetHeader className="shrink-0">
           <SheetTitle>Shopping Cart</SheetTitle>
           <SheetDescription>
@@ -205,10 +205,10 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
           
           return (
             <div key={key}>
-              <div className={`flex gap-3 py-3 px-1 ${isOutOfStock ? 'opacity-50' : ''}`}>
+              <div className={`mb-2 flex gap-3 rounded-xl border-2 border-ink/15 bg-card p-2.5 ${isOutOfStock ? 'opacity-50' : ''}`}>
                 {/* Product Image */}
                 {item.productImage && (
-                  <div className="size-16 bg-muted rounded overflow-hidden shrink-0">
+                  <div className="size-16 shrink-0 overflow-hidden rounded-lg border border-ink/10 bg-muted">
                     <img
                       src={item.productImage}
                       alt={item.productTitle}
@@ -258,7 +258,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                   
                   {/* Price and Controls */}
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm font-bold text-primary">
+                    <span className="text-sm font-bold text-brand">
                       ₹{item.price.toFixed(0)}
                     </span>
                     
@@ -327,7 +327,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
       <div className="space-y-2 pb-1">
         <div className="flex justify-between items-center px-1">
           <span className="font-medium text-sm">Subtotal</span>
-          <span className="text-lg font-bold text-primary">₹{subtotal.toFixed(0)}</span>
+          <span className="text-xl font-extrabold text-brand">₹{subtotal.toFixed(0)}</span>
         </div>
 
         <div className="flex flex-col items-center gap-2">
@@ -340,14 +340,18 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
             </div>
           )}
           <Link to="/checkout" className="w-full max-w-[85%]" onClick={onCheckoutClick}>
-            <Button className="w-full" size="default" disabled={hasOutOfStockItems}>
+            <Button
+              className="sticker sticker-press w-full rounded-xl bg-brand font-bold text-brand-foreground hover:bg-brand/90"
+              size="default"
+              disabled={hasOutOfStockItems}
+            >
               Proceed to Checkout
             </Button>
           </Link>
 
           <Button
-            variant="outline"
-            className="w-full max-w-[85%]"
+            variant="ghost"
+            className="w-full max-w-[85%] text-xs text-muted-foreground hover:text-destructive"
             size="sm"
             onClick={handleClearCart}
           >

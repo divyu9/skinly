@@ -82,8 +82,16 @@
   --card-foreground: oklch(0.09 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.09 0 0);
-  --primary: oklch(0.09 0 0);
-  --primary-foreground: oklch(0.98 0 0);
+  /*
+   * The storefront's primary IS the brand green.
+   *
+   * This shipped as near-black, so every default Button, price and accent on
+   * the shop rendered as a flat dark slab — the single biggest reason these
+   * pages read as an admin panel rather than as the packaging. Admin restores
+   * the neutral pair via `.admin-shell` at the bottom of this file.
+   */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
   --secondary: oklch(0.96 0 0);
   --secondary-foreground: oklch(0.09 0 0);
   --muted: oklch(0.96 0 0);
@@ -124,8 +132,9 @@
   --card-foreground: oklch(0.98 0 0);
   --popover: oklch(0.14 0 0);
   --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.98 0 0);
-  --primary-foreground: oklch(0.09 0 0);
+  /* Brand green here too — `.admin-shell` restores the neutral pair. */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
   --secondary: oklch(0.20 0 0);
   --secondary-foreground: oklch(0.98 0 0);
   --muted: oklch(0.20 0 0);
@@ -368,4 +377,22 @@ img[data-img-broken] {
     transparent 1px
   );
   background-size: 14px 14px;
+}
+
+
+/*
+ * Admin keeps the neutral theme.
+ *
+ * The packaging look is for shoppers. A stock screen benefits from a black
+ * button that means "the default action"; it does not benefit from looking
+ * like a sticker. This sits on the admin wrapper so the whole subtree — every
+ * shared component rendered inside it — inherits the plain pair back.
+ */
+.admin-shell {
+  --primary: oklch(0.09 0 0);
+  --primary-foreground: oklch(0.98 0 0);
+}
+.dark .admin-shell {
+  --primary: oklch(0.98 0 0);
+  --primary-foreground: oklch(0.09 0 0);
 }

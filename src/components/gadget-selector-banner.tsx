@@ -27,7 +27,7 @@ export function GadgetSelectorBanner({ brandName, modelName, onChangeDevice }: G
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2'
       }`}
     >
-      <div className="bg-black dark:bg-white text-white dark:text-black rounded-lg shadow-md border border-black dark:border-white">
+      <div className="rounded-lg border-2 border-ink bg-brand text-brand-foreground shadow-md">
         <div className="flex items-center justify-between gap-1.5 sm:gap-2 px-2 py-1.5 sm:px-3 sm:py-2">
           <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
             <CheckCircle2Icon className="size-3.5 sm:size-4 flex-shrink-0" />
