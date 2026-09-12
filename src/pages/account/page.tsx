@@ -253,7 +253,7 @@ function AccountPageInner() {
             <p className="text-xs text-muted-foreground">
               {referralCount > 0
                 ? `${referralCount} friend${referralCount === 1 ? "" : "s"} joined · ₹${referralEarned} earned`
-                : "₹100 for you, ₹100 for them, on their first order"}
+                : "₹100 each, on their first order"}
             </p>
           </div>
           <Button
