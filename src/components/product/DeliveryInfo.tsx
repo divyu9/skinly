@@ -45,9 +45,9 @@ export function DeliveryInfo({ isSkinProduct, codAvailable = false }: DeliveryIn
   return (
     <div className="space-y-3">
       {/* Pincode → a date, not a promise */}
-      <div className="rounded-2xl bg-card p-3 ring-1 ring-border/70">
+      <div className="rounded-2xl border-2 border-ink/15 bg-card p-3">
         <div className="mb-2.5 flex items-center gap-2">
-          <MapPinIcon className="size-4 text-violet-500" />
+          <MapPinIcon className="size-4 text-brand" />
           <span className="text-[13px] font-semibold">Check delivery to your pincode</span>
         </div>
         <div className="flex gap-2">
@@ -64,7 +64,7 @@ export function DeliveryInfo({ isSkinProduct, codAvailable = false }: DeliveryIn
             maxLength={6}
           />
           <Button
-            className="h-11 rounded-xl bg-foreground px-5 text-background hover:bg-foreground/90"
+            className="sticker-sm sticker-press h-11 rounded-xl bg-brand px-5 font-bold text-brand-foreground hover:bg-brand/90"
             onClick={handlePincodeCheck}
           >
             Check
@@ -72,13 +72,13 @@ export function DeliveryInfo({ isSkinProduct, codAvailable = false }: DeliveryIn
         </div>
 
         {pincodeChecked && /^\d{6}$/.test(pincode) && (
-          <div className="mt-2.5 flex items-start gap-2.5 rounded-xl bg-gradient-to-br from-emerald-500/12 to-emerald-500/5 p-3 ring-1 ring-emerald-500/25">
-            <TruckIcon className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <div className="mt-2.5 flex items-start gap-2.5 rounded-xl border-2 border-brand/30 bg-brand/10 p-3">
+            <TruckIcon className="mt-0.5 size-4 shrink-0 text-brand" />
             <div className="text-[13px] leading-snug">
-              <p className="font-semibold text-emerald-700 dark:text-emerald-300">
+              <p className="font-semibold text-brand">
                 Arrives by {longDate}
               </p>
-              <p className="text-emerald-700/80 dark:text-emerald-400/80">
+              <p className="text-brand/80">
                 Printed and dispatched the next working day
               </p>
             </div>
@@ -122,11 +122,12 @@ export function DeliveryInfo({ isSkinProduct, codAvailable = false }: DeliveryIn
   );
 }
 
+/* The packaging's colours, same four as the USP chips above them. */
 const TONES = {
-  emerald: "from-emerald-500/12 to-emerald-500/5 text-emerald-600 dark:text-emerald-300 ring-emerald-500/20",
-  sky:     "from-sky-500/12     to-sky-500/5     text-sky-600     dark:text-sky-300     ring-sky-500/20",
-  violet:  "from-violet-500/12  to-violet-500/5  text-violet-600  dark:text-violet-300  ring-violet-500/20",
-  amber:   "from-amber-500/12   to-amber-500/5   text-amber-600   dark:text-amber-300   ring-amber-500/20",
+  emerald: "bg-brand/15 text-brand",
+  sky:     "bg-blush/45 text-heart",
+  violet:  "bg-sunny/45 text-ink",
+  amber:   "bg-heart/15 text-heart",
 } as const;
 
 function Assurance({
@@ -144,9 +145,9 @@ function Assurance({
 }) {
   return (
     <div
-      className={`rounded-2xl bg-card p-3 ring-1 ring-border/70 ${wide ? "col-span-2" : ""}`}
+      className={`rounded-2xl border-2 border-ink/15 bg-card p-3 ${wide ? "col-span-2" : ""}`}
     >
-      <div className={`mb-1.5 inline-flex size-8 items-center justify-center rounded-lg bg-gradient-to-br ring-1 ${TONES[tone]}`}>
+      <div className={`mb-1.5 inline-flex size-8 items-center justify-center rounded-lg border-2 border-ink/15 ${TONES[tone]}`}>
         <Icon className="size-4" strokeWidth={2.2} />
       </div>
       <p className="text-[13px] font-semibold leading-tight">{title}</p>

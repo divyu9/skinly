@@ -29,11 +29,11 @@ export function StickyBottomBar({
   if (!show) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border/70 bg-background/85 backdrop-blur-xl md:hidden">
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t-2 border-ink/20 bg-background/90 backdrop-blur-xl md:hidden">
       <div className="container mx-auto flex items-center gap-3 px-4 py-3">
         <div className="flex-1">
           <p className="text-[11px] text-muted-foreground">Price</p>
-          <p className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-xl font-extrabold text-transparent">
+          <p className="text-xl font-extrabold text-brand">
             {price}
           </p>
         </div>
@@ -41,7 +41,7 @@ export function StickyBottomBar({
           size="lg"
           onClick={needsDevice ? onSelectDevice : onBuyNow}
           disabled={isLoading}
-          className="h-12 max-w-[220px] flex-1 rounded-xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 font-semibold text-white shadow-lg shadow-fuchsia-600/25 transition-all hover:brightness-110"
+          className="sticker sticker-press h-12 max-w-[220px] flex-1 rounded-xl bg-brand font-bold text-brand-foreground hover:bg-brand/90"
         >
           {needsDevice ? (
             <>

@@ -76,7 +76,7 @@ function ReviewCard({ review }: { review: Review }) {
             <div className="flex items-center gap-2 mb-1">
               <span className="font-semibold">{review.userName}</span>
               {review.verified && (
-                <span className="text-xs bg-green-500/10 text-green-600 px-2 py-0.5 rounded">
+                <span className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded">
                   Verified Purchase
                 </span>
               )}

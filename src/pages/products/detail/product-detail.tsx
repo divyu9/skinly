@@ -287,11 +287,13 @@ export default function ProductDetailPage() {
 
       {/* Product Detail Section */}
       <section className="relative px-4 pb-12 pt-[72px]">
-        {/* Aurora wash — colour without competing with the artwork */}
+        {/* Wash behind the artwork, in the sleeve's own three colours —
+            teal, pink, yellow. It used to be violet, fuchsia and sky, which
+            appear nowhere on the product, the packaging or the logo. */}
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[560px] overflow-hidden">
-          <div className="absolute -left-24 top-8 size-[380px] rounded-full bg-violet-500/25 blur-[100px]" />
-          <div className="absolute right-0 top-0 size-[340px] rounded-full bg-fuchsia-500/20 blur-[100px]" />
-          <div className="absolute left-1/3 top-40 size-[320px] rounded-full bg-sky-400/20 blur-[110px]" />
+          <div className="absolute -left-24 top-8 size-[380px] rounded-full bg-brand/25 blur-[100px]" />
+          <div className="absolute right-0 top-0 size-[340px] rounded-full bg-blush/40 blur-[100px]" />
+          <div className="absolute left-1/3 top-40 size-[320px] rounded-full bg-sunny/25 blur-[110px]" />
         </div>
 
         <div className="relative z-10 container mx-auto max-w-6xl">
@@ -310,8 +312,8 @@ export default function ProductDetailPage() {
               what they get — the first sentence on the page. Same fact, told as
               the reason the product is worth buying. */}
           {isSkinProduct && (
-            <div className="mb-5 flex items-center gap-3 rounded-2xl bg-gradient-to-r from-violet-500/10 via-fuchsia-500/10 to-amber-400/10 p-3.5 ring-1 ring-violet-500/20">
-              <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white shadow-sm shadow-fuchsia-600/30">
+            <div className="mb-5 flex items-center gap-3 rounded-2xl border-2 border-ink/15 bg-blush/30 p-3.5">
+              <span className="sticker-sm inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-foreground">
                 <ScissorsIcon className="size-[18px]" strokeWidth={2.2} />
               </span>
               <p className="text-[13px] leading-snug sm:text-sm">
@@ -327,7 +329,7 @@ export default function ProductDetailPage() {
           <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-6 md:gap-8 mb-12">
             {/* A plain white card made the artwork look like a stock photo.
                 A soft tinted stage gives it depth without competing. */}
-            <div className="rounded-3xl bg-gradient-to-br from-violet-500/8 via-transparent to-fuchsia-500/8 p-1.5 ring-1 ring-border/50 md:sticky md:top-24 md:self-start">
+            <div className="rounded-3xl border-2 border-ink/15 bg-card p-1.5 md:sticky md:top-24 md:self-start">
             <ProductImages
               images={displayImages}
               selectedImage={productState.selectedImage}
@@ -345,7 +347,7 @@ export default function ProductDetailPage() {
                 { icon: LockIcon,        label: "Secure\npayments" },
               ].map(({ icon: Icon, label }) => (
                 <div key={label} className="flex flex-col items-center gap-1.5 text-center">
-                  <Icon className="size-[18px] text-violet-500" strokeWidth={2} />
+                  <Icon className="size-[18px] text-brand" strokeWidth={2.2} />
                   <span className="whitespace-pre-line text-[10px] font-medium leading-tight text-muted-foreground">
                     {label}
                   </span>
@@ -369,18 +371,18 @@ export default function ProductDetailPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <div className="bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent">
+                  <div className="text-3xl font-extrabold tracking-tight text-brand">
                     {priceDisplay}
                   </div>
                   {hasRealDiscount && (
                     <>
                       <span className="text-lg text-muted-foreground line-through">₹{mrp.toFixed(0)}</span>
-                      <span className="rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm shadow-emerald-500/30">
+                      <span className="rounded-full border-2 border-ink bg-sunny px-2.5 py-1 text-[11px] font-bold text-ink">
                         {discountPercent}% OFF
                       </span>
                     </>
                   )}
-                  <span className="rounded-full bg-emerald-500/12 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-500/25 dark:text-emerald-300">
+                  <span className="rounded-full bg-brand/12 px-2.5 py-1 text-[11px] font-semibold text-brand ring-1 ring-brand/30">
                     Inclusive of all taxes
                   </span>
 
@@ -413,7 +415,7 @@ export default function ProductDetailPage() {
               {/* Description — the first lines carry the "matte finish / 3M vinyl"
                   detail that justifies the price, so it starts open. */}
               {productData.description && (
-                <div className="rounded-2xl bg-card p-4 ring-1 ring-border/70">
+                <div className="rounded-2xl border-2 border-ink/15 bg-card p-4">
                   <div
                     className={
                       productState.showFullDescription
@@ -427,7 +429,7 @@ export default function ProductDetailPage() {
                     onClick={() =>
                       updateProductState({ showFullDescription: !productState.showFullDescription })
                     }
-                    className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                    className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline"
                   >
                     {productState.showFullDescription ? "Show less" : "Read more"}
                     {productState.showFullDescription ? (
@@ -476,7 +478,7 @@ export default function ProductDetailPage() {
                     <Button
                       size="lg"
                       onClick={openSelector}
-                      className="h-14 w-full rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 text-base font-semibold text-white shadow-lg shadow-fuchsia-600/25 transition-all hover:shadow-xl hover:shadow-fuchsia-600/35 hover:brightness-110"
+                      className="h-14 w-full rounded-2xl sticker sticker-press bg-brand text-base font-bold text-brand-foreground hover:bg-brand/90"
                     >
                       <SmartphoneIcon className="mr-2 size-5" />
                       Select your device
@@ -492,7 +494,7 @@ export default function ProductDetailPage() {
                       size="lg"
                       onClick={handleAddToCartClick}
                       disabled={isAdding || isBuyingNow}
-                      className="h-14 flex-1 rounded-2xl border-2 text-base font-semibold"
+                      className="sticker sticker-press h-14 flex-1 rounded-2xl border-ink text-base font-bold"
                     >
                       <ShoppingCartIcon className="mr-2 size-5" />
                       {isAdding ? "Adding..." : "Add to Cart"}
@@ -501,7 +503,7 @@ export default function ProductDetailPage() {
                       size="lg"
                       onClick={handleBuyNow}
                       disabled={isAdding || isBuyingNow}
-                      className="h-14 flex-[1.3] rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-orange-500 text-base font-semibold text-white shadow-lg shadow-fuchsia-600/25 transition-all hover:shadow-xl hover:shadow-fuchsia-600/35 hover:brightness-110"
+                      className="h-14 flex-[1.3] rounded-2xl sticker sticker-press bg-brand text-base font-bold text-brand-foreground hover:bg-brand/90"
                     >
                       <ZapIcon className="mr-2 size-5" />
                       {isBuyingNow ? "Processing..." : "Buy Now"}
