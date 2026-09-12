@@ -288,7 +288,7 @@ img[data-img-broken] {
  * and cannot be tapped. Matches the bar's 56px plus the home-indicator inset.
  */
 @media (max-width: 639px) {
-  body {
+  body.has-mobile-tabbar {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
 }

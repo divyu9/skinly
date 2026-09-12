@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { PackageIcon, AlertCircleIcon } from "lucide-react";
+import { PackageIcon, AlertCircleIcon,
+  ChevronDownIcon,
+} from "lucide-react";
 import { CartButton } from "@/components/cart.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Link } from "react-router-dom";
@@ -553,10 +555,32 @@ function CheckoutPageInner() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Order Summary — mobile only */}
-              <div className="lg:hidden">
-                <OrderSummaryPanel {...summaryProps} />
-              </div>
+              {/*
+                Order summary — mobile only, and folded shut.
+
+                Open, it put the whole thing above the form: a customer on a
+                phone scrolled a full screen of items, coupon box and totals
+                before reaching the first field they had to fill. The number
+                they actually want to see is the total, so that is the part
+                that stays visible; the rest is one tap away.
+              */}
+              <details className="group rounded-xl border bg-card lg:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
+                  <span className="text-sm font-medium">
+                    Order summary
+                    <span className="ml-1 text-muted-foreground">
+                      ({(cartItems || []).length} item{(cartItems || []).length === 1 ? "" : "s"})
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-lg font-bold">₹{Number(finalTotal || 0).toFixed(0)}</span>
+                    <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                  </span>
+                </summary>
+                <div className="border-t p-1">
+                  <OrderSummaryPanel {...summaryProps} cardClassName="border-0 shadow-none" />
+                </div>
+              </details>
 
               <ActiveCouponsSection onCouponSelect={handleApplyCoupon} appliedCouponCode={appliedCoupon?.coupon.code} />
               <CheckoutUpsells />

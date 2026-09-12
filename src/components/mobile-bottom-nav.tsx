@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { HomeIcon, LayoutGridIcon, ShoppingBagIcon, UserIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
@@ -28,9 +29,19 @@ export function MobileBottomNav() {
   const signedInCount = useQuery(api.cart.getCartCount, user ? {} : "skip") as number | undefined;
   const count = user ? (signedInCount ?? 0) : getGuestCartCount();
 
-  // The bar would sit on top of the payment sheet and the cart's own sticky
-  // total, and a checkout is the one place a stray tap is expensive.
-  if (/^\/(checkout|payment)/.test(pathname)) return null;
+  // The bar would sit on top of the payment sheet, and a checkout is the one
+  // place a stray tap is expensive.
+  const hidden = /^\/(checkout|payment)/.test(pathname);
+
+  // The page needs clearance only where the bar is actually drawn. As a blanket
+  // rule on body it left 56px of dead space at the bottom of checkout, which is
+  // the page that can least afford it.
+  useEffect(() => {
+    document.body.classList.toggle("has-mobile-tabbar", !hidden);
+    return () => document.body.classList.remove("has-mobile-tabbar");
+  }, [hidden]);
+
+  if (hidden) return null;
 
   return (
     <nav

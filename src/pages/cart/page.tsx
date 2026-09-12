@@ -194,7 +194,7 @@ function AuthenticatedCartContent() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
           {cartItems.map((item) => {
@@ -324,8 +324,8 @@ function AuthenticatedCartContent() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-20">
-            <CardContent className="p-6 space-y-4">
+          <Card className="lg:sticky lg:top-20">
+            <CardContent className="p-4 sm:p-6 space-y-4">
               <h2 className="text-lg font-semibold">Order Summary</h2>
               <Separator />
               
@@ -455,7 +455,7 @@ function GuestCartContent() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
           {guestCart.map((item, idx) => {
@@ -589,8 +589,8 @@ function GuestCartContent() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="sticky top-20">
-            <CardContent className="p-6 space-y-4">
+          <Card className="lg:sticky lg:top-20">
+            <CardContent className="p-4 sm:p-6 space-y-4">
               <h2 className="text-lg font-semibold">Order Summary</h2>
               <Separator />
               
