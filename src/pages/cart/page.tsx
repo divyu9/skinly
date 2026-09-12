@@ -36,7 +36,7 @@ export default function CartPage() {
     <div className="min-h-screen bg-background">
       <SiteHeader />
       
-      <main className="container max-w-4xl mx-auto px-4 py-8">
+      <main className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
         {(authLoading || !showContent) ? (
           <div className="max-w-4xl mx-auto space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -56,6 +56,10 @@ export default function CartPage() {
 function AuthenticatedCartContent() {
   const navigate = useNavigate();
   const cartItems = useQuery(api.cart.getCart);
+  const shippingSettings = useQuery(api.shipping.getShippingSettings) as
+    | { freeShippingThreshold?: number; flatShippingFee?: number }
+    | null
+    | undefined;
   const updateQuantity = useMutation(api.cart.updateQuantity);
   const removeFromCart = useMutation(api.cart.removeFromCart);
   const clearCart = useMutation(api.cart.clearCart);
@@ -162,6 +166,10 @@ function AuthenticatedCartContent() {
   }
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const freeShippingThreshold = Number(shippingSettings?.freeShippingThreshold) || 0;
+  const shippingFee = Number(shippingSettings?.flatShippingFee) || 0;
+  const qualifiesFreeShipping = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
 
   const handleUpdateQuantity = async (cartId: Id<"cart">, newQuantity: number) => {
     try {
@@ -193,18 +201,35 @@ function AuthenticatedCartContent() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="mx-auto max-w-6xl">
+      {/* The page had no heading of any kind: the site nav ran straight into
+          the first item card, so nothing told you where you were. */}
+      <div className="mb-4 flex items-end justify-between gap-4 sm:mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Your cart</h1>
+          <p className="text-sm text-muted-foreground">
+            {itemCount} item{itemCount === 1 ? "" : "s"} ready to go
+          </p>
+        </div>
+        <Link
+          to="/products"
+          className="hidden shrink-0 text-sm font-medium text-primary hover:underline sm:block"
+        >
+          Continue shopping
+        </Link>
+      </div>
+
       <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
         {/* Cart Items */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-3">
           {cartItems.map((item) => {
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
             const isOutOfStock = stockInfo?.isOutOfStock || false;
             
             return (
               <Card key={item._id} className={isOutOfStock ? 'opacity-50' : ''}>
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex gap-3">
                     {/* Product Image */}
                   {item.productImage && (
                     <Link 
@@ -231,7 +256,7 @@ function AuthenticatedCartContent() {
                         to={`/products/detail?id=${item.productId}`}
                         className="hover:text-primary transition-colors flex-1"
                       >
-                        <h3 className="font-semibold text-base line-clamp-2">
+                        <h3 className="line-clamp-2 text-sm font-semibold sm:text-base">
                           {item.productTitle}
                         </h3>
                       </Link>
@@ -241,65 +266,74 @@ function AuthenticatedCartContent() {
                         </Badge>
                       )}
                     </div>
-                    {item.phoneModel && (
-                      <p className="text-sm text-muted-foreground mb-1">
-                        For: {item.phoneModel}
-                      </p>
-                    )}
-                    {item.coverage && (
-                      <p className="text-sm text-muted-foreground mb-1">
-                        Coverage: {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
-                      </p>
-                    )}
-                    {item.variant !== "Default Title" && (
-                      <p className="text-sm text-muted-foreground mb-2">
-                        Variant: {item.variant}
-                      </p>
-                    )}
+                    {/* One line instead of three stacked paragraphs, each
+                        repeating its own label. */}
+                    {(() => {
+                      const meta = [
+                        item.phoneModel,
+                        item.coverage ? (item.coverage === "only_back" ? "Only Back" : "Full Body Wrap") : null,
+                        item.variant !== "Default Title" && item.variant !== "Default" ? item.variant : null,
+                      ].filter(Boolean);
+                      return meta.length ? (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">{meta.join(" · ")}</p>
+                      ) : null;
+                    })()}
                     {isOutOfStock && (
                       <div className="flex items-center gap-1 mb-2 text-sm text-destructive">
                         <AlertCircleIcon className="size-4" />
                         <span>Remove this item to proceed with checkout</span>
                       </div>
                     )}
-                    <p className="text-lg font-bold text-primary mb-4">
-                      ₹{item.price.toFixed(0)}
-                    </p>
-
-                    {/* Quantity Controls */}
-                    <div className="flex items-center gap-3">
-                      <div className={`flex items-center border rounded-lg ${isOutOfStock ? 'opacity-50' : ''}`}>
+                    {/* Stepper, line total and remove on one row. Stacked, a
+                        single item card ran to 248px and two items filled the
+                        screen before the total was reachable. */}
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <div className={`flex items-center rounded-lg border ${isOutOfStock ? 'opacity-50' : ''}`}>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-9 w-9 p-0"
+                          className="size-9 p-0"
+                          aria-label="Decrease quantity"
                           disabled={isOutOfStock}
                           onClick={() => handleUpdateQuantity(item._id, Math.max(1, item.quantity - 1))}
                         >
                           <MinusIcon className="size-4" />
                         </Button>
-                        <span className="px-4 text-sm font-medium min-w-[3ch] text-center">
+                        <span className="min-w-[2.5ch] px-2 text-center text-sm font-medium">
                           {item.quantity}
                         </span>
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-9 w-9 p-0"
+                          className="size-9 p-0"
+                          aria-label="Increase quantity"
                           disabled={isOutOfStock}
                           onClick={() => handleUpdateQuantity(item._id, item.quantity + 1)}
                         >
                           <PlusIcon className="size-4" />
                         </Button>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-9 gap-2 text-destructive hover:text-destructive"
-                        onClick={() => handleRemove(item._id)}
-                      >
-                        <TrashIcon className="size-4" />
-                        Remove
-                      </Button>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-bold leading-tight">
+                            ₹{(item.price * item.quantity).toFixed(0)}
+                          </p>
+                          {item.quantity > 1 && (
+                            <p className="text-[11px] text-muted-foreground">
+                              ₹{item.price.toFixed(0)} each
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          aria-label="Remove item"
+                          onClick={() => handleRemove(item._id)}
+                          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <TrashIcon className="size-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -308,13 +342,17 @@ function AuthenticatedCartContent() {
              );
           })}
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleClearCart}
-          >
-            Clear Cart
-          </Button>
+          {/* Emptying the cart was a full-width button carrying the same
+              visual weight as Proceed to Checkout. It is a text link now. */}
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={handleClearCart}
+              className="text-xs text-muted-foreground underline-offset-4 hover:text-destructive hover:underline"
+            >
+              Clear cart
+            </button>
+          </div>
 
           {/* Upsells. `empty:hidden` because the component renders nothing when
               none are configured, and the wrapper was still spending its margin
@@ -328,19 +366,42 @@ function AuthenticatedCartContent() {
         <div className="lg:col-span-1">
           <Card className="lg:sticky lg:top-20">
             <CardContent className="p-4 sm:p-6 space-y-4">
-              <h2 className="text-lg font-semibold">Order Summary</h2>
+              <h2 className="text-base font-semibold">Order summary</h2>
               <Separator />
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Items ({cartItems.length})</span>
+                  <span className="text-muted-foreground">Items ({itemCount})</span>
                   <span>₹{subtotal.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span className={qualifiesFreeShipping ? "font-medium text-green-600" : ""}>
+                    {qualifiesFreeShipping ? "FREE" : shippingFee ? `₹${shippingFee}` : "At checkout"}
+                  </span>
                 </div>
               </div>
 
+              {/* How close they are to free delivery. The cart never showed
+                  this, so the only place to find out was checkout — after the
+                  decision to add another item had already passed. */}
+              {freeShippingThreshold > 0 && !qualifiesFreeShipping && (
+                <div className="space-y-1.5 rounded-lg bg-muted/60 p-3">
+                  <p className="text-xs">
+                    Add <strong>₹{(freeShippingThreshold - subtotal).toFixed(0)}</strong> more for free delivery
+                  </p>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${Math.min(100, (subtotal / freeShippingThreshold) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <Separator />
 
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="font-semibold">Subtotal</span>
                 <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
               </div>
@@ -364,9 +425,23 @@ function AuthenticatedCartContent() {
 
               <Link to="/products" className="block">
                 <Button variant="outline" className="w-full">
-                  Continue Shopping
+                  Continue shopping
                 </Button>
               </Link>
+
+              {/* The reasons to go through with it, at the moment of deciding. */}
+              <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
+                {[
+                  ["Secure", "payments"],
+                  ["Free", "reprint"],
+                  ["Pan-India", "delivery"],
+                ].map(([a, b]) => (
+                  <div key={a} className="text-[10px] leading-tight text-muted-foreground">
+                    <p className="font-semibold text-foreground">{a}</p>
+                    {b}
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -428,6 +503,10 @@ function GuestCartContent() {
   }
 
   const subtotal = guestCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemCount = guestCart.reduce((n, i) => n + i.quantity, 0);
+  const freeShippingThreshold = Number(shippingSettings?.freeShippingThreshold) || 0;
+  const shippingFee = Number(shippingSettings?.flatShippingFee) || 0;
+  const qualifiesFreeShipping = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
 
   const handleUpdateQuantity = (productId: string, variant: string, newQuantity: number) => {
     try {
@@ -456,10 +535,25 @@ function GuestCartContent() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="mx-auto max-w-6xl">
+      <div className="mb-4 flex items-end justify-between gap-4 sm:mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Your cart</h1>
+          <p className="text-sm text-muted-foreground">
+            {itemCount} item{itemCount === 1 ? "" : "s"} ready to go
+          </p>
+        </div>
+        <Link
+          to="/products"
+          className="hidden shrink-0 text-sm font-medium text-primary hover:underline sm:block"
+        >
+          Continue shopping
+        </Link>
+      </div>
+
       <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
         {/* Cart Items */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-3">
           {guestCart.map((item, idx) => {
             const key = `${item.productId}-${item.variant}-${idx}`;
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
@@ -580,32 +674,54 @@ function GuestCartContent() {
             );
           })}
 
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleClearCart}
-          >
-            Clear Cart
-          </Button>
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={handleClearCart}
+              className="text-xs text-muted-foreground underline-offset-4 hover:text-destructive hover:underline"
+            >
+              Clear cart
+            </button>
+          </div>
         </div>
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
           <Card className="lg:sticky lg:top-20">
             <CardContent className="p-4 sm:p-6 space-y-4">
-              <h2 className="text-lg font-semibold">Order Summary</h2>
+              <h2 className="text-base font-semibold">Order summary</h2>
               <Separator />
-              
+
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Items ({guestCart.length})</span>
+                  <span className="text-muted-foreground">Items ({itemCount})</span>
                   <span>₹{subtotal.toFixed(0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Shipping</span>
+                  <span className={qualifiesFreeShipping ? "font-medium text-green-600" : ""}>
+                    {qualifiesFreeShipping ? "FREE" : shippingFee ? `₹${shippingFee}` : "At checkout"}
+                  </span>
                 </div>
               </div>
 
+              {freeShippingThreshold > 0 && !qualifiesFreeShipping && (
+                <div className="space-y-1.5 rounded-lg bg-muted/60 p-3">
+                  <p className="text-xs">
+                    Add <strong>₹{(freeShippingThreshold - subtotal).toFixed(0)}</strong> more for free delivery
+                  </p>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${Math.min(100, (subtotal / freeShippingThreshold) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <Separator />
 
-              <div className="flex justify-between items-center">
+              <div className="flex items-center justify-between">
                 <span className="font-semibold">Subtotal</span>
                 <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
               </div>
@@ -629,9 +745,23 @@ function GuestCartContent() {
 
               <Link to="/products" className="block">
                 <Button variant="outline" className="w-full">
-                  Continue Shopping
+                  Continue shopping
                 </Button>
               </Link>
+
+              {/* The reasons to go through with it, at the moment of deciding. */}
+              <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
+                {[
+                  ["Secure", "payments"],
+                  ["Free", "reprint"],
+                  ["Pan-India", "delivery"],
+                ].map(([a, b]) => (
+                  <div key={a} className="text-[10px] leading-tight text-muted-foreground">
+                    <p className="font-semibold text-foreground">{a}</p>
+                    {b}
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>

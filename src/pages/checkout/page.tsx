@@ -22,6 +22,7 @@ import { PaymentMethodSelector } from "./_components/PaymentMethodSelector.tsx";
 import { CodOtpSection } from "./_components/CodOtpSection.tsx";
 import { WalletSection } from "./_components/WalletSection.tsx";
 import { OrderSummaryPanel } from "./_components/OrderSummaryPanel.tsx";
+import { CouponField } from "./_components/CouponField.tsx";
 import { ActiveCouponsSection } from "./_components/ActiveCouponsSection.tsx";
 
 import { BrandLogo } from "@/components/brand-logo.tsx";
@@ -581,6 +582,19 @@ function CheckoutPageInner() {
                   <OrderSummaryPanel {...summaryProps} cardClassName="border-0 shadow-none" />
                 </div>
               </details>
+
+              {/* Out of the summary and above the form: on a phone the summary
+                  is folded shut, so a shopper holding a code had to guess it
+                  was hiding in there. */}
+              <CouponField
+                couponCode={couponCode}
+                appliedCoupon={appliedCoupon}
+                isApplyingCoupon={isApplyingCoupon}
+                couponMessage={couponMessage}
+                onCouponCodeChange={handleCouponCodeChange}
+                onApplyCoupon={handleApplyCoupon}
+                onRemoveCoupon={handleRemoveCoupon}
+              />
 
               <ActiveCouponsSection onCouponSelect={handleApplyCoupon} appliedCouponCode={appliedCoupon?.coupon.code} />
               <CheckoutUpsells />
