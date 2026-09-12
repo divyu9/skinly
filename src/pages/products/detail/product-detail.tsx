@@ -557,12 +557,15 @@ export default function ProductDetailPage() {
                 coupons={applicableCoupons}
               />
               
-              {/* Support — deliberately quiet so it doesn't compete with Buy Now */}
+              {/* Support. Muted grey-on-white was quiet to the point of
+                  invisible; in the brand teal it reads as an offer of help
+                  rather than a footnote, while the outline keeps it clearly
+                  secondary to the filled Buy Now above. */}
               <button
                 onClick={handleWhatsAppSupport}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-card py-3 text-[13px] font-medium text-muted-foreground ring-1 ring-border/70 transition-colors hover:text-foreground"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-brand bg-brand/10 py-3 text-[13px] font-bold text-brand transition-colors hover:bg-brand/20"
               >
-                <MessageCircleIcon className="size-4 text-[#25D366]" />
+                <MessageCircleIcon className="size-4" strokeWidth={2.3} />
                 Questions? Chat with us on WhatsApp
               </button>
             </div>
