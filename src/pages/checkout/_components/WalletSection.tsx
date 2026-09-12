@@ -34,7 +34,7 @@ export function WalletSection({
   const capped = maxWalletUsage > 0 && maxWalletUsage < walletBalance;
 
   return (
-    <Card>
+    <Card className="rounded-2xl border-2 border-ink/15">
       <CardContent className="p-4">
         <div className="flex items-center gap-3">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10">

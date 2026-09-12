@@ -30,7 +30,7 @@ export function CodOtpSection({
   onVerifyOtp,
 }: CodOtpSectionProps) {
   return (
-    <Card>
+    <Card className="rounded-2xl border-2 border-ink/15">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ShieldCheckIcon className="size-5" />

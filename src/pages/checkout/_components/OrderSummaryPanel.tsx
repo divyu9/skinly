@@ -15,6 +15,7 @@ import {
 import type { Id } from "@/lib/firebase-api";
 import { useState } from "react";
 import { getCdnUrl } from "@/lib/config";
+import { cn } from "@/lib/utils";
 
 export interface CartItemData {
   productId: string;
@@ -145,7 +146,7 @@ export function OrderSummaryPanel({
   cardClassName,
 }: OrderSummaryPanelProps) {
   return (
-    <Card className={cardClassName}>
+    <Card className={cn("rounded-2xl border-2 border-ink/15", cardClassName)}>
       <CardHeader>
         <CardTitle>Order Summary</CardTitle>
       </CardHeader>
@@ -183,7 +184,7 @@ export function OrderSummaryPanel({
                         {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
                       </p>
                     )}
-                    <p className="text-sm font-semibold text-primary">
+                    <p className="text-sm font-semibold text-brand">
                       ₹{item.price.toFixed(0)} × {item.quantity}
                     </p>
                   </div>
@@ -204,7 +205,7 @@ export function OrderSummaryPanel({
             <span>Shipping</span>
             <span>
               {shippingFee === 0 ? (
-                <span className="text-green-600 font-medium">FREE</span>
+                <span className="font-bold text-brand">FREE</span>
               ) : (
                 `₹${shippingFee.toFixed(0)}`
               )}
@@ -212,20 +213,20 @@ export function OrderSummaryPanel({
           </div>
           {couponDiscount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-green-600 flex items-center gap-1">
+              <span className="flex items-center gap-1 text-brand">
                 <TagIcon className="size-3" />
                 Coupon Discount
               </span>
-              <span className="text-green-600 font-medium">-₹{couponDiscount.toFixed(0)}</span>
+              <span className="font-semibold text-brand">-₹{couponDiscount.toFixed(0)}</span>
             </div>
           )}
           {walletAmount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-green-600 flex items-center gap-1">
+              <span className="flex items-center gap-1 text-brand">
                 <WalletIcon className="size-3" />
                 Wallet Deduction
               </span>
-              <span className="text-green-600 font-medium">-₹{walletAmount.toFixed(0)}</span>
+              <span className="font-semibold text-brand">-₹{walletAmount.toFixed(0)}</span>
             </div>
           )}
           {codFee > 0 && (
@@ -248,7 +249,7 @@ export function OrderSummaryPanel({
           <span className="font-semibold">
             {walletAmount > 0 ? "Amount to Pay" : "Total"}
           </span>
-          <span className="text-2xl font-bold text-primary">₹{finalTotal.toFixed(0)}</span>
+          <span className="text-2xl font-extrabold text-brand">₹{finalTotal.toFixed(0)}</span>
         </div>
 
         {/* Cashback Display */}

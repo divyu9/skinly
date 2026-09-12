@@ -52,15 +52,21 @@ export function ActiveCouponsSection({
   const hidden = sorted.length - visible.length;
 
   return (
-    <Card>
-      <CardContent className="space-y-2 p-4">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <SparklesIcon className="size-4 text-amber-600" />
-          Available offers
-          <span className="text-xs font-normal text-muted-foreground">
-            ({sorted.length})
-          </span>
-        </div>
+    // Carries the logo's green, because this is the one block on the page a
+    // shopper benefits from noticing. Everything else at checkout is neutral
+    // by design; the offers earn the colour by saving them money.
+    <Card className="sticker gap-0 overflow-hidden rounded-2xl py-0">
+      {/* A solid bar in the logo's green. A tint alone got lost between two
+          white cards; this is the one block on the page a shopper is better
+          off noticing, so it is allowed to be the thing they see first. */}
+      <div className="flex items-center gap-2 border-b-2 border-ink bg-brand px-4 py-2 text-brand-foreground">
+        <SparklesIcon className="size-4 shrink-0" />
+        <span className="text-sm font-semibold">Available offers</span>
+        <span className="ml-auto rounded-full bg-white/25 px-2 py-0.5 text-[11px] font-bold leading-none">
+          {sorted.length}
+        </span>
+      </div>
+      <CardContent className="space-y-2 bg-blush/15 p-3">
 
         {visible.map((coupon: any) => {
           const isApplied = appliedCouponCode === coupon.code;
@@ -79,16 +85,16 @@ export function ActiveCouponsSection({
               key={coupon._id}
               className={`flex items-center gap-3 rounded-lg border p-2.5 ${
                 isApplied
-                  ? "border-green-500/50 bg-green-500/10"
-                  : "border-dashed bg-muted/40"
+                  ? "border-ink bg-brand/15"
+                  : "border-dashed border-ink/35 bg-background"
               }`}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-sm font-semibold tracking-wide">
+                  <span className="font-mono text-sm font-bold tracking-wide text-brand">
                     {coupon.code}
                   </span>
-                  <span className="text-xs font-medium text-primary">
+                  <span className="text-xs font-semibold text-foreground">
                     {discountText}
                   </span>
                   {isWalletCredit && (
@@ -109,17 +115,16 @@ export function ActiveCouponsSection({
                 ) : null}
               </div>
               {isApplied ? (
-                <span className="shrink-0 text-xs font-semibold text-green-700 dark:text-green-300">
+                <span className="shrink-0 text-xs font-semibold text-brand">
                   Applied
                 </span>
               ) : (
                 <Button
                   type="button"
                   size="sm"
-                  variant="ghost"
                   onClick={() => onCouponSelect(coupon.code)}
                   disabled={shortfall > 0}
-                  className="h-7 shrink-0 px-2 text-xs font-semibold text-primary hover:text-primary disabled:opacity-40"
+                  className="sticker-sm sticker-press h-7 shrink-0 rounded-lg bg-brand px-3 text-xs font-bold text-brand-foreground hover:bg-brand/90 disabled:opacity-40"
                 >
                   Apply
                 </Button>
@@ -132,7 +137,7 @@ export function ActiveCouponsSection({
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="flex w-full items-center justify-center gap-1 pt-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            className="flex w-full items-center justify-center gap-1 pt-0.5 text-xs font-semibold text-brand hover:underline"
           >
             View {hidden} more offer{hidden === 1 ? "" : "s"}
             <ChevronDownIcon className="size-3.5" />

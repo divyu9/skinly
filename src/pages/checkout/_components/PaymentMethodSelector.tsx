@@ -60,7 +60,7 @@ export function PaymentMethodSelector({
   onPaymentMethodChange,
 }: PaymentMethodSelectorProps) {
   return (
-    <Card>
+    <Card className="rounded-2xl border-2 border-ink/15">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCardIcon className="size-5" />

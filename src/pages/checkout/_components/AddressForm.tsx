@@ -35,7 +35,7 @@ export function AddressForm({
 }: AddressFormProps) {
   return (
     <>
-      <Card>
+      <Card className="rounded-2xl border-2 border-ink/15">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TruckIcon className="size-5" />
@@ -171,7 +171,7 @@ export function AddressForm({
       </Card>
 
       {!isAuthenticated && (
-        <Card>
+        <Card className="rounded-2xl border-2 border-ink/15">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
               <AlertCircleIcon className="size-5 text-blue-600 mt-0.5 shrink-0" />

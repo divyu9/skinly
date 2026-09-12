@@ -527,8 +527,8 @@ function CheckoutPageInner() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-50">
+    <div className="min-h-screen halftone">
+      <header className="border-b-2 border-ink/15 bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -536,7 +536,11 @@ function CheckoutPageInner() {
                 ← Back
               </Button>
               <BrandLogo type="header" imgClassName="h-10" />
-              <h1 className="text-xl font-bold hidden sm:block">Checkout</h1>
+              <h1 className="hidden text-xl font-extrabold sm:block">
+                <span className="box-decoration-clone bg-[linear-gradient(to_top,var(--blush)_38%,transparent_38%)] px-0.5">
+                  Checkout
+                </span>
+              </h1>
             </div>
             <CartButton />
           </div>
@@ -577,7 +581,7 @@ function CheckoutPageInner() {
                 they actually want to see is the total, so that is the part
                 that stays visible; the rest is one tap away.
               */}
-              <details className="group rounded-xl border bg-card lg:hidden">
+              <details className="group rounded-2xl border-2 border-ink/15 bg-card lg:hidden">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
                   <span className="text-sm font-medium">
                     Order summary
@@ -586,11 +590,11 @@ function CheckoutPageInner() {
                     </span>
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="text-lg font-bold">₹{Number(finalTotal || 0).toFixed(0)}</span>
+                    <span className="text-lg font-extrabold text-brand">₹{Number(finalTotal || 0).toFixed(0)}</span>
                     <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
                   </span>
                 </summary>
-                <div className="border-t p-1">
+                <div className="border-t-2 border-ink/10 p-1">
                   <OrderSummaryPanel {...summaryProps} cardClassName="border-0 shadow-none" />
                 </div>
               </details>
@@ -661,7 +665,7 @@ function CheckoutPageInner() {
                   and once under Place Order, where nobody scrolls. */}
               <CheckoutUpsells />
 
-              <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || isRedirectingToPayment || hasOutOfStockItems}>
+              <Button type="submit" size="lg" className="sticker sticker-press w-full rounded-xl bg-brand text-base font-bold text-brand-foreground hover:bg-brand/90" disabled={isSubmitting || isRedirectingToPayment || hasOutOfStockItems}>
                 {isRedirectingToPayment ? (
                   <span className="flex items-center gap-2">
                     <Spinner className="size-4" />

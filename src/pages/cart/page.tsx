@@ -36,7 +36,7 @@ export default function CartPage() {
   }, [authLoading]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen halftone">
       <SiteHeader />
       
       <main className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
@@ -211,7 +211,14 @@ function AuthenticatedCartContent() {
           the first item card, so nothing told you where you were. */}
       <div className="mb-4 flex items-end justify-between gap-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Your cart</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Your{" "}
+            {/* The sleeve draws a marker stroke under everything it wants
+                read first; this is that stroke, in the packaging pink. */}
+            <span className="box-decoration-clone bg-[linear-gradient(to_top,var(--blush)_38%,transparent_38%)] px-0.5">
+              cart
+            </span>
+          </h1>
           <p className="text-sm text-muted-foreground">
             {itemCount} item{itemCount === 1 ? "" : "s"} ready to go
           </p>
@@ -232,7 +239,7 @@ function AuthenticatedCartContent() {
             const isOutOfStock = stockInfo?.isOutOfStock || false;
             
             return (
-              <Card key={item._id} className={`py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
+              <Card key={item._id} className={`rounded-2xl border-2 border-ink/15 py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex gap-3">
                     {/* Product Image */}
@@ -369,7 +376,7 @@ function AuthenticatedCartContent() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="py-0 lg:sticky lg:top-20">
+          <Card className="sticker rounded-2xl py-0 lg:sticky lg:top-20">
             <CardContent className="p-4 sm:p-6 space-y-4">
               <h2 className="text-base font-semibold">Order summary</h2>
               <Separator />
@@ -381,7 +388,7 @@ function AuthenticatedCartContent() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span className={qualifiesFreeShipping ? "font-medium text-green-600" : ""}>
+                  <span className={qualifiesFreeShipping ? "font-bold text-brand" : ""}>
                     {qualifiesFreeShipping ? "FREE" : shippingFee ? `₹${shippingFee}` : "At checkout"}
                   </span>
                 </div>
@@ -391,13 +398,13 @@ function AuthenticatedCartContent() {
                   this, so the only place to find out was checkout — after the
                   decision to add another item had already passed. */}
               {freeShippingThreshold > 0 && !qualifiesFreeShipping && (
-                <div className="space-y-1.5 rounded-lg bg-muted/60 p-3">
+                <div className="space-y-1.5 rounded-xl border-2 border-ink/10 bg-sunny/25 p-3">
                   <p className="text-xs">
                     Add <strong>₹{(freeShippingThreshold - subtotal).toFixed(0)}</strong> more for free delivery
                   </p>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                  <div className="h-2 overflow-hidden rounded-full border border-ink/20 bg-background">
                     <div
-                      className="h-full rounded-full bg-primary transition-all"
+                      className="h-full rounded-full bg-brand transition-all"
                       style={{ width: `${Math.min(100, (subtotal / freeShippingThreshold) * 100)}%` }}
                     />
                   </div>
@@ -408,7 +415,7 @@ function AuthenticatedCartContent() {
 
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Subtotal</span>
-                <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
+                <span className="text-2xl font-extrabold text-brand">₹{subtotal.toFixed(0)}</span>
               </div>
 
               {hasOutOfStockItems && (
@@ -419,8 +426,8 @@ function AuthenticatedCartContent() {
                   </p>
                 </div>
               )}
-              <Button 
-                className="w-full" 
+              <Button
+                className="sticker sticker-press w-full rounded-xl bg-brand text-base font-bold text-brand-foreground hover:bg-brand/90"
                 size="lg"
                 disabled={hasOutOfStockItems}
                 onClick={() => navigate("/checkout")}
@@ -429,7 +436,10 @@ function AuthenticatedCartContent() {
               </Button>
 
               <Link to="/products" className="block">
-                <Button variant="outline" className="w-full">
+                <Button
+                  variant="outline"
+                  className="sticker-sm sticker-press w-full rounded-xl border-ink font-semibold"
+                >
                   Continue shopping
                 </Button>
               </Link>
@@ -445,7 +455,7 @@ function AuthenticatedCartContent() {
                   { Icon: TruckIcon, a: "Pan-India", b: "delivery" },
                 ].map(({ Icon, a, b }) => (
                   <div key={a} className="flex flex-col items-center gap-1 text-[10px] leading-tight text-muted-foreground">
-                    <Icon className="size-4 text-primary" strokeWidth={1.9} />
+                    <Icon className="size-4 text-brand" strokeWidth={2.2} />
                     <span>
                       <span className="block font-semibold text-foreground">{a}</span>
                       {b}
@@ -556,7 +566,14 @@ function GuestCartContent() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-4 flex items-end justify-between gap-4 sm:mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Your cart</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Your{" "}
+            {/* The sleeve draws a marker stroke under everything it wants
+                read first; this is that stroke, in the packaging pink. */}
+            <span className="box-decoration-clone bg-[linear-gradient(to_top,var(--blush)_38%,transparent_38%)] px-0.5">
+              cart
+            </span>
+          </h1>
           <p className="text-sm text-muted-foreground">
             {itemCount} item{itemCount === 1 ? "" : "s"} ready to go
           </p>
@@ -578,7 +595,7 @@ function GuestCartContent() {
             const isOutOfStock = stockInfo?.isOutOfStock || false;
             
             return (
-              <Card key={key} className={`py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
+              <Card key={key} className={`rounded-2xl border-2 border-ink/15 py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex gap-4">
                     {/* Product Image */}
@@ -704,7 +721,7 @@ function GuestCartContent() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="py-0 lg:sticky lg:top-20">
+          <Card className="sticker rounded-2xl py-0 lg:sticky lg:top-20">
             <CardContent className="p-4 sm:p-6 space-y-4">
               <h2 className="text-base font-semibold">Order summary</h2>
               <Separator />
@@ -716,20 +733,20 @@ function GuestCartContent() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
-                  <span className={qualifiesFreeShipping ? "font-medium text-green-600" : ""}>
+                  <span className={qualifiesFreeShipping ? "font-bold text-brand" : ""}>
                     {qualifiesFreeShipping ? "FREE" : shippingFee ? `₹${shippingFee}` : "At checkout"}
                   </span>
                 </div>
               </div>
 
               {freeShippingThreshold > 0 && !qualifiesFreeShipping && (
-                <div className="space-y-1.5 rounded-lg bg-muted/60 p-3">
+                <div className="space-y-1.5 rounded-xl border-2 border-ink/10 bg-sunny/25 p-3">
                   <p className="text-xs">
                     Add <strong>₹{(freeShippingThreshold - subtotal).toFixed(0)}</strong> more for free delivery
                   </p>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-border">
+                  <div className="h-2 overflow-hidden rounded-full border border-ink/20 bg-background">
                     <div
-                      className="h-full rounded-full bg-primary transition-all"
+                      className="h-full rounded-full bg-brand transition-all"
                       style={{ width: `${Math.min(100, (subtotal / freeShippingThreshold) * 100)}%` }}
                     />
                   </div>
@@ -740,7 +757,7 @@ function GuestCartContent() {
 
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Subtotal</span>
-                <span className="text-2xl font-bold text-primary">₹{subtotal.toFixed(0)}</span>
+                <span className="text-2xl font-extrabold text-brand">₹{subtotal.toFixed(0)}</span>
               </div>
 
               {hasOutOfStockItems && (
@@ -751,8 +768,8 @@ function GuestCartContent() {
                   </p>
                 </div>
               )}
-              <Button 
-                className="w-full" 
+              <Button
+                className="sticker sticker-press w-full rounded-xl bg-brand text-base font-bold text-brand-foreground hover:bg-brand/90"
                 size="lg"
                 disabled={hasOutOfStockItems}
                 onClick={() => navigate("/checkout")}
@@ -761,7 +778,10 @@ function GuestCartContent() {
               </Button>
 
               <Link to="/products" className="block">
-                <Button variant="outline" className="w-full">
+                <Button
+                  variant="outline"
+                  className="sticker-sm sticker-press w-full rounded-xl border-ink font-semibold"
+                >
                   Continue shopping
                 </Button>
               </Link>
@@ -777,7 +797,7 @@ function GuestCartContent() {
                   { Icon: TruckIcon, a: "Pan-India", b: "delivery" },
                 ].map(({ Icon, a, b }) => (
                   <div key={a} className="flex flex-col items-center gap-1 text-[10px] leading-tight text-muted-foreground">
-                    <Icon className="size-4 text-primary" strokeWidth={1.9} />
+                    <Icon className="size-4 text-brand" strokeWidth={2.2} />
                     <span>
                       <span className="block font-semibold text-foreground">{a}</span>
                       {b}

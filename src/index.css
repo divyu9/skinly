@@ -51,9 +51,30 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-ink: var(--ink);
+  --color-blush: var(--blush);
+  --color-cream: var(--cream);
+  --color-sunny: var(--sunny);
+  --color-heart: var(--heart);
 }
 
 :root {
+  /* The green of the logo, sampled from the wordmark itself: rgb(40,165,139).
+     `--primary` in this theme is near-black, so anything that needs to read
+     as *Skinly* rather than as UI chrome uses this. */
+  --brand: #28a58b;
+  --brand-foreground: #ffffff;
+  /* The rest of the packaging, sampled from the sleeve: the heavy outline the
+     wordmark and every doodle is drawn with, the pastel pink ground, a warm
+     off-white to stand cards on, the yellow of the lightning bolts, and the
+     red of the heart over the i. */
+  --ink: #16161a;
+  --blush: #f7b9cd;
+  --cream: #fffaf4;
+  --sunny: #ffd166;
+  --heart: #ef3e46;
   --radius: 0.75rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.09 0 0);
@@ -89,6 +110,14 @@
 }
 
 .dark {
+  /* Lifted a little so the mark keeps its punch against a dark card. */
+  --brand: #34c1a3;
+  --brand-foreground: #06231d;
+  --ink: #f2f2f2;
+  --blush: #a45f78;
+  --cream: oklch(0.09 0 0);
+  --sunny: #d9a72e;
+  --heart: #ef3e46;
   --background: oklch(0.09 0 0);
   --foreground: oklch(0.98 0 0);
   --card: oklch(0.14 0 0);
@@ -291,4 +320,52 @@ img[data-img-broken] {
   body.has-mobile-tabbar {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
+}
+
+
+/*
+ * The sticker look, borrowed from the packaging.
+ *
+ * Every mark on the sleeve — the wordmark, the doodles, the how-to panels —
+ * is drawn with a heavy outline and sits slightly off its own shadow, like a
+ * decal peeled and pressed down. Cart and checkout were flat white with a
+ * black button; nothing about them said this store sells quirky vinyl. These
+ * two classes carry the whole look, so the pages stay ordinary markup.
+ */
+.sticker {
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 0 var(--ink);
+}
+
+.sticker-sm {
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 0 var(--ink);
+}
+
+/* Pressing a decal down: it moves onto its shadow rather than dimming. */
+.sticker-press {
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+.sticker-press:not(:disabled):active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 0 var(--ink);
+}
+.sticker-press:disabled {
+  box-shadow: 2px 2px 0 0 color-mix(in oklab, var(--ink) 35%, transparent);
+}
+
+/*
+ * Halftone, the way the sleeve prints it — a dot grid, faint enough that text
+ * on top of it stays text. Used as the ground under cart and checkout so the
+ * cards read as things placed on packaging rather than as a blank page.
+ */
+.halftone {
+  background-color: var(--cream);
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--ink) 13%, transparent) 1.2px,
+    transparent 1px
+  );
+  background-size: 14px 14px;
 }

@@ -30,7 +30,7 @@ export function CouponField({
   onRemoveCoupon: () => void;
 }) {
   return (
-    <Card>
+    <Card className="rounded-2xl border-2 border-ink/15">
       <CardContent className="space-y-3 p-4">
         {!appliedCoupon ? (
           <>
@@ -59,6 +59,7 @@ export function CouponField({
                 variant="outline"
                 onClick={onApplyCoupon}
                 disabled={!couponCode.trim() || isApplyingCoupon}
+                className="sticker-sm sticker-press rounded-lg border-ink font-bold"
               >
                 {isApplyingCoupon ? "Applying…" : "Apply"}
               </Button>

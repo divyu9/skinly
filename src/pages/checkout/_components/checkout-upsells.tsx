@@ -111,7 +111,7 @@ export function CheckoutUpsells() {
   // Show loading state while auth or cart is loading
   if (authLoading || (user && dbCartItems === undefined)) {
     return (
-      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+      <Card className="rounded-2xl border-2 border-ink/15 bg-gradient-to-br from-blush/25 to-background">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -129,7 +129,7 @@ export function CheckoutUpsells() {
   // Show loading while upsells are being fetched
   if (upsells === undefined && cartItems && cartItems.length > 0) {
     return (
-      <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+      <Card className="rounded-2xl border-2 border-ink/15 bg-gradient-to-br from-blush/25 to-background">
         <CardHeader>
           <Skeleton className="h-6 w-48" />
         </CardHeader>
@@ -157,10 +157,10 @@ export function CheckoutUpsells() {
   }, 0);
 
   return (
-    <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-background">
+    <Card className="rounded-2xl border-2 border-ink/15 bg-gradient-to-br from-blush/25 to-background">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <SparklesIcon className="size-5 text-primary" />
+          <SparklesIcon className="size-5 text-brand" />
           <CardTitle>Complete Your Order</CardTitle>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -283,7 +283,7 @@ export function CheckoutUpsells() {
                   {/* Add Button */}
                   <Button
                     size="sm"
-                    className="w-full h-7 md:h-9 text-xs md:text-sm"
+                    className="sticker-sm sticker-press h-7 w-full rounded-lg bg-brand text-xs font-bold text-brand-foreground hover:bg-brand/90 md:h-9 md:text-sm"
                     onClick={() => handleAddUpsell(upsell)}
                     disabled={addingProduct === currentSelectedVariantId}
                   >
