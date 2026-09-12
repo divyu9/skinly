@@ -48,6 +48,7 @@ import {
 import { ProductShareButton } from "./_components/product-share.tsx";
 import { ProductUgcFloat } from "./_components/product-ugc-float.tsx";
 import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
+import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
@@ -73,6 +74,7 @@ const WHATSAPP_MESSAGE = "Hey Skinly Team , I have a query regarding my purchase
 export default function ProductDetailPage() {
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const headerOffset = useHeaderOffset();
   
   // Main product data hook
   const {
@@ -188,7 +190,7 @@ export default function ProductDetailPage() {
         />
         <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
         
-        <div className="px-4 pt-[72px]">
+        <div className="px-4" style={{ paddingTop: headerOffset + 12 }}>
           <div className="container mx-auto max-w-6xl">
             <Skeleton className="h-8 w-32 mb-8" />
             <div className="grid lg:grid-cols-2 gap-8">
@@ -217,7 +219,7 @@ export default function ProductDetailPage() {
         />
         <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
         
-        <div className="px-4 pt-[72px]">
+        <div className="px-4" style={{ paddingTop: headerOffset + 12 }}>
           <div className="container mx-auto max-w-2xl text-center space-y-6">
             <div className="flex justify-center">
               <div className="size-20 rounded-full bg-muted flex items-center justify-center">
@@ -288,7 +290,10 @@ export default function ProductDetailPage() {
       <MobileNav open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen} />
 
       {/* Product Detail Section */}
-      <section className="relative px-4 pb-12 pt-[72px]">
+      {/* Padding measured off the header rather than guessed: `pt-[72px]`
+          left the breadcrumb 20px behind it, since the announcement bar sits
+          above the header and pushes its bottom edge to 92. */}
+      <section className="relative px-4 pb-12" style={{ paddingTop: headerOffset + 12 }}>
         {/* Wash behind the artwork, in the sleeve's own three colours —
             teal, pink, yellow. It used to be violet, fuchsia and sky, which
             appear nowhere on the product, the packaging or the logo. */}

@@ -23,6 +23,7 @@ import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
 import { BrandLogo } from "./brand-logo.tsx";
 
 interface MobileHeaderProps {
@@ -185,7 +186,20 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   };
 
   const showSearch = homepageSettings?.showSearchIcon ?? true;
-  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
+  /*
+   * The bar can be turned off in settings, and it can be closed by the
+   * visitor. This header offsets itself to sit under it, so it has to track
+   * both — reading only the setting left it floating over a 28px strip of
+   * empty page for the rest of the session after anyone hit the X.
+   */
+  const [barDismissed, setBarDismissed] = useState(isAnnouncementDismissed);
+  useEffect(() => {
+    const sync = () => setBarDismissed(true);
+    window.addEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
+    return () => window.removeEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
+  }, []);
+
+  const showAnnouncement = (homepageSettings?.announcementEnabled ?? false) && !barDismissed;
   const announcementHeight = showAnnouncement ? 28 : 0;
 
   return (

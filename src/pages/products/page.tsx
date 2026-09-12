@@ -27,6 +27,7 @@ import {
 // Hooks
 import { useProductFilters } from "@/hooks/useProductFilters";
 import { useProductsData } from "@/hooks/useProductsData";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
 
 export default function ProductsPage() {
   // ============================================
@@ -41,7 +42,15 @@ export default function ProductsPage() {
   // LAYOUT CALCULATIONS
   // ============================================
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
-  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
+  // Same as the header: the sticky category strip below it has to move when
+  // the visitor closes the bar, not just when the setting is off.
+  const [barDismissed, setBarDismissed] = useState(isAnnouncementDismissed);
+  useEffect(() => {
+    const sync = () => setBarDismissed(true);
+    window.addEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
+    return () => window.removeEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
+  }, []);
+  const showAnnouncement = (homepageSettings?.announcementEnabled ?? false) && !barDismissed;
   const announcementHeight = showAnnouncement ? 28 : 0;
   const headerHeight = 64;
   const categoryHeaderTop = announcementHeight + headerHeight;

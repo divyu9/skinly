@@ -3,10 +3,11 @@ import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, dismissAnnouncement } from "@/lib/announcement-dismissed.ts";
 
 export function AnnouncementBar() {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(isAnnouncementDismissed);
 
   // Don't render loading state or if announcement is disabled or dismissed
   if (homepageSettings === undefined || !homepageSettings?.announcementEnabled || isDismissed) {
@@ -50,7 +51,12 @@ export function AnnouncementBar() {
 
         {/* Dismiss button */}
         <button
-          onClick={() => setIsDismissed(true)}
+          onClick={() => {
+            // The header positions itself under this bar, so it has to hear
+            // about this or it leaves a 28px strip of empty page above itself.
+            dismissAnnouncement();
+            setIsDismissed(true);
+          }}
           className="p-0.5 hover:bg-primary-foreground/10 rounded transition-colors"
           aria-label="Dismiss announcement"
         >
