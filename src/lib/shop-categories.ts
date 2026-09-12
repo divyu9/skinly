@@ -19,7 +19,6 @@ export interface ShopCategory {
   label: string;
   imageUrl?: string;
   href: string;
-  count?: number;
 }
 
 const prettify = (id: string) =>
@@ -29,8 +28,10 @@ export function useShopCategories(): ShopCategory[] | undefined {
   const curated = useQuery(api.homepage.getActiveCategoryDisplaySettings) as
     | Array<{ categoryName: string; buttonText?: string; displayName?: string; imageUrl?: string; linkUrl?: string; order?: number }>
     | undefined;
+  // Named "withCounts", but the handler returns no count — only the names are
+  // taken from here.
   const named = useQuery(api.productCategories.listAllWithCounts, {}) as
-    | Array<{ id: string; displayName: string; productCount?: number }>
+    | Array<{ id: string; displayName: string }>
     | undefined;
 
   if (curated === undefined) return undefined;
@@ -48,7 +49,6 @@ export function useShopCategories(): ShopCategory[] | undefined {
         label: c.buttonText?.trim() || c.displayName?.trim() || match?.displayName || prettify(c.categoryName),
         imageUrl: c.imageUrl,
         href: c.linkUrl || `/products?productType=${c.categoryName}`,
-        count: match?.productCount,
       };
     });
 }

@@ -115,23 +115,21 @@ export function MobileBottomNav() {
                       onClick={() => goTo(c.href)}
                       className="flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-colors active:bg-muted"
                     >
-                      <span className="size-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {/* contain, not cover: these are the homepage's tall
+                          banner cards, and a 48px centre crop of one lands on
+                          empty background as often as on the product. */}
+                      <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
                         {c.imageUrl && (
                           <img
                             src={c.imageUrl}
                             alt=""
                             loading="lazy"
-                            className="size-full object-cover"
+                            className="size-full object-contain"
                           />
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">{c.label}</span>
-                        {c.count != null && (
-                          <span className="block text-xs text-muted-foreground">
-                            {c.count} design{c.count === 1 ? "" : "s"}
-                          </span>
-                        )}
                       </span>
                       <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
                     </button>
