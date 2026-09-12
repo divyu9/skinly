@@ -67,6 +67,26 @@ export function MaterialMapping() {
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
   }, [mapping, search, filter]);
 
+  /*
+   * A prefix earns the task list by having siblings that do map. `R-` is at
+   * 97% — 968 SKUs find a roll and 26 do not — so those 26 are the odd ones
+   * out and worth a look. `TRIPOD-` is at 0%, which is not a mapping gap,
+   * it is a tripod.
+   */
+  const { taskBuckets, inertBuckets } = useMemo(() => {
+    const all = Object.entries(
+      (mapping?.unmatchedByPrefix || {}) as Record<string, { count: number; matched: number; items: any[] }>,
+    ).map(([prefix, b]) => ({
+      prefix,
+      ...b,
+      coverage: b.matched + b.count > 0 ? b.matched / (b.matched + b.count) : 0,
+    }));
+    return {
+      taskBuckets: all.filter((b) => b.matched > 0).sort((a, b) => b.coverage - a.coverage),
+      inertBuckets: all.filter((b) => b.matched === 0).sort((a, b) => b.count - a.count),
+    };
+  }, [mapping]);
+
   if (!mapping) {
     return (
       <div className="space-y-3">
@@ -258,48 +278,83 @@ export function MaterialMapping() {
         </CardContent>
       </Card>
 
-      {/* The two coverage questions, kept out of the way until wanted. */}
+      {/* The work, separated from the noise. A prefix whose siblings mostly
+          map has gaps worth chasing; one where nothing maps is a category
+          that simply is not cut from stocked material. */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <Coverage
-          icon={<AlertCircleIcon className="size-4 text-orange-600" />}
-          title="Not backed by stock"
-          subtitle={`${t?.unmatched ?? 0} variants, by SKU prefix`}
-          empty="Every variant resolves to a roll or a cutout."
-          rows={Object.entries(
-            (mapping.unmatchedByPrefix || {}) as Record<string, { count: number; samples: string[] }>,
-          )
-            .sort((a, b) => b[1].count - a[1].count)
-            .map(([prefix, info]) => ({
-              key: prefix,
-              left: `${prefix}-`,
-              sub: info.samples.join(", "),
-              right: String(info.count),
-            }))}
+        <UnmatchedPanel
+          title="Needs linking"
+          subtitle="SKUs whose siblings resolve, but these don't"
+          empty="Nothing outstanding — every family with stock is fully mapped."
+          tone="warn"
+          buckets={taskBuckets}
+          onPin={(item, code) => { setAssigning({ variantId: item.variantId, sku: item.sku, current: code }); setDraftCode(""); }}
         />
-        <Coverage
-          icon={<PackageIcon className="size-4 text-muted-foreground" />}
-          title="Stock with nothing selling it"
-          subtitle={`${(mapping.orphanStock || []).length} rolls and cutouts`}
-          empty="Every roll and cutout has variants behind it."
-          rows={((mapping.orphanStock || []) as any[]).map((o) => ({
-            key: `${o.kind}-${o.code}`,
-            left: o.code,
-            sub: o.designName || "—",
-            right: `${o.amount}${o.kind === "cutout" ? " sheets" : " m"}`,
-          }))}
+        <UnmatchedPanel
+          title="No material tracked"
+          subtitle="Cases, accessories and one-off products — nothing to draw down"
+          empty="Nothing here."
+          buckets={inertBuckets}
+          onPin={(item, code) => { setAssigning({ variantId: item.variantId, sku: item.sku, current: code }); setDraftCode(""); }}
         />
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-2">
+            <PackageIcon className="size-4 text-muted-foreground" />
+            <div>
+              <h4 className="text-sm font-semibold">Stock with nothing selling it</h4>
+              <p className="text-xs text-muted-foreground">
+                {(mapping.orphanStock || []).length} rolls and cutouts no variant resolves to
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {(mapping.orphanStock || []).length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Every roll and cutout has variants behind it.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {((mapping.orphanStock || []) as any[]).map((o) => (
+                <div key={`${o.kind}-${o.code}`} className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <span className="font-mono text-sm font-semibold">{o.code}</span>
+                    <p className="truncate text-xs text-muted-foreground">{o.designName || "—"}</p>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0">
+                    {o.amount}{o.kind === "cutout" ? " sheets" : " m"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={!!assigning} onOpenChange={(v) => !v && setAssigning(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Pin to a stock code</DialogTitle>
+            <DialogTitle>{assigning?.current ? "Re-pin to another code" : "Link to stock"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              <span className="font-mono">{assigning?.sku}</span> currently resolves to{" "}
-              <span className="font-mono">{assigning?.current}</span> from its SKU. Pinning
-              overrides that; removing the pin falls back to the SKU again.
+              {assigning?.current ? (
+                <>
+                  <span className="font-mono">{assigning.sku}</span> resolves to{" "}
+                  <span className="font-mono">{assigning.current}</span> from its SKU already.
+                  Pinning overrides that; removing the pin falls back to the SKU again.
+                </>
+              ) : (
+                <>
+                  <span className="font-mono">{assigning?.sku}</span> resolves to no stock.
+                  Pin it to the roll or cutout it is actually cut from — an{" "}
+                  <span className="font-mono">R-</span> code for a roll, or a cutout code
+                  such as <span className="font-mono">LC-04</span>.
+                </>
+              )}
             </p>
             <div>
               <Label className="text-xs">Stock code</Label>
@@ -313,7 +368,7 @@ export function MaterialMapping() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAssigning(null)}>Cancel</Button>
-            <Button onClick={() => void submitAssign()}>Pin</Button>
+            <Button onClick={() => void submitAssign()}>{assigning?.current ? "Re-pin" : "Link"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -330,48 +385,127 @@ function Stat({ label, value, tone }: { label: string; value: any; tone?: "warn"
   );
 }
 
-function Coverage({
-  icon, title, subtitle, empty, rows,
+
+/**
+ * One prefix per row, opening onto every SKU under it.
+ *
+ * It used to print eight sample SKUs and the count, which told an admin that
+ * 245 things were wrong and gave them no way to look at 237 of them. The list
+ * is the point: it is what someone works through.
+ */
+function UnmatchedPanel({
+  title, subtitle, empty, buckets, tone, onPin,
 }: {
-  icon: React.ReactNode;
   title: string;
   subtitle: string;
   empty: string;
-  rows: Array<{ key: string; left: string; sub: string; right: string }>;
+  tone?: "warn";
+  buckets: Array<{ prefix: string; count: number; matched: number; coverage: number; items: any[] }>;
+  onPin: (item: any, code: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? rows : rows.slice(0, 5);
+  const [open, setOpen] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const total = buckets.reduce((n, b) => n + b.count, 0);
+
   return (
-    <Card>
+    <Card className={tone === "warn" && total > 0 ? "border-orange-300 dark:border-orange-900" : undefined}>
       <CardHeader className="pb-3">
         <div className="flex items-center gap-2">
-          {icon}
-          <div>
-            <h4 className="text-sm font-semibold">{title}</h4>
+          {tone === "warn" ? (
+            <AlertCircleIcon className="size-4 text-orange-600" />
+          ) : (
+            <PackageIcon className="size-4 text-muted-foreground" />
+          )}
+          <div className="min-w-0">
+            <h4 className="text-sm font-semibold">
+              {title} {total > 0 && <span className="text-muted-foreground">· {total}</span>}
+            </h4>
             <p className="text-xs text-muted-foreground">{subtitle}</p>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-1.5">
-        {rows.length === 0 ? (
+        {buckets.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">{empty}</p>
         ) : (
-          <>
-            {shown.map((r) => (
-              <div key={r.key} className="flex items-center gap-2 rounded-lg border px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <span className="font-mono text-sm font-semibold">{r.left}</span>
-                  <p className="truncate font-mono text-[11px] text-muted-foreground">{r.sub}</p>
-                </div>
-                <Badge variant="secondary" className="shrink-0">{r.right}</Badge>
+          buckets.map((b) => {
+            const isOpen = open === b.prefix;
+            const items = q.trim()
+              ? b.items.filter(
+                  (i) =>
+                    String(i.sku || "").toLowerCase().includes(q.toLowerCase()) ||
+                    String(i.productTitle || "").toLowerCase().includes(q.toLowerCase()),
+                )
+              : b.items;
+            return (
+              <div key={b.prefix} className="rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => { setOpen(isOpen ? null : b.prefix); setQ(""); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-muted/50"
+                >
+                  <ChevronRightIcon
+                    className={`size-4 shrink-0 text-muted-foreground transition-transform ${isOpen ? "rotate-90" : ""}`}
+                  />
+                  <span className="font-mono text-sm font-semibold">{b.prefix}-</span>
+                  {b.matched > 0 && (
+                    <Badge variant="outline" className="shrink-0 text-[10px]">
+                      {Math.round(b.coverage * 100)}% of this family maps
+                    </Badge>
+                  )}
+                  <span className="flex-1" />
+                  <Badge variant="secondary" className="shrink-0">{b.count}</Badge>
+                </button>
+
+                {isOpen && (
+                  <div className="border-t bg-muted/30 p-2">
+                    {b.items.length > 12 && (
+                      <div className="relative mb-2">
+                        <SearchIcon className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          value={q}
+                          onChange={(e) => setQ(e.target.value)}
+                          placeholder={`Search ${b.items.length} SKUs…`}
+                          className="h-8 pl-8 text-xs"
+                        />
+                      </div>
+                    )}
+                    <div className="max-h-80 space-y-1 overflow-y-auto">
+                      {items.length === 0 ? (
+                        <p className="py-4 text-center text-xs text-muted-foreground">No match.</p>
+                      ) : (
+                        items.map((i: any) => (
+                          <div
+                            key={i.variantId}
+                            className="flex items-center gap-2 rounded-md bg-background px-2.5 py-1.5"
+                          >
+                            <span className="w-32 shrink-0 truncate font-mono text-xs">{i.sku}</span>
+                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                              {i.productTitle}
+                              {i.variantTitle ? ` · ${i.variantTitle}` : ""}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 shrink-0 px-2 text-xs"
+                              onClick={() => onPin(i, "")}
+                            >
+                              Link
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    {q && (
+                      <p className="pt-1.5 text-center text-[11px] text-muted-foreground">
+                        {items.length} of {b.items.length}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
-            {rows.length > 5 && (
-              <Button variant="ghost" size="sm" className="w-full" onClick={() => setExpanded(!expanded)}>
-                {expanded ? "Show less" : `Show all ${rows.length}`}
-              </Button>
-            )}
-          </>
+            );
+          })
         )}
       </CardContent>
     </Card>

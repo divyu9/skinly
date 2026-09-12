@@ -378,7 +378,20 @@ export const materialMapping = onCall(async (_data: any, context: any) => {
   const products = new Map(productSnap.docs.map((d) => [d.id, d.data() as any]));
 
   const groups: Record<string, any> = {};
-  const unmatchedByPrefix: Record<string, { count: number; samples: string[] }> = {};
+  /*
+   * Unmatched variants in full, and how many of their SKU siblings do match.
+   *
+   * The coverage figure is what separates a job from a fact. `R-` sits at 97%
+   * — 968 of its SKUs find a roll and 26 do not — so those 26 are an anomaly
+   * worth chasing. `TRIPOD-` and `GOLF-` are at 0%, which is not a gap in the
+   * mapping, it is a tripod. Sending both to the same list buries the first
+   * under the second.
+   */
+  const unmatchedByPrefix: Record<
+    string,
+    { count: number; matched: number; items: Array<{ variantId: string; sku: string; productTitle: string; variantTitle: string }> }
+  > = {};
+  const matchedByPrefix: Record<string, number> = {};
   let matchedCount = 0;
 
   for (const d of variantSnap.docs) {
@@ -386,15 +399,22 @@ export const materialMapping = onCall(async (_data: any, context: any) => {
     const product = products.get(v.productId);
     const entry = resolveMaterialCode(v, stock);
 
+    const sku = String(v.sku || "").trim();
+    const prefix = (sku.split("-")[0] || "(no sku)").toUpperCase();
+
     if (!entry) {
-      const sku = String(v.sku || "").trim();
-      const prefix = (sku.split("-")[0] || "(no sku)").toUpperCase();
-      const bucket = (unmatchedByPrefix[prefix] ||= { count: 0, samples: [] });
+      const bucket = (unmatchedByPrefix[prefix] ||= { count: 0, matched: 0, items: [] });
       bucket.count += 1;
-      if (bucket.samples.length < 8 && sku) bucket.samples.push(sku);
+      bucket.items.push({
+        variantId: d.id,
+        sku,
+        productTitle: product?.title || "",
+        variantTitle: String(v.title || ""),
+      });
       continue;
     }
 
+    matchedByPrefix[prefix] = (matchedByPrefix[prefix] || 0) + 1;
     matchedCount += 1;
     const g = (groups[entry.code] ||= {
       code: entry.code,
@@ -432,6 +452,13 @@ export const materialMapping = onCall(async (_data: any, context: any) => {
       return acc;
     }, {})
   );
+
+  for (const [prefix, bucket] of Object.entries(unmatchedByPrefix)) {
+    bucket.matched = matchedByPrefix[prefix] || 0;
+    // Longest SKUs last: within a prefix the plain codes are the interesting
+    // ones and the long view-suffixed variants are repetition.
+    bucket.items.sort((a, b) => a.sku.localeCompare(b.sku, undefined, { numeric: true }));
+  }
 
   return {
     totals: {
