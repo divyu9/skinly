@@ -233,21 +233,29 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
                         </Badge>
                       )}
                     </div>
-                    {item.phoneModel && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.phoneModel}
-                      </p>
-                    )}
-                    {item.coverage && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
-                      </p>
-                    )}
-                    {item.variant !== "Default Title" && (
-                      <p className="text-xs text-muted-foreground">
-                        {item.variant}
-                      </p>
-                    )}
+                    {/* One line, same as the cart page. Three stacked lines
+                        for what is really one description, and a variant
+                        filtered only for "Default Title" so the other
+                        placeholder — a bare "Default" — printed itself at a
+                        shopper who has no idea what it is a default of. */}
+                    {(() => {
+                      const meta = [
+                        item.phoneModel,
+                        item.coverage
+                          ? item.coverage === "only_back"
+                            ? "Only Back"
+                            : "Full Body Wrap"
+                          : null,
+                        item.variant !== "Default Title" && item.variant !== "Default"
+                          ? item.variant
+                          : null,
+                      ].filter(Boolean);
+                      return meta.length ? (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {meta.join(" · ")}
+                        </p>
+                      ) : null;
+                    })()}
                     {isOutOfStock && (
                       <div className="flex items-center gap-1 mt-1 text-xs text-destructive">
                         <AlertCircleIcon className="size-3" />
