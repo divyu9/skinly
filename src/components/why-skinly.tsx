@@ -39,7 +39,7 @@ export function WhySkinly({
   items = defaultItems
 }: WhySkinlyProps) {
   return (
-    <section className="container mx-auto px-4 py-8 bg-muted/30 rounded-3xl">
+    <section className="container mx-auto rounded-3xl border-2 border-ink/10 bg-blush/20 px-4 py-8">
       <div className="space-y-4">
         {/* Title */}
         <div className="text-center">

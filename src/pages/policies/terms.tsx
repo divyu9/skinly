@@ -13,7 +13,7 @@ export default function TermsOfService() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       <Helmet>
         <title>Terms of Service | GoSkinly</title>
         <meta name="description" content="Read GoSkinly's terms of service. Understand your rights and our policies when shopping for vinyl device skins." />

@@ -185,7 +185,7 @@ export default function Index() {
       </div>
 
       {/* Main Content */}
-      <main className="min-h-screen">
+      <main className="halftone min-h-screen">
         {/* Dynamically render sections based on layout manager order */}
         {sortedActiveSections.map((section) => renderSection(section))}
       </main>

@@ -13,7 +13,7 @@ export default function PrivacyPolicy() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       <Helmet>
         <title>Privacy Policy | GoSkinly</title>
         <meta name="description" content="Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy." />

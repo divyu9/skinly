@@ -59,7 +59,7 @@ export function ExploreByBrand({ sectionId, config }: ExploreByBrandProps) {
   }
 
   return (
-    <section className="py-12 px-4 bg-muted/30">
+    <section className="px-4 py-12">
       {/* Responsive styles for brand cards */}
       <style>{`
         .brand-card {

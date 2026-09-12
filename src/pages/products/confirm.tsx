@@ -21,7 +21,7 @@ export default function ProductConfirmPage() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="halftone min-h-screen">
       {/* Navigation */}
       <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">

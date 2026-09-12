@@ -13,7 +13,7 @@ export default function ShippingPolicy() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       <Helmet>
         <title>Shipping Policy | GoSkinly</title>
         <meta name="description" content="GoSkinly shipping policy — free delivery across India, COD available. Learn about delivery times and order tracking." />

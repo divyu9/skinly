@@ -178,7 +178,7 @@ export default function ProductDetailPage() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="halftone min-h-screen pb-20">
         <AnnouncementBar />
         <MobileHeader 
           onMenuClick={() => setIsMobileMenuOpen(true)}
@@ -207,7 +207,7 @@ export default function ProductDetailPage() {
   // Product not found
   if (!productData) {
     return (
-      <div className="min-h-screen bg-background pb-20">
+      <div className="halftone min-h-screen pb-20">
         <AnnouncementBar />
         <MobileHeader 
           onMenuClick={() => setIsMobileMenuOpen(true)}
@@ -265,7 +265,7 @@ export default function ProductDetailPage() {
   const discountPercent = hasRealDiscount ? Math.round(((mrp - nowPrice) / mrp) * 100) : 0;
   
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="halftone min-h-screen pb-20">
       {/* SEO Head */}
       <ProductSEOHead
         seoMeta={seoMeta}

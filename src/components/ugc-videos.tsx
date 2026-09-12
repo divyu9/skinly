@@ -15,7 +15,7 @@ export function UgcVideos() {
   // Loading state
   if (videos === undefined) {
     return (
-      <section className="py-8 bg-background">
+      <section className="py-8">
         <div className="container mx-auto px-4">
           <Skeleton className="h-8 w-48 mb-4" />
           <div className="flex gap-3 overflow-x-auto pb-4">

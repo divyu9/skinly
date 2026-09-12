@@ -151,7 +151,7 @@ function WalletPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -446,7 +446,7 @@ export default function WalletPage() {
   return (
     <>
       <Unauthenticated>
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="halftone min-h-screen flex items-center justify-center p-4">
           <Empty>
             <EmptyHeader>
               <EmptyMedia variant="icon">
@@ -464,7 +464,7 @@ export default function WalletPage() {
         </div>
       </Unauthenticated>
       <AuthLoading>
-        <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="halftone min-h-screen flex items-center justify-center">
           <Skeleton className="h-96 w-full max-w-4xl" />
         </div>
       </AuthLoading>

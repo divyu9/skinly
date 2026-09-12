@@ -358,7 +358,7 @@ export default function DevicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       <Helmet>
         <title>Supported Devices & Models | GoSkinly</title>
         <meta name="description" content="Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom vinyl skins starting ₹149. Free delivery across India." />

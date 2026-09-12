@@ -117,7 +117,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
   };
 
   return (
-    <section className="bg-muted/60 py-8 sm:py-12">
+    <section className="border-y-2 border-ink/10 bg-blush/25 py-8 sm:py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto space-y-6">
         {/* Title */}

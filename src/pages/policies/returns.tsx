@@ -13,7 +13,7 @@ export default function ReturnsPolicy() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       <Helmet>
         <title>Returns & Refund Policy | GoSkinly</title>
         <meta name="description" content="GoSkinly returns and refund policy. Easy returns, hassle-free refunds on vinyl device skins." />

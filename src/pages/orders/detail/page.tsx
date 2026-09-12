@@ -189,7 +189,7 @@ function OrderDetailPageInner() {
 
   if (order === undefined) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="halftone min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Loading order details...</p>
       </div>
     );
@@ -197,7 +197,7 @@ function OrderDetailPageInner() {
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center flex-col gap-4">
+      <div className="halftone min-h-screen flex items-center justify-center flex-col gap-4">
         <p className="text-xl font-semibold">Order not found</p>
         <p className="text-muted-foreground text-sm">This order may not exist or you may not have access to it.</p>
         <Link to="/orders"><Button variant="outline">View All Orders</Button></Link>
@@ -206,7 +206,7 @@ function OrderDetailPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="halftone min-h-screen">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
