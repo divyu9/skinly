@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from "react";
-import { PackageIcon } from "lucide-react";
+import { PackageIcon, SmartphoneIcon } from "lucide-react";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 
 interface ProductImage {
@@ -97,29 +97,6 @@ export function ProductImages({
               onError={handleImageError}
             />
             
-            {/* Says which phone is pictured. It used to claim the chosen
-                model whatever was on screen, so picking a model we have no
-                shot of showed a different phone under a label promising
-                yours. When it is a stand-in it says so, and still makes the
-                point that matters: the skin is cut for what you picked. */}
-            {phoneModel && isMockupImage && (
-              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 md:bottom-auto md:top-3 md:left-auto md:right-3 md:translate-x-0 max-w-[85%] rounded-lg bg-primary px-3 py-1.5 text-center text-xs font-semibold leading-tight text-primary-foreground shadow-lg pointer-events-none">
-                {mockupExact ? (
-                  <>
-                    <div>Preview on {phoneModel}</div>
-                    <div className="mt-0.5 text-[10px] opacity-90">Full Body Wrap</div>
-                  </>
-                ) : (
-                  <>
-                    <div>Shown on {shownModel || "another model"}</div>
-                    <div className="mt-0.5 text-[10px] opacity-90">
-                      Cut to fit your {phoneModel}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
             {/* Changing device refetches the mockup, and the old picture used
                 to sit there unchanged until the new one arrived — no way to
                 tell whether anything was happening. */}
@@ -134,9 +111,7 @@ export function ProductImages({
             
             {/* Swipe Indicator Dots */}
             {validImages.length > 1 && (
-              <div className={`absolute left-1/2 -translate-x-1/2 flex gap-1.5 pointer-events-none ${
-                phoneModel && isMockupImage ? "bottom-14 md:bottom-3" : "bottom-3"
-              }`}>
+              <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
                 {validImages.map((_, idx) => (
                   <div
                     key={idx}
@@ -160,6 +135,35 @@ export function ProductImages({
         )}
       </div>
       
+      {/* Which phone is pictured — under the image, not over it.
+          This was a filled pill sitting bottom-centre on mobile, directly on
+          the part of the shot a skin buyer most wants to look at: the port
+          cutouts along the bottom edge. Nothing about the label needs to be
+          on top of the product, so it is a caption now, and it can be a full
+          sentence without a max-width fighting the artwork. */}
+      {phoneModel && isMockupImage && (
+        <div className="flex items-start gap-2 rounded-xl border-2 border-ink/15 bg-card px-3 py-2">
+          <SmartphoneIcon className="mt-0.5 size-4 shrink-0 text-brand" strokeWidth={2.2} />
+          <p className="text-[12px] leading-snug">
+            {mockupExact ? (
+              <>
+                <span className="font-bold text-foreground">Preview on {phoneModel}</span>
+                <span className="text-muted-foreground"> · full body wrap</span>
+              </>
+            ) : (
+              <>
+                <span className="font-bold text-foreground">
+                  Shown on {shownModel || "another model"}
+                </span>
+                <span className="text-muted-foreground">
+                  {" "}— we don&rsquo;t have a photo on the {phoneModel} yet, but it&rsquo;s cut for yours
+                </span>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       {/* Thumbnail Gallery */}
       {validImages.length > 1 && (
         <div className="grid grid-cols-4 gap-2">
