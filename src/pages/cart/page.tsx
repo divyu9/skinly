@@ -162,7 +162,9 @@ function AuthenticatedCartContent() {
           </EmptyHeader>
           <EmptyContent>
             <Link to="/products">
-              <Button>Browse Products</Button>
+              <Button className="sticker sticker-press rounded-xl bg-brand font-bold text-brand-foreground hover:bg-brand/90">
+                Browse Products
+              </Button>
             </Link>
           </EmptyContent>
         </Empty>
@@ -522,7 +524,9 @@ function GuestCartContent() {
           </EmptyHeader>
           <EmptyContent>
             <Link to="/products">
-              <Button>Browse Products</Button>
+              <Button className="sticker sticker-press rounded-xl bg-brand font-bold text-brand-foreground hover:bg-brand/90">
+                Browse Products
+              </Button>
             </Link>
           </EmptyContent>
         </Empty>
