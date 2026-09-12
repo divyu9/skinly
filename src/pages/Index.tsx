@@ -30,17 +30,8 @@ function SectionSkeleton() {
     </div>
   );
 }
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { useMutation, useQuery } from "@/lib/firebase-hooks";
+import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
 
@@ -52,12 +43,8 @@ export default function Index() {
 
   // Request model form state
   const [requestBrand, setRequestBrand] = useState("");
-  const [requestModel, setRequestModel] = useState("");
   const [requestCategory, setRequestCategory] = useState<string>("");
-  const [requestPhone, setRequestPhone] = useState("");
-  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
-  const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
   // Get homepage sections to render dynamically
   const homepageSections = useQuery(api.homepage.getActiveHomepageSections);
@@ -156,36 +143,6 @@ export default function Index() {
     }
   };
 
-  const handleRequestModelSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!requestBrand || !requestModel || !requestCategory || !requestPhone) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
-    setIsSubmittingRequest(true);
-    try {
-      await createModelRequest({
-        brandName: requestBrand,
-        modelName: requestModel,
-        category: requestCategory,
-        whatsappPhone: requestPhone,
-      });
-      
-      toast.success("Request submitted! We'll notify you when it's available.");
-      setIsRequestModelOpen(false);
-      setRequestBrand("");
-      setRequestModel("");
-      setRequestCategory("");
-      setRequestPhone("");
-    } catch (error) {
-      toast.error("Failed to submit request. Please try again.");
-      console.error(error);
-    } finally {
-      setIsSubmittingRequest(false);
-    }
-  };
 
   const handleMenuClick = () => {
     setIsMobileMenuOpen(true);
@@ -254,89 +211,12 @@ export default function Index() {
       />
 
       {/* Request Model Dialog */}
-      <Dialog open={isRequestModelOpen} onOpenChange={setIsRequestModelOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Request Your Model</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleRequestModelSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="request-brand">Brand Name *</Label>
-              <Input
-                id="request-brand"
-                placeholder="e.g., Apple, Samsung, OnePlus"
-                value={requestBrand}
-                onChange={(e) => setRequestBrand(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="request-model">Model Name *</Label>
-              <Input
-                id="request-model"
-                placeholder="e.g., iPhone 15 Pro Max, Galaxy S24 Ultra"
-                value={requestModel}
-                onChange={(e) => setRequestModel(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="request-category">Device Category *</Label>
-              <Select value={requestCategory} onValueChange={setRequestCategory} required>
-                <SelectTrigger id="request-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="tablet">Tablet</SelectItem>
-                  <SelectItem value="laptop">Laptop</SelectItem>
-                  <SelectItem value="camera">Camera</SelectItem>
-                  <SelectItem value="lens">Lens</SelectItem>
-                  <SelectItem value="drone">Drone</SelectItem>
-                  <SelectItem value="console">Gaming Console</SelectItem>
-                  <SelectItem value="charger">Charger</SelectItem>
-                  <SelectItem value="mac-mini">Mac Mini</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="request-phone">WhatsApp Number *</Label>
-              <Input
-                id="request-phone"
-                type="tel"
-                placeholder="e.g., 9876543210"
-                value={requestPhone}
-                onChange={(e) => setRequestPhone(e.target.value)}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                We'll notify you on WhatsApp when your model is available
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsRequestModelOpen(false)}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubmittingRequest}
-                className="flex-1"
-              >
-                {isSubmittingRequest ? "Submitting..." : "Submit Request"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <RequestModelDialog
+        open={isRequestModelOpen}
+        onOpenChange={setIsRequestModelOpen}
+        initialCategory={requestCategory}
+        initialBrand={requestBrand}
+      />
 
       {/* Bug Report Modal */}
       <Suspense fallback={null}>
