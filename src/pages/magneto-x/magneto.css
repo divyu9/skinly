@@ -1,0 +1,510 @@
+/*
+ * Scroll choreography for /magneto-x.
+ *
+ * Every scene is a tall section whose useScrollScene hook writes one number,
+ * `--p` (0 → 1), as you pass through it. Nothing here reads scroll position
+ * itself; it all falls out of that one value in calc(). Only transform,
+ * opacity and filter are animated, so the whole page stays on the compositor
+ * and holds 60fps on the mid-range Android hardware most of this traffic is
+ * on — which is the entire reason the scroll position is not in React state.
+ */
+
+.mx-page {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  background-color: #07090c;
+  color-scheme: dark;
+}
+
+/* A scene is tall; its contents pin to the viewport while it passes. */
+.mx-scene {
+  --p: 0;
+}
+.mx-pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+  /* Phones stack: the object takes the upper half, the copy sits under it.
+     Absolutely positioning the stage — which is what the wide layout does —
+     lands the product on top of its own paragraph on a 375px screen. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  /* The page carries its own buy bar, and phones carry the app tab bar under
+     it, with the site header pinned over the top. Scene content stops clear
+     of all three rather than sliding behind them. */
+  padding-top: 4.5rem;
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 768px) {
+  .mx-pin {
+    padding-top: 5rem;
+    padding-bottom: 4.5rem;
+  }
+}
+@media (min-width: 1024px) {
+  .mx-pin { flex-direction: row; }
+}
+
+/* Soft coloured light behind the product, so the dark ground is not flat. */
+.mx-aurora {
+  position: absolute;
+  inset: -20% -10%;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 42% at 22% 28%, rgba(40, 165, 139, 0.28), transparent 70%),
+    radial-gradient(34% 38% at 78% 62%, rgba(70, 120, 220, 0.22), transparent 72%),
+    radial-gradient(50% 50% at 50% 50%, rgba(255, 255, 255, 0.05), transparent 75%);
+  filter: blur(20px);
+}
+.mx-aurora-soft {
+  opacity: 0.55;
+}
+
+.mx-display {
+  letter-spacing: -0.03em;
+}
+
+/* --------------------------------------------------------------- hero --- */
+
+.mx-hero-grid {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 78rem;
+  margin-inline: auto;
+  padding: 0 1.5rem;
+  display: grid;
+  gap: 1rem;
+  place-items: center;
+  text-align: center;
+}
+@media (min-width: 1024px) {
+  .mx-hero-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    text-align: left;
+    place-items: center start;
+  }
+}
+
+.mx-hero-copy {
+  /* Legible from the first frame; the scroll only settles it. */
+  transform: translateY(calc(var(--p) * -6vh));
+  opacity: calc(1 - var(--p) * 0.85);
+  will-change: transform, opacity;
+  order: 2;
+}
+@media (min-width: 1024px) {
+  .mx-hero-copy { order: 1; }
+}
+
+.mx-hero-stage {
+  order: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+}
+@media (min-width: 1024px) {
+  .mx-hero-stage { order: 2; }
+}
+
+.mx-hero-disc {
+  width: min(52vw, 300px);
+  aspect-ratio: 1;
+  /* Tips over and sinks as the page starts moving, handing the frame to the
+     next scene rather than simply scrolling off it. */
+  transform:
+    perspective(1400px)
+    translateY(calc(var(--p) * -10vh))
+    rotateX(calc(14deg + var(--p) * 46deg))
+    rotateZ(calc(var(--p) * 34deg))
+    scale(calc(1 - var(--p) * 0.3));
+  --sheen: calc(0.1 + var(--p) * 0.85);
+  will-change: transform;
+}
+@media (min-width: 1024px) {
+  .mx-hero-disc { width: min(34vw, 420px); }
+}
+
+.mx-scroll-hint {
+  position: absolute;
+  bottom: 5rem;
+  left: 50%;
+  translate: -50% 0;
+  width: 22px;
+  height: 36px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  opacity: calc(1 - var(--p) * 4);
+}
+.mx-scroll-hint span {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  translate: -50% 0;
+  width: 3px;
+  height: 7px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.6);
+  animation: mx-hint 1.6s var(--ease-out) infinite;
+}
+@keyframes mx-hint {
+  0% { transform: translateY(0); opacity: 0; }
+  30% { opacity: 1; }
+  100% { transform: translateY(13px); opacity: 0; }
+}
+
+/* --------------------------------------------------------------- copy --- */
+
+.mx-scene-copy {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
+  padding: 0 1.5rem;
+  max-width: 34rem;
+  margin-inline: auto;
+  text-align: center;
+}
+@media (min-width: 1024px) {
+  .mx-scene-copy {
+    /* Kept clear of the object's half of the frame — at 1280px a 34rem column
+       runs its last line under the phone. */
+    max-width: min(27rem, 36vw);
+    margin-inline: 0;
+    margin-left: max(6vw, calc(50vw - 32rem));
+    text-align: left;
+  }
+}
+
+.mx-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: 0.75rem;
+}
+.mx-h2 {
+  font-size: clamp(2rem, 6vw, 3.75rem);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+}
+.mx-body {
+  margin-top: 1.15rem;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.55);
+  text-wrap: pretty;
+}
+.mx-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.3rem 0.8rem;
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* ---------------------------------------------------------- snap scene --- */
+
+.mx-snap-stage {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 30vh;
+  max-height: 46vh;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .mx-snap-stage {
+    position: absolute;
+    inset: 0 4vw 0 auto;
+    width: 46vw;
+    max-height: none;
+  }
+}
+
+.mx-snap-phone {
+  position: relative;
+  width: min(46vw, 220px);
+  aspect-ratio: 200 / 400;
+  transform:
+    perspective(1200px)
+    rotateY(calc(-24deg + var(--p) * 14deg))
+    rotateX(6deg)
+    scale(calc(0.92 + var(--p) * 0.08));
+  opacity: 0.95;
+}
+
+/* The disc flies in and lands. Overshoot lives in the eased travel, not in a
+   keyframe, so it stays locked to the scrubbing finger. */
+.mx-snap-disc {
+  position: absolute;
+  width: min(30vw, 148px);
+  aspect-ratio: 1;
+  top: 50%;
+  left: 50%;
+  --travel: calc(1 - var(--p));
+  transform:
+    translate(-50%, -50%)
+    perspective(1000px)
+    translate3d(calc(var(--travel) * 42vw), calc(var(--travel) * -18vh), calc(var(--p) * 60px))
+    rotateY(calc(-24deg + var(--p) * 14deg))
+    rotateZ(calc(var(--travel) * 120deg))
+    scale(calc(0.6 + var(--p) * 0.4));
+  --sheen: calc(var(--p) * 0.9);
+  filter: drop-shadow(0 24px 46px rgba(0, 0, 0, calc(0.2 + var(--p) * 0.45)));
+  will-change: transform;
+}
+
+/* Field rings, only once the disc is close enough to matter. */
+.mx-field {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  border-radius: 999px;
+  border: 1.5px solid rgba(40, 165, 139, 0.55);
+  opacity: calc((var(--p) - 0.45) * 2.6);
+}
+.mx-field-1 { width: 42%; aspect-ratio: 1; }
+.mx-field-2 { width: 66%; aspect-ratio: 1; opacity: calc((var(--p) - 0.55) * 1.9); }
+.mx-field-3 { width: 92%; aspect-ratio: 1; opacity: calc((var(--p) - 0.65) * 1.5); }
+
+/* ---------------------------------------------------------- open scene --- */
+
+.mx-open-stage {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 30vh;
+  max-height: 46vh;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  perspective: 1400px;
+}
+@media (min-width: 1024px) {
+  .mx-open-stage {
+    position: absolute;
+    inset: 0 4vw 0 auto;
+    width: 46vw;
+    max-height: none;
+  }
+}
+
+.mx-open-board,
+.mx-open-lid {
+  position: absolute;
+  width: min(58vw, 300px);
+  aspect-ratio: 1;
+  transform-style: preserve-3d;
+}
+
+.mx-open-board {
+  transform:
+    rotateX(calc(52deg - var(--p) * 8deg))
+    translateZ(calc(var(--p) * -30px))
+    scale(calc(0.86 + var(--p) * 0.1));
+}
+
+/* The lid lifts off and drifts up-left, which is what an exploded diagram
+   does — but here it is driven by the finger rather than a loop. */
+.mx-open-lid {
+  transform:
+    rotateX(calc(52deg - var(--p) * 8deg))
+    translate3d(calc(var(--p) * -11%), calc(var(--p) * -15%), calc(var(--p) * 120px))
+    rotateZ(calc(var(--p) * -14deg))
+    scale(calc(0.86 + var(--p) * 0.1));
+  opacity: calc(1 - var(--p) * 0.18);
+  --sheen: calc(0.15 + var(--p) * 0.7);
+  will-change: transform;
+}
+
+/* The M.2 stick slides into the exposed slot in the back half of the scene. */
+.mx-ssd {
+  position: absolute;
+  width: min(34vw, 168px);
+  height: 34px;
+  border-radius: 4px;
+  background: linear-gradient(160deg, #1d242c, #0c1116);
+  border: 1px solid #39434d;
+  display: grid;
+  place-items: center;
+  opacity: calc((var(--p) - 0.3) * 3.4);
+  transform:
+    rotateX(52deg)
+    translate3d(calc(max(0.7 - var(--p), 0) * 62vw), calc(var(--p) * -2%), 30px)
+    scale(calc(0.86 + var(--p) * 0.1));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+}
+.mx-ssd::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 4px;
+  height: 5px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(90deg, #c9a227 0 3px, transparent 3px 6px);
+}
+.mx-ssd-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-3px);
+}
+
+/* --------------------------------------------------------- speed scene --- */
+
+.mx-speed-stage {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 30vh;
+  max-height: 46vh;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+@media (min-width: 1024px) {
+  .mx-speed-stage {
+    position: absolute;
+    inset: 0 4vw 0 auto;
+    width: 46vw;
+    max-height: none;
+  }
+}
+
+.mx-speed-dial {
+  position: relative;
+  width: min(52vw, 260px);
+  aspect-ratio: 1;
+  transform: rotate(calc(var(--p) * 300deg)) scale(calc(0.9 + var(--p) * 0.12));
+  --sheen: calc(var(--p));
+  will-change: transform;
+}
+
+/* Streaks that stretch as the scene scrubs — data leaving at speed. */
+.mx-speed-track {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+.mx-speed-track span {
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(40, 165, 139, 0.85), transparent);
+  top: calc(8% + var(--i) * 5%);
+  left: 50%;
+  width: calc(10% + var(--p) * 150%);
+  translate: -50% 0;
+  opacity: calc(var(--p) * 0.9);
+  transform: translateX(calc((var(--i) - 9) * 2% + var(--p) * ((var(--i) - 9) * 6%)));
+}
+
+.mx-gbps {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------- reveals --- */
+
+.mx-reveal > * {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out);
+}
+.mx-reveal[data-shown="true"] > * {
+  opacity: 1;
+  transform: none;
+}
+.mx-reveal[data-shown="true"] > *:nth-child(2) { transition-delay: 60ms; }
+.mx-reveal[data-shown="true"] > *:nth-child(3) { transition-delay: 120ms; }
+.mx-reveal[data-shown="true"] > *:nth-child(4) { transition-delay: 180ms; }
+.mx-reveal[data-shown="true"] > *:nth-child(5) { transition-delay: 240ms; }
+.mx-reveal[data-shown="true"] > *:nth-child(6) { transition-delay: 300ms; }
+
+.mx-idle-spin {
+  animation: mx-spin 26s linear infinite;
+}
+@keyframes mx-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ----------------------------------------------------------------- cta --- */
+
+.mx-cta {
+  box-shadow: 0 10px 30px rgba(40, 165, 139, 0.28);
+  transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out);
+}
+.mx-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 38px rgba(40, 165, 139, 0.38);
+}
+.mx-cta:active {
+  transform: translateY(1px);
+}
+
+/* The page's own buy bar sits above the app tab bar on phones. */
+.mx-sticky-buy {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* --------------------------------------------------- motion, switched off */
+
+@media (prefers-reduced-motion: reduce) {
+  .mx-hero-disc,
+  .mx-hero-copy,
+  .mx-snap-disc,
+  .mx-snap-phone,
+  .mx-open-lid,
+  .mx-open-board,
+  .mx-ssd,
+  .mx-speed-dial,
+  .mx-speed-track span {
+    transform: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+  }
+  .mx-idle-spin,
+  .mx-scroll-hint span {
+    animation: none !important;
+  }
+  /* Without the pin the scenes are simply tall; collapse them so the reader
+     is not scrolling through empty screens to reach the next paragraph. */
+  .mx-scene {
+    height: auto !important;
+  }
+  .mx-pin {
+    position: static;
+    height: auto;
+    padding-block: 5rem;
+    display: block;
+  }
+  .mx-snap-stage,
+  .mx-open-stage,
+  .mx-speed-stage {
+    position: relative;
+    inset: auto;
+    width: auto;
+    height: 46vh;
+    margin-bottom: 2rem;
+  }
+  .mx-reveal > * {
+    opacity: 1;
+    transform: none;
+  }
+}

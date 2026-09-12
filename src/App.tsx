@@ -31,6 +31,7 @@ const ShippingPolicy = lazyWithReload(() => import("./pages/policies/shipping.ts
 const TermsOfService = lazyWithReload(() => import("./pages/policies/terms.tsx"), "./pages/policies/terms.tsx");
 const PrivacyPolicy = lazyWithReload(() => import("./pages/policies/privacy.tsx"), "./pages/policies/privacy.tsx");
 const SEOPage = lazyWithReload(() => import("./pages/seo/page.tsx"), "./pages/seo/page.tsx");
+const MagnetoXPage = lazyWithReload(() => import("./pages/magneto-x/page.tsx"), "./pages/magneto-x/page.tsx");
 
 // Admin pages - lazy loaded to reduce initial bundle
 const AdminBrokenImagesPage = lazyWithReload(() => import("./pages/admin/broken-images/page.tsx"), "./pages/admin/broken-images/page.tsx");
@@ -107,6 +108,7 @@ export default function App() {
             <Route path="/account" element={<AccountPage />} />
             <Route path="/account/referrals" element={<ReferralsPage />} />
             <Route path="/account/wallet" element={<WalletPage />} />
+            <Route path="/magneto-x" element={<Suspense fallback={<PageSkeleton />}><MagnetoXPage /></Suspense>} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/detail" element={<ProductDetailPage />} />
             <Route path="/products/:slug" element={<ProductDetailPage />} />
