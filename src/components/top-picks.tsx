@@ -129,7 +129,7 @@ export function TopPicks({
                           {/* Badges */}
                           <div className="absolute top-3 left-3 flex flex-col gap-2">
                             {hasDiscount && (
-                              <span className="px-3 py-1 bg-destructive text-destructive-foreground text-xs font-bold rounded-full shadow-lg">
+                              <span className="rounded-full border-2 border-ink bg-sunny font-bold text-ink px-2.5 py-1 text-[11px]">
                                 {discountPercent}% OFF
                               </span>
                             )}

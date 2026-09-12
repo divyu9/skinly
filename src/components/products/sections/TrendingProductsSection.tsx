@@ -89,7 +89,7 @@ export function TrendingProductsSection({ productId }: TrendingProductsSectionPr
                         {/* Badges */}
                         <div className="absolute top-2 left-2 flex flex-col gap-1">
                           {hasDiscount && (
-                            <span className="px-2 py-0.5 bg-destructive text-destructive-foreground text-xs font-bold rounded-full shadow-lg">
+                            <span className="rounded-full border-2 border-ink bg-sunny font-bold text-ink px-2 py-0.5 text-[11px]">
                               {discountPercent}% OFF
                             </span>
                           )}

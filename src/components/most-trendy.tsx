@@ -101,7 +101,7 @@ export function MostTrendy({ config }: MostTrendyProps) {
                           </Badge>
                         )}
                         {hasDiscount && !isOutOfStock && (
-                          <Badge className="bg-green-500 text-white text-xs">
+                          <Badge className="rounded-full border-2 border-ink bg-sunny font-bold text-ink px-2.5 py-1 text-[11px] hover:bg-sunny">
                             {discountPercent}% OFF
                           </Badge>
                         )}
