@@ -16,6 +16,7 @@ const MostTrendy = lazy(() => import("@/components/most-trendy.tsx").then(m => (
 const ExploreByBrand = lazy(() => import("@/components/explore-by-brand.tsx").then(m => ({ default: m.ExploreByBrand })));
 const ExploreByGadget = lazy(() => import("@/components/explore-by-gadget.tsx").then(m => ({ default: m.ExploreByGadget })));
 const SiteFooter = lazy(() => import("@/components/site-footer.tsx").then(m => ({ default: m.SiteFooter })));
+import { RequestModelDialog } from "@/components/request-model-dialog.tsx";
 const BugReportModal = lazy(() => import("@/components/bug-report-modal.tsx").then(m => ({ default: m.BugReportModal })));
 const WhySkinly = lazy(() => import("@/components/why-skinly").then(m => ({ default: m.WhySkinly })));
 const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m => ({ default: m.FeatureBanner })));
