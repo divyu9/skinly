@@ -316,8 +316,10 @@ function AuthenticatedCartContent() {
             Clear Cart
           </Button>
 
-          {/* Upsells Section */}
-          <div className="mt-8">
+          {/* Upsells. `empty:hidden` because the component renders nothing when
+              none are configured, and the wrapper was still spending its margin
+              — 48px of blank between the cart and its total. */}
+          <div className="mt-4 empty:hidden">
             <CheckoutUpsells />
           </div>
         </div>
