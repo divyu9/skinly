@@ -8,6 +8,7 @@ import { FacebookPixelInitializer } from "./components/facebook-pixel-initialize
 import { ReferralTracker } from "./components/referral-tracker.tsx";
 import { lazyWithReload } from "./lib/lazy-with-reload.ts";
 import { StorefrontErrorBoundary } from "./components/storefront-error-boundary.tsx";
+import { MobileBottomNav } from "./components/mobile-bottom-nav.tsx";
 
 // Critical pages - loaded immediately
 import Index from "./pages/Index.tsx";
@@ -183,6 +184,9 @@ export default function App() {
             <Route path="*" element={<NotFound />} />
           </Routes>
           </StorefrontErrorBoundary>
+          {/* Outside the boundary: if a page throws, the way out of it should
+              still be there. */}
+          <MobileBottomNav />
         </BrowserRouter>
       </DefaultProviders>
     </HelmetProvider>

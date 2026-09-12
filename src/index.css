@@ -279,3 +279,16 @@ img[data-img-broken] {
   background-size: 28px 28px;
   min-height: 48px;
 }
+
+/*
+ * Clearance for the phone tab bar.
+ *
+ * It is fixed to the bottom, so without this the last thing on every page —
+ * an Add to Cart, a Place Order, the final row of a list — sits underneath it
+ * and cannot be tapped. Matches the bar's 56px plus the home-indicator inset.
+ */
+@media (max-width: 639px) {
+  body {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+  }
+}

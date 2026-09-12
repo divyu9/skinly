@@ -33,6 +33,7 @@ import {
   ArrowUpRightIcon,
   ArrowDownLeftIcon,
   HistoryIcon,
+  Share2Icon,
 } from "lucide-react";
 import {
   RadioGroup,
@@ -50,6 +51,9 @@ function AccountPageInner() {
   const walletBalance = useQuery(api.wallet.getWalletBalance);
   const walletStats = useQuery(api.wallet.getWalletStats);
   const recentTransactions = useQuery(api.wallet.getWalletTransactions, { limit: 5 });
+  const referralStats = useQuery(api.referrals.getReferralStats) as
+    | { referralCode?: string; totalReferrals?: number; totalEarned?: number }
+    | undefined;
   const generateLoginOtp = useMutation(api.loginOtp.generateLoginOtp);
   const verifyLoginOtp = useMutation(api.loginOtp.verifyLoginOtp);
   const updateConsent = useMutation(api.whatsappConsent.updateMyConsent);
@@ -63,6 +67,33 @@ function AccountPageInner() {
   const [isUpdatingConsent, setIsUpdatingConsent] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
+
+  const referralCount = Number(referralStats?.totalReferrals) || 0;
+  const referralEarned = Number(referralStats?.totalEarned) || 0;
+
+  /**
+   * The phone's share sheet where there is one, the clipboard everywhere else.
+   * Sending someone to a separate page just to copy a link loses most of them.
+   */
+  const shareReferral = async () => {
+    const code = referralStats?.referralCode;
+    if (!code) { window.location.href = "/account/referrals"; return; }
+    const url = `${window.location.origin}/?ref=${code}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Skinly", text: "Get ₹100 off your first Skinly order.", url });
+        return;
+      } catch {
+        // Sheet dismissed; fall through to copying.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Referral link copied");
+    } catch {
+      window.location.href = "/account/referrals";
+    }
+  };
 
   const handleSendOtp = async () => {
     if (!phoneNumber.trim()) {
@@ -216,12 +247,22 @@ function AccountPageInner() {
           <UserIcon className="size-5 shrink-0 text-indigo-600" />
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold leading-tight">Refer &amp; Earn ₹100</h3>
-            <p className="hidden text-sm text-muted-foreground sm:block">
-              Invite friends to Skinly and earn rewards when they shop.
+            {/* Progress where there is any, the offer where there is not — a
+                bare "Invite" told someone who had already referred four people
+                nothing about the four. */}
+            <p className="text-xs text-muted-foreground">
+              {referralCount > 0
+                ? `${referralCount} friend${referralCount === 1 ? "" : "s"} joined · ₹${referralEarned} earned`
+                : "₹100 for you, ₹100 for them, on their first order"}
             </p>
           </div>
-          <Button asChild size="sm" className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700">
-            <Link to="/account/referrals">Invite</Link>
+          <Button
+            size="sm"
+            className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700"
+            onClick={() => void shareReferral()}
+          >
+            <Share2Icon className="mr-1.5 size-3.5" />
+            Share
           </Button>
         </CardContent>
       </Card>
@@ -248,6 +289,13 @@ function AccountPageInner() {
               <p className="text-3xl font-bold tracking-tight sm:text-4xl">
                 ₹{(safeWalletBalance.balance || 0).toFixed(0)}
               </p>
+              {/* An empty wallet with no next step is just a zero. Cashback is
+                  earned by ordering, so the empty state points at the shop. */}
+              {!(safeWalletBalance.balance > 0) && (
+                <Button asChild size="sm" className="mt-3 bg-white text-blue-700 hover:bg-white/90">
+                  <Link to="/products">Shop &amp; start earning cashback</Link>
+                </Button>
+              )}
               {/* The explainer is desktop-only: on a phone it is three lines
                   of text above the thing it explains. */}
               <p className="mt-2 hidden text-xs opacity-75 sm:block">
