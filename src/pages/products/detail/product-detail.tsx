@@ -47,6 +47,7 @@ import {
 // Existing Components
 import { ProductShareButton } from "./_components/product-share.tsx";
 import { ProductUgcFloat } from "./_components/product-ugc-float.tsx";
+import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
@@ -408,6 +409,11 @@ export default function ProductDetailPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Beside the price, because that is where the money decision
+                    happens. It used to sit in the offers block, 665px below
+                    the Buy button. */}
+                <CashbackLine info={cashbackInfo} price={nowPrice} />
               </div>
 
               {/* USPs */}
@@ -524,7 +530,6 @@ export default function ProductDetailPage() {
               {/* Offers Section */}
               <OffersSection
                 coupons={applicableCoupons}
-                cashbackInfo={cashbackInfo}
               />
               
               {/* Support — deliberately quiet so it doesn't compete with Buy Now */}
@@ -611,6 +616,7 @@ export default function ProductDetailPage() {
         needsDevice={isButtonDisabled}
         isLoading={isBuyingNow}
         show={productState.showStickyBar}
+        coinsBack={cashbackAmount(cashbackInfo, nowPrice)}
       />
     </div>
   );

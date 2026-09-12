@@ -5,8 +5,6 @@ import {
   CopyIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  CoinsIcon,
-  SparklesIcon,
 } from "lucide-react";
 
 interface Coupon {
@@ -19,23 +17,21 @@ interface Coupon {
   minPurchase?: number;
 }
 
-interface CashbackInfo {
-  hasCashback: boolean;
-  displayText: string | null;
-}
-
 interface OffersSectionProps {
   coupons?: Coupon[] | null;
-  cashbackInfo?: CashbackInfo | null;
 }
 
-export function OffersSection({ coupons, cashbackInfo }: OffersSectionProps) {
+/*
+ * Coupons only. The cashback used to be announced here too, which put it
+ * below the Buy button — so it now sits beside the price, where it can
+ * actually affect the decision, and saying it twice would only make the
+ * second telling the weaker one.
+ */
+export function OffersSection({ coupons }: OffersSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
-  
+
   const hasCoupons = coupons && coupons.length > 0;
-  const hasCashback = cashbackInfo && cashbackInfo.hasCashback;
-  
-  if (!hasCoupons && !hasCashback) return null;
+  if (!hasCoupons) return null;
   
   const handleCopyCoupon = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -108,27 +104,6 @@ export function OffersSection({ coupons, cashbackInfo }: OffersSectionProps) {
         </div>
       )}
       
-      {/* Cashback Section */}
-      {hasCashback && (
-        <div className="border border-amber-500/50 rounded-lg p-3 bg-gradient-to-r from-amber-500/10 to-yellow-500/10">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center size-10 rounded-full bg-amber-500/20 shrink-0">
-              <CoinsIcon className="size-5 text-amber-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                  Earn {cashbackInfo.displayText ?? ""} Skinly Coins
-                </span>
-              </div>
-              <p className="text-xs text-amber-800 dark:text-amber-200">
-                Get cashback on this purchase! Redeem on your next order.
-              </p>
-            </div>
-            <SparklesIcon className="size-5 text-amber-500 shrink-0" />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

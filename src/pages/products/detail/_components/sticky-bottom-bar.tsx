@@ -10,6 +10,8 @@ interface StickyBottomBarProps {
   needsDevice?: boolean;
   isLoading?: boolean;
   show: boolean;
+  /** Rupees of Skinly Coins this purchase earns, 0 when there is no rule. */
+  coinsBack?: number;
 }
 
 /**
@@ -25,6 +27,7 @@ export function StickyBottomBar({
   needsDevice = false,
   isLoading = false,
   show,
+  coinsBack = 0,
 }: StickyBottomBarProps) {
   if (!show) return null;
 
@@ -36,6 +39,11 @@ export function StickyBottomBar({
           <p className="text-xl font-extrabold text-brand">
             {price}
           </p>
+          {coinsBack ? (
+            <p className="text-[11px] font-semibold text-ink/70">
+              +₹{coinsBack} back in coins
+            </p>
+          ) : null}
         </div>
         <Button
           size="lg"
