@@ -5220,6 +5220,38 @@ export function useMutation(apiRef: any) {
         return { success: true, queued: true };
       }
 
+      if (path === 'products.deleteProduct') {
+        /*
+         * Deleting a product never worked.
+         *
+         * There was no handler, so it fell through to the generic writer,
+         * which reads the target id from a fixed list of names — id, couponId,
+         * ruleId, pageId, slideId, bannerId, videoId, reviewId, promptId,
+         * mockupId. `productId` was not among them, so the id came out
+         * undefined and it threw "ID required for delete" every time.
+         *
+         * Adding the name to that list would have deleted the product row and
+         * left every variant behind it orphaned, still carrying stock and
+         * still matched by the material resolver. The confirm dialog promises
+         * the variants go too, so they go.
+         */
+        if (!args.productId) throw new Error('Missing productId');
+        const pref = doc(db, 'products', args.productId);
+        const psnap = await getDoc(pref);
+        if (!psnap.exists()) throw new Error('Product not found');
+
+        const vs = await getDocs(query(collection(db, 'variants'), where('productId', '==', args.productId)));
+        const refs = [...vs.docs.map((d) => d.ref), pref];
+        // Product last, so a failure part-way leaves a product with fewer
+        // variants rather than variants belonging to nothing.
+        for (let i = 0; i < refs.length; i += 450) {
+          const batch = writeBatch(db);
+          refs.slice(i, i + 450).forEach((r) => batch.delete(r));
+          await batch.commit();
+        }
+        return { success: true, variants: vs.size };
+      }
+
       if (path === 'products.cloneProduct') {
         if (!args.productId) throw new Error('Missing productId');
         const psnap = await getDoc(doc(db, 'products', args.productId));
@@ -5887,7 +5919,33 @@ export function useMutation(apiRef: any) {
             return { success: true };
           }
 
-          const targetId = args.id || args.couponId || args.ruleId || args.pageId || args.slideId || args.bannerId || args.videoId || args.reviewId || args.promptId || args.mockupId;
+          /*
+           * Find the id rather than recognising its name.
+           *
+           * This was a hardcoded list — id, couponId, ruleId, pageId, slideId,
+           * bannerId, videoId, reviewId, promptId, mockupId — and every caller
+           * naming its argument anything else got "ID required for delete" and
+           * a toast saying the thing failed. `productId` was the one that bit;
+           * variantId, cardId, templateId, presetId, modelId, collectionId and
+           * jobId are all names in use that the list never knew either.
+           *
+           * So: take the known names first, and otherwise accept a single
+           * `*Id` argument. Two of them is genuinely ambiguous and says so
+           * instead of silently deleting whichever the list happened to reach.
+           */
+          const named = args.id || args.couponId || args.ruleId || args.pageId || args.slideId || args.bannerId || args.videoId || args.reviewId || args.promptId || args.mockupId;
+          let targetId = named;
+          if (!targetId) {
+            const idish = Object.entries(args || {}).filter(
+              ([k, v]) => /id$/i.test(k) && typeof v === 'string' && v,
+            );
+            if (idish.length === 1) targetId = idish[0][1] as string;
+            else if (idish.length > 1) {
+              throw new Error(
+                `Ambiguous delete (${actionName}): ${idish.map(([k]) => k).join(', ')}`,
+              );
+            }
+          }
           if (!targetId) throw new Error(`ID required for delete (${actionName})`);
           await deleteDoc(doc(db, targetCollection, targetId));
           return targetId;

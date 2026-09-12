@@ -367,10 +367,17 @@ function AdminProductsPageInner() {
     }
 
     try {
-      await deleteProduct({ productId });
-      toast.success("Product deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete product");
+      const res: any = await deleteProduct({ productId });
+      toast.success(
+        res?.variants
+          ? `Product deleted, with ${res.variants} variant${res.variants === 1 ? "" : "s"}`
+          : "Product deleted",
+      );
+    } catch (error: any) {
+      // The generic "Failed to delete product" hid the actual reason for as
+      // long as this was broken, which is why nobody could say what went wrong.
+      toast.error(error?.message ? `Delete failed: ${error.message}` : "Failed to delete product");
+      console.error("deleteProduct", error);
     }
   };
 
