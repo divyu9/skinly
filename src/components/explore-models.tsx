@@ -117,25 +117,25 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
   };
 
   return (
-    <section className="bg-muted/60 py-12">
+    <section className="bg-muted/60 py-8 sm:py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-2xl mx-auto space-y-6">
         {/* Title */}
         <div className="text-center space-y-2">
-          <h2 className="text-3xl md:text-4xl font-bold">
+          <h2 className="text-2xl font-bold sm:text-3xl md:text-4xl">
             Find Your Device
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-sm text-muted-foreground sm:text-base">
             Search for your device model to see available products
           </p>
         </div>
 
         {/* Search Input */}
         <div className="relative">
-          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-primary" />
+          <SearchIcon className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-primary sm:left-4" />
           <Input
             type="text"
-            placeholder="Search devices, skins, cases, products..."
+            placeholder="Search devices or designs"
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -150,19 +150,19 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
               // Delay to allow clicks on results
               setTimeout(() => setShowResults(false), 200);
             }}
-            className="h-14 pl-12 pr-32 text-base rounded-full border-[3px] border-muted-foreground/40 bg-background focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/20 shadow-lg"
+            className="h-14 rounded-full border-[3px] border-muted-foreground/40 bg-background pl-11 pr-16 text-base shadow-lg focus-visible:border-primary focus-visible:ring-4 focus-visible:ring-primary/20 sm:pl-12 sm:pr-36"
           />
           <Button
             size="lg"
-            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full h-12 px-6 shadow-md"
+            className="absolute right-1 top-1/2 size-12 -translate-y-1/2 rounded-full p-0 shadow-md sm:h-12 sm:w-auto sm:px-6"
             onClick={() => {
               if (searchQuery.trim().length > 0) {
                 setShowResults(true);
               }
             }}
           >
-            <SearchIcon className="size-4 mr-2" />
-            Search
+            <SearchIcon className="size-5 sm:mr-2 sm:size-4" />
+            <span className="hidden sm:inline">Search</span>
           </Button>
         </div>
 
