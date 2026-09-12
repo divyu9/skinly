@@ -419,7 +419,48 @@ export function useQuery(apiRef: any, args?: any) {
             return;
           }
           unsubscribe = onSnapshot(doc(db, 'orders', args.orderId), (snap) => {
-            setData(snap.exists() ? normalizeOrder({ _id: snap.id, ...snap.data() }) : null);
+            if (!snap.exists()) { setData(null); return; }
+            const order = normalizeOrder({ _id: snap.id, ...snap.data() });
+            setData(order);
+
+            // Resolve each line's real SKU from the catalogue.
+            //
+            // Only 57 of 161 live order lines carry a `sku` field; the rest
+            // carry just the variant title, and the admin page was printing
+            // that under a "SKU:" label — so #4025 read "SKU: Default" when the
+            // variant it was sold as is L-356. The variant is found the same
+            // way the stock ledger finds it, by productId and title.
+            void (async () => {
+              try {
+                const ids = [...new Set((order.items || []).map((i: any) => i?.productId).filter(Boolean))];
+                if (!ids.length) return;
+                const chunks: any[][] = [];
+                for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+                const snaps = await Promise.all(chunks.map((c) =>
+                  getDocs(query(collection(db, 'variants'), where('productId', 'in', c)))
+                ));
+                const byKey = new Map<string, string>();
+                const byProduct = new Map<string, string[]>();
+                snaps.forEach((qs) => qs.docs.forEach((d) => {
+                  const v: any = d.data();
+                  if (!v.sku) return;
+                  byKey.set(`${v.productId}::${String(v.title ?? '').trim().toLowerCase()}`, v.sku);
+                  byProduct.set(v.productId, [...(byProduct.get(v.productId) || []), v.sku]);
+                }));
+                const items = (order.items || []).map((i: any) => {
+                  if (i?.sku) return i;
+                  const exact = byKey.get(`${i?.productId}::${String(i?.variant ?? '').trim().toLowerCase()}`);
+                  // A product with exactly one variant has no ambiguity, even
+                  // when the recorded title does not match it.
+                  const only = byProduct.get(i?.productId);
+                  const sku = exact || (only && only.length === 1 ? only[0] : undefined);
+                  return sku ? { ...i, sku } : i;
+                });
+                setData({ ...order, items });
+              } catch (err) {
+                console.error('could not resolve order line SKUs:', err);
+              }
+            })();
           });
         }
         else if (path === 'orders.getLastOrderedDevice') {

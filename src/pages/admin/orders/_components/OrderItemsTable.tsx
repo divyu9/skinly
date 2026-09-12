@@ -148,7 +148,7 @@ export function OrderItemsTable({
                       </p>
                     )}
                     <p className="font-medium text-foreground">
-                      SKU: {item.sku || item.variant}
+                      SKU: {item.sku || "—"}
                     </p>
                   </div>
                   <p className="font-medium">
