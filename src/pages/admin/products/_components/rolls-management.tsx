@@ -22,7 +22,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, XIcon, SearchIcon, RefreshCwIcon, CalculatorIcon } from "lucide-react";
+import { MaterialMapping } from "./material-mapping.tsx";
+import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, RefreshCwIcon, CalculatorIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import type { Id } from "@/lib/firebase-api";
@@ -35,7 +36,6 @@ const ROLL_WIDTH_CM = 29.5;
 export function RollsManagement() {
   const gadgets = useQuery(api.rollsManagement.getGadgetConsumption);
   const rolls = useQuery(api.rollsManagement.getRollInventory);
-  const productsByRNumber = useQuery(api.rollsManagement.getProductsByRNumber);
   const lowStockAlerts = useQuery(api.rollsManagement.getLowStockAlerts);
   
   const syncInventory = useMutation(api.rollsManagement.syncInventoryFromRolls);
@@ -43,13 +43,6 @@ export function RollsManagement() {
 
   const [showGadgetDialog, setShowGadgetDialog] = useState(false);
   const [showRollDialog, setShowRollDialog] = useState(false);
-  const [showAssignDialog, setShowAssignDialog] = useState(false);
-  const [assigningVariant, setAssigningVariant] = useState<{
-    variantId: Id<"variants">;
-    currentSku: string;
-    currentRNumber?: string;
-  } | null>(null);
-  const [newRNumber, setNewRNumber] = useState("");
   
   const [editingGadget, setEditingGadget] = useState<{
     _id: Id<"gadgetConsumption">;
@@ -216,43 +209,8 @@ export function RollsManagement() {
     }
   };
 
-  const handleAssignRNumber = async () => {
-    if (!assigningVariant || !newRNumber.trim()) {
-      toast.error("Please enter an R-number");
-      return;
-    }
 
-    try {
-      await assignRNumber({
-        variantId: assigningVariant.variantId,
-        rNumber: newRNumber.trim().toUpperCase(),
-      });
-      toast.success("R-number assigned successfully");
-      setShowAssignDialog(false);
-      setAssigningVariant(null);
-      setNewRNumber("");
-    } catch (error) {
-      toast.error("Failed to assign R-number");
-    }
-  };
-
-  const handleRemoveAssignment = async (variantId: Id<"variants">) => {
-    try {
-      await removeRNumberAssignment({ variantId });
-      toast.success("R-number assignment removed");
-    } catch (error) {
-      toast.error("Failed to remove assignment");
-    }
-  };
   
-  const handleUpdateMultiplier = async (variantId: Id<"variants">, multiplier: number) => {
-    try {
-      await updateMaterialMultiplier({ variantId, multiplier });
-      toast.success("Material multiplier updated");
-    } catch (error) {
-      toast.error("Failed to update multiplier");
-    }
-  };
   
   // Get existing R-numbers for dropdown
   const existingRNumbers = useMemo(() => {
@@ -276,7 +234,7 @@ export function RollsManagement() {
     }
   };
 
-  if (!gadgets || !rolls || !productsByRNumber || !lowStockAlerts) {
+  if (!gadgets || !rolls || !lowStockAlerts) {
     return <div className="text-center py-8">Loading...</div>;
   }
 
@@ -286,6 +244,10 @@ export function RollsManagement() {
         <TabsTrigger value="management">
           <PackageIcon className="size-4 mr-2" />
           Roll Management
+        </TabsTrigger>
+        <TabsTrigger value="mapping">
+          <LinkIcon className="size-4 mr-2" />
+          Mapping
         </TabsTrigger>
         <TabsTrigger value="calculator">
           <CalculatorIcon className="size-4 mr-2" />
@@ -574,220 +536,12 @@ export function RollsManagement() {
         </CardContent>
       </Card>
 
-      {/* SKU Mapping Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LinkIcon className="size-5" />
-            Material mapping
-          </CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            Resolved by the same rule checkout uses: a hand-assigned R-number
-            first, then the SKU&rsquo;s leading segments &mdash; so{" "}
-            <span className="font-mono">R-09-DRC</span> finds roll{" "}
-            <span className="font-mono">R-09</span>, and{" "}
-            <span className="font-mono">LP-3D-05-KB</span> finds cutout{" "}
-            <span className="font-mono">LP-3D-05</span>. Rolls and cutouts both.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* R-Number Groups */}
-          {Object.keys(productsByRNumber.groups).length > 0 ? (
-            <div className="space-y-4">
-              {Object.entries(productsByRNumber.groups)
-                .sort((a, b) => a[0].localeCompare(b[0]))
-                .map(([rNumber, items]) => (
-                  <Card key={rNumber} className="border-2">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-mono font-bold text-lg">{rNumber}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {productsByRNumber.meta?.[rNumber]?.designName || "—"} ·{" "}
-                            {items.length} {items.length === 1 ? "variant" : "variants"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={productsByRNumber.meta?.[rNumber]?.kind === "cutout" ? "secondary" : "default"}>
-                            {productsByRNumber.meta?.[rNumber]?.kind === "cutout" ? "Cutout" : "Roll"}
-                          </Badge>
-                          <Badge variant="outline" className="font-mono">
-                            {productsByRNumber.meta?.[rNumber]?.amount ?? 0}
-                            {productsByRNumber.meta?.[rNumber]?.unit === "sheets" ? " sheets" : " m"}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {items.map((item) => (
-                          <div
-                            key={item.variantId}
-                            className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">{item.productTitle}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="outline" className="font-mono text-xs">
-                                  {item.sku}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">
-                                  {item.variantTitle}
-                                </span>
-                                {item.isManual && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Manual
-                                  </Badge>
-                                )}
-                                {item.materialMultiplier > 1 && (
-                                  <Badge variant="outline" className="text-xs border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-400">
-                                    {item.materialMultiplier}x material
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="number"
-                                  min="0.1"
-                                  step="0.1"
-                                  value={item.materialMultiplier}
-                                  onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    if (!isNaN(value) && value > 0) {
-                                      handleUpdateMultiplier(item.variantId as Id<"variants">, value);
-                                    }
-                                  }}
-                                  className="w-16 h-8 text-xs text-center"
-                                  title="Material multiplier"
-                                />
-                                <span className="text-xs text-muted-foreground">x</span>
-                              </div>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setAssigningVariant({
-                                    variantId: item.variantId as Id<"variants">,
-                                    currentSku: item.sku,
-                                    currentRNumber: rNumber,
-                                  });
-                                  setNewRNumber(rNumber);
-                                  setShowAssignDialog(true);
-                                }}
-                              >
-                                <EditIcon className="size-4" />
-                              </Button>
-                              {item.isManual && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() =>
-                                    handleRemoveAssignment(item.variantId as Id<"variants">)
-                                  }
-                                >
-                                  <XIcon className="size-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No products with R-numbers yet
-            </div>
-          )}
+      </TabsContent>
 
-          {/* Coverage — what has no stock behind it, and what stock nobody
-              is selling. Both halves of the question, neither of which was
-              visible before: this panel is what would have shown R-32 going
-              missing under the twenty-six variants that reference it. */}
-          {productsByRNumber.totals && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="border-2">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <AlertCircleIcon className="size-5 text-orange-600" />
-                    <div>
-                      <h4 className="font-semibold">Not backed by stock</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {productsByRNumber.totals.unmatched} of {productsByRNumber.totals.variants} variants,
-                        grouped by SKU prefix
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {Object.keys(productsByRNumber.unmatchedByPrefix || {}).length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      Every variant resolves to a roll or a cutout.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {Object.entries(productsByRNumber.unmatchedByPrefix as Record<string, { count: number; samples: string[] }>)
-                        .sort((a, b) => b[1].count - a[1].count)
-                        .map(([prefix, info]) => (
-                          <div key={prefix} className="rounded-lg border p-3">
-                            <div className="flex items-center justify-between">
-                              <span className="font-mono font-semibold">{prefix}-</span>
-                              <Badge variant="secondary">{info.count}</Badge>
-                            </div>
-                            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
-                              {info.samples.join(", ")}
-                            </p>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-2">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2">
-                    <AlertCircleIcon className="size-5 text-muted-foreground" />
-                    <div>
-                      <h4 className="font-semibold">Stock with no variants</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {(productsByRNumber.orphanStock || []).length} on the shelf that nothing sells
-                      </p>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {(productsByRNumber.orphanStock || []).length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">
-                      Every roll and cutout has variants behind it.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {(productsByRNumber.orphanStock as Array<{ code: string; kind: string; designName: string; amount: number }>)
-                        .map((o) => (
-                          <div key={`${o.kind}-${o.code}`} className="flex items-center justify-between rounded-lg border p-3">
-                            <div className="min-w-0">
-                              <span className="font-mono font-semibold">{o.code}</span>
-                              <p className="truncate text-xs text-muted-foreground">{o.designName || "—"}</p>
-                            </div>
-                            <Badge variant="outline" className="shrink-0 font-mono">
-                              {o.amount}{o.kind === "cutout" ? " sheets" : " m"}
-                            </Badge>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-        </CardContent>
-      </Card>
+      {/* Which stock each variant is cut from. Its own tab because the list
+          is long by nature and does not belong stacked under the shelf. */}
+      <TabsContent value="mapping">
+        <MaterialMapping />
       </TabsContent>
 
       {/* Material Calculator Tab */}
@@ -912,50 +666,6 @@ export function RollsManagement() {
         )}
       </TabsContent>
 
-      {/* Assign R-Number Dialog */}
-      <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Assign R-Number</DialogTitle>
-            <DialogDescription>
-              {assigningVariant?.currentSku && (
-                <span className="font-mono">{assigningVariant.currentSku}</span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="rNumber">R-Number *</Label>
-              <Combobox
-                value={newRNumber}
-                onValueChange={setNewRNumber}
-                options={existingRNumbers}
-                placeholder="Select or create R-number"
-                emptyText="No R-numbers found"
-                searchPlaceholder="Search R-numbers..."
-                allowCustom
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Select an existing R-number or create a new one
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowAssignDialog(false);
-                setAssigningVariant(null);
-                setNewRNumber("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleAssignRNumber}>Assign</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Bulk Assign R-Number Dialog */}
 
