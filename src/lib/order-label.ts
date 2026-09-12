@@ -28,3 +28,24 @@ export function orderLabel(order: {
   const id = String(order?._id || "");
   return id ? `Ref ${id.slice(-6).toUpperCase()}` : "Pending";
 }
+
+/**
+ * The order status, in words a customer would use.
+ *
+ * The stored values are the database's own vocabulary, and the account page
+ * printed them raw — a shopper looking at their orders saw the literal string
+ * "pending_payment", underscore and all.
+ */
+export function orderStatusLabel(status?: string | null): string {
+  switch (String(status || "").toLowerCase()) {
+    case "pending_payment": return "Payment pending";
+    case "pending": return "Payment pending";
+    case "processing": return "Preparing";
+    case "shipped": return "On the way";
+    case "delivered": return "Delivered";
+    case "cancelled": return "Cancelled";
+    case "failed": return "Payment failed";
+    case "rto": return "Returned to us";
+    default: return String(status || "").replace(/_/g, " ") || "—";
+  }
+}

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
-import { orderLabel } from "@/lib/order-label.ts";
+import { orderLabel, orderStatusLabel } from "@/lib/order-label.ts";
 // PhonePe TypeScript declarations
 declare global {
   interface Window {
@@ -237,7 +237,7 @@ function OrderDetailPageInner() {
             </div>
             <div className="flex flex-col items-end gap-2">
               <Badge className={`${getStatusColor(order.status || "")} text-base px-4 py-2`}>
-                {(order.status || "pending").charAt(0).toUpperCase() + (order.status || "pending").slice(1)}
+                {orderStatusLabel(order.status)}
               </Badge>
               {order.paymentStatus === "failed" && (
                 <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">

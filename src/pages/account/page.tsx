@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/radio-group.tsx";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
-import { orderLabel } from "@/lib/order-label.ts";
+import { orderLabel, orderStatusLabel } from "@/lib/order-label.ts";
 function AccountPageInner() {
   const { signOut } = useAuth();
   const currentUser = useQuery(api.users.getCurrentUser);
@@ -209,17 +209,19 @@ function AccountPageInner() {
 
       {/* Referral Program */}
       <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border-indigo-200 dark:border-indigo-800">
-        <CardContent className="p-6 flex items-center justify-between gap-4">
+        {/* Stacked on a phone: side by side, the button left the copy three
+            words wide and wrapped it into three lines. */}
+        <CardContent className="p-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h3 className="font-semibold text-lg flex items-center gap-2">
               <UserIcon className="size-5 text-indigo-600" />
-              Refer & Earn ₹100
+              Refer &amp; Earn ₹100
             </h3>
             <p className="text-sm text-muted-foreground">
               Invite friends to Skinly and earn rewards when they shop.
             </p>
           </div>
-          <Button asChild className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
+          <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700 text-white sm:w-auto sm:shrink-0">
             <Link to="/account/referrals">Invite Now</Link>
           </Button>
         </CardContent>
@@ -575,27 +577,34 @@ function AccountPageInner() {
                   to={`/orders/${order._id}`}
                   className="block p-4 border rounded-lg hover:border-primary transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium text-sm">Order {orderLabel(order)}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  {/*
+                    On a 375px screen the number and the status pill did not fit
+                    on one line together: "Order #4024" was squeezed to 52px and
+                    broke across two lines beside a 118px pill. The number gets
+                    the line to itself now, and the status and date share the
+                    one below.
+                  */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-sm">Order {orderLabel(order)}</p>
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${
                           order.status === 'delivered' ? 'bg-green-100 text-green-700' :
                           order.status === 'shipped' ? 'bg-blue-100 text-blue-700' :
                           order.status === 'processing' ? 'bg-blue-100 text-blue-700' :
-                          order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                          order.status === 'cancelled' || order.status === 'failed' ? 'bg-red-100 text-red-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
-                          {order.status}
+                          {orderStatusLabel(order.status)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(order._creationTime || order.createdAt || Date.now()).toLocaleDateString('en-IN', { 
+                            day: 'numeric', 
+                            month: 'short', 
+                            year: 'numeric' 
+                          })}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(order._creationTime || order.createdAt || Date.now()).toLocaleDateString('en-IN', { 
-                          day: 'numeric', 
-                          month: 'short', 
-                          year: 'numeric' 
-                        })}
-                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">₹{order.total.toFixed(2)}</p>

@@ -278,7 +278,7 @@ function OrdersPageInner() {
                       </p>
                     </div>
                     <Badge className={getStatusColor(order.status)}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      {orderStatusLabel(order.status)}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -405,7 +405,7 @@ function OrdersPageInner() {
 
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
-import { orderLabel } from "@/lib/order-label.ts";
+import { orderLabel, orderStatusLabel } from "@/lib/order-label.ts";
 export default function OrdersPage() {
   return (
     <>
