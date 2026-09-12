@@ -227,7 +227,7 @@ function AuthenticatedCartContent() {
             const isOutOfStock = stockInfo?.isOutOfStock || false;
             
             return (
-              <Card key={item._id} className={isOutOfStock ? 'opacity-50' : ''}>
+              <Card key={item._id} className={`py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
                 <CardContent className="p-3 sm:p-4">
                   <div className="flex gap-3">
                     {/* Product Image */}
@@ -364,7 +364,7 @@ function AuthenticatedCartContent() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="lg:sticky lg:top-20">
+          <Card className="py-0 lg:sticky lg:top-20">
             <CardContent className="p-4 sm:p-6 space-y-4">
               <h2 className="text-base font-semibold">Order summary</h2>
               <Separator />
@@ -560,7 +560,7 @@ function GuestCartContent() {
             const isOutOfStock = stockInfo?.isOutOfStock || false;
             
             return (
-              <Card key={key} className={isOutOfStock ? 'opacity-50' : ''}>
+              <Card key={key} className={`py-0 ${isOutOfStock ? 'opacity-50' : ''}`}>
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex gap-4">
                     {/* Product Image */}
@@ -687,7 +687,7 @@ function GuestCartContent() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="lg:sticky lg:top-20">
+          <Card className="py-0 lg:sticky lg:top-20">
             <CardContent className="p-4 sm:p-6 space-y-4">
               <h2 className="text-base font-semibold">Order summary</h2>
               <Separator />
