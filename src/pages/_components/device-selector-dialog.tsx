@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
+import { Sheet, SheetContent } from "@/components/ui/sheet.tsx";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { api } from "@/lib/firebase-api";
 import type { LucideIcon } from "lucide-react";
 
@@ -172,8 +174,7 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   }, [selectedDeviceType, gadgetTypes]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[86vh] max-w-2xl flex-col overflow-hidden rounded-2xl p-6">
+    <Shell open={open} onOpenChange={onOpenChange}>
         <DialogHeader className="space-y-3">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-[22px] font-semibold tracking-tight">
@@ -364,6 +365,40 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
             </div>
           )}
         </div>
+    </Shell>
+  );
+}
+
+/**
+ * A centred dialog on a desktop, a sheet rising from the bottom on a phone.
+ *
+ * The step logic underneath is identical either way — rebuilding these three
+ * screens inside the tab bar's sheet would have meant a second copy of the
+ * brand cache, the model search and the request-a-model path, which is exactly
+ * how two pickers start disagreeing about what devices exist.
+ */
+function Shell({
+  open, onOpenChange, children,
+}: { open: boolean; onOpenChange: (v: boolean) => void; children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="bottom"
+          className="flex max-h-[88vh] flex-col overflow-hidden rounded-t-2xl p-4"
+        >
+          {children}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[86vh] max-w-2xl flex-col overflow-hidden rounded-2xl p-6">
+        {children}
       </DialogContent>
     </Dialog>
   );

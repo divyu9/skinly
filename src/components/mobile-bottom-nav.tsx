@@ -6,6 +6,8 @@ import { HomeIcon, LayoutGridIcon, ShoppingBagIcon, UserIcon, ChevronRightIcon }
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet.tsx";
 import { useShopCategories } from "@/lib/shop-categories.ts";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
+import { RequestModelDialog } from "@/components/request-model-dialog.tsx";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { useAuth } from "@/hooks/use-auth.ts";
@@ -31,6 +33,8 @@ export function MobileBottomNav() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const [shopOpen, setShopOpen] = useState(false);
+  const [deviceOpen, setDeviceOpen] = useState(false);
+  const [requestFor, setRequestFor] = useState<{ category: string; brand: string } | null>(null);
   const { user } = useAuth();
   const { getGuestCartCount } = useGuestCart();
   const signedInCount = useQuery(api.cart.getCartCount, user ? {} : "skip") as number | undefined;
@@ -43,6 +47,21 @@ export function MobileBottomNav() {
   const goTo = (href: string) => {
     setShopOpen(false);
     navigate(href);
+  };
+
+  /**
+   * Skins is the only category where the catalogue is per-device, so browsing
+   * it without saying which device shows a wall of designs that may not be cut
+   * for your phone. The picker asks first — the same one the homepage opens,
+   * so there is one device list, not two.
+   */
+  const openCategory = (c: { id: string; href: string }) => {
+    if (c.id === "skin") {
+      setShopOpen(false);
+      setDeviceOpen(true);
+      return;
+    }
+    goTo(c.href);
   };
 
   // The bar would sit on top of the payment sheet, and a checkout is the one
@@ -112,7 +131,7 @@ export function MobileBottomNav() {
                   <li key={c.id}>
                     <button
                       type="button"
-                      onClick={() => goTo(c.href)}
+                      onClick={() => openCategory(c)}
                       className="flex w-full items-center gap-3 rounded-xl border p-2 text-left transition-colors active:bg-muted"
                     >
                       {/* contain, not cover: these are the homepage's tall
@@ -151,6 +170,21 @@ export function MobileBottomNav() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Same component the homepage uses — a sheet here, a dialog on desktop —
+          so gadget, brand, model and the request path all behave identically
+          wherever the shopper started. */}
+      <DeviceSelectorDialog
+        open={deviceOpen}
+        onOpenChange={setDeviceOpen}
+        onRequestModel={(category, brand) => setRequestFor({ category, brand })}
+      />
+      <RequestModelDialog
+        open={requestFor !== null}
+        onOpenChange={(v) => { if (!v) setRequestFor(null); }}
+        initialCategory={requestFor?.category || ""}
+        initialBrand={requestFor?.brand || ""}
+      />
     </nav>
   );
 }
