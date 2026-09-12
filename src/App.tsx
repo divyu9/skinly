@@ -7,6 +7,7 @@ import { Skeleton } from "./components/ui/skeleton.tsx";
 import { FacebookPixelInitializer } from "./components/facebook-pixel-initializer.tsx";
 import { ReferralTracker } from "./components/referral-tracker.tsx";
 import { lazyWithReload } from "./lib/lazy-with-reload.ts";
+import { StorefrontErrorBoundary } from "./components/storefront-error-boundary.tsx";
 
 // Critical pages - loaded immediately
 import Index from "./pages/Index.tsx";
@@ -98,6 +99,7 @@ export default function App() {
         <FacebookPixelInitializer />
         <BrowserRouter>
           <ReferralTracker />
+          <StorefrontErrorBoundary>
           <Routes>
             {/* Critical paths - eagerly loaded */}
             <Route path="/" element={<Index />} />
@@ -180,6 +182,7 @@ export default function App() {
             {/* 404 - must be absolute last */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </StorefrontErrorBoundary>
         </BrowserRouter>
       </DefaultProviders>
     </HelmetProvider>

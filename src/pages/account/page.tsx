@@ -44,7 +44,7 @@ import { orderLabel, orderStatusLabel } from "@/lib/order-label.ts";
 function AccountPageInner() {
   const { signOut } = useAuth();
   const currentUser = useQuery(api.users.getCurrentUser);
-  const recentOrders = useQuery(api.orders.getOrders, { limit: 5 }) as Doc<"orders">[] | undefined;
+  const recentOrders = useQuery(api.orders.getOrders, { limit: 3 }) as Doc<"orders">[] | undefined;
   const phoneVerificationStatus = useQuery(api.loginOtp.checkPhoneVerified);
   const whatsappConsent = useQuery(api.whatsappConsent.getMyConsent);
   const walletBalance = useQuery(api.wallet.getWalletBalance);
@@ -168,8 +168,8 @@ function AccountPageInner() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Profile Card */}
-      <Card className="mb-6">
-        <CardHeader>
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <UserIcon className="size-5" />
             My Account
@@ -208,48 +208,49 @@ function AccountPageInner() {
       </Card>
 
       {/* Referral Program */}
-      <Card className="mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border-indigo-200 dark:border-indigo-800">
-        {/* Stacked on a phone: side by side, the button left the copy three
-            words wide and wrapped it into three lines. */}
-        <CardContent className="p-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <UserIcon className="size-5 text-indigo-600" />
-              Refer &amp; Earn ₹100
-            </h3>
-            <p className="text-sm text-muted-foreground">
+      <Card className="mb-4 sm:mb-6 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-950/20 border-indigo-200 dark:border-indigo-800">
+        {/* One row on a phone. Stacked with a full-width button it ate 170px
+            of a 812px screen to say one sentence; the wallet and the orders
+            are what people came for. */}
+        <CardContent className="flex items-center gap-3 p-4 sm:p-6">
+          <UserIcon className="size-5 shrink-0 text-indigo-600" />
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold leading-tight">Refer &amp; Earn ₹100</h3>
+            <p className="hidden text-sm text-muted-foreground sm:block">
               Invite friends to Skinly and earn rewards when they shop.
             </p>
           </div>
-          <Button asChild className="w-full bg-indigo-600 hover:bg-indigo-700 text-white sm:w-auto sm:shrink-0">
-            <Link to="/account/referrals">Invite Now</Link>
+          <Button asChild size="sm" className="shrink-0 bg-indigo-600 text-white hover:bg-indigo-700">
+            <Link to="/account/referrals">Invite</Link>
           </Button>
         </CardContent>
       </Card>
 
       {/* Wallet Balance & Stats */}
-      <Card className="mb-6">
-        <CardHeader>
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <WalletIcon className="size-5" />
             Skinly Wallet
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="hidden sm:block">
             Manage your wallet balance, earn cashback, and redeem coupons
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6">
           {/* Current Balance - Prominent Display */}
-          <div className="relative overflow-hidden p-6 rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 text-white">
+          <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-500 via-blue-600 to-purple-600 p-4 text-white sm:p-6">
             <div className="relative z-10">
-              <div className="flex items-center gap-2 mb-2">
-                <CoinsIcon className="size-5" />
+              <div className="mb-1 flex items-center gap-2 sm:mb-2">
+                <CoinsIcon className="size-4 sm:size-5" />
                 <p className="text-sm font-medium opacity-90">Available Balance</p>
               </div>
-              <p className="text-4xl font-bold tracking-tight">
+              <p className="text-3xl font-bold tracking-tight sm:text-4xl">
                 ₹{(safeWalletBalance.balance || 0).toFixed(0)}
               </p>
-              <p className="text-xs opacity-75 mt-2">
+              {/* The explainer is desktop-only: on a phone it is three lines
+                  of text above the thing it explains. */}
+              <p className="mt-2 hidden text-xs opacity-75 sm:block">
                 Use your wallet balance to pay for orders and earn cashback on purchases
               </p>
             </div>
@@ -258,30 +259,32 @@ function AccountPageInner() {
           </div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-3 sm:p-4">
+              <div className="mb-1 flex items-center gap-2 sm:mb-2">
                 <TrendingUpIcon className="size-4 text-green-600" />
                 <p className="text-xs text-muted-foreground">Lifetime Earned</p>
               </div>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xl font-bold text-green-600 sm:text-2xl">
                 ₹{(safeWalletStats.lifetimeEarned || 0).toFixed(0)}
               </p>
             </div>
-            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="rounded-lg border border-orange-500/20 bg-orange-500/10 p-3 sm:p-4">
+              <div className="mb-1 flex items-center gap-2 sm:mb-2">
                 <TrendingDownIcon className="size-4 text-orange-600" />
                 <p className="text-xs text-muted-foreground">Lifetime Spent</p>
               </div>
-              <p className="text-2xl font-bold text-orange-600">
+              <p className="text-xl font-bold text-orange-600 sm:text-2xl">
                 ₹{(safeWalletStats.lifetimeSpent || 0).toFixed(0)}
               </p>
             </div>
           </div>
 
           {/* Recent Transactions */}
+          {/* Desktop only: the full history is one tap away, and three more
+              rows here pushed the coupon field and the orders off the fold. */}
           {safeRecentTransactions && safeRecentTransactions.length > 0 && (
-            <div className="space-y-3 pt-4 border-t">
+            <div className="hidden space-y-3 border-t pt-4 sm:block">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <HistoryIcon className="size-4" />
@@ -371,13 +374,13 @@ function AccountPageInner() {
       </Card>
 
       {/* Phone Verification */}
-      <Card className="mb-6">
-        <CardHeader>
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <SmartphoneIcon className="size-5" />
             Phone Verification
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="hidden sm:block">
             Verify your phone number to receive order updates via WhatsApp
           </CardDescription>
         </CardHeader>
@@ -396,7 +399,7 @@ function AccountPageInner() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
+              <p className="hidden text-sm text-muted-foreground sm:block">
                 Verify your phone number to enable WhatsApp notifications for your orders
               </p>
               
@@ -466,13 +469,13 @@ function AccountPageInner() {
       </Card>
 
       {/* WhatsApp Notification Preferences */}
-      <Card className="mb-6">
-        <CardHeader>
+      <Card className="mb-4 sm:mb-6">
+        <CardHeader className="pb-3 sm:pb-6">
           <CardTitle className="flex items-center gap-2">
             <BellIcon className="size-5" />
             WhatsApp Notifications
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="hidden sm:block">
             Manage your WhatsApp notification preferences
           </CardDescription>
         </CardHeader>
@@ -557,7 +560,7 @@ function AccountPageInner() {
 
       {/* Recent Orders */}
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3 sm:pb-6">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <ShoppingBagIcon className="size-5" />
