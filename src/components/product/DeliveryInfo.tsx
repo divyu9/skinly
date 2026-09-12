@@ -88,18 +88,11 @@ export function DeliveryInfo({ isSkinProduct, codAvailable = false }: DeliveryIn
 
       {/* What you're covered on */}
       <div className="grid grid-cols-2 gap-2.5">
-        <Assurance
-          icon={ShieldCheckIcon}
-          tone="emerald"
-          title="Free reprint"
-          body="Misprint or wrong cut? We remake it, on us."
-        />
-        <Assurance
-          icon={TruckIcon}
-          tone="sky"
-          title="Pan-India"
-          body="Tracked delivery to every pincode we serve."
-        />
+        {/* Free reprint and Pan-India used to be here too. The trust row now
+            sits directly above this block making both promises already, and
+            saying them twice in a row, a centimetre apart, reads as padding
+            rather than as reassurance. What is left is what that row does not
+            cover. */}
         {codAvailable ? (
           <Assurance
             icon={BanknoteIcon}

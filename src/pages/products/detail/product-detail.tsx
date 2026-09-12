@@ -71,6 +71,26 @@ import { useProductRules } from "@/hooks/useProductRules";
 const WHATSAPP_NUMBER = "919761011121";
 const WHATSAPP_MESSAGE = "Hey Skinly Team , I have a query regarding my purchase";
 
+/** Pan-India delivery, free reprint, secure payments — the reassurance row. */
+function TrustStrip() {
+  return (
+    <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl border-2 border-ink/15 bg-card px-2 py-3">
+      {[
+        { icon: TruckIcon,       label: "Pan-India\ndelivery" },
+        { icon: ShieldCheckIcon, label: "Free reprint\nguarantee" },
+        { icon: LockIcon,        label: "Secure\npayments" },
+      ].map(({ icon: Icon, label }) => (
+        <div key={label} className="flex flex-col items-center gap-1.5 text-center">
+          <Icon className="size-[18px] text-brand" strokeWidth={2.2} />
+          <span className="whitespace-pre-line text-[10px] font-medium leading-tight text-muted-foreground">
+            {label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ProductDetailPage() {
   // Mobile menu state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -336,7 +356,8 @@ export default function ProductDetailPage() {
           <div className="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-6 md:gap-8 mb-12">
             {/* A plain white card made the artwork look like a stock photo.
                 A soft tinted stage gives it depth without competing. */}
-            <div className="rounded-3xl border-2 border-ink/15 bg-card p-1.5 md:sticky md:top-24 md:self-start">
+            <div className="md:self-start">
+            <div className="rounded-3xl border-2 border-ink/15 bg-card p-1.5 md:sticky md:top-24">
             <ProductImages
               images={displayImages}
               selectedImage={productState.selectedImage}
@@ -349,20 +370,6 @@ export default function ProductDetailPage() {
               mockupExact={mockupState.exact ?? true}
             />
 
-            {/* Trust strip — the row every marketplace puts under the gallery */}
-            <div className="grid grid-cols-3 gap-1 px-2 py-3">
-              {[
-                { icon: TruckIcon,       label: "Pan-India\ndelivery" },
-                { icon: ShieldCheckIcon, label: "Free reprint\nguarantee" },
-                { icon: LockIcon,        label: "Secure\npayments" },
-              ].map(({ icon: Icon, label }) => (
-                <div key={label} className="flex flex-col items-center gap-1.5 text-center">
-                  <Icon className="size-[18px] text-brand" strokeWidth={2.2} />
-                  <span className="whitespace-pre-line text-[10px] font-medium leading-tight text-muted-foreground">
-                    {label}
-                  </span>
-                </div>
-              ))}
             </div>
             </div>
 
@@ -531,6 +538,16 @@ export default function ProductDetailPage() {
                   variantTitle={productData.variants[productState.selectedVariant]?.title}
                 />
               ) : null}
+
+              {/* Under the buy button, on every screen.
+                  It used to sit at the bottom of the gallery card, which is
+                  `sticky` — that made the card taller than a laptop viewport,
+                  so on a 700px screen this row was below the fold at the top
+                  of the page and then slid up behind the fixed header as you
+                  scrolled, readable at no scroll position at all. Under the
+                  CTA it is always reachable, and reassurance is worth most at
+                  the moment of deciding. */}
+              <TrustStrip />
 
               {/* Delivery Info */}
               <DeliveryInfo isSkinProduct={isSkinProduct} />
