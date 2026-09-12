@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { 
@@ -10,14 +10,19 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   HelpCircleIcon,
-  ZapIcon
+  ZapIcon,
+  UserIcon,
+  ShoppingCartIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
+import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
+import { auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { BrandLogo } from "./brand-logo.tsx";
 
 interface MobileHeaderProps {
@@ -26,7 +31,18 @@ interface MobileHeaderProps {
 }
 
 export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderProps) {
-  const { user } = useAuth();
+  const { user, isLoaded } = useAuth();
+  const isSignedIn = !!user;
+  const navigate = useNavigate();
+
+  const handleSignIn = async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider());
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
@@ -36,6 +52,19 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
   // Fetch homepage settings
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   
+  // Cart count, for the header's own copy of the cart button on tablet and up.
+  const dbCartCount = useQuery(api.cart.getCartCount, user ? {} : "skip");
+  const { getGuestCartCount, guestCart } = useGuestCart();
+  const [displayCount, setDisplayCount] = useState(0);
+
+  useEffect(() => {
+    if (user && dbCartCount !== undefined) {
+      setDisplayCount(dbCartCount);
+    } else if (!user && isLoaded) {
+      setDisplayCount(getGuestCartCount());
+    }
+  }, [user, dbCartCount, guestCart, isLoaded, getGuestCartCount]);
+
   // Server-side device search
   const deviceSearchResults = useQuery(
     api.supportedModels.searchModels,
@@ -232,12 +261,39 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 </button>
               )}
 
-              {/* Account and cart used to sit here as well as in the tab bar.
-                  The tab bar is thumb-reachable, always visible and already
-                  carries the cart count, so the duplicates are gone and the
-                  search bar takes the width they were using — with 953 models
-                  and 500-odd designs, finding something is the job this
-                  header exists to do. */}
+              {/* Account and cart appear here only from 640px up, which is the
+                  exact complement of the tab bar's own `sm:hidden`. On a phone
+                  the tab bar carries both — thumb-reachable, always visible,
+                  already badged — so duplicating them in the header only cost
+                  the search bar its width. Above that breakpoint there is no
+                  tab bar, and this header is the only way to the cart. */}
+              {isLoaded && !isSignedIn ? (
+                <button onClick={handleSignIn} type="button" className="hidden flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted sm:block" aria-label="Sign In">
+                  <UserIcon className="size-[21px] text-foreground" />
+                </button>
+              ) : isLoaded && isSignedIn ? (
+                <button
+                  type="button"
+                  className="hidden flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted sm:block"
+                  aria-label="Account"
+                  onClick={() => navigate("/account")}
+                >
+                  <UserIcon className="size-[21px] text-foreground" />
+                </button>
+              ) : null}
+
+              <button
+                onClick={() => navigate("/cart")}
+                className="relative -mr-1 hidden flex-shrink-0 rounded-xl p-1.5 transition-colors hover:bg-muted sm:block"
+                aria-label="Cart"
+              >
+                <ShoppingCartIcon className="size-[21px] text-foreground" />
+                {displayCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-brand text-[10px] font-bold text-brand-foreground ring-2 ring-background">
+                    {displayCount > 9 ? "9+" : displayCount}
+                  </span>
+                )}
+              </button>
             </>
           )}
         </div>
