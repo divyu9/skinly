@@ -58,6 +58,7 @@ export default function ProductsPage() {
     clearAllFilters,
     applySmartFilters,
     hasActiveFilters,
+    activeDevice,
   } = useProductFilters();
   
   // ============================================
@@ -201,14 +202,21 @@ export default function ProductsPage() {
   // ============================================
   // RENDER CONDITIONS
   // ============================================
-  const showDeviceCTA = filters.productCategory === 'skin' && 
-    filters.gadgetFilter && 
-    !urlParams.brand && 
-    !urlParams.model;
-  
-  const showGadgetBanner = filters.productCategory === 'skin' && 
-    urlParams.brand && 
-    urlParams.model;
+  /*
+   * The device chip is not a property of one route.
+   *
+   * Both of these used to read `urlParams.brand/model`, so the chip appeared
+   * only while the query string happened to survive — and only under
+   * `productCategory === 'skin'`, which dropped it the moment a shopper looked
+   * at Cases, even though a case is cut for one model just as a skin is.
+   * `activeDevice` remembers the pick, so the chip is constant across every
+   * product route until the shopper changes it.
+   */
+  const showDeviceCTA = filters.productCategory === 'skin' &&
+    filters.gadgetFilter &&
+    !activeDevice;
+
+  const showGadgetBanner = !!activeDevice;
   
   const showCollectionPills = filters.productCategory === 'skin' && 
     filters.gadgetFilter === 'phone' && 
@@ -293,9 +301,9 @@ export default function ProductsPage() {
           {/* Gadget Selector Banner */}
           {showGadgetBanner && (
             <div className="mb-2 sm:mb-4">
-              <GadgetSelectorBanner 
-                brandName={urlParams.brand!} 
-                modelName={urlParams.model!}
+              <GadgetSelectorBanner
+                brandName={activeDevice!.brand}
+                modelName={activeDevice!.model}
                 onChangeDevice={() => setIsDeviceSelectorOpen(true)}
               />
             </div>

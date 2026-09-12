@@ -46,6 +46,7 @@ import {
 
 // Existing Components
 import { ProductShareButton } from "./_components/product-share.tsx";
+import { ProductUgcFloat } from "./_components/product-ugc-float.tsx";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
@@ -65,7 +66,7 @@ import { useProductReviews } from "@/hooks/useProductReviews";
 import { useProductRules } from "@/hooks/useProductRules";
 
 // Constants
-const WHATSAPP_NUMBER = "917505273504";
+const WHATSAPP_NUMBER = "919761011121";
 const WHATSAPP_MESSAGE = "Hey Skinly Team , I have a query regarding my purchase";
 
 export default function ProductDetailPage() {
@@ -555,6 +556,9 @@ export default function ProductDetailPage() {
         </div>
       </section>
       
+      {/* Customer clips for this product, in the corner next to Buy Now. */}
+      <ProductUgcFloat productId={productData._id} stickyBarVisible={productState.showStickyBar} />
+
       {/* Model Selector Dialog */}
       <ModelSelectorDialog
         open={selectorState.dialogOpen}

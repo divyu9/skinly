@@ -158,7 +158,7 @@ export function MobileBottomNav() {
                 <li className="pt-1">
                   <button
                     type="button"
-                    onClick={() => goTo("/products")}
+                    onClick={() => goTo("/products?all=1")}
                     className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary p-3 text-sm font-semibold text-primary-foreground"
                   >
                     Shop all products

@@ -396,3 +396,26 @@ img[data-img-broken] {
   --primary: oklch(0.98 0 0);
   --primary-foreground: oklch(0.09 0 0);
 }
+
+/*
+ * No zoom-on-focus, and no pinching back out afterwards.
+ *
+ * Mobile Safari zooms the page whenever a focused field's text is under 16px.
+ * The header search was `text-sm` (14px), so tapping it zoomed the viewport
+ * in; the results panel is `position: fixed`, so it then rendered against a
+ * layout viewport wider than what was visible and came out cropped — and the
+ * zoom never undoes itself, leaving the shopper to pinch back out by hand.
+ *
+ * The fix is to make fields 16px on phones, not to ban zooming: a
+ * `maximum-scale=1` on the viewport tag would also stop this, by taking
+ * pinch-zoom away from everyone who needs it to read. `:root` here only
+ * carries enough specificity to beat a single Tailwind text utility, so it
+ * needs no `!important`; nothing in the app asks an input for a larger size.
+ */
+@media (max-width: 767px) {
+  :root input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  :root textarea,
+  :root select {
+    font-size: 16px;
+  }
+}

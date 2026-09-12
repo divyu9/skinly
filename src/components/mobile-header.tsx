@@ -283,7 +283,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
               >
                 <ShoppingCartIcon className="size-[21px] text-foreground" />
                 {displayCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 text-[10px] font-bold text-white ring-2 ring-background">
+                  <span className="absolute -right-0.5 -top-0.5 flex size-[18px] items-center justify-center rounded-full bg-brand text-[10px] font-bold text-brand-foreground ring-2 ring-background">
                     {displayCount > 9 ? "9+" : displayCount}
                   </span>
                 )}

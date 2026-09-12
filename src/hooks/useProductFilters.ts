@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { readActiveDevice, writeActiveDevice } from "@/lib/active-device";
 
 // Types
 export type ProductCategory = "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null;
@@ -76,6 +77,38 @@ export function useProductFilters() {
     }));
   }, [location.search]);
   
+  /*
+   * The chosen device, kept across navigation.
+   *
+   * Whenever a link hands us a brand/model pair we write it down; when a route
+   * arrives without one we read it back. Without this the pair — and the
+   * "change model" chip that reflects it — survived only as long as the next
+   * link happened to carry the query string forward, which is why the chip
+   * showed on some routes and vanished on others.
+   *
+   * `?all=1` is the one explicit opt-out: "Shop all products" means all of
+   * them, so it must not come back silently filtered to one model.
+   */
+  const browsingAll = useMemo(
+    () => new URLSearchParams(location.search).get('all') === '1',
+    [location.search],
+  );
+
+  useEffect(() => {
+    if (urlParams.brand && urlParams.model) {
+      writeActiveDevice(urlParams.brand, urlParams.model);
+    }
+  }, [urlParams.brand, urlParams.model]);
+
+  const activeDevice = useMemo(() => {
+    if (urlParams.brand && urlParams.model) {
+      return { brand: urlParams.brand, model: urlParams.model };
+    }
+    if (browsingAll) return null;
+    const saved = readActiveDevice();
+    return saved ? { brand: saved.brand, model: saved.model } : null;
+  }, [urlParams.brand, urlParams.model, browsingAll]);
+
   // Reset smart filters when brand/model changes
   useEffect(() => {
     const currentBrandModel = `${urlParams.brand}-${urlParams.model}`;
@@ -239,6 +272,8 @@ export function useProductFilters() {
   return {
     filters,
     urlParams,
+    activeDevice,
+    browsingAll,
     updateFilters,
     updateSortAndStock,
     updateSearchQuery,
