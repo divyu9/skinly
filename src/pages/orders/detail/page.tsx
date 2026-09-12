@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
+import { orderLabel } from "@/lib/order-label.ts";
 // PhonePe TypeScript declarations
 declare global {
   interface Window {
@@ -228,7 +229,7 @@ function OrderDetailPageInner() {
             <div>
               <h1 className="text-3xl font-bold mb-2">Order Details</h1>
               <p className="text-lg text-muted-foreground">
-                {order.orderNumber || order.failedOrderNumber || "Pending"}
+                {orderLabel(order)}
               </p>
               <p className="text-sm text-muted-foreground">
                 Placed on {formatDate(order.createdAt || order._creationTime)}

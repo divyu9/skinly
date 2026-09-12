@@ -272,7 +272,7 @@ function OrdersPageInner() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
+                      <CardTitle className="text-lg">{orderLabel(order)}</CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">
                         Placed on {formatDate(order._creationTime || order.createdAt || Date.now())}
                       </p>
@@ -405,6 +405,7 @@ function OrdersPageInner() {
 
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
+import { orderLabel } from "@/lib/order-label.ts";
 export default function OrdersPage() {
   return (
     <>

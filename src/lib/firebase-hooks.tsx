@@ -388,7 +388,12 @@ export function useQuery(apiRef: any, args?: any) {
             const q = query(collection(db, 'orders'), where('userId', 'in', await userIdCandidates(user)));
             
             innerUnsubscribe = onSnapshot(q, (snap) => {
-              let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+              // Normalised like the admin reads are. The customer pages print
+              // order.total.toFixed(2) and order.items.length straight out, and
+              // five live orders carry no items at all — raw, those took the
+              // whole account page down, and there is no error boundary on the
+              // storefront to soften it.
+              let docs = snap.docs.map(d => normalizeOrder({ _id: d.id, ...d.data() }));
               docs.sort((a: any, b: any) => {
                 const aTime = a.createdAt || a._creationTime || 0;
                 const bTime = b.createdAt || b._creationTime || 0;
