@@ -111,22 +111,21 @@
   .mx-hero-stage { order: 2; }
 }
 
-.mx-hero-disc {
-  width: min(52vw, 300px);
-  aspect-ratio: 1;
-  /* Tips over and sinks as the page starts moving, handing the frame to the
-     next scene rather than simply scrolling off it. */
+/* The studio render, pushed in and lifted as the page starts moving, so the
+   hero hands the frame to the next scene rather than scrolling off it. It is
+   already dark, so it sits on the page ground without a cut-out. */
+.mx-hero-shot {
+  width: min(78vw, 340px);
+  height: auto;
   transform:
-    perspective(1400px)
-    translateY(calc(var(--p) * -10vh))
-    rotateX(calc(14deg + var(--p) * 46deg))
-    rotateZ(calc(var(--p) * 34deg))
-    scale(calc(1 - var(--p) * 0.3));
-  --sheen: calc(0.1 + var(--p) * 0.85);
-  will-change: transform;
+    translateY(calc(var(--p) * -8vh))
+    scale(calc(1.02 + var(--p) * 0.16));
+  opacity: calc(1 - var(--p) * 0.55);
+  will-change: transform, opacity;
+  mask-image: radial-gradient(84% 84% at 50% 46%, #000 68%, transparent 100%);
 }
 @media (min-width: 1024px) {
-  .mx-hero-disc { width: min(34vw, 420px); }
+  .mx-hero-shot { width: min(38vw, 470px); }
 }
 
 .mx-scroll-hint {
@@ -250,7 +249,7 @@
 .mx-snap-disc {
   position: absolute;
   width: min(30vw, 148px);
-  aspect-ratio: 1;
+  height: auto;
   top: 50%;
   left: 50%;
   --travel: calc(1 - var(--p));
@@ -306,6 +305,7 @@
 .mx-open-lid {
   position: absolute;
   width: min(58vw, 300px);
+  height: auto;
   aspect-ratio: 1;
   transform-style: preserve-3d;
 }
@@ -390,7 +390,7 @@
 .mx-speed-dial {
   position: relative;
   width: min(52vw, 260px);
-  aspect-ratio: 1;
+  height: auto;
   transform: rotate(calc(var(--p) * 300deg)) scale(calc(0.9 + var(--p) * 0.12));
   --sheen: calc(var(--p));
   will-change: transform;
@@ -466,7 +466,7 @@
 /* --------------------------------------------------- motion, switched off */
 
 @media (prefers-reduced-motion: reduce) {
-  .mx-hero-disc,
+  .mx-hero-shot,
   .mx-hero-copy,
   .mx-snap-disc,
   .mx-snap-phone,

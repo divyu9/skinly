@@ -16,7 +16,7 @@ import {
   ZapIcon,
   GaugeIcon,
   ThermometerSnowflakeIcon,
-  GripIcon,
+  SmartphoneIcon,
   HardDriveIcon,
   ArrowRightIcon,
 } from "lucide-react";
@@ -56,6 +56,7 @@ export default function MagnetoXPage() {
       <SpeedScene />
       <SpecSlab />
       <FeatureGrid />
+      <InTheBox />
       <CloseCta fromPrice={fromPrice} buyHref={buyHref} />
 
       <div className="bg-background text-foreground">
@@ -77,13 +78,10 @@ function Hero({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: strin
       <div className="mx-pin overflow-hidden">
         <div className="mx-aurora" aria-hidden="true" />
 
-        {/* Copy and object share the frame rather than stacking on top of one
-            another — the headline has to be readable at rest, before anyone
-            has scrolled a pixel. */}
         <div className="mx-hero-grid">
           <div className="mx-hero-copy">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.32em] text-brand">
-              Magneto X
+              Magneto X · BS-M3N
             </p>
             <h1 className="mx-display text-balance text-4xl font-extrabold leading-[1.03] sm:text-5xl lg:text-6xl">
               Your phone just grew
@@ -91,8 +89,8 @@ function Hero({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: strin
               <span className="text-brand">a hard drive.</span>
             </h1>
             <p className="mt-5 max-w-md text-pretty text-sm leading-relaxed text-white/60 sm:text-base">
-              A machined aluminium disc that snaps to the back of your phone and
-              turns it into 4TB of NVMe storage — while charging it at 100W.
+              A 69mm aluminium disc that snaps to the back of your phone and
+              turns it into 4TB of NVMe storage — at 10Gbps, while charging.
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3">
@@ -108,9 +106,15 @@ function Hero({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: strin
           </div>
 
           <div className="mx-hero-stage" aria-hidden="true">
-            <div className="mx-hero-disc">
-              <MagnetoDisc className="size-full drop-shadow-[0_40px_80px_rgba(0,0,0,0.65)]" />
-            </div>
+            <img
+              src="/magneto/hero.webp"
+              alt=""
+              width={1024}
+              height={868}
+              fetchPriority="high"
+              decoding="async"
+              className="mx-hero-shot"
+            />
           </div>
         </div>
 
@@ -137,9 +141,15 @@ function SnapScene() {
             <span className="mx-field mx-field-2" />
             <span className="mx-field mx-field-3" />
           </div>
-          <div className="mx-snap-disc">
-            <MagnetoDisc className="size-full drop-shadow-[0_24px_50px_rgba(0,0,0,0.6)]" />
-          </div>
+          <img
+            src="/magneto/disc.webp"
+            alt=""
+            width={900}
+            height={900}
+            loading="lazy"
+            decoding="async"
+            className="mx-snap-disc"
+          />
         </div>
 
         <div className="mx-scene-copy">
@@ -171,9 +181,15 @@ function OpenScene() {
           <div className="mx-open-board">
             <MagnetoDisc face="bottom" className="size-full" />
           </div>
-          <div className="mx-open-lid">
-            <MagnetoDisc className="size-full drop-shadow-[0_30px_60px_rgba(0,0,0,0.6)]" />
-          </div>
+          <img
+            src="/magneto/disc.webp"
+            alt=""
+            width={900}
+            height={900}
+            loading="lazy"
+            decoding="async"
+            className="mx-open-lid"
+          />
           <div className="mx-ssd" role="presentation">
             <span className="mx-ssd-label">2230</span>
           </div>
@@ -218,9 +234,15 @@ function SpeedScene() {
               <span key={i} style={{ ["--i" as string]: i }} />
             ))}
           </div>
-          <div className="mx-speed-dial">
-            <MagnetoDisc className="size-full" />
-          </div>
+          <img
+            src="/magneto/disc.webp"
+            alt=""
+            width={900}
+            height={900}
+            loading="lazy"
+            decoding="async"
+            className="mx-speed-dial"
+          />
         </div>
 
         <div className="mx-scene-copy">
@@ -243,10 +265,10 @@ function SpeedScene() {
 /* -------------------------------------------------------------- spec slab */
 
 const SPECS = [
-  { value: "11.4", unit: "mm", label: "Thin enough to pocket" },
+  { value: "11.4", unit: "mm", label: "69.5 × 69 × 11.4mm, aluminium" },
   { value: "100", unit: "W", label: "PD passthrough charging" },
-  { value: "10", unit: "Gbps", label: "Sustained transfer" },
-  { value: "4", unit: "TB", label: "Maximum capacity" },
+  { value: "10", unit: "Gbps", label: "USB 3.1, backward compatible" },
+  { value: "4", unit: "TB", label: "M.2 NVMe, M key / B+M key" },
 ];
 
 function SpecSlab() {
@@ -271,12 +293,36 @@ function SpecSlab() {
 /* ------------------------------------------------------------ feature grid */
 
 const FEATURES = [
-  { icon: MagnetIcon, title: "Magnetic mounting", body: "Snaps to any MagSafe-compatible phone, through a case." },
-  { icon: GaugeIcon, title: "10Gbps transfer", body: "USB 3.2 Gen 2 over Type-C. No dongle, no adapter." },
-  { icon: ZapIcon, title: "PD 100W charging", body: "Charges the phone while the drive is mounted." },
-  { icon: ThermometerSnowflakeIcon, title: "Heat dissipation", body: "The aluminium body is the heatsink. No throttling mid-transfer." },
-  { icon: GripIcon, title: "Non-slip surface", body: "Textured back so it stays put on a desk or in a hand." },
-  { icon: HardDriveIcon, title: "Bring your own SSD", body: "Ships empty. Fit the M.2 stick and capacity you actually want." },
+  {
+    icon: MagnetIcon,
+    title: "Works on any phone",
+    body: "Snaps to MagSafe on its own, and the box includes an adhesive magnet ring for every phone that hasn't got it.",
+  },
+  {
+    icon: SmartphoneIcon,
+    title: "Android, Windows, Mac, Linux",
+    body: "Plug and play over Type-C. No drivers, and it hot-swaps.",
+  },
+  {
+    icon: GaugeIcon,
+    title: "10Gbps transfer",
+    body: "USB 3.1 Gen 2, backward compatible with USB 3.0.",
+  },
+  {
+    icon: ZapIcon,
+    title: "PD 100W charging",
+    body: "Charges the phone while the drive is mounted. One cable, both jobs.",
+  },
+  {
+    icon: ThermometerSnowflakeIcon,
+    title: "Aluminium heatsink",
+    body: "The alloy body is the cooling. No throttling mid-transfer.",
+  },
+  {
+    icon: HardDriveIcon,
+    title: "Bring your own SSD",
+    body: "Ships empty. Any M.2 NVMe stick in 2230 or 2242, up to 4TB.",
+  },
 ];
 
 function FeatureGrid() {
@@ -306,6 +352,45 @@ function FeatureGrid() {
   );
 }
 
+/* ----------------------------------------------------------- in the box */
+
+const IN_THE_BOX = [
+  "Magneto X enclosure",
+  "Adhesive magnet ring",
+  "Type-C braided cable",
+  "USB-A adapter",
+  "Screwdriver + screws",
+  "Thermal pad",
+];
+
+function InTheBox() {
+  const ref = useReveal<HTMLUListElement>();
+  return (
+    <section className="border-t border-white/10 bg-[#0b0e12] py-16">
+      <div className="container mx-auto px-6">
+        <h2 className="mx-display mb-2 text-2xl font-extrabold sm:text-3xl">In the box</h2>
+        <p className="mb-8 text-sm text-white/45">
+          Everything except the drive — so you pick the capacity.
+        </p>
+        <ul ref={ref} className="mx-reveal grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {IN_THE_BOX.map((item) => (
+            <li
+              key={item}
+              className="rounded-xl border border-white/10 bg-white/[0.035] px-3 py-3 text-[13px] font-medium leading-snug text-white/70"
+            >
+              {item}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-6 max-w-2xl text-[12px] leading-relaxed text-white/35">
+          First use on Android: the phone's USB data mode is off by default —
+          turn on USB file transfer once and it is remembered.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* -------------------------------------------------------------- close cta */
 
 function CloseCta({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: string }) {
@@ -313,9 +398,15 @@ function CloseCta({ fromPrice, buyHref }: { fromPrice: number | null; buyHref: s
     <section className="relative overflow-hidden border-t border-white/10 bg-[#0b0e12] py-24 text-center">
       <div className="mx-aurora mx-aurora-soft" aria-hidden="true" />
       <div className="container relative mx-auto px-6">
-        <div className="mx-auto mb-8 w-40 sm:w-52">
-          <MagnetoDisc className="mx-idle-spin size-full" />
-        </div>
+        <img
+          src="/magneto/disc.webp"
+          alt="Magneto X magnetic M.2 NVMe SSD enclosure"
+          width={900}
+          height={900}
+          loading="lazy"
+          decoding="async"
+          className="mx-idle-spin mx-auto mb-8 w-40 sm:w-52"
+        />
         <h2 className="mx-display text-balance text-3xl font-extrabold sm:text-5xl">
           Stop deleting things.
         </h2>
