@@ -608,7 +608,11 @@ function CheckoutPageInner() {
                 onRemoveCoupon={handleRemoveCoupon}
               />
 
-              <ActiveCouponsSection onCouponSelect={handleApplyCoupon} appliedCouponCode={appliedCoupon?.coupon.code} />
+              <ActiveCouponsSection
+                onCouponSelect={handleApplyCoupon}
+                appliedCouponCode={appliedCoupon?.coupon.code}
+                cartValue={Number(subtotal) || 0}
+              />
 
               <AddressForm
                 formData={formData}

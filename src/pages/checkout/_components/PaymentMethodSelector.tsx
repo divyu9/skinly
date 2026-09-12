@@ -19,6 +19,41 @@ interface PaymentMethodSelectorProps {
   onPaymentMethodChange: (value: string) => void;
 }
 
+/**
+ * The PhonePe mark, inline.
+ *
+ * The gateway line said "PhonePe Payment Gateway" in plain text, which at
+ * checkout is the moment a shopper is deciding whether this store is real.
+ * A logo they recognise from their own phone answers that faster than a
+ * sentence does. Drawn inline so it costs no request and cannot 404.
+ */
+function PhonePeLogo({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className={className}
+      role="img"
+      aria-label="PhonePe"
+      focusable="false"
+    >
+      <rect width="48" height="48" rx="11" fill="#5F259F" />
+      <circle cx="24" cy="24" r="13.5" fill="#fff" />
+      <text
+        x="24"
+        y="24"
+        textAnchor="middle"
+        dominantBaseline="central"
+        fill="#5F259F"
+        fontSize="20"
+        fontWeight="600"
+        fontFamily="system-ui, -apple-system, Segoe UI, sans-serif"
+      >
+        ₹
+      </text>
+    </svg>
+  );
+}
+
 export function PaymentMethodSelector({
   paymentMethod,
   codAvailability,
@@ -36,11 +71,14 @@ export function PaymentMethodSelector({
         <RadioGroup value={paymentMethod} onValueChange={onPaymentMethodChange}>
           <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
             <RadioGroupItem value="phonepe" id="phonepe" />
-            <Label htmlFor="phonepe" className="flex-1 cursor-pointer">
-              <div className="font-medium">PhonePe Payment Gateway</div>
-              <div className="text-sm text-muted-foreground">
-                Pay securely with UPI, Cards, Net Banking & more
-              </div>
+            <Label htmlFor="phonepe" className="flex flex-1 cursor-pointer items-center gap-3">
+              <PhonePeLogo className="size-9 shrink-0 rounded-lg" />
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">PhonePe Payment Gateway</span>
+                <span className="block text-sm text-muted-foreground">
+                  UPI, Cards, Net Banking &amp; Wallets
+                </span>
+              </span>
             </Label>
           </div>
 

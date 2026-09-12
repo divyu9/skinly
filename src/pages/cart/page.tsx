@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import {
   MinusIcon, PlusIcon, TrashIcon, ShoppingCartIcon, ArrowLeftIcon, AlertCircleIcon,
-  ShieldCheckIcon, BanknoteIcon, TruckIcon,
+  ShieldCheckIcon, PackageIcon, TruckIcon,
 } from "lucide-react";
 import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
@@ -441,7 +441,7 @@ function AuthenticatedCartContent() {
               <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
                 {[
                   { Icon: ShieldCheckIcon, a: "Secure", b: "payments" },
-                  { Icon: BanknoteIcon, a: "Cash on", b: "delivery" },
+                  { Icon: PackageIcon, a: "Premium", b: "packaging" },
                   { Icon: TruckIcon, a: "Pan-India", b: "delivery" },
                 ].map(({ Icon, a, b }) => (
                   <div key={a} className="flex flex-col items-center gap-1 text-[10px] leading-tight text-muted-foreground">
@@ -617,73 +617,72 @@ function GuestCartContent() {
                           </Badge>
                         )}
                       </div>
-                      {item.phoneModel && (
-                        <p className="text-sm text-muted-foreground mb-1">
-                          For: {item.phoneModel}
-                        </p>
-                      )}
-                      {item.coverage && (
-                        <p className="text-sm text-muted-foreground mb-1">
-                          Coverage: {item.coverage === "only_back" ? "Only Back" : "Full Body Wrap"}
-                        </p>
-                      )}
-                      {item.variant !== "Default Title" && (
-                        <p className="text-sm text-muted-foreground mb-2">
-                          Variant: {item.variant}
-                        </p>
-                      )}
+                      {(() => {
+                        const meta = [
+                          item.phoneModel,
+                          item.coverage ? (item.coverage === "only_back" ? "Only Back" : "Full Body Wrap") : null,
+                          item.variant !== "Default Title" && item.variant !== "Default" ? item.variant : null,
+                        ].filter(Boolean);
+                        return meta.length ? (
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">{meta.join(" · ")}</p>
+                        ) : null;
+                      })()}
                       {isOutOfStock && (
                         <div className="flex items-center gap-1 mb-2 text-sm text-destructive">
                           <AlertCircleIcon className="size-4" />
                           <span>Remove this item to proceed with checkout</span>
                         </div>
                       )}
-                      <p className="text-lg font-bold text-primary mb-4">
-                        ₹{item.price.toFixed(0)}
-                      </p>
-
-                      {/* Quantity Controls */}
-                      <div className="flex items-center gap-3">
-                        <div className={`flex items-center border rounded-lg ${isOutOfStock ? 'opacity-50' : ''}`}>
+                      {/* Same row as the signed-in cart: stepper, line total,
+                          remove. The guest branch had been left on the old
+                          stacked layout. */}
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <div className={`flex items-center rounded-lg border ${isOutOfStock ? 'opacity-50' : ''}`}>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-9 w-9 p-0"
+                            className="size-9 p-0"
+                            aria-label="Decrease quantity"
                             disabled={isOutOfStock}
-                            onClick={() => handleUpdateQuantity(
-                              item.productId,
-                              item.variant,
-                              Math.max(1, item.quantity - 1)
-                            )}
+                            onClick={() => handleUpdateQuantity(item.productId, item.variant, Math.max(1, item.quantity - 1))}
                           >
                             <MinusIcon className="size-4" />
                           </Button>
-                          <span className="px-4 text-sm font-medium min-w-[3ch] text-center">
+                          <span className="min-w-[2.5ch] px-2 text-center text-sm font-medium">
                             {item.quantity}
                           </span>
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-9 w-9 p-0"
+                            className="size-9 p-0"
+                            aria-label="Increase quantity"
                             disabled={isOutOfStock}
-                            onClick={() => handleUpdateQuantity(
-                              item.productId,
-                              item.variant,
-                              item.quantity + 1
-                            )}
+                            onClick={() => handleUpdateQuantity(item.productId, item.variant, item.quantity + 1)}
                           >
                             <PlusIcon className="size-4" />
                           </Button>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-9 gap-2 text-destructive hover:text-destructive"
-                          onClick={() => handleRemove(item.productId, item.variant)}
-                        >
-                          <TrashIcon className="size-4" />
-                          Remove
-                        </Button>
+
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="font-bold leading-tight">
+                              ₹{(item.price * item.quantity).toFixed(0)}
+                            </p>
+                            {item.quantity > 1 && (
+                              <p className="text-[11px] text-muted-foreground">
+                                ₹{item.price.toFixed(0)} each
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            aria-label="Remove item"
+                            onClick={() => handleRemove(item.productId, item.variant)}
+                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <TrashIcon className="size-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -774,7 +773,7 @@ function GuestCartContent() {
               <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
                 {[
                   { Icon: ShieldCheckIcon, a: "Secure", b: "payments" },
-                  { Icon: BanknoteIcon, a: "Cash on", b: "delivery" },
+                  { Icon: PackageIcon, a: "Premium", b: "packaging" },
                   { Icon: TruckIcon, a: "Pan-India", b: "delivery" },
                 ].map(({ Icon, a, b }) => (
                   <div key={a} className="flex flex-col items-center gap-1 text-[10px] leading-tight text-muted-foreground">

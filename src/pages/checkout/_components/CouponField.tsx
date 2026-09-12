@@ -40,7 +40,10 @@ export function CouponField({
             </div>
             <div className="flex gap-2">
               <Input
-                placeholder="Enter coupon code"
+                // No placeholder. `uppercase` shouts placeholder text as
+                // ENTER COUPON CODE, which reads like a filled-in value the
+                // shopper has to clear before typing. The label above already
+                // says what the field is for.
                 value={couponCode}
                 onChange={(e) => onCouponCodeChange(e.target.value.toUpperCase())}
                 disabled={isApplyingCoupon}
