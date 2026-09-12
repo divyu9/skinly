@@ -118,7 +118,7 @@ function CartContent({ onCheckoutClick }: { onCheckoutClick: () => void }) {
   );
 
   // Create a map for quick stock lookup
-  const stockStatusMap = new Map(
+  const stockStatusMap = new Map<string, { isOutOfStock?: boolean }>(
     stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
   );
 

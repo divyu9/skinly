@@ -84,8 +84,10 @@ function AuthenticatedCartContent() {
   );
 
   // Create a map for quick stock lookup
-  const stockStatusMap = new Map(
-    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  // Typed, because the untyped Map inferred its values as {} and every
+  // stockInfo?.isOutOfStock read below was an error hiding in the noise.
+  const stockStatusMap = new Map<string, { isOutOfStock?: boolean }>(
+    stockStatus?.map((status: any) => [`${status.productId}-${status.variant}`, status]) || []
   );
 
   // Check if there are any out-of-stock items
@@ -486,8 +488,10 @@ function GuestCartContent() {
   );
 
   // Create a map for quick stock lookup
-  const stockStatusMap = new Map(
-    stockStatus?.map(status => [`${status.productId}-${status.variant}`, status]) || []
+  // Typed, because the untyped Map inferred its values as {} and every
+  // stockInfo?.isOutOfStock read below was an error hiding in the noise.
+  const stockStatusMap = new Map<string, { isOutOfStock?: boolean }>(
+    stockStatus?.map((status: any) => [`${status.productId}-${status.variant}`, status]) || []
   );
 
   // Check if there are any out-of-stock items

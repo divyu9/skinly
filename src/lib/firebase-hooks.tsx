@@ -3629,7 +3629,7 @@ export function useQuery(apiRef: any, args?: any) {
 export function useMutation(apiRef: any) {
   const path = getPath(apiRef);
 
-  return useCallback(async (args: any) => {
+  return useCallback(async (args?: any) => {
     try {
       console.log(`Mutation called for ${path} with args:`, args);
       
@@ -5896,7 +5896,7 @@ export function useMutation(apiRef: any) {
 export function useAction(apiRef: any) {
   const path = getPath(apiRef);
 
-  return useCallback(async (args: any) => {
+  return useCallback(async (args?: any) => {
     console.log(`Action called for ${path} with args:`, args);
     const collectionName = path.split('.')[0];
     const actionName = path.split('.').pop() || 'defaultAction';

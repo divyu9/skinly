@@ -155,7 +155,9 @@ export function useProductDetail() {
       setMockupState({ url: mockupFileUrl, loading: false });
     } else {
       // No mockup in database, use fallback URL string without making HEAD requests
-      const url = findMockupImageUrl(phoneModel, sku, null) as unknown as string;
+      // The old cast said `string`, which made the Promise branch below
+      // unreachable to the compiler while still running at runtime.
+      const url = findMockupImageUrl(phoneModel, sku, null) as unknown as string | Promise<string>;
       if (url && typeof url === 'string') {
         setMockupState({ url, loading: false });
       } else if (url instanceof Promise) {

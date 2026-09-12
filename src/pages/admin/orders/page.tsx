@@ -114,7 +114,13 @@ function AdminOrdersPageInner() {
   }, [baseOrders, dateFilter, customStartDate, customEndDate]);
 
   const computedStats = useMemo(() => {
-    if (!displayOrders) return null;
+    // Zeroes rather than null: the render below dereferences every field, and
+    // it is only safe today because of an early return three hundred lines
+    // away. Moving that guard would turn this into a blank admin page.
+    if (!displayOrders) return {
+      total: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0, rto: 0,
+      pending_payment: 0, failed: 0, deleted: 0, totalRevenue: 0, pendingPayments: 0,
+    };
     return {
       total: displayOrders.length,
       processing: displayOrders.filter((o) => o.status === "processing").length,

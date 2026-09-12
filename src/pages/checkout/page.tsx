@@ -307,7 +307,11 @@ function CheckoutPageInner() {
         userEmail: formData.email || undefined,
         cartItems: cartItems.map((i) => ({ productId: i.productId, productTitle: i.productTitle, price: i.price, quantity: i.quantity })),
       });
-      setAppliedCoupon(result);
+      if (!result) {
+        setCouponMessage({ type: "error", text: "That coupon could not be found" });
+        return;
+      }
+      setAppliedCoupon(result as any);
       setCouponCode(code.toUpperCase());
       if (result.isWalletCredit && result.walletCreditAmount) {
         setCouponMessage({ type: "success", text: `Coupon applied! You'll receive ₹${result.walletCreditAmount} wallet credit when your order is delivered` });
@@ -605,7 +609,6 @@ function CheckoutPageInner() {
               />
 
               <ActiveCouponsSection onCouponSelect={handleApplyCoupon} appliedCouponCode={appliedCoupon?.coupon.code} />
-              <CheckoutUpsells />
 
               <AddressForm
                 formData={formData}
@@ -649,6 +652,11 @@ function CheckoutPageInner() {
                 />
               )}
 
+              {/* One upsell, immediately above the button. It was rendered
+                  twice — once before the address form, where it interrupts,
+                  and once under Place Order, where nobody scrolls. */}
+              <CheckoutUpsells />
+
               <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || isRedirectingToPayment || hasOutOfStockItems}>
                 {isRedirectingToPayment ? (
                   <span className="flex items-center gap-2">
@@ -662,10 +670,6 @@ function CheckoutPageInner() {
                 )}
               </Button>
 
-              {/* Upsells Section under Place Order */}
-              <div className="mt-8">
-                <CheckoutUpsells />
-              </div>
             </form>
           </div>
 

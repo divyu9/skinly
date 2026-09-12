@@ -32,3 +32,6 @@ const createProxy = (path: string[] = []): ApiRef =>
 
 export const api: ApiRef = createProxy();
 export type Id<T extends string> = string;
+
+/** Convex's document type. Six files import it; the shim never exported it. */
+export type Doc<T extends string> = any;
