@@ -28,6 +28,90 @@ interface Consumption {
   unit: "m" | "sheets";
 }
 
+/**
+ * Every code a piece of stock answers to, rolls and cutouts in one map.
+ *
+ * A cutout answers to every code its views are sold under: LP-3D-05 and
+ * L-3D-06 are two views of one design and draw on one pile of sheets.
+ */
+export interface StockEntry {
+  kind: "roll" | "cutout";
+  id: string;
+  code: string;
+  designName: string;
+  /** Metres for a roll, sheets for a cutout. */
+  amount: number;
+  data: any;
+}
+
+export function buildStockMap(
+  rollDocs: admin.firestore.QueryDocumentSnapshot[],
+  cutoutDocs: admin.firestore.QueryDocumentSnapshot[]
+): Map<string, StockEntry> {
+  const map = new Map<string, StockEntry>();
+  rollDocs.forEach((d) => {
+    const r = d.data() as any;
+    if (!r.rNumber) return;
+    const code = String(r.rNumber).trim().toUpperCase();
+    map.set(code, {
+      kind: "roll",
+      id: d.id,
+      code,
+      designName: String(r.designName || ""),
+      amount: Number(r.metersAvailable) || 0,
+      data: r,
+    });
+  });
+  cutoutDocs.forEach((d) => {
+    const c = d.data() as any;
+    const primary = String(c.cutoutNumber || "").trim().toUpperCase();
+    for (const raw of [c.cutoutNumber, ...(c.aliases || [])]) {
+      if (!raw) continue;
+      map.set(String(raw).trim().toUpperCase(), {
+        kind: "cutout",
+        id: d.id,
+        code: primary,
+        designName: String(c.designName || ""),
+        amount: Number(c.sheetsAvailable) || 0,
+        data: c,
+      });
+    }
+  });
+  return map;
+}
+
+/**
+ * The one rule that decides which stock a variant is cut from.
+ *
+ * A manually assigned rNumber wins. Failing that, walk the SKU's leading
+ * segments longest-first, so `R-09-DRC` finds roll `R-09` and `LP-3D-05-KB`
+ * finds cutout `LP-3D-05` — one design, many device views, which is how the
+ * catalogue is actually built. The bare SKU is tried last for the single-view
+ * designs that carry no view suffix at all.
+ *
+ * This used to exist three times: once for drawing stock down on an order,
+ * once for pushing availability back out to variants, and a third, weaker
+ * version in the admin tab that read only rNumber and so reported hundreds of
+ * correctly-mapped variants as unmapped. One copy now, and the admin tab calls
+ * it rather than guessing alongside it.
+ */
+export function resolveMaterialCode(
+  variant: { rNumber?: any; sku?: any },
+  stock: Map<string, StockEntry>
+): StockEntry | null {
+  const rn = String(variant?.rNumber || "").trim().toUpperCase();
+  if (rn && stock.has(rn)) return stock.get(rn)!;
+
+  const sku = String(variant?.sku || "").trim();
+  const parts = sku.split("-");
+  for (let k = parts.length - 1; k >= 1; k--) {
+    const code = parts.slice(0, k).join("-").toUpperCase();
+    if (stock.has(code)) return stock.get(code)!;
+  }
+  const whole = sku.toUpperCase();
+  return whole && stock.has(whole) ? stock.get(whole)! : null;
+}
+
 export async function reserveMaterialForOrder(
   db: admin.firestore.Firestore,
   orderRef: admin.firestore.DocumentReference,
@@ -61,40 +145,12 @@ export async function reserveMaterialForOrder(
     for (const d of group) if (d.exists) products.set(d.id, d.data());
   }
 
-  const rolls = new Map<string, { id: string; data: any }>();
-  rollSnap.docs.forEach((d) => {
-    const r = d.data() as any;
-    if (r.rNumber) rolls.set(String(r.rNumber).trim().toUpperCase(), { id: d.id, data: r });
-  });
-  // A cutout answers to every code its views are sold under: LP-3D-05 and
-  // L-3D-06 are two views of one design and draw on one pile of sheets.
-  const cutouts = new Map<string, { id: string; data: any }>();
-  cutoutSnap.docs.forEach((d) => {
-    const c = d.data() as any;
-    const entry = { id: d.id, data: c };
-    for (const code of [c.cutoutNumber, ...(c.aliases || [])]) {
-      if (code) cutouts.set(String(code).trim().toUpperCase(), entry);
-    }
-  });
+  const stock = buildStockMap(rollSnap.docs, cutoutSnap.docs);
   const gadgets = new Map<string, any>();
   gadgetSnap.docs.forEach((d) => {
     const g = d.data() as any;
     if (g.gadgetTypeId) gadgets.set(g.gadgetTypeId, g);
   });
-
-  /** rNumber first, then progressively shorter leading segments of the SKU. */
-  const designOf = (variant: any) => {
-    const rn = String(variant?.rNumber || "").trim().toUpperCase();
-    if (rn && rolls.has(rn)) return { kind: "roll" as const, code: rn, entry: rolls.get(rn)! };
-    if (rn && cutouts.has(rn)) return { kind: "cutout" as const, code: rn, entry: cutouts.get(rn)! };
-    const parts = String(variant?.sku || "").split("-");
-    for (let k = parts.length - 1; k >= 1; k--) {
-      const code = parts.slice(0, k).join("-").toUpperCase();
-      if (rolls.has(code)) return { kind: "roll" as const, code, entry: rolls.get(code)! };
-      if (cutouts.has(code)) return { kind: "cutout" as const, code, entry: cutouts.get(code)! };
-    }
-    return null;
-  };
 
   const wanted = new Map<string, Consumption>();
   const unresolved: string[] = [];
@@ -104,7 +160,7 @@ export async function reserveMaterialForOrder(
     const variant = variants.get(`${item?.productId}::${String(item?.title ?? "")}`);
     if (!variant) { unresolved.push(`${item?.productId}::${item?.title}`); continue; }
 
-    const design = designOf(variant);
+    const design = resolveMaterialCode(variant, stock);
     // Accessories and anything not made from stocked material simply do not
     // draw down; that is not an error.
     if (!design) continue;
@@ -133,10 +189,10 @@ export async function reserveMaterialForOrder(
       amount = (cm / 100) * qty;
     }
 
-    const key = `${collection}/${design.entry.id}`;
+    const key = `${collection}/${design.id}`;
     const prev = wanted.get(key);
     if (prev) prev.amount += amount;
-    else wanted.set(key, { collection, docId: design.entry.id, code: design.code, amount, unit });
+    else wanted.set(key, { collection, docId: design.id, code: design.code, amount, unit });
   }
 
   if (!wanted.size) {
@@ -209,36 +265,29 @@ export async function syncStockForDesign(
     db.collection("products").get(),
   ]);
 
-  const stock = new Map<string, { kind: "roll" | "cutout"; amount: number }>();
-  rollSnap.docs.forEach((d) => {
-    const r = d.data() as any;
-    if (r.rNumber) stock.set(String(r.rNumber).trim().toUpperCase(), { kind: "roll", amount: Number(r.metersAvailable) || 0 });
-  });
-  cutoutSnap.docs.forEach((d) => {
-    const c = d.data() as any;
-    for (const code of [c.cutoutNumber, ...(c.aliases || [])]) {
-      if (code) stock.set(String(code).trim().toUpperCase(), { kind: "cutout", amount: Number(c.sheetsAvailable) || 0 });
-    }
-  });
+  const stock = buildStockMap(rollSnap.docs, cutoutSnap.docs);
+
+  /*
+   * Match on the stock record, not on the string that named it.
+   *
+   * A cutout answers to several codes, and the resolver reports whichever one
+   * is primary. Comparing the caller's code against that primary would silently
+   * skip a sync requested by an alias — ask for LP-04 and nothing moves,
+   * because the design calls itself LC-04.
+   */
+  const wantedIds = new Set<string>();
+  for (const code of wanted) {
+    const entry = stock.get(code);
+    if (entry) wantedIds.add(`${entry.kind}/${entry.id}`);
+  }
+  if (!wantedIds.size) return [];
+
   const products = new Map(productSnap.docs.map((d) => [d.id, d.data() as any]));
   const gadgets = new Map<string, any>();
   gadgetSnap.docs.forEach((d) => {
     const g = d.data() as any;
     if (g.gadgetTypeId) gadgets.set(g.gadgetTypeId, g);
   });
-
-  /** rNumber, else the leading segments of the SKU. */
-  const codeOf = (v: any): string | null => {
-    const rn = String(v?.rNumber || "").trim().toUpperCase();
-    if (rn && stock.has(rn)) return rn;
-    const parts = String(v?.sku || "").split("-");
-    for (let k = parts.length - 1; k >= 1; k--) {
-      const code = parts.slice(0, k).join("-").toUpperCase();
-      if (stock.has(code)) return code;
-    }
-    const whole = String(v?.sku || "").trim().toUpperCase();
-    return stock.has(whole) ? whole : null;
-  };
 
   const matched: Array<{
     ref: admin.firestore.DocumentReference;
@@ -248,10 +297,9 @@ export async function syncStockForDesign(
   }> = [];
   for (const d of variantSnap.docs) {
     const v = d.data() as any;
-    const code = codeOf(v);
-    if (!code || !wanted.has(code)) continue;
+    const entry = resolveMaterialCode(v, stock);
+    if (!entry || !wantedIds.has(`${entry.kind}/${entry.id}`)) continue;
 
-    const entry = stock.get(code)!;
     const multiplier = Math.max(Number(v.materialMultiplier) || 1, 0.01);
     let units: number;
 
@@ -298,5 +346,103 @@ export const recalcMaterialStock = onCall(async (data: any, context: any) => {
     matched: matched.length,
     updated: matched.filter((m) => m.changed).length,
     variants: matched.slice(0, 50),
+  };
+});
+
+/**
+ * What the mapping actually resolves to, for the admin tab to display.
+ *
+ * The tab used to compute its own answer from the `rNumber` field alone and
+ * disagreed with the order pipeline by nearly three hundred variants, all of
+ * them reported as unmapped when they were fine. It now asks this, so what an
+ * admin sees is by construction what happens when someone checks out.
+ *
+ * Unmatched variants are grouped by SKU prefix rather than listed flat,
+ * because the useful question is never "which variant" but "which family of
+ * codes has no stock behind it" — L- and M- are phone cutouts that are simply
+ * not stocked by sheet yet, and that reads very differently from a roll that
+ * has gone missing under everything that references it.
+ */
+export const materialMapping = onCall(async (_data: any, context: any) => {
+  await requireAdmin(context);
+  const db = admin.firestore();
+
+  const [rollSnap, cutoutSnap, variantSnap, productSnap] = await Promise.all([
+    db.collection("rollInventory").get(),
+    db.collection("cutoutInventory").get(),
+    db.collection("variants").get(),
+    db.collection("products").get(),
+  ]);
+
+  const stock = buildStockMap(rollSnap.docs, cutoutSnap.docs);
+  const products = new Map(productSnap.docs.map((d) => [d.id, d.data() as any]));
+
+  const groups: Record<string, any> = {};
+  const unmatchedByPrefix: Record<string, { count: number; samples: string[] }> = {};
+  let matchedCount = 0;
+
+  for (const d of variantSnap.docs) {
+    const v = d.data() as any;
+    const product = products.get(v.productId);
+    const entry = resolveMaterialCode(v, stock);
+
+    if (!entry) {
+      const sku = String(v.sku || "").trim();
+      const prefix = (sku.split("-")[0] || "(no sku)").toUpperCase();
+      const bucket = (unmatchedByPrefix[prefix] ||= { count: 0, samples: [] });
+      bucket.count += 1;
+      if (bucket.samples.length < 8 && sku) bucket.samples.push(sku);
+      continue;
+    }
+
+    matchedCount += 1;
+    const g = (groups[entry.code] ||= {
+      code: entry.code,
+      kind: entry.kind,
+      designName: entry.designName,
+      amount: entry.amount,
+      unit: entry.kind === "cutout" ? "sheets" : "m",
+      items: [],
+    });
+    g.items.push({
+      variantId: d.id,
+      productId: v.productId,
+      productTitle: product?.title || "",
+      sku: String(v.sku || ""),
+      variantTitle: String(v.title || ""),
+      materialMultiplier: Number(v.materialMultiplier) || 1,
+      // True only when a hand-set rNumber is doing the work — that is, the SKU
+      // alone would not have found this. Previously every grouped row claimed
+      // to be manual, because the field was the only way in.
+      isManual:
+        !!v.rNumber &&
+        resolveMaterialCode({ sku: v.sku }, stock)?.id !== entry.id,
+    });
+  }
+
+  // Stock nobody is selling: a roll or cutout on the shelf that no variant
+  // resolves to. The other half of the coverage question, and invisible until
+  // you ask it from this side.
+  const orphanStock = Object.values(
+    [...stock.values()].reduce((acc: Record<string, any>, e) => {
+      const key = `${e.kind}/${e.id}`;
+      if (!acc[key] && !groups[e.code]) {
+        acc[key] = { code: e.code, kind: e.kind, designName: e.designName, amount: e.amount };
+      }
+      return acc;
+    }, {})
+  );
+
+  return {
+    totals: {
+      variants: variantSnap.size,
+      matched: matchedCount,
+      unmatched: variantSnap.size - matchedCount,
+      rollCodes: rollSnap.size,
+      cutoutRecords: cutoutSnap.size,
+    },
+    groups,
+    unmatchedByPrefix,
+    orphanStock,
   };
 });

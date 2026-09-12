@@ -77,14 +77,9 @@ export function RollsManagement() {
   
   const assignRNumber = useMutation(api.rollsManagement.assignRNumber);
   const removeRNumberAssignment = useMutation(api.rollsManagement.removeRNumberAssignment);
-  const bulkAssign = useMutation(api.rollsManagement.bulkAssignRNumber);
   const updateMaterialMultiplier = useMutation(api.rollsManagement.updateMaterialMultiplier);
   
   // Bulk assignment state
-  const [unmappedSearch, setUnmappedSearch] = useState("");
-  const [selectedProductIds, setSelectedProductIds] = useState<Array<Id<"products">>>([]);
-  const [showBulkAssignDialog, setShowBulkAssignDialog] = useState(false);
-  const [bulkAssignRNumberValue, setBulkAssignRNumberValue] = useState("");
 
   const calculateMaterialUsed = (lengthCm: number, widthCm: number) => {
     return (lengthCm / 100).toFixed(3);
@@ -250,26 +245,6 @@ export function RollsManagement() {
     }
   };
   
-  const handleBulkAssign = async () => {
-    if (!bulkAssignRNumberValue || selectedProductIds.length === 0) {
-      toast.error("Please select products and enter an R-number");
-      return;
-    }
-    
-    try {
-      const result = await bulkAssign({
-        productIds: selectedProductIds,
-        rNumber: bulkAssignRNumberValue,
-      });
-      toast.success(`Assigned ${result.assignedCount} variants to ${bulkAssignRNumberValue}`);
-      setShowBulkAssignDialog(false);
-      setSelectedProductIds([]);
-      setBulkAssignRNumberValue("");
-    } catch (error) {
-      toast.error("Failed to bulk assign R-number");
-    }
-  };
-  
   const handleUpdateMultiplier = async (variantId: Id<"variants">, multiplier: number) => {
     try {
       await updateMaterialMultiplier({ variantId, multiplier });
@@ -278,27 +253,6 @@ export function RollsManagement() {
       toast.error("Failed to update multiplier");
     }
   };
-  
-  // Filter unmapped products
-  const filteredUnmapped = useMemo(() => {
-    if (!productsByRNumber) return [];
-    
-    const unmapped = productsByRNumber.unmapped;
-    if (!unmappedSearch) return unmapped;
-    
-    const searchLower = unmappedSearch.toLowerCase();
-    return unmapped.filter((item) => 
-      item.productTitle.toLowerCase().includes(searchLower) ||
-      item.sku.toLowerCase().includes(searchLower)
-    );
-  }, [productsByRNumber, unmappedSearch]);
-  
-  // Get unique product IDs from unmapped variants
-  const unmappedProductIds = useMemo(() => {
-    const ids = new Set<Id<"products">>();
-    filteredUnmapped.forEach((item) => ids.add(item.productId as Id<"products">));
-    return Array.from(ids);
-  }, [filteredUnmapped]);
   
   // Get existing R-numbers for dropdown
   const existingRNumbers = useMemo(() => {
@@ -625,10 +579,15 @@ export function RollsManagement() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LinkIcon className="size-5" />
-            SKU to R-Number Mapping
+            Material mapping
           </CardTitle>
           <p className="text-sm text-muted-foreground mt-1">
-            Products are automatically grouped by R-number extracted from SKUs. You can manually override any assignment.
+            Resolved by the same rule checkout uses: a hand-assigned R-number
+            first, then the SKU&rsquo;s leading segments &mdash; so{" "}
+            <span className="font-mono">R-09-DRC</span> finds roll{" "}
+            <span className="font-mono">R-09</span>, and{" "}
+            <span className="font-mono">LP-3D-05-KB</span> finds cutout{" "}
+            <span className="font-mono">LP-3D-05</span>. Rolls and cutouts both.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -644,14 +603,19 @@ export function RollsManagement() {
                         <div>
                           <h4 className="font-mono font-bold text-lg">{rNumber}</h4>
                           <p className="text-sm text-muted-foreground">
+                            {productsByRNumber.meta?.[rNumber]?.designName || "—"} ·{" "}
                             {items.length} {items.length === 1 ? "variant" : "variants"}
                           </p>
                         </div>
-                        {rolls?.find((r) => r.rNumber === rNumber) ? (
-                          <Badge variant="default">Roll exists</Badge>
-                        ) : (
-                          <Badge variant="secondary">No roll yet</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Badge variant={productsByRNumber.meta?.[rNumber]?.kind === "cutout" ? "secondary" : "default"}>
+                            {productsByRNumber.meta?.[rNumber]?.kind === "cutout" ? "Cutout" : "Roll"}
+                          </Badge>
+                          <Badge variant="outline" className="font-mono">
+                            {productsByRNumber.meta?.[rNumber]?.amount ?? 0}
+                            {productsByRNumber.meta?.[rNumber]?.unit === "sheets" ? " sheets" : " m"}
+                          </Badge>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -740,114 +704,88 @@ export function RollsManagement() {
             </div>
           )}
 
-          {/* Unmapped SKUs */}
-          {productsByRNumber.unmapped.length > 0 && (
-            <Card className="border-2 border-orange-200 dark:border-orange-900">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
+          {/* Coverage — what has no stock behind it, and what stock nobody
+              is selling. Both halves of the question, neither of which was
+              visible before: this panel is what would have shown R-32 going
+              missing under the twenty-six variants that reference it. */}
+          {productsByRNumber.totals && (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card className="border-2">
+                <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
                     <AlertCircleIcon className="size-5 text-orange-600" />
                     <div>
-                      <h4 className="font-semibold">Unmapped SKUs</h4>
+                      <h4 className="font-semibold">Not backed by stock</h4>
                       <p className="text-sm text-muted-foreground">
-                        {productsByRNumber.unmapped.length} variants without R-numbers
-                        {selectedProductIds.length > 0 && ` • ${selectedProductIds.length} selected`}
+                        {productsByRNumber.totals.unmatched} of {productsByRNumber.totals.variants} variants,
+                        grouped by SKU prefix
                       </p>
                     </div>
                   </div>
-                  {selectedProductIds.length > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={() => setShowBulkAssignDialog(true)}
-                    >
-                      <LinkIcon className="size-4 mr-2" />
-                      Assign Selected to R-Number
-                    </Button>
-                  )}
-                </div>
-                
-                {/* Search and Select All */}
-                <div className="flex items-center gap-2 mt-4">
-                  <div className="relative flex-1">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search by product name or SKU..."
-                      value={unmappedSearch}
-                      onChange={(e) => setUnmappedSearch(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (selectedProductIds.length === unmappedProductIds.length) {
-                        setSelectedProductIds([]);
-                      } else {
-                        setSelectedProductIds(unmappedProductIds);
-                      }
-                    }}
-                  >
-                    {selectedProductIds.length === unmappedProductIds.length ? "Deselect All" : "Select All"}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {filteredUnmapped.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      No unmapped products match your search
-                    </div>
+                </CardHeader>
+                <CardContent>
+                  {Object.keys(productsByRNumber.unmatchedByPrefix || {}).length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      Every variant resolves to a roll or a cutout.
+                    </p>
                   ) : (
-                    filteredUnmapped.map((item) => (
-                      <div
-                        key={item.variantId}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20"
-                      >
-                        <Checkbox
-                          checked={selectedProductIds.includes(item.productId as Id<"products">)}
-                          onCheckedChange={(checked) => {
-                            const productId = item.productId as Id<"products">;
-                            if (checked) {
-                              setSelectedProductIds([...selectedProductIds, productId]);
-                            } else {
-                              setSelectedProductIds(selectedProductIds.filter((id) => id !== productId));
-                            }
-                          }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">{item.productTitle}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {item.sku}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {item.variantTitle}
-                            </span>
+                    <div className="space-y-2">
+                      {Object.entries(productsByRNumber.unmatchedByPrefix as Record<string, { count: number; samples: string[] }>)
+                        .sort((a, b) => b[1].count - a[1].count)
+                        .map(([prefix, info]) => (
+                          <div key={prefix} className="rounded-lg border p-3">
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-semibold">{prefix}-</span>
+                              <Badge variant="secondary">{info.count}</Badge>
+                            </div>
+                            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                              {info.samples.join(", ")}
+                            </p>
                           </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setAssigningVariant({
-                              variantId: item.variantId as Id<"variants">,
-                              currentSku: item.sku,
-                            });
-                            setNewRNumber("");
-                            setShowAssignDialog(true);
-                          }}
-                        >
-                          <PlusIcon className="size-4 mr-2" />
-                          Assign
-                        </Button>
-                      </div>
-                    ))
+                        ))}
+                    </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <Card className="border-2">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircleIcon className="size-5 text-muted-foreground" />
+                    <div>
+                      <h4 className="font-semibold">Stock with no variants</h4>
+                      <p className="text-sm text-muted-foreground">
+                        {(productsByRNumber.orphanStock || []).length} on the shelf that nothing sells
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(productsByRNumber.orphanStock || []).length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">
+                      Every roll and cutout has variants behind it.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(productsByRNumber.orphanStock as Array<{ code: string; kind: string; designName: string; amount: number }>)
+                        .map((o) => (
+                          <div key={`${o.kind}-${o.code}`} className="flex items-center justify-between rounded-lg border p-3">
+                            <div className="min-w-0">
+                              <span className="font-mono font-semibold">{o.code}</span>
+                              <p className="truncate text-xs text-muted-foreground">{o.designName || "—"}</p>
+                            </div>
+                            <Badge variant="outline" className="shrink-0 font-mono">
+                              {o.amount}{o.kind === "cutout" ? " sheets" : " m"}
+                            </Badge>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
+
         </CardContent>
       </Card>
       </TabsContent>
@@ -1020,71 +958,6 @@ export function RollsManagement() {
       </Dialog>
 
       {/* Bulk Assign R-Number Dialog */}
-      <Dialog open={showBulkAssignDialog} onOpenChange={setShowBulkAssignDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Bulk Assign R-Number</DialogTitle>
-            <DialogDescription>
-              Assign all variants of {selectedProductIds.length} selected product{selectedProductIds.length !== 1 ? "s" : ""} to an R-number
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="bulkRNumber">R-Number *</Label>
-              <Combobox
-                value={bulkAssignRNumberValue}
-                onValueChange={setBulkAssignRNumberValue}
-                options={existingRNumbers}
-                placeholder="Select or create R-number"
-                emptyText="No R-numbers found"
-                searchPlaceholder="Search R-numbers..."
-                allowCustom
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Select an existing R-number or create a new one
-              </p>
-            </div>
-            
-            {/* Preview */}
-            {selectedProductIds.length > 0 && (
-              <div className="border rounded-lg p-3 max-h-48 overflow-y-auto">
-                <p className="text-sm font-medium mb-2">Products to be assigned:</p>
-                <div className="space-y-1">
-                  {selectedProductIds.map((productId) => {
-                    const variants = filteredUnmapped.filter((item) => item.productId === productId);
-                    const firstVariant = variants[0];
-                    if (!firstVariant) return null;
-                    
-                    return (
-                      <div key={productId} className="text-sm">
-                        <span className="font-medium">{firstVariant.productTitle}</span>
-                        <span className="text-muted-foreground ml-2">
-                          ({variants.length} variant{variants.length !== 1 ? "s" : ""})
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setShowBulkAssignDialog(false);
-                setBulkAssignRNumberValue("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleBulkAssign}>
-              Assign to {bulkAssignRNumberValue || "R-Number"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Gadget Dialog */}
       <Dialog open={showGadgetDialog} onOpenChange={setShowGadgetDialog}>

@@ -2296,35 +2296,52 @@ export function useQuery(apiRef: any, args?: any) {
             setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
         }
         else if (path === 'rollsManagement.getProductsByRNumber') {
-          // {groups, unmapped} — the tab reads Object.keys(groups) directly, so
-          // an array here takes the whole page down.
-          unsubscribe = onSnapshot(collection(db, 'variants'), async (vsnap) => {
-            const psnap = await getDocs(collection(db, 'products'));
-            const products = new Map(psnap.docs.map(d => [d.id, d.data() as any]));
-
-            const groups: Record<string, any[]> = {};
-            const unmapped: any[] = [];
-            vsnap.docs.forEach(d => {
-              const v: any = d.data();
-              const product = products.get(v.productId);
-              if (!product) return;
-              const item = {
-                variantId: d.id,
-                productId: v.productId,
-                productTitle: product.title,
-                sku: v.sku,
-                variantTitle: v.title,
-                isManual: !!v.rNumber,
-                materialMultiplier: v.materialMultiplier ?? 1,
-              };
-              if (v.rNumber) {
-                (groups[v.rNumber] ||= []).push(item);
-              } else {
-                unmapped.push(item);
-              }
-            });
-            setData({ groups, unmapped });
-          });
+          /*
+           * Ask the backend what the mapping resolves to, rather than working
+           * it out again here.
+           *
+           * This used to group on the `rNumber` field alone. The order
+           * pipeline also walks the SKU's leading segments, so the two
+           * disagreed by 293 variants — every one of them reported here as
+           * unmapped while checkout resolved it perfectly well. Whoever read
+           * this tab was looking at phantom gaps and hand-assigning numbers
+           * that were never needed. One resolver now, in functions/materials,
+           * and this calls it.
+           *
+           * `groups` stays keyed by code so existing callers keep working; it
+           * now covers cutouts as well as rolls, and carries the coverage
+           * figures the tab needs to show what is genuinely unstocked.
+           */
+          const load = async () => {
+            try {
+              const fn = httpsCallable(functions, 'materialMapping');
+              const res: any = await fn({});
+              const payload = res?.data || {};
+              const groups: Record<string, any[]> = {};
+              const meta: Record<string, any> = {};
+              Object.entries(payload.groups || {}).forEach(([code, g]: [string, any]) => {
+                groups[code] = g.items || [];
+                meta[code] = { kind: g.kind, designName: g.designName, amount: g.amount, unit: g.unit };
+              });
+              setData({
+                groups,
+                meta,
+                unmapped: [],
+                unmatchedByPrefix: payload.unmatchedByPrefix || {},
+                orphanStock: payload.orphanStock || [],
+                totals: payload.totals || null,
+              });
+            } catch (e) {
+              console.error('materialMapping failed', e);
+              setData({ groups: {}, meta: {}, unmapped: [], unmatchedByPrefix: {}, orphanStock: [], totals: null });
+            }
+          };
+          void load();
+          // Stock edits and manual assignments both change the answer.
+          const unsubV = onSnapshot(collection(db, 'variants'), () => { void load(); });
+          const unsubR = onSnapshot(collection(db, 'rollInventory'), () => { void load(); });
+          const unsubC = onSnapshot(collection(db, 'cutoutInventory'), () => { void load(); });
+          unsubscribe = () => { unsubV(); unsubR(); unsubC(); };
         }
         else if (path === 'rollsManagement.getLowStockAlerts') {
           const ROLL_WIDTH_CM = 29.5;
