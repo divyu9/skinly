@@ -6384,6 +6384,15 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
     
     const collectionName = path.includes('products') ? 'products' : path.split('.')[0];
     
+    /*
+     * Args change while a fetch is in flight — on a fresh load of
+     * ?gadget=gimbals the first run goes out before the gadget list has
+     * resolved, so without `gadgetTypeId`, and a second follows with it. The
+     * unfiltered one fetches more variants and lands last, overwriting the
+     * right answer with every product. Only the latest run may write.
+     */
+    let cancelled = false;
+
     const fetchInitial = async () => {
       setStatus("LoadingFirstPage");
       try {
@@ -6416,6 +6425,7 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
           return bTime - aTime;
         });
         
+        if (cancelled) return;
         setAllMatches(filtered);
         
         // Load first page
@@ -6434,15 +6444,19 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
           }));
         }
         
+        if (cancelled) return;
         setResults(data);
         setStatus(filtered.length <= options.initialNumItems ? "Exhausted" : "CanLoadMore");
       } catch (err) {
         console.error(`Error in paginated query ${path}:`, err);
-        setStatus("Exhausted");
+        if (!cancelled) setStatus("Exhausted");
       }
     };
     
     fetchInitial();
+    return () => {
+      cancelled = true;
+    };
   }, [path, JSON.stringify(args), options.initialNumItems]);
 
   const loadMore = useCallback(async (numItems: number) => {

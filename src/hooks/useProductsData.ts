@@ -1,4 +1,5 @@
 import { usePaginatedQuery, useQuery } from "@/lib/firebase-hooks";
+import { productFitsDevice } from "@/lib/device-fit";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { FilterState, URLParams } from "./useProductFilters";
@@ -35,6 +36,8 @@ interface UseProductsDataParams {
   gadgetTypeId?: Id<"gadgetTypes">;
   finishTypeId?: Id<"finishTypes">;
   modelCategory?: string;
+  /** The shopper's device, from the URL or remembered — used to rank what fits first. */
+  device?: { brand: string; model: string } | null;
 }
 
 // Viewport batch size - how many mockups to fetch at once
@@ -46,6 +49,7 @@ export function useProductsData({
   gadgetTypeId,
   finishTypeId,
   modelCategory,
+  device,
 }: UseProductsDataParams) {
   // Get OOS sorting setting
   const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
@@ -88,7 +92,15 @@ export function useProductsData({
       productCategory: filters.productCategory || undefined,
       gadgetTypeId: gadgetTypeId || undefined,
       finishTypeId: finishTypeId || undefined,
-      ...(urlParams.brand && urlParams.model && modelCategory ? { 
+      /*
+       * Narrow to the device's gadget on skins only. Cases, camera rings,
+       * screen guards and accessories carry `gadgetCategory: "accessory"` or
+       * none at all, so with a phone in the URL every one of them was filtered
+       * out and those categories read "No products found". Those are ranked by
+       * fit further down instead.
+       */
+      ...(urlParams.brand && urlParams.model && modelCategory &&
+          (!filters.productCategory || filters.productCategory === "skin") ? {
         gadgetCategory: modelCategory as any
       } : {})
     },
@@ -203,6 +215,16 @@ export function useProductsData({
         break;
     }
     
+    // Outside skins nothing is filtered to the device, so put what comes in a
+    // version for it first. Only on the default order — an explicit price sort
+    // means price. The sort is stable, so each group keeps its order.
+    const rankByFit = !!device && filters.sortBy === "default" &&
+      !!filters.productCategory && filters.productCategory !== "skin";
+    if (rankByFit) {
+      const fits = new Map(result.map((p) => [p._id, productFitsDevice(p.variants, device!.brand, device!.model)]));
+      result.sort((a, b) => Number(fits.get(b._id)) - Number(fits.get(a._id)));
+    }
+
     // Auto-sort by stock status if enabled
     if (autoSortOOS?.value === true) {
       result.sort((a, b) => {
@@ -215,7 +237,8 @@ export function useProductsData({
     }
     
     return result;
-  }, [filteredProducts, filters.sortBy, filters.stockFilter, autoSortOOS?.value]);
+  }, [filteredProducts, filters.sortBy, filters.stockFilter, filters.productCategory,
+      device?.brand, device?.model, autoSortOOS?.value]);
   
   // ============================================
   // VIEWPORT-BASED BATCH MOCKUP LOADING

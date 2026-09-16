@@ -139,6 +139,7 @@ export default function ProductsPage() {
     gadgetTypeId,
     finishTypeId,
     modelCategory: modelInfo?.category,
+    device: activeDevice,
   });
   
   // ============================================
@@ -158,7 +159,20 @@ export default function ProductsPage() {
     }
   }, [urlParams.brand, urlParams.model, modelInfo?.category]);
 
-  const deviceCategory = modelInfo?.category ?? activeDevice?.category;
+  // Devices saved before the category was recorded have none; look it up once.
+  const savedDeviceInfo = useQuery(
+    api.supportedModels.getModelInfo,
+    activeDevice && !activeDevice.category && !urlParams.brand
+      ? { brand: activeDevice.brand, model: activeDevice.model }
+      : "skip"
+  );
+  useEffect(() => {
+    if (activeDevice && savedDeviceInfo?.category) {
+      writeActiveDevice(activeDevice.brand, activeDevice.model, savedDeviceInfo.category);
+    }
+  }, [activeDevice, savedDeviceInfo?.category]);
+
+  const deviceCategory = modelInfo?.category ?? activeDevice?.category ?? savedDeviceInfo?.category;
   
   // ============================================
   // ANALYTICS
@@ -370,14 +384,13 @@ export default function ProductsPage() {
   // ============================================
   // EMPTY STATE
   // ============================================
-  if (products.length === 0 && isExhausted) {
-    return (
-      <EmptyState
-        hasFilters={hasActiveFilters}
-        onClearFilters={clearAllFilters}
-      />
-    );
-  }
+  /*
+   * Rendered in place of the grid, not as a page of its own. It used to
+   * replace everything — header, category stories, bottom nav — with a bare
+   * logo bar, so a shopper who landed on an empty category had no way to pick
+   * another one short of the back button.
+   */
+  const isEmpty = products.length === 0 && isExhausted;
   
   // ============================================
   // MAIN RENDER
@@ -470,6 +483,13 @@ export default function ProductsPage() {
             hasActiveFilters={hasActiveFilters}
           />
 
+          {isEmpty ? (
+            <EmptyState
+              hasFilters={hasActiveFilters}
+              onClearFilters={clearAllFilters}
+            />
+          ) : (
+          <>
           {/* Products Grid */}
           <ProductGrid
             products={visibleProducts}
@@ -501,6 +521,8 @@ export default function ProductsPage() {
               onLoadMore={filters.collectionParam ? handleLoadMoreCollection : handleLoadMore}
               observerRef={observerTarget}
             />
+          )}
+          </>
           )}
         </div>
       </section>

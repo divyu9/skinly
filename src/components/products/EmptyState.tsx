@@ -1,5 +1,4 @@
 import { memo } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { 
   Empty, 
@@ -21,41 +20,25 @@ export const EmptyState = memo(function EmptyState({
   onClearFilters,
 }: EmptyStateProps) {
   return (
-    <div className="min-h-screen">
-      <nav className="fixed top-0 w-full bg-background/80 backdrop-blur-lg border-b border-border z-50">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <img 
-              src="/logo.webp" 
-              alt="Skinly" 
-              className="h-10 sm:h-12"
-            />
-          </Link>
-        </div>
-      </nav>
-
-      <div className="pt-32 sm:pt-40 pb-6 sm:pb-20 px-2 sm:px-4">
-        <div className="container mx-auto max-w-2xl">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <PackageIcon />
-              </EmptyMedia>
-              <EmptyTitle>No Products Found</EmptyTitle>
-              <EmptyDescription>
-                {hasFilters
-                  ? "No products match your filters. Try adjusting your filters."
-                  : "Your store doesn't have any products yet."}
-              </EmptyDescription>
-            </EmptyHeader>
-            {hasFilters && (
-              <EmptyContent>
-                <Button onClick={onClearFilters}>Clear All Filters</Button>
-              </EmptyContent>
-            )}
-          </Empty>
-        </div>
-      </div>
+    <div className="mx-auto max-w-2xl py-10 sm:py-16">
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <PackageIcon />
+          </EmptyMedia>
+          <EmptyTitle>No Products Found</EmptyTitle>
+          <EmptyDescription>
+            {hasFilters
+              ? "Nothing matches this combination. Pick another category above, or clear the filters."
+              : "There is nothing here yet. Pick another category above."}
+          </EmptyDescription>
+        </EmptyHeader>
+        {hasFilters && (
+          <EmptyContent>
+            <Button onClick={onClearFilters}>Clear All Filters</Button>
+          </EmptyContent>
+        )}
+      </Empty>
     </div>
   );
 });

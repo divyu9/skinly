@@ -1,10 +1,10 @@
 import { memo } from "react";
+import { productFitsDevice } from "@/lib/device-fit";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
 import { PackageIcon, BellIcon, Sparkles } from "lucide-react";
 import type { Product } from "@/hooks/useProductsData";
-import { normalizeModelName } from "@/lib/mockups";
 
 interface ProductCardProps {
   product: Product;
@@ -39,22 +39,7 @@ export const ProductCard = memo(function ProductCard({
    * Alienware matches no camera-ring variant, so that card keeps asking
    * rather than promising a ring cut for a laptop.
    */
-  const deviceFitsProduct = (() => {
-    if (!brandFilter || !modelFilter) return false;
-    const variants = product.variants;
-    // Skins carry one variant and are filtered to the model upstream; there is
-    // nothing per-model to match against, and nothing to be wrong about.
-    if (!Array.isArray(variants) || variants.length <= 1) return true;
-
-    const wanted = normalizeModelName(`${modelFilter}`).toLowerCase();
-    const withBrand = normalizeModelName(`${brandFilter} ${modelFilter}`).toLowerCase();
-    return variants.some((v: { title?: string }) => {
-      // "<Model> / <Colour>" — the model is the part before the slash.
-      const head = normalizeModelName(String(v?.title ?? "").split("/")[0]).toLowerCase();
-      if (!head) return false;
-      return head === wanted || head === withBrand || head.endsWith(wanted);
-    });
-  })();
+  const deviceFitsProduct = productFitsDevice(product.variants, brandFilter, modelFilter);
 
   const hasDeviceSelected = deviceFitsProduct;
   
