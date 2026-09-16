@@ -54,6 +54,8 @@ type MissingVariant = {
   title: string;
   materialMultiplier: number;
   suggestedPrice: number | null;
+  /** Where the suggestion came from, in words: "18 matte laptop listings". */
+  suggestedFrom: string;
   weight?: number;
   weightUnit?: string;
 };
@@ -167,9 +169,26 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
   // What listings of the same finish charge for each view, for the price the
   // admin is asked to confirm on a view being added.
   const priceVotes = new Map<string, Map<number, number>>();
+  // Sharper: among listings of this finish whose other view costs the same as
+  // this listing's, what does the missing view cost? A ₹249 matte lid sits in
+  // a different price tier from a ₹399 one, and the plain finish average
+  // would mix the two.
+  const pairVotes = new Map<string, Map<number, number>>();
+  const vote = (map: Map<string, Map<number, number>>, key: string, price: number) => {
+    const votes = map.get(key) || new Map<number, number>();
+    votes.set(price, (votes.get(price) || 0) + 1);
+    map.set(key, votes);
+  };
   for (const p of productSnap.docs) {
     const pdata = p.data() as any;
     if (isTranzy(pdata)) continue;
+    const priced = (byProduct.get(p.id) || []).filter((v) => Number(v.price) > 0);
+    const top = priced.find((v) => viewOf(String(v.title || "")) === TOP);
+    const kb = priced.find((v) => viewOf(String(v.title || "")) === KEYBOARD);
+    if (top && kb) {
+      vote(pairVotes, `${finishKey(pdata)}|LP:${Number(top.price)}|LPK`, Number(kb.price));
+      vote(pairVotes, `${finishKey(pdata)}|LPK:${Number(kb.price)}|LP`, Number(top.price));
+    }
     for (const v of byProduct.get(p.id) || []) {
       const price = Number(v.price) || 0;
       if (price <= 0) continue;
@@ -179,17 +198,38 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
       priceVotes.set(key, votes);
     }
   }
-  const suggestPrice = (finishType: string, tail: string): number | null => {
-    const pick = (votes?: Map<number, number>) =>
-      votes && votes.size ? [...votes.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0] : null;
-    const exact = pick(priceVotes.get(`${finishType}|${tail}`));
-    if (exact) return exact;
+  /** The price most laptop listings of this finish charge for this view. */
+  const suggestPrice = (
+    finishType: string,
+    tail: string,
+    have?: { tail: string; price: number }
+  ): { price: number | null; from: string } => {
+    const pick = (votes?: Map<number, number>) => {
+      if (!votes || !votes.size) return null;
+      const [price, count] = [...votes.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+      return { price, count };
+    };
+    if (have && have.price > 0) {
+      const paired = pick(pairVotes.get(`${finishType}|${have.tail}:${have.price}|${tail}`));
+      if (paired) {
+        const other = have.tail === "LP" ? "Only Top" : "Top + Keyboard";
+        return {
+          price: paired.price,
+          from: `${paired.count} ${finishType || ""} laptop listing${paired.count === 1 ? "" : "s"} with ${other} at ₹${have.price}`.replace("  ", " "),
+        };
+      }
+    }
+    const exact = finishType ? pick(priceVotes.get(`${finishType}|${tail}`)) : null;
+    if (exact) return { price: exact.price, from: `${exact.count} ${finishType} laptop listing${exact.count === 1 ? "" : "s"}` };
     const any = new Map<number, number>();
     for (const [k, votes] of priceVotes) {
       if (!k.endsWith(`|${tail}`)) continue;
       votes.forEach((n, price) => any.set(price, (any.get(price) || 0) + n));
     }
-    return pick(any);
+    const fallback = pick(any);
+    return fallback
+      ? { price: fallback.price, from: `${fallback.count} laptop listings (finish unknown)` }
+      : { price: null, from: "" };
   };
 
   const plans: ProductPlan[] = [];
@@ -271,7 +311,13 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
           sku: `${design.code}-${want.tail}`,
           title: want.title,
           materialMultiplier: want.multiplier,
-          suggestedPrice: suggestPrice(finishKey(pdata), want.tail),
+          ...(() => {
+            const sp = suggestPrice(finishKey(pdata), want.tail, {
+              tail: want.tail === TOP.tail ? KEYBOARD.tail : TOP.tail,
+              price: Number(sibling?.price) || 0,
+            });
+            return { suggestedPrice: sp.price, suggestedFrom: sp.from };
+          })(),
           weight: Number(sibling?.weight) || undefined,
           weightUnit: sibling?.weightUnit || undefined,
         };
@@ -523,10 +569,11 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
                     });
                     setPrices(next);
                   }}>
-                  Fill usual prices
+                  Use all suggested prices
                 </Button>
                 <span className="w-full text-muted-foreground">
-                  "Usual" is what most listings of the same finish (matte, 3D) charge for that view. Rows stay empty until you fill or type them.
+                  A suggestion is the price most laptop listings of the same finish (matte, 3D) charge for that view.
+                  Rows stay empty until you pick it, apply a price, or type one.
                 </span>
               </div>
             )}
@@ -606,8 +653,25 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
                             value={prices[p.productId] ?? ""}
                             onChange={(e) => setPrices({ ...prices, [p.productId]: e.target.value })}
                           />
-                          {p.missing.suggestedPrice && (
-                            <span className="text-muted-foreground">usual ₹{p.missing.suggestedPrice}</span>
+                          {p.missing.suggestedPrice ? (
+                            <button
+                              type="button"
+                              disabled={running}
+                              title={`Most common price on ${p.missing.suggestedFrom}`}
+                              onClick={() => setPrices({ ...prices, [p.productId]: String(p.missing!.suggestedPrice) })}
+                              className={`rounded border px-1.5 py-0.5 text-[11px] font-medium transition ${
+                                prices[p.productId] === String(p.missing.suggestedPrice)
+                                  ? "border-emerald-400 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                  : "border-violet-300 bg-white text-violet-700 hover:bg-violet-100 dark:bg-transparent dark:text-violet-300"
+                              }`}
+                            >
+                              Use suggested ₹{p.missing.suggestedPrice}
+                            </button>
+                          ) : (
+                            <span className="text-muted-foreground">no price to suggest</span>
+                          )}
+                          {p.missing.suggestedFrom && (
+                            <span className="text-[10px] text-muted-foreground">from {p.missing.suggestedFrom}</span>
                           )}
                         </span>
                       </div>
