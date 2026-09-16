@@ -49,7 +49,11 @@ export function ProductCategoryHeader({
         }} />
         
         <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3 relative z-10">
-          <div className="flex gap-2 justify-center overflow-x-auto no-scrollbar">
+          {/* Wrapped, not scrolled. These were `overflow-x-auto no-scrollbar`, so
+              the row ran off the right edge with nothing to say it did —
+              categories past the fourth simply did not exist to most people.
+              A second line costs 40px and shows the whole shop. */}
+          <div className="flex flex-wrap gap-2 justify-center">
             {productCategories === undefined ? (
               // Loading skeleton
               <>
@@ -94,7 +98,7 @@ export function ProductCategoryHeader({
           <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
             {/* Show full gadget selector when no gadget is selected */}
             {productCategory === 'skin' && !gadgetFilter && (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex flex-wrap gap-2">
                 {gadgetTypes === undefined ? (
                   // Loading skeleton for gadget selector
                   <>
@@ -138,7 +142,7 @@ export function ProductCategoryHeader({
                   // Loading skeleton for compact layout
                   <>
                     <Skeleton className="h-8 sm:h-10 w-[30%] sm:w-32 rounded-lg flex-shrink-0" />
-                    <div className="flex-1 flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+                    <div className="flex-1 flex flex-wrap gap-1.5 sm:gap-2">
                       {Array.from({ length: 4 }).map((_, i) => (
                         <Skeleton key={i} className="h-8 sm:h-10 w-20 sm:w-28 rounded-lg flex-shrink-0" />
                       ))}
@@ -158,7 +162,7 @@ export function ProductCategoryHeader({
                     </button>
 
                     {/* Right side - Finish Selector (70% width on mobile) */}
-                    <div className="flex-1 flex gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+                    <div className="flex-1 flex flex-wrap gap-1.5 sm:gap-2">
                       <button
                         onClick={() => onUpdateFilters({ finish: null })}
                         className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-[10px] sm:text-xs whitespace-nowrap transition-all duration-200 ${

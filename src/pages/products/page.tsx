@@ -209,6 +209,34 @@ export default function ProductsPage() {
   }, [filters.productCategory, filters.gadgetFilter, filters.finishFilter]);
   
   // ============================================
+  // ROOM FOR THE STICKY CATEGORY HEADER
+  // ============================================
+  /*
+   * The page reserved a flat 120px under the fixed category strip. That strip
+   * changes height — it grows a second row when the gadget selector opens, and
+   * more again now the pills wrap instead of running off the edge — so the
+   * guess was wrong more often than right, and "Shop" sat underneath it.
+   *
+   * Measured instead, and re-measured whenever it resizes, which covers the
+   * selector opening, the filters changing and the window being resized.
+   */
+  const categoryHeaderRef = useRef<HTMLDivElement>(null);
+  const [categoryHeaderHeight, setCategoryHeaderHeight] = useState(120);
+
+  useEffect(() => {
+    const el = categoryHeaderRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      if (h > 0) setCategoryHeaderHeight(h);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // ============================================
   // HOW MANY CARDS ARE ACTUALLY IN THE DOM
   // ============================================
   /*
@@ -329,7 +357,8 @@ export default function ProductsPage() {
       />
 
       {/* Product Category Header - Sticky */}
-      <div 
+      <div
+        ref={categoryHeaderRef}
         className="fixed left-0 right-0 z-30 border-b-2 border-ink/10 bg-card"
         style={{ top: `${categoryHeaderTop}px` }}
       >
@@ -345,7 +374,7 @@ export default function ProductsPage() {
       {/* Products Section */}
       <section 
         className="halftone px-2 pb-6 sm:px-4 sm:pb-20"
-        style={{ paddingTop: `${categoryHeaderTop + 120}px` }}
+        style={{ paddingTop: `${categoryHeaderTop + categoryHeaderHeight + 16}px` }}
       >
         <div className="container mx-auto max-w-7xl">
           {/* Page Header */}
