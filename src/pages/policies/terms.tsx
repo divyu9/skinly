@@ -17,7 +17,7 @@ export default function TermsOfService() {
       <Helmet>
         <title>Terms of Service | GoSkinly</title>
         <meta name="description" content="Read GoSkinly's terms of service. Understand your rights and our policies when shopping for vinyl device skins." />
-        <link rel="canonical" href="https://www.goskinly.com/policies/terms" />
+        <link rel="canonical" href="https://goskinly.com/policies/terms" />
       </Helmet>
       {/* Announcement Bar */}
       <AnnouncementBar />

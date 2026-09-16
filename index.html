@@ -4,36 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>Skinly - Quirky wear for your gadgets</title>
-    <meta name="description" content="Wildly creative phone skins that'll make your friends jealous. Why blend in when you were born to stand out?" />
-    <meta name="author" content="Skinly" />
+    <title>GoSkinly</title>
+    <meta name="author" content="GoSkinly" />
+    <!-- Per-page title/description/canonical/OG/JSON-LD are written here by
+         scripts/prerender.mjs at build time. Nothing page-specific belongs in
+         this template: it is also the shell for routes that are not
+         prerendered, and a hardcoded canonical here told every page on the
+         site that it was a copy of the homepage. -->
+    <!--seo-head-->
     <link
       rel="icon"
       type="image/svg+xml"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💚</text></svg>"
     />
-
-    <meta property="og:title" content="Skinly - Quirky wear for your gadgets" />
-    <meta
-      property="og:description"
-      content="Wildly creative phone skins that'll make your friends jealous. Why blend in when you were born to stand out?"
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.goskinly.com" />
-    <meta property="og:image" content="/logo.webp" />
-    
-    <!-- Canonical URL -->
-    <link rel="canonical" href="https://www.goskinly.com/" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:type" content="image/png" />
-    <meta property="og:site_name" content="Skinly" />
-
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Skinly - Quirky wear for your gadgets" />
-    <meta name="twitter:description" content="Wildly creative phone skins that'll make your friends jealous. Premium skins for 1000+ phone models." />
-    <meta name="twitter:image" content="/logo.webp" />
-    <meta name="twitter:site" content="@goskinly" />
 
     <!-- Facebook Domain Verification -->
     <meta name="facebook-domain-verification" content="vm0bjui4j2eqmsl9csnumdym9zepkk" />
@@ -47,8 +30,6 @@
     <link rel="dns-prefetch" href="https://mercury.phonepe.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
 
-    <!-- Preload LCP image (logo) for faster rendering -->
-    <link rel="preload" href="/logo.webp" as="image" fetchpriority="high" />
 
     <!-- PhonePe Checkout Script - Deferred for performance -->
     <script src="https://mercury.phonepe.com/web/bundle/checkout.js" defer></script>
@@ -129,81 +110,6 @@
       };
     </script>
 
-    <!-- Structured Data for SEO -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Skinly",
-      "url": "https://www.goskinly.com",
-      "logo": "https://cdn.hercules.app/file_Qd06a0OWqeC2LadTl4tLLvmv",
-      "description": "Premium phone skins and protection for 1000+ smartphone models. Quirky designs, perfect fit, bubble-free application.",
-      "sameAs": [],
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "contactType": "Customer Service",
-        "availableLanguage": "English"
-      }
-    }
-    </script>
-
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "ItemList",
-      "name": "Supported Phone Models",
-      "description": "Complete list of smartphone models compatible with Skinly phone skins and protection",
-      "url": "https://www.goskinly.com/devices",
-      "numberOfItems": 1000,
-      "itemListElement": [
-        {
-          "@type": "ListItem",
-          "position": 1,
-          "item": {
-            "@type": "Product",
-            "name": "Apple iPhone Skins",
-            "description": "Premium skins for all iPhone models from iPhone 5 to iPhone 17 Pro Max"
-          }
-        },
-        {
-          "@type": "ListItem",
-          "position": 2,
-          "item": {
-            "@type": "Product",
-            "name": "Samsung Galaxy Skins",
-            "description": "Premium skins for Samsung Galaxy S, Z, A, M, Note, and F series"
-          }
-        },
-        {
-          "@type": "ListItem",
-          "position": 3,
-          "item": {
-            "@type": "Product",
-            "name": "OnePlus Skins",
-            "description": "Premium skins for all OnePlus models"
-          }
-        },
-        {
-          "@type": "ListItem",
-          "position": 4,
-          "item": {
-            "@type": "Product",
-            "name": "Realme Skins",
-            "description": "Premium skins for Realme GT, P, X, and numbered series"
-          }
-        },
-        {
-          "@type": "ListItem",
-          "position": 5,
-          "item": {
-            "@type": "Product",
-            "name": "Vivo Skins",
-            "description": "Premium skins for Vivo X, V, Y, T, and Z series"
-          }
-        }
-      ]
-    }
-    </script>
 
     <!-- Detect dark mode preference and set the class before next-themes loads. This avoids a flash of unstyled content (FOUC) when the page loads. -->
     <script>
@@ -259,6 +165,7 @@
     <noscript>
       <div id="fb-pixel-noscript"></div>
     </noscript>
+    <!--seo-body-->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

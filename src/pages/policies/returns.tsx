@@ -17,7 +17,7 @@ export default function ReturnsPolicy() {
       <Helmet>
         <title>Returns & Refund Policy | GoSkinly</title>
         <meta name="description" content="GoSkinly returns and refund policy. Easy returns, hassle-free refunds on vinyl device skins." />
-        <link rel="canonical" href="https://www.goskinly.com/policies/returns" />
+        <link rel="canonical" href="https://goskinly.com/policies/returns" />
       </Helmet>
       {/* Announcement Bar */}
       <AnnouncementBar />

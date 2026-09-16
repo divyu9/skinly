@@ -17,7 +17,7 @@ export default function PrivacyPolicy() {
       <Helmet>
         <title>Privacy Policy | GoSkinly</title>
         <meta name="description" content="Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy." />
-        <link rel="canonical" href="https://www.goskinly.com/policies/privacy" />
+        <link rel="canonical" href="https://goskinly.com/policies/privacy" />
       </Helmet>
 
       {/* Announcement Bar */}

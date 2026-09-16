@@ -1,9 +1,95 @@
+# goskinly.com — Hostinger (LiteSpeed) behind Cloudflare.
+#
+# firebase.json is not used by this host; its redirects never ran. Everything
+# the server does lives here.
+
+Options -MultiViews
+# /products is both a page (products.html) and a folder of product pages.
+# Without this Apache answers /products with a redirect to /products/.
+DirectorySlash Off
+DirectoryIndex index.html
+ErrorDocument 404 /404.html
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "^404\.html$">
+    Header set X-Robots-Tag "noindex"
+  </FilesMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_FILENAME} !-l
-  RewriteRule . /index.html [L]
+RewriteEngine On
+RewriteBase /
+
+# ─── One host: goskinly.com ─────────────────────────────────────────────────
+RewriteCond %{HTTP_HOST} ^www\.goskinly\.com$ [NC]
+RewriteRule ^(.*)$ https://goskinly.com/$1 [R=301,L]
+
+# ─── Shells are not pages ───────────────────────────────────────────────────
+# Reached only through the rules below; asked for directly they are duplicates.
+# THE_REQUEST is the browser's own request line, so the server's internal
+# hops to these files (DirectoryIndex, the rules below) never match.
+# REDIRECT_STATUS is empty only on the first pass; without it the 404 below
+# would re-trigger on the server's own internal fetch of 404.html, forever.
+RewriteCond %{ENV:REDIRECT_STATUS} ^$
+RewriteCond %{THE_REQUEST} \s/(app|404)\.html[\s?]
+RewriteRule ^ - [R=404,L]
+RewriteCond %{ENV:REDIRECT_STATUS} ^$
+RewriteCond %{THE_REQUEST} \s/index\.html[\s?]
+RewriteRule ^ https://goskinly.com/ [R=301,L]
+
+# ─── Trailing slashes ───────────────────────────────────────────────────────
+RewriteRule ^(.+)/$ https://goskinly.com/$1 [R=301,L]
+
+# ─── Shopify-era and older URLs still in Google ─────────────────────────────
+RewriteRule ^collections/[^/]+/products/([^/]+)$ https://goskinly.com/products/$1 [R=301,L,NC]
+RewriteRule ^collections/(phoneskins|phone-skins|mobile-skins|leather-mobile-skins)$ https://goskinly.com/phone-skins [R=301,L,NC]
+RewriteRule ^collections/laptop-skins$ https://goskinly.com/laptop-skins [R=301,L,NC]
+RewriteRule ^collections(/.*)?$ https://goskinly.com/products [R=301,L,NC]
+RewriteRule ^product/([^/]+)$ https://goskinly.com/products/$1 [R=301,L]
+RewriteRule ^(brand|device|skin-type)/([^/]+)$ https://goskinly.com/$2 [R=301,L]
+RewriteRule ^(shop|search|store)$ https://goskinly.com/products [R=301,L]
+RewriteRule ^blogs(/.*)?$ https://goskinly.com/ [R=301,L]
+RewriteRule ^pages/(returns|return-policy|refund-policy)$ https://goskinly.com/policies/returns [R=301,L]
+RewriteRule ^pages/(shipping|shipping-policy)$ https://goskinly.com/policies/shipping [R=301,L]
+RewriteRule ^pages/privacy-policy$ https://goskinly.com/policies/privacy [R=301,L]
+RewriteRule ^pages/(terms-of-service|terms)$ https://goskinly.com/policies/terms [R=301,L]
+RewriteRule ^pages/(shop|store)$ https://goskinly.com/products [R=301,L]
+RewriteRule ^pages(/.*)?$ https://goskinly.com/ [R=301,L]
+RewriteRule ^account/(login|register|signup)$ https://goskinly.com/account [R=301,L]
+# Shopify paginated listings: /products?page=4
+RewriteCond %{QUERY_STRING} (^|&)page=[0-9]+(&|$)
+RewriteRule ^products$ https://goskinly.com/products? [R=301,L]
+
+# ─── SEO pages that should not exist ────────────────────────────────────────
+RewriteRule ^(samsung-azx1-skins|samsung-skins-skins)$ https://goskinly.com/samsung-skins [R=301,L]
+RewriteRule ^samsung-galaxy-s23-skins-1$ https://goskinly.com/samsung-galaxy-s23-skins [R=301,L]
+RewriteRule ^master-skins$ https://goskinly.com/products [R=301,L]
+
+# ─── The homepage ───────────────────────────────────────────────────────────
+# "/" is a directory, not a file, so the routing below would 404 it before
+# DirectoryIndex ever ran.
+RewriteRule ^$ /index.html [L]
+
+# ─── Real files: assets, images, sitemaps, prerendered .html ───────────────
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# A missing asset is a 404, never the app's HTML.
+RewriteRule ^(assets|magneto)/ - [R=404,L]
+
+# >>> routing
+# Fallback for a build where scripts/prerender.mjs could not read the catalogue:
+# serve whatever pages it did write, and the app for every other path, as the
+# site always did.
+# The last segment of the resolved file must be the last segment of the URL.
+# Without this, /magneto-x/anything resolves to magneto-x plus path-info,
+# finds magneto-x.html, and rewrites itself in a loop until the server 500s.
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteCond %{REQUEST_FILENAME}#$1 ^.*/([^/]+)#(?:.*/)?\1$
+RewriteRule ^(.+)$ /$1.html [L]
+RewriteRule ^ /app.html [L]
+# <<< routing
 </IfModule>

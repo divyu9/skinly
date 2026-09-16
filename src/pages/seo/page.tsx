@@ -50,7 +50,7 @@ export default function SEOPage() {
 
   // Determine current URL - all SEO pages are at root level
   const getCurrentUrl = () => {
-    const baseUrl = "https://www.goskinly.com";
+    const baseUrl = "https://goskinly.com";
     return `${baseUrl}/${page.slug}`;
   };
 
@@ -100,7 +100,7 @@ export default function SEOPage() {
             "provider": {
               "@type": "Organization",
               "name": "GoSkinly",
-              "url": "https://www.goskinly.com"
+              "url": "https://goskinly.com"
             }
           })}
         </script>
@@ -115,7 +115,7 @@ export default function SEOPage() {
                 "@type": "ListItem",
                 "position": 1,
                 "name": "Home",
-                "item": "https://www.goskinly.com"
+                "item": "https://goskinly.com"
               },
               {
                 "@type": "ListItem",

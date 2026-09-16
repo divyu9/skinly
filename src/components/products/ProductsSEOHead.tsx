@@ -8,10 +8,10 @@ interface ProductsSEOHeadProps {
 
 export const ProductsSEOHead = memo(function ProductsSEOHead({
   title = "Shop Premium Phone Skins & Gadget Accessories | GoSkinly",
-  description = "Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application. Starting ₹149. Free delivery across India.",
+  description = "Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application. Starting ₹149. Free shipping above ₹499.",
 }: ProductsSEOHeadProps) {
-  const imageUrl = "/logo.webp";
-  const canonicalUrl = "https://www.goskinly.com/products";
+  const imageUrl = "https://goskinly.com/og-default.jpg";
+  const canonicalUrl = "https://goskinly.com/products";
 
   return (
     <Helmet>

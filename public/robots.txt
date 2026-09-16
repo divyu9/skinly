@@ -10,4 +10,4 @@ Disallow: /checkout/
 Disallow: /payment/
 Disallow: /mock-payment/
 
-Sitemap: https://www.goskinly.com/sitemap.xml
+Sitemap: https://goskinly.com/sitemap.xml

@@ -59,6 +59,28 @@ import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
 
+
+const HOME_ORGANIZATION_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "GoSkinly",
+  url: "https://goskinly.com",
+  logo: "https://goskinly.com/logo.webp",
+  description: "Vinyl skins cut to fit 1000+ phones, laptops, consoles, cameras and more.",
+};
+
+const HOME_WEBSITE_LD = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "GoSkinly",
+  url: "https://goskinly.com",
+  potentialAction: {
+    "@type": "SearchAction",
+    target: { "@type": "EntryPoint", urlTemplate: "https://goskinly.com/products?search={search_term_string}" },
+    "query-input": "required name=search_term_string",
+  },
+};
+
 export default function Index() {
   const [isRequestModelOpen, setIsRequestModelOpen] = useState(false);
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
@@ -217,13 +239,18 @@ export default function Index() {
     <>
       <Helmet>
         <title>GoSkinly - Premium Device Skins & Accessories | Starting ₹149</title>
-        <meta name="description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported. Free delivery across India. COD available. Starting ₹149." />
-        <link rel="canonical" href="https://www.goskinly.com/" />
+        <meta name="description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149." />
+        <link rel="canonical" href="https://goskinly.com/" />
         <meta property="og:type" content="website" />
         <meta property="og:title" content="GoSkinly - Premium Device Skins & Accessories | Starting ₹149" />
-        <meta property="og:description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported. Free delivery across India. COD available. Starting ₹149." />
-        <meta property="og:url" content="https://www.goskinly.com/" />
+        <meta property="og:description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149." />
+        <meta property="og:url" content="https://goskinly.com/" />
         <meta property="og:site_name" content="GoSkinly" />
+        {/* Same objects scripts/prerender.mjs writes into the homepage HTML.
+            Helmet replaces the prerendered tags when it mounts, so anything
+            not repeated here disappears from the page Google renders. */}
+        <script type="application/ld+json">{JSON.stringify(HOME_ORGANIZATION_LD)}</script>
+        <script type="application/ld+json">{JSON.stringify(HOME_WEBSITE_LD)}</script>
       </Helmet>
 
       {/* Announcement Bar */}

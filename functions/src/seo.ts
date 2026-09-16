@@ -73,7 +73,7 @@ BRAND FACTS (always accurate):
 - Brand name: GoSkinly
 - Products: vinyl skins/wraps for phones, laptops, tablets, cameras, drones, chargers, gaming consoles, Mac Mini
 - Price: starting from ₹149
-- Shipping: free delivery across India, COD available
+- Shipping: delivery across India; free shipping on orders above ₹499; prepaid orders only (no cash on delivery)
 - Models supported: 1000+ device models
 - Finish types: matte, 3D textured/embossed, transparent
 - Popular design themes: anime, 3D textured, carbon fiber, marble, camouflage, god/religious, gaming, abstract
@@ -162,7 +162,7 @@ CONTENT RULES:
 
 2. STRUCTURE (use exactly this order):
    <h2>Best ${pk} in India — Starting ₹149</h2>
-   [2-paragraph intro — mention GoSkinly brand, ₹149 price, COD available]
+   [2-paragraph intro — mention GoSkinly brand, ₹149 price, cut for the exact model]
 
    <h2>Popular ${brand} Models We Support</h2>
    [mention 6–8 specific models by exact name from DEVICE MODELS TO MENTION]
@@ -184,8 +184,8 @@ CONTENT RULES:
 
 4. INDIA CONTEXT — MANDATORY:
    - Mention "starting from ₹149" in intro paragraph
-   - Mention "COD available" or "cash on delivery"
-   - Mention "free delivery across India"
+   - Mention "free shipping above ₹499"
+   - Never claim cash on delivery — orders are prepaid only
    - Use ₹ symbol (not $ or Rs)
 
 5. INTERNAL LINK ANCHORS — exactly 3:

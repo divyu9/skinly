@@ -16,8 +16,8 @@ export default function ShippingPolicy() {
     <div className="halftone min-h-screen">
       <Helmet>
         <title>Shipping Policy | GoSkinly</title>
-        <meta name="description" content="GoSkinly shipping policy — free delivery across India, COD available. Learn about delivery times and order tracking." />
-        <link rel="canonical" href="https://www.goskinly.com/policies/shipping" />
+        <meta name="description" content="GoSkinly shipping policy — delivery across India, free shipping above ₹499. Learn about delivery times and order tracking." />
+        <link rel="canonical" href="https://goskinly.com/policies/shipping" />
       </Helmet>
       {/* Announcement Bar */}
       <AnnouncementBar />

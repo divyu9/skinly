@@ -291,7 +291,12 @@ export function useProductDetail() {
     if (!productData) return null;
     
     const productUrl = `https://goskinly.com/products/${productData.slug || 'detail'}`;
-    const productImage = displayImages[0]?.url || productData.images?.[0]?.url || '/logo.webp';
+    // Share previews need an absolute URL that loads. Cloudinary links are dead
+    // (the account is gone), so skip them rather than hand WhatsApp a 401.
+    const live = (u?: string) => !!u && !u.includes('res.cloudinary.com');
+    const productImage =
+      [displayImages[0]?.url, ...(productData.images ?? []).map((i: { url?: string }) => i?.url)].find(live) ||
+      'https://goskinly.com/og-default.jpg';
     const productPrice = productData.variants && productData.variants[productState.selectedVariant]?.price || 0;
     
     return {

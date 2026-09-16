@@ -1,0 +1,27 @@
+# Rebuild the site every night so products and SEO pages added during the day
+# get their own prerendered HTML and a place in the sitemap. Until a rebuild,
+# a new page still works for shoppers but answers crawlers with 404.
+#
+# Needs one repository secret: HOSTINGER_DEPLOY_WEBHOOK — the "Auto deployment"
+# webhook URL from hPanel → Websites → goskinly.com → Git. Without it the job
+# does nothing.
+name: Nightly rebuild
+
+on:
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST
+  workflow_dispatch:
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the Hostinger deploy webhook
+        env:
+          HOOK: ${{ secrets.HOSTINGER_DEPLOY_WEBHOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "HOSTINGER_DEPLOY_WEBHOOK is not set; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK" -o /dev/null -w "Hostinger answered %{http_code}\n"

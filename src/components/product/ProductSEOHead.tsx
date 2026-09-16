@@ -45,7 +45,7 @@ interface ProductSEOHeadProps {
   breadcrumb?: Crumb[];
 }
 
-const BASE_URL = "https://www.goskinly.com";
+const BASE_URL = "https://goskinly.com";
 
 export function ProductSEOHead({
   seoMeta,
@@ -63,12 +63,14 @@ export function ProductSEOHead({
   const canonicalUrl = slug ? `${BASE_URL}/products/${slug}` : productUrl;
 
   // Cheapest in-stock variant price; fall back to cheapest overall
-  const activeVariants = variants?.filter(v => v.inventoryQuantity > 0) ?? [];
+  // Unpriced variants are not for sale and must not become the offer price.
+  const pricedVariants = variants?.filter(v => v.price > 0) ?? [];
+  const activeVariants = pricedVariants.filter(v => v.inventoryQuantity > 0);
   const cheapestPrice =
     activeVariants.length > 0
       ? Math.min(...activeVariants.map(v => v.price))
-      : variants && variants.length > 0
-        ? Math.min(...variants.map(v => v.price))
+      : pricedVariants.length > 0
+        ? Math.min(...pricedVariants.map(v => v.price))
         : productPrice;
 
   const isInStock = activeVariants.length > 0;

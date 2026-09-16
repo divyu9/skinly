@@ -2962,7 +2962,7 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'sitemap.getSitemapUrls') {
           const fetchSitemap = async () => {
             try {
-              const baseUrl = "https://www.goskinly.com";
+              const baseUrl = "https://goskinly.com";
               const urls: any[] = [];
               const staticPages = [
                 { path: "/", priority: 1.0, changefreq: "daily" },

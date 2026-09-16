@@ -53,13 +53,13 @@ export function heroPreload(projectId: string): Plugin {
         const out: string[] = [];
         if (mobile) {
           out.push(
-            `<link rel="preload" as="image" href="${esc(mobile)}" ` +
+            `<link rel="preload" as="image" data-hero href="${esc(mobile)}" ` +
               `fetchpriority="high" media="(max-width: 767px)" />`,
           );
         }
         if (desktop) {
           out.push(
-            `<link rel="preload" as="image" href="${esc(desktop)}" ` +
+            `<link rel="preload" as="image" data-hero href="${esc(desktop)}" ` +
               `fetchpriority="high" media="(min-width: 768px)" />`,
           );
         }
