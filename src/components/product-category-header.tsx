@@ -24,6 +24,18 @@ interface ProductCategoryHeaderProps {
  * third and fourth line on a phone, over a strip that is fixed above the
  * products. The full names still live in the data and on the product page.
  */
+/*
+ * The order finishes are offered in, most-stocked first rather than whatever
+ * the collection happens to return. Matte and 3D carry almost the whole
+ * catalogue — 146 and 183 phone skins against 12, 3 and 1 for the rest — so
+ * they lead. Anything not named here falls in behind, in its existing order.
+ */
+const FINISH_ORDER = ["matte", "embossed", "transparent", "premium-leather", "protectors"];
+const finishRank = (name: string) => {
+  const i = FINISH_ORDER.indexOf(name);
+  return i === -1 ? FINISH_ORDER.length : i;
+};
+
 const SHORT_FINISH: Record<string, string> = {
   "3D (Embossed)": "3D",
   "Protectors/Membranes": "Protectors",
@@ -244,6 +256,8 @@ export function ProductCategoryHeader({
                           if (!facets || !g) return true;
                           return (facets.finishByGadget?.[g]?.[ft._id] ?? 0) > 0;
                         })
+                        .slice()
+                        .sort((a: { name: string }, b: { name: string }) => finishRank(a.name) - finishRank(b.name))
                         .map((finishType) => (
                         <button
                           key={finishType._id}
