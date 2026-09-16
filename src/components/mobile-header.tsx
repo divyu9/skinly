@@ -23,7 +23,7 @@ import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
 import { BrandLogo } from "./brand-logo.tsx";
 
 interface MobileHeaderProps {
@@ -199,7 +199,21 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
     return () => window.removeEventListener(ANNOUNCEMENT_DISMISSED_EVENT, sync);
   }, []);
 
-  const showAnnouncement = (homepageSettings?.announcementEnabled ?? false) && !barDismissed;
+  /*
+   * While the settings query is still out, assume what was true last time
+   * rather than assuming off. Defaulting to false meant the header sat at
+   * top 0, then jumped to 28 when the answer arrived, taking the whole page
+   * with it.
+   */
+  const settingsKnown = homepageSettings !== undefined;
+  const enabled = settingsKnown
+    ? !!homepageSettings?.announcementEnabled
+    : announcementLikelyShown();
+  useEffect(() => {
+    if (settingsKnown) rememberAnnouncementShown(!!homepageSettings?.announcementEnabled);
+  }, [settingsKnown, homepageSettings?.announcementEnabled]);
+
+  const showAnnouncement = enabled && !barDismissed;
   const announcementHeight = showAnnouncement ? 28 : 0;
 
   return (

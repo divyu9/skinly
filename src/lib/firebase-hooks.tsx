@@ -120,6 +120,14 @@ export function useQuery(apiRef: any, args?: any) {
           if (path === 'homepage.getActiveHomepageSections') {
           const q = query(collection(db, 'homepageSections'));
           unsubscribe = onSnapshot(q, (snap) => {
+            /*
+             * This one decides which sections exist and in what order, so an
+             * empty cache read unmounts the entire homepage for a frame and
+             * remounts it when the server answers. The tallest section paid
+             * for it: the customer videos went 426px → 0 → 706px, a single
+             * 0.65 layout shift and most of the page's CLS.
+             */
+            if (snap.empty && snap.metadata.fromCache) return;
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);
@@ -136,6 +144,8 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepage.getActiveCategoryDisplaySettings') {
           const q = query(collection(db, 'categoryDisplaySettings'));
           unsubscribe = onSnapshot(q, (snap) => {
+            // Empty from cache is not an answer — see getActiveHeroSlides.
+            if (snap.empty && snap.metadata.fromCache) return;
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);
@@ -225,6 +235,17 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepage.getActiveHeroSlides') {
           const q = query(collection(db, 'heroSlides'));
           unsubscribe = onSnapshot(q, (snap) => {
+            /*
+             * An empty answer from the local cache is not an answer.
+             *
+             * onSnapshot fires immediately from cache, which on a first visit
+             * is empty. The slider read that as "no slides", returned null, and
+             * a 425px-tall element vanished from the middle of the homepage
+             * until the server replied — a single 0.65 layout shift, most of
+             * the page's entire CLS. Staying undefined keeps the skeleton up,
+             * which is already exactly the right height.
+             */
+            if (snap.empty && snap.metadata.fromCache) return;
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);
@@ -241,6 +262,8 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepage.getActiveFeatureBanners') {
           const q = query(collection(db, 'featureBanners'));
           unsubscribe = onSnapshot(q, (snap) => {
+            // Empty from cache is not an answer — see getActiveHeroSlides.
+            if (snap.empty && snap.metadata.fromCache) return;
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);
@@ -257,6 +280,8 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepage.getActiveUgcVideos') {
           const q = query(collection(db, 'ugcVideos'));
           unsubscribe = onSnapshot(q, (snap) => {
+            // Empty from cache is not an answer — see getActiveHeroSlides.
+            if (snap.empty && snap.metadata.fromCache) return;
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);
@@ -273,6 +298,8 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepageSectionCards.getActiveSectionCards') {
           const q = query(collection(db, 'homepageSectionCards'), where('sectionId', '==', args?.sectionId));
           unsubscribe = onSnapshot(q, (snap) => {
+            // Empty from cache is not an answer — see getActiveHeroSlides.
+            if (snap.empty && snap.metadata.fromCache) return;
             let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);

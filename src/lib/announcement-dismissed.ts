@@ -28,3 +28,35 @@ export function dismissAnnouncement() {
   }
   window.dispatchEvent(new Event(ANNOUNCEMENT_DISMISSED_EVENT));
 }
+
+
+/*
+ * Whether the bar was showing last time, so the layout can reserve its height
+ * before the settings query answers.
+ *
+ * The bar is `fixed`, but the header offsets itself beneath it and the page
+ * pads for the header — so when `announcementEnabled` resolved from undefined
+ * to true, everything below moved down 28px. That was a measured 0.076 of
+ * layout shift on every cold load. Remembering the last answer means a
+ * returning visitor reserves the right space from the first frame; a first
+ * visit assumes it is on, which is the common case and the cheaper miss.
+ */
+
+const SHOWN_KEY = "skinly_announcement_was_shown";
+
+export function announcementLikelyShown(): boolean {
+  try {
+    const v = localStorage.getItem(SHOWN_KEY);
+    return v === null ? true : v === "1";
+  } catch {
+    return true;
+  }
+}
+
+export function rememberAnnouncementShown(shown: boolean) {
+  try {
+    localStorage.setItem(SHOWN_KEY, shown ? "1" : "0");
+  } catch {
+    /* storage unavailable — the guess above still holds for this page */
+  }
+}

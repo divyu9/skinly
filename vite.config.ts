@@ -1,10 +1,13 @@
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react-swc";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
+import { heroPreload } from "./vite-plugin-hero-preload";
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
   server: {
     host: "0.0.0.0",
     port: 5173,
@@ -13,7 +16,7 @@ export default defineConfig({
       overlay: false,
     },
   },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), heroPreload(env.VITE_FIREBASE_PROJECT_ID)],
   resolve: {
     alias: {
       "@/convex": path.resolve(__dirname, "./convex"),
@@ -36,4 +39,5 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 600
   }
+  };
 });
