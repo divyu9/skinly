@@ -171,14 +171,24 @@ export const copyR2Object = onCall(async (data: any, context: any) => {
   validateKey(toKey);
 
   const { s3, config } = r2Client();
-  await s3.send(new CopyObjectCommand({
-    Bucket: config.bucketName,
-    // CopySource is a path, so the source key needs encoding but the slashes do not.
-    CopySource: `${config.bucketName}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
-    Key: toKey,
-    ContentType: typeof contentType === "string" ? contentType : undefined,
-    MetadataDirective: contentType ? "REPLACE" : "COPY",
-  }));
+  try {
+    await s3.send(new CopyObjectCommand({
+      Bucket: config.bucketName,
+      // CopySource is a path, so the source key needs encoding but the slashes do not.
+      CopySource: `${config.bucketName}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
+      Key: toKey,
+      ContentType: typeof contentType === "string" ? contentType : undefined,
+      MetadataDirective: contentType ? "REPLACE" : "COPY",
+    }));
+  } catch (err: any) {
+    // Unhandled, any S3 error reached the studio as a bare "internal".
+    const code = err?.name || err?.Code || "";
+    console.error("copyR2Object failed", { fromKey, toKey, code, message: err?.message });
+    if (code === "NoSuchKey" || err?.$metadata?.httpStatusCode === 404) {
+      throw new HttpsError("not-found", `The staged image ${fromKey} is no longer there — generate this shot again`);
+    }
+    throw new HttpsError("unavailable", `Could not copy the image (${code || err?.message || "storage error"}) — try again`);
+  }
 
   return { success: true, key: toKey, url: `${config.publicUrl.replace(/\/$/, "")}/${toKey}` };
 });

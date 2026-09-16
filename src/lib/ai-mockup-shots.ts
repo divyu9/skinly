@@ -55,6 +55,18 @@ export interface MockupShot {
    * will attach its image to the other's listing.
    */
   matchSingleVariant?: boolean;
+  /**
+   * Which listing this image belongs to, within its gadget.
+   *
+   * One gadget can be several listings: under "console" a PS5 skin, an Xbox
+   * Series X skin and an Xbox Series S skin are three products; under "drone"
+   * the drone skin (Drone Only / Drone + RC) is one and a controller-only skin
+   * (with or without display) is another. Each listing can want several
+   * pictures, so the studio offers one "Create listing" per listing, not one
+   * per picture. Unset means the default for the shot's file suffix, and
+   * failing that, one listing for the whole gadget.
+   */
+  listing?: string;
   prompt: string;
   order: number;
   isActive: boolean;
@@ -198,6 +210,38 @@ export const PLACEHOLDERS = ["fidelity", "staging", "rNumber", "designName", "cu
 
 /** Where a design comes from. Rolls repeat; cutouts are one fixed artwork. */
 export type DesignSource = "roll" | "cutout";
+
+/**
+ * Listings for the starter shots, by file suffix, for shots saved before the
+ * listing field existed. Anything not named here is one listing per gadget —
+ * which is right for laptops, cameras, chargers and controllers (one controller
+ * listing carries every Xbox and PlayStation variant).
+ */
+const LISTING_BY_SUFFIX: Record<string, string> = {
+  "ps5": "PS5",
+  "ps5-angle": "PS5",
+  "ps5-set": "PS5",
+  "xbox-x": "Xbox Series X",
+  "xbox-x-set": "Xbox Series X",
+  "xbox-s": "Xbox Series S",
+  "xbox-s-set": "Xbox Series S",
+  "drone": "Drone",
+  "drone-rc": "Drone",
+  "drone-hand": "Drone",
+  "drone-rc-nodisplay": "Drone controller",
+  "drone-rc-display": "Drone controller",
+};
+
+const titleCase = (s: string) => s.replace(/(^|[\s-])(\w)/g, (_, a, b) => a + b.toUpperCase());
+
+/** The listing a shot's image belongs to. */
+export function listingOf(shot: Pick<MockupShot, "listing" | "suffix" | "gadget">): string {
+  const own = String(shot.listing || "").trim();
+  if (own) return own;
+  // A duplicated shot carries a "-2" tail; it still belongs where its original does.
+  const suffix = String(shot.suffix || "").toLowerCase().replace(/-\d+$/, "");
+  return LISTING_BY_SUFFIX[suffix] || titleCase(String(shot.gadget || "other"));
+}
 
 /** R-01 + laptop-top -> R-01-laptop-top. Kept ASCII-safe for use as an R2 key. */
 export function mockupFileStem(rNumber: string, suffix: string, attempt = 1): string {
@@ -738,7 +782,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "and the propellers stay uncovered. " + REAL + "{{staging}} ",
   },
   {
-    label: "Lid only",
+    label: "Lid only — with Apple logo",
     gadget: "laptop",
     suffix: "laptop-top",
     skuCodes: ["LP", "LPT", "LAP"],
@@ -761,6 +805,30 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "stops cleanly at the edges. Around the laptop, a few softly out-of-focus props placed off to "
         + "the sides — a small green plant, a closed notebook, a ceramic mug — muted and low-contrast so "
         + "they frame the laptop without competing with the design. {{staging}} ",
+  },
+  {
+    label: "Lid only — without logo",
+    gadget: "laptop",
+    suffix: "laptop-top-nologo",
+    skuCodes: ["LP", "LPT", "LAP"],
+    variantTitles: ["Only Top"],
+    matchSingleVariant: true,
+    order: 0,
+    isActive: true,
+    prompt:
+      "A modern 14-inch MacBook-style aluminium laptop resting on a light oak desk, opened just far "
+        + "enough — about 20 degrees — that the hinge and the edge of the screen are visible, "
+        + "photographed from slightly above and in front so the whole outer lid faces the camera and "
+        + "fills most of the frame while still reading unmistakably as a laptop: visible chassis "
+        + "thickness, rounded corners, hinge and a sliver of the dark screen. The entire outer lid is "
+        + "covered edge to edge with a vinyl skin. {{fidelity}} The vinyl is one continuous, unbroken "
+        + "sheet with no cut-out of any kind: there is no logo on the lid at all — no Apple logo, no "
+        + "brand mark, no hole, no outline and no bare metal anywhere on the lid. The printed artwork "
+        + "runs uninterrupted across the whole lid, including the centre where a logo would normally "
+        + "sit. The skin follows the lid's rounded corners and stops cleanly at the edges. Around the "
+        + "laptop, a few softly out-of-focus props placed off to the sides — a small green plant, a "
+        + "closed notebook, a ceramic mug — muted and low-contrast so they frame the laptop without "
+        + "competing with the design. {{staging}} ",
   },
   {
     label: "Keyboard deck — top down",

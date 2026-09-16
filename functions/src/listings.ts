@@ -43,22 +43,36 @@ interface VariantTemplate {
   weight?: number;
 }
 
-/** The variant shape most products of this gadget already use. */
+/**
+ * The variant shape most products of this listing kind already use.
+ *
+ * One gadget can hold several kinds of listing — PS5, Series X and Series S
+ * are all consoles — so the caller names the SKU view codes its pictures are
+ * for, and only shapes made entirely of those codes count. With no such shape
+ * there is no precedent, and `precedent: false` tells the studio to let the
+ * admin write the variants rather than copy a different product's.
+ */
 async function templateForGadget(
   db: admin.firestore.Firestore,
-  gadgetTypeId: string
-): Promise<{ variants: VariantTemplate[]; finishTypeId?: string; dims: any }> {
-  const [productSnap, variantSnap] = await Promise.all([
-    db.collection("products").where("gadgetTypeId", "==", gadgetTypeId).get(),
-    db.collection("variants").get(),
-  ]);
-  const ids = new Set(productSnap.docs.map((d) => d.id));
+  gadgetTypeId: string,
+  prefer: { codes?: string[] } = {}
+): Promise<{ variants: VariantTemplate[]; finishTypeId?: string; dims: any; precedent: boolean }> {
+  const productSnap = await db.collection("products").where("gadgetTypeId", "==", gadgetTypeId).get();
+  // Only this gadget's variants: reading all ~1,800 to use a hundred was most
+  // of the seven seconds the studio waited on this.
+  const ids = productSnap.docs.map((d) => d.id);
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
+  const variantSnaps = await Promise.all(
+    chunks.map((c) => db.collection("variants").where("productId", "in", c).get())
+  );
   const byProduct = new Map<string, any[]>();
-  for (const d of variantSnap.docs) {
-    const v = d.data() as any;
-    if (!ids.has(v.productId)) continue;
-    if (!byProduct.has(v.productId)) byProduct.set(v.productId, []);
-    byProduct.get(v.productId)!.push(v);
+  for (const snap of variantSnaps) {
+    for (const d of snap.docs) {
+      const v = d.data() as any;
+      if (!byProduct.has(v.productId)) byProduct.set(v.productId, []);
+      byProduct.get(v.productId)!.push(v);
+    }
   }
 
   // A product's shape is its set of SKU tails. The tail is what is left after
@@ -86,10 +100,18 @@ async function templateForGadget(
     else shapes.set(key, { count: 1, variants: entries });
   }
 
-  const best = [...shapes.values()].sort((a, b) => b.count - a.count)[0];
+  const codes = new Set((prefer.codes || []).map((c) => String(c).trim().toUpperCase()).filter(Boolean));
+  const ranked = [...shapes.values()].sort((a, b) => b.count - a.count);
+  const fits = (v: VariantTemplate[]) => v.every((e) => e.skuTail && codes.has(e.skuTail));
+  const best = codes.size ? ranked.find((sh) => fits(sh.variants)) : ranked[0];
+  const precedent = !!best;
+  const firstCode = [...codes][0] || "";
   const sample = productSnap.docs.find((d) => (d.data() as any).length > 0)?.data() as any;
   return {
-    variants: best?.variants || [{ skuTail: "", title: "Default Title", price: 299, materialMultiplier: 1 }],
+    precedent,
+    variants: best?.variants || [
+      { skuTail: firstCode, title: "Default Title", price: ranked[0]?.variants[0]?.price || 299, materialMultiplier: 1 },
+    ],
     finishTypeId: sample?.finishTypeId,
     dims: {
       length: sample?.length ?? 10,
@@ -147,7 +169,9 @@ export const getListingTemplate = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
   const db = admin.firestore();
   const g = await resolveGadget(db, String(data?.gadgetTypeId || ""), String(data?.gadget || ""));
-  const tpl = await templateForGadget(db, g.id);
+  const tpl = await templateForGadget(db, g.id, {
+    codes: Array.isArray(data?.skuCodes) ? data.skuCodes : [],
+  });
   return {
     success: true,
     ...tpl,
@@ -186,6 +210,8 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
   const designName = String(data?.designName || "").trim();
   const gadgetIn = String(data?.gadgetTypeId || "");
   const gadgetName = String(data?.gadget || "").trim();
+  // Which listing of the gadget this is — "Drone controller", "Xbox Series S".
+  const listingName = String(data?.listing || "").trim();
   const finish = String(data?.finish || "").trim();
   const source: "roll" | "cutout" = data?.source === "cutout" ? "cutout" : "roll";
   const imageUrl = String(data?.imageUrl || "").trim();
@@ -252,6 +278,9 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
             `Design name: ${designName || designCode}\n` +
             `Design code: ${designCode}\n` +
             `Gadget: ${gadgetLabel}\n` +
+            (listingName && listingName.toLowerCase() !== gadgetLabel.toLowerCase()
+              ? `Product: a skin for the ${listingName} (name this device in the title)\n`
+              : "") +
             `Finish: ${finishLabel}\n` +
             `Material: ${source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
             `Variants offered: ${variants.map((v) => v.title).join(", ")}`,
@@ -311,6 +340,7 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
     height: tpl.dims.height,
     weight: tpl.dims.weight,
     createdFromDesign: designCode,
+    ...(listingName ? { listingKind: listingName } : {}),
     createdAt: now,
   });
 

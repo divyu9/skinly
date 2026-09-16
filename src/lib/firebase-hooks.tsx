@@ -98,6 +98,24 @@ const chunked = <T,>(list: T[], size: number): T[][] => {
  * The products about to be shown, re-read: their documents and variants, so
  * price and stock on screen are live. Products no longer active drop out.
  */
+/**
+ * The order a product's variants are offered in.
+ *
+ * Firestore returns them in document-id order, which is random: a laptop
+ * listing could open on "Top + Keyboard Area" with "Only Top" to its right.
+ * The keyboard view spends two sheets, so a design with one sheet left opened
+ * on a variant it cannot make and read as sold out. Smallest material first,
+ * then cheapest, then oldest — which puts "Only Top" first on every laptop and
+ * leaves same-priced lists (phone models) in the order they were added.
+ */
+export function sortVariants<T extends { materialMultiplier?: any; price?: any; _creationTime?: any }>(list: T[]): T[] {
+  return [...list].sort((a, b) =>
+    (Number(a.materialMultiplier) || 1) - (Number(b.materialMultiplier) || 1) ||
+    (Number(a.price) || 0) - (Number(b.price) || 0) ||
+    (Number(a._creationTime) || 0) - (Number(b._creationTime) || 0)
+  );
+}
+
 async function refreshProducts(list: any[], label: string): Promise<any[]> {
   if (!list.length) return [];
   const ids = [...new Set(list.map((p) => p._id))];
@@ -1820,34 +1838,120 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'stockNotifications.getNotificationStats') {
+          // Waiting requests grouped by product and variant, each with the
+          // people behind it: the number they typed, when, and whether they
+          // were signed in — which is how a test entry or a fake is spotted.
+          // Requests saved before titles were stored are named from the
+          // product and variant themselves.
+          const names = new Map<string, any>();
+          const nameOf = async (col: 'products' | 'variants', id: string) => {
+            const key = `${col}/${id}`;
+            if (!id) return null;
+            if (!names.has(key)) {
+              names.set(key, getDoc(doc(db, col, id)).then((d) => (d.exists() ? d.data() : null)).catch(() => null));
+            }
+            return names.get(key);
+          };
           unsubscribe = onSnapshot(
             query(collection(db, 'stockNotifications'), where('status', '==', 'waiting')),
             (snap) => {
-              const products = new Map<string, any>();
-              snap.docs.forEach(d => {
-                const n: any = d.data();
-                if (!products.has(n.productId)) {
-                  products.set(n.productId, {
-                    productId: n.productId,
-                    productTitle: n.productTitle,
-                    variants: new Map<string, any>(),
-                    totalCount: 0,
+              void (async () => {
+                const rows = snap.docs.map(d => ({ _id: d.id, ...(d.data() as any) }));
+                const perPhone = new Map<string, number>();
+                rows.forEach(n => perPhone.set(n.phoneNumber, (perPhone.get(n.phoneNumber) || 0) + 1));
+                const products = new Map<string, any>();
+                for (const n of rows) {
+                  const variant: any = await nameOf('variants', n.variantId);
+                  const productId = n.productId || variant?.productId || '';
+                  const product: any = n.productTitle ? null : await nameOf('products', productId);
+                  if (!products.has(productId)) {
+                    products.set(productId, {
+                      productId,
+                      productTitle: n.productTitle || product?.title || 'Unknown product',
+                      productSlug: n.productSlug || product?.slug || '',
+                      variants: new Map<string, any>(),
+                      totalCount: 0,
+                    });
+                  }
+                  const p = products.get(productId);
+                  p.totalCount++;
+                  if (!p.variants.has(n.variantId)) {
+                    p.variants.set(n.variantId, {
+                      variantId: n.variantId,
+                      variantTitle: n.variantTitle || variant?.title || 'Unknown variant',
+                      sku: n.sku || variant?.sku || '',
+                      inventoryQuantity: variant?.inventoryQuantity,
+                      count: 0,
+                      requests: [] as any[],
+                    });
+                  }
+                  const v = p.variants.get(n.variantId);
+                  v.count++;
+                  v.requests.push({
+                    _id: n._id,
+                    phoneNumber: n.phoneNumber,
+                    createdAt: n.createdAt || 0,
+                    userId: n.userId || '',
+                    userEmail: n.userEmail || '',
+                    requestsFromThisNumber: perPhone.get(n.phoneNumber) || 1,
                   });
                 }
-                const p = products.get(n.productId);
-                p.totalCount++;
-                if (!p.variants.has(n.variantId)) {
-                  p.variants.set(n.variantId, {
-                    variantId: n.variantId, variantTitle: n.variantTitle, sku: n.sku, count: 0,
-                  });
-                }
-                p.variants.get(n.variantId).count++;
-              });
-              setData(Array.from(products.values()).map(p => ({
-                ...p, variants: Array.from(p.variants.values()),
-              })));
+                setData(Array.from(products.values())
+                  .map(p => ({
+                    ...p,
+                    variants: Array.from(p.variants.values()).map((v: any) => ({
+                      ...v,
+                      requests: v.requests.sort((a: any, b: any) => b.createdAt - a.createdAt),
+                    })),
+                  }))
+                  .sort((a, b) => b.totalCount - a.totalCount));
+              })();
             }
           );
+        }
+        else if (path === 'stockNotifications.getWhatsAppHealth') {
+          // Everything that has to be true for a back-in-stock message to
+          // leave, checked where it can be, plus what the last sends did.
+          void (async () => {
+            try {
+              const [uc, msgs, notified] = await Promise.all([
+                getDocs(query(collection(db, 'whatsappUsecases'), where('usecaseKey', '==', 'back_in_stock'), limit(1))),
+                getDocs(query(collection(db, 'whatsappMessages'), where('usecaseKey', '==', 'back_in_stock'), limit(100))),
+                getDocs(query(collection(db, 'stockNotifications'), where('status', '==', 'notified'), limit(200))),
+              ]);
+              const usecase: any = uc.empty ? null : uc.docs[0].data();
+              let template: any = null;
+              const wid = usecase?.providerTemplateId;
+              if (wid) {
+                const t = await getDocs(query(collection(db, 'whatsappTemplates'), where('providerTemplateId', '==', wid), limit(1)));
+                template = t.empty ? null : t.docs[0].data();
+              }
+              const recent = msgs.docs
+                .map(d => ({ _id: d.id, ...(d.data() as any) }))
+                .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+                .slice(0, 15)
+                .map(m => ({
+                  _id: m._id,
+                  phone: m.recipientPhone,
+                  status: m.status,
+                  reason: m.failureReason || '',
+                  createdAt: m.createdAt || 0,
+                  sentAt: m.sentAt || 0,
+                }));
+              setData({
+                usecase: usecase
+                  ? { enabled: usecase.enabled === true, templateName: usecase.templateName || '', providerTemplateId: wid || '' }
+                  : null,
+                template: template
+                  ? { name: template.templateName || '', variables: template.variables || [] }
+                  : null,
+                recent,
+                notifiedTotal: notified.size,
+              });
+            } catch (e: any) {
+              setData({ error: e?.message || 'Could not read the WhatsApp setup' });
+            }
+          })();
         }
         else if (path === 'mediaLibrary.getFolders') {
           unsubscribe = onSnapshot(collection(db, 'mediaLibrary'), (snap) => {
@@ -2663,11 +2767,26 @@ export function useQuery(apiRef: any, args?: any) {
             }
           };
           void load();
-          // Stock edits and manual assignments both change the answer.
-          const unsubV = onSnapshot(collection(db, 'variants'), () => { void load(); });
-          const unsubR = onSnapshot(collection(db, 'rollInventory'), () => { void load(); });
-          const unsubC = onSnapshot(collection(db, 'cutoutInventory'), () => { void load(); });
-          unsubscribe = () => { unsubV(); unsubR(); unsubC(); };
+          // Stock edits and manual assignments both change the answer. Each
+          // listener's first snapshot is the state `load` already asked about,
+          // and answering it called the function three more times at once —
+          // four cold calls of a function that reads the whole catalogue, which
+          // is most of why the Cutouts tab took ten seconds to open. Later
+          // changes arrive in bursts (a sheet edit restocks a dozen variants),
+          // so they are folded into one call.
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          const reload = () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(() => { timer = null; void load(); }, 1500);
+          };
+          const afterFirst = () => {
+            let first = true;
+            return () => { if (first) { first = false; return; } reload(); };
+          };
+          const unsubV = onSnapshot(collection(db, 'variants'), afterFirst());
+          const unsubR = onSnapshot(collection(db, 'rollInventory'), afterFirst());
+          const unsubC = onSnapshot(collection(db, 'cutoutInventory'), afterFirst());
+          unsubscribe = () => { if (timer) clearTimeout(timer); unsubV(); unsubR(); unsubC(); };
         }
         else if (path === 'rollsManagement.getLowStockAlerts') {
           const ROLL_WIDTH_CM = 29.5;
@@ -2733,7 +2852,7 @@ export function useQuery(apiRef: any, args?: any) {
 
               const vq = query(collection(db, 'variants'), where('productId', '==', productData._id));
               const vsnap = await getDocs(vq);
-              productData.variants = vsnap.docs.map(d => ({ _id: d.id, ...d.data() }));
+              productData.variants = sortVariants(vsnap.docs.map(d => ({ _id: d.id, ...d.data() }) as any));
               
               setData(productData);
             } catch (error) {
@@ -5108,6 +5227,13 @@ export function useMutation(apiRef: any) {
           where('variantId', '==', args.variantId), where('status', '==', 'waiting')));
         if (waiting.empty) return { queued: 0 };
 
+        // Requests made before titles were stored carry none, and the template
+        // would go out with an empty product name.
+        const variantSnap = await getDoc(doc(db, 'variants', String(args.variantId)));
+        const variant: any = variantSnap.exists() ? variantSnap.data() : null;
+        const productSnap = variant?.productId ? await getDoc(doc(db, 'products', variant.productId)) : null;
+        const product: any = productSnap?.exists() ? productSnap.data() : null;
+
         const batch = writeBatch(db);
         waiting.docs.forEach(d => {
           const n: any = d.data();
@@ -5118,7 +5244,19 @@ export function useMutation(apiRef: any) {
             providerTemplateId: usecase.providerTemplateId,
             recipientPhone: n.phoneNumber,
             recipientUserId: n.userId || null,
-            variables: { product_name: n.productTitle || "", variant_name: n.variantTitle || "" },
+            // Every name the template editor offers that this message can
+            // fill; the worker sends only the ones the template declares.
+            variables: {
+              product_name: n.productTitle || product?.title || "",
+              variant_name: n.variantTitle || variant?.title || "",
+              model_name: n.variantTitle || variant?.title || "",
+              product_url: `https://goskinly.com/products/${n.productSlug || product?.slug || ""}`,
+              product_price: variant?.price ? `₹${variant.price}` : "",
+              shop_url: "https://goskinly.com",
+              company_name: "Skinly",
+              customer_name: "there",
+              stock_notification: "back in stock",
+            },
             status: 'pending',
             retryCount: 0,
             createdAt: Date.now(),
@@ -5130,10 +5268,29 @@ export function useMutation(apiRef: any) {
             priority: 'normal',
             scheduledFor: Date.now(),
           });
-          batch.update(d.ref, { status: 'notified', notifiedAt: Date.now() });
+          // Kept as history under a fresh id: the waiting request's id is
+          // variant+phone, and it has to be free again for the next time this
+          // customer asks.
+          batch.set(doc(collection(db, 'stockNotifications')), {
+            ...n,
+            status: 'notified',
+            notifiedAt: Date.now(),
+            messageId: msgRef.id,
+          });
+          batch.delete(d.ref);
         });
         await batch.commit();
-        return { queued: waiting.size };
+        // Send now rather than on the worker's next five-minute pass, so the
+        // result is known while the admin is still looking.
+        let sent = 0;
+        let workerError = '';
+        try {
+          const res: any = await httpsCallable(functions, 'triggerWhatsAppWorker')({});
+          sent = Number(res?.data?.sent) || 0;
+        } catch (e: any) {
+          workerError = e?.message || 'worker call failed';
+        }
+        return { queued: waiting.size, sent, workerError };
       }
 
       if (path === 'whatsappMessaging.triggerWorker' || path === 'whatsappActions.testTemplate') {
@@ -5360,6 +5517,12 @@ export function useMutation(apiRef: any) {
       // functions, in functions/src/ordersAdmin.ts.
       // ---------------------------------------------------------------------
 
+      if (path === 'stockNotifications.deleteRequest') {
+        if (!args?.id) throw new Error('Missing request');
+        await deleteDoc(doc(db, 'stockNotifications', String(args.id)));
+        return { success: true };
+      }
+
       if (path === 'stockNotifications.subscribeToNotification') {
         const { getAuth } = await import('firebase/auth');
         const user = getAuth().currentUser;
@@ -5369,23 +5532,36 @@ export function useMutation(apiRef: any) {
 
         // One subscription per person per variant, or a restock texts them
         // once for every time they pressed the button.
-        const dupe = await getDocs(query(
-          collection(db, 'stockNotifications'),
-          where('variantId', '==', args.variantId),
-          where('phoneNumber', '==', phone),
-          where('status', '==', 'waiting'),
-          limit(1)
-        ));
-        if (!dupe.empty) return { success: true, alreadySubscribed: true };
-
-        await addDoc(collection(db, 'stockNotifications'), {
-          variantId: args.variantId,
-          productId: args.productId || '',
-          phoneNumber: phone,
-          userId: user?.uid || '',
-          status: 'waiting',
-          createdAt: Date.now(),
-        });
+        //
+        // This used to check with a query first, but only admins may read this
+        // collection, so every customer's request failed on that query and
+        // nothing was saved — only requests made while signed in as an admin
+        // ever arrived. The document id now is the uniqueness: a customer may
+        // create it, and creating it again is an update, which the rules
+        // refuse, which is exactly "already subscribed".
+        const variantSnap = await getDoc(doc(db, 'variants', String(args.variantId)));
+        const variant: any = variantSnap.exists() ? variantSnap.data() : {};
+        const productId = String(args.productId || variant.productId || '');
+        const productSnap = productId ? await getDoc(doc(db, 'products', productId)) : null;
+        const product: any = productSnap?.exists() ? productSnap.data() : {};
+        try {
+          await setDoc(doc(db, 'stockNotifications', `${args.variantId}_${phone}`), {
+            variantId: String(args.variantId),
+            productId,
+            productTitle: String(product.title || ''),
+            productSlug: String(product.slug || ''),
+            variantTitle: String(variant.title || args.variantTitle || ''),
+            sku: String(variant.sku || ''),
+            phoneNumber: phone,
+            userId: user?.uid || '',
+            userEmail: user?.email || '',
+            status: 'waiting',
+            createdAt: Date.now(),
+          });
+        } catch (e: any) {
+          if (e?.code === 'permission-denied') return { success: true, alreadySubscribed: true };
+          throw e;
+        }
         return { success: true, alreadySubscribed: false };
       }
 

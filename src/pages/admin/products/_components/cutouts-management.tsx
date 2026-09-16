@@ -12,8 +12,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
 import {
   ScissorsIcon, SearchIcon, ImageIcon, UploadIcon, PlusIcon, TrashIcon,
-  Loader2Icon, AlertTriangleIcon, RotateCwIcon, RotateCcwIcon,
+  Loader2Icon, AlertTriangleIcon, RotateCwIcon, RotateCcwIcon, PencilIcon, WrenchIcon,
 } from "lucide-react";
+import { LaptopSkuFix } from "./laptop-sku-fix.tsx";
 
 /**
  * Stock for designs that come as printed sheets rather than off a roll.
@@ -44,6 +45,11 @@ export function CutoutsManagement() {
   const [staged, setStaged] = useState<{ id: string; dataUrl: string; turns: number } | null>(null);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState({ cutoutNumber: "", designName: "", sheetsAvailable: "0", finish: "3D Textured", aliases: "" });
+  // The cutout being edited, or null. Shares the form with "Add".
+  const [editing, setEditing] = useState<any | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [fixingSkus, setFixingSkus] = useState(false);
+  const blankDraft = { cutoutNumber: "", designName: "", sheetsAvailable: "0", finish: "3D Textured", aliases: "" };
   const uploadFor = useRef<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -138,9 +144,80 @@ export function CutoutsManagement() {
     }
   };
 
-  if (cutouts === undefined || variantIndex === undefined) {
-    return <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
+  const openEdit = (c: any) => {
+    setEditing(c);
+    setDraft({
+      cutoutNumber: String(c.cutoutNumber || ""),
+      designName: String(c.designName || ""),
+      sheetsAvailable: String(Number(c.sheetsAvailable) || 0),
+      finish: String(c.finish || ""),
+      aliases: (c.aliases || []).join(", "),
+    });
+  };
+
+  const closeForm = () => {
+    setAdding(false);
+    setEditing(null);
+    setDraft(blankDraft);
+  };
+
+  const parseCodes = (v: string) =>
+    [...new Set(v.split(",").map((a) => a.trim().toUpperCase()).filter(Boolean))];
+
+  const saveForm = async () => {
+    const cutoutNumber = draft.cutoutNumber.trim().toUpperCase();
+    if (!cutoutNumber) return;
+    const aliases = parseCodes(draft.aliases).filter((a) => a !== cutoutNumber);
+    // A code may belong to one cutout only, or two piles would both claim the
+    // same listings and the stock would be counted twice.
+    const taken = (cutouts || []).find((c) =>
+      c._id !== editing?._id &&
+      [c.cutoutNumber, ...(c.aliases || [])].map((x: string) => String(x).toUpperCase())
+        .some((x: string) => x === cutoutNumber || aliases.includes(x))
+    );
+    if (taken) {
+      toast.error(`A code here already belongs to cutout ${taken.cutoutNumber}`);
+      return;
+    }
+    const fields = {
+      cutoutNumber,
+      designName: draft.designName.trim(),
+      sheetsAvailable: Math.max(0, parseInt(draft.sheetsAvailable) || 0),
+      finish: draft.finish.trim(),
+      aliases,
+    };
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateCutout({ id: editing._id, ...fields });
+        // Codes that were dropped stop feeding their listings; codes that were
+        // added start. Recalculate both sides.
+        const before = [editing.cutoutNumber, ...(editing.aliases || [])];
+        const codes = [...new Set([...before, cutoutNumber, ...aliases].map((x) => String(x).toUpperCase()))];
+        try { await recalcStock({ codes }); } catch { toast.warning("Saved, but restocking the variants failed"); }
+        toast.success(`Cutout ${cutoutNumber} updated`);
+      } else {
+        await createCutout({ ...fields, isActive: true, createdAt: Date.now() });
+        try { await recalcStock({ codes: [cutoutNumber, ...aliases] }); } catch { /* nothing uses it yet */ }
+        toast.success("Cutout added");
+      }
+      closeForm();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (cutouts === undefined) {
+    return (
+      <div className="space-y-3">
+        <LoadingNote text="Loading cutouts…" />
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+      </div>
+    );
   }
+  const usageLoading = variantIndex === undefined;
 
   return (
     <div className="space-y-4">
@@ -154,11 +231,23 @@ export function CutoutsManagement() {
             Designs printed as sheets. Stock is held once per design and shared by every product made from it.
           </p>
         </div>
-        <Button onClick={() => setAdding(true)}>
-          <PlusIcon className="mr-1.5 size-4" />
-          Add cutout
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setFixingSkus(true)}>
+            <WrenchIcon className="mr-1.5 size-4" />
+            Fix laptop SKUs
+          </Button>
+          <Button onClick={() => { setDraft(blankDraft); setAdding(true); }}>
+            <PlusIcon className="mr-1.5 size-4" />
+            Add cutout
+          </Button>
+        </div>
       </div>
+
+      {usageLoading && (
+        <LoadingNote text="Working out which listings use each design — this reads the whole catalogue and can take up to 10 seconds. The list below is already editable." />
+      )}
+
+      {fixingSkus && <LaptopSkuFix cutouts={cutouts} onClose={() => setFixingSkus(false)} />}
 
       <div className="grid gap-2 sm:grid-cols-4">
         <Stat label="Designs" value={totals.designs} />
@@ -293,7 +382,11 @@ export function CutoutsManagement() {
 
                 {/* The whole point: what that pile actually makes. */}
                 <div className="flex min-w-[12rem] flex-wrap gap-1.5">
-                  {byView.size === 0 ? (
+                  {usageLoading ? (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Loader2Icon className="size-3 animate-spin" /> checking listings…
+                    </span>
+                  ) : byView.size === 0 ? (
                     <span className="flex items-center gap-1 text-[11px] text-amber-600">
                       <AlertTriangleIcon className="size-3" /> no product uses this code yet
                     </span>
@@ -307,6 +400,9 @@ export function CutoutsManagement() {
                   )}
                 </div>
 
+                <Button size="sm" variant="ghost" className="shrink-0" title="Edit cutout" onClick={() => openEdit(c)}>
+                  <PencilIcon className="size-3.5" />
+                </Button>
                 <Button
                   size="sm" variant="ghost" className="shrink-0 text-rose-600"
                   onClick={async () => {
@@ -328,9 +424,11 @@ export function CutoutsManagement() {
         )}
       </div>
 
-      <Dialog open={adding} onOpenChange={setAdding}>
+      <Dialog open={adding || !!editing} onOpenChange={(o) => { if (!o && !saving) closeForm(); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add a cutout</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editing ? `Edit cutout ${editing.cutoutNumber}` : "Add a cutout"}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -360,31 +458,18 @@ export function CutoutsManagement() {
               Add every code this design is sold under. One design sold as "Only Top" and "Top + Keyboard Area"
               under two numbers is still one pile of sheets &mdash; listing both here keeps it that way.
             </p>
+            {editing && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                Changing the number or the codes changes which listings draw on this pile. Stock on every
+                affected variant is recalculated when you save.
+              </p>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAdding(false)}>Cancel</Button>
-            <Button
-              disabled={!draft.cutoutNumber.trim()}
-              onClick={async () => {
-                try {
-                  await createCutout({
-                    cutoutNumber: draft.cutoutNumber.trim().toUpperCase(),
-                    designName: draft.designName.trim(),
-                    sheetsAvailable: Math.max(0, parseInt(draft.sheetsAvailable) || 0),
-                    finish: draft.finish.trim(),
-                    aliases: draft.aliases.split(",").map((a) => a.trim().toUpperCase()).filter(Boolean),
-                    isActive: true,
-                    createdAt: Date.now(),
-                  });
-                  toast.success("Cutout added");
-                  setAdding(false);
-                  setDraft({ cutoutNumber: "", designName: "", sheetsAvailable: "0", finish: "3D Textured", aliases: "" });
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Could not add");
-                }
-              }}
-            >
-              Add
+            <Button variant="outline" disabled={saving} onClick={closeForm}>Cancel</Button>
+            <Button disabled={saving || !draft.cutoutNumber.trim()} onClick={() => void saveForm()}>
+              {saving && <Loader2Icon className="mr-1.5 size-4 animate-spin" />}
+              {editing ? "Save changes" : "Add"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -398,6 +483,16 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "am
     <div className={`rounded-xl border px-3 py-2 ${tone === "amber" ? "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40" : ""}`}>
       <div className="text-lg font-semibold tabular-nums">{value.toLocaleString()}</div>
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+/** A visible "still working" line, so a slow load never looks like a dead page. */
+export function LoadingNote({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950/40 dark:text-sky-200">
+      <Loader2Icon className="size-4 shrink-0 animate-spin" />
+      <span>{text}</span>
     </div>
   );
 }

@@ -323,14 +323,16 @@ export function useProductDetail() {
       : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
   }, [productData]);
   
-  // Open on a variant that can be bought. Index 0 is whatever the import put
-  // first, and on New Hexa Ring that was an unpriced, unstocked row.
+  // Open on a variant that can be bought: priced and in stock. Variants arrive
+  // smallest-material first (sortVariants), so a laptop opens on "Only Top",
+  // and a design with one sheet left is not shown as sold out because the
+  // two-sheet keyboard view happened to be selected.
   useEffect(() => {
     const vs = productData?.variants;
     if (!Array.isArray(vs) || vs.length < 2) return;
     const current = vs[productState.selectedVariant];
     const stock = (v: any) => Number(v?.inventoryQuantity ?? v?.inventory_quantity ?? 0);
-    if (current && Number(current.price) > 0) return;
+    if (current && Number(current.price) > 0 && stock(current) > 0) return;
     let next = vs.findIndex((v: any) => Number(v.price) > 0 && stock(v) > 0);
     if (next === -1) next = vs.findIndex((v: any) => Number(v.price) > 0);
     if (next > 0) setProductState(prev => ({ ...prev, selectedVariant: next }));

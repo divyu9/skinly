@@ -27,7 +27,7 @@ import {
   saveLocally, chooseBackupFolder, getBackupFolder, supportsDirectoryPicker,
 } from "@/lib/local-backup.ts";
 import {
-  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem,
+  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
@@ -131,6 +131,45 @@ interface Design {
   stockLabel: string;
 }
 
+/** The pictures of one product, within a gadget. */
+type ListingGroup = {
+  key: string;
+  gadget: string;
+  gadgetTypeId?: string;
+  listing: string;
+  shots: MockupShot[];
+};
+
+const listingKey = (shot: MockupShot) =>
+  `${String(shot.gadget).toLowerCase()}|${listingOf(shot).toLowerCase()}`;
+
+type VariantRow = { skuTail: string; title: string; price: string; materialMultiplier: string };
+
+const toRows = (res: any): VariantRow[] =>
+  (res?.variants || []).map((v: any) => ({
+    skuTail: String(v.skuTail || ""),
+    title: String(v.title || "Default Title"),
+    price: String(v.price ?? ""),
+    materialMultiplier: String(Number(v.materialMultiplier) || 1),
+  }));
+
+const rowsProblem = (rows: VariantRow[]) => {
+  if (!rows.length) return "Add at least one variant";
+  if (rows.some((r) => !(Number(r.price) > 0))) return "Every variant needs a price";
+  if (rows.some((r) => !r.title.trim())) return "Every variant needs a name";
+  const tails = rows.map((r) => r.skuTail.trim().toUpperCase());
+  if (new Set(tails).size !== tails.length) return "Two variants have the same SKU ending";
+  return null;
+};
+
+const rowsPayload = (rows: VariantRow[]) =>
+  rows.map((r) => ({
+    skuTail: r.skuTail.trim().toUpperCase(),
+    title: r.title.trim(),
+    price: Number(r.price),
+    materialMultiplier: Number(r.materialMultiplier) || 1,
+  }));
+
 function groupByGadget<T extends { gadget: string }>(rows: T[]): [string, T[]][] {
   const map = new Map<string, T[]>();
   for (const r of rows) {
@@ -211,6 +250,12 @@ function ShotLibrary() {
 
   const grouped = groupByGadget(shots);
   const usedGadgets = new Set(shots.map((s) => s.gadget));
+  // Starter shots added to the code after this library was seeded — the
+  // no-logo laptop lid, for one. Matched on gadget and file name, so a shot the
+  // admin renamed is not offered twice.
+  const missingStarters = STARTER_SHOTS.filter(
+    (st) => !shots.some((s) => s.gadget === st.gadget && s.suffix === st.suffix)
+  );
   const availableGadgets = (gadgetTypes || [])
     .map((g) => String(g.name || "").trim())
     .filter(Boolean)
@@ -268,6 +313,41 @@ function ShotLibrary() {
         </p>
       </div>
 
+      {shots.length > 0 && missingStarters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-900 dark:bg-violet-950/30">
+          <SparklesIcon className="size-4 text-violet-600" />
+          <p className="min-w-0 flex-1 text-sm">
+            {missingStarters.length} new built-in shot{missingStarters.length === 1 ? "" : "s"}:{" "}
+            <span className="text-muted-foreground">
+              {missingStarters.map((m) => `${m.gadget} · ${m.label}`).join(", ")}
+            </span>
+          </p>
+          <Button
+            size="sm"
+            disabled={seeding}
+            onClick={async () => {
+              setSeeding(true);
+              try {
+                for (const st of missingStarters) {
+                  const gt = (gadgetTypes || []).find((g) => g.name === st.gadget);
+                  await createShot({ ...st, gadgetTypeId: gt?._id || "", createdAt: Date.now() });
+                }
+                // The lid shot that was simply "Lid only" is the with-logo one;
+                // say so now that a without-logo one sits beside it.
+                const oldLid = shots.find((s) => s.gadget === "laptop" && s.suffix === "laptop-top" && s.label === "Lid only");
+                if (oldLid) await updateShot({ promptId: oldLid._id, label: "Lid only — with Apple logo" });
+                toast.success(`${missingStarters.length} shot${missingStarters.length === 1 ? "" : "s"} added`);
+              } catch (e) {
+                toast.error(e instanceof Error ? e.message : "Could not add");
+              } finally { setSeeding(false); }
+            }}
+          >
+            {seeding ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <PlusIcon className="mr-1.5 size-3.5" />}
+            Add {missingStarters.length === 1 ? "it" : "them"}
+          </Button>
+        </div>
+      )}
+
       {shots.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -289,7 +369,7 @@ function ShotLibrary() {
               }}
             >
               {seeding ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <SparklesIcon className="mr-1.5 size-4" />}
-              Load the 7 starter shots
+              Load the {STARTER_SHOTS.length} starter shots
             </Button>
             <p className="max-w-md text-xs text-muted-foreground">
               Laptop (lid and open), lens, camera body, PS5, iPad and charger. They become ordinary
@@ -414,6 +494,16 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
             />
           </div>
           <div className="flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground">listing</span>
+            <Input
+              value={v.listing ?? ""}
+              onChange={(e) => edit({ listing: e.target.value })}
+              className="h-8 w-[150px] text-xs"
+              placeholder={listingOf({ ...v, listing: "" })}
+              title="Shots with the same listing name are pictures of one product"
+            />
+          </div>
+          <div className="flex items-center gap-1">
             <span className="text-[11px] text-muted-foreground">SKU</span>
             <Input
               value={(v.skuCodes || []).join(", ")}
@@ -501,8 +591,8 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
     }));
     const fromCutouts: Design[] = (cutouts || []).map((c) => ({
       _id: c._id, source: "cutout", code: String(c.cutoutNumber || "").trim(), name: c.designName || "",
-      rawImageUrl: c.rawImageUrl, finish: c.finish, stock: c.piecesAvailable,
-      stockLabel: c.piecesAvailable != null ? `${c.piecesAvailable} pcs` : "cutout",
+      rawImageUrl: c.rawImageUrl, finish: c.finish, stock: Number(c.sheetsAvailable) || 0,
+      stockLabel: `${Number(c.sheetsAvailable) || 0} sheet${Number(c.sheetsAvailable) === 1 ? "" : "s"}`,
     }));
     const q = search.trim().toLowerCase();
     return [...fromRolls, ...fromCutouts]
@@ -646,7 +736,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const [redoJob, setRedoJob] = useState<Job | null>(null);
   // A listing made in this session will not show up in linkTargets until that
   // query re-runs, so remember it here and let the row say so straight away.
-  const [newListing, setNewListing] = useState<MockupShot | null>(null);
+  const [newListing, setNewListing] = useState<ListingGroup | null>(null);
   const [bulkListings, setBulkListings] = useState(false);
   const [justCreated, setJustCreated] = useState<Record<string, string>>({});
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
@@ -661,7 +751,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 
   /** Products a shot's image would attach to for this design, right now. */
   const targetsFor = useCallback((shot: MockupShot) => {
-    const fresh = justCreated[String(shot.gadget).toLowerCase()];
+    const fresh = justCreated[listingKey(shot)];
     if (fresh) return [fresh];
     if (!linkTargets) return null;
     const codes = (shot.skuCodes || []).map((c) => c.toUpperCase());
@@ -752,10 +842,13 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     useSize: string,
     orientation?: CutOrientation
   ) => {
-    const attempt = jobs.filter((j) => j.shotId === shot._id).length + 1;
     // Two cuts of one design are two different pictures, so they need two
     // filenames; without the tail the second would overwrite the first.
     const suffix = orientation ? `${shot.suffix}-${orientation === "widthwise" ? "wid" : "len"}` : shot.suffix;
+    // Numbered by file name, not by shot: two shots that share a suffix used to
+    // both be attempt 1, write the same file, and the second approval then
+    // failed because the first had already moved it away.
+    const attempt = jobs.filter((j) => j.suffix === suffix).reduce((n, j) => Math.max(n, j.attempt || 1), 0) + 1;
     const label = orientation ? `${shot.label} · ${orientation === "widthwise" ? "across" : "along"} the roll` : shot.label;
     let jobId: string | null = null;
     try {
@@ -817,23 +910,81 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const allPicked = activeShotIds.length > 0 && activeShotIds.every((id) => picked.includes(id));
 
   /**
-   * Gadgets this design has shots for but no product to hang them on.
+   * The shots grouped the way products are: by gadget, then by listing.
    *
-   * One per gadget, not one per shot: a laptop's three angles all land on the
-   * same listing, so offering to create it three times would be three
-   * duplicate products.
+   * A listing can want several pictures (a laptop's lid, keyboard deck and
+   * carried shot all land on one product), and one gadget can be several
+   * listings (PS5, Series X and Series S are all "console"). Creating a listing
+   * is offered once per listing, never once per picture.
    */
-  const missingGadgets = useMemo(() => {
-    if (!linkTargets) return [] as MockupShot[];
-    const byGadget = new Map<string, MockupShot>();
+  const listingGroups = useMemo(() => {
+    const byKey = new Map<string, ListingGroup>();
     for (const shot of shots) {
-      const key = String(shot.gadget).toLowerCase();
-      if (byGadget.has(key) || justCreated[key]) continue;
-      const targets = targetsFor(shot);
-      if (targets && targets.length === 0) byGadget.set(key, shot);
+      const key = listingKey(shot);
+      const g = byKey.get(key) || {
+        key,
+        gadget: shot.gadget,
+        gadgetTypeId: shot.gadgetTypeId,
+        listing: listingOf(shot),
+        shots: [],
+      };
+      if (!g.gadgetTypeId && shot.gadgetTypeId) g.gadgetTypeId = shot.gadgetTypeId;
+      g.shots.push(shot);
+      byKey.set(key, g);
     }
-    return [...byGadget.values()];
-  }, [shots, linkTargets, targetsFor, justCreated]);
+    return [...byKey.values()];
+  }, [shots]);
+
+  /** Products this listing's pictures would land on; null while checking. */
+  const targetsForGroup = useCallback((group: ListingGroup) => {
+    const fresh = justCreated[group.key];
+    if (fresh) return [fresh];
+    const seen = new Set<string>();
+    for (const shot of group.shots) {
+      const t = targetsFor(shot);
+      if (t === null) return null;
+      t.forEach((x) => seen.add(x));
+    }
+    return [...seen];
+  }, [targetsFor, justCreated]);
+
+  /** Listings this design has pictures for but no product to hang them on. */
+  const missingListings = useMemo(() => {
+    if (!linkTargets) return [] as ListingGroup[];
+    return listingGroups.filter((g) => {
+      const t = targetsForGroup(g);
+      return t !== null && t.length === 0;
+    });
+  }, [listingGroups, linkTargets, targetsForGroup]);
+
+  // The listing template is read by a Cloud Function that walks the gadget's
+  // catalogue, which took seven or eight seconds after "Create listing" was
+  // pressed. It is fetched as soon as a listing is known to be missing, so the
+  // dialog usually opens already filled in.
+  const templateCache = useRef(new Map<string, Promise<any>>());
+  const loadTemplate = useCallback((group: ListingGroup) => {
+    const cacheKey = `${group.key}|${roll.finish || ""}`;
+    let pending = templateCache.current.get(cacheKey);
+    if (!pending) {
+      pending = getTemplate({
+        gadgetTypeId: group.gadgetTypeId || "",
+        gadget: group.gadget,
+        listing: group.listing,
+        finish: roll.finish || "",
+        skuCodes: [...new Set(group.shots.flatMap((s) => s.skuCodes || []))],
+        variantTitles: [...new Set(group.shots.flatMap((s) => s.variantTitles || []))],
+      }).catch((e: unknown) => {
+        templateCache.current.delete(cacheKey);
+        throw e;
+      });
+      templateCache.current.set(cacheKey, pending);
+    }
+    return pending;
+  }, [getTemplate, roll.finish]);
+
+  useEffect(() => {
+    missingListings.forEach((g) => { void loadTemplate(g).catch(() => {}); });
+  }, [missingListings, loadTemplate]);
 
   const pickedShots = useMemo(
     () => picked.map((id) => shots.find((s) => s._id === id)).filter((s): s is MockupShot => !!s),
@@ -965,22 +1116,22 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     <div className="space-y-5">
       {bulkListings && (
         <BulkListingsDialog
-          shots={missingGadgets}
+          groups={missingListings}
           design={roll}
-          getTemplate={getTemplate}
+          loadTemplate={loadTemplate}
           createListing={createListing}
           onClose={() => setBulkListings(false)}
-          onCreated={(gadget, title) => setJustCreated((p) => ({ ...p, [gadget]: title }))}
+          onCreated={(key, title) => setJustCreated((p) => ({ ...p, [key]: title }))}
         />
       )}
       {newListing && (
         <CreateListingDialog
-          shot={newListing}
+          group={newListing}
           design={roll}
-          getTemplate={getTemplate}
+          loadTemplate={loadTemplate}
           createListing={createListing}
           onClose={() => setNewListing(null)}
-          onCreated={(gadget, title) => setJustCreated((p) => ({ ...p, [gadget]: title }))}
+          onCreated={(key, title) => setJustCreated((p) => ({ ...p, [key]: title }))}
         />
       )}
       <Card>
@@ -1087,7 +1238,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 <CheckCircle2Icon className="mr-1 size-3" />
                 {allPicked ? "Clear all" : `Select all ${activeShotIds.length} shots`}
               </Button>
-              {missingGadgets.length > 0 && (
+              {missingListings.length > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -1095,7 +1246,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   onClick={() => setBulkListings(true)}
                 >
                   <FilePlus2Icon className="mr-1 size-3" />
-                  Create {missingGadgets.length} missing listing{missingGadgets.length === 1 ? "" : "s"}
+                  Create {missingListings.length} missing listing{missingListings.length === 1 ? "" : "s"}
                 </Button>
               )}
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onManageShots}>
@@ -1113,48 +1264,68 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               to start.
             </div>
           ) : (
-            grouped.map(([gadget, rows]) => (
-              <div key={gadget} className="space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{gadget}</span>
-                  <button
-                    className="text-[11px] text-violet-600 hover:underline"
-                    onClick={() => {
-                      const ids = rows.map((r) => r._id);
-                      const allOn = ids.every((id) => picked.includes(id));
-                      setPicked(allOn ? picked.filter((p) => !ids.includes(p)) : [...new Set([...picked, ...ids])]);
-                    }}
-                  >
-                    toggle all
-                  </button>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {rows.map((s) => {
-                    const on = picked.includes(s._id);
+            grouped.map(([gadget]) => {
+              const groups = listingGroups.filter((g) => g.gadget === gadget);
+              return (
+                <div key={gadget} className="space-y-2 rounded-xl border p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold capitalize">{gadget}</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      {groups.length} listing{groups.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  {groups.map((group) => {
+                    const ids = group.shots.map((r) => r._id);
+                    const allOn = ids.every((id) => picked.includes(id));
                     return (
-                      <button
-                        key={s._id}
-                        onClick={() => setPicked(on ? picked.filter((k) => k !== s._id) : [...picked, s._id])}
-                        className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-left text-sm transition ${
-                          on ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40" : "hover:bg-muted/60"
-                        }`}
-                      >
-                        <span className={`flex size-4 shrink-0 items-center justify-center rounded border ${on ? "border-violet-600 bg-violet-600 text-white" : "border-muted-foreground/40"}`}>
-                          {on && <CheckCircle2Icon className="size-3" />}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{s.label}</span>
-                          <code className="block truncate text-[10px] text-muted-foreground">
-                            {mockupFileStem(roll.code, s.suffix)}.webp
-                          </code>
-                          <LinkTargets titles={targetsFor(s)} onCreate={() => setNewListing(s)} />
-                        </span>
-                      </button>
+                      <div key={group.key} className="space-y-1.5 rounded-lg bg-muted/30 p-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {group.listing}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {group.shots.length} image{group.shots.length === 1 ? "" : "s"}
+                          </span>
+                          <button
+                            className="text-[11px] text-violet-600 hover:underline"
+                            onClick={() => setPicked(allOn ? picked.filter((p) => !ids.includes(p)) : [...new Set([...picked, ...ids])])}
+                          >
+                            {allOn ? "clear" : "select all"}
+                          </button>
+                          <span className="ml-auto min-w-0">
+                            <LinkTargets titles={targetsForGroup(group)} onCreate={() => setNewListing(group)} />
+                          </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {group.shots.map((s) => {
+                            const on = picked.includes(s._id);
+                            return (
+                              <button
+                                key={s._id}
+                                onClick={() => setPicked(on ? picked.filter((k) => k !== s._id) : [...picked, s._id])}
+                                className={`flex items-center gap-2.5 rounded-lg border bg-background p-2.5 text-left text-sm transition ${
+                                  on ? "border-violet-400 bg-violet-50 dark:bg-violet-950/40" : "hover:bg-muted/60"
+                                }`}
+                              >
+                                <span className={`flex size-4 shrink-0 items-center justify-center rounded border ${on ? "border-violet-600 bg-violet-600 text-white" : "border-muted-foreground/40"}`}>
+                                  {on && <CheckCircle2Icon className="size-3" />}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate font-medium">{s.label}</span>
+                                  <code className="block truncate text-[10px] text-muted-foreground">
+                                    {mockupFileStem(roll.code, s.suffix)}.webp
+                                  </code>
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
@@ -1367,69 +1538,58 @@ function RedoDialog({ job, defaultModelId, defaultAspect, onCancel, onConfirm }:
  * generates again with a model you pick at that moment.
  */
 /**
- * Builds the listing a design is missing for one gadget.
+ * Builds the listing a design is missing, for one listing of one gadget.
  *
- * The variant shape is not asked for — it is read off the catalogue, because
- * the answer already exists 103 times over and typing it again is how two
- * conventions start. The admin sets prices and nothing else; the words are
- * generated.
+ * The variant shape is read off the catalogue — the listings of this kind that
+ * already exist — so the admin mostly sets prices. Where there is no precedent
+ * (a new kind of listing, like a drone controller on its own) the rows are
+ * editable: name, SKU ending, sheets used and price. The words are generated.
  */
-function CreateListingDialog({ shot, design, onClose, onCreated, getTemplate, createListing }: {
-  shot: MockupShot;
+function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, createListing }: {
+  group: ListingGroup;
   design: Design;
   onClose: () => void;
-  onCreated: (gadget: string, title: string, productId: string) => void;
-  getTemplate: (args: any) => Promise<any>;
+  onCreated: (key: string, title: string) => void;
+  loadTemplate: (group: ListingGroup) => Promise<any>;
   createListing: (args: any) => Promise<any>;
 }) {
-  const [rows, setRows] = useState<Array<{ skuTail: string; title: string; price: string; materialMultiplier: number }> | null>(null);
+  const [rows, setRows] = useState<VariantRow[] | null>(null);
+  const [precedent, setPrecedent] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let live = true;
-    void (async () => {
-      try {
-        const res: any = await getTemplate({
-          gadgetTypeId: shot.gadgetTypeId || "",
-          gadget: shot.gadget,
-          finish: design.finish || "",
-        });
+    loadTemplate(group)
+      .then((res: any) => {
         if (!live) return;
-        setRows((res?.variants || []).map((v: any) => ({
-          skuTail: String(v.skuTail || ""),
-          title: String(v.title || "Default Title"),
-          price: String(v.price ?? ""),
-          materialMultiplier: Number(v.materialMultiplier) || 1,
-        })));
-      } catch (e) {
+        setRows(toRows(res));
+        setPrecedent(res?.precedent !== false);
+      })
+      .catch((e: unknown) => {
         if (live) setLoadError(e instanceof Error ? e.message : "Could not read the template");
-      }
-    })();
+      });
     return () => { live = false; };
-  }, [shot._id]);
+  }, [group.key]);
 
   const submit = async () => {
-    if (!rows?.length) return;
-    if (rows.some((r) => !(Number(r.price) > 0))) return toast.error("Every variant needs a price");
+    if (!rows) return;
+    const problem = rowsProblem(rows);
+    if (problem) return toast.error(problem);
     setBusy(true);
     try {
       const res: any = await createListing({
         designCode: design.code,
         designName: design.name || "",
-        gadgetTypeId: shot.gadgetTypeId || "",
-        gadget: shot.gadget,
+        gadgetTypeId: group.gadgetTypeId || "",
+        gadget: group.gadget,
+        listing: group.listing,
         finish: design.finish || "",
         source: design.source,
         imageUrl: design.rawImageUrl || "",
-        variants: rows.map((r) => ({
-          skuTail: r.skuTail,
-          title: r.title,
-          price: Number(r.price),
-          materialMultiplier: r.materialMultiplier,
-        })),
+        variants: rowsPayload(rows),
       });
-      onCreated(String(shot.gadget).toLowerCase(), res.title, res.productId);
+      onCreated(group.key, res.title);
       // A new window, so the studio keeps its queue and the admin can check the
       // generated copy side by side.
       window.open(`/backend-skinly/products/${res.productId}`, "_blank", "noopener");
@@ -1442,54 +1602,29 @@ function CreateListingDialog({ shot, design, onClose, onCreated, getTemplate, cr
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Create the {shot.gadget} listing for {design.code}</DialogTitle>
+          <DialogTitle>Create the {group.listing} listing for {design.code}</DialogTitle>
           <DialogDescription>
-            The variants below are the shape this gadget's other listings already use. Set the
-            prices; the title, slug, description, meta tags and collections are written for you.
+            {group.shots.length} picture{group.shots.length === 1 ? "" : "s"} will land on it:{" "}
+            {group.shots.map((s) => s.label).join(", ")}. The title, slug, description, meta tags and
+            collections are written for you.
           </DialogDescription>
         </DialogHeader>
 
         {loadError ? (
           <p className="text-sm text-rose-600">{loadError}</p>
         ) : !rows ? (
-          <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-          </div>
+          <LoadingLine text={`Reading how existing ${group.listing} listings are set up — this can take a few seconds…`} />
         ) : (
-          <div className="space-y-2">
-            {rows.map((r, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-lg border p-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{r.title}</p>
-                  <code className="text-[10px] text-muted-foreground">
-                    {design.code}{r.skuTail ? `-${r.skuTail}` : ""}
-                    {r.materialMultiplier !== 1 && ` · uses ${r.materialMultiplier}×`}
-                  </code>
-                </div>
-                <span className="text-sm text-muted-foreground">₹</span>
-                <Input
-                  className="w-24"
-                  inputMode="numeric"
-                  value={r.price}
-                  onChange={(e) => setRows(rows.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))}
-                />
-              </div>
-            ))}
-            <p className="text-[11px] text-muted-foreground">
-              Stock starts from the design's own shelf — {design.stockLabel} — as soon as the listing
-              exists.
-            </p>
-          </div>
+          <VariantRowsEditor rows={rows} setRows={setRows} code={design.code} precedent={precedent} stockLabel={design.stockLabel} />
         )}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button onClick={() => void submit()} disabled={busy || !rows?.length}>
             {busy ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <FilePlus2Icon className="mr-1.5 size-4" />}
-            Create and open
+            {busy ? "Writing the listing…" : "Create and open"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1497,60 +1632,107 @@ function CreateListingDialog({ shot, design, onClose, onCreated, getTemplate, cr
   );
 }
 
+function LoadingLine({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-3 text-sm text-violet-800 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200">
+      <Loader2Icon className="size-4 shrink-0 animate-spin" />
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function VariantRowsEditor({ rows, setRows, code, precedent, stockLabel }: {
+  rows: VariantRow[];
+  setRows: (rows: VariantRow[]) => void;
+  code: string;
+  precedent: boolean;
+  stockLabel?: string;
+}) {
+  const set = (i: number, patch: Partial<VariantRow>) => setRows(rows.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  return (
+    <div className="space-y-2">
+      {!precedent && (
+        <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          No existing listing of this kind to copy. Set the variants yourself — one row per option the customer picks.
+        </p>
+      )}
+      <div className="grid grid-cols-[1fr_7rem_4.5rem_5.5rem_2rem] items-center gap-2 px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span>Variant name</span><span>SKU ending</span><span>Sheets</span><span>Price ₹</span><span />
+      </div>
+      {rows.map((r, i) => (
+        <div key={i} className="grid grid-cols-[1fr_7rem_4.5rem_5.5rem_2rem] items-center gap-2 rounded-lg border p-1.5">
+          <Input className="h-8 text-sm" value={r.title} onChange={(e) => set(i, { title: e.target.value })} />
+          <div className="flex items-center">
+            <span className="mr-0.5 truncate font-mono text-[10px] text-muted-foreground" title={code}>-</span>
+            <Input className="h-8 font-mono text-xs uppercase" value={r.skuTail} placeholder="(none)" onChange={(e) => set(i, { skuTail: e.target.value })} />
+          </div>
+          <Input className="h-8 text-sm" inputMode="decimal" value={r.materialMultiplier} onChange={(e) => set(i, { materialMultiplier: e.target.value })} />
+          <Input className="h-8 text-sm" inputMode="numeric" value={r.price} onChange={(e) => set(i, { price: e.target.value })} />
+          <Button size="sm" variant="ghost" className="h-8 px-0 text-rose-600" title="Remove" onClick={() => setRows(rows.filter((_, j) => j !== i))}>
+            <TrashIcon className="size-3.5" />
+          </Button>
+        </div>
+      ))}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button size="sm" variant="outline" onClick={() => setRows([...rows, { skuTail: "", title: "", price: "", materialMultiplier: "1" }])}>
+          <PlusIcon className="mr-1 size-3.5" /> Add variant
+        </Button>
+        <code className="text-[10px] text-muted-foreground">
+          SKUs: {rows.map((r) => `${code}${r.skuTail.trim() ? `-${r.skuTail.trim().toUpperCase()}` : ""}`).join(", ")}
+        </code>
+      </div>
+      {stockLabel && (
+        <p className="text-[11px] text-muted-foreground">
+          Stock starts from the design's own shelf — {stockLabel} — as soon as the listing exists.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Creates every listing a design is missing, in one pass.
  *
- * A roll that is new to the catalogue is missing all nine gadgets, and making
- * them one dialog at a time is nine rounds of the same three decisions. The
- * variant shapes and prices still come from the catalogue; the admin reviews a
- * list and presses once.
+ * A design that is new to the catalogue is missing most listings, and making
+ * them one dialog at a time is the same decisions over and over. The variant
+ * shapes and prices still come from the catalogue; the admin reviews a list
+ * and presses once.
  */
-function BulkListingsDialog({ shots, design, onClose, onCreated, getTemplate, createListing }: {
-  shots: MockupShot[];
+function BulkListingsDialog({ groups, design, onClose, onCreated, loadTemplate, createListing }: {
+  groups: ListingGroup[];
   design: Design;
   onClose: () => void;
-  onCreated: (gadget: string, title: string) => void;
-  getTemplate: (args: any) => Promise<any>;
+  onCreated: (key: string, title: string) => void;
+  loadTemplate: (group: ListingGroup) => Promise<any>;
   createListing: (args: any) => Promise<any>;
 }) {
   type Row = {
-    shot: MockupShot;
-    variants: Array<{ skuTail: string; title: string; price: string; materialMultiplier: number }>;
+    group: ListingGroup;
+    variants: VariantRow[];
+    precedent: boolean;
     state: "loading" | "ready" | "creating" | "done" | "error";
     note?: string;
   };
-  const [rows, setRows] = useState<Row[]>(shots.map((shot) => ({ shot, variants: [], state: "loading" })));
+  const [rows, setRows] = useState<Row[]>(groups.map((group) => ({ group, variants: [], precedent: true, state: "loading" })));
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
     let live = true;
-    void Promise.all(
-      shots.map(async (shot, i) => {
-        try {
-          const res: any = await getTemplate({
-            gadgetTypeId: shot.gadgetTypeId || "",
-            gadget: shot.gadget,
-            finish: design.finish || "",
-          });
+    groups.forEach((group, i) => {
+      loadTemplate(group)
+        .then((res: any) => {
           if (!live) return;
           setRows((prev) => prev.map((r, j) => j !== i ? r : {
-            ...r,
-            state: "ready",
-            variants: (res?.variants || []).map((v: any) => ({
-              skuTail: String(v.skuTail || ""),
-              title: String(v.title || "Default Title"),
-              price: String(v.price ?? ""),
-              materialMultiplier: Number(v.materialMultiplier) || 1,
-            })),
+            ...r, state: "ready", variants: toRows(res), precedent: res?.precedent !== false,
           }));
-        } catch (e) {
+        })
+        .catch((e: unknown) => {
           if (!live) return;
           setRows((prev) => prev.map((r, j) => j !== i ? r : {
             ...r, state: "error", note: e instanceof Error ? e.message : "Could not read the template",
           }));
-        }
-      })
-    );
+        });
+    });
     return () => { live = false; };
   }, []);
 
@@ -1559,25 +1741,25 @@ function BulkListingsDialog({ shots, design, onClose, onCreated, getTemplate, cr
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (row.state !== "ready") continue;
-      if (row.variants.some((v) => !(Number(v.price) > 0))) {
-        setRows((prev) => prev.map((r, j) => j === i ? { ...r, state: "error", note: "Every variant needs a price" } : r));
+      const problem = rowsProblem(row.variants);
+      if (problem) {
+        setRows((prev) => prev.map((r, j) => j === i ? { ...r, note: problem } : r));
         continue;
       }
-      setRows((prev) => prev.map((r, j) => j === i ? { ...r, state: "creating" } : r));
+      setRows((prev) => prev.map((r, j) => j === i ? { ...r, state: "creating", note: undefined } : r));
       try {
         const res: any = await createListing({
           designCode: design.code,
           designName: design.name || "",
-          gadgetTypeId: row.shot.gadgetTypeId || "",
-          gadget: row.shot.gadget,
+          gadgetTypeId: row.group.gadgetTypeId || "",
+          gadget: row.group.gadget,
+          listing: row.group.listing,
           finish: design.finish || "",
           source: design.source,
           imageUrl: design.rawImageUrl || "",
-          variants: row.variants.map((v) => ({
-            skuTail: v.skuTail, title: v.title, price: Number(v.price), materialMultiplier: v.materialMultiplier,
-          })),
+          variants: rowsPayload(row.variants),
         });
-        onCreated(String(row.shot.gadget).toLowerCase(), res.title);
+        onCreated(row.group.key, res.title);
         setRows((prev) => prev.map((r, j) => j === i ? { ...r, state: "done", note: res.skus.join(", ") } : r));
       } catch (e) {
         setRows((prev) => prev.map((r, j) => j === i ? {
@@ -1589,53 +1771,47 @@ function BulkListingsDialog({ shots, design, onClose, onCreated, getTemplate, cr
   };
 
   const ready = rows.filter((r) => r.state === "ready").length;
+  const loading = rows.filter((r) => r.state === "loading").length;
   const done = rows.filter((r) => r.state === "done").length;
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o && !running) onClose(); }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Create the {shots.length} missing listing{shots.length === 1 ? "" : "s"} for {design.code}</DialogTitle>
+          <DialogTitle>Create the {groups.length} missing listing{groups.length === 1 ? "" : "s"} for {design.code}</DialogTitle>
           <DialogDescription>
-            One listing per gadget. Variants and prices come from what the catalogue already uses;
+            One product per listing. Variants and prices come from what the catalogue already uses;
             titles, descriptions, meta tags and collections are written for each.
           </DialogDescription>
         </DialogHeader>
 
+        {loading > 0 && <LoadingLine text={`Reading ${loading} listing template${loading === 1 ? "" : "s"}…`} />}
+
         <div className="space-y-2">
           {rows.map((row, i) => (
-            <div key={row.shot._id} className="rounded-lg border p-2.5">
+            <div key={row.group.key} className="rounded-lg border p-2.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium capitalize">{row.shot.gadget}</span>
+                <span className="text-sm font-medium">
+                  {row.group.listing}
+                  <span className="ml-2 text-xs font-normal capitalize text-muted-foreground">{row.group.gadget}</span>
+                </span>
                 {row.state === "loading" && <Loader2Icon className="size-4 animate-spin text-muted-foreground" />}
                 {row.state === "creating" && <Loader2Icon className="size-4 animate-spin text-violet-600" />}
                 {row.state === "done" && <Badge className="bg-emerald-600 text-[10px]">created</Badge>}
                 {row.state === "error" && <Badge variant="destructive" className="text-[10px]">failed</Badge>}
               </div>
               {row.state === "ready" && (
-                <div className="mt-2 space-y-1.5">
-                  {row.variants.map((v, k) => (
-                    <div key={k} className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-xs">{v.title}</span>
-                      <code className="text-[10px] text-muted-foreground">
-                        {design.code}{v.skuTail ? `-${v.skuTail}` : ""}
-                      </code>
-                      <span className="text-xs text-muted-foreground">₹</span>
-                      <Input
-                        className="h-8 w-20"
-                        inputMode="numeric"
-                        value={v.price}
-                        onChange={(e) => setRows((prev) => prev.map((r, j) => j !== i ? r : {
-                          ...r,
-                          variants: r.variants.map((x, m) => m === k ? { ...x, price: e.target.value } : x),
-                        }))}
-                      />
-                    </div>
-                  ))}
+                <div className="mt-2">
+                  <VariantRowsEditor
+                    rows={row.variants}
+                    code={design.code}
+                    precedent={row.precedent}
+                    setRows={(next) => setRows((prev) => prev.map((r, j) => (j === i ? { ...r, variants: next } : r)))}
+                  />
                 </div>
               )}
               {row.note && (
-                <p className={`mt-1 text-[11px] ${row.state === "error" ? "text-rose-600" : "text-muted-foreground"}`}>
+                <p className={`mt-1 text-[11px] ${row.state === "done" ? "text-muted-foreground" : "text-rose-600"}`}>
                   {row.note}
                 </p>
               )}
@@ -1834,7 +2010,8 @@ function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
           // Staged, not published. Nothing reaches the media library until a
           // human has looked at it — an AI mockup that quietly went live with a
           // wrong pattern is the failure this whole tool guards against.
-          const pendingKey = `ai-mockups-pending/${stem}.webp`;
+          // The job id keeps two staged images from ever sharing a file.
+          const pendingKey = `ai-mockups-pending/${stem}-${job._id}.webp`;
           const staged: any = await stageUpload({
             fileBase64: img.base64,
             key: pendingKey,
