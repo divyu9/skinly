@@ -127,6 +127,17 @@ export const placeOrder = functions
       return sum + dbPrice * qty;
     }, 0);
 
+    // ── 3a. Shipping, the same rule the checkout page shows ──────────────────
+    // Checkout adds flatShippingFee below freeShippingThreshold and shows it in
+    // the total, but this function never added it, so PhonePe collected ₹70
+    // less than the customer was shown on every order under the threshold.
+    // Defaults match the storefront's fallback when the settings doc is absent.
+    const shipSnap = await db.collection("settings").doc("shipping").get();
+    const ship = shipSnap.exists ? (shipSnap.data() as any) : {};
+    const freeShippingThreshold = Number(ship.freeShippingThreshold ?? 500);
+    const flatShippingFee = Number(ship.flatShippingFee ?? 50);
+    const shippingFee = itemsTotal >= freeShippingThreshold ? 0 : Math.max(0, flatShippingFee);
+
     // ── 3b. Re-derive every discount server-side ──────────────────────────────
     let couponDiscount = 0;
     if (couponId && typeof couponId === "string") {
@@ -149,7 +160,8 @@ export const placeOrder = functions
     if (uid && Number(walletAmount) > 0) {
       const uSnap = await db.collection("users").doc(uid).get();
       const balance = Number(uSnap.exists ? (uSnap.data() as any)?.walletBalance || 0 : 0);
-      walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal - couponDiscount));
+      // The storefront lets the wallet cover shipping too.
+      walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal + shippingFee - couponDiscount));
     }
 
     // COD fee and the prepaid split come from codSettings, same formula the
@@ -170,7 +182,7 @@ export const placeOrder = functions
       }
     }
 
-    const calculatedTotal = Math.max(0, itemsTotal - couponDiscount - walletUsed + codFee);
+    const calculatedTotal = Math.max(0, itemsTotal + shippingFee - couponDiscount - walletUsed + codFee);
     // What PhonePe must collect right now: the whole thing for prepaid, only
     // the prepaid slice for partial COD.
     const amountPayable = paymentMethod === "cod"
@@ -193,6 +205,7 @@ export const placeOrder = functions
       status: "pending",
       paymentStatus: "pending",
       itemsTotal,
+      shippingFee,
       couponId: couponId || null,
       couponDiscount,
       walletUsed,
