@@ -71,6 +71,38 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   // Fetch active gadget types from database
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive);
 
+  /*
+   * The same artwork the homepage's "Explore by Gadget" cards use, so the admin
+   * sets a gadget's picture once and both surfaces follow — this sheet and the
+   * homepage row. Found by section type rather than a pasted id, so it keeps
+   * working if the section is reordered or rebuilt.
+   *
+   * Cards are matched on the `gadget=` value in their own link, falling back to
+   * the card title, because the title is admin-entered prose and the link is
+   * the thing the card already has to get right to work at all.
+   */
+  const homepageSections = useQuery(api.homepage.getActiveHomepageSections);
+  const gadgetSectionId = (homepageSections as Array<{ _id: string; sectionType?: string }> | undefined)
+    ?.find((sec) => sec.sectionType === "explore_by_gadget")?._id;
+  const gadgetCards = useQuery(
+    api.homepageSectionCards.getActiveSectionCards,
+    gadgetSectionId ? { sectionId: gadgetSectionId } : "skip",
+  );
+
+  const gadgetImageFor = (name: string): string | undefined => {
+    const cards = gadgetCards as Array<{ title?: string; linkUrl?: string; imageUrl?: string }> | undefined;
+    if (!cards?.length) return undefined;
+    const wanted = name.toLowerCase();
+    const hit = cards.find((c) => {
+      const fromLink = (c.linkUrl || "").match(/[?&]gadget=([^&]+)/)?.[1];
+      if (fromLink && decodeURIComponent(fromLink).toLowerCase() === wanted) return true;
+      return (c.title || "").trim().toLowerCase() === wanted;
+    });
+    // Placeholder art is worse than the icon it would replace.
+    const url = hit?.imageUrl;
+    return url && !url.includes("via.placeholder.com") ? url : undefined;
+  };
+
   // Fetch metadata from cache (super fast!)
   const metadata = useQuery(api.supportedModels.getMetadata);
   
@@ -215,14 +247,32 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                   {gadgetTypes.map((gadget) => {
                     const Icon = getGadgetIcon(gadget.name);
                     const count = modelCountFor(gadget.name);
+                    // Falls back to the icon for any gadget with no card yet.
+                    const img = gadgetImageFor(gadget.name);
                     return (
                       <button
                         key={gadget._id}
                         onClick={() => handleDeviceTypeSelect(gadget.name)}
                         className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3 text-left transition-all duration-200 hover:border-foreground/25 sm:block sm:p-4 sm:hover:-translate-y-px sm:hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.18)]"
                       >
-                        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground transition-colors duration-200 group-hover:bg-foreground group-hover:text-background sm:mb-3">
-                          <Icon className="size-5" strokeWidth={1.75} />
+                        <span
+                          className={`inline-flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl transition-colors duration-200 sm:mb-3 ${
+                            img
+                              ? "bg-muted"
+                              : "bg-muted text-muted-foreground group-hover:bg-foreground group-hover:text-background"
+                          }`}
+                        >
+                          {img ? (
+                            <img
+                              src={img}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            <Icon className="size-5" strokeWidth={1.75} />
+                          )}
                         </span>
                         <span className="min-w-0 flex-1 sm:block">
                           <p className="truncate text-[15px] font-semibold leading-tight tracking-tight">
