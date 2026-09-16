@@ -115,6 +115,15 @@ export const placeOrder = functions
           `No such variant "${item?.variant}" for product ${item?.productId}`
         );
       }
+      // An unpriced variant is not for sale. New Hexa Ring carried twenty rows
+      // at price 0; the storefront hides them, but this is the line that bills,
+      // and it would have charged ₹0 for any of them.
+      if (!(dbPrice > 0)) {
+        throw new HttpsError(
+          "failed-precondition",
+          `"${item?.variant}" is not available to order`
+        );
+      }
       return sum + dbPrice * qty;
     }, 0);
 

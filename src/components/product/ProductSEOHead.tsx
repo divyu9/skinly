@@ -1,4 +1,5 @@
 import { Helmet } from "react-helmet-async";
+import type { Crumb } from "@/lib/product-breadcrumb";
 import { generateBreadcrumbStructuredData } from "@/lib/seo-structured-data";
 
 interface SeoMeta {
@@ -40,6 +41,8 @@ interface ProductSEOHeadProps {
   productPrice: number;
   variants?: Variant[];
   reviews?: Review[];
+  /** The on-page trail, so the JSON-LD names the same steps. */
+  breadcrumb?: Crumb[];
 }
 
 const BASE_URL = "https://www.goskinly.com";
@@ -52,6 +55,7 @@ export function ProductSEOHead({
   productPrice,
   variants,
   reviews,
+  breadcrumb,
 }: ProductSEOHeadProps) {
   if (!seoMeta) return null;
 
@@ -109,11 +113,18 @@ export function ProductSEOHead({
     : null;
 
   const breadcrumbSchema = slug
-    ? generateBreadcrumbStructuredData([
-        { name: "Home", url: BASE_URL },
-        { name: "Products", url: `${BASE_URL}/products` },
-        { name: productData?.title ?? "Product", url: canonicalUrl },
-      ])
+    ? generateBreadcrumbStructuredData(
+        breadcrumb && breadcrumb.length > 1
+          ? breadcrumb.map((c) => ({
+              name: c.name,
+              url: c.path ? `${BASE_URL}${c.path === "/" ? "" : c.path}` : canonicalUrl,
+            }))
+          : [
+              { name: "Home", url: BASE_URL },
+              { name: "Products", url: `${BASE_URL}/products` },
+              { name: productData?.title ?? "Product", url: canonicalUrl },
+            ]
+      )
     : null;
 
   return (

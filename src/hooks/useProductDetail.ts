@@ -307,7 +307,10 @@ export function useProductDetail() {
   // Price display
   const priceDisplay = useMemo(() => {
     if (!productData || !productData.variants || productData.variants.length === 0) return "";
-    const prices = productData.variants.map(v => v.price);
+    // Unpriced rows are not for sale; they made New Hexa Ring read "₹0 - ₹249".
+    const all: number[] = productData.variants.map((v: { price?: number }) => Number(v.price) || 0);
+    const priced = all.filter((p) => p > 0);
+    const prices = priced.length > 0 ? priced : all;
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
     return minPrice === maxPrice 
@@ -315,6 +318,20 @@ export function useProductDetail() {
       : `₹${minPrice.toFixed(0)} - ₹${maxPrice.toFixed(0)}`;
   }, [productData]);
   
+  // Open on a variant that can be bought. Index 0 is whatever the import put
+  // first, and on New Hexa Ring that was an unpriced, unstocked row.
+  useEffect(() => {
+    const vs = productData?.variants;
+    if (!Array.isArray(vs) || vs.length < 2) return;
+    const current = vs[productState.selectedVariant];
+    const stock = (v: any) => Number(v?.inventoryQuantity ?? v?.inventory_quantity ?? 0);
+    if (current && Number(current.price) > 0) return;
+    let next = vs.findIndex((v: any) => Number(v.price) > 0 && stock(v) > 0);
+    if (next === -1) next = vs.findIndex((v: any) => Number(v.price) > 0);
+    if (next > 0) setProductState(prev => ({ ...prev, selectedVariant: next }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productData?._id]);
+
   // Update product state helper
   const updateProductState = (updates: Partial<ProductState>) => {
     setProductState(prev => ({ ...prev, ...updates }));

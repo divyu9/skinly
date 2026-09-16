@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { Fragment, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button.tsx";
@@ -66,6 +66,12 @@ import { useCartActions } from "@/hooks/useCartActions";
 import { useModelSelector } from "@/hooks/useModelSelector";
 import { useProductReviews } from "@/hooks/useProductReviews";
 import { useProductRules } from "@/hooks/useProductRules";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import { productBreadcrumb } from "@/lib/product-breadcrumb";
+
+/** Variant titles that name a device, e.g. "iPhone 15 Pro / Green". */
+const DEVICE_WORD = /\b(iphone|ipad|galaxy|samsung|pixel|oneplus|one plus|redmi|xiaomi|poco|vivo|oppo|realme|iqoo|motorola|moto|nothing|cmf)\b/i;
 
 // Constants
 const WHATSAPP_NUMBER = "919761011121";
@@ -114,6 +120,8 @@ export default function ProductDetailPage() {
   
   // Product rules
   const { needsDeviceSelector, isSkinProduct, isPhoneSkin } = useProductRules(productData);
+  // Admin names for the breadcrumb's category step.
+  const productCategories = useQuery(api.productCategories.listAll, {});
   
   // Device category for model selector
   const deviceCategory = productData?.gadgetCategory || "phone";
@@ -273,6 +281,26 @@ export default function ProductDetailPage() {
   }
   
   // Derived values
+  const categoryNames = Object.fromEntries(
+    ((productCategories as Array<{ slug?: string; name?: string }> | undefined) ?? [])
+      .filter((c) => c.slug && c.name)
+      .map((c) => [c.slug as string, c.name as string])
+  );
+  const breadcrumb = productBreadcrumb(productData, {
+    categoryNames,
+    device: phoneModel && phoneBrand ? { brand: phoneBrand, model: phoneModel } : null,
+  });
+  // The JSON-LD names the category pages themselves, without a shopper's device.
+  const breadcrumbForSeo = productBreadcrumb(productData, { categoryNames });
+
+  // What the variants are. On cases, rings and guards they are phone models,
+  // and the heading said "Select Finish" over a list of iPhones.
+  const variantLabel = isSkinProduct
+    ? "Select Finish"
+    : (productData.variants ?? []).some((v: { title?: string }) => DEVICE_WORD.test(String(v?.title ?? "")))
+      ? "Select Your Model"
+      : "Select Option";
+
   const productUrl = `https://goskinly.com/products/${productData.slug || 'detail'}`;
   const productImage = displayImages[0]?.url || productData.images?.[0]?.url || '';
   const productPrice = productData.variants?.[productState.selectedVariant]?.price || 0;
@@ -298,6 +326,7 @@ export default function ProductDetailPage() {
         productUrl={productUrl}
         productPrice={productPrice}
         variants={productData?.variants}
+        breadcrumb={breadcrumbForSeo}
         reviews={reviews}
       />
       
@@ -327,12 +356,19 @@ export default function ProductDetailPage() {
           {/* A full-height ghost button on its own line cost ~48px and told the
               visitor nothing. A breadcrumb is shorter, orients them, and gives
               the crawler a path. */}
-          <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-1.5 py-1 text-[13px] text-muted-foreground">
-            <Link to="/" className="transition-colors hover:text-foreground">Home</Link>
-            <ChevronRightIcon className="size-3.5 opacity-50" />
-            <Link to="/products" className="transition-colors hover:text-foreground">Shop</Link>
-            <ChevronRightIcon className="size-3.5 opacity-50" />
-            <span className="truncate font-medium text-foreground">{productData.title}</span>
+          <nav aria-label="Breadcrumb" className="mb-3 flex min-w-0 items-center gap-1.5 py-1 text-[13px] text-muted-foreground">
+            {breadcrumb.map((crumb, i) => (
+              <Fragment key={`${crumb.name}-${i}`}>
+                {i > 0 && <ChevronRightIcon className="size-3.5 shrink-0 opacity-50" />}
+                {crumb.path ? (
+                  <Link to={crumb.path} className="shrink-0 whitespace-nowrap transition-colors hover:text-foreground">
+                    {crumb.name}
+                  </Link>
+                ) : (
+                  <span aria-current="page" className="truncate font-medium text-foreground">{crumb.name}</span>
+                )}
+              </Fragment>
+            ))}
           </nav>
 
           {/* This used to be an amber warning telling the buyer the photo is not
@@ -488,6 +524,7 @@ export default function ProductDetailPage() {
                   variants={productData.variants}
                   selectedVariant={productState.selectedVariant}
                   onVariantChange={handleVariantChange}
+                  label={variantLabel}
                 />
               )}
               
