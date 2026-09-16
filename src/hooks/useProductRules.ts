@@ -44,11 +44,15 @@ export function useProductRules(product: ProductLike | null | undefined) {
     const titleLower = (product.title || "").toLowerCase();
     const category = product.gadgetCategory;
 
-    // Determine if product is a skin (backend truth preferred).
+    // Is this a skin? `productCategory` decides whenever it is set — and every
+    // active product has one. A finish alone is not enough: the transparent
+    // cases, the AutoApply guards and the membranes all carry one, which put
+    // "Cut to fit your exact model" and the skin feature cards on a Samsung
+    // case. The finish is only a fallback for a product with no category.
     // finishType is legacy; products migrated to finishTypeId no longer carry it.
-    const isSkinProduct = Boolean(
-      product.finishType || product.finishTypeId || product.productCategory === "skin"
-    );
+    const isSkinProduct = product.productCategory
+      ? product.productCategory === "skin"
+      : Boolean(product.finishType || product.finishTypeId);
 
     // Accessories / non-device-specific exclusions
     const isAccessory =
