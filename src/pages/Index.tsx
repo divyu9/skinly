@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -57,6 +57,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
+import { announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
 
 export default function Index() {
   const [isRequestModelOpen, setIsRequestModelOpen] = useState(false);
@@ -74,8 +75,29 @@ export default function Index() {
   
   // Get homepage settings to determine header height
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
-  const showAnnouncement = homepageSettings?.announcementEnabled ?? false;
-  const headerOffset = showAnnouncement ? 92 : 64; // 28px announcement + 64px header OR just 64px header
+  /*
+   * The offset the fixed header and announcement bar need underneath them.
+   *
+   * `?? false` meant every cold load began at 64 and moved to 92 once the
+   * settings query answered — 28px, applied to a margin above everything on
+   * the page, so the whole document jumped. That was the last 0.043 of the
+   * homepage's layout shift after the UGC skeleton was fixed.
+   *
+   * Assume what was true on the last visit instead, which the header already
+   * does for the same reason. A first-ever visitor assumes the bar is on: it
+   * usually is, and guessing wrong costs one 28px shift rather than one on
+   * every load forever.
+   */
+  const announcementOn = homepageSettings !== undefined
+    ? !!homepageSettings.announcementEnabled
+    : announcementLikelyShown();
+  useEffect(() => {
+    if (homepageSettings !== undefined) {
+      rememberAnnouncementShown(!!homepageSettings.announcementEnabled);
+    }
+  }, [homepageSettings]);
+
+  const headerOffset = announcementOn ? 92 : 64; // 28px announcement + 64px header
   
   // Sort sections by order for dynamic rendering
   const sortedActiveSections = homepageSections?.sort((a, b) => a.order - b.order) || [];
