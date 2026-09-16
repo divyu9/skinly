@@ -11,6 +11,7 @@ import { normalizeModelName } from '@/lib/mockups';
 import { normalizeImageForUpload, withExtension } from '@/lib/image-processing';
 
 import { normalizeOrder } from "./normalize-order.ts";
+import { collectionKey } from "./collection-key";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
@@ -1700,9 +1701,24 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'collections.getCollectionByName') {
-          const q = query(collection(db, 'collections'), where('slug', '==', args?.name || ''));
+          // The `name` argument arrives in two spellings. The collection chips
+          // on /products send the display name ("Cars & Bikes"); the sitemap,
+          // and every link built from it, sends the slug ("cars-bikes"). This
+          // matched the slug only, so a chip click looked up nothing, got null,
+          // and `useProductsData` quietly fell back to the unfiltered grid —
+          // the URL gained `?collection=Marvel` and the products never moved.
+          const wanted = collectionKey(args?.name);
+          const q = query(collection(db, 'collections'));
           unsubscribe = onSnapshot(q, (snap) => {
-            setData(snap.empty ? null : { _id: snap.docs[0].id, ...snap.docs[0].data() });
+            if (!wanted) {
+              setData(null);
+              return;
+            }
+            const hit = snap.docs.find((d) => {
+              const c: any = d.data();
+              return collectionKey(c.slug) === wanted || collectionKey(c.name) === wanted;
+            });
+            setData(hit ? { _id: hit.id, ...hit.data() } : null);
           });
         }
         else if (path === 'collections.getCollectionProductsPaginated') {

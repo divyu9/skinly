@@ -108,8 +108,30 @@ export function useProductsData({
   
   // Transform products to common format (without mockups first)
   const allProductsBase = useMemo((): Product[] => {
-    const sourceProducts = filters.collectionParam && accumulatedCollectionProducts.length > 0
-      ? accumulatedCollectionProducts
+    // Once a collection resolves, its products are the grid. Keyed on the
+    // accumulator being non-empty, a collection that was still loading — or
+    // that genuinely holds nothing — silently rendered the whole catalogue
+    // instead, which reads as "the filter did nothing".
+    // Collection products arrive straight from the collection join, so unlike
+    // the main query they are not narrowed by the gadget and finish the shopper
+    // picked: on an iPhone 12, "Cars & Bikes" listed a laptop charger and a
+    // drone skin. Drop anything that declares a different gadget or finish; a
+    // product that declares neither cannot be ruled out, so it stays.
+    const fitsChosenFilters = (p: any) => {
+      if (filters.productCategory && p.productCategory && p.productCategory !== filters.productCategory) {
+        return false;
+      }
+      if (filters.gadgetFilter && p.gadgetCategory && p.gadgetCategory !== filters.gadgetFilter) {
+        return false;
+      }
+      if (filters.finishFilter && p.finishType && p.finishType !== filters.finishFilter) {
+        return false;
+      }
+      return true;
+    };
+
+    const sourceProducts = filters.collectionParam && collection
+      ? accumulatedCollectionProducts.filter(fitsChosenFilters)
       : productsData || [];
     
     if (!Array.isArray(sourceProducts)) return [];
@@ -134,7 +156,8 @@ export function useProductsData({
         available: (v.inventoryQuantity ?? v.inventory_quantity ?? 0) > 0,
       })) || [],
     }));
-  }, [productsData, accumulatedCollectionProducts, filters.collectionParam]);
+  }, [productsData, accumulatedCollectionProducts, filters.collectionParam, collection,
+      filters.productCategory, filters.gadgetFilter, filters.finishFilter]);
   
   // Apply search filter
   const filteredProducts = useMemo(() => {
@@ -312,7 +335,9 @@ export function useProductsData({
   
   // Loading states
   const isInitialLoading = status === "LoadingFirstPage" ||
-    (filters.collectionParam && collection === undefined);
+    !!(filters.collectionParam && collection === undefined) ||
+    // The collection is known but its products have not arrived yet.
+    !!(filters.collectionParam && collection && collectionProductsData === undefined);
 
   const isMockupsLoading = !!(urlParams.brand && urlParams.model && mockupResult === undefined);
 

@@ -1,6 +1,8 @@
 import { memo, useMemo, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
+import { collectionKey } from "@/lib/collection-key";
+
 interface Collection {
   _id: string;
   name: string;
@@ -37,16 +39,21 @@ export const CollectionPills = memo(function CollectionPills({
 }: CollectionPillsProps) {
   const [expanded, setExpanded] = useState(false);
 
+  // `?collection=` carries the display name when a chip set it and the slug
+  // when the link came from the sitemap, so compare through a shared key.
+  const activeKey = collectionKey(currentCollection);
+  const isActive = (name: string) => !!activeKey && collectionKey(name) === activeKey;
+
   const shown = useMemo(() => {
     if (expanded) return collections;
     const head = collections.slice(0, COLLAPSED_COUNT);
     // The active one survives the collapse even if it sits further down.
-    if (currentCollection && !head.some((c) => c.name === currentCollection)) {
-      const active = collections.find((c) => c.name === currentCollection);
+    if (activeKey && !head.some((c) => collectionKey(c.name) === activeKey)) {
+      const active = collections.find((c) => collectionKey(c.name) === activeKey);
       if (active) return [...head.slice(0, COLLAPSED_COUNT - 1), active];
     }
     return head;
-  }, [collections, currentCollection, expanded]);
+  }, [collections, activeKey, expanded]);
 
   if (!collections || collections.length === 0) return null;
 
@@ -61,7 +68,7 @@ export const CollectionPills = memo(function CollectionPills({
 
   return (
     <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-4">
-      <button onClick={() => onCollectionChange(null)} className={chip(!currentCollection)}>
+      <button onClick={() => onCollectionChange(null)} className={chip(!activeKey)}>
         All Collections
       </button>
 
@@ -69,7 +76,7 @@ export const CollectionPills = memo(function CollectionPills({
         <button
           key={col._id}
           onClick={() => onCollectionChange(col.name)}
-          className={chip(currentCollection === col.name)}
+          className={chip(isActive(col.name))}
         >
           {col.name}
         </button>
