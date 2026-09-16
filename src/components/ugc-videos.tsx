@@ -12,15 +12,27 @@ export function UgcVideos() {
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Loading state
+  /*
+   * The loading state mirrors the loaded one exactly, because any difference
+   * between them is a layout shift.
+   *
+   * It used to be `py-8` with a 32px heading block and 400px cards — roughly
+   * 528px against the 706px this section actually renders at. Turning the
+   * section off entirely dropped the homepage's CLS from 0.79 to 0.156, which
+   * is how it was finally pinned down: same padding, same two-line header, same
+   * 480px cards, same gap.
+   */
   if (videos === undefined) {
     return (
-      <section className="py-8">
+      <section className="py-12 bg-gradient-to-b from-background to-muted/20">
         <div className="container mx-auto px-4">
-          <Skeleton className="h-8 w-48 mb-4" />
-          <div className="flex gap-3 overflow-x-auto pb-4">
+          <div className="mb-6">
+            <Skeleton className="mb-2 h-9 w-72" />
+            <Skeleton className="h-6 w-80 max-w-full" />
+          </div>
+          <div className="flex gap-4 overflow-x-hidden pb-4">
             {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[400px] w-[280px] flex-shrink-0 rounded-2xl" />
+              <Skeleton key={i} className="h-[480px] w-[280px] flex-shrink-0 rounded-3xl" />
             ))}
           </div>
         </div>
@@ -28,7 +40,9 @@ export function UgcVideos() {
     );
   }
 
-  // Don't render if no videos
+  // Nothing to show is a legitimate answer, but collapsing 706px of page to
+  // reach it is not — the section is simply absent from the layout config when
+  // it is meant to be off.
   if (!videos || videos.length === 0) {
     return null;
   }
