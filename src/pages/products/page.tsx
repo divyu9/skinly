@@ -28,6 +28,7 @@ import {
 import { useProductFilters } from "@/hooks/useProductFilters";
 import { useProductsData } from "@/hooks/useProductsData";
 import { writeActiveDevice } from "@/lib/active-device";
+import { CATEGORY_PAGES, canonicalListingPath } from "@/lib/category-paths.mjs";
 import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
 
 export default function ProductsPage() {
@@ -381,6 +382,14 @@ export default function ProductsPage() {
     urlParams.brand && 
     urlParams.model;
   
+  // The listing's canonical follows its category (and, for skins, gadget), so
+  // /products?productType=case-cover declares /cases-covers.
+  const listingCanonical = canonicalListingPath(filters.productCategory, filters.gadgetFilter);
+  const categoryPage = filters.productCategory ? CATEGORY_PAGES[filters.productCategory] : undefined;
+  const listingSeo = categoryPage && listingCanonical === categoryPage.path
+    ? { title: categoryPage.title, description: categoryPage.description, canonicalPath: listingCanonical }
+    : { canonicalPath: listingCanonical };
+
   // ============================================
   // EMPTY STATE
   // ============================================
@@ -398,7 +407,7 @@ export default function ProductsPage() {
   return (
     <div className="min-h-screen">
       {/* SEO */}
-      <ProductsSEOHead />
+      <ProductsSEOHead {...listingSeo} />
       
       {/* Announcement Bar */}
       <AnnouncementBar />

@@ -29,6 +29,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy } from "../src/lib/seo-pages.mjs";
+import { CATEGORY_PAGES, GADGET_PAGES } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -49,7 +50,8 @@ const REDIRECTED_SLUGS = new Set([
 const RESERVED = new Set([
   "", "account", "auth", "backend-skinly", "admin", "cart", "checkout", "orders",
   "payment", "mock-payment", "products", "devices", "policies", "magneto-x",
-  "assets", "magneto", "app", "404", "index", "sitemap", "robots",
+  "assets", "magneto", "app", "404", "index", "sitemap", "robots", "seo-data",
+  "skins", "cases-covers", "camera-rings", "screen-protectors", "accessories",
 ]);
 
 const CATEGORY_FALLBACK = {
@@ -569,6 +571,51 @@ async function writeHtaccess(strict) {
   await fs.writeFile(file, out);
 }
 
+// ─── category listings ────────────────────────────────────────────────────────
+
+function categoryPages(products, variantsByProduct) {
+  const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
+  return Object.entries(CATEGORY_PAGES).map(([category, meta]) => {
+    const rows = products
+      .filter((p) => p.productCategory === category)
+      .map((p) => {
+        const vs = (variantsByProduct.get(p._id) || []).filter((v) => Number(v.price) > 0);
+        return { p, vs, inStock: vs.some((v) => stock(v) > 0) };
+      })
+      .filter((r) => r.vs.length)
+      .sort((a, b) => Number(b.inStock) - Number(a.inStock) || Number(b.p._creationTime || 0) - Number(a.p._creationTime || 0));
+    const links = rows
+      .slice(0, 60)
+      .map(({ p }) => `<li><a href="${SITE}/products/${esc(p.slug)}">${esc(p.title)}</a></li>`)
+      .join("");
+    const url = `${SITE}${meta.path}`;
+    return {
+      route: meta.path,
+      title: meta.title,
+      description: meta.description,
+      canonical: url,
+      priority: "0.9",
+      empty: rows.length === 0,
+      robots: rows.length === 0 ? "noindex, follow" : undefined,
+      jsonLd: [
+        {
+          "@context": "https://schema.org",
+          "@type": "CollectionPage",
+          name: meta.heading,
+          description: meta.description,
+          url,
+          provider: { "@type": "Organization", name: "GoSkinly", url: SITE },
+        },
+        breadcrumbLd([
+          { name: "Home", url: `${SITE}/` },
+          { name: meta.heading, url },
+        ]),
+      ],
+      body: `<h1>${esc(meta.heading)}</h1><p>${esc(meta.description)}</p>${links ? `<ul>${links}</ul>` : ""}`,
+    };
+  });
+}
+
 // ─── SEO page data ────────────────────────────────────────────────────────────
 
 /**
@@ -731,11 +778,23 @@ async function main() {
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
 
-  await writeSitemaps([...statics, magneto, ...seo.filter((p) => !p.empty)], productPages);
+  const categories = categoryPages(active, variantsByProduct);
+  for (const p of categories) await writePage(p.route, render(template, p));
+
+  // The listing points skins-for-one-gadget at these pages; say so if one is gone.
+  const published = new Set(seo.map((p) => p.route));
+  for (const [gadget, route] of Object.entries(GADGET_PAGES)) {
+    if (!published.has(route)) log(`warning: ${gadget} listings canonicalise to ${route}, which is not a published SEO page`);
+  }
+
+  await writeSitemaps(
+    [...statics, magneto, ...categories.filter((p) => !p.empty), ...seo.filter((p) => !p.empty)],
+    productPages,
+  );
   await writeHtaccess(true);
   const kinds = {};
   for (const i of seoInfo.values()) kinds[i.target.kind] = (kinds[i.target.kind] || 0) + 1;
-  log(`wrote ${statics.length + 1} static, ${productPages.length} product and ${seo.length} SEO pages`);
+  log(`wrote ${statics.length + 1} static, ${categories.length} category, ${productPages.length} product and ${seo.length} SEO pages`);
   log(`SEO pages by kind ${JSON.stringify(kinds)}; ${seo.filter((p) => p.empty).length} with nothing to sell (noindex)`);
 }
 

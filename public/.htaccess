@@ -17,6 +17,11 @@ ErrorDocument 404 /404.html
   <FilesMatch "^404\.html$">
     Header set X-Robots-Tag "noindex"
   </FilesMatch>
+  # Page data the SEO pages load. Crawlers must be able to fetch it to render
+  # those pages, so it is not blocked in robots.txt — only kept out of results.
+  <FilesMatch "\.json$">
+    Header set X-Robots-Tag "noindex"
+  </FilesMatch>
 </IfModule>
 
 <IfModule mod_rewrite.c>
@@ -67,6 +72,8 @@ RewriteRule ^products$ https://goskinly.com/products? [R=301,L]
 # ─── SEO pages that should not exist ────────────────────────────────────────
 RewriteRule ^(samsung-azx1-skins|samsung-skins-skins)$ https://goskinly.com/samsung-skins [R=301,L]
 RewriteRule ^samsung-galaxy-s23-skins-1$ https://goskinly.com/samsung-galaxy-s23-skins [R=301,L]
+RewriteRule ^samsung-galaxy-s24-skins-1$ https://goskinly.com/samsung-galaxy-s24-skins [R=301,L]
+RewriteRule ^mac-mini-skins-1$ https://goskinly.com/mac-mini-skins [R=301,L]
 RewriteRule ^master-skins$ https://goskinly.com/products [R=301,L]
 
 # ─── The homepage ───────────────────────────────────────────────────────────

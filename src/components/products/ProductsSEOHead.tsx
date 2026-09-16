@@ -4,14 +4,17 @@ import { Helmet } from "react-helmet-async";
 interface ProductsSEOHeadProps {
   title?: string;
   description?: string;
+  /** Site-relative canonical path for this listing state. */
+  canonicalPath?: string;
 }
 
 export const ProductsSEOHead = memo(function ProductsSEOHead({
   title = "Shop Premium Phone Skins & Gadget Accessories | GoSkinly",
   description = "Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application. Starting ₹149. Free shipping above ₹499.",
+  canonicalPath = "/products",
 }: ProductsSEOHeadProps) {
   const imageUrl = "https://goskinly.com/og-default.jpg";
-  const canonicalUrl = "https://goskinly.com/products";
+  const canonicalUrl = `https://goskinly.com${canonicalPath}`;
 
   return (
     <Helmet>

@@ -110,6 +110,12 @@ export default function App() {
             <Route path="/account/wallet" element={<WalletPage />} />
             <Route path="/magneto-x" element={<Suspense fallback={<PageSkeleton />}><MagnetoXPage /></Suspense>} />
             <Route path="/products" element={<ProductsPage />} />
+            {/* Category listings with a path of their own (src/lib/category-paths.mjs). */}
+            <Route path="/skins" element={<ProductsPage />} />
+            <Route path="/cases-covers" element={<ProductsPage />} />
+            <Route path="/camera-rings" element={<ProductsPage />} />
+            <Route path="/screen-protectors" element={<ProductsPage />} />
+            <Route path="/accessories" element={<ProductsPage />} />
             <Route path="/products/detail" element={<ProductDetailPage />} />
             <Route path="/products/:slug" element={<ProductDetailPage />} />
             <Route path="/cart" element={<CartPage />} />

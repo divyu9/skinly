@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { readActiveDevice, writeActiveDevice } from "@/lib/active-device";
+import { categoryForPath } from "@/lib/category-paths.mjs";
 
 // Types
 export type ProductCategory = "skin" | "case-cover" | "camera-ring" | "magneto-x" | "glass" | "accessory" | null;
@@ -33,6 +34,9 @@ export function useProductFilters() {
   const location = useLocation();
   const navigate = useNavigate();
   
+  // /skins, /cases-covers… carry their category in the path, not the query.
+  const pathCategory = categoryForPath(location.pathname) as ProductCategory;
+
   // Parse URL params once
   const urlParams = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -42,12 +46,12 @@ export function useProductFilters() {
       model: params.get('model'),
       search: params.get('search') || '',
       collection: params.get('collection') || '',
-      productType: params.get('productType') as ProductCategory,
+      productType: (params.get('productType') as ProductCategory) || pathCategory,
       gadget: params.get('gadget'),
       finish: params.get('finish'),
       fromGadgetSelector: params.get('fromGadgetSelector') === 'true',
     };
-  }, [location.search]);
+  }, [location.search, pathCategory]);
   
   // Consolidated filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -69,13 +73,13 @@ export function useProductFilters() {
     const params = new URLSearchParams(location.search);
     setFilters(prev => ({
       ...prev,
-      productCategory: params.get('productType') as ProductCategory,
+      productCategory: (params.get('productType') as ProductCategory) || pathCategory,
       gadgetFilter: params.get('gadget'),
       finishFilter: params.get('finish'),
       collectionParam: params.get('collection') || '',
       searchQuery: params.get('search') || '',
     }));
-  }, [location.search]);
+  }, [location.search, pathCategory]);
   
   /*
    * The chosen device, kept across navigation.
@@ -139,6 +143,24 @@ export function useProductFilters() {
       }
     });
     
+    // On a category path the category is implied. Setting it to the same one
+    // is not a change; picking another (or clearing it) leaves the page for
+    // /products, so the path and the query never disagree.
+    const pathCat = categoryForPath(window.location.pathname);
+    if (pathCat && 'productType' in updates) {
+      const next = updates.productType;
+      if (next === pathCat) {
+        if (params.get('productType') === pathCat) {
+          params.delete('productType');
+          hasChanges = true;
+        }
+      } else {
+        if (next) params.set('productType', next);
+        navigate(`/products?${params.toString()}`, { replace: true });
+        return;
+      }
+    }
+
     if (hasChanges) {
       navigate(`?${params.toString()}`, { replace: true });
     }
