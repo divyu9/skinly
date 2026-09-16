@@ -57,7 +57,10 @@ export function AnnouncementBar() {
             dismissAnnouncement();
             setIsDismissed(true);
           }}
-          className="p-0.5 hover:bg-primary-foreground/10 rounded transition-colors"
+          /* Was 18x18. This is the control someone reaches for precisely
+             because they want the bar gone; missing it twice is worse than the
+             bar. The icon stays 14px, the target is 44. */
+          className="-my-2 grid size-11 place-items-center rounded transition-colors hover:bg-primary-foreground/10"
           aria-label="Dismiss announcement"
         >
           <XIcon className="size-3.5" />

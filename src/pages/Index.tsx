@@ -108,8 +108,22 @@ export default function Index() {
 
     switch (section.sectionType) {
       case "hero_slides":
-        // Hero slider is critical for LCP - keep it eager
-        return <HeroSlider key={key} />;
+        // Hero slider is critical for LCP - keep it eager.
+        //
+        // The page's h1 rides with it. The homepage had no h1 at all — the
+        // highest-authority page on the site stated no heading, so screen
+        // readers got no landmark and search engines fell back to the title
+        // tag for a page we would otherwise control. Kept small and set above
+        // the slider rather than hidden, because a heading worth having is one
+        // a visitor can read too.
+        return (
+          <div key={key}>
+            <h1 className="container mx-auto px-4 pt-4 text-center text-[15px] font-bold tracking-tight text-muted-foreground sm:text-base">
+              Quirky skins &amp; accessories for every gadget you own
+            </h1>
+            <HeroSlider />
+          </div>
+        );
 
       case "models_marquee":
         return null; // Already rendered above header

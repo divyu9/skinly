@@ -101,7 +101,7 @@ export function FeatureBanner() {
           {/* Background Image */}
           <img
             src={banner.backgroundImage}
-            alt={banner.heading}
+            alt={banner.heading || "Skinly feature banner"}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
 
@@ -167,7 +167,7 @@ export function FeatureBanner() {
                   {/* Background Image */}
                   <img
                     src={banner.backgroundImage}
-                    alt={banner.heading}
+                    alt={banner.heading || "Skinly feature banner"}
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
 
@@ -222,13 +222,16 @@ export function FeatureBanner() {
                   behavior: 'smooth',
                 });
               }}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                index === activeIndex
-                  ? 'w-8 bg-foreground'
-                  : 'w-2 bg-foreground/30'
-              }`}
+              /* 8px dot, 44px target — same treatment as the hero dots. */
+              className="grid h-11 w-11 place-items-center"
               aria-label={`Go to banner ${index + 1}`}
-            />
+            >
+              <span
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  index === activeIndex ? 'w-8 bg-foreground' : 'w-2 bg-foreground/30'
+                }`}
+              />
+            </button>
           ))}
         </div>
       </div>

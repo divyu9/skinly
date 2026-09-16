@@ -168,8 +168,15 @@ export function CheckoutUpsells() {
         </p>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          {upsells.map((upsell) => {
+        {/* Two, not everything the matcher returns.
+            Measured on the live page, this block ran 768px between choosing a
+            payment method and reaching Place Order — four products, each with
+            its own variant dropdown, one of them listing eleven options. Every
+            dropdown at the checkout line is a chance to leave, and a dropdown
+            beside a payment method is a chance to mis-tap. Two is an offer;
+            four is an aisle. */}
+        <div className="grid grid-cols-2 gap-3 md:gap-4">
+          {upsells.slice(0, 2).map((upsell) => {
             // Get selected variant or default to the first variant
             const currentSelectedVariantId = selectedVariants[upsell.productId] || upsell.variantId;
             const currentVariant = upsell.hasMultipleVariants && upsell.allVariants

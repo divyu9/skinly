@@ -21,6 +21,9 @@ import { CartButton } from "@/components/cart.tsx";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 
 import { SiteHeader } from "@/components/site-header.tsx";
+import { MobileHeader } from "@/components/mobile-header.tsx";
+import { MobileNav } from "@/components/mobile-nav.tsx";
+import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 
 export default function CartPage() {
   const navigate = useNavigate();
@@ -35,11 +38,33 @@ export default function CartPage() {
     }
   }, [authLoading]);
 
+
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  // MobileHeader is fixed, so the page has to start below it. Measured rather
+  // than guessed, because the announcement bar above it comes and goes.
+  const headerOffset = useHeaderOffset();
+
   return (
     <div className="min-h-screen halftone">
-      <SiteHeader />
+      {/* The same header as the rest of the shop.
+          Cart used to render SiteHeader alone, which on a phone is a logo and
+          an account icon: no menu, no search. Someone who decides mid-cart to
+          add one more skin had no way to look for it and had to go back — and
+          it read as a different site at the moment you most want it to feel
+          solid. Checkout is the page that earns a stripped-back header; a cart
+          is still shopping. */}
+      <div className="md:hidden">
+        <MobileHeader onMenuClick={() => setIsMobileNavOpen(true)} />
+      </div>
+      <div className="hidden md:block">
+        <SiteHeader />
+      </div>
+      <MobileNav open={isMobileNavOpen} onOpenChange={setIsMobileNavOpen} />
       
-      <main className="container mx-auto max-w-6xl px-4 py-6 sm:py-8">
+      <main
+        className="container mx-auto max-w-6xl px-4 pb-6 sm:pb-8"
+        style={{ paddingTop: headerOffset + 24 }}
+      >
         {(authLoading || !showContent) ? (
           <div className="max-w-4xl mx-auto space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (

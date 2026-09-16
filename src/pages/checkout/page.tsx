@@ -381,7 +381,6 @@ function CheckoutPageInner() {
     }
     if (!isPhoneValid) { toast.error("Please enter a valid 10-digit mobile number"); return; }
     if (!formData.addressLine1.trim()) { toast.error("Please enter address line 1"); return; }
-    if (!formData.addressLine2.trim()) { toast.error("Please enter address line 2"); return; }
     if (!formData.city.trim()) { toast.error("Please enter your city"); return; }
     if (!formData.state.trim()) { toast.error("Please enter your state"); return; }
     if (!/^[1-9]\d{5}$/.test(formData.pincode.trim())) {

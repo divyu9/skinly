@@ -186,13 +186,19 @@ export function HeroSlider() {
                   behavior: 'smooth',
                 });
               }}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                index === activeIndex
-                  ? 'w-8 bg-foreground'
-                  : 'w-2 bg-foreground/30'
-              }`}
+              /* The dot stays 8px tall; the button around it is 44. These were
+                 8x8 targets — a quarter of the minimum in each direction — on
+                 the control people reach for while the carousel is moving. The
+                 padding is transparent, so nothing looks different. */
+              className="group grid h-11 w-11 place-items-center"
               aria-label={`Go to slide ${index + 1}`}
-            />
+            >
+              <span
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  index === activeIndex ? 'w-8 bg-foreground' : 'w-2 bg-foreground/30'
+                }`}
+              />
+            </button>
           ))}
         </div>
       )}

@@ -118,18 +118,22 @@ export function AddressForm({
           </div>
 
           <div>
-            <Label htmlFor="addressLine2">Address Line 2</Label>
+            {/* Optional, and named for what couriers here actually use. Plenty
+                of Indian addresses are one line; requiring a second means people
+                invent one, and an invented address line reaches the courier as
+                written. The character counter went with it — it read as a
+                constraint on a field nobody is trying to overrun. */}
+            <Label htmlFor="addressLine2">
+              Landmark or area <span className="text-muted-foreground">(optional)</span>
+            </Label>
             <Input
               id="addressLine2"
-              required
               autoComplete="address-line2"
+              placeholder="Near…"
               value={formData.addressLine2}
               maxLength={99}
               onChange={(e) => onFieldChange("addressLine2", e.target.value)}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              {formData.addressLine2.length}/99 characters
-            </p>
           </div>
 
           <div className="grid sm:grid-cols-3 gap-4">
@@ -157,13 +161,21 @@ export function AddressForm({
 
             <div>
               <Label htmlFor="pincode">Pincode</Label>
+              {/* Six digits on a letter keyboard, in the middle of an address
+                  form, on a phone. The autocomplete token was already right —
+                  only the keyboard hint was missing. */}
               <Input
                 id="pincode"
                 required
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
                 placeholder="6 digits"
                 autoComplete="postal-code"
                 value={formData.pincode}
-                onChange={(e) => onFieldChange("pincode", e.target.value)}
+                onChange={(e) =>
+                  onFieldChange("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
               />
             </div>
           </div>

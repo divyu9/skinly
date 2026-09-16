@@ -115,10 +115,14 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
                     }
                   }
                 `}</style>
-                {/* Background Image - Simplified */}
+                {/* Background image. `displayName` is blank for several
+                    categories and React drops the attribute entirely when it is
+                    undefined, which is how nine homepage images ended up with no
+                    alt at all. On a shop the alt is the category name, which is
+                    also what someone would have searched for. */}
                 <img
                   src={getCategoryImage(category.categoryName, category.imageUrl)}
-                  alt={category.displayName}
+                  alt={category.displayName || category.categoryName || "Skins category"}
                   loading="lazy"
                   decoding="async"
                   width="800"
