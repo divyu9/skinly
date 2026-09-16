@@ -23,10 +23,32 @@ const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m =>
 const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
 
 // Loading fallback for lazy components
+/**
+ * Holds a lazy section's place at its real height, through every state.
+ *
+ * The reserve lives on a wrapper outside Suspense, not on the fallback, and
+ * that distinction is the whole fix. Reserving only the fallback held the
+ * height until the chunk arrived, then the component mounted, rendered its own
+ * much shorter loading state while its data was still in flight, and the page
+ * collapsed anyway — measured, `main` went 5456px, down to 3046px, back to
+ * 4919px. A wrapper is mounted for all three and holds the floor.
+ *
+ * Heights were measured off the loaded page at 400px and 873px wide. They are
+ * written as literal class strings at each call site because Tailwind's scanner
+ * reads source text; assembled from a template it emits nothing at all.
+ */
+function LazySection({ reserve, children }: { reserve: string; children: React.ReactNode }) {
+  return (
+    <div className={reserve}>
+      <Suspense fallback={<SectionSkeleton />}>{children}</Suspense>
+    </div>
+  );
+}
+
 function SectionSkeleton() {
   return (
-    <div className="container mx-auto px-4 py-12 space-y-4">
-      <Skeleton className="h-10 w-64 mx-auto" />
+    <div className="container mx-auto space-y-4 px-4 py-12">
+      <Skeleton className="mx-auto h-10 w-64" />
       <Skeleton className="h-32 w-full" />
     </div>
   );
@@ -72,9 +94,9 @@ export default function Index() {
 
       case "explore_models":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[208px] md:min-h-[252px]">
             <ExploreModels onRequestModelClick={() => setIsRequestModelOpen(true)} />
-          </Suspense>
+          </LazySection>
         );
 
       case "category_explorer":
@@ -83,60 +105,60 @@ export default function Index() {
 
       case "top_picks":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[784px] md:min-h-[772px]">
             <TopPicks />
-          </Suspense>
+          </LazySection>
         );
 
       case "most_trendy":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[608px] md:min-h-[612px]">
             <MostTrendy
               sectionId={section._id}
               config={section.config as never}
             />
-          </Suspense>
+          </LazySection>
         );
 
       case "explore_by_brand":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[283px] md:min-h-[287px]">
             <ExploreByBrand
               sectionId={section._id}
               config={section.config as never}
             />
-          </Suspense>
+          </LazySection>
         );
 
       case "explore_by_gadget":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[508px] md:min-h-[512px]">
             <ExploreByGadget
               sectionId={section._id}
               config={section.config as never}
             />
-          </Suspense>
+          </LazySection>
         );
 
       case "why_skinly":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[387px] md:min-h-[413px]">
             <WhySkinly />
-          </Suspense>
+          </LazySection>
         );
 
       case "feature_banner":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[320px] md:min-h-[520px]">
             <FeatureBanner />
-          </Suspense>
+          </LazySection>
         );
 
       case "ugc_videos":
         return (
-          <Suspense key={key} fallback={<SectionSkeleton />}>
+          <LazySection key={key} reserve="min-h-[742px] md:min-h-[706px]">
             <UgcVideos />
-          </Suspense>
+          </LazySection>
         );
 
       default:
