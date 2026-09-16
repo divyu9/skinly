@@ -15,6 +15,22 @@ interface ProductCategoryHeaderProps {
   onDeviceSelectorClick?: () => void;
 }
 
+
+/*
+ * Chip labels, shortened.
+ *
+ * "3D (Embossed)" and "Protectors/Membranes" are right in a product title and
+ * wrong on a filter chip — between them they pushed the finish row onto a
+ * third and fourth line on a phone, over a strip that is fixed above the
+ * products. The full names still live in the data and on the product page.
+ */
+const SHORT_FINISH: Record<string, string> = {
+  "3D (Embossed)": "3D",
+  "Protectors/Membranes": "Protectors",
+  "Premium Leather": "Leather",
+};
+const shortFinish = (name: string) => SHORT_FINISH[name] ?? name;
+
 export function ProductCategoryHeader({
   productCategory,
   gadgetFilter,
@@ -177,7 +193,11 @@ export function ProductCategoryHeader({
 
             {/* Compact horizontal layout when gadget is selected */}
             {productCategory === 'skin' && gadgetFilter && (
-              <div className="flex items-center gap-1.5 sm:gap-3">
+              /* One row, not two. The chosen gadget is a chip like any other
+                 rather than a 30%-wide block that forced the finishes onto
+                 their own line — and it reads as the step you came through,
+                 which the old layout did not say either. */
+              <div className="flex flex-wrap items-center gap-1">
                 {gadgetTypes === undefined || finishTypes === undefined ? (
                   // Loading skeleton for compact layout
                   <>
@@ -195,20 +215,25 @@ export function ProductCategoryHeader({
                     <button
                       onClick={() => onUpdateFilters({ gadget: null, finish: null })}
                       title="Change device category"
-                      className="w-[30%] sm:w-auto px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg bg-brand text-brand-foreground font-semibold text-[10px] sm:text-xs truncate flex-shrink-0 hover:shadow-md transition-all duration-200 border-2 border-ink"
+                      className="flex shrink-0 items-center gap-1 rounded-full border-2 border-ink bg-brand px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-brand-foreground transition-colors sm:px-2.5 sm:py-1 sm:text-xs"
                     >
                       {gadgetTypes?.find(gt => gt.name === gadgetFilter)?.displayName || gadgetFilter}
-                      <span className="ml-1 opacity-70">✕</span>
+                      <span className="opacity-70">✕</span>
                     </button>
 
-                    {/* Right side - Finish Selector (70% width on mobile) */}
-                    <div className="flex-1 flex flex-wrap gap-1.5 sm:gap-2">
+                    <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-ink/15" />
+
+                    {/* Siblings of the gadget chip, not a nested flex box. As
+                        their own div they were a single wide flex item, so the
+                        whole group dropped to its own line and the gadget chip
+                        sat alone above it — three rows where two will do. */}
+                    <>
                       <button
                         onClick={() => onUpdateFilters({ finish: null })}
-                        className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-[10px] sm:text-xs whitespace-nowrap transition-all duration-200 ${
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap transition-colors sm:px-2.5 sm:py-1 sm:text-xs ${
                           !finishFilter
-                            ? 'bg-brand text-brand-foreground shadow-md hover:shadow-lg'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm'
+                            ? 'bg-brand font-bold text-brand-foreground'
+                            : 'border border-ink/15 bg-background text-ink/80 hover:border-ink/40'
                         }`}
                       >
                         All
@@ -223,13 +248,13 @@ export function ProductCategoryHeader({
                         <button
                           key={finishType._id}
                           onClick={() => onUpdateFilters({ finish: finishType.name })}
-                          className={`px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-[10px] sm:text-xs whitespace-nowrap transition-all duration-200 ${
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap transition-colors sm:px-2.5 sm:py-1 sm:text-xs ${
                             finishFilter === finishType.name
-                              ? 'bg-brand text-brand-foreground shadow-md hover:shadow-lg'
-                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm'
+                              ? 'bg-brand font-bold text-brand-foreground'
+                              : 'border border-ink/15 bg-background text-ink/80 hover:border-ink/40'
                           }`}
                         >
-                          {finishType.displayName}
+                          {shortFinish(finishType.displayName)}
                           {(() => {
                             const g = gadgetTypes?.find(gt => gt.name === gadgetFilter)?._id;
                             const n = g ? facets?.finishByGadget?.[g]?.[finishType._id] : undefined;
@@ -237,7 +262,7 @@ export function ProductCategoryHeader({
                           })()}
                         </button>
                       ))}
-                    </div>
+                    </>
                   </>
                 )}
               </div>
