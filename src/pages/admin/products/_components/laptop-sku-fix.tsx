@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { collection, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAction } from "@/lib/firebase-hooks";
+import { useAction, useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -264,7 +264,7 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
       }
     } else {
       state = "blocked";
-      problem = "No cutout or roll record matches these SKUs — add the design (or its code as an alias) first";
+      problem = "No stock record matches these SKUs — add the R- number under Rolls Management, or the cutout (or this code as an alias) under Cutouts, then reopen this";
     }
 
     const variantPlans: VariantPlan[] = list.map((v) => {
@@ -369,8 +369,11 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
   return plans.sort((a, b) => order[a.state] - order[b.state] || a.title.localeCompare(b.title));
 }
 
-export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: () => void }) {
+export function LaptopSkuFix({ cutouts: given, onClose }: { cutouts?: any[]; onClose: () => void }) {
   const recalcStock = useAction(api.materials.recalcMaterialStock);
+  // Opened from the Rolls tab there is no cutout list to hand in.
+  const fetched = useQuery(api.aiMockups.getCutouts, given ? "skip" : {}) as any[] | undefined;
+  const cutouts = given ?? fetched;
   const [plans, setPlans] = useState<ProductPlan[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -381,6 +384,7 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
   const [bulkPrice, setBulkPrice] = useState<{ LP: string; LPK: string }>({ LP: "", LPK: "" });
 
   const load = async () => {
+    if (!cutouts) return;
     setPlans(null);
     setError(null);
     try {
@@ -395,7 +399,7 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
     }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { if (cutouts) void load(); }, [!!cutouts]);
 
   const counts = useMemo(() => {
     const c = { ok: 0, review: 0, blocked: 0, clean: 0 };

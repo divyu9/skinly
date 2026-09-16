@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { MaterialMapping } from "./material-mapping.tsx";
-import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, RefreshCwIcon, CalculatorIcon } from "lucide-react";
+import { LaptopSkuFix } from "./laptop-sku-fix.tsx";
+import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, RefreshCwIcon, CalculatorIcon, WrenchIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import type { Id } from "@/lib/firebase-api";
@@ -34,6 +35,7 @@ import { Combobox } from "@/components/ui/combobox.tsx";
 const ROLL_WIDTH_CM = 29.5;
 
 export function RollsManagement() {
+  const [fixingSkus, setFixingSkus] = useState(false);
   const gadgets = useQuery(api.rollsManagement.getGadgetConsumption);
   const rolls = useQuery(api.rollsManagement.getRollInventory);
   const lowStockAlerts = useQuery(api.rollsManagement.getLowStockAlerts);
@@ -240,6 +242,8 @@ export function RollsManagement() {
 
   return (
     <Tabs defaultValue="management" className="space-y-6">
+      {fixingSkus && <LaptopSkuFix onClose={() => setFixingSkus(false)} />}
+      <div className="flex flex-wrap items-center justify-between gap-2">
       <TabsList>
         <TabsTrigger value="management">
           <PackageIcon className="size-4 mr-2" />
@@ -254,6 +258,13 @@ export function RollsManagement() {
           Material Calculator
         </TabsTrigger>
       </TabsList>
+        {/* R- laptop listings are fixed against the rolls on this tab, the
+            same way cutout ones are against the Cutouts tab. */}
+        <Button variant="outline" size="sm" onClick={() => setFixingSkus(true)}>
+          <WrenchIcon className="mr-1.5 size-4" />
+          Fix laptop SKUs
+        </Button>
+      </div>
 
       <TabsContent value="management" className="space-y-8">
       {/* Low Stock Alerts */}
