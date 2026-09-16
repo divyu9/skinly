@@ -24,11 +24,13 @@ import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hook
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { MediaPickerDialog } from "../products/_components/media-picker-dialog.tsx";
 import { isDeadImageUrl } from "@/lib/image-fallback.ts";
+import { CloudinaryCleanup } from "./cloudinary-cleanup.tsx";
 
 const PAGE_SIZE = 40;
 
 /**
- * Every product whose photos 404, with the details needed to replace them.
+ * Every product without a working photo, with the details needed to replace it:
+ * photos that 404 and, once the dead links are cleared, no photos at all.
  *
  * The old Cloudinary account was deleted and took 2,531 image URLs with it, so
  * roughly two thirds of the catalogue renders a placeholder on the storefront.
@@ -88,9 +90,9 @@ function BrokenImagesContent() {
       .map((p: any) => {
         const images = Array.isArray(p.images) ? p.images : [];
         const dead = images.filter((i: any) => isDeadImageUrl(i?.url));
-        return { ...p, images, dead, allDead: images.length > 0 && dead.length === images.length };
+        return { ...p, images, dead, allDead: dead.length === images.length, empty: images.length === 0 };
       })
-      .filter((p: any) => p.dead.length > 0 && !fixed.has(p._id));
+      .filter((p: any) => (p.empty || p.dead.length > 0) && !fixed.has(p._id));
   }, [products, fixed]);
 
   const filtered = useMemo(() => {
@@ -188,7 +190,7 @@ function BrokenImagesContent() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Broken images</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Products whose photos no longer load. Upload a replacement and it goes live immediately.
+            Products with no working photo. Upload a replacement and it goes live immediately.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -197,6 +199,8 @@ function BrokenImagesContent() {
           <Stat label="Fixed today" value={fixed.size} tone="emerald" />
         </div>
       </div>
+
+      <CloudinaryCleanup />
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 sm:max-w-sm">
@@ -270,7 +274,9 @@ function BrokenImagesContent() {
                       {gadget && <Badge variant="secondary" className="text-[11px]">{gadget}</Badge>}
                       {p.finishType && <Badge variant="outline" className="text-[11px]">{p.finishType}</Badge>}
                       <span>
-                        {p.dead.length} of {p.images.length} image{p.images.length === 1 ? "" : "s"} dead
+                        {p.empty
+                          ? "No photo"
+                          : `${p.dead.length} of ${p.images.length} image${p.images.length === 1 ? "" : "s"} dead`}
                       </span>
                       {!p.allDead && (
                         <Badge className="bg-amber-500/15 text-[11px] text-amber-700 dark:text-amber-300">
