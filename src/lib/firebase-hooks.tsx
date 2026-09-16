@@ -6298,11 +6298,52 @@ export function useAction(apiRef: any) {
 
     // seoProductGenerator — also uses callOpenAIForSEO (no CF)
     if (collectionName === 'seoProductGenerator') {
+      /*
+       * A product's meta title and description, from the product itself.
+       *
+       * These used to be lifted from the generated landing-page copy: the first
+       * <h2> and first <p>. For a product the prompt's keyword is
+       * "<gadget> Skins", so every phone product would have been titled "Best
+       * phone Skins in India — Starting ₹149" — one title across the catalogue
+       * — with a description promising free delivery everywhere.
+       */
+      const GADGET_WORD: Record<string, string> = {
+        phone: 'phone', laptop: 'laptop', tablet: 'tablet', camera: 'camera', lens: 'lens',
+        drone: 'drone', charger: 'charger', console: 'console', controller: 'controller',
+        gimbals: 'gimbal', 'mac-mini': 'Mac mini',
+      };
+      const FINISH_WORD: Record<string, string> = {
+        matte: 'Matte', embossed: '3D textured', transparent: 'Transparent', 'premium-leather': 'Leather',
+      };
+      const fit = (text: string, max: number) =>
+        text.length <= max ? text : text.slice(0, max - 1).replace(/\s+\S*$/, '') + '…';
+      const buildProductMeta = async (productId: string | undefined, p: any) => {
+        const title = String(p.title || p.name || 'Skin').replace(/\s+/g, ' ').trim();
+        let price = 0;
+        if (productId) {
+          const vs = await getDocs(query(collection(db, 'variants'), where('productId', '==', productId)));
+          const prices = vs.docs.map(d => Number((d.data() as any).price)).filter(n => n > 0);
+          if (prices.length) price = Math.min(...prices);
+        }
+        const isSkin = p.productCategory ? p.productCategory === 'skin' : !!(p.finishType || p.finishTypeId);
+        const suffix = isSkin ? ' – Custom Cut | GoSkinly' : ' | GoSkinly';
+        const metaTitle = (title + suffix).length <= 60 ? title + suffix : fit(title, 60 - ' | GoSkinly'.length) + ' | GoSkinly';
+        const gadget = GADGET_WORD[p.gadgetCategory] || 'device';
+        const finish = FINISH_WORD[p.finishType];
+        const from = price ? ` from ₹${price}` : '';
+        const metaDescription = fit(
+          isSkin
+            ? `${title}, printed and cut for your exact ${gadget} model.${finish ? ` ${finish} finish` : ''}${from}. Free shipping above ₹499.`
+            : `${title}${from}. Ships across India; free shipping above ₹499.`,
+          160,
+        );
+        return { metaTitle, metaDescription };
+      };
       const extractSEOFields = (data: any, title: string) => {
         const h2Match = data.contentHTML?.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
         const metaTitle = (h2Match?.[1]?.replace(/<[^>]*>/g, '') || `${title} Skin | GoSkinly`).substring(0, 60);
         const pMatch = data.contentHTML?.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
-        const metaDescription = (pMatch?.[1]?.replace(/<[^>]*>/g, '') || `Buy ${title} skin at GoSkinly. Starting ₹149. Free delivery across India.`).substring(0, 160);
+        const metaDescription = (pMatch?.[1]?.replace(/<[^>]*>/g, '') || `${title} at GoSkinly. Free shipping above ₹499.`).substring(0, 160);
         const tags: string[] = (data.imageAltTexts || [])
           .slice(0, 8)
           .map((t: string) => t.split(' ').filter((w: string) => w.length > 3).slice(0, 3).join(' '))
@@ -6316,13 +6357,13 @@ export function useAction(apiRef: any) {
         const product = productSnap.data() as any;
         const title = product.title || product.name || 'Phone Skin';
         const data = await callOpenAIForSEO({ pageType: 'product', keywords: [title], productType: product.gadgetCategory || product.category });
-        return extractSEOFields(data, title);
+        return { ...extractSEOFields(data, title), ...(await buildProductMeta(args.productId, product)) };
       }
 
       if (actionName === 'generateSEOFromFormData') {
         const title = args.title || 'Phone Skin';
         const data = await callOpenAIForSEO({ pageType: 'product', keywords: [title], productType: args.gadgetCategory, notes: args.finishType ? `Finish type: ${args.finishType}` : undefined });
-        const fields = extractSEOFields(data, title);
+        const fields = { ...extractSEOFields(data, title), ...(await buildProductMeta(undefined, args)) };
         const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
         const imageAlt = (data.imageAltTexts || [])[0] || `${title} phone skin India`;
         return { ...fields, slug, imageAlt };
@@ -6334,9 +6375,8 @@ export function useAction(apiRef: any) {
           const productSnap = await getDoc(doc(db, 'products', productId));
           if (!productSnap.exists()) continue;
           const product = productSnap.data() as any;
-          const title = product.title || product.name || 'Phone Skin';
-          const data = await callOpenAIForSEO({ pageType: 'product', keywords: [title], productType: product.gadgetCategory || product.category });
-          const { metaTitle, metaDescription } = extractSEOFields(data, title);
+          // Meta fields only, so no model call: they are built from the product.
+          const { metaTitle, metaDescription } = await buildProductMeta(productId, product);
           await updateDoc(doc(db, 'products', productId), { metaTitle, metaDescription, updatedAt: Date.now() });
         }
         return { success: true };

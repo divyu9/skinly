@@ -53,7 +53,7 @@ export function useSeoPageData(page: Page | null | undefined): SeoPageData | und
 
   const computed = useMemo((): SeoPageData | undefined => {
     if (!needFallback || !page || !products || !models || !collections) return undefined;
-    const target = resolveSeoTarget(page, models as any[]);
+    const target = resolveSeoTarget(page, models as any[], (collections as any[]).map((c) => c.name));
     const names = new Map((collections as any[]).map((c) => [c._id, c.name]));
     const variantsBy = new Map<string, any[]>();
     const collectionsBy = new Map<string, Set<string>>();

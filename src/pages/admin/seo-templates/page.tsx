@@ -446,6 +446,8 @@ export default function SEOTemplatesPage() {
                     <CardTitle>Layout Sections</CardTitle>
                     <CardDescription>
                       Configure which sections appear and in what order. Use arrows to reorder.
+                      The product grid is the exception: it always shows, straight after the hero,
+                      whatever its position or switch here.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -458,7 +460,10 @@ export default function SEOTemplatesPage() {
                             </span>
                             <div className="flex-1">
                               <p className="font-medium">{section.label}</p>
-                              <p className="text-sm text-muted-foreground">ID: {section.id}</p>
+                              <p className="text-sm text-muted-foreground">
+                                ID: {section.id}
+                                {section.id === "products" && " · always on, placed after the hero"}
+                              </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { resolveSeoTarget, selectSeoProducts, type SeoTarget } from "@/lib/seo-pages.mjs";
 import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
@@ -68,6 +69,39 @@ type Page = {
   updatedAt?: number;
 };
 
+const KIND_LABEL: Record<SeoTarget["kind"], string> = {
+  model: "Model",
+  family: "Series",
+  brand: "Brand",
+  unlisted: "Model not in database",
+  gadget: "Gadget",
+  finish: "Finish",
+  theme: "Theme",
+  keyword: "Keyword",
+};
+
+function SeoHealthCell({ health }: { health: { target: SeoTarget; total: number } | null }) {
+  if (!health) return <span className="text-muted-foreground">…</span>;
+  const { target, total } = health;
+  const subject = target.model || target.brand || target.gadget || target.finish || target.collections?.join(", ") || "";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-1">
+        <Badge variant={target.kind === "unlisted" ? "destructive" : "outline"}>{KIND_LABEL[target.kind]}</Badge>
+        {subject && target.kind !== "unlisted" && <span className="text-muted-foreground">{subject}</span>}
+      </div>
+      {total === 0 ? (
+        <span className="text-amber-700 dark:text-amber-400">No designs — hidden from Google</span>
+      ) : (
+        <span className="text-muted-foreground">{total} designs</span>
+      )}
+      {target.kind === "unlisted" && (
+        <span className="text-muted-foreground">Add the model to Supported Models, or unpublish</span>
+      )}
+    </div>
+  );
+}
+
 export default function SEOPagesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [pageTypeFilter, setPageTypeFilter] = useState<PageType | "all">("all");
@@ -78,6 +112,45 @@ export default function SEOPagesPage() {
   const [pageToDelete, setPageToDelete] = useState<Id<"seoPages"> | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [healthFilter, setHealthFilter] = useState<"all" | "attention">("all");
+
+  /*
+   * What each page actually shows on the storefront: the device or theme it
+   * resolves to and how many designs that gives it (the same rules the build
+   * uses, src/lib/seo-pages.mjs). A page naming a model we do not carry, or
+   * one with nothing to sell, needs a decision; the rest look after themselves.
+   */
+  const catalogue = useQuery(api.products.getAllProducts, {});
+  const allModels = useQuery(api.supportedModels.listAll, {});
+  const allCollections = useQuery(api.collections.getAllCollections, {});
+  const health = useMemo(() => {
+    if (!catalogue || !allModels || !allCollections) return null;
+    const names = new Map((allCollections as any[]).map((c) => [c._id, c.name]));
+    const variantsBy = new Map<string, any[]>();
+    const collectionsBy = new Map<string, Set<string>>();
+    for (const p of catalogue as any[]) {
+      variantsBy.set(p._id, p.variants || []);
+      collectionsBy.set(p._id, new Set((p.collectionIds || []).map((id: string) => names.get(id)).filter(Boolean)));
+    }
+    return { models: allModels as any[], products: catalogue as any[], variantsBy, collectionsBy, collectionNames: (allCollections as any[]).map((c) => c.name) };
+  }, [catalogue, allModels, allCollections]);
+  const healthOf = useMemo(() => {
+    const cache = new Map<string, { target: SeoTarget; total: number }>();
+    return (page: { slug: string; pageType?: string; h1Heading?: string }) => {
+      if (!health) return null;
+      if (!cache.has(page.slug)) {
+        const target = resolveSeoTarget(page, health.models, health.collectionNames);
+        const { total } = selectSeoProducts(target, health.products, health.variantsBy, health.collectionsBy);
+        cache.set(page.slug, { target, total });
+      }
+      return cache.get(page.slug)!;
+    };
+  }, [health]);
+  const needsAttention = (page: { slug: string; pageType?: string; h1Heading?: string }) => {
+    const h = healthOf(page);
+    return !!h && (h.target.kind === "unlisted" || h.total === 0);
+  };
+
   const pages = useQuery(api.seoPages.listPages, {
     pageType: pageTypeFilter === "all" ? undefined : pageTypeFilter,
     isPublished: publishedFilter === "all" ? undefined : publishedFilter === "published",
@@ -87,7 +160,7 @@ export default function SEOPagesPage() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedPages(new Set());
-  }, [searchQuery, pageTypeFilter, publishedFilter]);
+  }, [searchQuery, pageTypeFilter, publishedFilter, healthFilter]);
 
   const pageSize = 25;
   const filteredPages = pages
@@ -97,6 +170,7 @@ export default function SEOPagesPage() {
           const shouldBePublished = publishedFilter === "published";
           if (p.isPublished !== shouldBePublished) return false;
         }
+        if (healthFilter === "attention" && !needsAttention(p)) return false;
         if (searchQuery.trim()) {
           const term = searchQuery.toLowerCase().trim();
           const metaTitle = String(p.metaTitle || "").toLowerCase();
@@ -537,6 +611,15 @@ export default function SEOPagesPage() {
               <SelectItem value="draft">Draft</SelectItem>
             </SelectContent>
           </Select>
+          <Select value={healthFilter} onValueChange={(v) => setHealthFilter(v as typeof healthFilter)}>
+            <SelectTrigger className="w-full md:w-[200px]">
+              <SelectValue placeholder="Health" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any health</SelectItem>
+              <SelectItem value="attention">Needs attention</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </Card>
 
@@ -579,6 +662,7 @@ export default function SEOPagesPage() {
               <TableHead>Title</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Slug</TableHead>
+              <TableHead>What it shows</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -587,7 +671,7 @@ export default function SEOPagesPage() {
           <TableBody>
             {filteredPages.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   No pages found. Create your first SEO page to get started.
                 </TableCell>
               </TableRow>
@@ -607,6 +691,9 @@ export default function SEOPagesPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-sm text-muted-foreground">/{page.slug}</TableCell>
+                  <TableCell className="text-sm">
+                    <SeoHealthCell health={healthOf(page)} />
+                  </TableCell>
                   <TableCell>
                     {page.isPublished ? (
                       <Badge variant="default">Published</Badge>

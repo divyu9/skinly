@@ -95,7 +95,7 @@ const FINISH_LABEL = { matte: "matte", embossed: "3D textured", transparent: "tr
  * "unlisted" is a brand we carry with a model we do not — the page promises a
  * device the model picker cannot offer, so its copy is left as written.
  */
-export function resolveSeoTarget(page, models) {
+export function resolveSeoTarget(page, models, collectionNames = []) {
   let base = String(page?.slug || "")
     .replace(/-\d+$/, "")
     .replace(/-(skins?|wraps?|stickers?)$/, "");
@@ -185,6 +185,13 @@ export function resolveSeoTarget(page, models) {
   }
 
   const target = { kind: "keyword", ...scan(words) };
+  // Collections added since this list was written: a page whose slug contains
+  // a collection's name is about that collection.
+  for (const name of collectionNames || []) {
+    const cs = slugify(name);
+    if (!cs || !(`-${words.join("-")}-`).includes(`-${cs}-`)) continue;
+    if (!(target.collections || []).includes(name)) target.collections = [...(target.collections || []), name];
+  }
   if (target.collections?.length) target.kind = "theme";
   else if (target.finish && !target.titleWords) target.kind = "finish";
   else if (target.gadget && words.length <= 2) target.kind = "gadget";

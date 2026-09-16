@@ -634,7 +634,7 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
     collectionsByProduct.get(r.productId).add(name);
   }
 
-  const resolved = seoDocs.map((s) => ({ s, target: resolveSeoTarget(s, data.models) }));
+  const resolved = seoDocs.map((s) => ({ s, target: resolveSeoTarget(s, data.models, data.collections.map((c) => c.name)) }));
 
   // A device's own SEO page, so brand pages can link models to it.
   const pageForModel = new Map();

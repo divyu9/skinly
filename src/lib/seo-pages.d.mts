@@ -22,6 +22,7 @@ export function gadgetLabel(g?: string): string;
 export function resolveSeoTarget(
   page: { slug?: string; pageType?: string; h1Heading?: string },
   models: Array<{ brandName?: string; modelName?: string; category?: string; isActive?: boolean }>,
+  collectionNames?: string[],
 ): SeoTarget;
 export function selectSeoProducts(
   target: SeoTarget,
