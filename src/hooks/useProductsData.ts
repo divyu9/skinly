@@ -25,6 +25,7 @@ export interface Product {
   tags: string;
   images: Array<{ url: string; alt?: string }>;
   gadgetCategory?: string;
+  productCategory?: string;
   finishType?: string;
   variants: ProductVariant[];
   mockupUrl?: string; // Added for batch mockup support
@@ -157,6 +158,7 @@ export function useProductsData({
       tags: Array.isArray(product.tags) ? product.tags.join(", ") : product.tags || "",
       images: product.images,
       gadgetCategory: product.gadgetCategory,
+      productCategory: product.productCategory,
       finishType: product.finishType,
       variants: product.variants?.map((v: any) => ({
         _id: v._id,
@@ -221,7 +223,7 @@ export function useProductsData({
     const rankByFit = !!device && filters.sortBy === "default" &&
       !!filters.productCategory && filters.productCategory !== "skin";
     if (rankByFit) {
-      const fits = new Map(result.map((p) => [p._id, productFitsDevice(p.variants, device!.brand, device!.model)]));
+      const fits = new Map(result.map((p) => [p._id, productFitsDevice(p, device!.brand, device!.model, null)]));
       result.sort((a, b) => Number(fits.get(b._id)) - Number(fits.get(a._id)));
     }
 

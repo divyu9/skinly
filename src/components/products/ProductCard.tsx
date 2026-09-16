@@ -10,6 +10,8 @@ interface ProductCardProps {
   product: Product;
   brandFilter: string | null;
   modelFilter: string | null;
+  /** What kind of gadget the device is — "phone", "tablet". */
+  deviceCategory?: string | null;
   autoSortOOS: boolean;
 }
 
@@ -19,6 +21,7 @@ export const ProductCard = memo(function ProductCard({
   product,
   brandFilter,
   modelFilter,
+  deviceCategory,
   autoSortOOS,
 }: ProductCardProps) {
   const mainImage = product.images?.[0];
@@ -39,7 +42,7 @@ export const ProductCard = memo(function ProductCard({
    * Alienware matches no camera-ring variant, so that card keeps asking
    * rather than promising a ring cut for a laptop.
    */
-  const deviceFitsProduct = productFitsDevice(product.variants, brandFilter, modelFilter);
+  const deviceFitsProduct = productFitsDevice(product, brandFilter, modelFilter, deviceCategory);
 
   const hasDeviceSelected = deviceFitsProduct;
   
@@ -72,9 +75,11 @@ export const ProductCard = memo(function ProductCard({
     : null;
 
   // Build product URL
+  // Carry the device only onto a product it fits. Passing it everywhere is how
+  // a PS5 skin opened as "Preview on iPhone 12".
   const productUrl = `/products/detail?slug=${product.slug}${
-    modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''
-  }${brandFilter ? `&brand=${brandFilter}` : ''}`;
+    deviceFitsProduct && modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''
+  }${deviceFitsProduct && brandFilter ? `&brand=${encodeURIComponent(brandFilter)}` : ''}`;
   
   return (
     <Link to={productUrl}>

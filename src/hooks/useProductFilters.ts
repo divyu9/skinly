@@ -204,7 +204,12 @@ export function useProductFilters() {
   
   // Apply smart filters based on model info
   const applySmartFilters = useCallback((gadgetTypeName: string) => {
-    if (!smartFiltersApplied && urlParams.brand && urlParams.model) {
+    // Only fill in what the shopper has not chosen. Run unconditionally, a
+    // shared or reloaded ?productType=case-cover&brand=…&model=… link was
+    // switched to phone skins the moment the model resolved.
+    const chosen = !!urlParams.productType &&
+      (urlParams.productType !== 'skin' || !!urlParams.gadget);
+    if (!smartFiltersApplied && urlParams.brand && urlParams.model && !chosen) {
       setFilters(prev => ({
         ...prev,
         productCategory: "skin",
@@ -218,7 +223,7 @@ export function useProductFilters() {
       
       setSmartFiltersApplied(true);
     }
-  }, [smartFiltersApplied, urlParams.brand, urlParams.model, updateURL]);
+  }, [smartFiltersApplied, urlParams.brand, urlParams.model, urlParams.productType, urlParams.gadget, updateURL]);
   
   // Clear all filters
   const clearAllFilters = useCallback(() => {

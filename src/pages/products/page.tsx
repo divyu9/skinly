@@ -499,6 +499,7 @@ export default function ProductsPage() {
                against its own variants before using it. */
             brandFilter={activeDevice?.brand ?? urlParams.brand}
             modelFilter={activeDevice?.model ?? urlParams.model}
+            deviceCategory={deviceCategory}
             autoSortOOS={autoSortOOS}
             isLoading={!!isInitialLoading}
             loadingMessage={loadingMessage}

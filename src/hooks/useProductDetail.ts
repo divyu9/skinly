@@ -31,8 +31,8 @@ export function useProductDetail() {
   // URL params
   const productId = searchParams.get('id');
   const productSlug = params.slug || searchParams.get('slug');
-  const phoneModel = searchParams.get('model');
-  const phoneBrand = searchParams.get('brand');
+  const urlModel = searchParams.get('model');
+  const urlBrand = searchParams.get('brand');
   
   // Product state
   const [productState, setProductState] = useState<ProductState>({
@@ -96,6 +96,30 @@ export function useProductDetail() {
     isLoading = false;
   }
   
+  /*
+   * A device in the URL only counts on a skin for that kind of gadget.
+   *
+   * Listing links used to carry the saved device onto every card, so a PS5
+   * skin opened captioned "Preview on iPhone 12" and "Cutting for iPhone 12".
+   * The links are fixed, but old ones are shared and bookmarked; check the
+   * model's category against the skin's gadget before trusting it. Until the
+   * model is known, a non-phone skin holds off rather than flash the phone.
+   * Cases and other per-model products are left alone — their device lives in
+   * the variants, and their gadgetCategory never names one.
+   */
+  const urlModelInfo = useQuery(
+    api.supportedModels.getModelInfo,
+    urlBrand && urlModel ? { brand: urlBrand, model: urlModel } : "skip"
+  );
+  const skinGadget = productData?.productCategory === "skin" ? productData?.gadgetCategory : undefined;
+  const deviceMismatch = !!skinGadget && !!urlModel && (
+    urlModelInfo === undefined
+      ? !!urlBrand && skinGadget !== "phone"
+      : !!urlModelInfo?.category && urlModelInfo.category !== skinGadget
+  );
+  const phoneModel = deviceMismatch ? null : urlModel;
+  const phoneBrand = deviceMismatch ? null : urlBrand;
+
   // Query mockup file URL from database
   // Use phoneBrand from URL params if available, otherwise try to extract from model name
   const mockupLookup = useQuery(

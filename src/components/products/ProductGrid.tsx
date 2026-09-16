@@ -9,6 +9,7 @@ interface ProductGridProps {
   products: Product[];
   brandFilter: string | null;
   modelFilter: string | null;
+  deviceCategory?: string | null;
   autoSortOOS: boolean;
   isLoading: boolean;
   loadingMessage?: string;
@@ -20,6 +21,7 @@ export const ProductGrid = memo(function ProductGrid({
   products,
   brandFilter,
   modelFilter,
+  deviceCategory,
   autoSortOOS,
   isLoading,
   loadingMessage = "Loading products...",
@@ -102,6 +104,7 @@ export const ProductGrid = memo(function ProductGrid({
               product={product}
               brandFilter={brandFilter}
               modelFilter={modelFilter}
+              deviceCategory={deviceCategory}
               autoSortOOS={autoSortOOS}
             />
           </div>
