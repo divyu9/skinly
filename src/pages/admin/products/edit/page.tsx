@@ -243,6 +243,14 @@ function EditProductPageInner() {
 
     try {
       // Validate
+      // The storefront decides what a product is from its category — which
+      // category story lists it, and whether it gets the skin banner and
+      // device picker. Without one it shows up nowhere and gets guessed at.
+      if (!formData.productCategory) {
+        toast.error("Please choose a product category");
+        setIsSubmitting(false);
+        return;
+      }
       if (formData.images.filter((img) => img.url).length === 0) {
         toast.error("Please add at least one product image");
         setIsSubmitting(false);
@@ -690,7 +698,7 @@ function EditProductPageInner() {
               </div>
 
               <div>
-                <Label htmlFor="productCategory">Product Category (Optional)</Label>
+                <Label htmlFor="productCategory">Product Category <span className="text-destructive">*</span></Label>
                 <Select
                   value={formData.productCategory || undefined}
                   onValueChange={(value) => setFormData({ ...formData, productCategory: value })}
