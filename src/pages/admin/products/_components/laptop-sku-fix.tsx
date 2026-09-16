@@ -6,6 +6,7 @@ import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
+import { Input } from "@/components/ui/input.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 import { Loader2Icon, ArrowRightIcon, DownloadIcon } from "lucide-react";
 
@@ -30,9 +31,14 @@ import { Loader2Icon, ArrowRightIcon, DownloadIcon } from "lucide-react";
  * row where the SKU was wrong. A listing whose variants point at two different
  * designs is settled by the design name that best matches the listing title and
  * is left unticked for a human to confirm.
+ *
+ * Every laptop skin except Tranzy is sold in both views. A listing that has
+ * only one gets the other created, with the SKU from the same rule and a price
+ * the admin confirms (suggested from what listings of the same finish charge).
+ * Tranzy is clear film for the lid alone, so it keeps Only Top only.
  */
 
-type Design = { key: string; code: string; name: string; kind: "cutout" | "roll" };
+type Design = { key: string; code: string; name: string; kind: "cutout" | "roll"; finish: string };
 
 type VariantPlan = {
   id: string;
@@ -41,8 +47,21 @@ type VariantPlan = {
   changed: boolean;
 };
 
+/** A view the listing lacks, to be created. */
+type MissingVariant = {
+  tail: string;
+  sku: string;
+  title: string;
+  materialMultiplier: number;
+  suggestedPrice: number | null;
+  weight?: number;
+  weightUnit?: string;
+};
+
 type ProductPlan = {
   productId: string;
+  tranzy: boolean;
+  missing: MissingVariant | null;
   title: string;
   status: string;
   design: Design | null;
@@ -102,12 +121,12 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
   for (const d of rollSnap.docs) {
     const r = d.data() as any;
     const code = String(r.rNumber || "").trim().toUpperCase();
-    if (code) stock.set(code, { key: `roll/${d.id}`, code, name: String(r.designName || ""), kind: "roll" });
+    if (code) stock.set(code, { key: `roll/${d.id}`, code, name: String(r.designName || ""), kind: "roll", finish: String(r.finish || "") });
   }
   for (const c of cutouts) {
     const code = String(c.cutoutNumber || "").trim().toUpperCase();
     if (!code) continue;
-    const design: Design = { key: `cutout/${c._id}`, code, name: String(c.designName || ""), kind: "cutout" };
+    const design: Design = { key: `cutout/${c._id}`, code, name: String(c.designName || ""), kind: "cutout", finish: String(c.finish || "") };
     for (const alias of [code, ...(c.aliases || []).map((a: string) => String(a).trim().toUpperCase())]) {
       if (alias) stock.set(alias, design);
     }
@@ -132,6 +151,46 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
     if (!byProduct.has(v.productId)) byProduct.set(v.productId, []);
     byProduct.get(v.productId)!.push(v);
   }
+
+  const isTranzy = (pdata: any, design?: Design | null) =>
+    /tranz|transparent|membrane/i.test(`${pdata.finishType || ""} ${pdata.title || ""} ${design?.finish || ""}`);
+
+  // The finish decides the price (3D costs more than matte), and many older
+  // listings carry it only in the title.
+  const finishKey = (pdata: any) => {
+    const f = String(pdata.finishType || "").toLowerCase();
+    if (f) return f;
+    const t = String(pdata.title || "");
+    return /3d|emboss|textur/i.test(t) ? "embossed" : /matte/i.test(t) ? "matte" : "";
+  };
+
+  // What listings of the same finish charge for each view, for the price the
+  // admin is asked to confirm on a view being added.
+  const priceVotes = new Map<string, Map<number, number>>();
+  for (const p of productSnap.docs) {
+    const pdata = p.data() as any;
+    if (isTranzy(pdata)) continue;
+    for (const v of byProduct.get(p.id) || []) {
+      const price = Number(v.price) || 0;
+      if (price <= 0) continue;
+      const key = `${finishKey(pdata)}|${viewOf(String(v.title || "")).tail}`;
+      const votes = priceVotes.get(key) || new Map<number, number>();
+      votes.set(price, (votes.get(price) || 0) + 1);
+      priceVotes.set(key, votes);
+    }
+  }
+  const suggestPrice = (finishType: string, tail: string): number | null => {
+    const pick = (votes?: Map<number, number>) =>
+      votes && votes.size ? [...votes.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0] : null;
+    const exact = pick(priceVotes.get(`${finishType}|${tail}`));
+    if (exact) return exact;
+    const any = new Map<number, number>();
+    for (const [k, votes] of priceVotes) {
+      if (!k.endsWith(`|${tail}`)) continue;
+      votes.forEach((n, price) => any.set(price, (any.get(price) || 0) + n));
+    }
+    return pick(any);
+  };
 
   const plans: ProductPlan[] = [];
   for (const p of productSnap.docs) {
@@ -194,10 +253,36 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
         problem = "Two variants read as the same view — check their titles";
       }
     }
-    if (state === "ok" && !variantPlans.some((v) => v.changed)) state = "clean";
+
+    const tranzy = isTranzy(pdata, design);
+    let missing: MissingVariant | null = null;
+    if (design && state !== "blocked") {
+      const views = new Set(variantPlans.map((v) => viewOf(v.after.title).tail));
+      if (tranzy) {
+        if (views.has(KEYBOARD.tail)) {
+          state = "review";
+          problem = "Tranzy is lid-only, but this listing sells a keyboard view — remove that variant by hand";
+        }
+      } else if (views.size === 1) {
+        const want = views.has(TOP.tail) ? KEYBOARD : TOP;
+        const sibling = list[0];
+        missing = {
+          tail: want.tail,
+          sku: `${design.code}-${want.tail}`,
+          title: want.title,
+          materialMultiplier: want.multiplier,
+          suggestedPrice: suggestPrice(finishKey(pdata), want.tail),
+          weight: Number(sibling?.weight) || undefined,
+          weightUnit: sibling?.weightUnit || undefined,
+        };
+      }
+    }
+    if (state === "ok" && !missing && !variantPlans.some((v) => v.changed)) state = "clean";
 
     plans.push({
       productId: p.id,
+      tranzy,
+      missing,
       title: String(pdata.title || ""),
       status: String(pdata.status || ""),
       design,
@@ -216,16 +301,21 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
   for (const plan of plans) {
     if (plan.state === "blocked") continue;
     for (const vp of plan.variants) finalSku.set(vp.id, vp.after.sku.toUpperCase());
+    if (plan.missing) finalSku.set(`new:${plan.productId}`, plan.missing.sku.toUpperCase());
   }
   const owners = new Map<string, string[]>();
   for (const [id, sku] of finalSku) owners.set(sku, [...(owners.get(sku) || []), id]);
   for (const plan of plans) {
     if (plan.state === "blocked" || plan.state === "clean") continue;
-    const clash = plan.variants.find((vp) => (owners.get(vp.after.sku.toUpperCase()) || []).length > 1);
+    const skus = [...plan.variants.map((vp) => vp.after.sku), ...(plan.missing ? [plan.missing.sku] : [])];
+    const clash = skus.find((sku) => (owners.get(sku.toUpperCase()) || []).length > 1);
     if (clash) {
-      const other = plans.find((o) => o !== plan && o.variants.some((x) => x.after.sku.toUpperCase() === clash.after.sku.toUpperCase()));
+      const other = plans.find((o) => o !== plan && (
+        o.variants.some((x) => x.after.sku.toUpperCase() === clash.toUpperCase()) ||
+        o.missing?.sku.toUpperCase() === clash.toUpperCase()
+      ));
       plan.state = "blocked";
-      plan.problem = `${clash.after.sku} would also be used by ${other ? `"${other.title}"` : "another variant"} — two listings for one design`;
+      plan.problem = `${clash} would also be used by ${other ? `"${other.title}"` : "another variant"} — two listings for one design`;
     }
   }
 
@@ -240,6 +330,9 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [running, setRunning] = useState(false);
   const [showClean, setShowClean] = useState(false);
+  // Price for each view being added, by product. Asked, never assumed.
+  const [prices, setPrices] = useState<Record<string, string>>({});
+  const [bulkPrice, setBulkPrice] = useState<{ LP: string; LPK: string }>({ LP: "", LPK: "" });
 
   const load = async () => {
     setPlans(null);
@@ -248,6 +341,9 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
       const next = await buildPlan(cutouts);
       setPlans(next);
       setPicked(new Set(next.filter((p) => p.state === "ok").map((p) => p.productId)));
+      // Rows start empty: the admin states each price, by hand or with one of
+      // the fill buttons.
+      setPrices({});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read the catalogue");
     }
@@ -265,12 +361,32 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
     if (!plans) return;
     const chosen = plans.filter((p) => picked.has(p.productId) && p.state !== "blocked" && p.state !== "clean");
     const writes = chosen.flatMap((p) => p.variants.filter((v) => v.changed).map((v) => ({ p, v })));
-    if (!writes.length) return toast.info("Nothing selected to change");
-    if (!confirm(`Update ${writes.length} variant(s) across ${chosen.length} listing(s)? A backup file downloads first.`)) return;
+    const adds = chosen.filter((p) => p.missing);
+    if (!writes.length && !adds.length) return toast.info("Nothing selected to change");
+    const unpriced = adds.filter((p) => !(Number(prices[p.productId]) > 0));
+    if (unpriced.length) {
+      return toast.error(`Set a price for the new variant on ${unpriced.length} listing(s) — first: "${unpriced[0].title}"`);
+    }
+    if (!confirm(
+      `Update ${writes.length} variant(s) and add ${adds.length} missing variant(s) across ${chosen.length} listing(s)? A backup file downloads first.`
+    )) return;
 
-    // Backup first, so any row can be put back by hand.
+    // Planned ids for the new variants, so the backup can name them.
+    const newIds = new Map(adds.map((p) => [p.productId, doc(collection(db, "variants")).id]));
+
+    // Backup first, so any row can be put back by hand (and any added row deleted).
     const backup = JSON.stringify(
-      { createdAt: new Date().toISOString(), variants: writes.map(({ p, v }) => ({ productId: p.productId, variantId: v.id, before: v.before, after: v.after })) },
+      {
+        createdAt: new Date().toISOString(),
+        variants: writes.map(({ p, v }) => ({ productId: p.productId, variantId: v.id, before: v.before, after: v.after })),
+        added: adds.map((p) => ({
+          productId: p.productId,
+          variantId: newIds.get(p.productId),
+          sku: p.missing!.sku,
+          title: p.missing!.title,
+          price: Number(prices[p.productId]),
+        })),
+      },
       null,
       1
     );
@@ -298,6 +414,30 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
         });
         await batch.commit();
       }
+      const now = Date.now();
+      for (let i = 0; i < adds.length; i += 200) {
+        const batch = writeBatch(db);
+        adds.slice(i, i + 200).forEach((p, k) => {
+          const m = p.missing!;
+          batch.set(doc(db, "variants", newIds.get(p.productId)!), {
+            _creationTime: now + i + k,
+            productId: p.productId,
+            sku: m.sku,
+            title: m.title,
+            price: Number(prices[p.productId]),
+            inventoryQuantity: 0,
+            materialMultiplier: m.materialMultiplier,
+            rNumber: p.design!.code,
+            ...(m.weight ? { weight: m.weight } : {}),
+            ...(m.weightUnit ? { weightUnit: m.weightUnit } : {}),
+            isDefaultVariant: false,
+            createdBySkuFix: now,
+          });
+          batch.update(doc(db, "products", p.productId), { hasMultipleVariants: true, updatedAt: now });
+          p.variants.forEach((v) => batch.update(doc(db, "variants", v.id), { isDefaultVariant: false }));
+        });
+        await batch.commit();
+      }
       // Stock follows the design code, so every design touched is recounted.
       const codes = [...new Set(chosen.map((p) => p.design!.code))];
       try {
@@ -305,7 +445,7 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
       } catch {
         toast.warning("SKUs saved, but recounting stock failed — edit a sheet count to retry");
       }
-      toast.success(`Fixed ${writes.length} variant(s) on ${chosen.length} listing(s)`);
+      toast.success(`Fixed ${writes.length} variant(s) and added ${adds.length} on ${chosen.length} listing(s)`);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? `Stopped: ${e.message}` : "Stopped");
@@ -325,7 +465,8 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
           <DialogDescription>
             Every laptop listing becomes <code>&lt;design&gt;-LP</code> for Only Top (1 sheet) and{" "}
             <code>&lt;design&gt;-LPK</code> for Top + Keyboard Area (2 sheets). The design code comes from the
-            cutout or roll record; the view comes from the variant title. Nothing changes until you press Apply.
+            cutout or roll record; the view comes from the variant title. Every listing except Tranzy gets both
+            views — a missing one is added at the price you set. Nothing changes until you press Apply.
           </DialogDescription>
         </DialogHeader>
 
@@ -343,11 +484,52 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
               <Badge className="bg-amber-500">{counts.review} need a look</Badge>
               <Badge variant="destructive">{counts.blocked} blocked</Badge>
               <Badge variant="outline">{counts.clean} already correct</Badge>
+              <Badge variant="outline" className="border-violet-300 text-violet-700 dark:text-violet-300">
+                {(plans || []).filter((p) => p.missing).length} missing a view
+              </Badge>
               <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
                 <input type="checkbox" checked={showClean} onChange={(e) => setShowClean(e.target.checked)} />
                 show correct ones
               </label>
             </div>
+
+            {(plans || []).some((p) => p.missing) && (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 p-2 text-xs dark:border-violet-900 dark:bg-violet-950/30">
+                <span className="font-medium">Price for added variants:</span>
+                <span>Only Top ₹</span>
+                <Input className="h-7 w-20" inputMode="numeric" value={bulkPrice.LP}
+                  onChange={(e) => setBulkPrice({ ...bulkPrice, LP: e.target.value })} />
+                <span>Top + Keyboard ₹</span>
+                <Input className="h-7 w-20" inputMode="numeric" value={bulkPrice.LPK}
+                  onChange={(e) => setBulkPrice({ ...bulkPrice, LPK: e.target.value })} />
+                <Button size="sm" variant="outline" className="h-7"
+                  disabled={!(Number(bulkPrice.LP) > 0 || Number(bulkPrice.LPK) > 0)}
+                  onClick={() => {
+                    const next = { ...prices };
+                    (plans || []).forEach((p) => {
+                      const v = p.missing ? bulkPrice[p.missing.tail as "LP" | "LPK"] : "";
+                      if (p.missing && Number(v) > 0) next[p.productId] = v;
+                    });
+                    setPrices(next);
+                  }}>
+                  Apply to all
+                </Button>
+                <span className="text-muted-foreground">or</span>
+                <Button size="sm" variant="outline" className="h-7"
+                  onClick={() => {
+                    const next = { ...prices };
+                    (plans || []).forEach((p) => {
+                      if (p.missing?.suggestedPrice && !(Number(next[p.productId]) > 0)) next[p.productId] = String(p.missing.suggestedPrice);
+                    });
+                    setPrices(next);
+                  }}>
+                  Fill usual prices
+                </Button>
+                <span className="w-full text-muted-foreground">
+                  "Usual" is what most listings of the same finish (matte, 3D) charge for that view. Rows stay empty until you fill or type them.
+                </span>
+              </div>
+            )}
 
             <div className="space-y-2">
               {visible.map((p) => (
@@ -409,6 +591,28 @@ export function LaptopSkuFix({ cutouts, onClose }: { cutouts: any[]; onClose: ()
                         )}
                       </div>
                     ))}
+                    {p.missing && (
+                      <div className="flex flex-wrap items-center gap-2 rounded-md bg-violet-50 px-2 py-1 text-xs dark:bg-violet-950/30">
+                        <Badge className="bg-violet-600 text-[10px]">new</Badge>
+                        <span className="font-mono font-semibold">
+                          {p.missing.sku} · {p.missing.title} · ×{p.missing.materialMultiplier}
+                        </span>
+                        <span className="ml-auto flex items-center gap-1">
+                          ₹
+                          <Input
+                            className={`h-7 w-20 ${Number(prices[p.productId]) > 0 ? "" : "border-rose-400"}`}
+                            inputMode="numeric"
+                            placeholder="price"
+                            value={prices[p.productId] ?? ""}
+                            onChange={(e) => setPrices({ ...prices, [p.productId]: e.target.value })}
+                          />
+                          {p.missing.suggestedPrice && (
+                            <span className="text-muted-foreground">usual ₹{p.missing.suggestedPrice}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {p.tranzy && <p className="text-[11px] text-muted-foreground">Tranzy — lid only, no keyboard view.</p>}
                   </div>
                 </div>
               ))}
