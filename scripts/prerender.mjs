@@ -27,6 +27,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
+import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -303,7 +304,7 @@ function magnetoPage(products, variantsByProduct) {
   };
 }
 
-function productPage(p, variants, categoryNames) {
+function productPage(p, variants, categoryNames, shipping) {
   const url = `${SITE}/products/${p.slug}`;
   const priced = variants.filter((v) => Number(v.price) > 0);
   const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
@@ -353,6 +354,7 @@ function productPage(p, variants, categoryNames) {
       availability: inStock.length ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       url,
       seller: { "@type": "Organization", name: "GoSkinly" },
+      ...offerShippingAndReturns(price, shipping),
     },
   };
 
@@ -527,13 +529,16 @@ async function main() {
   const project = await projectId();
   let data = null;
   try {
-    const [products, variants, seoPages, categories] = await Promise.all([
+    const [products, variants, seoPages, categories, shipping] = await Promise.all([
       readCollection(project, "products"),
       readCollection(project, "variants"),
       readCollection(project, "seoPages"),
       readCollection(project, "productCategoriesConfig").catch(() => []),
+      readCollection(project, "settings")
+        .then((rows) => rows.find((r) => r._id === "shipping") || null)
+        .catch(() => null),
     ]);
-    data = { products, variants, seoPages, categories };
+    data = { products, variants, seoPages, categories, shipping };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
   }
@@ -558,7 +563,7 @@ async function main() {
   );
 
   const active = data.products.filter((p) => p.status === "active" && p.slug && !/[/?#\s]/.test(p.slug));
-  const productPages = active.map((p) => productPage(p, variantsByProduct.get(p._id) || [], categoryNames));
+  const productPages = active.map((p) => productPage(p, variantsByProduct.get(p._id) || [], categoryNames, data.shipping));
   for (const p of productPages) await writePage(p.route, render(template, p));
 
   const productSlugs = new Set(active.map((p) => p.slug));

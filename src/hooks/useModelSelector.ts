@@ -120,19 +120,17 @@ export function useModelSelector(deviceCategory: string = "phone") {
     newSearchParams.set('model', model);
     newSearchParams.set('brand', brand);
     
-    if (productId) {
-      newSearchParams.set('id', productId);
-    }
-    if (productSlug && !params.slug) {
-      newSearchParams.set('slug', productSlug);
-    }
-    
-    if (params.slug) {
+    // Land on the canonical /products/<slug> whenever the slug is known,
+    // including from an old /products/detail?slug= link.
+    if (productSlug) {
+      newSearchParams.delete('slug');
+      newSearchParams.delete('id');
       navigate({
-        pathname: `/products/${params.slug}`,
+        pathname: `/products/${productSlug}`,
         search: newSearchParams.toString(),
       });
     } else {
+      if (productId) newSearchParams.set('id', productId);
       navigate({
         pathname: '/products/detail',
         search: newSearchParams.toString(),

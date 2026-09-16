@@ -61,7 +61,7 @@ export function SuggestedProductsSection({ productId }: SuggestedProductsSection
               return (
                 <Link
                   key={product._id}
-                  to={`/products/detail?slug=${product.slug}`}
+                  to={`/products/${product.slug}`}
                   className="flex-shrink-0 w-[200px] md:w-[240px] snap-start group"
                 >
                   <Card className="border-2 hover:border-primary transition-all hover:shadow-xl overflow-hidden">

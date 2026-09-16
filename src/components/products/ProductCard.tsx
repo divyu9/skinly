@@ -77,9 +77,12 @@ export const ProductCard = memo(function ProductCard({
   // Build product URL
   // Carry the device only onto a product it fits. Passing it everywhere is how
   // a PS5 skin opened as "Preview on iPhone 12".
-  const productUrl = `/products/detail?slug=${product.slug}${
-    deviceFitsProduct && modelFilter ? `&model=${encodeURIComponent(modelFilter)}` : ''
-  }${deviceFitsProduct && brandFilter ? `&brand=${encodeURIComponent(brandFilter)}` : ''}`;
+  // The canonical path, so every internal link points where the page's own
+  // canonical does; /products/detail?slug= split the signal between two URLs.
+  const deviceQuery = deviceFitsProduct && modelFilter && brandFilter
+    ? `?${new URLSearchParams({ model: modelFilter, brand: brandFilter }).toString()}`
+    : '';
+  const productUrl = `/products/${product.slug}${deviceQuery}`;
   
   return (
     <Link to={productUrl}>

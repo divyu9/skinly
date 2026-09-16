@@ -1,6 +1,9 @@
 import { Helmet } from "react-helmet-async";
 import type { Crumb } from "@/lib/product-breadcrumb";
 import { generateBreadcrumbStructuredData } from "@/lib/seo-structured-data";
+import { offerShippingAndReturns } from "@/lib/merchant-schema.mjs";
+import { useQuery } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
 
 interface SeoMeta {
   title: string;
@@ -57,6 +60,7 @@ export function ProductSEOHead({
   reviews,
   breadcrumb,
 }: ProductSEOHeadProps) {
+  const shippingSettings = useQuery(api.shipping.getShippingSettings);
   if (!seoMeta) return null;
 
   const slug = productData?.slug;
@@ -101,6 +105,7 @@ export function ProductSEOHead({
             : "https://schema.org/OutOfStock",
           url: canonicalUrl,
           seller: { "@type": "Organization", name: "GoSkinly" },
+          ...offerShippingAndReturns(cheapestPrice, shippingSettings),
         },
         ...(hasRatings && {
           aggregateRating: {

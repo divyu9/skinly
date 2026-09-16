@@ -40,7 +40,7 @@ export default function SEOPage() {
 
   // If this slug belongs to a product, redirect to product detail page
   if (product) {
-    return <Navigate to={`/products/detail?slug=${slug}`} replace />;
+    return <Navigate to={`/products/${slug}`} replace />;
   }
 
   // Not found or unpublished SEO page
