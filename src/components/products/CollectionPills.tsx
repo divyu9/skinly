@@ -1,4 +1,5 @@
-import { memo } from "react";
+import { memo, useMemo, useState } from "react";
+import { ChevronDownIcon } from "lucide-react";
 
 interface Collection {
   _id: string;
@@ -11,43 +12,88 @@ interface CollectionPillsProps {
   onCollectionChange: (collection: string | null) => void;
 }
 
+/** How many fit comfortably before the row needs a second line. */
+const COLLAPSED_COUNT = 7;
+
+/**
+ * Collections, all of them reachable.
+ *
+ * This was a single `overflow-x-auto no-scrollbar` row holding twenty
+ * collections — 1806px of chips in a 409px box. Technically scrollable, but
+ * the scrollbar was hidden so nothing said so, and on a desktop with a mouse
+ * there is no way to scroll a row sideways at all. Anything past "Nature" —
+ * Marvel, DC, Gaming, Anime, fourteen of the twenty — was unreachable.
+ *
+ * Wrapping all twenty instead would run five rows on a phone, above the
+ * products, under a filter strip that is already fixed there. So: seven, then
+ * a count of what is left. Opening it wraps the rest, and a chosen collection
+ * is always shown whether or not it made the first seven — otherwise selecting
+ * "Anime" and collapsing would hide the thing you are looking at.
+ */
 export const CollectionPills = memo(function CollectionPills({
   collections,
   currentCollection,
   onCollectionChange,
 }: CollectionPillsProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const shown = useMemo(() => {
+    if (expanded) return collections;
+    const head = collections.slice(0, COLLAPSED_COUNT);
+    // The active one survives the collapse even if it sits further down.
+    if (currentCollection && !head.some((c) => c.name === currentCollection)) {
+      const active = collections.find((c) => c.name === currentCollection);
+      if (active) return [...head.slice(0, COLLAPSED_COUNT - 1), active];
+    }
+    return head;
+  }, [collections, currentCollection, expanded]);
+
   if (!collections || collections.length === 0) return null;
-  
+
+  const hidden = collections.length - shown.length;
+
+  const chip = (active: boolean) =>
+    `rounded-full px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+      active
+        ? "border-2 border-ink bg-brand text-brand-foreground"
+        : "border-2 border-ink/15 bg-card text-ink/80 hover:border-ink/40"
+    }`;
+
   return (
-    <div className="mb-2 sm:mb-4">
-      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2">
-        {/* All Collections button */}
+    <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-4">
+      <button onClick={() => onCollectionChange(null)} className={chip(!currentCollection)}>
+        All Collections
+      </button>
+
+      {shown.map((col) => (
         <button
-          onClick={() => onCollectionChange(null)}
-          className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
-            !currentCollection
-              ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
-              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
-          }`}
+          key={col._id}
+          onClick={() => onCollectionChange(col.name)}
+          className={chip(currentCollection === col.name)}
         >
-          All Collections
+          {col.name}
         </button>
-        
-        {/* Individual collection buttons */}
-        {collections.map((col) => (
-          <button
-            key={col._id}
-            onClick={() => onCollectionChange(col.name)}
-            className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
-              currentCollection === col.name
-                ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg hover:shadow-xl'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-2 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-md'
-            }`}
-          >
-            {col.name}
-          </button>
-        ))}
-      </div>
+      ))}
+
+      {hidden > 0 && !expanded && (
+        <button
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:text-ink"
+        >
+          {hidden} more
+          <ChevronDownIcon className="size-3.5" strokeWidth={2.5} />
+        </button>
+      )}
+
+      {expanded && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:text-ink"
+        >
+          Show fewer
+          <ChevronDownIcon className="size-3.5 rotate-180" strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 });
