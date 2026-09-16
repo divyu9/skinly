@@ -2,6 +2,11 @@ import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { cn } from "@/lib/utils.ts";
 
+/** The strip's reserved height. Measured at 72px on both breakpoints — the
+ *  mobile layout stacks a brand bar over the row, the wide one sets them side
+ *  by side, and they land on the same height. */
+const MARQUEE_H = "h-[72px]";
+
 export function ModelsMarquee() {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const marqueeModels = useQuery(
@@ -11,26 +16,42 @@ export function ModelsMarquee() {
       : "skip"
   );
 
-  // Don't render if marquee is disabled
-  if (!homepageSettings?.marqueeEnabled) {
+  /*
+   * This strip sits above `main`, so anything it does to its own height moves
+   * the entire page.
+   *
+   * It used to return null while the settings query was out, then render a
+   * 44px loading row, then the finished 72px strip — pushing everything below
+   * it down twice. Measured, `main` started at y=64 and settled at y=164, and
+   * because a full viewport of content moves with it that single 100px push
+   * was 0.65 of the homepage's layout shift, far more than everything else
+   * combined.
+   *
+   * So the height is reserved from the first paint and every state fills it:
+   * unknown, loading, and loaded are all MARQUEE_H tall. Only an explicit
+   * "off" collapses it, which is a shift no one sees unless the marquee is
+   * actually disabled.
+   */
+  const settingsKnown = homepageSettings !== undefined;
+
+  if (settingsKnown && !homepageSettings?.marqueeEnabled) {
     return null;
   }
 
-  // Loading state
-  if (marqueeModels === undefined) {
+  if (!settingsKnown || marqueeModels === undefined) {
     return (
-      <div className="halftone w-full overflow-hidden border-y-2 border-ink/15">
-        <div className="py-3 flex items-center justify-center gap-2">
+      <div className={`halftone w-full overflow-hidden border-y-2 border-ink/15 ${MARQUEE_H}`}>
+        <div className="flex h-full items-center justify-center gap-2">
           <div className="size-3 animate-pulse rounded-full bg-brand/50" />
-          <span className="text-xs text-muted-foreground">Loading latest models...</span>
+          <span className="text-xs text-muted-foreground">Loading latest models…</span>
         </div>
       </div>
     );
   }
 
-  // Empty state
+  // Genuinely nothing to scroll: hold the space rather than collapse the page.
   if (marqueeModels.length === 0) {
-    return null;
+    return <div className={`w-full border-y-2 border-ink/15 ${MARQUEE_H}`} aria-hidden="true" />;
   }
 
   // Triple the array for seamless infinite scroll
