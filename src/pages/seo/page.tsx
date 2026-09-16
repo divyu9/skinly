@@ -9,6 +9,7 @@ import BrandPageLayout from "./_components/brand-layout.tsx";
 import SkinTypePageLayout from "./_components/skin-type-layout.tsx";
 import ProductPageLayout from "./_components/product-layout.tsx";
 import NotFound from "../NotFound.tsx";
+import { useSeoPageData } from "./use-seo-page-data";
 
 export default function SEOPage() {
   const params = useParams<{ slug?: string }>();
@@ -18,6 +19,7 @@ export default function SEOPage() {
   // Check if this slug belongs to a product first (for SEO-friendly product URLs)
   const product = useQuery(api.products.getProductBySlug, { slug });
   const page = useQuery(api.seoPages.getPageBySlug, { slug });
+  const data = useSeoPageData(page && page.isPublished ? page : null);
 
   // Loading state
   if (page === undefined || product === undefined) {
@@ -55,47 +57,43 @@ export default function SEOPage() {
   };
 
   const currentUrl = getCurrentUrl();
+  // Built from what the page offers once its data has loaded; the stored copy
+  // until then (and for pages whose device we do not carry).
+  const title = data?.title || page.metaTitle;
+  const description = data?.description || page.metaDescription;
 
   return (
     <>
       {/* SEO Meta Tags */}
       <Helmet>
-        <title>{page.metaTitle}</title>
-        <meta name="description" content={page.metaDescription} />
-        <link rel="canonical" href={page.canonicalUrl || currentUrl} />
-        <meta name="keywords" content={page.keywords.join(", ")} />
-        
+        <title>{title}</title>
+        <meta name="description" content={description} />
+        {/* Same URL the prerendered HTML declares. */}
+        <link rel="canonical" href={currentUrl} />
+        {data?.total === 0 && <meta name="robots" content="noindex, follow" />}
+
         {/* Open Graph */}
-        <meta property="og:title" content={page.metaTitle} />
-        <meta property="og:description" content={page.metaDescription} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
         <meta property="og:type" content="website" />
         <meta property="og:url" content={currentUrl} />
         <meta property="og:site_name" content="GoSkinly" />
-        {page.heroImageUrl && (
-          <>
-            <meta property="og:image" content={page.heroImageUrl} />
-            <meta property="og:image:width" content="1200" />
-            <meta property="og:image:height" content="630" />
-            <meta property="og:image:alt" content={page.h1Heading} />
-          </>
-        )}
-        
+        {/* No fragments inside Helmet: it does not read their children. */}
+        <meta property="og:image" content={page.heroImageUrl || "https://goskinly.com/og-default.jpg"} />
+
         {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={page.metaTitle} />
-        <meta name="twitter:description" content={page.metaDescription} />
-        <meta name="twitter:site" content="@goskinly" />
-        {page.heroImageUrl && (
-          <meta name="twitter:image" content={page.heroImageUrl} />
-        )}
-        
+        <meta name="twitter:title" content={title} />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={page.heroImageUrl || "https://goskinly.com/og-default.jpg"} />
+
         {/* CollectionPage Structured Data */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "CollectionPage",
             "name": page.h1Heading,
-            "description": page.metaDescription,
+            "description": description,
             "url": currentUrl,
             "provider": {
               "@type": "Organization",
@@ -147,10 +145,10 @@ export default function SEOPage() {
       </Helmet>
 
       {/* Render appropriate layout based on page type */}
-      {page.pageType === "keyword" && <KeywordPageLayout page={page} />}
-      {page.pageType === "device" && <DevicePageLayout page={page} />}
-      {page.pageType === "brand" && <BrandPageLayout page={page} />}
-      {page.pageType === "skin-type" && <SkinTypePageLayout page={page} />}
+      {page.pageType === "keyword" && <KeywordPageLayout page={page} data={data} />}
+      {page.pageType === "device" && <DevicePageLayout page={page} data={data} />}
+      {page.pageType === "brand" && <BrandPageLayout page={page} data={data} />}
+      {page.pageType === "skin-type" && <SkinTypePageLayout page={page} data={data} />}
       {page.pageType === "product" && <ProductPageLayout page={page} />}
     </>
   );

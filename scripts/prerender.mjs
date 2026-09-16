@@ -28,6 +28,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
+import { resolveSeoTarget, selectSeoProducts, seoCopy } from "../src/lib/seo-pages.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -39,6 +40,8 @@ const REDIRECTED_SLUGS = new Set([
   "samsung-azx1-skins",
   "samsung-skins-skins",
   "samsung-galaxy-s23-skins-1",
+  "samsung-galaxy-s24-skins-1",
+  "mac-mini-skins-1",
   "master-skins",
 ]);
 
@@ -146,6 +149,59 @@ async function readCollection(project, name) {
     }
     token = body.nextPageToken || "";
   } while (token);
+  return out;
+}
+
+/** Every mockup row for one device (the storefront asks the same question). */
+async function readMockups(project, brand, model) {
+  const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:runQuery`;
+  const eq = (field, value) => ({ fieldFilter: { field: { fieldPath: field }, op: "EQUAL", value: { stringValue: value } } });
+  const body = JSON.stringify({
+    structuredQuery: {
+      from: [{ collectionId: "mockups" }],
+      where: { compositeFilter: { op: "AND", filters: [eq("brand", brand), eq("model", model)] } },
+    },
+  });
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const rows = await res.json();
+      return rows.filter((r) => r.document).map((r) => unwrap({ mapValue: { fields: r.document.fields || {} } }));
+    } catch (err) {
+      if (attempt === 3) throw err;
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
+  }
+  return [];
+}
+
+const R2 = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
+const mockupUrl = (m) => (m?.r2Key ? `${R2}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}` : null);
+// SKUs differ by suffix between catalogues, e.g. R-01 vs R-01-PH (as in firebase-hooks).
+const skuMatches = (a, b) => {
+  a = String(a || "").toUpperCase();
+  b = String(b || "").toUpperCase();
+  return !!a && !!b && (a === b || a.startsWith(b + "-") || b.startsWith(a + "-"));
+};
+
+/** Run async jobs a few at a time. */
+async function pool(items, size, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(size, items.length) }, async () => {
+      while (i < items.length) {
+        const k = i++;
+        out[k] = await fn(items[k], k);
+      }
+    }),
+  );
   return out;
 }
 
@@ -383,7 +439,7 @@ function productPage(p, variants, categoryNames, shipping) {
   };
 }
 
-function seoPage(s) {
+function seoPage(s, info) {
   const url = `${SITE}/${s.slug}`;
   const h1 = s.h1Heading || s.metaTitle || titleCase(s.slug);
   const trail = [
@@ -414,10 +470,18 @@ function seoPage(s) {
     });
   }
   const text = stripHtml(s.contentHTML);
+  const empty = info && info.total === 0;
+  const productLinks = (info?.products || [])
+    .slice(0, 24)
+    .map((p) => `<li><a href="${SITE}/products/${esc(p.slug)}">${esc(p.title)}</a></li>`)
+    .join("");
   return {
     route: `/${s.slug}`,
-    title: s.metaTitle || `${h1} | GoSkinly`,
-    description: s.metaDescription || clip(text, 155),
+    title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
+    description: info?.description || s.metaDescription || clip(text, 155),
+    // Nothing to sell here right now: keep the page for people, not for search.
+    robots: empty ? "noindex, follow" : undefined,
+    empty,
     canonical: url,
     image: liveImage(s.heroImageUrl) ? s.heroImageUrl : undefined,
     jsonLd: jsonLdList,
@@ -427,6 +491,7 @@ function seoPage(s) {
       crumbLinks(trail) +
       `<h1>${esc(h1)}</h1>` +
       (text ? `<p>${esc(clip(text, 3000))}</p>` : "") +
+      (productLinks ? `<ul>${productLinks}</ul>` : "") +
       faqs.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
   };
 }
@@ -504,6 +569,92 @@ async function writeHtaccess(strict) {
   await fs.writeFile(file, out);
 }
 
+// ─── SEO page data ────────────────────────────────────────────────────────────
+
+/**
+ * What each SEO page shows: its device or theme, the products that belong on
+ * it (with that device's mockups on model pages), and its title. Written to
+ * dist/seo-data/<slug>.json, which the page loads instead of reading the whole
+ * catalogue from Firestore on every visit.
+ */
+async function seoPageData(project, seoDocs, data, variantsByProduct) {
+  const collectionName = new Map(data.collections.map((c) => [c._id, c.name]));
+  const collectionsByProduct = new Map();
+  for (const r of data.memberships) {
+    const name = collectionName.get(r.collectionId);
+    if (!name || !r.productId) continue;
+    if (!collectionsByProduct.has(r.productId)) collectionsByProduct.set(r.productId, new Set());
+    collectionsByProduct.get(r.productId).add(name);
+  }
+
+  const resolved = seoDocs.map((s) => ({ s, target: resolveSeoTarget(s, data.models) }));
+
+  // A device's own SEO page, so brand pages can link models to it.
+  const pageForModel = new Map();
+  for (const { s, target } of resolved) {
+    if (target.kind === "model") pageForModel.set(`${target.brand}|${target.model}`, s.slug);
+  }
+
+  await fs.mkdir(path.join(DIST, "seo-data"), { recursive: true });
+  const out = new Map();
+  await pool(resolved, 8, async ({ s, target }) => {
+    const sel = selectSeoProducts(target, data.products, variantsByProduct, collectionsByProduct);
+    const copy = seoCopy(s, target, sel);
+
+    let products = sel.products.slice(0, 48);
+    let mockups = 0;
+    if (target.kind === "model") {
+      try {
+        const rows = (await readMockups(project, target.brand, target.model)).filter((m) => mockupUrl(m));
+        products = products.map((p) => {
+          const sku = p.variants[0]?.sku;
+          const m = sku && rows.find((r) => skuMatches(r.sku, sku));
+          if (m) mockups++;
+          return m ? { ...p, mockupUrl: mockupUrl(m) } : p;
+        });
+        // Designs pictured on this device first, within the in-stock order.
+        products.sort((a, b) => Number(b.variants.some((v) => v.available)) - Number(a.variants.some((v) => v.available)) ||
+          Number(!!b.mockupUrl) - Number(!!a.mockupUrl));
+      } catch (err) {
+        log(`mockups for ${target.brand} ${target.model} unavailable (${err?.message || err})`);
+      }
+    }
+
+    // Models with their own page first, then the page's own kind of gadget,
+    // then highest model number first ("Redmi Note 13" before "Redmi Note 8").
+    const ranked = [...(target.models || [])].sort(
+      (a, b) =>
+        Number(pageForModel.has(`${b.brand}|${b.model}`)) - Number(pageForModel.has(`${a.brand}|${a.model}`)) ||
+        Number(b.category === target.gadget) - Number(a.category === target.gadget) ||
+        b.model.localeCompare(a.model, "en", { numeric: true, sensitivity: "base" }),
+    );
+    const models = ranked.slice(0, 80).map((m) => {
+      const slug = pageForModel.get(`${m.brand}|${m.model}`);
+      const q = new URLSearchParams({ productType: "skin", gadget: m.category || target.gadget || "phone", brand: m.brand, model: m.model });
+      return { brand: m.brand, model: m.model.replace(/\s+/g, " ").trim(), href: slug ? `/${slug}` : `/products?${q.toString()}` };
+    });
+
+    const info = {
+      slug: s.slug,
+      target: { ...target, models: undefined },
+      title: copy.title,
+      description: copy.description,
+      listing: copy.listing,
+      total: sel.total,
+      inStock: sel.inStock,
+      minPrice: sel.minPrice,
+      finishes: sel.finishes,
+      mockups,
+      models,
+      products,
+      builtAt: Date.now(),
+    };
+    await fs.writeFile(path.join(DIST, "seo-data", `${s.slug}.json`), JSON.stringify(info));
+    out.set(s.slug, info);
+  });
+  return out;
+}
+
 // ─── main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -529,7 +680,7 @@ async function main() {
   const project = await projectId();
   let data = null;
   try {
-    const [products, variants, seoPages, categories, shipping] = await Promise.all([
+    const [products, variants, seoPages, categories, shipping, models, collections, memberships] = await Promise.all([
       readCollection(project, "products"),
       readCollection(project, "variants"),
       readCollection(project, "seoPages"),
@@ -537,8 +688,11 @@ async function main() {
       readCollection(project, "settings")
         .then((rows) => rows.find((r) => r._id === "shipping") || null)
         .catch(() => null),
+      readCollection(project, "supportedModels"),
+      readCollection(project, "collections"),
+      readCollection(project, "collectionProducts"),
     ]);
-    data = { products, variants, seoPages, categories, shipping };
+    data = { products, variants, seoPages, categories, shipping, models, collections, memberships };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
   }
@@ -567,18 +721,22 @@ async function main() {
   for (const p of productPages) await writePage(p.route, render(template, p));
 
   const productSlugs = new Set(active.map((p) => p.slug));
-  const seo = data.seoPages
+  const seoDocs = data.seoPages
     .filter((s) => s.isPublished && s.slug && /^[a-z0-9][a-z0-9-]*$/.test(s.slug))
-    .filter((s) => !REDIRECTED_SLUGS.has(s.slug) && !RESERVED.has(s.slug) && !productSlugs.has(s.slug))
-    .map(seoPage);
+    .filter((s) => !REDIRECTED_SLUGS.has(s.slug) && !RESERVED.has(s.slug) && !productSlugs.has(s.slug));
+  const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);
+  const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug)));
   for (const p of seo) await writePage(p.route, render(template, p));
 
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
 
-  await writeSitemaps([...statics, magneto, ...seo], productPages);
+  await writeSitemaps([...statics, magneto, ...seo.filter((p) => !p.empty)], productPages);
   await writeHtaccess(true);
+  const kinds = {};
+  for (const i of seoInfo.values()) kinds[i.target.kind] = (kinds[i.target.kind] || 0) + 1;
   log(`wrote ${statics.length + 1} static, ${productPages.length} product and ${seo.length} SEO pages`);
+  log(`SEO pages by kind ${JSON.stringify(kinds)}; ${seo.filter((p) => p.empty).length} with nothing to sell (noindex)`);
 }
 
 main().catch(async (err) => {

@@ -13,15 +13,17 @@ import { PhoneBrandSelector } from "@/components/phone-brand-selector.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { useState, useRef } from "react";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import type { SeoPageData } from "../use-seo-page-data";
+import { SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
 
 type DeviceType = "laptop" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
 interface SkinTypePageLayoutProps {
   page: Doc<"seoPages">;
+  data?: SeoPageData;
 }
 
-export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
-  const products = useQuery(api.products.getAllProducts, {});
+export default function SkinTypePageLayout({ page, data }: SkinTypePageLayoutProps) {
   const template = useQuery(api.seoTemplates.getTemplateByType, { pageType: "skin-type" });
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,12 +45,6 @@ export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
   // Extract skin type from heading (e.g., "Matte", "Glossy", "Carbon Fiber")
   const skinType = (page.h1Heading || page.title || "").replace(/Skins|Phone Skins/gi, "").trim();
 
-  // Filter products by variant/finish (show all for now since variant filtering is complex)
-  const skinTypeProducts = products?.filter((p: Doc<"products">) => 
-    (p.title || "").toLowerCase().includes(skinType.toLowerCase())
-  ) || [];
-
-  const displayProducts = skinTypeProducts.length > 0 ? skinTypeProducts : products?.slice(0, 12) || [];
 
   // Section renderers
   const renderHero = () => (
@@ -73,11 +69,11 @@ export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
             {page.h1Heading}
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            {page.metaDescription}
+            {data?.description || page.metaDescription}
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
             <Button size="lg" asChild>
-              <Link to="/products">Shop {skinType} Skins</Link>
+              <Link to={data?.listing || "/products"}>Shop {skinType} Skins</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
               <Link to="/devices">Browse by Device</Link>
@@ -135,35 +131,11 @@ export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
     </section>
   );
 
-  const renderProducts = () => displayProducts.length > 0 && (
-    <section className="container mx-auto px-4 py-12 md:py-16">
-      <h2 className="text-3xl font-bold mb-8 text-center">
-        Explore {skinType} Collection
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
-        {displayProducts.map((product) => (
-          <Link
-            key={product._id}
-            to={`/products/detail?id=${product._id}`}
-            className="group"
-          >
-            <Card className="overflow-hidden h-full hover:shadow-lg transition-shadow">
-              <div className="aspect-square overflow-hidden bg-muted">
-                <img
-                  src={product.images?.[0]?.url || "/placeholder.svg"}
-                  alt={product.images?.[0]?.alt || product.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-              <CardContent className="p-4">
-                <h3 className="font-semibold line-clamp-2 mb-2">{product.title}</h3>
-                <p className="text-lg font-bold text-primary">₹{product.variants?.[0]?.price?.toFixed(2) || "N/A"}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    </section>
+  const renderProducts = () => (
+    <>
+      <SeoProductsSection data={data} heading={page.h1Heading} />
+      {data && ["brand", "family", "unlisted"].includes(data.target.kind) && <SeoModelsSection data={data} />}
+    </>
   );
 
   const renderFaqs = () => page.faqs && page.faqs.length > 0 && (
@@ -200,9 +172,18 @@ export default function SkinTypePageLayout({ page }: SkinTypePageLayoutProps) {
   };
 
   // Get enabled sections in order - prioritize page overrides, fallback to global template
-  const sections = (page.layoutOverrides?.sections || template?.layoutConfig.sections || [])
-    .filter(s => s.enabled)
-    .sort((a, b) => a.order - b.order);
+  type Section = { id: string; enabled: boolean; order: number };
+  const configured: Section[] = (page.layoutOverrides?.sections || template?.layoutConfig.sections || [])
+    .filter((s: Section) => s.enabled)
+    .sort((a: Section, b: Section) => a.order - b.order);
+  // The products are the point of the page: always on, and straight after the
+  // hero rather than below the generated copy, where the templates had them.
+  const rest = configured.filter((s) => s.id !== "products");
+  const heroFirst = rest[0]?.id === "hero";
+  const productsSection: Section = { id: "products", enabled: true, order: 0 };
+  const sections: Section[] = heroFirst
+    ? [rest[0], productsSection, ...rest.slice(1)]
+    : [productsSection, ...rest];
 
   return (
     <>

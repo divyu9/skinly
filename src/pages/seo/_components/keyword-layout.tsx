@@ -13,16 +13,17 @@ import { PhoneBrandSelector } from "@/components/phone-brand-selector.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { useState, useRef } from "react";
 import { sanitizeHtml } from "@/lib/sanitize-html";
+import type { SeoPageData } from "../use-seo-page-data";
+import { SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
 
 type DeviceType = "laptop" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
 interface KeywordPageLayoutProps {
   page: Doc<"seoPages">;
+  data?: SeoPageData;
 }
 
-export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
-  // Fetch featured products if any
-  const products = useQuery(api.products.getAllProducts, {});
+export default function KeywordPageLayout({ page, data }: KeywordPageLayoutProps) {
   
   // Fetch template for this page type to determine section order and visibility
   const template = useQuery(api.seoTemplates.getTemplateByType, { pageType: "keyword" });
@@ -49,9 +50,18 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
   };
   
   // Get enabled sections sorted by order - prioritize page overrides, fallback to global template
-  const enabledSections = (page.layoutOverrides?.sections || template?.layoutConfig.sections || [])
-    .filter(section => section.enabled)
-    .sort((a, b) => a.order - b.order);
+  type Section = { id: string; enabled: boolean; order: number };
+  const configured: Section[] = (page.layoutOverrides?.sections || template?.layoutConfig.sections || [])
+    .filter((section: Section) => section.enabled)
+    .sort((a: Section, b: Section) => a.order - b.order);
+  // The products are the point of the page: always on, and straight after the
+  // hero rather than below the generated copy, where the templates had them.
+  const rest = configured.filter((s) => s.id !== "products");
+  const heroFirst = rest[0]?.id === "hero";
+  const productsSection: Section = { id: "products", enabled: true, order: 0 };
+  const enabledSections: Section[] = heroFirst
+    ? [rest[0], productsSection, ...rest.slice(1)]
+    : [productsSection, ...rest];
   
   // Helper to check if a section is enabled
   const isSectionEnabled = (sectionId: string) => {
@@ -84,11 +94,11 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
                   {page.h1Heading}
                 </h1>
                 <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-                  {page.metaDescription}
+                  {data?.description || page.metaDescription}
                 </p>
                 <div className="flex flex-wrap gap-4 justify-center">
                   <Button size="lg" asChild>
-                    <Link to="/products">
+                    <Link to={data?.listing || "/products"}>
                       Shop Now <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>
                   </Button>
@@ -130,41 +140,11 @@ export default function KeywordPageLayout({ page }: KeywordPageLayoutProps) {
         );
       
       case "products":
-        if (!products || products.length === 0) return null;
         return (
-          <section key={sectionId} className="bg-muted/30 border-y">
-            <div className="container mx-auto px-4 py-12 md:py-16">
-              <h2 className="text-3xl font-bold mb-8 text-center">Featured Products</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-                {products.slice(0, 8).map((product) => (
-                  <Link
-                    key={product._id}
-                    to={`/products/detail?id=${product._id}`}
-                    className="group"
-                  >
-                    <Card className="overflow-hidden h-full hover:shadow-lg transition-shadow">
-                      <div className="aspect-square overflow-hidden bg-muted">
-                        <img
-                          src={product.images?.[0]?.url || "/placeholder.svg"}
-                          alt={product.images?.[0]?.alt || product.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold line-clamp-2 mb-2">{product.title}</h3>
-                        <p className="text-lg font-bold text-primary">₹{product.variants?.[0]?.price?.toFixed(2) || "N/A"}</p>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-              <div className="text-center mt-8">
-                <Button size="lg" variant="outline" asChild>
-                  <Link to="/products">View All Products</Link>
-                </Button>
-              </div>
-            </div>
-          </section>
+          <div key={sectionId}>
+            <SeoProductsSection data={data} heading={page.h1Heading} />
+            {data && ["brand", "family", "unlisted"].includes(data.target.kind) && <SeoModelsSection data={data} />}
+          </div>
         );
       
       case "faqs":
