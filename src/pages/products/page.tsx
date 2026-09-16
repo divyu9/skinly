@@ -310,7 +310,22 @@ export default function ProductsPage() {
     filters.gadgetFilter &&
     !activeDevice;
 
-  const showGadgetBanner = !!activeDevice;
+  /*
+   * Skins only.
+   *
+   * I widened this to every category a while back, reasoning that "a case is
+   * cut for one model just as a skin is". That was wrong in practice. The
+   * banner promises "all designs shown are reference, we'll send it for your
+   * exact model", which is a statement about printing a skin to order — cases,
+   * camera rings and screen protectors are stocked per model and each card
+   * carries its own Select Your Device. So on those tabs the banner was not
+   * merely redundant, it was claiming something untrue: a shopper with an
+   * Alienware laptop saved was being told camera rings would come cut for it.
+   *
+   * The device itself is remembered either way, so it is waiting when they
+   * come back to Skins.
+   */
+  const showGadgetBanner = !!activeDevice && filters.productCategory === 'skin';
   
   const showCollectionPills = filters.productCategory === 'skin' && 
     filters.gadgetFilter === 'phone' && 
