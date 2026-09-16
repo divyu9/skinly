@@ -27,6 +27,7 @@ import {
 // Hooks
 import { useProductFilters } from "@/hooks/useProductFilters";
 import { useProductsData } from "@/hooks/useProductsData";
+import { writeActiveDevice } from "@/lib/active-device";
 import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
 
 export default function ProductsPage() {
@@ -148,6 +149,16 @@ export default function ProductsPage() {
       applySmartFilters(modelGadgetType.name);
     }
   }, [modelGadgetType?.name, applySmartFilters]);
+
+  // Remember what kind of gadget the device is, so the page can still tell
+  // once the pair has left the URL.
+  useEffect(() => {
+    if (urlParams.brand && urlParams.model && modelInfo?.category) {
+      writeActiveDevice(urlParams.brand, urlParams.model, modelInfo.category);
+    }
+  }, [urlParams.brand, urlParams.model, modelInfo?.category]);
+
+  const deviceCategory = modelInfo?.category ?? activeDevice?.category;
   
   // ============================================
   // ANALYTICS
@@ -189,8 +200,27 @@ export default function ProductsPage() {
     if ("productType" in updates) next.productCategory = updates.productType;
     if ("gadget" in updates) next.gadgetFilter = updates.gadget;
     if ("finish" in updates) next.finishFilter = updates.finish;
-    updateFilters(next as any);
-  }, [updateFilters]);
+
+    /*
+     * The device pair follows the gadget.
+     *
+     * With `brand=Apple&model=iPhone 12` still in the URL, picking Laptop asked
+     * for laptop skins that also fit a phone — the query adds the model's
+     * category — and the grid said "No products found". Picking another gadget
+     * now drops the pair (the device stays remembered); coming back to the
+     * device's own gadget puts it back, so its mockups and collections return.
+     */
+    let extraURL: Record<string, string | null> | undefined;
+    const gadget = updates.gadget;
+    if (gadget && deviceCategory && activeDevice) {
+      if (gadget !== deviceCategory && urlParams.brand) {
+        extraURL = { brand: null, model: null, fromGadgetSelector: null };
+      } else if (gadget === deviceCategory && !urlParams.brand) {
+        extraURL = { brand: activeDevice.brand, model: activeDevice.model };
+      }
+    }
+    updateFilters(next as any, extraURL);
+  }, [updateFilters, deviceCategory, activeDevice, urlParams.brand]);
   
   // ============================================
   // LOADING MESSAGE
@@ -325,7 +355,10 @@ export default function ProductsPage() {
    * The device itself is remembered either way, so it is waiting when they
    * come back to Skins.
    */
-  const showGadgetBanner = !!activeDevice && filters.productCategory === 'skin';
+  // …and only while the gadget being browsed is the kind the device is: an
+  // iPhone 12 banner has nothing to say on laptop skins.
+  const showGadgetBanner = !!activeDevice && filters.productCategory === 'skin' &&
+    (!filters.gadgetFilter || !deviceCategory || filters.gadgetFilter === deviceCategory);
   
   const showCollectionPills = filters.productCategory === 'skin' && 
     filters.gadgetFilter === 'phone' && 

@@ -100,13 +100,14 @@ export function useProductFilters() {
     }
   }, [urlParams.brand, urlParams.model]);
 
-  const activeDevice = useMemo(() => {
+  const activeDevice = useMemo((): { brand: string; model: string; category?: string } | null => {
+    const saved = readActiveDevice();
     if (urlParams.brand && urlParams.model) {
-      return { brand: urlParams.brand, model: urlParams.model };
+      const same = saved && saved.brand === urlParams.brand && saved.model === urlParams.model;
+      return { brand: urlParams.brand, model: urlParams.model, category: same ? saved.category : undefined };
     }
     if (browsingAll) return null;
-    const saved = readActiveDevice();
-    return saved ? { brand: saved.brand, model: saved.model } : null;
+    return saved ? { brand: saved.brand, model: saved.model, category: saved.category } : null;
   }, [urlParams.brand, urlParams.model, browsingAll]);
 
   // Reset smart filters when brand/model changes
@@ -144,7 +145,9 @@ export function useProductFilters() {
   }, [navigate]);
   
   // Update filters with URL sync
-  const updateFilters = useCallback((updates: Partial<FilterState>) => {
+  // `extraURL` rides along in the same navigation — used to add or drop the
+  // device pair when the gadget changes, so the two never land out of step.
+  const updateFilters = useCallback((updates: Partial<FilterState>, extraURL?: Record<string, string | null>) => {
     setFilters(prev => {
       // Spreading a key whose value is undefined still overwrites it, which
       // silently cleared filters the caller never meant to touch. Only keys
@@ -196,7 +199,7 @@ export function useProductFilters() {
       urlUpdates.collection = updates.collectionParam || null;
     }
     
-    updateURL(urlUpdates);
+    updateURL({ ...urlUpdates, ...extraURL });
   }, [updateURL]);
   
   // Apply smart filters based on model info

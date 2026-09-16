@@ -2843,13 +2843,19 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'gadgetTypes.getByCategory') {
-          const q = query(collection(db, 'gadgetTypes'), where('category', '==', args.category), limit(1));
+          // No gadgetType document has a `category` field — they carry `name`
+          // ("phone", "laptop"), which is exactly what a model's `category`
+          // holds. Querying `category` always came back empty, so a device
+          // picked from the gadget sheet never resolved to a gadget, the smart
+          // filters never ran, and /products opened with no productType or
+          // gadget: no device banner, no collection row. Match either field.
+          const q = query(collection(db, 'gadgetTypes'));
           unsubscribe = onSnapshot(q, (snap) => {
-            if (!snap.empty) {
-              setData({ _id: snap.docs[0].id, ...snap.docs[0].data() });
-            } else {
-              setData(null);
-            }
+            const hit = snap.docs.find((d) => {
+              const g: any = d.data();
+              return g.category === args.category || g.name === args.category;
+            });
+            setData(hit ? { _id: hit.id, ...hit.data() } : null);
           });
         }
         else if (path === 'gadgetTypes.getActive' || path === 'gadgetTypes.listAllActive' || path === 'gadgetTypes.listActive' || path === 'gadgetTypes.list') {

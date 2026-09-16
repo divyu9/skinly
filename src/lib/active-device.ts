@@ -18,6 +18,11 @@ export interface ActiveDevice {
   model: string;
   /** True when the shopper picked it, rather than the UA sniffer guessing. */
   isConfirmed?: boolean;
+  /**
+   * The gadget it is — "phone", "tablet". Lets a page tell whether the saved
+   * device has anything to do with the gadget being browsed, without a lookup.
+   */
+  category?: string;
 }
 
 export function readActiveDevice(): ActiveDevice | null {
@@ -26,7 +31,12 @@ export function readActiveDevice(): ActiveDevice | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<ActiveDevice>;
     if (!parsed?.brand || !parsed?.model) return null;
-    return { brand: parsed.brand, model: parsed.model, isConfirmed: parsed.isConfirmed };
+    return {
+      brand: parsed.brand,
+      model: parsed.model,
+      isConfirmed: parsed.isConfirmed,
+      category: parsed.category,
+    };
   } catch {
     // Private windows and cleared site data both land here. No device is a
     // perfectly good answer; it just means we show the picker instead.
@@ -34,9 +44,16 @@ export function readActiveDevice(): ActiveDevice | null {
   }
 }
 
-export function writeActiveDevice(brand: string, model: string) {
+export function writeActiveDevice(brand: string, model: string, category?: string) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ brand, model, isConfirmed: true }));
+    // A write without a category keeps the one already known for this device,
+    // since most callers only have the pair from the URL.
+    const prev = readActiveDevice();
+    const kept = prev && prev.brand === brand && prev.model === model ? prev.category : undefined;
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({ brand, model, isConfirmed: true, category: category ?? kept }),
+    );
   } catch {
     /* storage unavailable — the URL still carries it for this visit */
   }
