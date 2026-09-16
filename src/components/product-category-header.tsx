@@ -40,70 +40,82 @@ export function ProductCategoryHeader({
 
   return (
     <>
-      {/* Product Category Extension Bar */}
-      <div className="relative border-t border-gray-200/50 bg-gradient-to-r from-purple-50 via-blue-50 to-pink-50 dark:from-purple-950/30 dark:via-blue-950/30 dark:to-pink-950/30 dark:border-gray-700/50 overflow-hidden">
-        {/* Animated gradient shimmer */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent dark:via-white/10 animate-shimmer" style={{
-          backgroundSize: '200% 100%',
-          animation: 'shimmer 3s ease-in-out infinite'
-        }} />
-        
-        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3 relative z-10">
-          {/* Wrapped, not scrolled. These were `overflow-x-auto no-scrollbar`, so
-              the row ran off the right edge with nothing to say it did —
-              categories past the fourth simply did not exist to most people.
-              A second line costs 40px and shows the whole shop. */}
-          <div className="flex flex-wrap gap-2 justify-center">
-            {productCategories === undefined ? (
-              // Loading skeleton
-              <>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="h-8 sm:h-10 w-24 sm:w-32 rounded-lg sm:rounded-xl flex-shrink-0" />
-                ))}
-              </>
-            ) : (
-              // Loaded categories
-              productCategories.map((category) => {
-                const config = categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box };
-                const IconComponent = config.icon;
-                
-                return (
-                  <button
-                    key={category.id}
-                    onClick={() => onUpdateFilters({ productType: category.id })}
-                    className={`group relative flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 sm:px-5 sm:py-2.5 font-semibold whitespace-nowrap transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-lg sm:rounded-xl ${
-                      productCategory === category.id
-                        ? 'bg-brand text-brand-foreground shadow-2xl hover:shadow-3xl animate-pulse-strong border-4 border-sunny'
-                        : 'bg-white text-gray-700 hover:bg-gray-100 hover:shadow-xl border-3 border-purple-300 hover:border-purple-500 dark:bg-gray-800 dark:text-gray-200 dark:border-purple-600 dark:hover:bg-gray-700 dark:hover:border-purple-400'
-                    }`}
-                  >
-                    <IconComponent className={`size-3.5 sm:size-4.5 transition-transform duration-300 ${productCategory === category.id ? 'animate-bounce-subtle' : 'group-hover:rotate-12'}`} />
-                    <span className="text-xs sm:text-sm">{category.displayName}</span>
-                    
-                    {/* Hover glow effect */}
-                    {productCategory !== category.id && (
-                      <div className="absolute inset-0 rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-500/0 via-purple-500/0 to-pink-500/0 group-hover:from-blue-500/10 group-hover:via-purple-500/10 group-hover:to-pink-500/10 transition-all duration-300 pointer-events-none" />
-                    )}
-                  </button>
-                );
-              })
-            )}
+      {/* Categories, as stories.
+          These were wrapped pills — six of them at up to 32px tall plus gaps
+          ran to three rows on a phone and pushed the products themselves off
+          the screen. A circle with its name underneath says the same thing in
+          one row at any width: six columns of a grid, so they fit at 320px and
+          at 1440px without scrolling or wrapping. The active one takes a ring
+          with a gap inside it, which is the one visual convention everybody
+          already reads as "this is the selected one".
+
+          The bar also carried a purple-to-pink gradient and a shimmer
+          animation from before the packaging palette existed, on a page where
+          nothing else is purple. */}
+      <div className="border-t-2 border-ink/10 bg-blush/20">
+        <div className="container mx-auto px-2 py-2.5 sm:px-4">
+          <div className="grid grid-cols-6 gap-1 sm:gap-2">
+            {productCategories === undefined
+              ? Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex flex-col items-center gap-1.5">
+                    <Skeleton className="aspect-square w-full max-w-[56px] rounded-full" />
+                    <Skeleton className="h-2.5 w-10" />
+                  </div>
+                ))
+              : productCategories.map((category) => {
+                  const config =
+                    categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box };
+                  const IconComponent = config.icon;
+                  const active = productCategory === category.id;
+
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => onUpdateFilters({ productType: category.id })}
+                      aria-pressed={active}
+                      className="group flex min-w-0 flex-col items-center gap-1.5"
+                    >
+                      <span
+                        className={`grid aspect-square w-full max-w-[56px] place-items-center rounded-full transition-colors ${
+                          active
+                            ? 'bg-brand text-brand-foreground ring-2 ring-brand ring-offset-2 ring-offset-background'
+                            : 'bg-card text-ink/70 ring-1 ring-ink/15 group-hover:ring-ink/40'
+                        }`}
+                      >
+                        <IconComponent className="size-5 sm:size-[22px]" strokeWidth={2} />
+                      </span>
+                      {/* Two lines rather than an ellipsis. A 60px column
+                          truncates "Screen Protectors" to "Screen Pr…", which
+                          is worse than the extra 11px a second line costs. */}
+                      <span
+                        className={`line-clamp-2 w-full text-center text-[10px] leading-[1.15] sm:text-[11px] ${
+                          active ? 'font-bold text-ink' : 'font-medium text-muted-foreground'
+                        }`}
+                      >
+                        {category.displayName}
+                      </span>
+                    </button>
+                  );
+                })}
           </div>
         </div>
       </div>
-      
-      {/* Animated Filter Bar - Shows when category is selected */}
+
+      {/* Second tier: gadget, then finish. Smaller than the stories above them
+          because they refine a choice already made, and because this strip is
+          fixed over the products — every row it takes is a row of shop nobody
+          sees. */}
       {productCategory && (
-        <div className="border-t border-gray-100 bg-white dark:bg-gray-900 dark:border-gray-800 animate-in slide-in-from-top-2 duration-300">
-          <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3">
+        <div className="border-t-2 border-ink/10 bg-card">
+          <div className="container mx-auto px-2 py-2 sm:px-4">
             {/* Show full gadget selector when no gadget is selected */}
             {productCategory === 'skin' && !gadgetFilter && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1">
                 {gadgetTypes === undefined ? (
                   // Loading skeleton for gadget selector
                   <>
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Skeleton key={i} className="h-8 sm:h-10 w-20 sm:w-24 rounded-lg sm:rounded-xl flex-shrink-0" />
+                      <Skeleton key={i} className="h-6 w-16 flex-shrink-0 rounded-full" />
                     ))}
                   </>
                 ) : (
@@ -111,7 +123,7 @@ export function ProductCategoryHeader({
                   <>
                     <button
                       onClick={() => onUpdateFilters({ gadget: null })}
-                      className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-brand text-brand-foreground font-semibold text-xs sm:text-sm whitespace-nowrap shadow-md hover:shadow-lg transition-all duration-200"
+                      className="rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold whitespace-nowrap text-brand-foreground transition-colors sm:px-2.5 sm:py-1 sm:text-xs"
                     >
                       All Gadgets
                     </button>
@@ -122,11 +134,11 @@ export function ProductCategoryHeader({
                         <button
                           key={gadgetType._id}
                           onClick={() => onUpdateFilters({ gadget: gadgetType.name })}
-                          className="px-3 py-1.5 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-medium text-xs sm:text-sm whitespace-nowrap border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-750 hover:shadow-sm transition-all duration-200"
+                          className="rounded-full border border-ink/15 bg-background px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-ink/80 transition-colors hover:border-ink/40 sm:px-2.5 sm:py-1 sm:text-xs"
                         >
                           {gadgetType.displayName}
                           {facets?.byGadget?.[gadgetType._id] ? (
-                            <span className="ml-1 opacity-60">{facets.byGadget[gadgetType._id]}</span>
+                            <span className="ml-1 text-muted-foreground">{facets.byGadget[gadgetType._id]}</span>
                           ) : null}
                         </button>
                       ))}
