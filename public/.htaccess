@@ -31,10 +31,11 @@ RewriteRule ^(.*)$ https://goskinly.com/$1 [R=301,L]
 # Reached only through the rules below; asked for directly they are duplicates.
 # THE_REQUEST is the browser's own request line, so the server's internal
 # hops to these files (DirectoryIndex, the rules below) never match.
-# REDIRECT_STATUS is empty only on the first pass; without it the 404 below
-# would re-trigger on the server's own internal fetch of 404.html, forever.
+# Only app.html is blocked. Blocking 404.html too loops on LiteSpeed, which
+# does not set REDIRECT_STATUS when it fetches the error page itself; that
+# file is noindex anyway.
 RewriteCond %{ENV:REDIRECT_STATUS} ^$
-RewriteCond %{THE_REQUEST} \s/(app|404)\.html[\s?]
+RewriteCond %{THE_REQUEST} \s/app\.html[\s?]
 RewriteRule ^ - [R=404,L]
 RewriteCond %{ENV:REDIRECT_STATUS} ^$
 RewriteCond %{THE_REQUEST} \s/index\.html[\s?]
