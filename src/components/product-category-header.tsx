@@ -24,6 +24,16 @@ export function ProductCategoryHeader({
 }: ProductCategoryHeaderProps) {
   // Get product categories, gadget types, and finish types
   const productCategories = useQuery(api.productCategories.listAllWithCounts, {});
+  /*
+   * The same artwork the homepage's "Explore by Category" cards use, so the
+   * admin sets a category's image once and both places follow. A photograph of
+   * the thing beats a line icon of it, and it keeps the two surfaces from
+   * drifting apart every time someone updates one of them.
+   */
+  const categoryImages = useQuery(api.homepage.getActiveCategoryDisplaySettings);
+  const imageFor = (id: string): string | undefined =>
+    (categoryImages as Array<{ categoryName?: string; imageUrl?: string }> | undefined)
+      ?.find((c) => c.categoryName === id)?.imageUrl || undefined;
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive, {});
   // Counts behind each chip, so we never offer a filter with nothing behind it.
   const facets = useQuery(api.products.getFilterFacets, { productCategory });
@@ -67,6 +77,9 @@ export function ProductCategoryHeader({
                     categoryConfig[category.id as keyof typeof categoryConfig] || { icon: Box };
                   const IconComponent = config.icon;
                   const active = productCategory === category.id;
+                  // Falls back to the icon when no image is set, so a category
+                  // added without artwork still renders as something.
+                  const img = imageFor(category.id);
 
                   return (
                     <button
@@ -76,13 +89,28 @@ export function ProductCategoryHeader({
                       className="group flex min-w-0 flex-col items-center gap-1.5"
                     >
                       <span
-                        className={`grid aspect-square w-full max-w-[56px] place-items-center rounded-full transition-colors ${
+                        className={`grid aspect-square w-full max-w-[56px] place-items-center overflow-hidden rounded-full transition-colors ${
                           active
-                            ? 'bg-brand text-brand-foreground ring-2 ring-brand ring-offset-2 ring-offset-background'
-                            : 'bg-card text-ink/70 ring-1 ring-ink/15 group-hover:ring-ink/40'
-                        }`}
+                            ? 'ring-2 ring-brand ring-offset-2 ring-offset-background'
+                            : 'ring-1 ring-ink/15 group-hover:ring-ink/40'
+                        } ${img ? 'bg-muted' : active ? 'bg-brand text-brand-foreground' : 'bg-card text-ink/70'}`}
                       >
-                        <IconComponent className="size-5 sm:size-[22px]" strokeWidth={2} />
+                        {img ? (
+                          /* A plain centre crop, which is what a circular
+                             thumbnail wants. The artwork is portrait and gets
+                             cropped hard, so it should carry the product and
+                             not a caption — the name is already printed under
+                             the circle. */
+                          <img
+                            src={img}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <IconComponent className="size-5 sm:size-[22px]" strokeWidth={2} />
+                        )}
                       </span>
                       {/* Two lines rather than an ellipsis. A 60px column
                           truncates "Screen Protectors" to "Screen Pr…", which
