@@ -440,8 +440,12 @@ export default function ProductsPage() {
           {/* Products Grid */}
           <ProductGrid
             products={visibleProducts}
-            brandFilter={urlParams.brand}
-            modelFilter={urlParams.model}
+            /* The remembered device, not only one sitting in the URL — so a
+               shopper who picked a model on the skins tab is not asked again
+               on every case and camera-ring card. Each card checks the device
+               against its own variants before using it. */
+            brandFilter={activeDevice?.brand ?? urlParams.brand}
+            modelFilter={activeDevice?.model ?? urlParams.model}
             autoSortOOS={autoSortOOS}
             isLoading={!!isInitialLoading}
             loadingMessage={loadingMessage}

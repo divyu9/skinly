@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
 import { PackageIcon, BellIcon, Sparkles } from "lucide-react";
 import type { Product } from "@/hooks/useProductsData";
+import { normalizeModelName } from "@/lib/mockups";
 
 interface ProductCardProps {
   product: Product;
@@ -21,9 +22,41 @@ export const ProductCard = memo(function ProductCard({
   autoSortOOS,
 }: ProductCardProps) {
   const mainImage = product.images?.[0];
-  
-  // Check if device is selected
-  const hasDeviceSelected = !!(brandFilter && modelFilter);
+
+  /*
+   * Does the saved device actually fit this product?
+   *
+   * On skins the listing is already filtered to the model, so any product
+   * shown fits. Cases, camera rings and screen guards are a different shape:
+   * they are stocked per model as variants titled "Samsung Galaxy S24 Ultra /
+   * Black", and the listing shows all of them at once. Someone who has already
+   * told us they own an iPhone 12 was still asked to pick a device on every
+   * card.
+   *
+   * The variant titles are the honest signal here — `gadgetCategory` says
+   * "accessory" for all of these and never names a device type, so it cannot
+   * answer the question. Matching on variants also fails safe: a saved
+   * Alienware matches no camera-ring variant, so that card keeps asking
+   * rather than promising a ring cut for a laptop.
+   */
+  const deviceFitsProduct = (() => {
+    if (!brandFilter || !modelFilter) return false;
+    const variants = product.variants;
+    // Skins carry one variant and are filtered to the model upstream; there is
+    // nothing per-model to match against, and nothing to be wrong about.
+    if (!Array.isArray(variants) || variants.length <= 1) return true;
+
+    const wanted = normalizeModelName(`${modelFilter}`).toLowerCase();
+    const withBrand = normalizeModelName(`${brandFilter} ${modelFilter}`).toLowerCase();
+    return variants.some((v: { title?: string }) => {
+      // "<Model> / <Colour>" — the model is the part before the slash.
+      const head = normalizeModelName(String(v?.title ?? "").split("/")[0]).toLowerCase();
+      if (!head) return false;
+      return head === wanted || head === withBrand || head.endsWith(wanted);
+    });
+  })();
+
+  const hasDeviceSelected = deviceFitsProduct;
   
   // Use mockupUrl if available (batch loaded), else fall back to default image
   // If we have a mockupUrl from batch loading, use it
