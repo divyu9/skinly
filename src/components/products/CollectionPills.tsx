@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
 
 import { collectionKey } from "@/lib/collection-key";
@@ -38,6 +38,17 @@ export const CollectionPills = memo(function CollectionPills({
   onCollectionChange,
 }: CollectionPillsProps) {
   const [expanded, setExpanded] = useState(false);
+  /*
+   * How many collections the collapsed row shows. Starts at COLLAPSED_COUNT
+   * and gives one up whenever "N more" would otherwise wrap onto a line of its
+   * own — the button belongs at the end of the last row, where the eye already
+   * is, not alone at the left edge underneath.
+   */
+  const [fit, setFit] = useState(COLLAPSED_COUNT);
+  // Bumped on resize, so a reset to a `fit` that has not changed still re-measures.
+  const [measure, setMeasure] = useState(0);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
 
   // `?collection=` carries the display name when a chip set it and the slug
   // when the link came from the sitemap, so compare through a shared key.
@@ -46,14 +57,42 @@ export const CollectionPills = memo(function CollectionPills({
 
   const shown = useMemo(() => {
     if (expanded) return collections;
-    const head = collections.slice(0, COLLAPSED_COUNT);
+    const head = collections.slice(0, fit);
     // The active one survives the collapse even if it sits further down.
     if (activeKey && !head.some((c) => collectionKey(c.name) === activeKey)) {
       const active = collections.find((c) => collectionKey(c.name) === activeKey);
-      if (active) return [...head.slice(0, COLLAPSED_COUNT - 1), active];
+      if (active) return [...head.slice(0, fit - 1), active];
     }
     return head;
-  }, [collections, activeKey, expanded]);
+  }, [collections, activeKey, expanded, fit]);
+
+  // Drop one chip at a time until the button shares the last row.
+  useLayoutEffect(() => {
+    const more = moreRef.current;
+    const prev = more?.previousElementSibling as HTMLElement | null;
+    if (expanded || !more || !prev) return;
+    // Compare the button's middle against the chip's line, not the raw tops:
+    // the button is a touch shorter and `items-center` nudges it down a couple
+    // of pixels, which read as "wrapped" on every pass.
+    const middle = more.offsetTop + more.offsetHeight / 2;
+    const wrapped = middle > prev.offsetTop + prev.offsetHeight;
+    if (wrapped && fit > 1) setFit((n) => n - 1);
+  }, [expanded, fit, shown, measure]);
+
+  // A different width fits a different number, so start over from the top.
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row || typeof ResizeObserver === "undefined") return;
+    let width = row.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (row.clientWidth === width) return;
+      width = row.clientWidth;
+      setFit(COLLAPSED_COUNT);
+      setMeasure((n) => n + 1);
+    });
+    ro.observe(row);
+    return () => ro.disconnect();
+  }, []);
 
   if (!collections || collections.length === 0) return null;
 
@@ -67,7 +106,7 @@ export const CollectionPills = memo(function CollectionPills({
     }`;
 
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-4">
+    <div ref={rowRef} className="mb-2 flex flex-wrap items-center gap-1.5 sm:mb-4">
       <button onClick={() => onCollectionChange(null)} className={chip(!activeKey)}>
         All Collections
       </button>
@@ -84,8 +123,9 @@ export const CollectionPills = memo(function CollectionPills({
 
       {hidden > 0 && !expanded && (
         <button
+          ref={moreRef}
           onClick={() => setExpanded(true)}
-          className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-brand transition-colors hover:text-ink"
+          className="flex items-center gap-0.5 rounded-full px-1.5 py-1.5 text-xs font-bold whitespace-nowrap text-brand transition-colors hover:text-ink"
         >
           {hidden} more
           <ChevronDownIcon className="size-3.5" strokeWidth={2.5} />
