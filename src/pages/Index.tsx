@@ -222,7 +222,11 @@ export default function Index() {
       />
 
       {/* Models Marquee - below header */}
-      <div style={{ marginTop: `${headerOffset}px` }}>
+      {/* Padding, not margin. A top margin on this wrapper collapses straight
+          out through `body`, so `body` itself is what moves — which is why the
+          shift was recorded against BODY and why it counted the whole document
+          as displaced. Padding creates the same gap without collapsing. */}
+      <div style={{ paddingTop: `${headerOffset}px` }}>
         <Suspense fallback={<div className="h-10" />}>
           <ModelsMarquee />
         </Suspense>
