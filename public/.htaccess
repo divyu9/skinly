@@ -21,6 +21,9 @@ ErrorDocument 404 /404.html
   # those pages, so it is not blocked in robots.txt — only kept out of results.
   <FilesMatch "\.json$">
     Header set X-Robots-Tag "noindex"
+    # Rebuilt at most daily; ten minutes of browser cache saves a refetch on
+    # every page of a visit without holding stale data for long.
+    Header set Cache-Control "public, max-age=600"
   </FilesMatch>
 </IfModule>
 

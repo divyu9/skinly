@@ -571,6 +571,82 @@ async function writeHtaccess(strict) {
   await fs.writeFile(file, out);
 }
 
+// ─── storefront catalogue ─────────────────────────────────────────────────────
+
+/**
+ * /data/catalogue.json: every active product with the fields the listing, tag
+ * rows, related rows and search use, and its variants. See src/lib/catalogue.ts.
+ */
+async function writeCatalogue(active, variantsByProduct) {
+  const tagsOf = (t) =>
+    (Array.isArray(t) ? t : typeof t === "string" ? t.split(",") : []).map((x) => String(x).trim()).filter(Boolean);
+  const products = active.map((p) => ({
+    _id: p._id,
+    slug: p.slug,
+    title: p.title || "",
+    status: p.status,
+    productCategory: p.productCategory,
+    gadgetCategory: p.gadgetCategory,
+    gadgetTypeId: p.gadgetTypeId,
+    finishType: p.finishType,
+    finishTypeId: p.finishTypeId,
+    tags: tagsOf(p.tags),
+    // One image — cards show the first — and never a dead Cloudinary link.
+    images: (p.images || [])
+      .map((i) => (typeof i === "string" ? { url: i } : i))
+      .filter((i) => i && liveImage(i.url))
+      .slice(0, 1)
+      .map((i) => ({ url: i.url })),
+    _creationTime: Number(p._creationTime || p.createdAt || 0),
+    variants: (variantsByProduct.get(p._id) || []).map((v) => ({
+      _id: v._id,
+      title: v.title || "",
+      price: Number(v.price) || 0,
+      ...(v.compareAtPrice ? { compareAtPrice: Number(v.compareAtPrice) } : {}),
+      ...(v.sku ? { sku: v.sku } : {}),
+      inventoryQuantity: Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0),
+    })),
+  }));
+  // Tags repeat across hundreds of products; store each once and refer to it
+  // by index. src/lib/catalogue.ts expands them again on load.
+  const tagIndex = new Map();
+  const tagList = [];
+  for (const p of products) {
+    p.tags = p.tags.map((t) => {
+      if (!tagIndex.has(t)) { tagIndex.set(t, tagList.length); tagList.push(t); }
+      return tagIndex.get(t);
+    });
+  }
+  await fs.mkdir(path.join(DIST, "data"), { recursive: true });
+  const body = JSON.stringify({ builtAt: Date.now(), tagList, products });
+  await fs.writeFile(path.join(DIST, "data", "catalogue.json"), body);
+  return body.length;
+}
+
+/**
+ * /data/models.json: every active supported model, for the storefront's model
+ * search and pickers (each of which read all ~3,500 documents per use).
+ */
+async function writeModels(models) {
+  // Grouped by brand, one [name, category, created-seconds] row per model; no
+  // document ids, which were most of the file and which nothing here needs.
+  const brands = {};
+  let count = 0;
+  for (const m of models) {
+    if (m.isActive === false || !m.brandName || !m.modelName) continue;
+    (brands[m.brandName] ||= []).push([
+      m.modelName,
+      m.category || "",
+      Math.floor(Number(m._creationTime || m.createdAt || 0) / 1000),
+    ]);
+    count++;
+  }
+  await fs.mkdir(path.join(DIST, "data"), { recursive: true });
+  const body = JSON.stringify({ builtAt: Date.now(), brands });
+  await fs.writeFile(path.join(DIST, "data", "models.json"), body);
+  return { count, bytes: body.length };
+}
+
 // ─── category listings ────────────────────────────────────────────────────────
 
 function categoryPages(products, variantsByProduct) {
@@ -777,6 +853,11 @@ async function main() {
 
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
+
+  const catalogueBytes = await writeCatalogue(active, variantsByProduct);
+  log(`catalogue: ${active.length} products, ${Math.round(catalogueBytes / 1024)} KB`);
+  const modelFile = await writeModels(data.models);
+  log(`models: ${modelFile.count} active, ${Math.round(modelFile.bytes / 1024)} KB`);
 
   const categories = categoryPages(active, variantsByProduct);
   for (const p of categories) await writePage(p.route, render(template, p));

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db, functions } from './firebase';
 import { 
-  collection, query, where, getDocs, onSnapshot, doc, getDoc,
+  collection, query, where, getDocs as fsGetDocs, onSnapshot as fsOnSnapshot, doc, getDoc as fsGetDoc,
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
   writeBatch, DocumentSnapshot, QuerySnapshot, documentId, getCountFromServer, deleteField, runTransaction
 } from 'firebase/firestore';
@@ -11,7 +11,166 @@ import { normalizeModelName } from '@/lib/mockups';
 import { normalizeImageForUpload, withExtension } from '@/lib/image-processing';
 
 import { normalizeOrder } from "./normalize-order.ts";
+
+/*
+ * Firestore read audit — off unless localStorage.skinly_read_audit === "1".
+ *
+ * Firestore bills per document read, and every storefront read goes through
+ * this file, so this is where they can be counted: getDocs and getDoc by the
+ * documents they return (an empty result still costs one), listeners by their
+ * first result and then only the documents that change, cache hits not at all.
+ * Each read is filed under the hook path that started it and the collection it
+ * touched. Inspect window.__skinlyReads; reset with window.__skinlyReadsReset().
+ */
+const readAuditOn = (() => {
+  try { return typeof window !== "undefined" && localStorage.getItem("skinly_read_audit") === "1"; }
+  catch { return false; }
+})();
+let readLabel = "";
+type ReadRow = { reads: number; calls: number };
+const readAudit: { total: number; byPath: Record<string, ReadRow>; byCollection: Record<string, ReadRow> } =
+  { total: 0, byPath: {}, byCollection: {} };
+if (readAuditOn) {
+  (window as any).__skinlyReads = readAudit;
+  (window as any).__skinlyReadsReset = () => { readAudit.total = 0; readAudit.byPath = {}; readAudit.byCollection = {}; };
+}
+const refPath = (ref: any): string => {
+  try {
+    if (typeof ref?.path === "string") return ref.path.split("/").filter((_: string, i: number) => i % 2 === 0).join("/");
+    const p = ref?._query?.path;
+    const cg = ref?._query?.collectionGroup;
+    return cg ? `group:${cg}` : p?.canonicalString?.() || "unknown";
+  } catch { return "unknown"; }
+};
+const countRead = (label: string, target: string, n: number) => {
+  readAudit.total += n;
+  const a = (readAudit.byPath[label || "(untracked)"] ||= { reads: 0, calls: 0 });
+  a.reads += n; a.calls += 1;
+  const b = (readAudit.byCollection[target] ||= { reads: 0, calls: 0 });
+  b.reads += n; b.calls += 1;
+};
+const getDocs: typeof fsGetDocs = (async (q: any) => {
+  const label = readLabel;
+  const snap = await fsGetDocs(q);
+  if (readAuditOn && !snap.metadata.fromCache) countRead(label, refPath(q), Math.max(1, snap.size));
+  return snap;
+}) as any;
+const getDoc: typeof fsGetDoc = (async (r: any) => {
+  const label = readLabel;
+  const snap = await fsGetDoc(r);
+  if (readAuditOn && !snap.metadata.fromCache) countRead(label, refPath(r), 1);
+  return snap;
+}) as any;
+const onSnapshot: typeof fsOnSnapshot = ((ref: any, ...rest: any[]) => {
+  if (!readAuditOn) return (fsOnSnapshot as any)(ref, ...rest);
+  const label = readLabel;
+  const target = refPath(ref);
+  let first = true;
+  const i = rest.findIndex((x) => typeof x === "function" || (x && typeof x.next === "function"));
+  if (i === -1) return (fsOnSnapshot as any)(ref, ...rest);
+  const orig = rest[i];
+  const next = typeof orig === "function" ? orig : orig.next.bind(orig);
+  const wrapped = (snap: any) => {
+    if (!snap.metadata?.fromCache) {
+      const n = typeof snap.docChanges === "function"
+        ? (first ? Math.max(1, snap.size) : snap.docChanges().length)
+        : 1;
+      if (n) countRead(label, target, n);
+      first = false;
+    }
+    return next(snap);
+  };
+  rest[i] = typeof orig === "function" ? wrapped : { ...orig, next: wrapped };
+  return (fsOnSnapshot as any)(ref, ...rest);
+}) as any;
+
+// ─── catalogue-backed product reads ───────────────────────────────────────────
+// See src/lib/catalogue.ts. Views pick from the build's catalogue, then read
+// live only what they are about to show.
+
+const chunked = <T,>(list: T[], size: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));
+  return out;
+};
+
+/**
+ * The products about to be shown, re-read: their documents and variants, so
+ * price and stock on screen are live. Products no longer active drop out.
+ */
+async function refreshProducts(list: any[], label: string): Promise<any[]> {
+  if (!list.length) return [];
+  const ids = [...new Set(list.map((p) => p._id))];
+  readLabel = label;
+  const [pSnaps, vSnaps] = await Promise.all([
+    Promise.all(chunked(ids, 30).map((c) => getDocs(query(collection(db, 'products'), where(documentId(), 'in', c))))),
+    Promise.all(chunked(ids, 30).map((c) => getDocs(query(collection(db, 'variants'), where('productId', 'in', c))))),
+  ]);
+  const fresh = new Map<string, any>();
+  pSnaps.forEach((snap) => snap.docs.forEach((d) => fresh.set(d.id, { _id: d.id, ...d.data() })));
+  const variants = new Map<string, any[]>();
+  vSnaps.forEach((snap) => snap.docs.forEach((d) => {
+    const v: any = { _id: d.id, ...d.data() };
+    if (!variants.has(v.productId)) variants.set(v.productId, []);
+    variants.get(v.productId)!.push(v);
+  }));
+  return list
+    .map((p) => {
+      const doc = fresh.get(p._id);
+      if (!doc || doc.status !== 'active') return null;
+      return { ...p, ...doc, variants: variants.get(p._id) || [] };
+    })
+    .filter(Boolean);
+}
+
+let createdSinceBuild: Promise<any[]> | null = null;
+/** Active products created after the catalogue was built, with variants. */
+function productsSinceBuild(builtAt: number): Promise<any[]> {
+  if (!createdSinceBuild) {
+    createdSinceBuild = (async () => {
+      readLabel = 'catalogue:sinceBuild';
+      const snap = await getDocs(query(collection(db, 'products'), where('_creationTime', '>', builtAt)));
+      const rows = snap.docs.map((d) => ({ _id: d.id, ...d.data() } as any)).filter((p) => p.status === 'active');
+      return refreshProducts(rows, 'catalogue:sinceBuild');
+    })().catch(() => []);
+  }
+  return createdSinceBuild;
+}
+
+let modelsSinceBuild: Promise<any[]> | null = null;
+/**
+ * Every active supported model — the build's list plus any added since (a
+ * model an admin adds must be pickable at once). null without the file.
+ */
+async function catalogueModels(): Promise<any[] | null> {
+  const cat = await loadModelCatalogue();
+  if (!cat) return null;
+  if (!modelsSinceBuild) {
+    modelsSinceBuild = (async () => {
+      readLabel = 'catalogue:modelsSinceBuild';
+      const snap = await getDocs(query(collection(db, 'supportedModels'), where('_creationTime', '>', cat.builtAt)));
+      return snap.docs.map((d) => ({ _id: d.id, ...d.data() } as any)).filter((m) => m.isActive === true);
+    })().catch(() => []);
+  }
+  const extra = await modelsSinceBuild;
+  const known = new Set(cat.models.map((m) => m._id));
+  return [...extra.filter((m) => !known.has(m._id)), ...cat.models];
+}
+
+/**
+ * Every active product with its variants — the build's catalogue plus
+ * anything created since. null when there is no catalogue file, in which case
+ * callers use their original Firestore reads.
+ */
+async function catalogueProducts(): Promise<any[] | null> {
+  const cat = await loadCatalogue();
+  if (!cat) return null;
+  const extra = await productsSinceBuild(cat.builtAt);
+  const known = new Set(cat.products.map((p) => p._id));
+  return [...extra.filter((p) => !known.has(p._id)), ...cat.products];
+}
 import { collectionKey } from "./collection-key";
+import { loadCatalogue, loadModelCatalogue } from "./catalogue";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
@@ -115,8 +274,10 @@ export function useQuery(apiRef: any, args?: any) {
     }
 
     let unsubscribe = () => {};
+    let active = true;
 
     const fetchData = async () => {
+        readLabel = path;
         try {
           if (path === 'homepage.getActiveHomepageSections') {
           const q = query(collection(db, 'homepageSections'));
@@ -323,6 +484,16 @@ export function useQuery(apiRef: any, args?: any) {
           const limitNum = args?.maxProducts || args?.limit || 10;
           const tagsArg = args?.tags || (args?.tag ? [args.tag] : []);
           
+          const fromCatalogue = await catalogueProducts();
+          if (fromCatalogue) {
+            const tagged = tagsArg.length
+              ? fromCatalogue.filter((d: any) => tagsArg.some((t: string) => (d.tags || []).includes(t)))
+              : fromCatalogue;
+            // A few spare in case some have gone inactive since the build.
+            const shown = await refreshProducts(tagged.slice(0, limitNum + 4), path);
+            if (active) setData(shown.slice(0, limitNum));
+            return;
+          }
           const q = query(collection(db, 'products'), where('status', '==', 'active'));
           unsubscribe = onSnapshot(q, async (snap) => {
             let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
@@ -1472,6 +1643,13 @@ export function useQuery(apiRef: any, args?: any) {
             setData([]);
             return;
           }
+          const modelRows = await catalogueModels();
+          if (modelRows) {
+            const term = searchParam.toLowerCase();
+            const hits = modelRows.filter((d: any) => `${d.brandName} ${d.modelName}`.toLowerCase().includes(term));
+            if (active) setData(hits.slice(0, args?.limit || 10));
+            return;
+          }
           // Fetch all active models to search in-memory
           const q = query(collection(db, 'supportedModels'), where('isActive', '==', true));
           unsubscribe = onSnapshot(q, (snap) => {
@@ -1486,6 +1664,22 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'supportedModels.listAll') {
+          const shape = (list: any[]) => {
+            let models = list;
+            if (args?.category !== undefined) models = models.filter(m => m.category === args.category);
+            if (args?.brandName !== undefined) models = models.filter(m => m.brandName === args.brandName);
+            if (args?.isActive !== undefined) models = models.filter(m => m.isActive === args.isActive);
+            return [...models].sort((a, b) => (b._creationTime ?? 0) - (a._creationTime ?? 0));
+          };
+          // Storefront pickers ask for active models only; admin pages, which
+          // must see their own edits at once, do not and keep the live read.
+          if (args?.isActive === true) {
+            const modelRows = await catalogueModels();
+            if (modelRows) {
+              if (active) setData(shape(modelRows));
+              return;
+            }
+          }
           const q = query(collection(db, 'supportedModels'));
           unsubscribe = onSnapshot(q, (snap) => {
             let models = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
@@ -1895,6 +2089,28 @@ export function useQuery(apiRef: any, args?: any) {
           // The category bar used to offer every finish for every gadget, but
           // most pairs have nothing behind them — picking Console then
           // Transparent led to a guaranteed empty grid.
+          const countFacets = (rows: any[]) => {
+            const byGadget: Record<string, number> = {};
+            const byCategory: Record<string, number> = {};
+            const finishByGadget: Record<string, Record<string, number>> = {};
+            rows.forEach((p: any) => {
+              if (args?.productCategory && p.productCategory !== args.productCategory) return;
+              const g = p.gadgetTypeId;
+              const f = p.finishTypeId;
+              if (p.productCategory) byCategory[p.productCategory] = (byCategory[p.productCategory] || 0) + 1;
+              if (!g) return;
+              byGadget[g] = (byGadget[g] || 0) + 1;
+              if (!f) return;
+              (finishByGadget[g] ||= {})[f] = (finishByGadget[g][f] || 0) + 1;
+            });
+            return { byGadget, byCategory, finishByGadget };
+          };
+          // Counts only: the build's catalogue is plenty fresh for these.
+          const fromCatalogue = await catalogueProducts();
+          if (fromCatalogue) {
+            if (active) setData(countFacets(fromCatalogue));
+            return;
+          }
           unsubscribe = onSnapshot(query(collection(db, 'products'), where('status', '==', 'active')), (snap) => {
             const byGadget: Record<string, number> = {};
             const byCategory: Record<string, number> = {};
@@ -1935,6 +2151,15 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'products.searchProducts') {
           if (!args?.query || args.query.length < 2) {
             setData([]);
+            return;
+          }
+          const fromCatalogue = await catalogueProducts();
+          if (fromCatalogue) {
+            const term = args.query.toLowerCase();
+            const hits = fromCatalogue.filter((d: any) =>
+              `${d.title} ${(d.tags || []).join(' ')}`.toLowerCase().includes(term));
+            const shown = await refreshProducts(hits.slice(0, (args?.limit || 15) + 3), path);
+            if (active) setData(shown.slice(0, args?.limit || 15));
             return;
           }
           const q = query(collection(db, 'products'), where('status', '==', 'active'));
@@ -2644,6 +2869,20 @@ export function useQuery(apiRef: any, args?: any) {
           } else {
             const brandSearch = args?.brandName?.toLowerCase().trim();
             const keywords = search.split(/\s+/).filter((k: string) => k.length > 1);
+            const similar = (rows: any[]) => rows
+              .filter(m => {
+                if (args?.category && m.category !== args.category) return false;
+                if (brandSearch && (m.brandName || "").toLowerCase() !== brandSearch) return false;
+                const name = (m.modelName || "").toLowerCase();
+                return keywords.every((k: string) => name.includes(k));
+              })
+              .slice(0, 5)
+              .map(m => ({ _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category }));
+            const modelRows = await catalogueModels();
+            if (modelRows) {
+              if (active) setData(similar(modelRows));
+              return;
+            }
             unsubscribe = onSnapshot(
               query(collection(db, 'supportedModels'), where('isActive', '==', true)),
               (snap) => {
@@ -2766,10 +3005,12 @@ export function useQuery(apiRef: any, args?: any) {
               }
               if (!config || !config.isActive) { setData({ config: null, products: [] }); return; }
 
-              const all = await getDocs(query(collection(db, 'products'), where('status', '==', 'active')));
-              const candidates = all.docs
-                .map(d => ({ _id: d.id, ...d.data() } as any))
-                .filter(p => p._id !== args.productId);
+              const fromCatalogue = await catalogueProducts();
+              const all = fromCatalogue
+                ? fromCatalogue
+                : (await getDocs(query(collection(db, 'products'), where('status', '==', 'active'))))
+                    .docs.map(d => ({ _id: d.id, ...d.data() } as any));
+              const candidates = all.filter((p: any) => p._id !== args.productId);
 
               let picked: any[] = [];
               if (config.sourceType === 'manual' && config.manualProductIds?.length) {
@@ -2782,13 +3023,10 @@ export function useQuery(apiRef: any, args?: any) {
               }
               picked = picked.slice(0, config.maxProducts || 8);
 
-              // The cards read product.variants for price and stock.
-              const withVariants = await Promise.all(picked.map(async p => {
-                const v = await getDocs(query(collection(db, 'variants'), where('productId', '==', p._id)));
-                return { ...p, variants: v.docs.map(d => ({ _id: d.id, ...d.data() })) };
-              }));
+              // The cards read product.variants for price and stock — live.
+              const withVariants = await refreshProducts(picked, path);
 
-              setData({ config, products: withVariants });
+              if (active) setData({ config, products: withVariants });
             })();
           }
         }
@@ -3047,14 +3285,19 @@ export function useQuery(apiRef: any, args?: any) {
           if (!args?.brand || !args?.model || requestedSkus.length === 0) {
             setData({ mockups: {}, cursor: "", isDone: true });
           } else {
-            const q = query(
-              collection(db, 'mockups'),
-              where('brand', '==', args.brand),
-              where('model', '==', args.model)
-            );
-            unsubscribe = onSnapshot(q, async (snap) => {
+            // Only the SKUs asked for. Every mockup row for a model is ~333
+            // reads, and a screen shows a couple of dozen designs; SKUs match
+            // exactly for 99.6% of rows.
+            const bySku = (brand: string, model: string, skus: string[]) =>
+              Promise.all(chunked([...new Set(skus)], 30).map((c) => getDocs(query(
+                collection(db, 'mockups'),
+                where('brand', '==', brand),
+                where('model', '==', model),
+                where('sku', 'in', c),
+              )))).then((snaps) => snaps.flatMap((sn) => sn.docs));
+            (async () => {
               const result: Record<string, string> = {};
-              const collect = (docs: any[]) => {
+              const collectRows = (docs: any[]) => {
                 docs.forEach(d => {
                   const m: any = d.data();
                   const url = mockupUrlFrom(m);
@@ -3064,22 +3307,13 @@ export function useQuery(apiRef: any, args?: any) {
                   }
                 });
               };
-
-              collect(snap.docs);
-
-              const unresolved = requestedSkus.filter(s => !result[s]);
-              if (unresolved.length > 0 &&
-                  !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
-                const heroSnap = await getDocs(query(
-                  collection(db, 'mockups'),
-                  where('brand', '==', HERO_MOCKUP_BRAND),
-                  where('model', '==', HERO_MOCKUP_MODEL)
-                ));
-                collect(heroSnap.docs);
+              collectRows(await bySku(args.brand, args.model, requestedSkus));
+              const missing = requestedSkus.filter(sku => !result[sku]);
+              if (missing.length > 0 && !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
+                collectRows(await bySku(HERO_MOCKUP_BRAND, HERO_MOCKUP_MODEL, missing));
               }
-
-              setData({ mockups: result, cursor: "", isDone: true });
-            });
+              if (active) setData({ mockups: result, cursor: "", isDone: true });
+            })().catch((err) => console.error('[firebase-hooks] mockup lookup failed:', err));
           }
         }
         else if (path === 'mockupsAdvanced.getUniqueBrands') {
@@ -3754,7 +3988,7 @@ export function useQuery(apiRef: any, args?: any) {
 
     fetchData();
 
-    return () => unsubscribe();
+    return () => { active = false; unsubscribe(); };
   }, [path, JSON.stringify(args)]);
 
   return data;
@@ -5476,8 +5710,19 @@ export function useMutation(apiRef: any) {
               limit(1)
             ));
             if (existing.empty) {
+              // Without a category the model never appears in a picker, which
+              // filters by it; _creationTime lets the storefront see it before
+              // the next build.
+              const category = String(r.category || '').trim() || undefined;
+              let gadgetTypeId: string | undefined;
+              if (category) {
+                const g = await getDocs(query(collection(db, 'gadgetTypes'), where('name', '==', category), limit(1)));
+                gadgetTypeId = g.empty ? undefined : g.docs[0].id;
+              }
               await addDoc(collection(db, 'supportedModels'), {
-                brandName, modelName, isActive: true, createdAt: Date.now(),
+                brandName, modelName, isActive: true, createdAt: Date.now(), _creationTime: Date.now(),
+                ...(category ? { category } : {}),
+                ...(gadgetTypeId ? { gadgetTypeId } : {}),
               });
             } else {
               await updateDoc(existing.docs[0].ref, { isActive: true });
@@ -5875,7 +6120,9 @@ export function useMutation(apiRef: any) {
 
       // Generic add/update
       if (actionName.includes('create') || actionName.includes('add') || actionName.includes('insert')) {
-        const clean = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        const clean: Record<string, unknown> = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        // The storefront finds products added since its last build by this.
+        if (clean._creationTime === undefined) clean._creationTime = Date.now();
         const docRef = await addDoc(collection(db, targetCollection), clean);
         return docRef.id;
       }
@@ -6413,6 +6660,9 @@ export function ConvexProvider({ children }: { children: React.ReactNode, client
 }
 
 
+/** Products re-read live on a listing's first load: about two screens of cards. */
+const LIVE_FIRST_SCREENS = 48;
+
 export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumItems: number }) {
   const [allMatches, setAllMatches] = useState<any[]>([]);
   const [results, setResults] = useState<any[]>([]);
@@ -6434,13 +6684,18 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
     let cancelled = false;
 
     const fetchInitial = async () => {
+      readLabel = `paginated:${path}`;
       setStatus("LoadingFirstPage");
       try {
-        // Fetch all active to avoid composite index errors
-        const q = query(collection(db, collectionName), where('status', '==', 'active'));
-        const snap = await getDocs(q);
-        
-        let filtered = snap.docs.map(d => ({ _id: d.id, ...d.data() })) as any[];
+        // Products come from the build's catalogue when there is one (the
+        // whole collection was 959 reads per visit); otherwise all active
+        // documents, filtered here to avoid composite indexes.
+        const fromCatalogue = collectionName === 'products' ? await catalogueProducts() : null;
+        if (cancelled) return;
+        let filtered = (fromCatalogue
+          ? fromCatalogue.map((p) => ({ ...p }))
+          : (await getDocs(query(collection(db, collectionName), where('status', '==', 'active'))))
+              .docs.map(d => ({ _id: d.id, ...d.data() }))) as any[];
         
         // In-memory filtering for multiple constraints
         if (args && typeof args === 'object') {
@@ -6473,7 +6728,12 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
         
         // Let's attach variants if this is products
         let data = firstPage;
-        if (collectionName === 'products') {
+        if (fromCatalogue) {
+          // Live price and stock for what the first screens show; the rest of
+          // the page keeps the catalogue's values until it is scrolled to.
+          const live = await refreshProducts(firstPage.slice(0, LIVE_FIRST_SCREENS), `paginated:${path}`);
+          data = [...live, ...firstPage.slice(LIVE_FIRST_SCREENS)];
+        } else if (collectionName === 'products') {
           data = await Promise.all(data.map(async (product: any) => {
             const vq = query(collection(db, 'variants'), where('productId', '==', product._id));
             const vsnap = await getDocs(vq);
@@ -6515,7 +6775,10 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
       }
       
       let newData = nextPage;
-      if (collectionName === 'products') {
+      if (collectionName === 'products' && Array.isArray(nextPage[0]?.variants)) {
+        // Catalogue rows: re-read what is about to be shown.
+        newData = await refreshProducts(nextPage, `paginated:${path}`);
+      } else if (collectionName === 'products') {
         newData = await Promise.all(newData.map(async (product: any) => {
           const vq = query(collection(db, 'variants'), where('productId', '==', product._id));
           const vsnap = await getDocs(vq);

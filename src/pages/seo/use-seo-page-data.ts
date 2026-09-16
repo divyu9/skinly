@@ -48,7 +48,7 @@ export function useSeoPageData(page: Page | null | undefined): SeoPageData | und
 
   const needFallback = fromFile === null && !!page;
   const products = useQuery(api.products.getAllProducts, needFallback ? {} : "skip");
-  const models = useQuery(api.supportedModels.listAll, needFallback ? {} : "skip");
+  const models = useQuery(api.supportedModels.listAll, needFallback ? { isActive: true } : "skip");
   const collections = useQuery(api.collections.getAllCollections, needFallback ? {} : "skip");
 
   const computed = useMemo((): SeoPageData | undefined => {
