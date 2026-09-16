@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { MaterialMapping } from "./material-mapping.tsx";
 import { LaptopSkuFix } from "./laptop-sku-fix.tsx";
-import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, RefreshCwIcon, CalculatorIcon, WrenchIcon } from "lucide-react";
+import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, RefreshCwIcon, CalculatorIcon, WrenchIcon, SearchIcon, ArrowUpIcon, ArrowDownIcon, ArrowUpDownIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import type { Id } from "@/lib/firebase-api";
@@ -220,6 +220,37 @@ export function RollsManagement() {
     return rolls.map((roll) => roll.rNumber).sort();
   }, [rolls]);
   
+  // Roll list: search by R-number, design or notes; sort by R-number or metres.
+  const [rollSearch, setRollSearch] = useState("");
+  const [rollSort, setRollSort] = useState<{ key: "rNumber" | "meters"; dir: "asc" | "desc" }>({ key: "rNumber", dir: "asc" });
+  const visibleRolls = useMemo(() => {
+    const q = rollSearch.trim().toLowerCase();
+    const list = (rolls || []).filter((roll: any) =>
+      !q ||
+      String(roll.rNumber || "").toLowerCase().includes(q) ||
+      String(roll.designName || "").toLowerCase().includes(q) ||
+      String(roll.notes || "").toLowerCase().includes(q)
+    );
+    const sign = rollSort.dir === "asc" ? 1 : -1;
+    return [...list].sort((a: any, b: any) =>
+      rollSort.key === "meters"
+        ? sign * ((Number(a.metersAvailable) || 0) - (Number(b.metersAvailable) || 0)) ||
+          String(a.rNumber).localeCompare(String(b.rNumber), undefined, { numeric: true })
+        // Numeric, so R-9 comes before R-10.
+        : sign * String(a.rNumber || "").localeCompare(String(b.rNumber || ""), undefined, { numeric: true, sensitivity: "base" })
+    );
+  }, [rolls, rollSearch, rollSort]);
+  const toggleRollSort = (key: "rNumber" | "meters") =>
+    setRollSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  const sortIcon = (key: "rNumber" | "meters") =>
+    rollSort.key !== key ? (
+      <ArrowUpDownIcon className="size-3.5 opacity-40" />
+    ) : rollSort.dir === "asc" ? (
+      <ArrowUpIcon className="size-3.5" />
+    ) : (
+      <ArrowDownIcon className="size-3.5" />
+    );
+
   // Handler for manual sync
   const handleSync = async (syncType: "all" | "rNumber", rNumber?: string) => {
     setIsSyncing(true);
@@ -471,28 +502,50 @@ export function RollsManagement() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative min-w-0 flex-1 sm:max-w-sm">
+              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={rollSearch}
+                onChange={(e) => setRollSearch(e.target.value)}
+                placeholder="Search R-number, design or notes"
+                className="h-9 pl-9"
+              />
+            </div>
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {visibleRolls.length === rolls.length ? `${rolls.length} rolls` : `${visibleRolls.length} of ${rolls.length} rolls`}
+            </span>
+          </div>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>R-Number</TableHead>
+                  <TableHead aria-sort={rollSort.key === "rNumber" ? (rollSort.dir === "asc" ? "ascending" : "descending") : "none"}>
+                    <button type="button" className="inline-flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleRollSort("rNumber")}>
+                      R-Number {sortIcon("rNumber")}
+                    </button>
+                  </TableHead>
                   <TableHead>Design/Color</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Available</TableHead>
+                  <TableHead aria-sort={rollSort.key === "meters" ? (rollSort.dir === "asc" ? "ascending" : "descending") : "none"}>
+                    <button type="button" className="inline-flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleRollSort("meters")}>
+                      Available {sortIcon("meters")}
+                    </button>
+                  </TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rolls.length === 0 ? (
+                {visibleRolls.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No rolls in inventory yet
+                      {rolls.length === 0 ? "No rolls in inventory yet" : "No roll matches that search"}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rolls.map((roll) => (
+                  visibleRolls.map((roll: any) => (
                     <TableRow key={roll._id}>
                       <TableCell className="font-mono font-semibold">{roll.rNumber}</TableCell>
                       <TableCell>{roll.designName}</TableCell>
