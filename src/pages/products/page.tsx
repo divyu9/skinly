@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { trackSearch, trackCollectionView } from "@/lib/analytics.ts";
@@ -209,6 +209,63 @@ export default function ProductsPage() {
   }, [filters.productCategory, filters.gadgetFilter, filters.finishFilter]);
   
   // ============================================
+  // HOW MANY CARDS ARE ACTUALLY IN THE DOM
+  // ============================================
+  /*
+   * The listing built every loaded product at once: 100 cards, 14601px, about
+   * eighteen screens. Nobody reaches card ninety, but every phone pays to lay
+   * them out and hold them.
+   *
+   * So the grid renders a windowful and grows as you approach the end. This is
+   * deliberately separate from the fetching the hook already does — that
+   * decides how many products exist here, this decides how many are drawn.
+   * The existing loader only appears once drawing has caught up with fetching,
+   * so reaching the bottom asks the backend for more rather than firing the
+   * moment the page is short.
+   */
+  const RENDER_PAGE = 24;
+  const [visibleCount, setVisibleCount] = useState(RENDER_PAGE);
+  const growRef = useRef<HTMLDivElement>(null);
+
+  // A different result set starts from the top again.
+  useEffect(() => {
+    setVisibleCount(RENDER_PAGE);
+  }, [
+    filters.productCategory,
+    filters.gadgetFilter,
+    filters.finishFilter,
+    filters.sortBy,
+    filters.stockFilter,
+    filters.searchQuery,
+    filters.collectionParam,
+    urlParams.brand,
+    urlParams.model,
+  ]);
+
+  useEffect(() => {
+    const el = growRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => Math.min(c + RENDER_PAGE, products.length));
+        }
+      },
+      // Grow before the sentinel is on screen, so the next rows are already
+      // there by the time anyone scrolls to where they belong.
+      { rootMargin: "800px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [products.length]);
+
+  const visibleProducts = useMemo(
+    () => products.slice(0, visibleCount),
+    [products, visibleCount],
+  );
+  const moreToDraw = visibleCount < products.length;
+
+  // ============================================
   // RENDER CONDITIONS
   // ============================================
   /*
@@ -338,7 +395,7 @@ export default function ProductsPage() {
 
           {/* Products Grid */}
           <ProductGrid
-            products={products}
+            products={visibleProducts}
             brandFilter={urlParams.brand}
             modelFilter={urlParams.model}
             autoSortOOS={autoSortOOS}
@@ -348,8 +405,11 @@ export default function ProductsPage() {
             updateViewport={updateViewport} // Pass viewport update function
           />
           
+          {/* Draw more of what is already here before asking for more. */}
+          {moreToDraw && <div ref={growRef} aria-hidden="true" className="h-px w-full" />}
+
           {/* Pagination Controls */}
-          {!isInitialLoading && (
+          {!isInitialLoading && !moreToDraw && (
             <PaginationControls
               isCollection={!!filters.collectionParam}
               hasMore={hasMoreCollectionProducts}
