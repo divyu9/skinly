@@ -565,13 +565,26 @@ export function RollCalibration({ roll, onClose, onSaved }: {
   const [working, setWorking] = useState(false);
   const flat = useRef<ImageData | null>(null);
 
-  // A guess at the length from the marked shape, which the admin should check.
-  useEffect(() => {
-    if (points.length !== 4 || length) return;
+  // What the marked shape says the stretch is, roughly: the photo is shot
+  // straight down, so the rectangle's sides are close to their real ratio.
+  const guess = useMemo(() => {
+    if (points.length !== 4) return 0;
     const across = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
     const down = Math.hypot(points[3].x - points[0].x, points[3].y - points[0].y);
-    if (across > 0) setLength(((down / across) * Number(width || ROLL_WIDTH_CM)).toFixed(1));
-  }, [points]);
+    return across > 0 ? (down / across) * Number(width || ROLL_WIDTH_CM) : 0;
+  }, [points, width]);
+
+  useEffect(() => {
+    if (!guess || length) return;
+    setLength(guess.toFixed(1));
+  }, [guess]);
+
+  // A length far from the shape stretches the pattern, and every mockup made
+  // from it is then the wrong size — worth saying before it is saved.
+  const off = guess && Number(length) > 0 ? Number(length) / guess : 1;
+  const lengthWarning = off > 1.25 || off < 0.8
+    ? `The marked rectangle looks about ${guess.toFixed(0)} cm long, not ${length} cm. Either type the length of the rectangle you marked, or mark a longer stretch of the roll.`
+    : "";
 
   const run = async () => {
     setWorking(true);
@@ -647,14 +660,34 @@ export function RollCalibration({ roll, onClose, onSaved }: {
               The length is estimated from the shape; measure the real roll for accuracy — it sets the
               pattern's vertical scale.
             </p>
+            {lengthWarning && (
+              <p className="rounded-md bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                {lengthWarning}
+              </p>
+            )}
             <Button size="sm" variant="outline" disabled={!valid || working} onClick={() => void run()}>
               <RulerIcon className="mr-1 size-3.5" /> Flatten
             </Button>
-            <div className="max-h-[360px] overflow-auto rounded-lg border bg-muted">
+            <div className="rounded-lg border bg-muted p-2">
               {working ? (
                 <div className="flex h-40 items-center justify-center"><Loader2Icon className="size-5 animate-spin" /></div>
               ) : preview ? (
-                <img src={preview} alt="Flattened roll" className="w-full" />
+                <>
+                  {/* Shown whole, at the shape the entered centimetres make, with
+                      a 5 cm bar: if the bar does not look like 5 cm of real
+                      vinyl, the marked length is wrong and every mockup made
+                      from it will be off. */}
+                  <div className="relative mx-auto w-fit">
+                    <img src={preview} alt="Flattened roll" className="max-h-[340px] w-auto rounded" />
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5">
+                      <div className="h-1.5 rounded-sm bg-white/90 ring-1 ring-black/40" style={{ width: `${Math.min(100, (5 / Number(width || ROLL_WIDTH_CM)) * 100)}%` }} />
+                      <span className="mt-0.5 block text-[10px] font-medium text-white drop-shadow">5 cm</span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-center text-[11px] text-muted-foreground">
+                    Flattened to {width} × {length} cm · {Math.round(Number(width) * FLAT_PX_PER_CM)} × {Math.round(Number(length) * FLAT_PX_PER_CM)} px
+                  </p>
+                </>
               ) : (
                 <div className="flex h-40 items-center justify-center p-4 text-center text-xs text-muted-foreground">
                   The flattened design appears here. It should look straight-on, with the pattern square.
