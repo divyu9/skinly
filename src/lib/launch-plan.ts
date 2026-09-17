@@ -73,6 +73,8 @@ export interface ExistingListing {
   status: string;
   gadget: string;
   listingKind: string;
+  /** The listing's current pictures, to tell a picture it has from one sitting elsewhere. */
+  imageUrls?: string[];
   variants: ExistingVariant[];
 }
 
@@ -227,7 +229,7 @@ export function buildLaunchPlan(input: {
   blocks: SharedBlocks;
   readyTemplates: Map<string, { _id: string }>;
   gadgetTypeIds: Record<string, string>;
-  jobs: Array<{ suffix: string; status: string; attempt?: number }>;
+  jobs: Array<{ suffix: string; status: string; attempt?: number; url?: string }>;
   options: LaunchOptions;
 }): LaunchPlan {
   const { design, existing, shots, blocks, readyTemplates, gadgetTypeIds, jobs, options } = input;
@@ -237,6 +239,8 @@ export function buildLaunchPlan(input: {
   const revises: PlanStep[] = [];
   const retires: PlanStep[] = [];
   const covered = new Set<string>();
+  /** The listing that stays for each kind, when one already exists. */
+  const keptFor = new Map<string, ExistingListing>();
   const needed = new Set<string>();
 
   const inScope = (kind: string) => {
@@ -263,6 +267,7 @@ export function buildLaunchPlan(input: {
       continue;
     }
     covered.add(kind);
+    keptFor.set(kind, l);
     const { ops, needsKinds } = variantOps(kind, design.finish, code, l.variants, true);
     needsKinds.forEach((k) => needed.add(k));
     if (ops.length || options.rewriteCopy) {
@@ -294,6 +299,7 @@ export function buildLaunchPlan(input: {
     const [primary, ...rest] = list;
     if (!covered.has(kind)) {
       covered.add(kind);
+      keptFor.set(kind, primary);
       const { ops, needsKinds } = variantOps(kind, design.finish, code, primary.variants, false);
       needsKinds.forEach((k) => needed.add(k));
       revises.push({
@@ -331,20 +337,27 @@ export function buildLaunchPlan(input: {
   // Pictures, for the kinds this launch leaves in place and in scope.
   const images: PlanStep[] = [];
   let aiImages = 0, templateImages = 0, costInr = 0;
-  const taken = new Map<string, number>();
-  for (const j of jobs) {
-    if (["review", "approved", "running", "queued"].includes(j.status)) taken.set(j.suffix, Math.max(taken.get(j.suffix) || 0, j.attempt || 1));
-    else if (!taken.has(j.suffix)) taken.set(j.suffix, 0);
-  }
   const attemptFor = (suffix: string) =>
     jobs.filter((j) => j.suffix === suffix).reduce((n, j) => Math.max(n, j.attempt || 1), 0) + 1;
-  const already = (suffix: string) => !options.regenerateImages && (taken.get(suffix) || 0) > 0;
+  // A picture counts as made when one is on its way, or when an approved one
+  // is on this kind's listing. An approved picture sitting on another listing
+  // (the old iPad shot on the generic Tablet listing) does not count, or the
+  // listing it belongs to never gets one.
+  const already = (suffix: string, kind: string) => {
+    if (options.regenerateImages) return false;
+    const onListing = new Set(keptFor.get(kind)?.imageUrls || []);
+    return jobs.some((j) =>
+      j.suffix === suffix &&
+      (["review", "running", "queued"].includes(j.status) || (j.status === "approved" && !!j.url && onListing.has(j.url)))
+    );
+  };
   const isRoll = design.source === "roll";
   if (!design.rawImageUrl) warnings.push("No raw design photo yet — pictures cannot be made");
 
   if (options.images && design.rawImageUrl) {
+    // Every listing this launch leaves live gets pictures — including old
+    // listings outside phase 1, which are converted whatever their kind.
     for (const kind of covered) {
-      if (!inScope(kind)) continue;
       const info = KIND_INFO.get(kind)!;
       const kindShots = shots.filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind);
       const template = readyTemplates.get(kind);
@@ -354,7 +367,7 @@ export function buildLaunchPlan(input: {
         const orients: CutOrientation[] = info.gadget === "phone" && isRoll ? options.orientations : ["lengthwise"];
         for (const o of orients) {
           const suffix = `tpl-${listingSlug(info.listing)}${o === "widthwise" ? "-wid" : ""}`;
-          if (already(suffix)) continue;
+          if (already(suffix, kind)) continue;
           templateImages++;
           images.push({
             id: stepId(), type: "template", label: `Template picture · ${info.listing}${o === "widthwise" ? " · across" : ""}`, status: "pending",
@@ -382,7 +395,7 @@ export function buildLaunchPlan(input: {
         const orients: Array<CutOrientation | undefined> = shot.askCutOrientation && isRoll ? options.orientations : [undefined];
         for (const o of orients) {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
-          if (already(suffix)) continue;
+          if (already(suffix, kind)) continue;
           const crop = surface ? { widthCm: surface[0], heightCm: surface[1], rotate90: o === "widthwise" } : undefined;
           const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + (crop ? TRUE_SIZE_CLAUSE : "") + expandPrompt(shot.prompt, blocks, {
             rNumber: code, designName: design.name, source: design.source, finish: design.finish,

@@ -189,7 +189,7 @@ async function catalogueProducts(): Promise<any[] | null> {
 }
 import { collectionKey } from "./collection-key";
 import { loadCatalogue, loadModelCatalogue } from "./catalogue";
-import { presetFor } from "./ai-mockup-shots";
+import { listingOf, presetFor } from "./ai-mockup-shots";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
@@ -5548,9 +5548,12 @@ export function useMutation(apiRef: any) {
 
       if (path === 'aiMockups.tidyListingImages') {
         // Puts a design's brand listings right after pictures landed on the
-        // wrong one: a studio picture whose listing differs from the product's
-        // comes off, and the listing's own pictures move to the front. Older
-        // pictures that no studio job accounts for are kept, after them.
+        // wrong one. Each studio picture belongs to one listing kind — the
+        // job's own, or for older jobs the one its shot maps to — and moves
+        // there when this design has that listing; a picture for a listing the
+        // design does not have stays where it is unless the job named it
+        // outright. The listing's own pictures lead; pictures no job accounts
+        // for (older mockups) follow, untouched.
         const design = String(args.rNumber || '').trim();
         if (!design) throw new Error('Missing design code');
         const [snap, wholeSnap, jobSnap] = await Promise.all([
@@ -5558,46 +5561,82 @@ export function useMutation(apiRef: any) {
           getDocs(query(collection(db, 'variants'), where('sku', '==', design))),
           getDocs(query(collection(db, 'designMockups'), where('rNumber', '==', design))),
         ]);
-        const listingByUrl = new Map<string, string>();
+        const kindByUrl = new Map<string, { kind: string; explicit: boolean }>();
         jobSnap.docs.forEach((d) => {
           const j: any = d.data();
-          if (j.url && j.listing) listingByUrl.set(String(j.url), String(j.listing).trim().toLowerCase());
+          if (!j.url) return;
+          if (j.listing) { kindByUrl.set(String(j.url), { kind: String(j.listing).trim().toLowerCase(), explicit: true }); return; }
+          const kind = listingOf({ suffix: String(j.suffix || '').replace(/-(len|wid)$/, ''), gadget: j.gadget }).toLowerCase();
+          if (presetFor(kind)) kindByUrl.set(String(j.url), { kind, explicit: false });
         });
         const productIds = new Set<string>();
         [...snap.docs, ...wholeSnap.docs].forEach((d) => { const pid = (d.data() as any).productId; if (pid) productIds.add(pid); });
 
-        let removed = 0, changed = 0;
-        const hidden: string[] = [];
+        const products: Array<{ id: string; data: any; kind: string; images: any[] }> = [];
         for (const pid of productIds) {
-          const pref = doc(db, 'products', pid);
-          const psnap = await getDoc(pref);
+          const psnap = await getDoc(doc(db, 'products', pid));
           if (!psnap.exists()) continue;
-          const pdata: any = psnap.data();
-          const kind = String(pdata.listingKind || '').trim().toLowerCase();
-          if (!kind) continue;
-          const images: any[] = Array.isArray(pdata.images) ? pdata.images : [];
-          const own: any[] = [], old: any[] = [];
-          for (const img of images) {
-            const url = typeof img === 'string' ? img : img?.url;
-            const from = (typeof img === 'object' && img?.listing) || listingByUrl.get(url) || '';
-            if (!from) { old.push(img); continue; }
-            if (from !== kind) { removed++; continue; }
-            own.push(typeof img === 'string' ? { url, alt: pdata.title || '', listing: kind } : { ...img, listing: kind });
+          const data: any = psnap.data();
+          if (data.status === 'archived') continue;
+          const kind = String(data.listingKind || '').trim().toLowerCase();
+          if (kind) products.push({ id: pid, data, kind, images: Array.isArray(data.images) ? data.images : [] });
+        }
+        const byKind = new Map(products.map((p) => [p.kind, p]));
+        const urlOf = (i: any) => String(typeof i === 'string' ? i : i?.url || '');
+        const asObject = (i: any, kind: string, title: string) =>
+          typeof i === 'string' ? { url: i, alt: title, listing: kind } : { ...i, listing: kind };
+
+        // own: made for this listing; mapped: older shots that map to it.
+        const plan = new Map(products.map((p) => [p.id, { own: [] as any[], mapped: [] as any[], old: [] as any[] }]));
+        let removed = 0, moved = 0;
+        for (const p of products) {
+          const slot = plan.get(p.id)!;
+          for (const img of p.images) {
+            const url = urlOf(img);
+            const tagged = typeof img === 'object' && img?.listing ? { kind: String(img.listing), explicit: true } : null;
+            const from = tagged || kindByUrl.get(url);
+            if (!from) { slot.old.push(img); continue; }
+            if (from.kind === p.kind) {
+              (from.explicit ? slot.own : slot.mapped).push(asObject(img, p.kind, p.data.title || ''));
+              continue;
+            }
+            const target = byKind.get(from.kind);
+            if (target) {
+              const tslot = plan.get(target.id)!;
+              if (target.images.some((x) => urlOf(x) === url) || tslot.mapped.some((x) => urlOf(x) === url)) {
+                removed++;
+              } else {
+                (from.explicit ? tslot.own : tslot.mapped).push(asObject(img, from.kind, target.data.title || ''));
+                moved++;
+              }
+            } else if (from.explicit) {
+              removed++;
+            } else {
+              slot.old.push(img);
+            }
           }
-          const next = [...own, ...old];
-          if (JSON.stringify(next) === JSON.stringify(images)) continue;
+        }
+
+        let changed = 0;
+        const hidden: string[] = [];
+        for (const p of products) {
+          const { own, mapped, old } = plan.get(p.id)!;
+          const next = [...own, ...mapped, ...old];
+          if (JSON.stringify(next) === JSON.stringify(p.images)) continue;
           // A listing left with no picture waits in draft; its first approved
           // picture publishes it again, as with a new listing.
-          const emptied = !next.length && pdata.status === 'active';
-          await updateDoc(pref, {
+          const emptied = !next.length && p.data.status === 'active';
+          const filled = next.length && p.data.awaitingImage;
+          await updateDoc(doc(db, 'products', p.id), {
             images: next,
             updatedAt: Date.now(),
             ...(emptied ? { status: 'draft', awaitingImage: true } : {}),
+            ...(filled ? { status: 'active', awaitingImage: deleteField(), publishedAt: Date.now() } : {}),
           });
           changed++;
-          if (emptied) hidden.push(String(pdata.listingKind || pdata.title || pid));
+          if (emptied) hidden.push(String(p.data.listingKind || p.data.title || p.id));
         }
-        return { success: true, removed, changed, hidden, products: productIds.size };
+        return { success: true, removed, moved, changed, hidden, products: products.length };
       }
 
       if (path === 'stockNotifications.deleteRequest') {

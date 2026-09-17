@@ -29,7 +29,7 @@ import {
 } from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, REFERENCE_PREAMBLE, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
-  isPhase1, listingSlug, FLAT_GADGETS,
+  isPhase1, listingSlug, FLAT_GADGETS, deviceNameOf, cleanDesignName,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
@@ -925,7 +925,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     try {
       const res: any = await tidyImages({ rNumber: roll.code });
       toast.success(res?.changed
-        ? `Photos fixed on ${res.changed} listing${res.changed > 1 ? "s" : ""} · ${res.removed} wrong photo${res.removed === 1 ? "" : "s"} removed`
+        ? `Photos fixed on ${res.changed} listing${res.changed > 1 ? "s" : ""} · ${res.moved} moved to the right listing · ${res.removed} removed`
         : "Every listing already has the right photos");
       if (res?.hidden?.length) {
         toast.message(`Back in draft until a photo is approved: ${res.hidden.join(", ")}`, { duration: 10000 });
@@ -1319,10 +1319,12 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     try {
       // A file name that says what the picture is — design, device, "skin" —
       // is a small search signal of its own; the design code keeps it unique.
-      const stem = job.listing && job.designName
+      const device = deviceNameOf(job.listing || "", job.gadget || "");
+      const design = cleanDesignName(job.designName || "");
+      const stem = job.listing && design
         ? [
-            listingSlug(job.designName),
-            listingSlug(job.listing),
+            listingSlug(design),
+            listingSlug(device),
             "skin",
             listingSlug(job.rNumber),
             listingSlug(job.suffix).slice(0, 40),
@@ -1360,8 +1362,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           gadget: job.gadget,
           listing: job.listing || "",
           url,
-          alt: job.listing && job.designName
-            ? `${job.designName} ${job.listing} skin`
+          alt: job.listing && design
+            ? `${design} ${device} skin`
             : job.designName || job.shotLabel || "",
         });
         linked = res?.linked ?? 0;

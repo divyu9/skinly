@@ -43,6 +43,7 @@ export async function loadDesignListings(code: string): Promise<ExistingListing[
       status: String(d.status || ""),
       gadget: gadgetName[d.gadgetTypeId] || String(d.gadgetCategory || ""),
       listingKind: String(d.listingKind || ""),
+      imageUrls: (Array.isArray(d.images) ? d.images : []).map((i: any) => String(typeof i === "string" ? i : i?.url || "")).filter(Boolean),
       variants,
     });
   }

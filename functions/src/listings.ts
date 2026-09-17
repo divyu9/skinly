@@ -316,6 +316,10 @@ export async function writeListingCopy(
   const tags: string[] = Array.isArray(copy.tags)
     ? copy.tags.map((t: any) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 15)
     : [];
+  // The device is what people search by; it is always a tag.
+  for (const t of [`${device} skin`.toLowerCase(), device.toLowerCase()].reverse()) {
+    if (!tags.includes(t)) tags.unshift(t);
+  }
   const picked = new Set((Array.isArray(copy.collections) ? copy.collections : []).map((n: any) => String(n).trim().toLowerCase()));
   return {
     title,
@@ -323,7 +327,7 @@ export async function writeListingCopy(
     metaTitle: metaTitle.slice(0, 70),
     metaDescription: String(copy.metaDescription || "").slice(0, 170),
     description: String(copy.description || ""),
-    tags,
+    tags: tags.slice(0, 16),
     collectionIds: themeCollections.filter((c) => picked.has(c.name.toLowerCase())).map((c) => c.id),
   };
 }

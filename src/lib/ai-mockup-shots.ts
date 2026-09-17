@@ -1652,3 +1652,23 @@ export const DEFAULT_SURFACE_CM: Record<string, [number, number]> = {
 };
 
 export { slug as listingSlug };
+
+/**
+ * The device as a shopper names it — "OnePlus" alone does not say phone.
+ * Kept in step with deviceNameFor in functions/src/listings.ts.
+ */
+const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|camera|lens|gimbal|drone|controller|console|ps5|xbox|switch|mac mini/i;
+const GADGET_NOUNS: Record<string, string> = {
+  phone: "Phone", tablet: "Tablet", laptop: "Laptop", charger: "Charger", lens: "Lens", camera: "Camera",
+  gimbals: "Gimbal", controller: "Controller", console: "Console", drone: "Drone",
+};
+export function deviceNameOf(listing: string, gadget: string): string {
+  const name = String(listing || "").trim();
+  if (!name || SAYS_DEVICE.test(name)) return name;
+  const noun = GADGET_NOUNS[String(gadget || "").toLowerCase()];
+  return noun ? `${name} ${noun}` : name;
+}
+
+/** A roll named after its whole old listing title ("… Matte Finish Skin") loses the tail. */
+export const cleanDesignName = (name: string) =>
+  String(name || "").replace(/\s+(\w+\s+)?finish(\s+skin)?\s*$/i, "").replace(/\s+skins?\s*$/i, "").trim();
