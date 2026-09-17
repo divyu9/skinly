@@ -181,6 +181,34 @@ const rowsProblem = (rows: VariantRow[]) => {
   return null;
 };
 
+/** Whether new listings go live at once or wait for their first picture. */
+function usePublishNow() {
+  const [on, setOn] = useState<boolean>(() => {
+    try { return localStorage.getItem("studio_publish_now") !== "0"; } catch { return true; }
+  });
+  const set = (v: boolean) => {
+    setOn(v);
+    try { localStorage.setItem("studio_publish_now", v ? "1" : "0"); } catch { /* storage blocked */ }
+  };
+  return [on, set] as const;
+}
+
+function PublishNowSwitch({ on, set }: { on: boolean; set: (v: boolean) => void }) {
+  return (
+    <label className="flex items-start gap-2 rounded-lg border p-2 text-sm">
+      <Switch checked={on} onCheckedChange={set} className="mt-0.5" />
+      <span>
+        <span className="font-medium">Publish now</span>
+        <span className="block text-xs text-muted-foreground">
+          {on
+            ? "The listing goes live immediately, without a picture; approved mockups are added to it later."
+            : "The listing stays a draft and goes live when its first mockup is approved."}
+        </span>
+      </span>
+    </label>
+  );
+}
+
 const rowsPayload = (rows: VariantRow[]) =>
   rows.map((r) => ({
     skuTail: r.skuTail.trim().toUpperCase(),
@@ -1711,6 +1739,7 @@ function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, 
   createListing: (args: any) => Promise<any>;
 }) {
   const [rows, setRows] = useState<VariantRow[] | null>(null);
+  const [publishNow, setPublishNow] = usePublishNow();
   const [precedent, setPrecedent] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1742,6 +1771,7 @@ function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, 
         gadget: group.gadget,
         listing: group.listing,
         ...(scopeFor(group.listing) || {}),
+        publishNow,
         finish: design.finish || "",
         source: design.source,
         imageUrl: design.rawImageUrl || "",
@@ -1751,7 +1781,9 @@ function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, 
       // A new window, so the studio keeps its queue and the admin can check the
       // generated copy side by side.
       window.open(`/backend-skinly/products/${res.productId}`, "_blank", "noopener");
-      toast.success(`Created ${res.skus.join(", ")} as a draft · it goes live when its first mockup is approved`);
+      toast.success(publishNow
+        ? `Created ${res.skus.join(", ")} · live now`
+        : `Created ${res.skus.join(", ")} as a draft · it goes live when its first mockup is approved`);
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create the listing");
@@ -1775,7 +1807,10 @@ function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, 
         ) : !rows ? (
           <LoadingLine text={`Reading how existing ${group.listing} listings are set up — this can take a few seconds…`} />
         ) : (
-          <VariantRowsEditor rows={rows} setRows={setRows} code={design.code} precedent={precedent} stockLabel={design.stockLabel} />
+          <div className="space-y-3">
+            <VariantRowsEditor rows={rows} setRows={setRows} code={design.code} precedent={precedent} stockLabel={design.stockLabel} />
+            <PublishNowSwitch on={publishNow} set={setPublishNow} />
+          </div>
         )}
 
         <DialogFooter>
@@ -1872,6 +1907,7 @@ function BulkListingsDialog({ groups, design, onClose, onCreated, loadTemplate, 
     note?: string;
   };
   const [rows, setRows] = useState<Row[]>(groups.map((group) => ({ group, variants: [], precedent: true, state: "loading" })));
+  const [publishNow, setPublishNow] = usePublishNow();
   const [running, setRunning] = useState(false);
 
   useEffect(() => {
@@ -1913,6 +1949,7 @@ function BulkListingsDialog({ groups, design, onClose, onCreated, loadTemplate, 
           gadget: row.group.gadget,
           listing: row.group.listing,
           ...(scopeFor(row.group.listing) || {}),
+          publishNow,
           finish: design.finish || "",
           source: design.source,
           imageUrl: design.rawImageUrl || "",
@@ -1945,6 +1982,7 @@ function BulkListingsDialog({ groups, design, onClose, onCreated, loadTemplate, 
         </DialogHeader>
 
         {loading > 0 && <LoadingLine text={`Reading ${loading} listing template${loading === 1 ? "" : "s"}…`} />}
+        <PublishNowSwitch on={publishNow} set={setPublishNow} />
 
         <div className="space-y-2">
           {rows.map((row, i) => (

@@ -212,6 +212,8 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
   const gadgetName = String(data?.gadget || "").trim();
   // Which listing of the gadget this is — "Drone controller", "Xbox Series S".
   const listingName = String(data?.listing || "").trim();
+  // Live straight away, before any picture exists, when the admin asks for it.
+  const publishNow = data?.publishNow === true;
   // Device brands the listing is for, so its model picker offers only those.
   const brandList = (v: unknown) =>
     Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 20) : [];
@@ -333,8 +335,8 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
     tags,
     // Draft until its first mockup is approved: the studio's linker publishes
     // it then. A listing with no picture of the device is not worth showing.
-    status: "draft",
-    awaitingImage: true,
+    status: publishNow ? "active" : "draft",
+    ...(publishNow ? { publishedAt: now } : { awaitingImage: true }),
     productCategory: "skin",
     productType: "physical",
     gadgetTypeId,
