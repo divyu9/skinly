@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { BrandBadge } from "@/components/products/BrandBadge.tsx";
 import { productFitsDevice } from "@/lib/device-fit";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card.tsx";
@@ -99,6 +100,9 @@ export const ProductCard = memo(function ProductCard({
             </div>
           )}
           
+          {/* A brand listing says which brand it is for, with the admin's logo. */}
+          {product.modelBrands?.[0] && <BrandBadge brand={product.modelBrands[0]} />}
+
           {/* Product Image */}
           <ProductThumb
             src={displayImageUrl}

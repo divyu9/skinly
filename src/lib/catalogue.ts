@@ -46,10 +46,22 @@ export interface CatalogueProduct {
   variants: CatalogueVariant[];
 }
 
+export interface BrandLogo {
+  href: string;
+  image?: string;
+  name?: string;
+}
+
 export interface Catalogue {
   builtAt: number;
   products: CatalogueProduct[];
+  /** From the homepage's Explore by Brand cards, keyed by brandKey(). */
+  brandLogos: Record<string, BrandLogo>;
 }
+
+/** "One Plus", "OnePlus" and "oneplus-skins" are one brand. */
+export const brandKey = (s: unknown) =>
+  String(s ?? "").toLowerCase().replace(/-skins$/, "").replace(/[^a-z0-9]+/g, "");
 
 let pending: Promise<Catalogue | null> | null = null;
 
@@ -65,7 +77,7 @@ export function loadCatalogue(): Promise<Catalogue | null> {
       for (const p of body.products) {
         p.tags = Array.isArray(p.tags) ? p.tags.map((t: number | string) => (typeof t === "number" ? tagList[t] : t)).filter(Boolean) : [];
       }
-      return { builtAt: body.builtAt, products: body.products } as Catalogue;
+      return { builtAt: body.builtAt, products: body.products, brandLogos: body.brandLogos || {} } as Catalogue;
     })
     .catch(() => null);
   return pending;

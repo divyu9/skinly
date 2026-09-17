@@ -584,7 +584,32 @@ async function writeHtaccess(strict, retired = []) {
  * /data/catalogue.json: every active product with the fields the listing, tag
  * rows, related rows and search use, and its variants. See src/lib/catalogue.ts.
  */
-async function writeCatalogue(active, variantsByProduct) {
+/** "One Plus", "OnePlus", "oneplus-skins" all key to "oneplus". */
+const brandKey = (s) => String(s || "").toLowerCase().replace(/-skins$/, "").replace(/[^a-z0-9]+/g, "");
+
+/**
+ * The brand logos an admin has put in the homepage's "Explore by Brand"
+ * section, keyed by brand, with where each links. Product cards use them as
+ * the badge on brand listings, so a logo changed there changes everywhere.
+ */
+function brandLogos(sections, cards) {
+  const ids = new Set(sections.filter((s) => /brand/i.test(String(s.sectionType || s.type || ""))).map((s) => s._id));
+  const out = {};
+  for (const c of cards) {
+    if (!ids.has(c.sectionId) || c.isActive === false) continue;
+    const link = String(c.linkUrl || c.link || "");
+    const fromPath = /\/([a-z0-9-]+)-skins\/?$/i.exec(link)?.[1];
+    const fromQuery = /[?&]brand=([^&]+)/i.exec(link)?.[1];
+    const key = brandKey(c.title || fromPath || (fromQuery && decodeURIComponent(fromQuery)) || "");
+    if (!key) continue;
+    const href = link.replace(/^https?:\/\/(www\.)?goskinly\.com/i, "") || `/${key}-skins`;
+    const image = String(c.imageUrl || "");
+    out[key] = { href, ...(image && liveImage(image) ? { image } : {}), ...(c.title ? { name: c.title } : {}) };
+  }
+  return out;
+}
+
+async function writeCatalogue(active, variantsByProduct, logos = {}) {
   const tagsOf = (t) =>
     (Array.isArray(t) ? t : typeof t === "string" ? t.split(",") : []).map((x) => String(x).trim()).filter(Boolean);
   const products = active.map((p) => ({
@@ -627,7 +652,7 @@ async function writeCatalogue(active, variantsByProduct) {
     });
   }
   await fs.mkdir(path.join(DIST, "data"), { recursive: true });
-  const body = JSON.stringify({ builtAt: Date.now(), tagList, products });
+  const body = JSON.stringify({ builtAt: Date.now(), tagList, products, brandLogos: logos });
   await fs.writeFile(path.join(DIST, "data", "catalogue.json"), body);
   return body.length;
 }
@@ -824,7 +849,11 @@ async function main() {
       readCollection(project, "collections"),
       readCollection(project, "collectionProducts"),
     ]);
-    data = { products, variants, seoPages, categories, shipping, models, collections, memberships };
+    const [sections, sectionCards] = await Promise.all([
+      readCollection(project, "homepageSections").catch(() => []),
+      readCollection(project, "homepageSectionCards").catch(() => []),
+    ]);
+    data = { products, variants, seoPages, categories, shipping, models, collections, memberships, sections, sectionCards };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
   }
@@ -863,7 +892,7 @@ async function main() {
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
 
-  const catalogueBytes = await writeCatalogue(active, variantsByProduct);
+  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []));
   log(`catalogue: ${active.length} products, ${Math.round(catalogueBytes / 1024)} KB`);
   const modelFile = await writeModels(data.models);
   log(`models: ${modelFile.count} active, ${Math.round(modelFile.bytes / 1024)} KB`);
