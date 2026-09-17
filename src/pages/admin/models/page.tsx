@@ -35,6 +35,7 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { Combobox } from "@/components/ui/combobox.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { toast } from "sonner";
+import { BulkAddModels } from "./bulk-add-models.tsx";
 import {
   PlusIcon,
   PencilIcon,
@@ -90,6 +91,7 @@ export default function AdminModelsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [bulkAdding, setBulkAdding] = useState(false);
   const [editingModel, setEditingModel] = useState<{ id: Id<"supportedModels">; data: ModelFormData } | null>(null);
   const [formData, setFormData] = useState<ModelFormData>({
     brandName: "",
@@ -507,6 +509,13 @@ export default function AdminModelsPage() {
                   <PlusIcon className="size-4 mr-2" />
                   Add Model
                 </Button>
+                <Button variant="outline" disabled={!models || !gadgetTypes} onClick={() => setBulkAdding(true)}>
+                  <PlusIcon className="size-4 mr-2" />
+                  Bulk add
+                </Button>
+                {bulkAdding && models && gadgetTypes && (
+                  <BulkAddModels models={models} gadgetTypes={gadgetTypes} onClose={() => setBulkAdding(false)} />
+                )}
                 <Button
                   variant="outline"
                   onClick={async () => {
