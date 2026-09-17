@@ -1236,6 +1236,15 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     });
   }, [listingGroups, linkTargets, targetsForGroup, phaseOnly]);
 
+  // Listings on this design made before the studio, which carry no kind.
+  // Launch converts these into their brand listing; creating the missing ones
+  // by hand would leave a second listing beside each of them.
+  const legacyListings = useMemo(() => {
+    if (!linkTargets) return 0;
+    const ids = new Set(linkTargets.filter((t) => !String(t.listingKind || "").trim()).map((t) => t.productId));
+    return ids.size;
+  }, [linkTargets]);
+
   /** Listings whose picture a template can make for this design right now. */
   const templatedGroups = useMemo(() =>
     listingGroups.filter((g) =>
@@ -1615,6 +1624,11 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   <FilePlus2Icon className="mr-1 size-3" />
                   Create {missingListings.length} missing listing{missingListings.length === 1 ? "" : "s"}
                 </Button>
+              )}
+              {missingListings.length > 0 && legacyListings > 0 && (
+                <span className="text-[11px] text-amber-700 dark:text-amber-400">
+                  {legacyListings} old listing{legacyListings === 1 ? "" : "s"} here — Launch converts {legacyListings === 1 ? "it" : "them"} instead of adding duplicates
+                </span>
               )}
               <Button size="sm" className="h-7 bg-violet-600 text-xs hover:bg-violet-700" onClick={() => setLaunching(true)}>
                 <SparklesIcon className="mr-1 size-3" />
