@@ -153,20 +153,32 @@ const r2Client = () => {
     };
 };
 exports.copyR2Object = (0, https_1.onCall)(async (data, context) => {
+    var _a;
     const { uid } = await (0, auth_1.requireAdmin)(context);
     await (0, rate_limit_1.enforceDailyRateLimit)({ key: `copyR2Object_${uid}`, limit: Number(process.env.R2_COPY_DAILY_LIMIT || 2000) });
     const { fromKey, toKey, contentType } = data || {};
     validateKey(fromKey);
     validateKey(toKey);
     const { s3, config } = r2Client();
-    await s3.send(new client_s3_1.CopyObjectCommand({
-        Bucket: config.bucketName,
-        // CopySource is a path, so the source key needs encoding but the slashes do not.
-        CopySource: `${config.bucketName}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
-        Key: toKey,
-        ContentType: typeof contentType === "string" ? contentType : undefined,
-        MetadataDirective: contentType ? "REPLACE" : "COPY",
-    }));
+    try {
+        await s3.send(new client_s3_1.CopyObjectCommand({
+            Bucket: config.bucketName,
+            // CopySource is a path, so the source key needs encoding but the slashes do not.
+            CopySource: `${config.bucketName}/${fromKey.split("/").map(encodeURIComponent).join("/")}`,
+            Key: toKey,
+            ContentType: typeof contentType === "string" ? contentType : undefined,
+            MetadataDirective: contentType ? "REPLACE" : "COPY",
+        }));
+    }
+    catch (err) {
+        // Unhandled, any S3 error reached the studio as a bare "internal".
+        const code = (err === null || err === void 0 ? void 0 : err.name) || (err === null || err === void 0 ? void 0 : err.Code) || "";
+        console.error("copyR2Object failed", { fromKey, toKey, code, message: err === null || err === void 0 ? void 0 : err.message });
+        if (code === "NoSuchKey" || ((_a = err === null || err === void 0 ? void 0 : err.$metadata) === null || _a === void 0 ? void 0 : _a.httpStatusCode) === 404) {
+            throw new https_1.HttpsError("not-found", `The staged image ${fromKey} is no longer there — generate this shot again`);
+        }
+        throw new https_1.HttpsError("unavailable", `Could not copy the image (${code || (err === null || err === void 0 ? void 0 : err.message) || "storage error"}) — try again`);
+    }
     return { success: true, key: toKey, url: `${config.publicUrl.replace(/\/$/, "")}/${toKey}` };
 });
 exports.getR2Object = (0, https_1.onCall)(async (data, context) => {

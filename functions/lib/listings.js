@@ -55,22 +55,33 @@ const resolveOpenAIKey = async () => {
         return process.env.OPENAI_API_KEY;
     throw new https_1.HttpsError("failed-precondition", "OPENAI_API_KEY is not set in the functions environment.");
 };
-/** The variant shape most products of this gadget already use. */
-async function templateForGadget(db, gadgetTypeId) {
-    var _a, _b, _c, _d, _e;
-    const [productSnap, variantSnap] = await Promise.all([
-        db.collection("products").where("gadgetTypeId", "==", gadgetTypeId).get(),
-        db.collection("variants").get(),
-    ]);
-    const ids = new Set(productSnap.docs.map((d) => d.id));
+/**
+ * The variant shape most products of this listing kind already use.
+ *
+ * One gadget can hold several kinds of listing — PS5, Series X and Series S
+ * are all consoles — so the caller names the SKU view codes its pictures are
+ * for, and only shapes made entirely of those codes count. With no such shape
+ * there is no precedent, and `precedent: false` tells the studio to let the
+ * admin write the variants rather than copy a different product's.
+ */
+async function templateForGadget(db, gadgetTypeId, prefer = {}) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const productSnap = await db.collection("products").where("gadgetTypeId", "==", gadgetTypeId).get();
+    // Only this gadget's variants: reading all ~1,800 to use a hundred was most
+    // of the seven seconds the studio waited on this.
+    const ids = productSnap.docs.map((d) => d.id);
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 30)
+        chunks.push(ids.slice(i, i + 30));
+    const variantSnaps = await Promise.all(chunks.map((c) => db.collection("variants").where("productId", "in", c).get()));
     const byProduct = new Map();
-    for (const d of variantSnap.docs) {
-        const v = d.data();
-        if (!ids.has(v.productId))
-            continue;
-        if (!byProduct.has(v.productId))
-            byProduct.set(v.productId, []);
-        byProduct.get(v.productId).push(v);
+    for (const snap of variantSnaps) {
+        for (const d of snap.docs) {
+            const v = d.data();
+            if (!byProduct.has(v.productId))
+                byProduct.set(v.productId, []);
+            byProduct.get(v.productId).push(v);
+        }
     }
     // A product's shape is its set of SKU tails. The tail is what is left after
     // the design code, which is every leading segment but the last — except for
@@ -99,16 +110,24 @@ async function templateForGadget(db, gadgetTypeId) {
         else
             shapes.set(key, { count: 1, variants: entries });
     }
-    const best = [...shapes.values()].sort((a, b) => b.count - a.count)[0];
+    const codes = new Set((prefer.codes || []).map((c) => String(c).trim().toUpperCase()).filter(Boolean));
+    const ranked = [...shapes.values()].sort((a, b) => b.count - a.count);
+    const fits = (v) => v.every((e) => e.skuTail && codes.has(e.skuTail));
+    const best = codes.size ? ranked.find((sh) => fits(sh.variants)) : ranked[0];
+    const precedent = !!best;
+    const firstCode = [...codes][0] || "";
     const sample = (_a = productSnap.docs.find((d) => d.data().length > 0)) === null || _a === void 0 ? void 0 : _a.data();
     return {
-        variants: (best === null || best === void 0 ? void 0 : best.variants) || [{ skuTail: "", title: "Default Title", price: 299, materialMultiplier: 1 }],
+        precedent,
+        variants: (best === null || best === void 0 ? void 0 : best.variants) || [
+            { skuTail: firstCode, title: "Default Title", price: ((_c = (_b = ranked[0]) === null || _b === void 0 ? void 0 : _b.variants[0]) === null || _c === void 0 ? void 0 : _c.price) || 299, materialMultiplier: 1 },
+        ],
         finishTypeId: sample === null || sample === void 0 ? void 0 : sample.finishTypeId,
         dims: {
-            length: (_b = sample === null || sample === void 0 ? void 0 : sample.length) !== null && _b !== void 0 ? _b : 10,
-            breadth: (_c = sample === null || sample === void 0 ? void 0 : sample.breadth) !== null && _c !== void 0 ? _c : 10,
-            height: (_d = sample === null || sample === void 0 ? void 0 : sample.height) !== null && _d !== void 0 ? _d : 2,
-            weight: (_e = sample === null || sample === void 0 ? void 0 : sample.weight) !== null && _e !== void 0 ? _e : 100,
+            length: (_d = sample === null || sample === void 0 ? void 0 : sample.length) !== null && _d !== void 0 ? _d : 10,
+            breadth: (_e = sample === null || sample === void 0 ? void 0 : sample.breadth) !== null && _e !== void 0 ? _e : 10,
+            height: (_f = sample === null || sample === void 0 ? void 0 : sample.height) !== null && _f !== void 0 ? _f : 2,
+            weight: (_g = sample === null || sample === void 0 ? void 0 : sample.weight) !== null && _g !== void 0 ? _g : 100,
         },
     };
 }
@@ -152,7 +171,9 @@ exports.getListingTemplate = (0, https_1.onCall)(async (data, context) => {
     await (0, auth_1.requireAdmin)(context);
     const db = admin.firestore();
     const g = await resolveGadget(db, String((data === null || data === void 0 ? void 0 : data.gadgetTypeId) || ""), String((data === null || data === void 0 ? void 0 : data.gadget) || ""));
-    const tpl = await templateForGadget(db, g.id);
+    const tpl = await templateForGadget(db, g.id, {
+        codes: Array.isArray(data === null || data === void 0 ? void 0 : data.skuCodes) ? data.skuCodes : [],
+    });
     return Object.assign(Object.assign({ success: true }, tpl), { gadgetTypeId: g.id, gadgetName: g.displayName, variants: applyFinishRules(tpl.variants, g.name, String((data === null || data === void 0 ? void 0 : data.finish) || "")) });
 });
 const SYSTEM = `You write product listings for Skinly, an Indian D2C brand selling precision-cut vinyl
@@ -183,6 +204,8 @@ exports.createListingForDesign = (0, https_1.onCall)(async (data, context) => {
     const designName = String((data === null || data === void 0 ? void 0 : data.designName) || "").trim();
     const gadgetIn = String((data === null || data === void 0 ? void 0 : data.gadgetTypeId) || "");
     const gadgetName = String((data === null || data === void 0 ? void 0 : data.gadget) || "").trim();
+    // Which listing of the gadget this is — "Drone controller", "Xbox Series S".
+    const listingName = String((data === null || data === void 0 ? void 0 : data.listing) || "").trim();
     const finish = String((data === null || data === void 0 ? void 0 : data.finish) || "").trim();
     const source = (data === null || data === void 0 ? void 0 : data.source) === "cutout" ? "cutout" : "roll";
     const imageUrl = String((data === null || data === void 0 ? void 0 : data.imageUrl) || "").trim();
@@ -245,6 +268,9 @@ exports.createListingForDesign = (0, https_1.onCall)(async (data, context) => {
                     content: `Design name: ${designName || designCode}\n` +
                         `Design code: ${designCode}\n` +
                         `Gadget: ${gadgetLabel}\n` +
+                        (listingName && listingName.toLowerCase() !== gadgetLabel.toLowerCase()
+                            ? `Product: a skin for the ${listingName} (name this device in the title)\n`
+                            : "") +
                         `Finish: ${finishLabel}\n` +
                         `Material: ${source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
                         `Variants offered: ${variants.map((v) => v.title).join(", ")}`,
@@ -281,8 +307,8 @@ exports.createListingForDesign = (0, https_1.onCall)(async (data, context) => {
         : [];
     const now = Date.now();
     const productRef = db.collection("products").doc();
-    await productRef.set(Object.assign(Object.assign(Object.assign({ _creationTime: now, title,
-        slug, description: String(copy.description || ""), metaTitle: String(copy.metaTitle || `${title} | Skinly`).slice(0, 70), metaDescription: String(copy.metaDescription || "").slice(0, 170), tags, status: "active", productCategory: "skin", productType: "physical", gadgetTypeId, gadgetCategory: gadgetType.name }, (finishTypeId ? { finishTypeId } : {})), (finishMatch ? { finishType: finishMatch.data().name } : {})), { hasMultipleVariants: variants.length > 1, images: imageUrl ? [{ url: imageUrl, alt: designCode }] : [], length: tpl.dims.length, breadth: tpl.dims.breadth, height: tpl.dims.height, weight: tpl.dims.weight, createdFromDesign: designCode, createdAt: now }));
+    await productRef.set(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ _creationTime: now, title,
+        slug, description: String(copy.description || ""), metaTitle: String(copy.metaTitle || `${title} | Skinly`).slice(0, 70), metaDescription: String(copy.metaDescription || "").slice(0, 170), tags, status: "active", productCategory: "skin", productType: "physical", gadgetTypeId, gadgetCategory: gadgetType.name }, (finishTypeId ? { finishTypeId } : {})), (finishMatch ? { finishType: finishMatch.data().name } : {})), { hasMultipleVariants: variants.length > 1, images: imageUrl ? [{ url: imageUrl, alt: designCode }] : [], length: tpl.dims.length, breadth: tpl.dims.breadth, height: tpl.dims.height, weight: tpl.dims.weight, createdFromDesign: designCode }), (listingName ? { listingKind: listingName } : {})), { createdAt: now }));
     const batch = db.batch();
     variants.forEach((v, i) => {
         const ref = db.collection("variants").doc();

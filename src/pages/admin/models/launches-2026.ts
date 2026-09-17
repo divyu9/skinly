@@ -1,12 +1,12 @@
 /**
- * Devices launched from January to September 2026 that were not yet in
- * supportedModels (the table stopped growing on 16 Jan 2026 while the site was
- * down). Phones and tablets from GSMArena brand listings and launch news for
- * AI+, Boltt and Mivi, China-only models removed; names in the catalogue's own
- * style (no brand prefix, except Infinix and HMD which carry one).
+ * Devices launched from February to September 2026 that were not yet in
+ * supportedModels. Phones and tablets from GSMArena brand listings and launch
+ * news for AI+, Boltt and Mivi (China-only models removed), plus Apple's 2026
+ * MacBooks; names in the catalogue's own style (no brand prefix, except
+ * Infinix and HMD which carry one).
  *
- * One line per model: "Brand, Model, category". Loaded into the bulk-add
- * dialog, where it is checked against the live table before anything is saved.
+ * One line per model: "Brand, Model, category". Loaded into the import dialog,
+ * where it is checked against the live table before anything is saved.
  */
 export const LAUNCHES_2026 = `Apple, iPhone 18 Pro, phone
 Apple, iPhone 18 Pro Max, phone

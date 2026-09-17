@@ -33,25 +33,35 @@ const toDayKey = (d) => {
     return `${y}-${m}-${day}`;
 };
 const enforceDailyRateLimit = async ({ key, limit, }) => {
+    var _a;
     const db = admin.firestore();
     const now = new Date();
     const dayKey = toDayKey(now);
     const docId = `${key}_${dayKey}`;
     const ref = db.collection("rateLimits").doc(docId);
-    await db.runTransaction(async (tx) => {
-        var _a;
-        const snap = await tx.get(ref);
-        const current = snap.exists ? Number(((_a = snap.data()) === null || _a === void 0 ? void 0 : _a.count) || 0) : 0;
-        if (current >= limit) {
-            throw new https_1.HttpsError("resource-exhausted", "Rate limit exceeded");
-        }
-        tx.set(ref, {
+    // An atomic increment rather than a read-then-write transaction. Several
+    // calls at once (approving a row of mockups quickly) contended on this one
+    // document; after five retries the transaction gave up with a plain error,
+    // which the client saw as "internal". The count may overshoot the limit by
+    // the few calls racing at the boundary, which is fine for a daily ceiling.
+    let count;
+    try {
+        await ref.set({
             key,
             dayKey,
-            count: current + 1,
+            count: admin.firestore.FieldValue.increment(1),
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, { merge: true });
-    });
+        count = Number(((_a = (await ref.get()).data()) === null || _a === void 0 ? void 0 : _a.count) || 0);
+    }
+    catch (err) {
+        // The limiter must never be the reason a legitimate call fails.
+        console.warn("rate limit check skipped", key, (err === null || err === void 0 ? void 0 : err.message) || err);
+        return;
+    }
+    if (count > limit) {
+        throw new https_1.HttpsError("resource-exhausted", "Rate limit exceeded");
+    }
 };
 exports.enforceDailyRateLimit = enforceDailyRateLimit;
 //# sourceMappingURL=rate-limit.js.map

@@ -71,7 +71,7 @@ const getPhonePeConfig = () => {
 exports.placeOrder = functions
     .runWith({ memory: "256MB", timeoutSeconds: 120, minInstances: 1 })
     .https.onCall(async (data, context) => {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     const { uid } = (0, auth_1.getCaller)(context);
     const db = admin.firestore();
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems, sessionId: reqSessionId, customerPhone, couponId, walletAmount } = data;
@@ -128,8 +128,24 @@ exports.placeOrder = functions
         if (typeof dbPrice !== "number") {
             throw new https_1.HttpsError("failed-precondition", `No such variant "${item === null || item === void 0 ? void 0 : item.variant}" for product ${item === null || item === void 0 ? void 0 : item.productId}`);
         }
+        // An unpriced variant is not for sale. New Hexa Ring carried twenty rows
+        // at price 0; the storefront hides them, but this is the line that bills,
+        // and it would have charged ₹0 for any of them.
+        if (!(dbPrice > 0)) {
+            throw new https_1.HttpsError("failed-precondition", `"${item === null || item === void 0 ? void 0 : item.variant}" is not available to order`);
+        }
         return sum + dbPrice * qty;
     }, 0);
+    // ── 3a. Shipping, the same rule the checkout page shows ──────────────────
+    // Checkout adds flatShippingFee below freeShippingThreshold and shows it in
+    // the total, but this function never added it, so PhonePe collected ₹70
+    // less than the customer was shown on every order under the threshold.
+    // Defaults match the storefront's fallback when the settings doc is absent.
+    const shipSnap = await db.collection("settings").doc("shipping").get();
+    const ship = shipSnap.exists ? shipSnap.data() : {};
+    const freeShippingThreshold = Number((_a = ship.freeShippingThreshold) !== null && _a !== void 0 ? _a : 500);
+    const flatShippingFee = Number((_b = ship.flatShippingFee) !== null && _b !== void 0 ? _b : 50);
+    const shippingFee = itemsTotal >= freeShippingThreshold ? 0 : Math.max(0, flatShippingFee);
     // ── 3b. Re-derive every discount server-side ──────────────────────────────
     let couponDiscount = 0;
     if (couponId && typeof couponId === "string") {
@@ -153,8 +169,9 @@ exports.placeOrder = functions
     let walletUsed = 0;
     if (uid && Number(walletAmount) > 0) {
         const uSnap = await db.collection("users").doc(uid).get();
-        const balance = Number(uSnap.exists ? ((_a = uSnap.data()) === null || _a === void 0 ? void 0 : _a.walletBalance) || 0 : 0);
-        walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal - couponDiscount));
+        const balance = Number(uSnap.exists ? ((_c = uSnap.data()) === null || _c === void 0 ? void 0 : _c.walletBalance) || 0 : 0);
+        // The storefront lets the wallet cover shipping too.
+        walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal + shippingFee - couponDiscount));
     }
     // COD fee and the prepaid split come from codSettings, same formula the
     // storefront shows.
@@ -173,7 +190,7 @@ exports.placeOrder = functions
                 : (base * Number(st.prepaidValue || 0)) / 100;
         }
     }
-    const calculatedTotal = Math.max(0, itemsTotal - couponDiscount - walletUsed + codFee);
+    const calculatedTotal = Math.max(0, itemsTotal + shippingFee - couponDiscount - walletUsed + codFee);
     // What PhonePe must collect right now: the whole thing for prepaid, only
     // the prepaid slice for partial COD.
     const amountPayable = paymentMethod === "cod"
@@ -194,6 +211,7 @@ exports.placeOrder = functions
         status: "pending",
         paymentStatus: "pending",
         itemsTotal,
+        shippingFee,
         couponId: couponId || null,
         couponDiscount,
         walletUsed,
@@ -258,7 +276,7 @@ exports.placeOrder = functions
             try {
                 responseData = JSON.parse(responseText);
             }
-            catch (_e) {
+            catch (_g) {
                 console.error("PhonePe non-JSON", { status: response.status, body: responseText.slice(0, 200) });
                 return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: `PhonePe HTTP ${response.status}` };
             }
@@ -268,7 +286,7 @@ exports.placeOrder = functions
                 console.error("PhonePe failed", responseData);
                 return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: errMsg };
             }
-            const paymentUrl = (_d = (_c = (_b = responseData.data) === null || _b === void 0 ? void 0 : _b.instrumentResponse) === null || _c === void 0 ? void 0 : _c.redirectInfo) === null || _d === void 0 ? void 0 : _d.url;
+            const paymentUrl = (_f = (_e = (_d = responseData.data) === null || _d === void 0 ? void 0 : _d.instrumentResponse) === null || _e === void 0 ? void 0 : _e.redirectInfo) === null || _f === void 0 ? void 0 : _f.url;
             if (!paymentUrl) {
                 return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: "PhonePe returned no payment URL" };
             }

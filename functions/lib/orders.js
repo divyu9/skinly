@@ -89,16 +89,18 @@ exports.createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 60, m
         const key = `${String(v.productId)}::${String(v.title)}`;
         priceMap.set(key, Number(v.price || 0));
     }
+    // Price from the variant document only, as placeOrder does. Falling back to
+    // `item.price` let a caller name a variant that does not exist and set its
+    // price; and a variant priced 0 is an unpriced row, not a free item.
     const lineTotals = orderItems.map((item) => {
-        const quantity = Number((item === null || item === void 0 ? void 0 : item.quantity) || 1);
-        if ((item === null || item === void 0 ? void 0 : item.productId) && (item === null || item === void 0 ? void 0 : item.variant)) {
-            const key = `${String(item.productId)}::${String(item.variant)}`;
-            const dbPrice = priceMap.get(key);
-            if (typeof dbPrice === "number") {
-                return dbPrice * quantity;
-            }
+        const quantity = Math.max(1, Math.floor(Number((item === null || item === void 0 ? void 0 : item.quantity) || 1)));
+        const dbPrice = (item === null || item === void 0 ? void 0 : item.productId) && (item === null || item === void 0 ? void 0 : item.variant)
+            ? priceMap.get(`${String(item.productId)}::${String(item.variant)}`)
+            : undefined;
+        if (typeof dbPrice !== "number" || !(dbPrice > 0)) {
+            throw new functions.https.HttpsError("failed-precondition", `"${item === null || item === void 0 ? void 0 : item.variant}" is not available to order`);
         }
-        return Number((item === null || item === void 0 ? void 0 : item.price) || 0) * quantity;
+        return dbPrice * quantity;
     });
     const calculatedTotal = lineTotals.reduce((sum, n) => sum + Number(n || 0), 0);
     // Use calculated total instead of client-provided remainingAmount
