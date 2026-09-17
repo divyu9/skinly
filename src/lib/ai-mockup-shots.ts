@@ -67,6 +67,12 @@ export interface MockupShot {
    * failing that, one listing for the whole gadget.
    */
   listing?: string;
+  /**
+   * A finished mockup whose camera angle, framing and skin coverage this shot
+   * should copy — sent to the model as a second image. Its colours and
+   * pattern are ignored.
+   */
+  referenceUrl?: string;
   prompt: string;
   order: number;
   isActive: boolean;
@@ -205,6 +211,13 @@ export function expandPrompt(
     name in table ? table[name] : whole
   );
 }
+
+/** Said first when a shot sends an angle reference alongside the design photo. */
+export const REFERENCE_PREAMBLE =
+  "Two images are supplied. The FIRST is the printed design to put on the device — it is the only source of "
+  + "the artwork. The SECOND is a composition reference only: copy its camera angle, framing, the device's "
+  + "pose and exactly how the skin covers the device, its camera area and its edges; ignore the second "
+  + "image's colours, pattern, text and watermarks entirely. ";
 
 export const PLACEHOLDERS = ["fidelity", "staging", "rNumber", "designName", "cutOrientation"];
 
@@ -404,6 +417,36 @@ const CAMERA_COVERED =
   + "openings are the only uncovered parts of the back; the printed vinyl runs right up to the edge of "
   + "every lens. ";
 
+/**
+ * The phone pose every phone shot uses — the classic skin-shop product view:
+ * the skinned back at a three-quarter turn with its side showing, and a second
+ * identical phone behind it showing the front, so the shopper sees the device
+ * whole and the skin's coverage at a glance.
+ */
+const PHONE_POSE = (device: string) =>
+  `Two identical ${device} phones standing upright side by side on a light oak desk, photographed at eye `
+  + "level. The phone in front shows its back, turned about thirty degrees so its right side frame is "
+  + "visible; the phone just behind it and slightly to the left shows its front, the black screen turned "
+  + "off, angled so its left side frame and buttons are visible. Both are sharp and fill most of the "
+  + "frame, the back phone the larger and nearer of the two. The device itself is reproduced exactly as "
+  + "manufactured — its true proportions, camera layout, corner radius and buttons — with nothing "
+  + "redesigned. ";
+
+const PHONE_COVERAGE =
+  "The vinyl skin covers the whole back edge to edge and wraps around the rounded edges onto the side "
+  + "frame of both phones, so the sides carry the same design; the buttons, ports and the screen stay "
+  + "bare. {{fidelity}} {{cutOrientation}} ";
+
+const LOGO_CUT = (logo: string) =>
+  `The ${logo} is knocked out of the skin as negative space, a cut-out following its exact outline so the `
+  + "phone's own finish shows through only that shape, with no plate or border around it. ";
+
+const CHARGER_COVERAGE =
+  "A vinyl skin covers the whole body — every flat face and the rounded edges between them — as one "
+  + "continuous wrap with the design running across the edges. {{fidelity}} Only the metal pins and the "
+  + "USB port opening stay uncovered, the vinyl cut cleanly around them. The skin is thin and perfectly "
+  + "smooth, with no bubbles and no lift. ";
+
 const REAL =
   "Real manufactured product photographed as it actually is: exact factory proportions, crisp "
   + "machined geometry, sharp defined edges and consistent wall thickness. Do not fatten, inflate, "
@@ -489,7 +532,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "{{staging}} ",
   },
   {
-    label: "20W charger — two angles",
+    label: "20W charger — pins view",
     gadget: "charger",
     suffix: "charger",
     skuCodes: ["CH"],
@@ -497,45 +540,43 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     order: 0,
     isActive: true,
     prompt:
-      "Two Apple 20W USB-C power adapters (Indian model, two round pins) on a light oak desk, the same "
-        + "product shown from two different sides: one in front turned to a three-quarter angle so its "
-        + "flat front face with the single oval USB-C port is towards the camera, and one behind it, "
-        + "smaller in frame and rotated away, showing its top face with the two round pins standing up. "
-        + "Each is a small glossy white cuboid the size of a matchbox — about 27 by 27 by 36 millimetres "
-        + "— with softly rounded corners and a fine seam running around the body. A vinyl skin covers "
-        + "the flat faces of the body. {{fidelity}} The skin is a thin die-cut vinyl sheet lying "
-        + "perfectly flat on those faces, with no bubbles, no lift and no thickness of its own. It does "
-        + "not wrap over the rounded corners or the curved edges, which stay bare glossy white plastic, "
-        + "and a clean straight cut edge is visible where the vinyl ends. The oval USB-C port and the "
-        + "two round metal pins stay completely uncovered. The two adapters sit at different distances "
-        + "with their own separate shadows so they read as two photographs of one product, not a "
-        + "copy-paste. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+      "A single Apple 20W USB-C power adapter, Indian model with two round pins, standing upright on a light "
+        + "oak desk and photographed straight on at its own height, the pins pointing straight up. It is a "
+        + "small glossy white cuboid about 27 by 27 by 36 millimetres with softly rounded vertical edges, "
+        + "reproduced exactly as manufactured. The broad front face fills the centre of the frame with the two "
+        + "chrome pins rising from its top. " + CHARGER_COVERAGE
+        + "Soft daylight, a gentle contact shadow beneath it, a softly blurred plant and mug far behind. "
+        + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
   {
-    label: "MacBook charger — two angles",
+    label: "20W charger — port view",
     gadget: "charger",
-    suffix: "charger-macbook",
+    suffix: "charger-port",
     skuCodes: ["CH"],
+    matchSingleVariant: true,
     order: 1,
     isActive: true,
     prompt:
-      "Two Apple MacBook USB-C power adapters on a light oak desk, the same product shown from two "
-        + "different sides: one in front turned to a three-quarter angle showing its large flat square "
-        + "face, and one behind it, smaller in frame and rotated away, showing the side with the "
-        + "detachable Indian-standard pin head fitted. Each is a thick glossy white square brick with "
-        + "softly rounded corners, roughly the size of a coaster. A vinyl skin covers the large flat "
-        + "square faces. {{fidelity}} The vinyl on the face is one continuous sheet with the Apple logo "
-        + "knocked out of it as negative space: a single apple-shaped hole following the exact "
-        + "silhouette of the logo, leaf and bite included, through which the bare white plastic shows. "
-        + "The pattern touches that outline directly on every side. There is absolutely no circle, ring, "
-        + "disc, square, panel, plate, badge or border of bare white around it — the only bare plastic "
-        + "on that face is the apple shape itself. The skin is a thin die-cut vinyl sheet lying "
-        + "perfectly flat, with no bubbles, no lift and no thickness of its own. It does not wrap over "
-        + "the rounded corners or the curved edges, which stay bare glossy white plastic, and a clean "
-        + "straight cut edge is visible where the vinyl ends. The USB-C port and the metal pins stay "
-        + "completely uncovered. The two adapters sit at different distances with their own separate "
-        + "shadows so they read as two photographs of one product, not a copy-paste. No people and no "
-        + "hands anywhere in the frame. " + REAL + "{{staging}} ",
+      "A single Apple 20W USB-C power adapter lying on its back on a light oak desk and photographed straight "
+        + "down at its bottom face, which fills the centre of the frame: a rounded rectangle with the single "
+        + "oval USB-C port in the middle. It is reproduced exactly as manufactured, with softly rounded edges. "
+        + CHARGER_COVERAGE
+        + "Soft daylight, a gentle shadow, the desk grain softly out of focus around it. No people and no hands "
+        + "anywhere in the frame. " + REAL + "{{staging}} ",
+  },
+  {
+    label: "MacBook charger",
+    gadget: "charger",
+    suffix: "charger-macbook",
+    skuCodes: ["CH"],
+    order: 2,
+    isActive: true,
+    prompt:
+      "A single Apple MacBook USB-C power adapter with its detachable Indian-standard pin head fitted, standing "
+        + "on a light oak desk and photographed straight on so its large square face fills the frame. It is a "
+        + "thick glossy white square brick with softly rounded corners, reproduced exactly as manufactured. "
+        + CHARGER_COVERAGE + LOGO_CUT("Apple logo in the centre of the face").replace("phone's", "adapter's")
+        + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
   {
     label: "20W charger — held",
@@ -549,11 +590,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "thumb and forefinger of one hand against a bright, softly blurred indoor background, shot "
         + "close so its real size against the fingers is obvious. It is a small glossy white cuboid the "
         + "size of a matchbox with softly rounded corners, one oval USB-C port on the front face and two "
-        + "round pins on top. A vinyl skin covers the flat front face. {{fidelity}} The skin is a thin "
-        + "die-cut vinyl sheet lying perfectly flat on that face, with no bubbles, no lift and no "
-        + "thickness of its own. It does not wrap over the rounded corners or the curved edges, which "
-        + "stay bare glossy white plastic, and a clean straight cut edge is visible where the vinyl "
-        + "ends. A single adult hand holds it, cropped at the wrist, skin tone neutral, nails plain and "
+        + "round pins on top. " + CHARGER_COVERAGE + "A single adult hand holds it, cropped at the wrist, skin tone neutral, nails plain and "
         + "short, fingers placed so they cover as little of the design as possible. The USB-C port and "
         + "the two round pins stay completely uncovered. " + REAL + "{{staging}} ",
   },
@@ -1138,18 +1175,12 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     order: 0,
     isActive: true,
     prompt:
-      "An iPhone 17 Pro Max lying face down on a light oak desk, photographed from directly overhead "
-        + "with the camera square to the desk so the back panel is perfectly straight in the frame, its "
-        + "edges parallel to the picture edges, with no tilt and no perspective skew. The phone fills "
-        + "most of the frame. It is a large flat slab with a flat polished titanium band around its "
-        + "edge, tightly rounded corners, and across the top of the back a wide raised camera plateau "
-        + "spanning the full width of the phone, carrying three large lenses in a triangle on its left "
-        + "with the flash and sensor to their right. A vinyl skin covers the back panel edge to edge. "
-        + "{{fidelity}} {{cutOrientation}} The skin follows the rounded corners and stops cleanly at the "
-        + "titanium side band, which stays bare polished metal. " + CAMERA_COVERED
-        + "No Apple logo is visible — it sits under the skin. At the very edges of the "
-        + "frame, softly out of focus, a pair of earphones and a ceramic mug suggest a desk without "
-        + "drawing the eye. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+      PHONE_POSE("iPhone 17 Pro Max")
+        + "Each is a large slab with a polished side band, tightly rounded corners and, across the top of the "
+        + "back, a wide raised camera plateau spanning the full width with three large lenses in a triangle "
+        + "and the flash beside them. "
+        + PHONE_COVERAGE + CAMERA_COVERED + LOGO_CUT("Apple logo in the centre of the back")
+        + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
   {
     label: "Samsung S26 Ultra — back",
@@ -1164,20 +1195,15 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
     order: 1,
     isActive: true,
     prompt:
-      "A Samsung Galaxy S26 Ultra lying face down on a light oak desk, photographed from directly "
-        + "overhead with the camera square to the desk so the back panel is perfectly straight in the "
-        + "frame, its edges parallel to the picture edges, with no tilt and no perspective skew. The "
-        + "phone fills most of the frame. It is a large flat slab with an almost square profile, gently "
-        + "rounded corners, a flat metal side rail, and down the upper left of the back a vertical "
-        + "column of individually raised camera lenses — no camera bump plate, each lens ring standing "
-        + "proud of the back panel on its own. A vinyl skin covers the back panel edge to edge. "
-        + "{{fidelity}} {{cutOrientation}} The skin follows the rounded corners and stops cleanly at the "
-        + "metal side rail, which stays bare. It is die-cut with a separate circular hole around each "
-        + "camera lens and around the flash, every cut following the exact outline of its ring, so the "
-        + "lenses and flash stay completely uncovered while the vinyl lies flat on the panel between and "
-        + "around them. No Samsung logo is visible — it sits under the skin. At the very edges of the "
-        + "frame, softly out of focus, an S Pen and a ceramic mug suggest a desk without drawing the "
-        + "eye. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+      PHONE_POSE("Samsung Galaxy S26 Ultra")
+        + "Each is a large flat slab with an almost square profile, gently rounded corners, a flat metal side "
+        + "rail, and down the upper left of the back a vertical column of individually raised camera lenses "
+        + "with the flash beside them — no camera bump plate, each lens ring standing proud on its own. "
+        + PHONE_COVERAGE
+        + "The skin is die-cut with a round hole exactly the size of each lens's glass and small holes for the "
+        + "flash and sensor, the printed vinyl running right up to every lens; nothing else on the back is "
+        + "uncovered. " + LOGO_CUT("SAMSUNG wordmark low on the back")
+        + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
   {
     label: "Galaxy Tab — back",
@@ -1303,16 +1329,16 @@ interface BrandListing {
 const PHONE_BRANDS: BrandListing[] = [
   { listing: "Apple iPhone", code: "IPH", brands: ["Apple"] },
   { listing: "Samsung Galaxy", code: "SAM", brands: ["Samsung"] },
-  { listing: "OnePlus", code: "OPL", brands: ["One Plus", "OnePlus"], device: "A OnePlus 13 smartphone", camera: "the large circular camera module in the upper left, carrying three lenses and the flash" },
-  { listing: "Google Pixel", code: "PXL", brands: ["Google"], device: "A Google Pixel 9 Pro smartphone", camera: "the raised pill-shaped camera bar running across the upper back, carrying three lenses and the flash" },
-  { listing: "Nothing Phone", code: "NTH", brands: ["Nothing", "CMF"], device: "A Nothing Phone (3a) smartphone", camera: "the horizontal pill-shaped camera housing near the top centre, carrying its lenses and flash" },
+  { listing: "OnePlus", code: "OPL", brands: ["One Plus", "OnePlus"], logo: "OnePlus logo in the centre of the back", device: "A OnePlus 13 smartphone", camera: "the large circular camera module in the upper left, carrying three lenses and the flash" },
+  { listing: "Google Pixel", code: "PXL", brands: ["Google"], logo: "Google G logo in the centre of the back", device: "A Google Pixel 9 Pro smartphone", camera: "the raised pill-shaped camera bar running across the upper back, carrying three lenses and the flash" },
+  { listing: "Nothing Phone", code: "NTH", brands: ["Nothing", "CMF"], device: "A Nothing Phone (3a) smartphone", camera: "the horizontal pill-shaped camera housing near the top centre, carrying its lenses and flash; its transparent back is fully hidden under the opaque skin" },
   { listing: "Xiaomi Redmi", code: "XRM", brands: ["Xiaomi", "Redmi"], device: "A Redmi Note 14 Pro smartphone", camera: "the square camera island in the upper left, carrying three lenses and the flash" },
   { listing: "Poco", code: "PCO", brands: ["Poco"], device: "A Poco X7 Pro smartphone", camera: "the camera island in the upper left, carrying its lenses and the flash" },
   { listing: "Realme", code: "RLM", brands: ["Realme"], device: "A realme 14 Pro smartphone", camera: "the circular camera module near the top centre, carrying its lenses and the flash" },
   { listing: "Vivo", code: "VIV", brands: ["Vivo"], device: "A vivo V50 smartphone", camera: "the vertical pill-shaped camera module in the upper left, carrying two lenses and the ring flash" },
   { listing: "iQOO", code: "IQO", brands: ["iQOO"], device: "An iQOO 13 smartphone", camera: "the square camera module in the upper left, carrying three lenses and the flash" },
   { listing: "Oppo", code: "OPO", brands: ["Oppo"], device: "An OPPO Reno 13 smartphone", camera: "the camera island in the upper left, carrying its lenses and the flash" },
-  { listing: "Motorola", code: "MOT", brands: ["Motorola"], device: "A Motorola Edge 50 Pro smartphone", camera: "the raised camera island in the upper left, carrying three lenses and the flash" },
+  { listing: "Motorola", code: "MOT", brands: ["Motorola"], logo: "Motorola batwing logo in the centre of the back", device: "A Motorola Edge 50 Pro smartphone", camera: "the raised camera island in the upper left, carrying three lenses and the flash" },
   { listing: "Infinix", code: "INF", brands: ["Infinix"], device: "An Infinix Note 40 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
   { listing: "Tecno", code: "TEC", brands: ["Tecno"], device: "A Tecno Camon 30 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
   { listing: "Lava", code: "LAV", brands: ["Lava"], device: "A Lava Agni 3 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
@@ -1417,15 +1443,11 @@ const phoneShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
   order: 5,
   isActive: true,
   prompt:
-    `${b.device} lying face down on a light oak desk, photographed from directly overhead with the camera `
-    + "square to the desk so the back panel is perfectly straight in the frame, its edges parallel to the "
-    + "picture edges, with no tilt and no perspective skew. The phone fills most of the frame. A vinyl skin "
-    + "covers the back panel edge to edge. {{fidelity}} {{cutOrientation}} The skin follows the rounded "
-    + "corners and stops cleanly at the side frame, which stays bare. "
-    + `The phone has ${b.camera}. ` + CAMERA_COVERED
-    + "No brand logo is visible — it sits under the skin. At the very edges of the frame, softly out of focus, a pair of "
-    + "earphones and a ceramic mug suggest a desk without drawing the eye. No people and no hands anywhere "
-    + "in the frame. " + REAL + "{{staging}} ",
+    PHONE_POSE(b.device!.replace(/^an? /i, "").replace(/ smartphone$/i, ""))
+    + `Each has ${b.camera}. `
+    + PHONE_COVERAGE + CAMERA_COVERED
+    + (b.logo ? LOGO_CUT(b.logo) : "Any brand logo on the back sits under the skin. ")
+    + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
 });
 
 const laptopShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
@@ -1472,23 +1494,39 @@ const laptopShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
   },
 ];
 
-const chargerShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
-  label: `${b.listing} — two angles`,
-  gadget: "charger",
-  suffix: `charger-${slug(b.listing)}`,
-  listing: b.listing,
-  skuCodes: [b.code],
-  matchSingleVariant: true,
-  order: 5,
-  isActive: true,
-  prompt:
-    `Two of the same power adapter on a light oak desk: ${b.device}. One sits in front at a three-quarter `
-    + "angle with its USB port towards the camera, the other behind it, smaller in frame and turned to show "
-    + "the pins. A vinyl skin covers the flat faces of each body. {{fidelity}} The skin is a thin die-cut "
-    + "sheet lying perfectly flat, with a clean cut edge where it stops before the rounded corners, which "
-    + "stay bare plastic. The USB port and the metal pins stay completely uncovered. No people and no hands "
-    + "anywhere in the frame. " + REAL + "{{staging}} ",
-});
+const chargerShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
+  {
+    label: `${b.listing} — pins view`,
+    gadget: "charger",
+    suffix: `charger-${slug(b.listing)}`,
+    listing: b.listing,
+    skuCodes: [b.code],
+    matchSingleVariant: true,
+    order: 5,
+    isActive: true,
+    prompt:
+      `${b.device}, standing upright on a light oak desk and photographed straight on at its own height with `
+      + "the pins pointing up; its broad front face fills the centre of the frame. It is reproduced exactly as "
+      + "manufactured. " + CHARGER_COVERAGE
+      + "Soft daylight and a gentle contact shadow. No people and no hands anywhere in the frame. "
+      + REAL + "{{staging}} ",
+  },
+  {
+    label: `${b.listing} — port view`,
+    gadget: "charger",
+    suffix: `charger-${slug(b.listing)}-port`,
+    listing: b.listing,
+    skuCodes: [b.code],
+    matchSingleVariant: true,
+    order: 6,
+    isActive: true,
+    prompt:
+      `${b.device}, lying on its back on a light oak desk and photographed straight down at the face with its `
+      + "USB port, which fills the centre of the frame. It is reproduced exactly as manufactured. "
+      + CHARGER_COVERAGE
+      + "Soft daylight and a gentle shadow. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+  },
+];
 
 const cameraShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
   {
@@ -1564,7 +1602,7 @@ const gimbalShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
 STARTER_SHOTS.push(
   ...PHONE_BRANDS.filter((b) => b.device).map(phoneShot),
   ...LAPTOP_BRANDS.filter((b) => b.device).flatMap(laptopShots),
-  ...CHARGER_BRANDS.filter((b) => b.device).map(chargerShot),
+  ...CHARGER_BRANDS.filter((b) => b.device).flatMap(chargerShots),
   ...CAMERA_BRANDS.filter((b) => b.device).flatMap(cameraShots),
   ...LENS_BRANDS.filter((b) => b.device).map(lensShot),
   ...GIMBAL_BRANDS.filter((b) => b.device).map(gimbalShot),

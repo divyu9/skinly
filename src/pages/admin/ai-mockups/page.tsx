@@ -28,7 +28,7 @@ import {
   saveLocally, chooseBackupFolder, getBackupFolder, supportsDirectoryPicker,
 } from "@/lib/local-backup.ts";
 import {
-  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
+  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, REFERENCE_PREAMBLE, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
   isPhase1, listingSlug, FLAT_GADGETS,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
@@ -381,7 +381,7 @@ function ShotLibrary() {
             <RefreshCwIcon className="size-4 text-sky-600" />
             <p className="min-w-0 flex-1 text-sm">
               {staleStarters.length} built-in shot{staleStarters.length === 1 ? " has" : "s have"} a newer prompt
-              {" "}(phone shots now cover the camera module).
+              {" "}(phones: two-phone view with the camera module skinned; chargers: pins and port views, fully wrapped).
               <button className="ml-2 text-xs text-sky-700 underline" onClick={() => setShowStale(!showStale)}>
                 {showStale ? "hide" : "which?"}
               </button>
@@ -393,7 +393,7 @@ function ShotLibrary() {
                 if (!confirm(`Replace the prompt of ${staleStarters.length} shot(s) with the built-in one? Any edits you made to those prompts are lost.`)) return;
                 setSeeding(true);
                 try {
-                  for (const { s, st } of staleStarters) await updateShot({ promptId: s._id, prompt: st.prompt });
+                  for (const { s, st } of staleStarters) await updateShot({ promptId: s._id, prompt: st.prompt, label: st.label });
                   toast.success(`${staleStarters.length} prompt${staleStarters.length === 1 ? "" : "s"} updated`);
                 } catch (e) {
                   toast.error(e instanceof Error ? e.message : "Could not update");
@@ -567,7 +567,37 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
 }) {
   const [draft, setDraft] = useState<Partial<MockupShot> | null>(null);
   const [saving, setSaving] = useState(false);
+  const [refBusy, setRefBusy] = useState(false);
+  const uploadRef = useAction(api.r2.uploadToR2);
+  const refInput = useRef<HTMLInputElement>(null);
   const v = { ...shot, ...(draft || {}) };
+
+  const onReference = async (file: File) => {
+    setRefBusy(true);
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const up: any = await uploadRef({
+        fileBase64: dataUrl,
+        key: `shot-references/${shot.gadget}-${shot.suffix}-${Date.now()}.webp`,
+        contentType: file.type || "image/png",
+      });
+      const url = up?.url || up?.publicUrl;
+      if (!url) throw new Error("Upload failed");
+      // Saved at once: a reference is not a draft edit worth losing.
+      await onSave({ referenceUrl: url });
+      toast.success("Angle reference saved");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setRefBusy(false);
+      if (refInput.current) refInput.current.value = "";
+    }
+  };
   const dirty = !!draft && Object.entries(draft).some(([k, val]) => (shot as any)[k] !== val);
   const edit = (patch: Partial<MockupShot>) => setDraft({ ...(draft || {}), ...patch });
 
@@ -621,6 +651,33 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
               <TrashIcon className="size-3.5" />
             </Button>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-2">
+          <div className="size-16 shrink-0 overflow-hidden rounded-md border bg-background">
+            {shot.referenceUrl
+              ? <img src={shot.referenceUrl} alt="Angle reference" className="size-full object-contain" />
+              : <div className="flex size-full items-center justify-center"><ImageIcon className="size-5 text-muted-foreground/40" /></div>}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium">Angle reference</p>
+            <p className="text-[11px] text-muted-foreground">
+              A finished mockup to copy the angle, framing and skin coverage from. Sent to the model with the
+              design; its colours and pattern are ignored.
+            </p>
+          </div>
+          <input ref={refInput} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void onReference(f); }} />
+          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={refBusy} onClick={() => refInput.current?.click()}>
+            {refBusy ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <UploadIcon className="mr-1 size-3" />}
+            {shot.referenceUrl ? "Replace" : "Upload"}
+          </Button>
+          {shot.referenceUrl && (
+            <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={refBusy}
+              onClick={async () => { await onSave({ referenceUrl: "" }); toast.success("Reference removed"); }}>
+              Remove
+            </Button>
+          )}
         </div>
 
         <Textarea
@@ -1006,14 +1063,14 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         size: useSize,
         resolution: useModel.resolution,
         quality: useModel.quality,
-        prompt: expandPrompt(shot.prompt, blocks, {
+        prompt: (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + expandPrompt(shot.prompt, blocks, {
           rNumber: roll.code,
           designName: roll.name,
           source: roll.source,
           finish: roll.finish,
           cutOrientation: orientation,
         }),
-        imageUrls: [roll.rawImageUrl],
+        imageUrls: shot.referenceUrl ? [roll.rawImageUrl, shot.referenceUrl] : [roll.rawImageUrl],
       });
       await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
       return true;
