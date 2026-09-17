@@ -21,6 +21,29 @@ const getR2Config = () => {
   return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 };
 
+/** One S3 client for the pipeline's own writes. */
+let pipelineClient: S3Client | null = null;
+const pipelineS3 = () => {
+  const config = getR2Config();
+  pipelineClient ||= new S3Client({
+    region: "auto",
+    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+  });
+  return { s3: pipelineClient, config };
+};
+
+/** Public URL of an object key, each path segment encoded. */
+export const r2PublicUrl = (key: string) =>
+  `${getR2Config().publicUrl.replace(/\/$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}`;
+
+/** Stores bytes server-side (the launch pipeline) and returns the public URL. */
+export async function putR2Object(key: string, body: Buffer, contentType: string): Promise<string> {
+  const { s3, config } = pipelineS3();
+  await s3.send(new PutObjectCommand({ Bucket: config.bucketName, Key: key, Body: body, ContentType: contentType }));
+  return r2PublicUrl(key);
+}
+
 const getAllowedOrigins = () => {
   const env = process.env.R2_ALLOWED_ORIGINS;
   const origins = (env ? env.split(",") : ["https://goskinly.com", "https://www.goskinly.com"])

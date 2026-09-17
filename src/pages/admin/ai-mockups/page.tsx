@@ -35,6 +35,7 @@ import {
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
 import { TemplatesTab, RollCalibration, useTemplateMockups } from "./templates.tsx";
 import { RetireListings } from "./retire-listings.tsx";
+import { LaunchPanel } from "@/pages/admin/launch/launch-panel.tsx";
 import {
   IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, formatCredits, resolveSize, USD_TO_INR,
 } from "@/lib/ai-mockup-models.ts";
@@ -145,13 +146,14 @@ interface Design {
   flatLengthCm?: number;
   /** Gadgets this design can be cut for; empty means any. */
   usableFor?: string[];
+  themes?: string[];
 }
 
 /**
- * Template mockups are built but parked: listings first. Flip this to bring
- * back the Templates tab, roll calibration and the template button.
+ * The Templates tab, roll calibration and the template button. Set to false
+ * to hide them.
  */
-const TEMPLATE_TOOLS = false;
+const TEMPLATE_TOOLS = true;
 
 /** The pictures of one product, within a gadget. */
 type ListingGroup = {
@@ -774,12 +776,14 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
       rawImageUrl: r.rawImageUrl, finish: r.finish, stock: r.metersAvailable,
       stockLabel: `${r.metersAvailable ?? 0} m`,
       flatImageUrl: r.flatImageUrl, flatPxPerCm: r.flatPxPerCm, flatWidthCm: r.flatWidthCm, flatLengthCm: r.flatLengthCm,
+      themes: r.designThemes,
     }));
     const fromCutouts: Design[] = (cutouts || []).map((c) => ({
       _id: c._id, source: "cutout", code: String(c.cutoutNumber || "").trim(), name: c.designName || "",
       rawImageUrl: c.rawImageUrl, finish: c.finish, stock: Number(c.sheetsAvailable) || 0,
       stockLabel: `${Number(c.sheetsAvailable) || 0} ${c.kind === "precut" ? "piece" : "sheet"}${Number(c.sheetsAvailable) === 1 ? "" : "s"}`,
       usableFor: Array.isArray(c.usableFor) ? c.usableFor : undefined,
+      themes: c.designThemes,
     }));
     const q = search.trim().toLowerCase();
     return [...fromRolls, ...fromCutouts]
@@ -948,6 +952,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   };
   const [calibrating, setCalibrating] = useState(false);
   const [retiring, setRetiring] = useState(false);
+  const [launching, setLaunching] = useState(false);
+  const [approvingAll, setApprovingAll] = useState<{ done: number; total: number } | null>(null);
   const [tplProgress, setTplProgress] = useState<{ done: number; total: number } | null>(null);
   const templateMockups = useTemplateMockups();
   const updatePrompt = useMutation(api.aiMockups.updateMockupPrompt);
@@ -1574,6 +1580,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   Create {missingListings.length} missing listing{missingListings.length === 1 ? "" : "s"}
                 </Button>
               )}
+              <Button size="sm" className="h-7 bg-violet-600 text-xs hover:bg-violet-700" onClick={() => setLaunching(true)}>
+                <SparklesIcon className="mr-1 size-3" />
+                Launch (auto)
+              </Button>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRetiring(true)}>
                 Retire old listings
               </Button>
@@ -1755,6 +1765,26 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 </span>
               )}
             </Label>
+            {reviewCount > 1 && (
+              <Button
+                size="sm"
+                className="h-7 bg-emerald-600 text-xs hover:bg-emerald-700"
+                disabled={!!approvingAll}
+                onClick={async () => {
+                  const pending = jobs.filter((j) => j.status === "review" && j.pendingKey);
+                  if (!confirm(`Approve all ${pending.length} pictures? Each is added to the media library and its listings. Reject the bad ones first.`)) return;
+                  setApprovingAll({ done: 0, total: pending.length });
+                  for (let i = 0; i < pending.length; i++) {
+                    await approve(pending[i]);
+                    setApprovingAll({ done: i + 1, total: pending.length });
+                  }
+                  setApprovingAll(null);
+                }}
+              >
+                {approvingAll ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <ThumbsUpIcon className="mr-1 size-3" />}
+                {approvingAll ? `Approving ${approvingAll.done}/${approvingAll.total}` : `Approve all ${reviewCount}`}
+              </Button>
+            )}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <FolderIcon className="size-3.5" />
               {backupFolder ? (
@@ -1794,6 +1824,32 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
       )}
 
       {retiring && <RetireListings design={roll} onClose={() => setRetiring(false)} />}
+
+      {launching && (
+        <Dialog open onOpenChange={(o) => { if (!o) setLaunching(false); }}>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Launch {roll.code}</DialogTitle>
+              <DialogDescription>
+                Creates the missing listings, brings existing ones into shape, retires duplicates, recounts stock and
+                makes the pictures — on the server. Pictures come back here for approval.
+              </DialogDescription>
+            </DialogHeader>
+            {!roll.name || !roll.finish ? (
+              <p className="text-sm text-amber-700">Give this design a name and a finish first (Quick Launch, or the design's record).</p>
+            ) : (
+              <LaunchPanel
+                design={{
+                  _id: roll._id, code: roll.code, name: roll.name, source: roll.source, finish: roll.finish,
+                  rawImageUrl: roll.rawImageUrl, flatImageUrl: roll.flatImageUrl || undefined, flatPxPerCm: roll.flatPxPerCm,
+                  flatWidthCm: roll.flatWidthCm, flatLengthCm: roll.flatLengthCm, usableFor: roll.usableFor,
+                }}
+                themes={roll.themes}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
 
       {calibrating && (
         <RollCalibration
@@ -2378,7 +2434,9 @@ function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
   const inFlight = useRef<Set<string>>(new Set());
 
   const tick = useCallback(async () => {
-    const pending = jobs.filter((j) => j.status === "running" && j.taskId && !inFlight.current.has(j._id));
+    // Launch jobs are collected on the server; polling them here too would
+    // store the same picture twice.
+    const pending = jobs.filter((j) => j.status === "running" && j.taskId && !(j as any).serverManaged && !inFlight.current.has(j._id));
     for (const job of pending) {
       inFlight.current.add(job._id);
       try {
@@ -2418,7 +2476,7 @@ function useJobPoller(jobs: Job[], updateJob: (a: any) => Promise<any>) {
   }, [jobs, status, stageUpload, updateJob]);
 
   useEffect(() => {
-    if (!jobs.some((j) => j.status === "running")) return;
+    if (!jobs.some((j) => j.status === "running" && !(j as any).serverManaged)) return;
     const id = setInterval(() => { void tick(); }, POLL_MS);
     return () => clearInterval(id);
   }, [jobs, tick]);

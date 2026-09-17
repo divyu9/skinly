@@ -20,3 +20,4 @@ export * from "./whatsappWorker";
 export * from "./poyo";
 export * from "./materials";
 export * from "./listings";
+export * from "./launch";

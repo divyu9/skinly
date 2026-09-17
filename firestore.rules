@@ -187,6 +187,9 @@ service cloud.firestore {
     // ways — the prompts steer a billed API and the jobs carry task ids.
     match /gadgetMockupPrompts/{id}     { allow read, write: if isAdmin(); }
     match /designMockups/{id}           { allow read, write: if isAdmin(); }
+    // Design launches: the plan for one design and its progress, run by
+    // functions/src/launch.ts.
+    match /designLaunches/{id}          { allow read, write: if isAdmin(); }
     match /gadgetMockupSettings/{id}    { allow read, write: if isAdmin(); }
     match /cutoutInventory/{id}         { allow read, write: if isAdmin(); }
     match /gadgetConsumption/{id}       { allow read, write: if isAdmin(); }
