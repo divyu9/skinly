@@ -389,6 +389,21 @@ export function mockupFileStem(rNumber: string, suffix: string, attempt = 1): st
  * its real depth, chargers with smeared edges. Naming the failure is what
  * stops it.
  */
+/**
+ * How a phone skin treats the camera module: it is skinned too.
+ *
+ * The first shots left the whole module bare, which is not the product — the
+ * skin carries on over the raised module and only the lens glass, flash,
+ * sensors and microphone show through small cut-outs.
+ */
+const CAMERA_COVERED =
+  "The skin also covers the raised camera module: the same design carries on without a break up over "
+  + "the module's top face and down its sides, so the module reads as part of the skinned back, not as a "
+  + "bare island. Only small, precise holes are cut in it — a round hole exactly the size of each camera "
+  + "lens's glass, and small holes for the flash, the sensors and the microphone. The lens glass and those "
+  + "openings are the only uncovered parts of the back; the printed vinyl runs right up to the edge of "
+  + "every lens. ";
+
 const REAL =
   "Real manufactured product photographed as it actually is: exact factory proportions, crisp "
   + "machined geometry, sharp defined edges and consistent wall thickness. Do not fatten, inflate, "
@@ -1131,10 +1146,8 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "spanning the full width of the phone, carrying three large lenses in a triangle on its left "
         + "with the flash and sensor to their right. A vinyl skin covers the back panel edge to edge. "
         + "{{fidelity}} {{cutOrientation}} The skin follows the rounded corners and stops cleanly at the "
-        + "titanium side band, which stays bare polished metal. It is die-cut around the camera plateau: "
-        + "the vinyl lies flat on the back below and around it, and the plateau itself, the three lenses, "
-        + "the flash and the microphone stay completely uncovered, the cut following the exact outline "
-        + "of the plateau. No Apple logo is visible — it sits under the skin. At the very edges of the "
+        + "titanium side band, which stays bare polished metal. " + CAMERA_COVERED
+        + "No Apple logo is visible — it sits under the skin. At the very edges of the "
         + "frame, softly out of focus, a pair of earphones and a ceramic mug suggest a desk without "
         + "drawing the eye. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
@@ -1408,10 +1421,9 @@ const phoneShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
     + "square to the desk so the back panel is perfectly straight in the frame, its edges parallel to the "
     + "picture edges, with no tilt and no perspective skew. The phone fills most of the frame. A vinyl skin "
     + "covers the back panel edge to edge. {{fidelity}} {{cutOrientation}} The skin follows the rounded "
-    + "corners and stops cleanly at the side frame, which stays bare. It is die-cut around "
-    + `${b.camera}: the module, every lens, the flash and the microphone stay completely uncovered, the cut `
-    + "following the exact outline of the module, and the vinyl lies flat everywhere else. No brand logo is "
-    + "visible — it sits under the skin. At the very edges of the frame, softly out of focus, a pair of "
+    + "corners and stops cleanly at the side frame, which stays bare. "
+    + `The phone has ${b.camera}. ` + CAMERA_COVERED
+    + "No brand logo is visible — it sits under the skin. At the very edges of the frame, softly out of focus, a pair of "
     + "earphones and a ceramic mug suggest a desk without drawing the eye. No people and no hands anywhere "
     + "in the frame. " + REAL + "{{staging}} ",
 });

@@ -311,6 +311,13 @@ function ShotLibrary() {
   const missingStarters = STARTER_SHOTS.filter(
     (st) => !shots.some((s) => s.gadget === st.gadget && s.suffix === st.suffix)
   );
+  // Built-in shots whose prompt has since been improved in the code (the
+  // phone shots now skin the camera module). Saved shots are never changed
+  // behind the admin's back; this offers the update.
+  const staleStarters = shots
+    .map((s) => ({ s, st: STARTER_SHOTS.find((st) => st.gadget === s.gadget && st.suffix === s.suffix) }))
+    .filter((x): x is { s: MockupShot; st: (typeof STARTER_SHOTS)[number] } => !!x.st && x.s.prompt !== x.st.prompt);
+  const [showStale, setShowStale] = useState(false);
   const availableGadgets = (gadgetTypes || [])
     .map((g) => String(g.name || "").trim())
     .filter(Boolean)
@@ -367,6 +374,41 @@ function ShotLibrary() {
           camera — shows up here without a code change.
         </p>
       </div>
+
+      {staleStarters.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-sky-200 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/30">
+          <div className="flex flex-wrap items-center gap-3">
+            <RefreshCwIcon className="size-4 text-sky-600" />
+            <p className="min-w-0 flex-1 text-sm">
+              {staleStarters.length} built-in shot{staleStarters.length === 1 ? " has" : "s have"} a newer prompt
+              {" "}(phone shots now cover the camera module).
+              <button className="ml-2 text-xs text-sky-700 underline" onClick={() => setShowStale(!showStale)}>
+                {showStale ? "hide" : "which?"}
+              </button>
+            </p>
+            <Button
+              size="sm"
+              disabled={seeding}
+              onClick={async () => {
+                if (!confirm(`Replace the prompt of ${staleStarters.length} shot(s) with the built-in one? Any edits you made to those prompts are lost.`)) return;
+                setSeeding(true);
+                try {
+                  for (const { s, st } of staleStarters) await updateShot({ promptId: s._id, prompt: st.prompt });
+                  toast.success(`${staleStarters.length} prompt${staleStarters.length === 1 ? "" : "s"} updated`);
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Could not update");
+                } finally { setSeeding(false); }
+              }}
+            >
+              {seeding ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <RefreshCwIcon className="mr-1.5 size-3.5" />}
+              Update {staleStarters.length === 1 ? "it" : "them"}
+            </Button>
+          </div>
+          {showStale && (
+            <p className="text-xs text-muted-foreground">{staleStarters.map(({ s }) => `${s.gadget} · ${s.label}`).join(", ")}</p>
+          )}
+        </div>
+      )}
 
       {shots.length > 0 && missingStarters.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 dark:border-violet-900 dark:bg-violet-950/30">
