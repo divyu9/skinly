@@ -17,7 +17,7 @@ import {
 } from "@/lib/ai-mockup-shots.ts";
 import { IMAGE_MODELS, resolveSize, formatInr } from "@/lib/ai-mockup-models.ts";
 import {
-  canvasToWebp, composite, dataToCanvas, greenSwatch, imageToData, loadImage, rectifyRoll, type Point,
+  canvasToWebp, composite, dataToCanvas, greenSwatch, imageToData, loadImage, rectifyRoll, truePiece, type Point,
 } from "@/lib/mockup-composite.ts";
 
 /**
@@ -549,6 +549,36 @@ function CornerEditor({ template, onClose, onSave }: {
 
 const ROLL_WIDTH_CM = 29.5;
 const FLAT_PX_PER_CM = 40;
+
+/**
+ * The device's own piece of a calibrated roll, uploaded and ready to hand to
+ * the image model in place of the whole roll photo. Returns null when the roll
+ * has no calibration or the gadget's face has no measurement — then the whole
+ * photo is sent, as before.
+ */
+export function useTruePiece() {
+  const loadCanvasImage = useCanvasImage();
+  const upload = useAction(api.r2.uploadToR2);
+  return useCallback(async (
+    design: { code: string; source?: string; flatImageUrl?: string; flatPxPerCm?: number },
+    gadget: string,
+    rotate90 = false
+  ): Promise<{ url: string; widthCm: number; heightCm: number } | null> => {
+    const surface = DEFAULT_SURFACE_CM[String(gadget || "").toLowerCase()];
+    if (design.source === "cutout" || !design.flatImageUrl || !surface) return null;
+    const flat = imageToData(await loadCanvasImage(design.flatImageUrl));
+    const piece = truePiece(flat, {
+      pxPerCm: design.flatPxPerCm || FLAT_PX_PER_CM,
+      widthCm: surface[0],
+      heightCm: surface[1],
+      rotate90,
+    });
+    const key = `design-pieces/${design.code.toUpperCase().replace(/[^A-Z0-9-]/g, "")}-${String(gadget).toLowerCase()}${rotate90 ? "-wid" : ""}-${Date.now()}.webp`;
+    const up: any = await upload({ fileBase64: canvasToWebp(dataToCanvas(piece), 0.92), key, contentType: "image/webp" });
+    const url = up?.url || up?.publicUrl;
+    return url ? { url, widthCm: surface[0], heightCm: surface[1] } : null;
+  }, [loadCanvasImage, upload]);
+}
 
 export function RollCalibration({ roll, onClose, onSaved }: {
   roll: { _id: string; code: string; rawImageUrl?: string };

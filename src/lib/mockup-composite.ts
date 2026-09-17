@@ -220,6 +220,55 @@ export function composite(template: ImageData, spec: TemplateSpec, design: Image
   return out;
 }
 
+/**
+ * The piece of a calibrated roll that goes on one device, at true size and
+ * turned upright — the same crop functions/src/composite.ts makes for the
+ * launch pipeline, so a picture redone from the studio matches one the server
+ * made. The roll repeats where the photographed stretch is smaller than the
+ * piece.
+ */
+export function truePiece(
+  design: ImageData,
+  opts: { pxPerCm: number; widthCm: number; heightCm: number; rotate90?: boolean }
+): ImageData {
+  const ppc = opts.pxPerCm || 40;
+  const pieceW = opts.rotate90 ? opts.heightCm : opts.widthCm;
+  const pieceH = opts.rotate90 ? opts.widthCm : opts.heightCm;
+  const w = Math.max(1, Math.round(pieceW * ppc));
+  const h = Math.max(1, Math.round(pieceH * ppc));
+  // The middle of the photographed stretch, where the photo is sharpest.
+  const ox = Math.round(Math.max(0, design.width - w) / 2);
+  const oy = Math.round(Math.max(0, design.height - h) / 2);
+  const cut = new ImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    const sy = (oy + y) % design.height;
+    for (let x = 0; x < w; x++) {
+      const sx = (ox + x) % design.width;
+      const i = (sy * design.width + sx) * 4;
+      const o = (y * w + x) * 4;
+      cut.data[o] = design.data[i];
+      cut.data[o + 1] = design.data[i + 1];
+      cut.data[o + 2] = design.data[i + 2];
+      cut.data[o + 3] = 255;
+    }
+  }
+  if (!opts.rotate90) return cut;
+  // A quarter turn anticlockwise, which is how the template mockups read a
+  // piece cut across the roll: (x, y) -> (y, w - 1 - x).
+  const out = new ImageData(h, w);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const o = ((w - 1 - x) * h + y) * 4;
+      out.data[o] = cut.data[i];
+      out.data[o + 1] = cut.data[i + 1];
+      out.data[o + 2] = cut.data[i + 2];
+      out.data[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
 /** A canvas as a base64 data URL in WebP, for upload. */
 export const canvasToWebp = (c: HTMLCanvasElement, quality = 0.9) => c.toDataURL("image/webp", quality);
 

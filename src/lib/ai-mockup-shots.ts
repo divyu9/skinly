@@ -222,12 +222,17 @@ export const REFERENCE_PREAMBLE =
 /**
  * Said when the design image is the device's own piece of the roll, cut to
  * true size from a calibrated photo, rather than the whole roll.
+ *
+ * The measurements are spelled out: a model shown a 16 x 10 cm piece for a
+ * controller and a 26 x 39 cm one for a console has nothing left to guess
+ * about how big the motifs are.
  */
-export const TRUE_SIZE_CLAUSE =
-  "The design image is the exact piece of vinyl cut for this device, shown at its true size and already "
-  + "turned the way it sits on the device (upright, as the device is held). It covers the skinned face from "
-  + "edge to edge: keep every motif exactly this size relative to the device and in this orientation. Do not "
-  + "shrink, enlarge, rotate or add repeats of the pattern — the device shows this piece and nothing more. ";
+export const TRUE_SIZE_CLAUSE = (widthCm: number, heightCm: number) =>
+  `The design image is the exact piece of printed vinyl cut for this device: ${widthCm} cm by ${heightCm} cm `
+  + "of the roll, at true size, already turned the way it sits on the device. That piece covers the device's "
+  + "main skinned face. Keep every motif at exactly this size relative to the device, and in this "
+  + "orientation — do not shrink, enlarge, rotate or add repeats of the pattern. Where the skin is cut into "
+  + "several pieces, every piece is cut from this same stretch, so the motifs stay this size all over. ";
 
 export const PLACEHOLDERS = ["fidelity", "staging", "rNumber", "designName", "cutOrientation"];
 
@@ -1643,12 +1648,31 @@ export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing
  */
 export const FLAT_GADGETS = new Set(["phone", "laptop", "tablet", "mac-mini"]);
 
-/** Surface a template covers, in cm (width × height), for the listing's gadget. */
+/**
+ * The face a skin covers, in cm (width × height), by gadget.
+ *
+ * Two jobs: the size a template's corners default to, and — for a roll with a
+ * calibrated photo — the piece cut out of it and sent to the image model, so
+ * the motifs come out the size they really are. Without it the model sees a
+ * whole roll and guesses, which makes the pattern far too large on small
+ * things like controllers and far too small on a console.
+ *
+ * These are the dominant skinned face of a typical device, not every piece in
+ * the kit: a controller's top shell, a console's side panel, the wrap around a
+ * lens barrel (its circumference by its length).
+ */
 export const DEFAULT_SURFACE_CM: Record<string, [number, number]> = {
   phone: [7.6, 16.3],
   laptop: [31.0, 22.0],
   tablet: [17.9, 24.8],
   "mac-mini": [12.7, 12.7],
+  console: [26.0, 39.0],
+  controller: [16.0, 10.0],
+  drone: [20.0, 12.0],
+  camera: [13.0, 10.0],
+  lens: [27.0, 12.0],
+  gimbals: [20.0, 10.0],
+  charger: [6.0, 6.0],
 };
 
 export { slug as listingSlug };

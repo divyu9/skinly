@@ -392,7 +392,8 @@ export function buildLaunchPlan(input: {
         continue;
       }
       // A calibrated roll sends the model the device's own piece at true size,
-      // so the motifs come out as big as they really are.
+      // so the motifs come out as big as they really are — for every gadget
+      // whose face is measured, not only the flat ones a template can cover.
       const surface = isRoll && design.flatImageUrl ? DEFAULT_SURFACE_CM[info.gadget] : undefined;
       for (const shot of kindShots) {
         const orients: Array<CutOrientation | undefined> = shot.askCutOrientation && isRoll ? options.orientations : [undefined];
@@ -400,7 +401,9 @@ export function buildLaunchPlan(input: {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
           if (already(suffix, kind)) continue;
           const crop = surface ? { widthCm: surface[0], heightCm: surface[1], rotate90: o === "widthwise" } : undefined;
-          const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + (crop ? TRUE_SIZE_CLAUSE : "") + expandPrompt(shot.prompt, blocks, {
+          const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "")
+            + (crop ? TRUE_SIZE_CLAUSE(crop.widthCm, crop.heightCm) : "")
+            + expandPrompt(shot.prompt, blocks, {
             rNumber: code, designName: design.name, source: design.source, finish: design.finish,
             // The piece is already turned; saying so again would turn it twice.
             cutOrientation: crop ? undefined : o,
