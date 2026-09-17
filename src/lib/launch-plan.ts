@@ -355,9 +355,12 @@ export function buildLaunchPlan(input: {
   if (!design.rawImageUrl) warnings.push("No raw design photo yet — pictures cannot be made");
 
   if (options.images && design.rawImageUrl) {
-    // Every listing this launch leaves live gets pictures — including old
-    // listings outside phase 1, which are converted whatever their kind.
+    // Pictures go to the listings of this phase, and to any older listing
+    // that is already live — an out-of-phase listing that was converted
+    // (Charger) still needs its photo. A draft listing outside the phase,
+    // made ahead of its turn, waits: nobody can see it yet.
     for (const kind of covered) {
+      if (!inScope(kind) && keptFor.get(kind)?.status !== "active") continue;
       const info = KIND_INFO.get(kind)!;
       const kindShots = shots.filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind);
       const template = readyTemplates.get(kind);
