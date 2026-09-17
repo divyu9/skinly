@@ -1,5 +1,5 @@
 /**
- * Devices launched from January to September 2026 that were not yet in
+ * Devices launched from January to September 2026 (plus older Apple models) not yet in
  * supportedModels (the table stopped growing on 16 Jan 2026 while the site was
  * down). Phones and tablets from GSMArena brand listings and launch news for
  * AI+, Boltt and Mivi, China-only models removed; names in the catalogue's own
@@ -34,6 +34,21 @@ Apple, iPad AIR 13 M3 (2025), tablet
 Apple, iPad Pro 11 (M5), tablet
 Apple, iPad Pro 13 (M5), tablet
 Apple, iPad mini (7th Gen) A17 Pro, tablet
+Apple, iPhone SE (2nd Gen) 2020, phone
+Apple, iPhone SE (3rd Gen) 2022, phone
+Apple, iPhone 5C, phone
+Apple, iPhone 4S, phone
+Apple, iPhone 4, phone
+Apple, Macbook Pro 16 M2 Pro / M2 Max (2023), laptop
+Apple, Macbook Pro 13inch - A1989/A2159 (2018-2019), laptop
+Apple, USB-C Power Adapter (35W Dual), charger
+Apple, 40W Dynamic Power Adapter (60W Max), charger
+Apple, USB-C Power Adapter (70W), charger
+Apple, USB-C Power Adapter (96W), charger
+Apple, USB-C Power Adapter (87W), charger
+Apple, USB-C Power Adapter (61W), charger
+Apple, USB Power Adapter (12W), charger
+Apple, USB Power Adapter (5W), charger
 Samsung, Galaxy A07s, phone
 Samsung, Galaxy A08 4G, phone
 Samsung, Galaxy A18 4G, phone
@@ -57,6 +72,14 @@ Google, Pixel 11 Pro, phone
 Google, Pixel 11 Pro Fold, phone
 Google, Pixel 11 Pro XL, phone
 Google, Pixel 10a, phone
+One Plus, 15R, phone
+One Plus, 15T, phone
+One Plus, Nord 6, phone
+One Plus, Nord CE6, phone
+One Plus, Nord CE6 Lite, phone
+One Plus, Pad 4, tablet
+One Plus, Pad 3 Pro, tablet
+One Plus, Pad Go 2, tablet
 Xiaomi, Xiaomi 18 Fold, phone
 Xiaomi, Xiaomi Pad 9 Pro Max, tablet
 Xiaomi, Redmi 17, phone

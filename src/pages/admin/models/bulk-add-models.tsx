@@ -30,6 +30,10 @@ type Line = {
   reason?: string;
 };
 
+/** The bundled list, narrowed to one brand. */
+const onlyBrand = (brand: string) =>
+  LAUNCHES_2026.split("\n").filter((l) => l.startsWith(`${brand},`)).join("\n");
+
 const norm = (s: string) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
 
 export function BulkAddModels({ models, gadgetTypes, onClose }: {
@@ -119,7 +123,13 @@ export function BulkAddModels({ models, gadgetTypes, onClose }: {
 
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" disabled={saving} onClick={() => setText(LAUNCHES_2026)}>
-            Load Jan–Sep 2026 launches ({LAUNCHES_2026.split("\n").length})
+            Load all 2026 additions ({LAUNCHES_2026.split("\n").length})
+          </Button>
+          <Button size="sm" variant="outline" disabled={saving} onClick={() => setText(onlyBrand("Apple"))}>
+            Apple only ({onlyBrand("Apple").split("\n").length})
+          </Button>
+          <Button size="sm" variant="outline" disabled={saving} onClick={() => setText(onlyBrand("One Plus"))}>
+            OnePlus only ({onlyBrand("One Plus").split("\n").length})
           </Button>
           {lines.length > 0 && (
             <>
