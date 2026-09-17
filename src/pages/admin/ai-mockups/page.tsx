@@ -765,9 +765,14 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     // carries no view code, and the preview has to say the same thing or the
     // admin is told there is nowhere to put an image that in fact has one.
     const gadget = String(shot.gadget).toLowerCase();
+    // A brand listing (a preset) exists only once one was made for that brand:
+    // the old one-size listings of the gadget do not stand in for it, or no
+    // design could ever get its brand listings.
+    const kind = presetFor(listingOf(shot)) ? listingOf(shot).toLowerCase() : null;
     const byProduct = new Map<string, { title: string; rows: any[] }>();
     for (const t of linkTargets) {
       if (t.gadget !== gadget) continue;
+      if (kind && String(t.listingKind || "").toLowerCase() !== kind) continue;
       const entry = byProduct.get(t.productId) || { title: t.productTitle, rows: [] };
       entry.rows.push(t);
       byProduct.set(t.productId, entry);
@@ -972,7 +977,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         precedent: true,
         preset: true,
         variants: preset.map((v) => ({
-          skuTail: v.tail, title: v.title, price: v.price, materialMultiplier: v.materialMultiplier,
+          skuTail: v.tail,
+          title: v.title,
+          price: v.price3d && /3d|emboss|textur/i.test(roll.finish || "") ? v.price3d : v.price,
+          materialMultiplier: v.materialMultiplier,
         })),
       });
       templateCache.current.set(cacheKey, pending);

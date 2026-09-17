@@ -385,6 +385,8 @@ export function useQuery(apiRef: any, args?: any) {
                 productId: v.productId,
                 productTitle: pd.title || '',
                 gadget: gadgetById[pd.gadgetTypeId || pd.gadgetType] || '',
+                listingKind: String(pd.listingKind || ''),
+                status: String(pd.status || ''),
               });
             }
             setData(rows);

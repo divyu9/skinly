@@ -237,6 +237,9 @@ async function buildPlan(cutouts: any[]): Promise<ProductPlan[]> {
     const pdata = p.data() as any;
     const list = byProduct.get(p.id) || [];
     if (!list.length) continue;
+    // Brand listings made in the studio carry their own SKU tails (R-12-HPLP)
+    // and are right as made.
+    if (pdata.listingKind) continue;
 
     const candidates = new Map<string, Design>();
     list.forEach((v) => designsFor(v).forEach((d) => candidates.set(d.key, d)));

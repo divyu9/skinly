@@ -213,9 +213,8 @@ export type DesignSource = "roll" | "cutout";
 
 /**
  * Listings for the starter shots, by file suffix, for shots saved before the
- * listing field existed. Anything not named here is one listing per gadget —
- * which is right for laptops, cameras and chargers. Controllers are two
- * listings, PlayStation and Xbox, because those are two different searches.
+ * listing field existed. Every gadget is now one listing per device brand
+ * (see BRAND_LISTINGS); anything not named here falls back to the gadget.
  */
 const LISTING_BY_SUFFIX: Record<string, string> = {
   "ps5": "PS5",
@@ -235,11 +234,27 @@ const LISTING_BY_SUFFIX: Record<string, string> = {
   "xbox-x-set": "Xbox Series X",
   "xbox-s": "Xbox Series S",
   "xbox-s-set": "Xbox Series S",
-  "drone": "Drone",
-  "drone-rc": "Drone",
-  "drone-hand": "Drone",
-  "drone-rc-nodisplay": "Drone controller",
-  "drone-rc-display": "Drone controller",
+  "drone": "DJI Drone",
+  "drone-rc": "DJI Drone",
+  "drone-hand": "DJI Drone",
+  "drone-rc-nodisplay": "DJI Drone Controller",
+  "drone-rc-display": "DJI Drone Controller",
+  "phone-iphone": "Apple iPhone",
+  "phone-samsung": "Samsung Galaxy",
+  "laptop-top": "MacBook",
+  "laptop-top-nologo": "MacBook",
+  "laptop-open": "MacBook",
+  "laptop-hand": "MacBook",
+  "charger": "Apple Charger",
+  "charger-macbook": "Apple Charger",
+  "charger-hand": "Apple Charger",
+  "camera": "Sony Camera",
+  "camera-hand": "Sony Camera",
+  "camera-lens": "Sony Camera",
+  "lens": "Sony Lens",
+  "lens-hand": "Sony Lens",
+  "macmini": "Mac mini",
+  "macmini-hand": "Mac mini",
 };
 
 const titleCase = (s: string) => s.replace(/(^|[\s-])(\w)/g, (_, a, b) => a + b.toUpperCase());
@@ -258,6 +273,8 @@ export interface PresetVariant {
   tail: string;
   title: string;
   price: number;
+  /** Price when the design is 3D textured, where that costs more. */
+  price3d?: number;
   materialMultiplier: number;
 }
 
@@ -1245,3 +1262,298 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "module has a clean cutout and the metal edges stay uncovered. " + REAL + "{{staging}} ",
   },
 ];
+
+/* ------------------------------------------------------------------ brands */
+
+/**
+ * One listing per device brand, for every gadget.
+ *
+ * Stock is held once per design, so a listing per brand costs nothing on the
+ * shelf and gives each brand its own title, photo and page — and its own
+ * traffic figures, which is how real demand shows up. `code` prefixes the
+ * SKU tail so the listings of one design never share a SKU (R-12-OPL,
+ * R-12-HPLP). The "other" listing of a gadget takes every brand the named
+ * ones do not.
+ */
+interface BrandListing {
+  listing: string;
+  code: string;
+  brands?: string[];
+  /** Photo subject for the generated shot(s); omitted where a shot exists. */
+  device?: string;
+  /** Phones: how the camera module looks, so the cut can follow it. */
+  camera?: string;
+  /** Laptops: the lid logo to knock out, if any. */
+  logo?: string;
+}
+
+const PHONE_BRANDS: BrandListing[] = [
+  { listing: "Apple iPhone", code: "IPH", brands: ["Apple"] },
+  { listing: "Samsung Galaxy", code: "SAM", brands: ["Samsung"] },
+  { listing: "OnePlus", code: "OPL", brands: ["One Plus", "OnePlus"], device: "A OnePlus 13 smartphone", camera: "the large circular camera module in the upper left, carrying three lenses and the flash" },
+  { listing: "Google Pixel", code: "PXL", brands: ["Google"], device: "A Google Pixel 9 Pro smartphone", camera: "the raised pill-shaped camera bar running across the upper back, carrying three lenses and the flash" },
+  { listing: "Nothing Phone", code: "NTH", brands: ["Nothing", "CMF"], device: "A Nothing Phone (3a) smartphone", camera: "the horizontal pill-shaped camera housing near the top centre, carrying its lenses and flash" },
+  { listing: "Xiaomi Redmi", code: "XRM", brands: ["Xiaomi", "Redmi"], device: "A Redmi Note 14 Pro smartphone", camera: "the square camera island in the upper left, carrying three lenses and the flash" },
+  { listing: "Poco", code: "PCO", brands: ["Poco"], device: "A Poco X7 Pro smartphone", camera: "the camera island in the upper left, carrying its lenses and the flash" },
+  { listing: "Realme", code: "RLM", brands: ["Realme"], device: "A realme 14 Pro smartphone", camera: "the circular camera module near the top centre, carrying its lenses and the flash" },
+  { listing: "Vivo", code: "VIV", brands: ["Vivo"], device: "A vivo V50 smartphone", camera: "the vertical pill-shaped camera module in the upper left, carrying two lenses and the ring flash" },
+  { listing: "iQOO", code: "IQO", brands: ["iQOO"], device: "An iQOO 13 smartphone", camera: "the square camera module in the upper left, carrying three lenses and the flash" },
+  { listing: "Oppo", code: "OPO", brands: ["Oppo"], device: "An OPPO Reno 13 smartphone", camera: "the camera island in the upper left, carrying its lenses and the flash" },
+  { listing: "Motorola", code: "MOT", brands: ["Motorola"], device: "A Motorola Edge 50 Pro smartphone", camera: "the raised camera island in the upper left, carrying three lenses and the flash" },
+  { listing: "Infinix", code: "INF", brands: ["Infinix"], device: "An Infinix Note 40 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
+  { listing: "Tecno", code: "TEC", brands: ["Tecno"], device: "A Tecno Camon 30 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
+  { listing: "Lava", code: "LAV", brands: ["Lava"], device: "A Lava Agni 3 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
+  { listing: "Android Phone", code: "AND", device: "A modern Android smartphone with no brand logo", camera: "the camera island in the upper left, carrying its lenses and the flash" },
+];
+
+const LAPTOP_BRANDS: BrandListing[] = [
+  { listing: "MacBook", code: "MB", brands: ["Apple"] },
+  { listing: "HP Laptop", code: "HP", brands: ["HP"], device: "An HP Pavilion 15 laptop", logo: "the round HP logo in the centre of the lid" },
+  { listing: "Dell Laptop", code: "DEL", brands: ["Dell", "Alienware"], device: "A Dell Inspiron 15 laptop", logo: "the round DELL logo in the centre of the lid" },
+  { listing: "Lenovo Laptop", code: "LEN", brands: ["Lenovo"], device: "A Lenovo IdeaPad Slim 5 laptop", logo: "the small Lenovo wordmark near one corner of the lid" },
+  { listing: "Asus Laptop", code: "ASU", brands: ["Asus"], device: "An ASUS Vivobook 15 laptop", logo: "the ASUS wordmark on the lid" },
+  { listing: "Acer Laptop", code: "ACR", brands: ["Acer"], device: "An Acer Aspire 7 laptop", logo: "the acer wordmark in the centre of the lid" },
+  { listing: "MSI Laptop", code: "MSI", brands: ["MSI"], device: "An MSI gaming laptop", logo: "the MSI dragon shield logo in the centre of the lid" },
+  { listing: "Laptop", code: "WL", device: "A modern 15-inch Windows laptop with no brand logo" },
+];
+
+const CHARGER_BRANDS: BrandListing[] = [
+  { listing: "Apple Charger", code: "APCH", brands: ["Apple"] },
+  { listing: "Samsung Charger", code: "SMCH", brands: ["Samsung"], device: "A Samsung 25W USB-C power adapter (Indian model, two round pins), a small white cuboid with rounded edges" },
+  { listing: "OnePlus Charger", code: "OPCH", brands: ["One Plus", "OnePlus"], device: "A OnePlus SUPERVOOC power adapter (Indian model, two round pins), a white rounded cuboid" },
+  { listing: "Realme Charger", code: "RMCH", brands: ["Realme"], device: "A realme SUPERVOOC power adapter (Indian model, two round pins), a white rounded cuboid" },
+  { listing: "Oppo Charger", code: "OOCH", brands: ["Oppo"], device: "An OPPO SUPERVOOC power adapter (Indian model, two round pins), a white rounded cuboid" },
+  { listing: "Vivo Charger", code: "VVCH", brands: ["Vivo", "iQOO"], device: "A vivo FlashCharge power adapter (Indian model, two round pins), a white rounded cuboid" },
+  { listing: "Xiaomi Charger", code: "XMCH", brands: ["Xiaomi", "Redmi", "Poco"], device: "A Xiaomi HyperCharge power adapter (Indian model, two round pins), a white rounded cuboid" },
+  { listing: "Charger", code: "CHG", device: "A white USB-C phone power adapter (Indian model, two round pins) with no brand marking" },
+];
+
+const CAMERA_BRANDS: BrandListing[] = [
+  { listing: "Sony Camera", code: "SNY", brands: ["Sony"] },
+  { listing: "Canon Camera", code: "CAN", brands: ["Canon"], device: "A Canon EOS R6 Mark II mirrorless camera", logo: "Canon" },
+  { listing: "Nikon Camera", code: "NIK", brands: ["Nikon"], device: "A Nikon Z6 III mirrorless camera", logo: "Nikon" },
+];
+
+const LENS_BRANDS: BrandListing[] = [
+  { listing: "Sony Lens", code: "SNYL", brands: ["Sony"] },
+  { listing: "Canon Lens", code: "CANL", brands: ["Canon"], device: "A Canon RF 24-105mm f/4 L zoom lens" },
+  { listing: "Nikon Lens", code: "NIKL", brands: ["Nikon"], device: "A Nikon NIKKOR Z 24-120mm f/4 S zoom lens" },
+  { listing: "Sigma Lens", code: "SIGL", brands: ["SIGMA"], device: "A Sigma 24-70mm f/2.8 DG DN Art zoom lens" },
+  { listing: "Tamron Lens", code: "TAML", brands: ["TAMRON"], device: "A Tamron 28-75mm f/2.8 Di III zoom lens" },
+  { listing: "Fujifilm Lens", code: "FUJL", brands: ["FUJIFILM"], device: "A Fujifilm XF 16-55mm f/2.8 zoom lens" },
+  { listing: "Camera Lens", code: "LNS", device: "A black mirrorless-camera zoom lens with no brand marking" },
+];
+
+const GIMBAL_BRANDS: BrandListing[] = [
+  { listing: "DJI Gimbal", code: "DJG", brands: ["DJI"], device: "A DJI RS 4 camera gimbal" },
+  { listing: "Zhiyun Gimbal", code: "ZHG", brands: ["ZHIYUN"], device: "A Zhiyun Crane 4 camera gimbal" },
+  { listing: "Gimbal", code: "GMB", device: "A black handheld camera gimbal with no brand marking" },
+];
+
+const allBrandsOf = (list: BrandListing[]) => list.flatMap((b) => b.brands || []);
+const scopeOf = (b: BrandListing, list: BrandListing[]) =>
+  b.brands ? { modelBrands: b.brands } : { modelBrandsExclude: allBrandsOf(list) };
+
+const PRESET_BUILDERS: Array<[BrandListing[], (b: BrandListing) => PresetVariant[]]> = [
+  [PHONE_BRANDS, (b) => [{ tail: b.code, title: "Back Skin", price: 149, price3d: 249, materialMultiplier: 1 }]],
+  [LAPTOP_BRANDS, (b) => [
+    { tail: `${b.code}LP`, title: "Only Top", price: 249, price3d: 399, materialMultiplier: 1 },
+    { tail: `${b.code}LPK`, title: "Top + Keyboard Area", price: 449, price3d: 649, materialMultiplier: 2 },
+  ]],
+  [CHARGER_BRANDS, (b) => [{ tail: b.code, title: "Charger Skin", price: 119, price3d: 149, materialMultiplier: 1 }]],
+  [CAMERA_BRANDS, (b) => [
+    { tail: `${b.code}CAM`, title: "Without Lens", price: 499, materialMultiplier: 1 },
+    { tail: `${b.code}CAML`, title: "With Lens", price: 699, materialMultiplier: 2 },
+  ]],
+  [LENS_BRANDS, (b) => [{ tail: b.code, title: "Lens Skin", price: 299, price3d: 349, materialMultiplier: 1 }]],
+  [GIMBAL_BRANDS, (b) => [{ tail: b.code, title: "Gimbal Skin", price: 399, materialMultiplier: 1 }]],
+];
+for (const [list, build] of PRESET_BUILDERS) {
+  for (const b of list) {
+    LISTING_PRESETS[b.listing.toLowerCase()] = build(b);
+    LISTING_SCOPES[b.listing.toLowerCase()] = scopeOf(b, list);
+  }
+}
+Object.assign(LISTING_PRESETS, {
+  "dji drone": [
+    { tail: "DJDRO", title: "Drone Only", price: 699, price3d: 799, materialMultiplier: 1 },
+    { tail: "DJDRC", title: "Drone + RC", price: 999, materialMultiplier: 1.7 },
+  ],
+  "dji drone controller": [
+    { tail: "DJRC", title: "RC — Without Display", price: 399, materialMultiplier: 1 },
+    { tail: "DJRCD", title: "RC — With Display", price: 449, materialMultiplier: 1 },
+  ],
+  "mac mini": [{ tail: "MM", title: "Mac mini Skin", price: 599, materialMultiplier: 1 }],
+});
+Object.assign(LISTING_SCOPES, {
+  "dji drone": { modelBrands: ["DJI"] },
+  "dji drone controller": { modelBrands: ["DJI"] },
+  "mac mini": { modelBrands: ["Apple"] },
+});
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+const phoneShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
+  label: `${b.listing} — back`,
+  gadget: "phone",
+  suffix: `phone-${slug(b.listing)}`,
+  listing: b.listing,
+  skuCodes: [b.code],
+  matchSingleVariant: true,
+  askCutOrientation: true,
+  order: 5,
+  isActive: true,
+  prompt:
+    `${b.device} lying face down on a light oak desk, photographed from directly overhead with the camera `
+    + "square to the desk so the back panel is perfectly straight in the frame, its edges parallel to the "
+    + "picture edges, with no tilt and no perspective skew. The phone fills most of the frame. A vinyl skin "
+    + "covers the back panel edge to edge. {{fidelity}} {{cutOrientation}} The skin follows the rounded "
+    + "corners and stops cleanly at the side frame, which stays bare. It is die-cut around "
+    + `${b.camera}: the module, every lens, the flash and the microphone stay completely uncovered, the cut `
+    + "following the exact outline of the module, and the vinyl lies flat everywhere else. No brand logo is "
+    + "visible — it sits under the skin. At the very edges of the frame, softly out of focus, a pair of "
+    + "earphones and a ceramic mug suggest a desk without drawing the eye. No people and no hands anywhere "
+    + "in the frame. " + REAL + "{{staging}} ",
+});
+
+const laptopShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
+  {
+    label: `${b.listing} — lid`,
+    gadget: "laptop",
+    suffix: `laptop-${slug(b.listing)}-top`,
+    listing: b.listing,
+    skuCodes: [`${b.code}LP`],
+    variantTitles: ["Only Top"],
+    order: 5,
+    isActive: true,
+    prompt:
+      `${b.device} resting on a light oak desk, opened just far enough — about 20 degrees — that the hinge `
+      + "and the edge of the screen are visible, photographed from slightly above and in front so the whole "
+      + "outer lid faces the camera and fills most of the frame while still reading unmistakably as a laptop. "
+      + "The entire outer lid is covered edge to edge with a vinyl skin. {{fidelity}} "
+      + (b.logo
+        ? `The vinyl is one continuous sheet with ${b.logo} knocked out of it as negative space, following the `
+          + "logo's exact outline so the bare lid shows only through that shape; there is no circle, plate or "
+          + "border of bare metal around it. "
+        : "The vinyl is one continuous sheet with no cut-out of any kind. ")
+      + "The skin follows the lid's rounded corners and stops cleanly at the edges. Around the laptop, a few "
+      + "softly out-of-focus props — a small green plant, a closed notebook, a ceramic mug — muted and "
+      + "low-contrast. " + REAL + "{{staging}} ",
+  },
+  {
+    label: `${b.listing} — keyboard deck`,
+    gadget: "laptop",
+    suffix: `laptop-${slug(b.listing)}-open`,
+    listing: b.listing,
+    skuCodes: [`${b.code}LPK`],
+    variantTitles: ["Top + Keyboard Area"],
+    order: 6,
+    isActive: true,
+    prompt:
+      `${b.device}, open on a light oak desk, photographed straight down from above the keyboard so the `
+      + "keyboard deck and palm rest fill the frame and the open screen is foreshortened along the top edge. "
+      + "A vinyl skin covers the whole deck around the keyboard and the palm rest as one continuous printed "
+      + "surface. {{fidelity}} The keycaps, the touchpad, the speaker grilles and the power button stay "
+      + "completely uncovered, with the vinyl stopping cleanly at their edges. Softly out-of-focus props at "
+      + "the edges of the frame — a small plant, a closed notebook — muted and low-contrast. "
+      + REAL + "{{staging}} ",
+  },
+];
+
+const chargerShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
+  label: `${b.listing} — two angles`,
+  gadget: "charger",
+  suffix: `charger-${slug(b.listing)}`,
+  listing: b.listing,
+  skuCodes: [b.code],
+  matchSingleVariant: true,
+  order: 5,
+  isActive: true,
+  prompt:
+    `Two of the same power adapter on a light oak desk: ${b.device}. One sits in front at a three-quarter `
+    + "angle with its USB port towards the camera, the other behind it, smaller in frame and turned to show "
+    + "the pins. A vinyl skin covers the flat faces of each body. {{fidelity}} The skin is a thin die-cut "
+    + "sheet lying perfectly flat, with a clean cut edge where it stops before the rounded corners, which "
+    + "stay bare plastic. The USB port and the metal pins stay completely uncovered. No people and no hands "
+    + "anywhere in the frame. " + REAL + "{{staging}} ",
+});
+
+const cameraShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
+  {
+    label: `${b.listing} — body`,
+    gadget: "camera",
+    suffix: `camera-${slug(b.listing)}`,
+    listing: b.listing,
+    skuCodes: [`${b.code}CAM`],
+    variantTitles: ["Without Lens"],
+    order: 5,
+    isActive: true,
+    prompt:
+      `${b.device} body with no lens attached, standing on a light oak desk, photographed from a front `
+      + "three-quarter angle slightly above eye level so the front plate, the grip and the top plate read "
+      + "clearly. A vinyl skin covers the flat front plate and the flat top plate. {{fidelity}} The rubber "
+      + "hand grip is not skinned and stays bare textured rubber, the vinyl stopping with a clean edge where "
+      + `the plate meets it. The ${b.logo} wordmark on the front is knocked out of the vinyl as letter-shaped `
+      + "holes with no box or border around them. The lens mount, buttons, dials and rear screen stay "
+      + "uncovered. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+  },
+  {
+    label: `${b.listing} — with lens`,
+    gadget: "camera",
+    suffix: `camera-${slug(b.listing)}-lens`,
+    listing: b.listing,
+    skuCodes: [`${b.code}CAML`],
+    variantTitles: ["With Lens"],
+    order: 6,
+    isActive: true,
+    prompt:
+      `${b.device} with a standard zoom lens attached, standing on a light oak desk, photographed from a `
+      + "front three-quarter angle. A vinyl skin covers the flat front and top plates of the body and wraps "
+      + "the lens barrel between its rings, as one matching design. {{fidelity}} The rubber grip, the zoom "
+      + "and focus rings, the lens markings, the front glass, the buttons and the dials stay uncovered. No "
+      + "people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+  },
+];
+
+const lensShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
+  label: `${b.listing} — standing`,
+  gadget: "lens",
+  suffix: `lens-${slug(b.listing)}`,
+  listing: b.listing,
+  skuCodes: [b.code],
+  matchSingleVariant: true,
+  order: 5,
+  isActive: true,
+  prompt:
+    `${b.device} standing upright on a light oak desk, photographed from a front three-quarter angle at lens `
+    + "height so the barrel dominates the frame. A vinyl skin is wrapped around the smooth sections of the "
+    + "barrel. {{fidelity}} The artwork curves realistically around the cylinder. The zoom and focus rings, "
+    + "the markings, the front glass and the mount stay uncovered, the vinyl stopping cleanly at their edges. "
+    + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+});
+
+const gimbalShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
+  label: `${b.listing} — standing`,
+  gadget: "gimbals",
+  suffix: `gimbal-${slug(b.listing)}`,
+  listing: b.listing,
+  skuCodes: [b.code],
+  matchSingleVariant: true,
+  order: 0,
+  isActive: true,
+  prompt:
+    `${b.device} standing on its tripod legs on a light oak desk, arms unfolded, photographed from a front `
+    + "three-quarter angle so the handle and the arms fill the frame. A vinyl skin covers the flat faces of "
+    + "the handle and the arms. {{fidelity}} The motors, the joints, the buttons, the joystick, the screen "
+    + "and the camera plate stay uncovered, the vinyl stopping cleanly at their edges. No people and no "
+    + "hands anywhere in the frame. " + REAL + "{{staging}} ",
+});
+
+STARTER_SHOTS.push(
+  ...PHONE_BRANDS.filter((b) => b.device).map(phoneShot),
+  ...LAPTOP_BRANDS.filter((b) => b.device).flatMap(laptopShots),
+  ...CHARGER_BRANDS.filter((b) => b.device).map(chargerShot),
+  ...CAMERA_BRANDS.filter((b) => b.device).flatMap(cameraShots),
+  ...LENS_BRANDS.filter((b) => b.device).map(lensShot),
+  ...GIMBAL_BRANDS.filter((b) => b.device).map(gimbalShot),
+);
