@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import {
@@ -46,17 +46,22 @@ export function MediaPickerDialog({
   const [folder, setFolder] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Record<string, PickedImage>>({});
+  // The list used to stop at 200, newest first, so older uploads could not be
+  // reached at all. It now grows a page at a time, as the grid is scrolled.
+  const PAGE = 120;
+  const [shown, setShown] = useState(PAGE);
+  useEffect(() => { setShown(PAGE); }, [folder, search]);
 
   const folders = useQuery(api.mediaLibrary.getFolders);
   const result = useQuery(api.mediaLibrary.listMedia, {
     folder: folder === "all" ? undefined : folder,
     mediaType: "image",
     searchQuery: search || undefined,
-    limit: 200,
   });
 
   // Media documents keep the URL under whichever provider uploaded them.
-  const items = useMemo(() => {
+  // The library is read once; paging only decides how many to draw.
+  const allItems = useMemo(() => {
     const raw = (result as any)?.items ?? [];
     return raw
       .map((m: any) => ({
@@ -67,6 +72,8 @@ export function MediaPickerDialog({
       }))
       .filter((m: any) => m.url);
   }, [result]);
+  const total = allItems.length;
+  const items = useMemo(() => allItems.slice(0, shown), [allItems, shown]);
 
   const alreadyAdded = useMemo(() => new Set(existingUrls), [existingUrls]);
   const selectedCount = Object.keys(selected).length;
@@ -125,7 +132,13 @@ export function MediaPickerDialog({
           </Select>
         </div>
 
-        <div className="max-h-[55vh] overflow-y-auto rounded-lg border p-3">
+        <div
+          className="max-h-[55vh] overflow-y-auto rounded-lg border p-3"
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            if (el.scrollTop + el.clientHeight > el.scrollHeight - 300 && shown < total) setShown((n) => n + PAGE);
+          }}
+        >
           {result === undefined ? (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {[...Array(8)].map((_, i) => <Skeleton key={i} className="aspect-square" />)}
@@ -171,6 +184,16 @@ export function MediaPickerDialog({
                   </button>
                 );
               })}
+            </div>
+          )}
+          {result !== undefined && total > 0 && (
+            <div className="mt-3 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+              <span>Showing {Math.min(items.length, total)} of {total}</span>
+              {shown < total && (
+                <Button type="button" size="sm" variant="outline" onClick={() => setShown((n) => n + PAGE)}>
+                  Load more
+                </Button>
+              )}
             </div>
           )}
         </div>
