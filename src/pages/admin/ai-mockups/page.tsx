@@ -323,6 +323,15 @@ function ShotLibrary() {
     .filter(Boolean)
     .sort();
 
+  /**
+   * Other shots of the same gadget showing the same view — the part of the
+   * label after the dash: every phone's "back", every charger's "port view".
+   * One uploaded reference is meant for all of them.
+   */
+  const viewOf = (label: string) => (label.split(" — ")[1] || "").replace(/\s*\(copy\)$/, "").trim().toLowerCase();
+  const viewSiblings = (shot: MockupShot) =>
+    shots.filter((o) => o._id !== shot._id && o.gadget === shot.gadget && viewOf(o.label) === viewOf(shot.label));
+
   const addShot = async (gadget: string, gadgetTypeId?: string) => {
     const siblings = shots.filter((s) => s.gadget === gadget);
     await createShot({
@@ -492,6 +501,12 @@ function ShotLibrary() {
               shot={shot}
               onSave={(patch) => updateShot({ promptId: shot._id, ...patch })}
               onDelete={() => deleteShot({ promptId: shot._id })}
+              siblings={viewSiblings(shot)}
+              onShareReference={async (url) => {
+                const targets = viewSiblings(shot);
+                for (const t of targets) await updateShot({ promptId: t._id, referenceUrl: url });
+                toast.success(`Reference applied to ${targets.length} more shot${targets.length === 1 ? "" : "s"}`);
+              }}
               onDuplicate={() =>
                 createShot({
                   ...shot, _id: undefined,
@@ -559,11 +574,13 @@ function SharedBlocksEditor({ blocks, onSave }: { blocks: SharedBlocks; onSave: 
   );
 }
 
-function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
+function ShotCard({ shot, onSave, onDelete, onDuplicate, siblings, onShareReference }: {
   shot: MockupShot;
   onSave: (patch: Partial<MockupShot>) => Promise<any>;
   onDelete: () => Promise<any>;
   onDuplicate: () => Promise<any>;
+  siblings: MockupShot[];
+  onShareReference: (url: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<Partial<MockupShot> | null>(null);
   const [saving, setSaving] = useState(false);
@@ -672,6 +689,17 @@ function ShotCard({ shot, onSave, onDelete, onDuplicate }: {
             {refBusy ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <UploadIcon className="mr-1 size-3" />}
             {shot.referenceUrl ? "Replace" : "Upload"}
           </Button>
+          {shot.referenceUrl && siblings.length > 0 && (
+            <Button size="sm" className="h-7 text-xs" disabled={refBusy}
+              title={siblings.map((x) => x.label).join(", ")}
+              onClick={async () => {
+                if (!confirm(`Use this reference for ${siblings.length} other ${shot.gadget} shot(s) with the same view?\n\n${siblings.map((x) => x.label).join("\n")}`)) return;
+                setRefBusy(true);
+                try { await onShareReference(shot.referenceUrl!); } finally { setRefBusy(false); }
+              }}>
+              Use for all {siblings.length + 1} “{(shot.label.split(" — ")[1] || "same view")}” shots
+            </Button>
+          )}
           {shot.referenceUrl && (
             <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={refBusy}
               onClick={async () => { await onSave({ referenceUrl: "" }); toast.success("Reference removed"); }}>
