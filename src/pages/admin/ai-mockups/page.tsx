@@ -89,6 +89,9 @@ type Job = {
   createdAt: number;
   designName?: string;
   listing?: string;
+  /** Exactly what the model was sent, so a surprising picture can be explained. */
+  promptSent?: string;
+  referenceUrl?: string;
 };
 
 export default function AdminAiMockupsPage() {
@@ -947,6 +950,26 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const [retiring, setRetiring] = useState(false);
   const [tplProgress, setTplProgress] = useState<{ done: number; total: number } | null>(null);
   const templateMockups = useTemplateMockups();
+  const updatePrompt = useMutation(api.aiMockups.updateMockupPrompt);
+  // Shots whose saved prompt is older than the built-in one of the same name.
+  const staleShots = useMemo(() => shots.filter((s) => {
+    const st = STARTER_SHOTS.find((x) => x.gadget === s.gadget && x.suffix === s.suffix);
+    return !!st && st.prompt !== s.prompt;
+  }), [shots]);
+  const staleIds = useMemo(() => new Set(staleShots.map((s) => s._id)), [staleShots]);
+  const [updatingPrompts, setUpdatingPrompts] = useState(false);
+  const updateStale = async () => {
+    setUpdatingPrompts(true);
+    try {
+      for (const s of staleShots) {
+        const st = STARTER_SHOTS.find((x) => x.gadget === s.gadget && x.suffix === s.suffix)!;
+        await updatePrompt({ promptId: s._id, prompt: st.prompt, label: st.label });
+      }
+      toast.success(`${staleShots.length} prompt${staleShots.length === 1 ? "" : "s"} updated`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update");
+    } finally { setUpdatingPrompts(false); }
+  };
 
   useEffect(() => {
     void getBackupFolder().then((h: any) => setBackupFolder(h?.name ?? null));
@@ -1063,8 +1086,17 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     const attempt = jobs.filter((j) => j.suffix === suffix).reduce((n, j) => Math.max(n, j.attempt || 1), 0) + 1;
     const label = orientation ? `${shot.label} · ${orientation === "widthwise" ? "across" : "along"} the roll` : shot.label;
     let jobId: string | null = null;
+    const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + expandPrompt(shot.prompt, blocks, {
+      rNumber: roll.code,
+      designName: roll.name,
+      source: roll.source,
+      finish: roll.finish,
+      cutOrientation: orientation,
+    });
     try {
       jobId = (await createJob({
+        promptSent,
+        referenceUrl: shot.referenceUrl || "",
         rNumber: roll.code,
         designName: roll.name || "",
         designSource: roll.source,
@@ -1091,13 +1123,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         size: useSize,
         resolution: useModel.resolution,
         quality: useModel.quality,
-        prompt: (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + expandPrompt(shot.prompt, blocks, {
-          rNumber: roll.code,
-          designName: roll.name,
-          source: roll.source,
-          finish: roll.finish,
-          cutOrientation: orientation,
-        }),
+        prompt: promptSent,
         imageUrls: shot.referenceUrl ? [roll.rawImageUrl, shot.referenceUrl] : [roll.rawImageUrl],
       });
       await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
@@ -1557,6 +1583,20 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
             </div>
           </div>
 
+          {staleShots.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+              <AlertCircleIcon className="size-4 shrink-0 text-amber-600" />
+              <span className="min-w-0 flex-1">
+                {staleShots.length} shot{staleShots.length === 1 ? " still uses its" : "s still use their"} old prompt —
+                the old pose and the bare camera module. Generate after updating.
+              </span>
+              <Button size="sm" disabled={updatingPrompts} onClick={() => void updateStale()}>
+                {updatingPrompts ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <RefreshCwIcon className="mr-1.5 size-3.5" />}
+                Update prompts
+              </Button>
+            </div>
+          )}
+
           {shots.length === 0 ? (
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               No shots defined yet.{" "}
@@ -1613,7 +1653,11 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                                   {on && <CheckCircle2Icon className="size-3" />}
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                  <span className="block truncate font-medium">{s.label}</span>
+                                  <span className="flex items-center gap-1">
+                                    <span className="truncate font-medium">{s.label}</span>
+                                    {staleIds.has(s._id) && <span className="shrink-0 rounded bg-amber-500 px-1 text-[9px] font-semibold text-white">old prompt</span>}
+                                    {s.referenceUrl && <span className="shrink-0 rounded bg-sky-600 px-1 text-[9px] font-semibold text-white">ref</span>}
+                                  </span>
                                   <code className="block truncate text-[10px] text-muted-foreground">
                                     {mockupFileStem(roll.code, s.suffix)}.webp
                                   </code>
@@ -2257,6 +2301,22 @@ function JobCard({ job, onApprove, onReject, onRedo, onRetryDownload, busy }: {
                 {job.linkedCount ? `linked to ${job.linkedCount} product${job.linkedCount > 1 ? "s" : ""}` : "media library only"}
               </p>
             )}
+            <p className="truncate text-[10px] text-muted-foreground">
+              {job.promptSent === undefined
+                ? "sent before prompts were recorded"
+                : job.referenceUrl
+                  ? <>angle reference sent · <a className="underline" href={job.referenceUrl} target="_blank" rel="noreferrer">view</a></>
+                  : "no angle reference"}
+              {job.promptSent && (
+                <>
+                  {" · "}
+                  <button className="underline" onClick={() => { void navigator.clipboard?.writeText(job.promptSent!); toast.success("Prompt copied"); }}>
+                    copy prompt
+                  </button>
+                  {/^Two identical|Two images are supplied/.test(job.promptSent) ? " · new pose" : " · old pose"}
+                </>
+              )}
+            </p>
             {job.status === "review" && (job.skuCodes || []).length > 0 && (
               <p className="truncate text-[10px] text-muted-foreground">
                 will link {(job.skuCodes || []).map((c) => `${job.rNumber}-${c}`).join(", ")}
