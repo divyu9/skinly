@@ -1,5 +1,5 @@
 import { Fragment, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -239,6 +239,12 @@ export default function ProductDetailPage() {
     );
   }
   
+  // A retired listing points at its replacement. The build also 301s it; this
+  // covers the time before the next build.
+  if (productData && productData.status === "archived") {
+    return <Navigate to={productData.redirectTo || "/products"} replace />;
+  }
+
   // Product not found
   if (!productData) {
     return (

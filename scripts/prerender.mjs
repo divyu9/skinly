@@ -560,14 +560,21 @@ RewriteRule ^(account|auth|backend-skinly|admin|cart|checkout|orders|payment|moc
 # just is not reported to crawlers as a page until the next build.
 RewriteRule ^ - [R=404,L]`;
 
-async function writeHtaccess(strict) {
+async function writeHtaccess(strict, retired = []) {
   const file = path.join(DIST, ".htaccess");
   const src = await fs.readFile(file, "utf8");
   const start = src.indexOf("# >>> routing");
   const end = src.indexOf("# <<< routing");
   if (start === -1 || end === -1) throw new Error(".htaccess is missing its routing markers");
   if (!strict) return;
-  const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${STRICT_ROUTING}\n` + src.slice(end);
+  // Retired listings: their old URL moves permanently to the replacement.
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const moves = retired.length
+    ? `# Retired listings -> their replacements\n${retired
+        .map((p) => `RewriteRule ^products/${esc(p.slug)}$ ${SITE}${p.redirectTo} [R=301,L]`)
+        .join("\n")}\n\n`
+    : "";
+  const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${moves}${STRICT_ROUTING}\n` + src.slice(end);
   await fs.writeFile(file, out);
 }
 
@@ -874,7 +881,12 @@ async function main() {
     [...statics, magneto, ...categories.filter((p) => !p.empty), ...seo.filter((p) => !p.empty)],
     productPages,
   );
-  await writeHtaccess(true);
+  const retired = data.products.filter((p) =>
+    p.status === "archived" && p.slug && /^[a-z0-9][a-z0-9-]*$/.test(p.slug) && !productSlugs.has(p.slug) &&
+    typeof p.redirectTo === "string" && /^\/[a-z0-9/-]*$/.test(p.redirectTo)
+  );
+  await writeHtaccess(true, retired);
+  if (retired.length) log(`redirects: ${retired.length} retired listings`);
   const kinds = {};
   for (const i of seoInfo.values()) kinds[i.target.kind] = (kinds[i.target.kind] || 0) + 1;
   log(`wrote ${statics.length + 1} static, ${categories.length} category, ${productPages.length} product and ${seo.length} SEO pages`);

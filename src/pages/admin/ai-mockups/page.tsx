@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -33,6 +34,7 @@ import {
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
 import { TemplatesTab, RollCalibration, useTemplateMockups } from "./templates.tsx";
+import { RetireListings } from "./retire-listings.tsx";
 import {
   IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, formatCredits, resolveSize, USD_TO_INR,
 } from "@/lib/ai-mockup-models.ts";
@@ -620,6 +622,17 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
   }, [rolls, cutouts, search, source]);
 
+  // "Open in studio" from the coverage table: /backend-skinly/ai-mockups?design=R-12
+  const [params] = useSearchParams();
+  const wanted = params.get("design");
+  useEffect(() => {
+    if (!wanted || !rolls || !cutouts) return;
+    const norm = (s: string) => s.toUpperCase().replace(/-0+(\d)/g, "-$1");
+    const hit = [...rolls.map((r) => ({ id: r._id, code: String(r.rNumber || "") })), ...cutouts.map((c) => ({ id: c._id, code: String(c.cutoutNumber || "") }))]
+      .find((d) => norm(d.code) === norm(wanted));
+    if (hit) setSelectedRollId(hit.id);
+  }, [wanted, rolls, cutouts]);
+
   const selected = designs.find((d) => d._id === selectedRollId) || null;
   const jobsForRoll = useMemo(
     () => (jobs || []).filter((j) => selected && j.rNumber === selected.code),
@@ -767,6 +780,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     try { localStorage.setItem("studio_phase1", v ? "1" : "0"); } catch { /* storage blocked */ }
   };
   const [calibrating, setCalibrating] = useState(false);
+  const [retiring, setRetiring] = useState(false);
   const [tplProgress, setTplProgress] = useState<{ done: number; total: number } | null>(null);
   const templateMockups = useTemplateMockups();
 
@@ -1370,6 +1384,9 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   Create {missingListings.length} missing listing{missingListings.length === 1 ? "" : "s"}
                 </Button>
               )}
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRetiring(true)}>
+                Retire old listings
+              </Button>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onManageShots}>
                 Manage gadgets &amp; prompts
               </Button>
@@ -1567,6 +1584,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           </div>
         </div>
       )}
+
+      {retiring && <RetireListings design={roll} onClose={() => setRetiring(false)} />}
 
       {calibrating && (
         <RollCalibration

@@ -24,6 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { MaterialMapping } from "./material-mapping.tsx";
 import { LaptopSkuFix } from "./laptop-sku-fix.tsx";
+import { RollCoverage } from "./roll-coverage.tsx";
 import { PlusIcon, EditIcon, TrashIcon, PackageIcon, RulerIcon, LinkIcon, AlertCircleIcon, RefreshCwIcon, CalculatorIcon, WrenchIcon, SearchIcon, ArrowUpIcon, ArrowDownIcon, ArrowUpDownIcon } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
@@ -280,6 +281,10 @@ export function RollsManagement() {
           <PackageIcon className="size-4 mr-2" />
           Roll Management
         </TabsTrigger>
+        <TabsTrigger value="coverage">
+          <RulerIcon className="size-4 mr-2" />
+          Coverage
+        </TabsTrigger>
         <TabsTrigger value="mapping">
           <LinkIcon className="size-4 mr-2" />
           Mapping
@@ -296,6 +301,10 @@ export function RollsManagement() {
           Fix laptop SKUs
         </Button>
       </div>
+
+      <TabsContent value="coverage">
+        <RollCoverage />
+      </TabsContent>
 
       <TabsContent value="management" className="space-y-8">
       {/* Low Stock Alerts */}
