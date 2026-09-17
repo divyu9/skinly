@@ -17,7 +17,8 @@ import {
 } from "@/lib/ai-mockup-shots.ts";
 import { IMAGE_MODELS, resolveSize, formatInr } from "@/lib/ai-mockup-models.ts";
 import {
-  canvasToWebp, composite, dataToCanvas, greenSwatch, imageToData, loadImage, rectifyRoll, truePiece, type Point,
+  canvasToWebp, composite, dataToCanvas, greenSwatch, imageToData, largestGreenQuad, loadImage, rectifyRoll, truePiece,
+  type Point,
 } from "@/lib/mockup-composite.ts";
 
 /**
@@ -443,22 +444,9 @@ function CornerEditor({ template, onClose, onSave }: {
   const autoDetect = async () => {
     setWorking(true);
     try {
-      const data = imageToData(await loadCanvasImage(template.imageUrl!));
-      let tl: Point | null = null, tr: Point | null = null, br: Point | null = null, bl: Point | null = null;
-      let a = Infinity, b = -Infinity, c = -Infinity, d = Infinity;
-      for (let y = 0; y < data.height; y += 2) {
-        for (let x = 0; x < data.width; x += 2) {
-          const i = (y * data.width + x) * 4;
-          const g = data.data[i + 1] - Math.max(data.data[i], data.data[i + 2]);
-          if (g < 80) continue;
-          if (x + y < a) { a = x + y; tl = { x, y }; }
-          if (x - y > b) { b = x - y; tr = { x, y }; }
-          if (x + y > c) { c = x + y; br = { x, y }; }
-          if (x - y < d) { d = x - y; bl = { x, y }; }
-        }
-      }
-      if (!tl || !tr || !br || !bl) throw new Error("No green area found in this photo");
-      setPoints([tl, tr, br, bl]);
+      const quad = largestGreenQuad(imageToData(await loadCanvasImage(template.imageUrl!)));
+      if (!quad) throw new Error("No green area found in this photo");
+      setPoints(quad);
       toast.info("Corners found — drag any that sit inside the real edge (a camera bar or logo can hide one)");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not read the photo");

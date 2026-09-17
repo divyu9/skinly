@@ -272,6 +272,59 @@ export function truePiece(
 /** A canvas as a base64 data URL in WebP, for upload. */
 export const canvasToWebp = (c: HTMLCanvasElement, quality = 0.9) => c.toDataURL("image/webp", quality);
 
+/**
+ * The four corners of the largest green patch in a photo: a template's skin
+ * area, ready for the admin to nudge.
+ *
+ * Grouping the green into patches matters. A template photo often holds a
+ * second device (a phone shown front-on beside the skinned one) or a plant,
+ * each with green of its own, and the extremes of all the green together drew
+ * a box around the whole scene instead of the surface.
+ */
+export function largestGreenQuad(data: ImageData, step = 2): Point[] | null {
+  const gw = Math.ceil(data.width / step), gh = Math.ceil(data.height / step);
+  const green = new Uint8Array(gw * gh);
+  for (let gy = 0; gy < gh; gy++) {
+    for (let gx = 0; gx < gw; gx++) {
+      const i = ((gy * step) * data.width + gx * step) * 4;
+      if (data.data[i + 1] - Math.max(data.data[i], data.data[i + 2]) >= 80) green[gy * gw + gx] = 1;
+    }
+  }
+  const seen = new Uint8Array(gw * gh);
+  const queue = new Int32Array(gw * gh);
+  let best: number[] | null = null;
+  for (let start = 0; start < green.length; start++) {
+    if (!green[start] || seen[start]) continue;
+    let head = 0, tail = 0;
+    queue[tail++] = start;
+    seen[start] = 1;
+    const cells: number[] = [];
+    while (head < tail) {
+      const cell = queue[head++];
+      cells.push(cell);
+      const cx = cell % gw, cy = (cell - cx) / gw;
+      if (cx + 1 < gw) { const n = cell + 1; if (green[n] && !seen[n]) { seen[n] = 1; queue[tail++] = n; } }
+      if (cx > 0) { const n = cell - 1; if (green[n] && !seen[n]) { seen[n] = 1; queue[tail++] = n; } }
+      if (cy + 1 < gh) { const n = cell + gw; if (green[n] && !seen[n]) { seen[n] = 1; queue[tail++] = n; } }
+      if (cy > 0) { const n = cell - gw; if (green[n] && !seen[n]) { seen[n] = 1; queue[tail++] = n; } }
+    }
+    if (!best || cells.length > best.length) best = cells;
+  }
+  if (!best || best.length < 50) return null;
+
+  let tl: Point | null = null, tr: Point | null = null, br: Point | null = null, bl: Point | null = null;
+  let a = Infinity, b = -Infinity, c = -Infinity, d = Infinity;
+  for (const cell of best) {
+    const gx = cell % gw, gy = (cell - gx) / gw;
+    const x = gx * step, y = gy * step;
+    if (x + y < a) { a = x + y; tl = { x, y }; }
+    if (x - y > b) { b = x - y; tr = { x, y }; }
+    if (x + y > c) { c = x + y; br = { x, y }; }
+    if (x - y < d) { d = x - y; bl = { x, y }; }
+  }
+  return tl && tr && br && bl ? [tl, tr, br, bl] : null;
+}
+
 /** A flat solid-green swatch, the reference an image model is given to paint a template's skin. */
 export function greenSwatch(size = 512): string {
   const c = document.createElement("canvas");
