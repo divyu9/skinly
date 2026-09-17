@@ -29,6 +29,8 @@ interface BaseStep {
   label: string;
   status: StepStatus;
   note?: string;
+  /** How many times this step has been run, for the one retry a failure gets. */
+  tries?: number;
 }
 
 type Step =
@@ -289,6 +291,15 @@ export async function runLaunch(launchId: string, budgetMs: number) {
   const save = (extra: Record<string, unknown> = {}) =>
     ref.update({ steps: launch.steps, created: launch.created || {}, updatedAt: Date.now(), leaseUntil: Date.now() + LEASE_MS, ...extra });
 
+  // One more go at a listing that failed on its own — the copywriter
+  // occasionally returns a half-written answer — but only where nothing was
+  // written, so a retry can never leave two listings of the same kind.
+  for (const step of launch.steps) {
+    if (step.type !== "create" || step.status !== "failed" || (step.tries || 0) >= 2) continue;
+    if (await listingOfKind(db, launch, step.listing)) continue;
+    step.status = "pending";
+  }
+
   try {
     for (const step of launch.steps) {
       if (step.status !== "pending") continue;
@@ -296,6 +307,7 @@ export async function runLaunch(launchId: string, budgetMs: number) {
         await save({ leaseUntil: 0 });
         return;
       }
+      step.tries = (step.tries || 0) + 1;
       try {
         const out = await runStep(db, launch, step, launchId);
         step.status = out.status;

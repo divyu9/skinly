@@ -230,6 +230,40 @@ export function deviceNameFor(listingName: string, gadgetLabel: string): string 
   return noun ? `${name} ${noun}` : name;
 }
 
+/**
+ * Reads the copywriter's JSON, and rescues it when the model stops mid-answer.
+ *
+ * A truncated reply — the description is long and the model sometimes runs
+ * into the token ceiling — is still nearly all there, so the fields that did
+ * arrive are pulled out rather than losing the whole listing to a parse error.
+ */
+export function parseCopyJson(raw: string): any | null {
+  const text = String(raw || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  if (!text) return null;
+  const body = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1 || undefined);
+  for (const candidate of [text, body, `${body.replace(/,\s*$/, "")}}`, `${body.replace(/[^"]*$/, "")}"}`]) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch { /* try the next repair */ }
+  }
+  // Last resort: take the fields one by one out of the half-finished JSON.
+  const str = (key: string) => {
+    const m = text.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+    try { return m ? JSON.parse(`"${m[1]}"`) : ""; } catch { return m ? m[1] : ""; }
+  };
+  const list = (key: string) => {
+    const m = text.match(new RegExp(`"${key}"\\s*:\\s*\\[([^\\]]*)`));
+    return m ? (m[1].match(/"((?:[^"\\]|\\.)*)"/g) || []).map((q) => q.slice(1, -1)) : [];
+  };
+  const out = {
+    title: str("title"), slug: str("slug"), metaTitle: str("metaTitle"),
+    metaDescription: str("metaDescription"), description: str("description"),
+    tags: list("tags"), collections: list("collections"),
+  };
+  return out.title || out.description ? out : null;
+}
+
 export interface ListingCopy {
   title: string;
   slug: string;
@@ -270,43 +304,72 @@ export async function writeListingCopy(
     .replace(/\s+(\w+\s+)?finish(\s+skin)?\s*$/i, "")
     .replace(/\s+skins?\s*$/i, "")
     .trim() || args.designCode;
-  const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: "gpt-4o",
-      temperature: 0.7,
-      max_tokens: 2400,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM },
-        {
-          role: "user",
-          content:
-            `Design name: ${designName}\n` +
-            `Design code: ${args.designCode}\n` +
-            `Gadget: ${args.gadgetLabel}\n` +
-            `Device: ${device} (use exactly "${device} Skin" in the title and "${device}" in the meta title, ` +
-            `so a shopper can tell which gadget this is)\n` +
-            `Finish: ${args.finishLabel}\n` +
-            `Material: ${args.source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
-            (args.themes?.length ? `Design themes: ${args.themes.join(", ")}\n` : "") +
-            `Variants offered: ${args.variantTitles.join(", ")}\n` +
-            `Collections: ${themeCollections.map((c) => c.name).join(" | ")}`,
-        },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    console.error("writeListingCopy: OpenAI failed", await res.text());
-    throw new HttpsError("internal", "The copywriter call failed — try again");
+  const ask = async (attempt: number) => {
+    const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        temperature: attempt > 1 ? 0.4 : 0.7,
+        max_tokens: 4000,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM },
+          {
+            role: "user",
+            content:
+              `Design name: ${designName}\n` +
+              `Design code: ${args.designCode}\n` +
+              `Gadget: ${args.gadgetLabel}\n` +
+              `Device: ${device} (use exactly "${device} Skin" in the title and "${device}" in the meta title, ` +
+              `so a shopper can tell which gadget this is)\n` +
+              `Finish: ${args.finishLabel}\n` +
+              `Material: ${args.source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
+              (args.themes?.length ? `Design themes: ${args.themes.join(", ")}\n` : "") +
+              `Variants offered: ${args.variantTitles.join(", ")}\n` +
+              `Collections: ${themeCollections.map((c) => c.name).join(" | ")}` +
+              // A second run follows a first that came back cut off or empty.
+              (attempt > 1 ? "\n\nKeep the description to about 300 words, and reply with the JSON only." : ""),
+          },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.error("writeListingCopy: OpenAI failed", await res.text());
+      throw new HttpsError("internal", "The copywriter call failed — try again");
+    }
+    const body: any = await res.json();
+    const choice = body.choices?.[0] || {};
+    const parsed = parseCopyJson(choice.message?.content || "");
+    // A title with no description is a listing with an empty page, so a reply
+    // that arrived only half-written counts as a failure worth retrying.
+    const usable = parsed && String(parsed.description || "").trim().length > 200;
+    if (!usable) {
+      console.error(
+        "writeListingCopy: unreadable reply",
+        JSON.stringify({
+          designCode: args.designCode,
+          listing: listingName,
+          attempt,
+          finishReason: choice.finish_reason || "",
+          refusal: choice.message?.refusal || "",
+          head: String(choice.message?.content || "").slice(0, 400),
+        })
+      );
+      return { copy: null as any, reason: String(choice.finish_reason || (parsed ? "short description" : "unreadable")) };
+    }
+    return { copy: parsed, reason: "" };
+  };
+
+  let copy: any = null;
+  let reason = "";
+  for (let attempt = 1; attempt <= 2 && !copy; attempt++) {
+    const out = await ask(attempt);
+    copy = out.copy;
+    reason = out.reason;
   }
-  const body: any = await res.json();
-  let copy: any;
-  try {
-    copy = JSON.parse(body.choices?.[0]?.message?.content || "{}");
-  } catch {
-    throw new HttpsError("internal", "The copywriter returned something unreadable");
+  if (!copy) {
+    throw new HttpsError("internal", `The copywriter could not finish this listing (${reason}) — run the launch again`);
   }
   const says = (t: string) => t.toLowerCase().includes(device.toLowerCase());
   let title = String(copy.title || "").trim();
