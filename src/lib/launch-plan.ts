@@ -427,6 +427,7 @@ export function buildLaunchPlan(input: {
               gadget: shot.gadget, listing: info.listing, suffix, skuCodes: shotCodes(shot),
               variantTitles: shot.variantTitles || [], matchSingleVariant: shot.matchSingleVariant || false,
               sourceUrl: design.rawImageUrl, attempt: attemptFor(suffix), modelLabel: options.model.label,
+              pieceCm: crop ? `${crop.widthCm}×${crop.heightCm}` : "",
               aspect: size, credits: options.model.credits, costInr: cost, promptSent, referenceUrl: shot.referenceUrl || "",
             },
           });

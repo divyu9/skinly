@@ -92,6 +92,8 @@ type Job = {
   listing?: string;
   /** Exactly what the model was sent, so a surprising picture can be explained. */
   promptSent?: string;
+  /** "16×10" when the model was given the device's own piece at true size. */
+  pieceCm?: string;
   referenceUrl?: string;
 };
 
@@ -1145,6 +1147,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         variantTitles: shot.variantTitles || [],
         matchSingleVariant: shot.matchSingleVariant || false,
         sourceUrl: designUrl,
+        pieceCm: piece ? `${piece.widthCm}×${piece.heightCm}` : "",
         status: "queued",
         attempt,
         modelLabel: useModel.label,
@@ -2410,6 +2413,13 @@ function JobCard({ job, onApprove, onReject, onRedo, onRetryDownload, busy }: {
                   {/^Two identical|Two images are supplied/.test(job.promptSent) ? " · new pose" : " · old pose"}
                 </>
               )}
+            </p>
+            {/* Whether the model saw the device's own piece of the roll, which
+                is what decides the pattern's scale. */}
+            <p className="truncate text-[10px]">
+              {job.pieceCm
+                ? <span className="text-emerald-600 dark:text-emerald-400">true size · {job.pieceCm} cm piece</span>
+                : <span className="text-amber-600 dark:text-amber-400">whole roll photo · scale is the model's guess</span>}
             </p>
             {job.status === "review" && (job.skuCodes || []).length > 0 && (
               <p className="truncate text-[10px] text-muted-foreground">
