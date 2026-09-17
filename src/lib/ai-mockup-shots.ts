@@ -686,10 +686,11 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "ends. The black centre chassis, the blue light strip, the disc slot, the ports, the buttons, "
         + "the SONY and PlayStation lettering and the base stand are never skinned. On the controller "
         + "the vinyl wraps the full outer shell as a single continuous piece — both curved grips all the "
-        + "way round their outer and under sides, the two shoulder humps, and the front face panels on "
-        + "either side of the touchpad — following every compound curve tightly with no bubbles, no lift "
-        + "and no gaps of bare white left between panels. The touchpad, the D-pad, the face buttons, the "
-        + "thumbsticks, the light bar, the triggers and the central PS button stay bare, with the vinyl "
+        + "way round their outer and under sides, the two shoulder humps, the front face panels on "
+        + "either side of the touchpad and the touchpad itself, skinned over with the pattern running "
+        + "straight across it — following every compound curve tightly with no bubbles, no lift and no "
+        + "gaps of bare white left between panels. The D-pad, the face buttons, the thumbsticks, the "
+        + "thin light bar strip, the triggers and the central PS button stay bare, with the vinyl "
         + "die-cut cleanly around each of them. No people and no hands anywhere in the frame. " + REAL
         + "{{staging}} ",
   },
@@ -832,15 +833,18 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "straight in frame with no tilt and fills it. A vinyl skin wraps the outer shell. "
         + "{{fidelity}} The vinyl is applied as one continuous piece over the whole outer shell — both "
         + "curved grips all the way round their outer and under sides, the two shoulder humps at the "
-        + "top, and the two front face panels on either side of the touchpad — following every compound "
+        + "top, the two front face panels on either side of the touchpad, and the touchpad itself, "
+        + "which is skinned over with the pattern running straight across it — following every compound "
         + "curve tightly, conforming to the shape like heat-shrunk film, with no bubbles, no lift, no "
-        + "wrinkles, and no gaps of bare white shell left showing between panels. The pattern is "
-        + "continuous across the grip and the face panel above it, not two separate stickers. The "
-        + "touchpad, the D-pad, the four face buttons, the two thumbsticks, the light bar around the "
-        + "touchpad, the triggers and bumpers, the create and options buttons and the central PS button "
-        + "all stay bare factory white or black, with the vinyl die-cut precisely around each of them so "
-        + "the cut follows the exact outline of the recess. No people and no hands anywhere in the "
-        + "frame. " + REAL + "{{staging}} ",
+        + "wrinkles, and no gaps of bare white shell left showing between panels. The whole upper face "
+        + "is covered: no white factory shell is left anywhere between the D-pad, the face buttons and "
+        + "the touchpad, and none around or below the touchpad. The pattern is continuous across the "
+        + "grip, the face panel above it and the touchpad, not separate stickers. The D-pad, the four "
+        + "face buttons, the two thumbsticks, the thin light bar strip along the touchpad's edges, the "
+        + "triggers and bumpers, the create and options buttons, the speaker holes and the central PS "
+        + "button stay bare factory white or black, with the vinyl die-cut precisely around each of "
+        + "them so the cut follows the exact outline of the recess. No people and no hands anywhere in "
+        + "the frame. " + REAL + "{{staging}} ",
   },
   {
     label: "DualShock 4 controller",
@@ -854,11 +858,12 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "daylight, photographed from directly above with the camera square to the surface so the "
         + "controller is straight in frame with no tilt and fills it. A vinyl skin wraps the outer "
         + "shell. {{fidelity}} The vinyl is applied as one continuous piece over the whole outer shell "
-        + "— the top face around the controls, both grips all the way round their outer and under "
-        + "sides, and the shoulder humps — following every compound curve tightly with no bubbles, no "
-        + "lift and no gaps of bare factory shell showing between panels. The touchpad, the D-pad, the "
-        + "face buttons, the thumbsticks, the light bar, the triggers and the bumpers stay bare, with "
-        + "the vinyl die-cut precisely around each of them. No people and no hands anywhere in the "
+        + "— the top face around the controls, the touchpad, which is skinned over with the pattern "
+        + "running straight across it, both grips all the way round their outer and under sides, and "
+        + "the shoulder humps — following every compound curve tightly with no bubbles, no lift and no "
+        + "gaps of bare factory shell showing between panels. The D-pad, the face buttons, the "
+        + "thumbsticks, the thin light bar strip, the triggers and the bumpers stay bare, with the "
+        + "vinyl die-cut precisely around each of them. No people and no hands anywhere in the "
         + "frame. " + REAL + "{{staging}} ",
   },
   {
