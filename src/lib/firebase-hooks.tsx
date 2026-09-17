@@ -402,6 +402,14 @@ export function useQuery(apiRef: any, args?: any) {
             setData(rows);
           });
         }
+        else if (path === 'aiMockups.getTemplates') {
+          // Template mockups live beside the shared prompt settings, which are
+          // already admin-only, rather than in a collection of their own.
+          unsubscribe = onSnapshot(
+            query(collection(db, 'gadgetMockupSettings'), where('kind', '==', 'template')),
+            (snap) => setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })))
+          );
+        }
         else if (path === 'aiMockups.getSettings') {
           // Single doc holding the prompt fragments every shot shares.
           unsubscribe = onSnapshot(doc(db, 'gadgetMockupSettings', 'default'), (snap) => {
@@ -5503,6 +5511,9 @@ export function useMutation(apiRef: any) {
           await updateDoc(pref, {
             images: [...images, { url: args.url, alt: args.alt || pdata.title || '' }],
             updatedAt: Date.now(),
+            // A studio listing waits in draft for its first approved picture:
+            // a listing with no photo is not worth showing to anyone.
+            ...(pdata.awaitingImage ? { status: 'active', awaitingImage: deleteField(), publishedAt: Date.now() } : {}),
           });
           linked++;
         }
@@ -6217,6 +6228,14 @@ export function useMutation(apiRef: any) {
           added,
           message: added ? `Added ${added} missing row(s)` : 'Everything is already present — nothing added',
         };
+      }
+
+      if (path === 'aiMockups.saveTemplate') {
+        const { id, ...rest } = args || {};
+        if (!id) throw new Error('Missing template id');
+        const clean = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+        await setDoc(doc(db, 'gadgetMockupSettings', String(id)), { ...clean, kind: 'template', updatedAt: Date.now() }, { merge: true });
+        return id;
       }
 
       if (path === 'aiMockups.updateMockupSettings') {

@@ -331,7 +331,10 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
     metaTitle: String(copy.metaTitle || `${title} | Skinly`).slice(0, 70),
     metaDescription: String(copy.metaDescription || "").slice(0, 170),
     tags,
-    status: "active",
+    // Draft until its first mockup is approved: the studio's linker publishes
+    // it then. A listing with no picture of the device is not worth showing.
+    status: "draft",
+    awaitingImage: true,
     productCategory: "skin",
     productType: "physical",
     gadgetTypeId,
@@ -339,7 +342,9 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
     ...(finishTypeId ? { finishTypeId } : {}),
     ...(finishMatch ? { finishType: (finishMatch.data() as any).name } : {}),
     hasMultipleVariants: variants.length > 1,
-    images: imageUrl ? [{ url: imageUrl, alt: designCode }] : [],
+    // The raw roll photo is kept for reference but is not a product picture.
+    images: [],
+    ...(imageUrl ? { designImageUrl: imageUrl } : {}),
     length: tpl.dims.length,
     breadth: tpl.dims.breadth,
     height: tpl.dims.height,

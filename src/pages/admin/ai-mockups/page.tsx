@@ -28,9 +28,11 @@ import {
 } from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
+  isPhase1, listingSlug, FLAT_GADGETS,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
+import { TemplatesTab, RollCalibration, useTemplateMockups } from "./templates.tsx";
 import {
   IMAGE_MODELS, MODEL_BY_ID, DEFAULT_MODEL_ID, formatInr, formatCredits, resolveSize, USD_TO_INR,
 } from "@/lib/ai-mockup-models.ts";
@@ -83,6 +85,8 @@ type Job = {
   credits?: number;
   costInr?: number;
   createdAt: number;
+  designName?: string;
+  listing?: string;
 };
 
 export default function AdminAiMockupsPage() {
@@ -129,6 +133,11 @@ interface Design {
   /** Metres for a roll, pieces for a cutout. */
   stock?: number;
   stockLabel: string;
+  /** A roll photo flattened to true centimetres (template mockups). */
+  flatImageUrl?: string;
+  flatPxPerCm?: number;
+  flatWidthCm?: number;
+  flatLengthCm?: number;
 }
 
 /** The pictures of one product, within a gadget. */
@@ -181,7 +190,7 @@ function groupByGadget<T extends { gadget: string }>(rows: T[]): [string, T[]][]
 }
 
 function AiMockupsContent() {
-  const [tab, setTab] = useState<"studio" | "shots">("studio");
+  const [tab, setTab] = useState<"studio" | "shots" | "templates">("studio");
   // Held above the tabs: switching to Shots unmounts Studio, and losing your
   // place every time you tweak a prompt is maddening.
   const [selectedRollId, setSelectedRollId] = useState<string | null>(null);
@@ -202,7 +211,7 @@ function AiMockupsContent() {
           </p>
         </div>
         <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
-          {(["studio", "shots"] as const).map((t) => (
+          {(["studio", "templates", "shots"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -210,7 +219,7 @@ function AiMockupsContent() {
                 tab === t ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "shots" ? "Gadgets & prompts" : t}
+              {t === "shots" ? "Gadgets & prompts" : t === "templates" ? "Templates" : t}
             </button>
           ))}
         </div>
@@ -228,11 +237,19 @@ function AiMockupsContent() {
           setAspect={setAspect}
           onManageShots={() => setTab("shots")}
         />
+      ) : tab === "templates" ? (
+        <TemplatesTabWrapper />
       ) : (
         <ShotLibrary />
       )}
     </div>
   );
+}
+
+function TemplatesTabWrapper() {
+  const { shots, blocks, loading } = useShotLibrary();
+  if (loading) return <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}</div>;
+  return <TemplatesTab shots={shots} blocks={blocks} />;
 }
 
 /* --------------------------------------------------- gadgets & prompts tab */
@@ -588,6 +605,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
       _id: r._id, source: "roll", code: String(r.rNumber || "").trim(), name: r.designName || "",
       rawImageUrl: r.rawImageUrl, finish: r.finish, stock: r.metersAvailable,
       stockLabel: `${r.metersAvailable ?? 0} m`,
+      flatImageUrl: r.flatImageUrl, flatPxPerCm: r.flatPxPerCm, flatWidthCm: r.flatWidthCm, flatLengthCm: r.flatLengthCm,
     }));
     const fromCutouts: Design[] = (cutouts || []).map((c) => ({
       _id: c._id, source: "cutout", code: String(c.cutoutNumber || "").trim(), name: c.designName || "",
@@ -740,6 +758,17 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const [bulkListings, setBulkListings] = useState(false);
   const [justCreated, setJustCreated] = useState<Record<string, string>>({});
   const [backupFolder, setBackupFolder] = useState<string | null>(null);
+  // Phase 1: only the high-search listings are created and templated.
+  const [phaseOnly, setPhaseOnlyState] = useState<boolean>(() => {
+    try { return localStorage.getItem("studio_phase1") !== "0"; } catch { return true; }
+  });
+  const setPhaseOnly = (v: boolean) => {
+    setPhaseOnlyState(v);
+    try { localStorage.setItem("studio_phase1", v ? "1" : "0"); } catch { /* storage blocked */ }
+  };
+  const [calibrating, setCalibrating] = useState(false);
+  const [tplProgress, setTplProgress] = useState<{ done: number; total: number } | null>(null);
+  const templateMockups = useTemplateMockups();
 
   useEffect(() => {
     void getBackupFolder().then((h: any) => setBackupFolder(h?.name ?? null));
@@ -864,6 +893,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         shotId: shot._id,
         shotLabel: label,
         gadget: shot.gadget,
+        listing: listingOf(shot),
         suffix,
         skuCodes: shotCodes(shot),
         variantTitles: shot.variantTitles || [],
@@ -957,10 +987,39 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const missingListings = useMemo(() => {
     if (!linkTargets) return [] as ListingGroup[];
     return listingGroups.filter((g) => {
+      if (phaseOnly && !isPhase1(g.listing)) return false;
       const t = targetsForGroup(g);
       return t !== null && t.length === 0;
     });
-  }, [listingGroups, linkTargets, targetsForGroup]);
+  }, [listingGroups, linkTargets, targetsForGroup, phaseOnly]);
+
+  /** Listings whose picture a template can make for this design right now. */
+  const templatedGroups = useMemo(() =>
+    listingGroups.filter((g) =>
+      FLAT_GADGETS.has(g.gadget) &&
+      (!phaseOnly || isPhase1(g.listing)) &&
+      templateMockups.byListing.get(g.listing.toLowerCase())?.status === "ready"
+    ), [listingGroups, phaseOnly, templateMockups.byListing]);
+
+  const makeTemplateMockups = async () => {
+    if (!templatedGroups.length) return toast.error("No listing has a ready template yet — set them up in the Templates tab");
+    if (roll.source === "roll" && !roll.flatImageUrl) return toast.error("Calibrate this roll first");
+    setTplProgress({ done: 0, total: templatedGroups.length });
+    try {
+      const n = await templateMockups.run(
+        roll,
+        templatedGroups,
+        cutOrientation === "both" ? ["lengthwise", "widthwise"] : [cutOrientation],
+        jobs,
+        (done, total) => setTplProgress({ done, total })
+      );
+      toast.success(`${n} template mockup${n === 1 ? "" : "s"} ready for review · ₹0`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not make the mockups");
+    } finally {
+      setTplProgress(null);
+    }
+  };
 
   // The listing template is read by a Cloud Function that walks the gadget's
   // catalogue, which took seven or eight seconds after "Create listing" was
@@ -1031,7 +1090,18 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     if (!job.pendingKey) return;
     setBusyJob(job._id);
     try {
-      const stem = mockupFileStem(job.rNumber, job.suffix, job.attempt || 1);
+      // A file name that says what the picture is — design, device, "skin" —
+      // is a small search signal of its own; the design code keeps it unique.
+      const stem = job.listing && job.designName
+        ? [
+            listingSlug(job.designName),
+            listingSlug(job.listing),
+            "skin",
+            listingSlug(job.rNumber),
+            listingSlug(job.suffix).slice(0, 40),
+            (job.attempt || 1) > 1 ? `v${job.attempt}` : "",
+          ].filter(Boolean).join("-")
+        : mockupFileStem(job.rNumber, job.suffix, job.attempt || 1);
       const finalKey = `ai-mockups/${stem}.webp`;
       // Copied server-side; there is no reason to pull a megabyte through the
       // browser just to push it back.
@@ -1062,7 +1132,9 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           matchSingleVariant: job.matchSingleVariant,
           gadget: job.gadget,
           url,
-          alt: job.designName || job.shotLabel || "",
+          alt: job.listing && job.designName
+            ? `${job.designName} ${job.listing} skin`
+            : job.designName || job.shotLabel || "",
         });
         linked = res?.linked ?? 0;
       }
@@ -1235,10 +1307,22 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 </div>
               </div>
             ) : (
-              <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
-                <UploadIcon className="mr-1.5 size-3.5" />
-                {roll.rawImageUrl ? "Replace raw photo" : "Upload raw photo"}
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" disabled={uploading} onClick={() => fileRef.current?.click()}>
+                  <UploadIcon className="mr-1.5 size-3.5" />
+                  {roll.rawImageUrl ? "Replace raw photo" : "Upload raw photo"}
+                </Button>
+                {roll.source === "roll" && roll.rawImageUrl && (
+                  <Button size="sm" variant={roll.flatImageUrl ? "ghost" : "default"} onClick={() => setCalibrating(true)}>
+                    {roll.flatImageUrl ? "Re-calibrate" : "Calibrate for template mockups"}
+                  </Button>
+                )}
+                {roll.source === "roll" && (
+                  <span className={`text-[11px] ${roll.flatImageUrl ? "text-emerald-600" : "text-muted-foreground"}`}>
+                    {roll.flatImageUrl ? `calibrated · ${roll.flatWidthCm} × ${roll.flatLengthCm} cm` : "not calibrated"}
+                  </span>
+                )}
+              </div>
             )}
           </div>
         </CardContent>
@@ -1257,6 +1341,23 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               >
                 <CheckCircle2Icon className="mr-1 size-3" />
                 {allPicked ? "Clear all" : `Select all ${activeShotIds.length} shots`}
+              </Button>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground" title="Only the high-search listings are created and templated">
+                <Switch checked={phaseOnly} onCheckedChange={setPhaseOnly} />
+                Phase 1
+              </label>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-emerald-400 text-xs text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
+                disabled={!!tplProgress || !templatedGroups.length}
+                title={templatedGroups.length ? "" : "Set up templates in the Templates tab first"}
+                onClick={() => void makeTemplateMockups()}
+              >
+                {tplProgress ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <ImageIcon className="mr-1 size-3" />}
+                {tplProgress
+                  ? `Making ${tplProgress.done}/${tplProgress.total}…`
+                  : `Template mockups (${templatedGroups.length}) · ₹0`}
               </Button>
               {missingListings.length > 0 && (
                 <Button
@@ -1467,6 +1568,14 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         </div>
       )}
 
+      {calibrating && (
+        <RollCalibration
+          roll={roll}
+          onClose={() => setCalibrating(false)}
+          onSaved={async (fields) => { await updateRoll({ id: roll._id, ...fields }); }}
+        />
+      )}
+
       {redoJob && (
         <RedoDialog
           job={redoJob}
@@ -1614,7 +1723,7 @@ function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, 
       // A new window, so the studio keeps its queue and the admin can check the
       // generated copy side by side.
       window.open(`/backend-skinly/products/${res.productId}`, "_blank", "noopener");
-      toast.success(`Created ${res.skus.join(", ")} · in ${res.collections} collection${res.collections === 1 ? "" : "s"}`);
+      toast.success(`Created ${res.skus.join(", ")} as a draft · it goes live when its first mockup is approved`);
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not create the listing");

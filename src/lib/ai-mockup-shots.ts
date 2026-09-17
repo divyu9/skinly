@@ -1557,3 +1557,38 @@ STARTER_SHOTS.push(
   ...LENS_BRANDS.filter((b) => b.device).map(lensShot),
   ...GIMBAL_BRANDS.filter((b) => b.device).map(gimbalShot),
 );
+
+/* ------------------------------------------------------------------ phases */
+
+/**
+ * Listings in the first, measured roll-out.
+ *
+ * Phase 1 is the high-search listings on a handful of designs, so the
+ * brand-listing model can be judged on real impressions and orders before the
+ * rest are made. The studio creates only these while its phase switch is on.
+ */
+export const PHASE_1_LISTINGS = new Set([
+  "apple iphone", "samsung galaxy", "oneplus", "android phone",
+  "macbook", "laptop",
+  "apple ipad", "samsung galaxy tab",
+  "ps5", "xbox series x", "xbox series s",
+  "playstation controller",
+]);
+
+export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing || "").trim().toLowerCase());
+
+/**
+ * Listings whose picture can be made from a template rather than by AI: the
+ * skin sits on one flat face that a single perspective warp can cover.
+ */
+export const FLAT_GADGETS = new Set(["phone", "laptop", "tablet", "mac-mini"]);
+
+/** Surface a template covers, in cm (width × height), for the listing's gadget. */
+export const DEFAULT_SURFACE_CM: Record<string, [number, number]> = {
+  phone: [7.6, 16.3],
+  laptop: [31.0, 22.0],
+  tablet: [17.9, 24.8],
+  "mac-mini": [12.7, 12.7],
+};
+
+export { slug as listingSlug };
