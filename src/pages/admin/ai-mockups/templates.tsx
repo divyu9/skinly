@@ -565,42 +565,51 @@ export function RollCalibration({ roll, onClose, onSaved }: {
   const [working, setWorking] = useState(false);
   const flat = useRef<ImageData | null>(null);
 
-  // What the marked shape says the stretch is, roughly: the photo is shot
-  // straight down, so the rectangle's sides are close to their real ratio.
-  const guess = useMemo(() => {
-    if (points.length !== 4) return 0;
-    const across = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
-    const down = Math.hypot(points[3].x - points[0].x, points[3].y - points[0].y);
-    return across > 0 ? (down / across) * Number(width || ROLL_WIDTH_CM) : 0;
-  }, [points, width]);
+  // Rolls are photographed as they are stored: lying with the length running
+  // left to right and the 29.5 cm width top to bottom. So the marked top edge
+  // follows the length, and the side edge is the roll's width.
+  //
+  // The flattened design still comes out width-across, length-down, because
+  // everything downstream — the template mockups, the true-size pieces — reads
+  // it that way. Passing the corners round by one turns the picture upright.
+  const marked = useMemo(() => {
+    if (points.length !== 4) return null;
+    const along = Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y);
+    const across = Math.hypot(points[3].x - points[0].x, points[3].y - points[0].y);
+    return across > 0 && along > 0 ? { along, across } : null;
+  }, [points]);
+
+  // What the shape says the marked length is: the photo is shot straight down,
+  // so the rectangle's sides keep close to their real ratio.
+  const guess = marked ? (marked.along / marked.across) * Number(width || ROLL_WIDTH_CM) : 0;
 
   useEffect(() => {
     if (!guess || length) return;
     setLength(guess.toFixed(1));
   }, [guess]);
 
-  // A length far from the shape stretches the pattern, and every mockup made
-  // from it is then the wrong size — worth saying before it is saved.
-  //
-  // The usual cause is a photo turned a quarter turn: the roll's width then
-  // runs down the picture, the marked top edge follows its length, and the two
-  // measurements are entered the wrong way round. That case has a fix worth
-  // naming, and it is recognisable — the shape matches the numbers swapped.
+  // A length that fights the shape stretches the pattern, and every mockup
+  // made from it is then the wrong size. The usual cause is a photo standing
+  // the other way round — the roll's length running down the picture — which
+  // the shape gives away: it matches the two measurements swapped.
   const off = guess && Number(length) > 0 ? Number(length) / guess : 1;
-  const swapped =
+  const upright =
     guess > 0 && Number(width) > 0 && Number(length) > 0 &&
     Math.abs(guess / (Number(width) * Number(width) / Number(length)) - 1) < 0.15;
   const lengthWarning = !(off > 1.25 || off < 0.8)
     ? ""
-    : swapped
-      ? `This photo looks turned a quarter turn: the edge you marked as the roll's width runs along its length instead. Rotate the raw photo so the roll's width runs left to right, then mark it again.`
+    : upright
+      ? "This photo looks like it is standing upright — the roll's length running top to bottom. Turn it a quarter turn so the length runs left to right, then mark it again."
       : `The marked rectangle looks about ${guess.toFixed(0)} cm long, not ${length} cm. Either type the length of the rectangle you marked, or mark a longer stretch of the roll.`;
 
   const run = async () => {
     setWorking(true);
     try {
       const raw = imageToData(await loadCanvasImage(roll.rawImageUrl!));
-      flat.current = rectifyRoll(raw, points, Number(width), Number(length), FLAT_PX_PER_CM);
+      // bottom-left, top-left, top-right, bottom-right: the first edge is the
+      // roll's width, which is the x axis of every flat design we store.
+      const turned = [points[3], points[0], points[1], points[2]];
+      flat.current = rectifyRoll(raw, turned, Number(width), Number(length), FLAT_PX_PER_CM);
       setPreview(canvasToWebp(dataToCanvas(flat.current), 0.8));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not flatten the photo");
@@ -638,10 +647,11 @@ export function RollCalibration({ roll, onClose, onSaved }: {
         <DialogHeader>
           <DialogTitle>Calibrate {roll.code}</DialogTitle>
           <DialogDescription>
-            Shoot the roll with its width running left to right in the photo and its length top to bottom.
-            Mark a rectangle whose top and bottom edges run the roll's full width, edge to edge: click{" "}
-            {LABELS.join(", ")}. Enter how long that stretch is. The photo is then flattened to true
-            centimetres, which is what keeps mockups at the right scale.
+            Photograph the roll as you store it: lying down, its length running left to right and its
+            {" "}{ROLL_WIDTH_CM} cm width top to bottom. Mark a rectangle whose left and right edges run the
+            roll's full width, edge to edge: click {LABELS.join(", ")}. Enter how long that stretch is —
+            measure it along the roll. The photo is then flattened to true centimetres, which is what keeps
+            mockups at the right scale.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2">
@@ -659,17 +669,19 @@ export function RollCalibration({ roll, onClose, onSaved }: {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Width (roll), cm</Label>
-                <Input inputMode="decimal" value={width} onChange={(e) => { setWidth(e.target.value); setPreview(null); }} />
-              </div>
-              <div>
                 <Label className="text-xs">Length marked, cm</Label>
                 <Input inputMode="decimal" value={length} placeholder="measure it" onChange={(e) => { setLength(e.target.value); setPreview(null); }} />
+                <p className="mt-0.5 text-[10px] text-muted-foreground">left to right</p>
+              </div>
+              <div>
+                <Label className="text-xs">Width (roll), cm</Label>
+                <Input inputMode="decimal" value={width} onChange={(e) => { setWidth(e.target.value); setPreview(null); }} />
+                <p className="mt-0.5 text-[10px] text-muted-foreground">top to bottom</p>
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground">
               The length is estimated from the shape; measure the real roll for accuracy — it sets the
-              pattern's vertical scale.
+              pattern's scale along the roll. The width is the same on almost every roll.
             </p>
             {lengthWarning && (
               <p className="rounded-md bg-amber-50 p-2 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
