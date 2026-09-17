@@ -1,4 +1,5 @@
 import { useQuery } from "@/lib/firebase-hooks";
+import { brandInScope } from "@/lib/device-fit";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useParams } from "react-router-dom";
@@ -112,10 +113,13 @@ export function useProductDetail() {
     urlBrand && urlModel ? { brand: urlBrand, model: urlModel } : "skip"
   );
   const skinGadget = productData?.productCategory === "skin" ? productData?.gadgetCategory : undefined;
+  // A device of a brand this listing is not for (an iPad link on the Samsung
+  // Tab listing) is a mismatch too.
   const deviceMismatch = !!skinGadget && !!urlModel && (
-    urlModelInfo === undefined
+    (!!productData && !brandInScope(productData, urlBrand)) ||
+    (urlModelInfo === undefined
       ? !!urlBrand && skinGadget !== "phone"
-      : !!urlModelInfo?.category && urlModelInfo.category !== skinGadget
+      : !!urlModelInfo?.category && urlModelInfo.category !== skinGadget)
   );
   const phoneModel = deviceMismatch ? null : urlModel;
   const phoneBrand = deviceMismatch ? null : urlBrand;

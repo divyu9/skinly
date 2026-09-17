@@ -1,5 +1,5 @@
 import { usePaginatedQuery, useQuery } from "@/lib/firebase-hooks";
-import { productFitsDevice } from "@/lib/device-fit";
+import { brandInScope, productFitsDevice } from "@/lib/device-fit";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { FilterState, URLParams } from "./useProductFilters";
@@ -25,6 +25,8 @@ export interface Product {
   tags: string;
   images: Array<{ url: string; alt?: string }>;
   gadgetCategory?: string;
+  modelBrands?: string[];
+  modelBrandsExclude?: string[];
   productCategory?: string;
   finishType?: string;
   variants: ProductVariant[];
@@ -149,7 +151,13 @@ export function useProductsData({
     
     if (!Array.isArray(sourceProducts)) return [];
 
-    return sourceProducts.map((product: any) => ({
+    // With a device chosen, a skin listing for another brand's devices (the
+    // Samsung Tab listing, for an iPad) does not belong in the grid.
+    const forBrand = urlParams.brand && urlParams.model
+      ? sourceProducts.filter((p: any) => p.productCategory !== "skin" || brandInScope(p, urlParams.brand))
+      : sourceProducts;
+
+    return forBrand.map((product: any) => ({
       _id: product._id,
       slug: product.slug,
       title: product.title,
@@ -160,6 +168,8 @@ export function useProductsData({
       gadgetCategory: product.gadgetCategory,
       productCategory: product.productCategory,
       finishType: product.finishType,
+      modelBrands: product.modelBrands,
+      modelBrandsExclude: product.modelBrandsExclude,
       variants: product.variants?.map((v: any) => ({
         _id: v._id,
         title: v.title,
@@ -171,7 +181,7 @@ export function useProductsData({
       })) || [],
     }));
   }, [productsData, accumulatedCollectionProducts, filters.collectionParam, collection,
-      filters.productCategory, filters.gadgetFilter, filters.finishFilter]);
+      filters.productCategory, filters.gadgetFilter, filters.finishFilter, urlParams.brand, urlParams.model]);
   
   // Apply search filter
   const filteredProducts = useMemo(() => {

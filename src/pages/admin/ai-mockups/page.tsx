@@ -27,7 +27,7 @@ import {
   saveLocally, chooseBackupFolder, getBackupFolder, supportsDirectoryPicker,
 } from "@/lib/local-backup.ts";
 import {
-  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes,
+  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
@@ -1596,6 +1596,7 @@ function CreateListingDialog({ group, design, onClose, onCreated, loadTemplate, 
         gadgetTypeId: group.gadgetTypeId || "",
         gadget: group.gadget,
         listing: group.listing,
+        ...(scopeFor(group.listing) || {}),
         finish: design.finish || "",
         source: design.source,
         imageUrl: design.rawImageUrl || "",
@@ -1766,6 +1767,7 @@ function BulkListingsDialog({ groups, design, onClose, onCreated, loadTemplate, 
           gadgetTypeId: row.group.gadgetTypeId || "",
           gadget: row.group.gadget,
           listing: row.group.listing,
+          ...(scopeFor(row.group.listing) || {}),
           finish: design.finish || "",
           source: design.source,
           imageUrl: design.rawImageUrl || "",

@@ -589,6 +589,8 @@ async function writeCatalogue(active, variantsByProduct) {
     gadgetCategory: p.gadgetCategory,
     gadgetTypeId: p.gadgetTypeId,
     finishType: p.finishType,
+    ...(Array.isArray(p.modelBrands) && p.modelBrands.length ? { modelBrands: p.modelBrands } : {}),
+    ...(Array.isArray(p.modelBrandsExclude) && p.modelBrandsExclude.length ? { modelBrandsExclude: p.modelBrandsExclude } : {}),
     finishTypeId: p.finishTypeId,
     tags: tagsOf(p.tags),
     // One image — cards show the first — and never a dead Cloudinary link.

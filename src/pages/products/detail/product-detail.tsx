@@ -144,7 +144,10 @@ export default function ProductDetailPage() {
     handleSubmitRequest,
     similarModels,
     allBrands,
-  } = useModelSelector(deviceCategory);
+  } = useModelSelector(deviceCategory, {
+    modelBrands: productData?.modelBrands,
+    modelBrandsExclude: productData?.modelBrandsExclude,
+  });
   
   // Cart actions hook
   const {

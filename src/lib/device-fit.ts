@@ -4,6 +4,28 @@ export interface FitProduct {
   variants?: Array<{ title?: string }>;
   productCategory?: string;
   gadgetCategory?: string;
+  modelBrands?: string[];
+  modelBrandsExclude?: string[];
+}
+
+/** "One Plus", "OnePlus" and "oneplus" are one brand. */
+const brandKey = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+/**
+ * Is this device's brand one the listing is for?
+ *
+ * A listing can be for one brand's devices — "Apple iPad Skin" cuts iPads and
+ * nothing else — named in `modelBrands`, or for every brand but some — the
+ * "other tablets" listing — named in `modelBrandsExclude`. A listing that
+ * names neither takes every brand, which is every listing made before this.
+ */
+export function brandInScope(product: Pick<FitProduct, "modelBrands" | "modelBrandsExclude">, brand: string | null | undefined): boolean {
+  const b = brandKey(brand);
+  if (!b) return true;
+  const only = (product.modelBrands || []).map(brandKey).filter(Boolean);
+  if (only.length) return only.includes(b);
+  const not = (product.modelBrandsExclude || []).map(brandKey).filter(Boolean);
+  return !not.includes(b);
 }
 
 /**
@@ -29,7 +51,8 @@ export function productFitsDevice(
   if (!brand || !model) return false;
 
   if (product.productCategory === "skin") {
-    return !!deviceCategory && !!product.gadgetCategory && product.gadgetCategory === deviceCategory;
+    return !!deviceCategory && !!product.gadgetCategory && product.gadgetCategory === deviceCategory
+      && brandInScope(product, brand);
   }
 
   const variants = product.variants;

@@ -212,6 +212,11 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
   const gadgetName = String(data?.gadget || "").trim();
   // Which listing of the gadget this is — "Drone controller", "Xbox Series S".
   const listingName = String(data?.listing || "").trim();
+  // Device brands the listing is for, so its model picker offers only those.
+  const brandList = (v: unknown) =>
+    Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 20) : [];
+  const modelBrands = brandList(data?.modelBrands);
+  const modelBrandsExclude = brandList(data?.modelBrandsExclude);
   const finish = String(data?.finish || "").trim();
   const source: "roll" | "cutout" = data?.source === "cutout" ? "cutout" : "roll";
   const imageUrl = String(data?.imageUrl || "").trim();
@@ -341,6 +346,8 @@ export const createListingForDesign = onCall(async (data: any, context: any) => 
     weight: tpl.dims.weight,
     createdFromDesign: designCode,
     ...(listingName ? { listingKind: listingName } : {}),
+    ...(modelBrands.length ? { modelBrands } : {}),
+    ...(modelBrandsExclude.length ? { modelBrandsExclude } : {}),
     createdAt: now,
   });
 

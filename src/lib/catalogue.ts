@@ -35,6 +35,9 @@ export interface CatalogueProduct {
   productCategory?: string;
   gadgetCategory?: string;
   gadgetTypeId?: string;
+  /** Listing is for these device brands only / for all but these. */
+  modelBrands?: string[];
+  modelBrandsExclude?: string[];
   finishType?: string;
   finishTypeId?: string;
   tags: string[];

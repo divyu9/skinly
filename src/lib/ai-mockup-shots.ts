@@ -226,6 +226,11 @@ const LISTING_BY_SUFFIX: Record<string, string> = {
   "controller-ps4": "PlayStation Controller",
   "controller-ps3": "PlayStation Controller",
   "controller-xbox": "Xbox Controller",
+  "ipad": "Apple iPad",
+  "ipad-hand": "Apple iPad",
+  "samsung-tab": "Samsung Galaxy Tab",
+  "xiaomi-pad": "Xiaomi Pad",
+  "tablet-generic": "Tablet",
   "xbox-x": "Xbox Series X",
   "xbox-x-set": "Xbox Series X",
   "xbox-s": "Xbox Series S",
@@ -263,6 +268,31 @@ const bundle = (tail: string, name: string, prices: [number, number, number]): P
 ];
 
 const CONSOLE_PRICES: [number, number, number] = [799, 999, 1199];
+
+/** A tablet skin is the back, or the back plus front bezel and charger. */
+const tabletViews = (tail: string): PresetVariant[] => [
+  { tail, title: "Only Back", price: 249, materialMultiplier: 1 },
+  { tail: `${tail}F`, title: "Back + Front Bezel + Charger", price: 399, materialMultiplier: 1 },
+];
+
+/**
+ * Which device brands a listing is for, so its model picker offers only
+ * those. The "Tablet" listing is every tablet brand without its own listing.
+ */
+export const LISTING_SCOPES: Record<string, { modelBrands?: string[]; modelBrandsExclude?: string[] }> = {
+  "apple ipad": { modelBrands: ["Apple"] },
+  "samsung galaxy tab": { modelBrands: ["Samsung"] },
+  "xiaomi pad": { modelBrands: ["Xiaomi", "Redmi", "Poco"] },
+  "tablet": { modelBrandsExclude: ["Apple", "Samsung", "Xiaomi", "Redmi", "Poco"] },
+  "ps5": { modelBrands: ["PlayStation", "Sony"] },
+  "xbox series x": { modelBrands: ["Xbox", "Microsoft"] },
+  "xbox series s": { modelBrands: ["Xbox", "Microsoft"] },
+  "nintendo switch": { modelBrands: ["Nintendo"] },
+  "playstation controller": { modelBrands: ["PlayStation", "Sony", "Snoy"] },
+  "xbox controller": { modelBrands: ["Xbox", "Microsoft"] },
+};
+
+export const scopeFor = (listing: string) => LISTING_SCOPES[String(listing || "").trim().toLowerCase()];
 
 /**
  * The fixed variant set for listings whose shape is decided, not copied.
@@ -305,6 +335,10 @@ export const LISTING_PRESETS: Record<string, PresetVariant[]> = {
     { tail: "DS4", title: "PS4 DualShock 4", price: 399, materialMultiplier: 1 },
     { tail: "DS3", title: "PS3 Controller", price: 399, materialMultiplier: 1 },
   ],
+  "apple ipad": tabletViews("IPAD"),
+  "samsung galaxy tab": tabletViews("SGT"),
+  "xiaomi pad": tabletViews("XPD"),
+  "tablet": tabletViews("TABB"),
   "xbox controller": [
     { tail: "XBC", title: "Xbox Series X|S", price: 399, materialMultiplier: 1 },
     { tail: "XBC1", title: "Xbox One", price: 399, materialMultiplier: 1 },
@@ -1114,6 +1148,59 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "around them. No Samsung logo is visible — it sits under the skin. At the very edges of the "
         + "frame, softly out of focus, an S Pen and a ceramic mug suggest a desk without drawing the "
         + "eye. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+  },
+  {
+    label: "Galaxy Tab — back",
+    gadget: "tablet",
+    suffix: "samsung-tab",
+    listing: "Samsung Galaxy Tab",
+    skuCodes: ["SGT", "SGTF"],
+    matchSingleVariant: true,
+    order: 2,
+    isActive: true,
+    prompt:
+      "A Samsung Galaxy Tab S-series tablet lying face down on a light oak desk, photographed from "
+        + "slightly above so the whole back panel faces the camera and fills most of the frame, with "
+        + "its thin aluminium edges and rounded corners visible. The back panel is covered edge to edge "
+        + "with a vinyl skin. {{fidelity}} The two separate round camera lenses in the top-left corner, "
+        + "the magnetic S Pen strip and the small SAMSUNG wordmark area stay bare metal, with the vinyl "
+        + "cut cleanly around each of them; nothing else on the back is uncovered. A stylus and a "
+        + "closed notebook sit off to one side, softly out of focus. " + REAL + "{{staging}} ",
+  },
+  {
+    label: "Xiaomi Pad — back",
+    gadget: "tablet",
+    suffix: "xiaomi-pad",
+    listing: "Xiaomi Pad",
+    skuCodes: ["XPD", "XPDF"],
+    matchSingleVariant: true,
+    order: 3,
+    isActive: true,
+    prompt:
+      "A Xiaomi Pad tablet lying face down on a light oak desk, photographed from slightly above so "
+        + "the whole back panel faces the camera and fills most of the frame, with its thin edges and "
+        + "rounded corners visible. The back panel is covered edge to edge with a vinyl skin. "
+        + "{{fidelity}} The raised square camera island in the top-left corner and the lens on it stay "
+        + "bare, with the vinyl cut cleanly around the island's outline; nothing else on the back is "
+        + "uncovered. A stylus and a closed notebook sit off to one side, softly out of focus. "
+        + REAL + "{{staging}} ",
+  },
+  {
+    label: "Tablet — back (other brands)",
+    gadget: "tablet",
+    suffix: "tablet-generic",
+    listing: "Tablet",
+    skuCodes: ["TABB", "TABBF"],
+    matchSingleVariant: true,
+    order: 4,
+    isActive: true,
+    prompt:
+      "A modern Android tablet with slim bezels lying face down on a light oak desk, photographed "
+        + "from slightly above so the whole back panel faces the camera and fills most of the frame. "
+        + "It carries no brand logo. The back panel is covered edge to edge with a vinyl skin. "
+        + "{{fidelity}} The single camera bump in the top-left corner stays bare, with the vinyl cut "
+        + "cleanly around it; nothing else on the back is uncovered. A stylus and a closed notebook "
+        + "sit off to one side, softly out of focus. " + REAL + "{{staging}} ",
   },
   {
     label: "iPad — back",

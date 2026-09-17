@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { brandInScope } from "@/lib/device-fit";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -22,7 +23,11 @@ interface RequestFormState {
   isSubmitting: boolean;
 }
 
-export function useModelSelector(deviceCategory: string = "phone") {
+export function useModelSelector(
+  deviceCategory: string = "phone",
+  // The listing's brands: an "Apple iPad Skin" offers iPads only.
+  brandScope: { modelBrands?: string[]; modelBrandsExclude?: string[] } = {}
+) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const params = useParams();
@@ -64,6 +69,7 @@ export function useModelSelector(deviceCategory: string = "phone") {
     
     const grouped: Record<string, string[]> = {};
     deviceModelsFromDb.forEach(model => {
+      if (!brandInScope(brandScope, model.brandName)) return;
       if (!grouped[model.brandName]) {
         grouped[model.brandName] = [];
       }
@@ -76,13 +82,20 @@ export function useModelSelector(deviceCategory: string = "phone") {
     });
     
     return grouped;
-  }, [deviceModelsFromDb]);
+  }, [deviceModelsFromDb, (brandScope.modelBrands || []).join("|"), (brandScope.modelBrandsExclude || []).join("|")]);
   
   // All brands list
   const allBrands = useMemo(() => {
     return Object.keys(modelsByBrand).sort();
   }, [modelsByBrand]);
   
+  // One brand to choose from is no choice: open straight on its models.
+  useEffect(() => {
+    if (selectorState.dialogOpen && !selectorState.selectedBrand && allBrands.length === 1) {
+      setSelectorState(prev => ({ ...prev, selectedBrand: allBrands[0] }));
+    }
+  }, [selectorState.dialogOpen, selectorState.selectedBrand, allBrands]);
+
   // Filter models based on search
   const filteredModels = useMemo(() => {
     const models = modelsByBrand[selectorState.selectedBrand] || [];
