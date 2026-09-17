@@ -581,10 +581,20 @@ export function RollCalibration({ roll, onClose, onSaved }: {
 
   // A length far from the shape stretches the pattern, and every mockup made
   // from it is then the wrong size — worth saying before it is saved.
+  //
+  // The usual cause is a photo turned a quarter turn: the roll's width then
+  // runs down the picture, the marked top edge follows its length, and the two
+  // measurements are entered the wrong way round. That case has a fix worth
+  // naming, and it is recognisable — the shape matches the numbers swapped.
   const off = guess && Number(length) > 0 ? Number(length) / guess : 1;
-  const lengthWarning = off > 1.25 || off < 0.8
-    ? `The marked rectangle looks about ${guess.toFixed(0)} cm long, not ${length} cm. Either type the length of the rectangle you marked, or mark a longer stretch of the roll.`
-    : "";
+  const swapped =
+    guess > 0 && Number(width) > 0 && Number(length) > 0 &&
+    Math.abs(guess / (Number(width) * Number(width) / Number(length)) - 1) < 0.15;
+  const lengthWarning = !(off > 1.25 || off < 0.8)
+    ? ""
+    : swapped
+      ? `This photo looks turned a quarter turn: the edge you marked as the roll's width runs along its length instead. Rotate the raw photo so the roll's width runs left to right, then mark it again.`
+      : `The marked rectangle looks about ${guess.toFixed(0)} cm long, not ${length} cm. Either type the length of the rectangle you marked, or mark a longer stretch of the roll.`;
 
   const run = async () => {
     setWorking(true);
@@ -628,8 +638,9 @@ export function RollCalibration({ roll, onClose, onSaved }: {
         <DialogHeader>
           <DialogTitle>Calibrate {roll.code}</DialogTitle>
           <DialogDescription>
-            Mark a rectangle on the roll whose top and bottom edges run the roll's full width, edge to edge:
-            click {LABELS.join(", ")}. Enter how long that stretch is. The photo is then flattened to true
+            Shoot the roll with its width running left to right in the photo and its length top to bottom.
+            Mark a rectangle whose top and bottom edges run the roll's full width, edge to edge: click{" "}
+            {LABELS.join(", ")}. Enter how long that stretch is. The photo is then flattened to true
             centimetres, which is what keeps mockups at the right scale.
           </DialogDescription>
         </DialogHeader>
