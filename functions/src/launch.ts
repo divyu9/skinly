@@ -150,10 +150,29 @@ async function runStep(db: admin.firestore.Firestore, launch: Launch, step: Step
       return { status: "done", note: `${out.length} variant(s) counted` };
     }
     case "rebuild": {
+      // Hostinger deploys prod-ready on every push; the repository's "Rebuild
+      // storefront" workflow pushes an empty commit when asked.
+      const token = process.env.GITHUB_REBUILD_TOKEN || "";
+      const repo = process.env.GITHUB_REPO || "divyu9/skinly";
       const hook = process.env.HOSTINGER_DEPLOY_WEBHOOK || "";
-      if (!hook) return { status: "skipped", note: "HOSTINGER_DEPLOY_WEBHOOK is not set; the next build picks this up" };
-      const res = await fetch(hook, { method: "POST" });
-      return { status: res.ok ? "done" : "failed", note: `webhook ${res.status}` };
+      if (token) {
+        const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "User-Agent": "skinly-launch",
+          },
+          body: JSON.stringify({ event_type: "rebuild", client_payload: { design: launch.code } }),
+        });
+        return { status: res.ok ? "done" : "failed", note: res.ok ? "rebuild requested (deploys in ~5 min)" : `GitHub ${res.status}: ${(await res.text()).slice(0, 120)}` };
+      }
+      if (hook) {
+        const res = await fetch(hook, { method: "POST" });
+        return { status: res.ok ? "done" : "failed", note: `webhook ${res.status}` };
+      }
+      return { status: "skipped", note: "GITHUB_REBUILD_TOKEN is not set; the nightly rebuild picks this up" };
     }
     case "image": {
       const taskId = await submitPoyoTask(step.request);

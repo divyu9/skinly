@@ -1,27 +1,44 @@
-# Rebuild the site every night so products and SEO pages added during the day
-# get their own prerendered HTML and a place in the sitemap. Until a rebuild,
-# a new page still works for shoppers but answers crawlers with 404.
+# Rebuilds the storefront by pushing an empty commit to prod-ready, which
+# Hostinger deploys on its own (its Git auto-deployment has no webhook to call).
 #
-# Needs one repository secret: HOSTINGER_DEPLOY_WEBHOOK — the "Auto deployment"
-# webhook URL from hPanel → Websites → goskinly.com → Git. Without it the job
-# does nothing.
-name: Nightly rebuild
+# Runs every night, so products and SEO pages added during the day get their
+# prerendered HTML and a place in the sitemap, and on demand when a design
+# launch finishes its listings (functions/src/launch.ts sends a
+# repository_dispatch "rebuild"). Launch requests wait three minutes and only
+# the latest runs, so a burst of launches makes one deploy.
+#
+# Scheduled and dispatched workflows run from the repository's DEFAULT branch:
+# this file has to be there too (or prod-ready made the default branch).
+name: Rebuild storefront
 
 on:
   schedule:
     - cron: "30 21 * * *" # 03:00 IST
   workflow_dispatch:
+  repository_dispatch:
+    types: [rebuild]
+
+concurrency:
+  group: rebuild-storefront
+  cancel-in-progress: true
+
+permissions:
+  contents: write
 
 jobs:
-  trigger:
+  rebuild:
     runs-on: ubuntu-latest
     steps:
-      - name: Call the Hostinger deploy webhook
-        env:
-          HOOK: ${{ secrets.HOSTINGER_DEPLOY_WEBHOOK }}
+      - name: Wait for other launches to land
+        if: github.event_name == 'repository_dispatch'
+        run: sleep 180
+      - uses: actions/checkout@v4
+        with:
+          ref: prod-ready
+          fetch-depth: 1
+      - name: Push an empty commit to prod-ready
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "HOSTINGER_DEPLOY_WEBHOOK is not set; skipping."
-            exit 0
-          fi
-          curl -fsS -X POST "$HOOK" -o /dev/null -w "Hostinger answered %{http_code}\n"
+          git config user.name "skinly-rebuild-bot"
+          git config user.email "rebuild-bot@users.noreply.github.com"
+          git commit --allow-empty -m "Rebuild storefront (${{ github.event_name }})"
+          git push origin HEAD:prod-ready
