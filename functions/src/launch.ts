@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import { createListing, reviseListing, moveRestockRequests, type CreateListingSpec, type VariantOp } from "./listings";
 import { submitPoyoTask, poyoTaskStatus } from "./poyo";
 import { putR2Object } from "./r2";
-import { renderTemplateMockup } from "./composite";
+import { renderTemplateMockup, renderTrueSizeCrop } from "./composite";
 import sharp from "sharp";
 
 /**
@@ -37,7 +37,13 @@ type Step =
   | (BaseStep & { type: "retire"; productId: string; redirectKind?: string; redirectTo?: string })
   | (BaseStep & { type: "sync" })
   | (BaseStep & { type: "rebuild" })
-  | (BaseStep & { type: "image"; job: Record<string, any>; request: { model: string; prompt: string; imageUrls: string[]; size?: string; resolution?: string; quality?: string } })
+  | (BaseStep & {
+      type: "image";
+      job: Record<string, any>;
+      request: { model: string; prompt: string; imageUrls: string[]; size?: string; resolution?: string; quality?: string };
+      /** Send the device's own piece of the calibrated roll instead of the whole photo. */
+      crop?: { widthCm: number; heightCm: number; rotate90?: boolean };
+    })
   | (BaseStep & { type: "template"; templateId: string; rotate90: boolean; job: Record<string, any> });
 
 interface Launch {
@@ -175,9 +181,24 @@ async function runStep(db: admin.firestore.Firestore, launch: Launch, step: Step
       return { status: "skipped", note: "GITHUB_REBUILD_TOKEN is not set; the nightly rebuild picks this up" };
     }
     case "image": {
-      const taskId = await submitPoyoTask(step.request);
+      const request = { ...step.request, imageUrls: [...step.request.imageUrls] };
+      let sourceUrl = step.job.sourceUrl;
+      if (step.crop && launch.flat?.url) {
+        const piece = await renderTrueSizeCrop({
+          designUrl: launch.flat.url,
+          pxPerCm: Number(launch.flat.pxPerCm) || 40,
+          widthCm: step.crop.widthCm,
+          heightCm: step.crop.heightCm,
+          rotate90: step.crop.rotate90,
+        });
+        const code = launch.code.replace(/[^A-Za-z0-9-]/g, "");
+        sourceUrl = await putR2Object(`ai-mockups-pending/pieces/${code}-${step.job.suffix}-${Date.now()}.jpg`, piece, "image/jpeg");
+        request.imageUrls[0] = sourceUrl;
+      }
+      const taskId = await submitPoyoTask(request);
       await db.collection("designMockups").add({
         ...step.job,
+        sourceUrl,
         taskId,
         status: "running",
         launchId,

@@ -190,7 +190,7 @@ are told about, no compatibility claims about specific device models, no warrant
 
 Reply with JSON only, in exactly this shape:
 {
-  "title": "60-70 characters. The design name, the finish, the device (as named in Product), the word Skin.",
+  "title": "60-70 characters. The design name, the finish, the device exactly as given in Device, the word Skin.",
   "slug": "lowercase-hyphenated-from-the-title, no stop words dropped mid-phrase, under 70 chars",
   "metaTitle": "under 60 characters, ends with | Skinly",
   "metaDescription": "140-155 characters, one sentence of benefit plus a light call to action",
@@ -208,6 +208,27 @@ const slugify = (s: string) =>
 
 /** Collections whose membership is decided by the device, not the design. */
 const isGadgetCollection = (name: string) => /\bskins?\b|tempered|cases?|covers?|magneto/i.test(name);
+
+/**
+ * The device as a shopper searches for it. "OnePlus" alone does not say
+ * phone, so a brand-only listing name gets its gadget noun: OnePlus Phone,
+ * Xiaomi Redmi Phone. Names that already say what the device is are kept.
+ */
+const GADGET_NOUNS: Record<string, string> = {
+  phone: "Phone", mobile: "Phone", tablet: "Tablet", laptop: "Laptop", charger: "Charger",
+  lens: "Lens", camera: "Camera", gimbal: "Gimbal", gimbals: "Gimbal", controller: "Controller",
+  console: "Console", drone: "Drone",
+};
+const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|camera|lens|gimbal|drone|controller|console|ps5|xbox|switch|mac mini/i;
+
+export function deviceNameFor(listingName: string, gadgetLabel: string): string {
+  const name = String(listingName || "").trim();
+  const label = String(gadgetLabel || "").trim();
+  if (!name) return label;
+  if (SAYS_DEVICE.test(name)) return name;
+  const noun = GADGET_NOUNS[label.toLowerCase()] || GADGET_NOUNS[label.toLowerCase().replace(/s$/, "")] || label;
+  return noun ? `${name} ${noun}` : name;
+}
 
 export interface ListingCopy {
   title: string;
@@ -242,6 +263,13 @@ export async function writeListingCopy(
   const apiKey = await resolveOpenAIKey();
   const fetchFn: any = (global as any).fetch || require("node-fetch");
   const listingName = args.listingName || "";
+  const device = deviceNameFor(listingName, args.gadgetLabel);
+  // Older rolls were named after their whole listing title ("... Matte Finish
+  // Skin"); the finish and the word Skin are added back where they belong.
+  const designName = String(args.designName || args.designCode)
+    .replace(/\s+(\w+\s+)?finish(\s+skin)?\s*$/i, "")
+    .replace(/\s+skins?\s*$/i, "")
+    .trim() || args.designCode;
   const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -255,12 +283,11 @@ export async function writeListingCopy(
         {
           role: "user",
           content:
-            `Design name: ${args.designName || args.designCode}\n` +
+            `Design name: ${designName}\n` +
             `Design code: ${args.designCode}\n` +
             `Gadget: ${args.gadgetLabel}\n` +
-            (listingName && listingName.toLowerCase() !== args.gadgetLabel.toLowerCase()
-              ? `Product: a skin for ${listingName} devices (name this device family in the title)\n`
-              : "") +
+            `Device: ${device} (use exactly "${device} Skin" in the title and "${device}" in the meta title, ` +
+            `so a shopper can tell which gadget this is)\n` +
             `Finish: ${args.finishLabel}\n` +
             `Material: ${args.source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
             (args.themes?.length ? `Design themes: ${args.themes.join(", ")}\n` : "") +
@@ -281,7 +308,11 @@ export async function writeListingCopy(
   } catch {
     throw new HttpsError("internal", "The copywriter returned something unreadable");
   }
-  const title = String(copy.title || `${args.designName || args.designCode} ${args.finishLabel} ${listingName || args.gadgetLabel} Skin`).trim();
+  const says = (t: string) => t.toLowerCase().includes(device.toLowerCase());
+  let title = String(copy.title || "").trim();
+  if (!title || !says(title)) title = `${designName} ${args.finishLabel} ${device} Skin`.replace(/\s+/g, " ").trim();
+  let metaTitle = String(copy.metaTitle || "").trim();
+  if (!metaTitle || !says(metaTitle)) metaTitle = `${designName} ${device} Skin | Skinly`;
   const tags: string[] = Array.isArray(copy.tags)
     ? copy.tags.map((t: any) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 15)
     : [];
@@ -289,7 +320,7 @@ export async function writeListingCopy(
   return {
     title,
     slug: slugify(String(copy.slug || title)),
-    metaTitle: String(copy.metaTitle || `${title} | Skinly`).slice(0, 70),
+    metaTitle: metaTitle.slice(0, 70),
     metaDescription: String(copy.metaDescription || "").slice(0, 170),
     description: String(copy.description || ""),
     tags,

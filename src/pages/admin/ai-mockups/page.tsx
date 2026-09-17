@@ -918,6 +918,22 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const deleteObject = useAction(api.r2.deleteR2Object);
   const addMediaItem = useMutation(api.mediaLibrary.createMediaItem);
   const linkToProducts = useMutation(api.aiMockups.linkMockupToProducts);
+  const tidyImages = useMutation(api.aiMockups.tidyListingImages);
+  const [tidying, setTidying] = useState(false);
+  const tidy = async () => {
+    setTidying(true);
+    try {
+      const res: any = await tidyImages({ rNumber: roll.code });
+      toast.success(res?.changed
+        ? `Photos fixed on ${res.changed} listing${res.changed > 1 ? "s" : ""} · ${res.removed} wrong photo${res.removed === 1 ? "" : "s"} removed`
+        : "Every listing already has the right photos");
+      if (res?.hidden?.length) {
+        toast.message(`Back in draft until a photo is approved: ${res.hidden.join(", ")}`, { duration: 10000 });
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not fix the photos");
+    } finally { setTidying(false); }
+  };
   const model = MODEL_BY_ID[modelId] ?? MODEL_BY_ID[DEFAULT_MODEL_ID];
   // One ratio for the whole run, and it wins: a shot no longer carries its own.
   // The model still gets the last word, because a ratio it does not accept is a
@@ -1342,6 +1358,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           variantTitles: job.variantTitles,
           matchSingleVariant: job.matchSingleVariant,
           gadget: job.gadget,
+          listing: job.listing || "",
           url,
           alt: job.listing && job.designName
             ? `${job.designName} ${job.listing} skin`
@@ -1588,6 +1605,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setRetiring(true)}>
                 Retire old listings
               </Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={tidying} onClick={tidy}>
+                {tidying && <Loader2Icon className="mr-1 size-3 animate-spin" />}
+                Fix listing photos
+              </Button>
               <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onManageShots}>
                 Manage gadgets &amp; prompts
               </Button>
@@ -1780,6 +1801,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                     setApprovingAll({ done: i + 1, total: pending.length });
                   }
                   setApprovingAll(null);
+                  void tidy();
                 }}
               >
                 {approvingAll ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <ThumbsUpIcon className="mr-1 size-3" />}

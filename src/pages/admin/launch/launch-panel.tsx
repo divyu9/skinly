@@ -53,6 +53,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
   const [images, setImages] = useState(pref("launch_images", "1") === "1");
   const [templatesOn, setTemplatesOn] = useState(pref("launch_templates", "1") === "1");
   const [regenerate, setRegenerate] = useState(false);
+  const [rewriteCopy, setRewriteCopy] = useState(false);
   const [modelId, setModelId] = useState(pref("launch_model", cheapest.id));
   const [orientation, setOrientation] = useState<CutOrientation | "both">((pref("launch_orient", "lengthwise") as any) || "lengthwise");
   const [plan, setPlan] = useState<LaunchPlan | null>(null);
@@ -65,7 +66,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
   const ready = shots !== undefined && settings !== undefined && gadgetTypes !== undefined && templates !== undefined;
 
   // Any change to the options makes the shown plan stale.
-  useEffect(() => { setPlan(null); }, [phaseOnly, publishNow, images, templatesOn, regenerate, modelId, orientation, design.code, design.finish, design.name, design.rawImageUrl, design.flatImageUrl]);
+  useEffect(() => { setPlan(null); }, [phaseOnly, publishNow, images, templatesOn, regenerate, rewriteCopy, modelId, orientation, design.code, design.finish, design.name, design.rawImageUrl, design.flatImageUrl]);
 
   const makePlan = async () => {
     setPlanning(true);
@@ -85,7 +86,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         gadgetTypeIds: Object.fromEntries((gadgetTypes || []).map((g) => [String(g.name), g._id])),
         jobs: jobSnap.docs.map((d) => d.data() as any),
         options: {
-          phaseOnly, publishNow, images, useTemplates: templatesOn, regenerateImages: regenerate, model, aspect: "1:1",
+          phaseOnly, publishNow, images, useTemplates: templatesOn, regenerateImages: regenerate, rewriteCopy, model, aspect: "1:1",
           orientations: orientation === "both" ? ["lengthwise", "widthwise"] : [orientation],
         },
       });
@@ -111,7 +112,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         flat: design.flatImageUrl
           ? { url: design.flatImageUrl, pxPerCm: design.flatPxPerCm || 40, widthCm: design.flatWidthCm || 29.5, lengthCm: design.flatLengthCm || 0 }
           : null,
-        options: { phaseOnly, publishNow, images, useTemplates: templatesOn, regenerate, model: model.label },
+        options: { phaseOnly, publishNow, images, useTemplates: templatesOn, regenerate, rewriteCopy, model: model.label },
         summary: plan.summary,
         warnings: plan.warnings,
         steps: plan.steps,
@@ -149,6 +150,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         {toggle("Make pictures", images, setImages, "launch_images")}
         {toggle("Use templates where ready", templatesOn, setTemplatesOn, "launch_templates", "Free and true to scale; needs a calibrated roll.")}
         {toggle("Make pictures again", regenerate, setRegenerate, undefined, "Off: pictures this design already has are skipped.")}
+        {toggle("Rewrite titles & descriptions", rewriteCopy, setRewriteCopy, undefined, "Also for listings already made; links (slugs) stay the same.")}
       </div>
       {images && (
         <div className="flex flex-wrap items-center gap-2">

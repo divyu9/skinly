@@ -1,5 +1,6 @@
 import {
-  STARTER_SHOTS, LISTING_PRESETS, LISTING_SCOPES, FLAT_GADGETS, PHASE_1_LISTINGS, REFERENCE_PREAMBLE,
+  STARTER_SHOTS, LISTING_PRESETS, LISTING_SCOPES, FLAT_GADGETS, PHASE_1_LISTINGS, REFERENCE_PREAMBLE, TRUE_SIZE_CLAUSE,
+  DEFAULT_SURFACE_CM,
   expandPrompt, listingOf, listingSlug, mockupFileStem, shotCodes,
   type MockupShot, type SharedBlocks, type CutOrientation, type PresetVariant,
 } from "@/lib/ai-mockup-shots.ts";
@@ -49,6 +50,8 @@ export interface LaunchOptions {
   images: boolean;
   useTemplates: boolean;
   regenerateImages: boolean;
+  /** Rewrite the title, description and SEO of listings the studio already made. */
+  rewriteCopy?: boolean;
   model: ImageModel;
   aspect: string;
   orientations: CutOrientation[];
@@ -262,10 +265,12 @@ export function buildLaunchPlan(input: {
     covered.add(kind);
     const { ops, needsKinds } = variantOps(kind, design.finish, code, l.variants, true);
     needsKinds.forEach((k) => needed.add(k));
-    if (ops.length) {
+    if (ops.length || options.rewriteCopy) {
       revises.push({
-        id: stepId(), type: "revise", label: `Update variants of ${proper(kind)}`, status: "pending",
-        listing: proper(kind), productId: l.id, variantOps: ops, rewriteCopy: false, ...scopeFields(kind),
+        id: stepId(), type: "revise",
+        label: ops.length ? `Update variants of ${proper(kind)}` : `Rewrite the words of ${proper(kind)}`,
+        status: "pending",
+        listing: proper(kind), productId: l.id, variantOps: ops, rewriteCopy: !!options.rewriteCopy, ...scopeFields(kind),
       });
     }
   }
@@ -370,13 +375,19 @@ export function buildLaunchPlan(input: {
         warnings.push(`${info.listing}: no shots in the studio yet (Gadgets & prompts → add the built-in shots) — no picture planned`);
         continue;
       }
+      // A calibrated roll sends the model the device's own piece at true size,
+      // so the motifs come out as big as they really are.
+      const surface = isRoll && design.flatImageUrl ? DEFAULT_SURFACE_CM[info.gadget] : undefined;
       for (const shot of kindShots) {
         const orients: Array<CutOrientation | undefined> = shot.askCutOrientation && isRoll ? options.orientations : [undefined];
         for (const o of orients) {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
           if (already(suffix)) continue;
-          const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + expandPrompt(shot.prompt, blocks, {
-            rNumber: code, designName: design.name, source: design.source, finish: design.finish, cutOrientation: o,
+          const crop = surface ? { widthCm: surface[0], heightCm: surface[1], rotate90: o === "widthwise" } : undefined;
+          const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "") + (crop ? TRUE_SIZE_CLAUSE : "") + expandPrompt(shot.prompt, blocks, {
+            rNumber: code, designName: design.name, source: design.source, finish: design.finish,
+            // The piece is already turned; saying so again would turn it twice.
+            cutOrientation: crop ? undefined : o,
           });
           const size = resolveSize(options.model, options.aspect);
           const cost = Number((options.model.usd * USD_TO_INR).toFixed(2));
@@ -390,6 +401,7 @@ export function buildLaunchPlan(input: {
               ...(options.model.quality ? { quality: options.model.quality } : {}),
               imageUrls: shot.referenceUrl ? [design.rawImageUrl, shot.referenceUrl] : [design.rawImageUrl],
             },
+            ...(crop ? { crop } : {}),
             job: {
               rNumber: code, designName: design.name || "", designSource: design.source, shotId: shot._id,
               shotLabel: o ? `${shot.label} · ${o === "widthwise" ? "across" : "along"} the roll` : shot.label,

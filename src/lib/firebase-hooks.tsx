@@ -189,6 +189,7 @@ async function catalogueProducts(): Promise<any[] | null> {
 }
 import { collectionKey } from "./collection-key";
 import { loadCatalogue, loadModelCatalogue } from "./catalogue";
+import { presetFor } from "./ai-mockup-shots";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
@@ -5496,7 +5497,14 @@ export function useMutation(apiRef: any) {
           if (!allowedTypeIds.size) allowedTypeIds = null;
         }
 
-        let linked = 0, alreadyThere = 0, wrongGadget = 0;
+        // A brand listing takes only its own brand's pictures. Without this a
+        // one-variant listing (OnePlus, iPhone) took every phone shot through
+        // the single-variant rule, and "Only Top" pulled the generic laptop
+        // shot onto the MacBook listing.
+        const listing = String(args.listing || '').trim().toLowerCase();
+        const listingIsPreset = !!(listing && presetFor(listing));
+
+        let linked = 0, alreadyThere = 0, wrongGadget = 0, wrongListing = 0;
         for (const pid of productIds) {
           const pref = doc(db, 'products', pid);
           const psnap = await getDoc(pref);
@@ -5506,10 +5514,18 @@ export function useMutation(apiRef: any) {
             const gt = pdata.gadgetTypeId || pdata.gadgetType;
             if (!allowedTypeIds.has(gt)) { wrongGadget++; continue; }
           }
+          const kind = String(pdata.listingKind || '').trim().toLowerCase();
+          if (listing && (kind ? kind !== listing : listingIsPreset)) { wrongListing++; continue; }
           const images = Array.isArray(pdata.images) ? pdata.images : [];
           if (images.some((i: any) => (typeof i === 'string' ? i : i?.url) === args.url)) { alreadyThere++; continue; }
+          // The listing's own pictures lead, in the order they were approved;
+          // older pictures carried over from before follow them.
+          const added = { url: args.url, alt: args.alt || pdata.title || '', ...(listing ? { listing } : {}) };
+          const next = listing && kind
+            ? [...images.filter((i: any) => i?.listing === kind), added, ...images.filter((i: any) => i?.listing !== kind)]
+            : [...images, added];
           await updateDoc(pref, {
-            images: [...images, { url: args.url, alt: args.alt || pdata.title || '' }],
+            images: next,
             updatedAt: Date.now(),
             // A studio listing waits in draft for its first approved picture:
             // a listing with no photo is not worth showing to anyone.
@@ -5517,7 +5533,7 @@ export function useMutation(apiRef: any) {
           });
           linked++;
         }
-        return { success: true, linked, alreadyThere, wrongGadget, matchedSkus, productIds: [...productIds] };
+        return { success: true, linked, alreadyThere, wrongGadget, wrongListing, matchedSkus, productIds: [...productIds] };
       }
 
       // ---------------------------------------------------------------------
@@ -5529,6 +5545,60 @@ export function useMutation(apiRef: any) {
       // holding the MSG91 key, deciding what is still owed — did become
       // functions, in functions/src/ordersAdmin.ts.
       // ---------------------------------------------------------------------
+
+      if (path === 'aiMockups.tidyListingImages') {
+        // Puts a design's brand listings right after pictures landed on the
+        // wrong one: a studio picture whose listing differs from the product's
+        // comes off, and the listing's own pictures move to the front. Older
+        // pictures that no studio job accounts for are kept, after them.
+        const design = String(args.rNumber || '').trim();
+        if (!design) throw new Error('Missing design code');
+        const [snap, wholeSnap, jobSnap] = await Promise.all([
+          getDocs(query(collection(db, 'variants'), where('sku', '>=', `${design}-`), where('sku', '<', `${design}-\uf8ff`))),
+          getDocs(query(collection(db, 'variants'), where('sku', '==', design))),
+          getDocs(query(collection(db, 'designMockups'), where('rNumber', '==', design))),
+        ]);
+        const listingByUrl = new Map<string, string>();
+        jobSnap.docs.forEach((d) => {
+          const j: any = d.data();
+          if (j.url && j.listing) listingByUrl.set(String(j.url), String(j.listing).trim().toLowerCase());
+        });
+        const productIds = new Set<string>();
+        [...snap.docs, ...wholeSnap.docs].forEach((d) => { const pid = (d.data() as any).productId; if (pid) productIds.add(pid); });
+
+        let removed = 0, changed = 0;
+        const hidden: string[] = [];
+        for (const pid of productIds) {
+          const pref = doc(db, 'products', pid);
+          const psnap = await getDoc(pref);
+          if (!psnap.exists()) continue;
+          const pdata: any = psnap.data();
+          const kind = String(pdata.listingKind || '').trim().toLowerCase();
+          if (!kind) continue;
+          const images: any[] = Array.isArray(pdata.images) ? pdata.images : [];
+          const own: any[] = [], old: any[] = [];
+          for (const img of images) {
+            const url = typeof img === 'string' ? img : img?.url;
+            const from = (typeof img === 'object' && img?.listing) || listingByUrl.get(url) || '';
+            if (!from) { old.push(img); continue; }
+            if (from !== kind) { removed++; continue; }
+            own.push(typeof img === 'string' ? { url, alt: pdata.title || '', listing: kind } : { ...img, listing: kind });
+          }
+          const next = [...own, ...old];
+          if (JSON.stringify(next) === JSON.stringify(images)) continue;
+          // A listing left with no picture waits in draft; its first approved
+          // picture publishes it again, as with a new listing.
+          const emptied = !next.length && pdata.status === 'active';
+          await updateDoc(pref, {
+            images: next,
+            updatedAt: Date.now(),
+            ...(emptied ? { status: 'draft', awaitingImage: true } : {}),
+          });
+          changed++;
+          if (emptied) hidden.push(String(pdata.listingKind || pdata.title || pid));
+        }
+        return { success: true, removed, changed, hidden, products: productIds.size };
+      }
 
       if (path === 'stockNotifications.deleteRequest') {
         if (!args?.id) throw new Error('Missing request');

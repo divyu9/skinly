@@ -146,3 +146,55 @@ export async function renderTemplateMockup(input: TemplateMockupInput): Promise<
   }
   return sharp(out, { raw: { width: tpl.width, height: tpl.height, channels: 4 } }).webp({ quality: 90 }).toBuffer();
 }
+
+export interface TrueSizeCropInput {
+  /** The calibrated, flattened roll photo: x across the roll, y along it. */
+  designUrl: string;
+  pxPerCm: number;
+  /** The device face, upright (a phone is width × height in portrait). */
+  widthCm: number;
+  heightCm: number;
+  /** Cut across the roll: the piece is turned a quarter turn onto the device. */
+  rotate90?: boolean;
+}
+
+/**
+ * The exact piece of vinyl that goes on a device, at its true size and
+ * turned upright, as a JPEG for the image model. Given the whole roll photo
+ * the model guesses how big the motifs are and usually shrinks them; given
+ * the piece itself, edge to edge, it has nothing to guess. Takes the same
+ * stretch as the template mockups (the middle of the photo) and repeats the
+ * roll where the photo is smaller than the piece.
+ */
+export async function renderTrueSizeCrop(input: TrueSizeCropInput): Promise<Buffer> {
+  const design = await decode(input.designUrl);
+  const ppc = input.pxPerCm || 40;
+  const pieceW = input.rotate90 ? input.heightCm : input.widthCm;
+  const pieceH = input.rotate90 ? input.widthCm : input.heightCm;
+  const w = Math.max(1, Math.round(pieceW * ppc));
+  const h = Math.max(1, Math.round(pieceH * ppc));
+  const ox = Math.round(Math.max(0, design.width - w) / 2);
+  const oy = Math.round(Math.max(0, design.height - h) / 2);
+  const out = Buffer.alloc(w * h * 3);
+  for (let y = 0; y < h; y++) {
+    const sy = (oy + y) % design.height;
+    for (let x = 0; x < w; x++) {
+      const sx = (ox + x) % design.width;
+      const i = (sy * design.width + sx) * 4;
+      const o = (y * w + x) * 3;
+      out[o] = design.data[i];
+      out[o + 1] = design.data[i + 1];
+      out[o + 2] = design.data[i + 2];
+    }
+  }
+  let img = sharp(out, { raw: { width: w, height: h, channels: 3 } });
+  // Upright on the device: the rotation the template mockup uses, read back.
+  if (input.rotate90) img = sharp(await img.rotate(270).png().toBuffer());
+  // Upright, the piece is taller than wide for a phone; the long side goes to
+  // 1024 px, a size the image models read detail from comfortably.
+  const [fw, fh] = input.rotate90 ? [h, w] : [w, h];
+  return img
+    .resize(fh >= fw ? { height: 1024 } : { width: 1024 })
+    .jpeg({ quality: 92 })
+    .toBuffer();
+}

@@ -219,6 +219,16 @@ export const REFERENCE_PREAMBLE =
   + "pose and exactly how the skin covers the device, its camera area and its edges; ignore the second "
   + "image's colours, pattern, text and watermarks entirely. ";
 
+/**
+ * Said when the design image is the device's own piece of the roll, cut to
+ * true size from a calibrated photo, rather than the whole roll.
+ */
+export const TRUE_SIZE_CLAUSE =
+  "The design image is the exact piece of vinyl cut for this device, shown at its true size and already "
+  + "turned the way it sits on the device (upright, as the device is held). It covers the skinned face from "
+  + "edge to edge: keep every motif exactly this size relative to the device and in this orientation. Do not "
+  + "shrink, enlarge, rotate or add repeats of the pattern — the device shows this piece and nothing more. ";
+
 export const PLACEHOLDERS = ["fidelity", "staging", "rNumber", "designName", "cutOrientation"];
 
 /** Where a design comes from. Rolls repeat; cutouts are one fixed artwork. */
