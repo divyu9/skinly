@@ -27,7 +27,7 @@ import {
   saveLocally, chooseBackupFolder, getBackupFolder, supportsDirectoryPicker,
 } from "@/lib/local-backup.ts";
 import {
-  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf,
+  STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
@@ -754,7 +754,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     const fresh = justCreated[listingKey(shot)];
     if (fresh) return [fresh];
     if (!linkTargets) return null;
-    const codes = (shot.skuCodes || []).map((c) => c.toUpperCase());
+    const codes = shotCodes(shot);
     // "Default" says nothing about which view a variant is, and appears on
     // every gadget, so it is never allowed to match.
     const titles = (shot.variantTitles || [])
@@ -860,7 +860,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         shotLabel: label,
         gadget: shot.gadget,
         suffix,
-        skuCodes: shot.skuCodes || [],
+        skuCodes: shotCodes(shot),
         variantTitles: shot.variantTitles || [],
         matchSingleVariant: shot.matchSingleVariant || false,
         sourceUrl: roll.rawImageUrl,
@@ -965,13 +965,25 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const loadTemplate = useCallback((group: ListingGroup) => {
     const cacheKey = `${group.key}|${roll.finish || ""}`;
     let pending = templateCache.current.get(cacheKey);
+    // Consoles and controllers have a decided shape; no need to ask the catalogue.
+    const preset = presetFor(group.listing);
+    if (!pending && preset) {
+      pending = Promise.resolve({
+        precedent: true,
+        preset: true,
+        variants: preset.map((v) => ({
+          skuTail: v.tail, title: v.title, price: v.price, materialMultiplier: v.materialMultiplier,
+        })),
+      });
+      templateCache.current.set(cacheKey, pending);
+    }
     if (!pending) {
       pending = getTemplate({
         gadgetTypeId: group.gadgetTypeId || "",
         gadget: group.gadget,
         listing: group.listing,
         finish: roll.finish || "",
-        skuCodes: [...new Set(group.shots.flatMap((s) => s.skuCodes || []))],
+        skuCodes: [...new Set(group.shots.flatMap((s) => shotCodes(s)))],
         variantTitles: [...new Set(group.shots.flatMap((s) => s.variantTitles || []))],
       }).catch((e: unknown) => {
         templateCache.current.delete(cacheKey);

@@ -214,13 +214,18 @@ export type DesignSource = "roll" | "cutout";
 /**
  * Listings for the starter shots, by file suffix, for shots saved before the
  * listing field existed. Anything not named here is one listing per gadget —
- * which is right for laptops, cameras, chargers and controllers (one controller
- * listing carries every Xbox and PlayStation variant).
+ * which is right for laptops, cameras and chargers. Controllers are two
+ * listings, PlayStation and Xbox, because those are two different searches.
  */
 const LISTING_BY_SUFFIX: Record<string, string> = {
   "ps5": "PS5",
   "ps5-angle": "PS5",
   "ps5-set": "PS5",
+  "switch": "Nintendo Switch",
+  "controller-ps5": "PlayStation Controller",
+  "controller-ps4": "PlayStation Controller",
+  "controller-ps3": "PlayStation Controller",
+  "controller-xbox": "Xbox Controller",
   "xbox-x": "Xbox Series X",
   "xbox-x-set": "Xbox Series X",
   "xbox-s": "Xbox Series S",
@@ -241,6 +246,81 @@ export function listingOf(shot: Pick<MockupShot, "listing" | "suffix" | "gadget"
   // A duplicated shot carries a "-2" tail; it still belongs where its original does.
   const suffix = String(shot.suffix || "").toLowerCase().replace(/-\d+$/, "");
   return LISTING_BY_SUFFIX[suffix] || titleCase(String(shot.gadget || "other"));
+}
+
+export interface PresetVariant {
+  /** SKU tail after the design code: R-12-PS5SDG. One segment, no dashes. */
+  tail: string;
+  title: string;
+  price: number;
+  materialMultiplier: number;
+}
+
+const bundle = (tail: string, name: string, prices: [number, number, number]): PresetVariant[] => [
+  { tail, title: `${name} — Console`, price: prices[0], materialMultiplier: 1 },
+  { tail: `${tail}C1`, title: `${name} + 1 Controller`, price: prices[1], materialMultiplier: 1 },
+  { tail: `${tail}C2`, title: `${name} + 2 Controller`, price: prices[2], materialMultiplier: 1 },
+];
+
+const CONSOLE_PRICES: [number, number, number] = [799, 999, 1199];
+
+/**
+ * The fixed variant set for listings whose shape is decided, not copied.
+ *
+ * Consoles are one listing per family with the models as variants, each
+ * sold alone or with one or two controller skins (the shape the Xbox listings
+ * already use, at their prices). Controllers are one PlayStation and one Xbox
+ * listing. The catalogue's older PS5 listings are a single "Default Title"
+ * row, so copying the catalogue would repeat exactly that; these win.
+ *
+ * Keyed by listing name, lower-cased. Prices are starting points the admin
+ * edits in the dialog.
+ */
+export const LISTING_PRESETS: Record<string, PresetVariant[]> = {
+  "ps5": [
+    ...bundle("PS5D", "PS5 Disc", CONSOLE_PRICES),
+    ...bundle("PS5DG", "PS5 Digital", CONSOLE_PRICES),
+    ...bundle("PS5SD", "PS5 Slim Disc", CONSOLE_PRICES),
+    ...bundle("PS5SDG", "PS5 Slim Digital", CONSOLE_PRICES),
+    ...bundle("PS5PRO", "PS5 Pro", CONSOLE_PRICES),
+  ],
+  "xbox series x": [
+    { tail: "XBX", title: "Console", price: 799, materialMultiplier: 1 },
+    { tail: "XBXCL1", title: "Console + 1 Controller", price: 999, materialMultiplier: 1 },
+    { tail: "XBXCL2", title: "Console + 2 Controller", price: 1199, materialMultiplier: 1 },
+  ],
+  "xbox series s": [
+    { tail: "XBXS", title: "Console", price: 799, materialMultiplier: 1 },
+    { tail: "XBXSCL1", title: "Console + 1 Controller", price: 999, materialMultiplier: 1 },
+    { tail: "XBXSCL2", title: "Console + 2 Controller", price: 1199, materialMultiplier: 1 },
+  ],
+  "nintendo switch": [
+    ...bundle("NSW", "Switch", [599, 749, 899]),
+    ...bundle("NSWO", "Switch OLED", [599, 749, 899]),
+    ...bundle("NSW2", "Switch 2", [699, 849, 999]),
+  ],
+  "playstation controller": [
+    { tail: "DS5", title: "PS5 DualSense", price: 399, materialMultiplier: 1 },
+    { tail: "DS5E", title: "PS5 DualSense Edge", price: 449, materialMultiplier: 1 },
+    { tail: "DS4", title: "PS4 DualShock 4", price: 399, materialMultiplier: 1 },
+    { tail: "DS3", title: "PS3 Controller", price: 399, materialMultiplier: 1 },
+  ],
+  "xbox controller": [
+    { tail: "XBC", title: "Xbox Series X|S", price: 399, materialMultiplier: 1 },
+    { tail: "XBC1", title: "Xbox One", price: 399, materialMultiplier: 1 },
+  ],
+};
+
+export const presetFor = (listing: string) => LISTING_PRESETS[String(listing || "").trim().toLowerCase()];
+
+/**
+ * The SKU view codes an image for this shot may land on: the shot's own plus
+ * its listing's preset tails, so a picture finds a listing made from the
+ * preset as well as the older ones.
+ */
+export function shotCodes(shot: Pick<MockupShot, "skuCodes" | "listing" | "suffix" | "gadget">): string[] {
+  const preset = presetFor(listingOf(shot)) || [];
+  return [...new Set([...(shot.skuCodes || []), ...preset.map((p) => p.tail)].map((c) => c.toUpperCase()))];
 }
 
 /** R-01 + laptop-top -> R-01-laptop-top. Kept ASCII-safe for use as an R2 key. */
@@ -494,6 +574,24 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "thumbsticks, the light bar, the triggers and the central PS button stay bare, with the vinyl "
         + "die-cut cleanly around each of them. No people and no hands anywhere in the frame. " + REAL
         + "{{staging}} ",
+  },
+  {
+    label: "Nintendo Switch 2 — docked",
+    gadget: "console",
+    suffix: "switch",
+    listing: "Nintendo Switch",
+    skuCodes: ["NSW", "NSWO", "NSW2"],
+    order: 0,
+    isActive: true,
+    prompt:
+      "A Nintendo Switch 2 console standing in its dock on a light oak media unit, photographed from a "
+        + "front three-quarter angle at dock height so the dock's front face and the console's screen edge "
+        + "are both clearly visible and fill most of the frame. The two detachable Joy-Con controllers are "
+        + "attached to either side of the console. A vinyl skin covers the front face of the dock and the "
+        + "outer faces of both Joy-Con controllers. {{fidelity}} The console's screen stays dark and "
+        + "uncovered, and every button, stick, trigger, port and the Switch logo stay completely bare, "
+        + "with the vinyl stopping cleanly at their edges. Behind and to the side, well out of focus, a "
+        + "small plant and a closed game case, muted and low-contrast. " + REAL + "{{staging}} ",
   },
   {
     label: "Series X — console",
