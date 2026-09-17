@@ -15,6 +15,10 @@ import {
   Loader2Icon, AlertTriangleIcon, RotateCwIcon, RotateCcwIcon, PencilIcon, WrenchIcon,
 } from "lucide-react";
 import { LaptopSkuFix } from "./laptop-sku-fix.tsx";
+import { PrecutImport } from "./precut-import.tsx";
+
+/** Gadgets a design's sheets or pieces can be cut for. */
+const GADGET_CHOICES = ["phone", "laptop", "tablet", "console", "controller", "camera", "lens", "charger", "drone", "mac-mini", "gimbals"];
 
 /**
  * Stock for designs that come as printed sheets rather than off a roll.
@@ -49,6 +53,9 @@ export function CutoutsManagement() {
   const [editing, setEditing] = useState<any | null>(null);
   const [saving, setSaving] = useState(false);
   const [fixingSkus, setFixingSkus] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [kindFilter, setKindFilter] = useState<"all" | "precut" | "sheet">("all");
+  const [usableFor, setUsableFor] = useState<string[]>([]);
   const blankDraft = { cutoutNumber: "", designName: "", sheetsAvailable: "0", finish: "3D Textured", aliases: "" };
   const uploadFor = useRef<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -80,13 +87,17 @@ export function CutoutsManagement() {
     const q = search.trim().toLowerCase();
     return (cutouts || [])
       .filter((c) =>
+        kindFilter === "all" ||
+        (kindFilter === "precut" ? c.kind === "precut" : c.kind !== "precut")
+      )
+      .filter((c) =>
         !q ||
         String(c.cutoutNumber || "").toLowerCase().includes(q) ||
         String(c.designName || "").toLowerCase().includes(q) ||
         (c.aliases || []).some((a: string) => a.toLowerCase().includes(q))
       )
       .sort((a, b) => String(a.cutoutNumber).localeCompare(String(b.cutoutNumber), undefined, { numeric: true }));
-  }, [cutouts, search]);
+  }, [cutouts, search, kindFilter]);
 
   const totals = useMemo(() => {
     const list = cutouts || [];
@@ -153,12 +164,14 @@ export function CutoutsManagement() {
       finish: String(c.finish || ""),
       aliases: (c.aliases || []).join(", "),
     });
+    setUsableFor(Array.isArray(c.usableFor) ? c.usableFor : []);
   };
 
   const closeForm = () => {
     setAdding(false);
     setEditing(null);
     setDraft(blankDraft);
+    setUsableFor([]);
   };
 
   const parseCodes = (v: string) =>
@@ -185,6 +198,9 @@ export function CutoutsManagement() {
       sheetsAvailable: Math.max(0, parseInt(draft.sheetsAvailable) || 0),
       finish: draft.finish.trim(),
       aliases,
+      // Empty means any gadget; a pre-cut phone design says ["phone"].
+      usableFor,
+      ...(usableFor.length === 1 && usableFor[0] === "phone" ? { kind: "precut" } : {}),
     };
     setSaving(true);
     try {
@@ -232,6 +248,10 @@ export function CutoutsManagement() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setImporting(true)}>
+            <UploadIcon className="mr-1.5 size-4" />
+            Import pre-cut phone designs
+          </Button>
           <Button variant="outline" onClick={() => setFixingSkus(true)}>
             <WrenchIcon className="mr-1.5 size-4" />
             Fix laptop SKUs
@@ -248,6 +268,7 @@ export function CutoutsManagement() {
       )}
 
       {fixingSkus && <LaptopSkuFix cutouts={cutouts} onClose={() => setFixingSkus(false)} />}
+      {importing && <PrecutImport cutouts={cutouts} onClose={() => setImporting(false)} />}
 
       <div className="grid gap-2 sm:grid-cols-4">
         <Stat label="Designs" value={totals.designs} />
@@ -259,6 +280,13 @@ export function CutoutsManagement() {
       <div className="relative">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code, alias or design name" className="pl-9" />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {([["all", "All"], ["precut", "Phone pre-cut (L, M, T, A…)"], ["sheet", "Sheets (laptop and others)"]] as const).map(([k, label]) => (
+          <Button key={k} size="sm" variant={kindFilter === k ? "default" : "outline"} className="h-7 text-xs" onClick={() => setKindFilter(k)}>
+            {label} ({(cutouts || []).filter((c) => k === "all" || (k === "precut" ? c.kind === "precut" : c.kind !== "precut")).length})
+          </Button>
+        ))}
       </div>
 
       <input ref={fileRef} type="file" accept="image/*" className="hidden"
@@ -345,6 +373,9 @@ export function CutoutsManagement() {
                       <span key={a} className="rounded bg-muted px-1 font-mono text-[10px] text-muted-foreground">{a}</span>
                     ))}
                     {c.finish && <Badge variant="outline" className="text-[10px]">{c.finish}</Badge>}
+                    {Array.isArray(c.usableFor) && c.usableFor.length > 0 && (
+                      <Badge className="bg-sky-600 text-[10px]">{c.usableFor.join(", ")} only</Badge>
+                    )}
                   </div>
                   <p className="truncate text-sm text-muted-foreground">{c.designName || "Untitled"}</p>
                 </div>
@@ -453,6 +484,27 @@ export function CutoutsManagement() {
                 <Label className="text-xs">Other SKU codes</Label>
                 <Input value={draft.aliases} onChange={(e) => setDraft({ ...draft, aliases: e.target.value })} placeholder="LP-3D-06, LC-07" className="font-mono text-xs" />
               </div>
+            </div>
+            <div>
+              <Label className="text-xs">Used for</Label>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {GADGET_CHOICES.map((g) => {
+                  const on = usableFor.includes(g);
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setUsableFor(on ? usableFor.filter((x) => x !== g) : [...usableFor, g])}
+                      className={`rounded-full border px-2 py-0.5 text-[11px] capitalize ${on ? "border-sky-600 bg-sky-600 text-white" : "hover:bg-muted"}`}
+                    >
+                      {g}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Nothing picked = any gadget. A pre-cut phone design is phone only; the studio then offers only phone listings for it.
+              </p>
             </div>
             <p className="text-[11px] text-muted-foreground">
               Add every code this design is sold under. One design sold as "Only Top" and "Top + Keyboard Area"

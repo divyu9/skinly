@@ -140,7 +140,15 @@ interface Design {
   flatPxPerCm?: number;
   flatWidthCm?: number;
   flatLengthCm?: number;
+  /** Gadgets this design can be cut for; empty means any. */
+  usableFor?: string[];
 }
+
+/**
+ * Template mockups are built but parked: listings first. Flip this to bring
+ * back the Templates tab, roll calibration and the template button.
+ */
+const TEMPLATE_TOOLS = false;
 
 /** The pictures of one product, within a gadget. */
 type ListingGroup = {
@@ -213,7 +221,7 @@ function AiMockupsContent() {
           </p>
         </div>
         <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
-          {(["studio", "templates", "shots"] as const).map((t) => (
+          {(TEMPLATE_TOOLS ? (["studio", "templates", "shots"] as const) : (["studio", "shots"] as const)).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -612,7 +620,8 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
     const fromCutouts: Design[] = (cutouts || []).map((c) => ({
       _id: c._id, source: "cutout", code: String(c.cutoutNumber || "").trim(), name: c.designName || "",
       rawImageUrl: c.rawImageUrl, finish: c.finish, stock: Number(c.sheetsAvailable) || 0,
-      stockLabel: `${Number(c.sheetsAvailable) || 0} sheet${Number(c.sheetsAvailable) === 1 ? "" : "s"}`,
+      stockLabel: `${Number(c.sheetsAvailable) || 0} ${c.kind === "precut" ? "piece" : "sheet"}${Number(c.sheetsAvailable) === 1 ? "" : "s"}`,
+      usableFor: Array.isArray(c.usableFor) ? c.usableFor : undefined,
     }));
     const q = search.trim().toLowerCase();
     return [...fromRolls, ...fromCutouts]
@@ -700,7 +709,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
         <RollPanel
           key={selected._id}
           roll={selected}
-          shots={activeShots}
+          shots={selected.usableFor?.length ? activeShots.filter((s) => selected.usableFor!.includes(s.gadget)) : activeShots}
           blocks={blocks}
           picked={picked}
           setPicked={setPicked}
@@ -1326,12 +1335,12 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   <UploadIcon className="mr-1.5 size-3.5" />
                   {roll.rawImageUrl ? "Replace raw photo" : "Upload raw photo"}
                 </Button>
-                {roll.source === "roll" && roll.rawImageUrl && (
+                {TEMPLATE_TOOLS && roll.source === "roll" && roll.rawImageUrl && (
                   <Button size="sm" variant={roll.flatImageUrl ? "ghost" : "default"} onClick={() => setCalibrating(true)}>
                     {roll.flatImageUrl ? "Re-calibrate" : "Calibrate for template mockups"}
                   </Button>
                 )}
-                {roll.source === "roll" && (
+                {TEMPLATE_TOOLS && roll.source === "roll" && (
                   <span className={`text-[11px] ${roll.flatImageUrl ? "text-emerald-600" : "text-muted-foreground"}`}>
                     {roll.flatImageUrl ? `calibrated · ${roll.flatWidthCm} × ${roll.flatLengthCm} cm` : "not calibrated"}
                   </span>
@@ -1360,7 +1369,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 <Switch checked={phaseOnly} onCheckedChange={setPhaseOnly} />
                 Phase 1
               </label>
-              <Button
+              {TEMPLATE_TOOLS && <Button
                 size="sm"
                 variant="outline"
                 className="h-7 border-emerald-400 text-xs text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
@@ -1372,7 +1381,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 {tplProgress
                   ? `Making ${tplProgress.done}/${tplProgress.total}…`
                   : `Template mockups (${templatedGroups.length}) · ₹0`}
-              </Button>
+              </Button>}
               {missingListings.length > 0 && (
                 <Button
                   size="sm"
