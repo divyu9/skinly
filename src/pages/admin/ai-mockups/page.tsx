@@ -1066,9 +1066,10 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
       const url = result?.url || result?.publicUrl;
       if (!url) throw new Error(result?.error || "Upload failed");
       const save = roll.source === "cutout" ? updateCutout : updateRoll;
-      await save({ id: roll._id, rawImageUrl: url });
+      // A calibration belongs to the photo it was marked on.
+      await save({ id: roll._id, rawImageUrl: url, ...(roll.source === "roll" && roll.flatImageUrl ? { flatImageUrl: "" } : {}) });
       setStaged(null);
-      toast.success("Raw design saved");
+      toast.success(roll.source === "roll" && roll.flatImageUrl ? "Raw design saved — calibrate it again" : "Raw design saved");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {

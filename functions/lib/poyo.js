@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.poyoStatus = exports.poyoSubmit = void 0;
+exports.poyoStatus = exports.poyoTaskStatus = exports.poyoSubmit = exports.submitPoyoTask = void 0;
 const https_1 = require("firebase-functions/v1/https");
 const auth_1 = require("./auth");
 const rate_limit_1 = require("./rate-limit");
@@ -84,24 +84,14 @@ const poyoRequest = async (path, init, attempt = 0) => {
     }
     return body;
 };
-/**
- * Starts a generation. Returns the task id to poll with poyoStatus.
- *
- * `imageUrls` must be publicly fetchable — PoYo pulls them itself and does not
- * accept base64. Raw design photos are uploaded to R2 first for exactly this.
- */
-exports.poyoSubmit = (0, https_1.onCall)(async (data, context) => {
+/** Validates and submits one generation; returns PoYo's task id. */
+async function submitPoyoTask(params) {
     var _a;
-    const { uid } = await (0, auth_1.requireAdmin)(context);
-    await (0, rate_limit_1.enforceDailyRateLimit)({
-        key: `poyoSubmit_${uid}`,
-        limit: Number(process.env.POYO_DAILY_LIMIT || 500),
-    });
-    const { model, prompt, imageUrls, size, resolution, quality } = data || {};
+    const { model, prompt, imageUrls, size, resolution, quality } = params || {};
     if (typeof prompt !== "string" || prompt.trim().length < 10) {
         throw new https_1.HttpsError("invalid-argument", "A prompt of at least 10 characters is required");
     }
-    if (prompt.length > 5000) {
+    if (prompt.length > 6000) {
         throw new https_1.HttpsError("invalid-argument", "Prompt is too long");
     }
     if (!MODELS.includes(model)) {
@@ -150,8 +140,57 @@ exports.poyoSubmit = (0, https_1.onCall)(async (data, context) => {
     if (!taskId) {
         throw new https_1.HttpsError("internal", "PoYo did not return a task id");
     }
+    return String(taskId);
+}
+exports.submitPoyoTask = submitPoyoTask;
+exports.poyoSubmit = (0, https_1.onCall)(async (data, context) => {
+    const { uid } = await (0, auth_1.requireAdmin)(context);
+    await (0, rate_limit_1.enforceDailyRateLimit)({
+        key: `poyoSubmit_${uid}`,
+        limit: Number(process.env.POYO_DAILY_LIMIT || 500),
+    });
+    const taskId = await submitPoyoTask(data || {});
     return { success: true, taskId };
 });
+/** One task's state, and the image bytes once it has finished (when asked). */
+async function poyoTaskStatus(taskId, withImage) {
+    var _a, _b;
+    if (typeof taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
+        throw new https_1.HttpsError("invalid-argument", "A valid taskId is required");
+    }
+    const body = await poyoRequest(`/api/generate/status/${taskId}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${getKey()}` },
+    });
+    const d = (body === null || body === void 0 ? void 0 : body.data) || {};
+    const files = Array.isArray(d.files) ? d.files : [];
+    const fileUrl = ((_a = files.find((f) => (f === null || f === void 0 ? void 0 : f.file_type) === "image")) === null || _a === void 0 ? void 0 : _a.file_url) || ((_b = files[0]) === null || _b === void 0 ? void 0 : _b.file_url) || null;
+    const out = {
+        status: d.status || "unknown",
+        progress: typeof d.progress === "number" ? d.progress : null,
+        error: d.error_message || null,
+        fileUrl,
+    };
+    if (withImage && fileUrl && /^https:\/\//.test(String(fileUrl))) {
+        let img;
+        try {
+            img = await fetch(fileUrl);
+        }
+        catch (e) {
+            throw new https_1.HttpsError("unavailable", `Could not download image: ${(e === null || e === void 0 ? void 0 : e.message) || e}`);
+        }
+        if (!img.ok)
+            throw new https_1.HttpsError("internal", `Image download failed: ${img.status}`);
+        const buf = Buffer.from(await img.arrayBuffer());
+        if (buf.byteLength > 15 * 1024 * 1024) {
+            throw new https_1.HttpsError("resource-exhausted", "Generated image is too large");
+        }
+        out.contentType = img.headers.get("content-type") || "image/png";
+        out.buffer = buf;
+    }
+    return out;
+}
+exports.poyoTaskStatus = poyoTaskStatus;
 /**
  * Polls one task, and hands back the image in the same breath.
  *
@@ -166,42 +205,22 @@ exports.poyoSubmit = (0, https_1.onCall)(async (data, context) => {
  * response, so nothing client-supplied is ever fetched.
  */
 exports.poyoStatus = (0, https_1.onCall)(async (data, context) => {
-    var _a, _b;
     await (0, auth_1.requireAdmin)(context);
-    const taskId = data === null || data === void 0 ? void 0 : data.taskId;
-    if (typeof taskId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(taskId)) {
-        throw new https_1.HttpsError("invalid-argument", "A valid taskId is required");
-    }
-    const body = await poyoRequest(`/api/generate/status/${taskId}`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${getKey()}` },
-    });
-    const d = (body === null || body === void 0 ? void 0 : body.data) || {};
-    const files = Array.isArray(d.files) ? d.files : [];
-    const fileUrl = ((_a = files.find((f) => (f === null || f === void 0 ? void 0 : f.file_type) === "image")) === null || _a === void 0 ? void 0 : _a.file_url) || ((_b = files[0]) === null || _b === void 0 ? void 0 : _b.file_url) || null;
+    const r = await poyoTaskStatus(data === null || data === void 0 ? void 0 : data.taskId, !!(data === null || data === void 0 ? void 0 : data.withImage));
     const out = {
         success: true,
-        status: d.status || "unknown",
-        progress: typeof d.progress === "number" ? d.progress : null,
-        error: d.error_message || null,
-        fileUrl,
+        status: r.status,
+        progress: r.progress,
+        error: r.error,
+        fileUrl: r.fileUrl,
     };
-    if ((data === null || data === void 0 ? void 0 : data.withImage) && fileUrl && /^https:\/\//.test(String(fileUrl))) {
-        let img;
-        try {
-            img = await fetch(fileUrl);
-        }
-        catch (e) {
-            throw new https_1.HttpsError("unavailable", `Could not download image: ${(e === null || e === void 0 ? void 0 : e.message) || e}`);
-        }
-        if (!img.ok)
-            throw new https_1.HttpsError("internal", `Image download failed: ${img.status}`);
-        const buf = Buffer.from(await img.arrayBuffer());
-        if (buf.byteLength > 9 * 1024 * 1024) {
+    if (r.buffer) {
+        // The callable relays at most ~9 MB; the pipeline stores larger ones directly.
+        if (r.buffer.byteLength > 9 * 1024 * 1024) {
             throw new https_1.HttpsError("resource-exhausted", "Generated image is too large to relay");
         }
-        out.contentType = img.headers.get("content-type") || "image/png";
-        out.base64 = buf.toString("base64");
+        out.contentType = r.contentType;
+        out.base64 = r.buffer.toString("base64");
     }
     return out;
 });

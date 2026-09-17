@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createListingForDesign = exports.getListingTemplate = void 0;
+exports.suggestDesignDetails = exports.reviseListing = exports.moveRestockRequests = exports.createListingForDesign = exports.createListing = exports.setListingCollections = exports.writeListingCopy = exports.getListingTemplate = void 0;
 const admin = __importStar(require("firebase-admin"));
 const https_1 = require("firebase-functions/v1/https");
 const auth_1 = require("./auth");
@@ -185,137 +185,206 @@ are told about, no compatibility claims about specific device models, no warrant
 
 Reply with JSON only, in exactly this shape:
 {
-  "title": "60-70 characters. The design name, the finish, the gadget, the word Skin or Wrap.",
+  "title": "60-70 characters. The design name, the finish, the device (as named in Product), the word Skin.",
   "slug": "lowercase-hyphenated-from-the-title, no stop words dropped mid-phrase, under 70 chars",
   "metaTitle": "under 60 characters, ends with | Skinly",
   "metaDescription": "140-155 characters, one sentence of benefit plus a light call to action",
   "description": "350-500 words of markdown. Open with one bold hook line. Then four or five short
-    sections with an emoji and a bold heading each: the design, the finish and feel, precision fit,
-    protection and durability, easy application and clean removal. Close with a 3-question mini FAQ.
-    Use **bold** for headings and blank lines between sections.",
-  "tags": ["10-15 lowercase search tags: the subject, the colours, the gadget, the finish"]
+    sections with an emoji and a bold heading each: the design, the finish and feel, precision fit
+    for this device, protection and durability, easy application and clean removal. Close with a
+    3-question mini FAQ. Use **bold** for headings and blank lines between sections.",
+  "tags": ["10-15 lowercase search tags: the subject, the colours, the device, the brand, the finish"],
+  "collections": ["0-4 names copied exactly from the Collections list that genuinely fit this design's
+    subject or colour; never a device or finish collection; [] if none fit"]
 }`;
-/** Creates the product, its variants and its collection links. */
-exports.createListingForDesign = (0, https_1.onCall)(async (data, context) => {
-    var _a, _b, _c;
-    await (0, auth_1.requireAdmin)(context);
-    const db = admin.firestore();
-    const designCode = String((data === null || data === void 0 ? void 0 : data.designCode) || "").trim().toUpperCase();
-    const designName = String((data === null || data === void 0 ? void 0 : data.designName) || "").trim();
-    const gadgetIn = String((data === null || data === void 0 ? void 0 : data.gadgetTypeId) || "");
-    const gadgetName = String((data === null || data === void 0 ? void 0 : data.gadget) || "").trim();
-    // Which listing of the gadget this is — "Drone controller", "Xbox Series S".
-    const listingName = String((data === null || data === void 0 ? void 0 : data.listing) || "").trim();
-    const finish = String((data === null || data === void 0 ? void 0 : data.finish) || "").trim();
-    const source = (data === null || data === void 0 ? void 0 : data.source) === "cutout" ? "cutout" : "roll";
-    const imageUrl = String((data === null || data === void 0 ? void 0 : data.imageUrl) || "").trim();
-    const variants = Array.isArray(data === null || data === void 0 ? void 0 : data.variants) ? data.variants : [];
-    if (!designCode)
-        throw new https_1.HttpsError("invalid-argument", "A design code is required");
-    if (!variants.length)
-        throw new https_1.HttpsError("invalid-argument", "At least one variant is required");
-    const gadgetType = await resolveGadget(db, gadgetIn, gadgetName);
-    const gadgetTypeId = gadgetType.id;
-    if (variants.some((v) => !(Number(v.price) > 0))) {
-        throw new https_1.HttpsError("invalid-argument", "Every variant needs a price");
-    }
-    // Refuse to make a second listing for a pair that already has one — the
-    // studio's "no listing" badge can be a stale render, and a duplicate SKU is
-    // exactly the mess this tool exists to avoid.
-    const tails = variants.map((v) => `${designCode}${v.skuTail ? `-${v.skuTail}` : ""}`.toUpperCase());
-    const existing = await db.collection("variants")
-        .where("sku", "in", tails.slice(0, 30))
-        .get();
-    if (!existing.empty) {
-        throw new https_1.HttpsError("already-exists", `${existing.docs.map((d) => d.data().sku).join(", ")} already exists — refresh the studio.`);
-    }
-    const [finishSnap, collectionSnap, tpl] = await Promise.all([
-        db.collection("finishTypes").get(),
-        db.collection("collections").get(),
-        templateForGadget(db, gadgetTypeId),
-    ]);
-    const gadgetLabel = gadgetType.displayName;
-    // Match the finish the design is actually printed in, falling back to what
-    // this gadget's other listings use.
-    const finishMatch = finishSnap.docs.find((d) => {
-        const f = d.data();
-        const hay = `${f.name} ${f.displayName}`.toLowerCase();
-        const needle = finish.toLowerCase();
-        if (!needle)
-            return false;
-        if (/tranz|transparent|membrane/.test(needle))
-            return /transparent/.test(hay);
-        if (/3d|emboss|textur/.test(needle))
-            return /emboss/.test(hay);
-        return hay.includes(needle);
-    });
-    const finishTypeId = (finishMatch === null || finishMatch === void 0 ? void 0 : finishMatch.id) || tpl.finishTypeId;
-    const finishLabel = finishMatch ? finishMatch.data().displayName : finish || "Matte";
+const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+/** Collections whose membership is decided by the device, not the design. */
+const isGadgetCollection = (name) => /\bskins?\b|tempered|cases?|covers?|magneto/i.test(name);
+/** The words of a listing, and the theme collections it belongs in. */
+async function writeListingCopy(db, args) {
+    var _a, _b, _c, _d;
+    const collectionSnap = await db.collection("collections").get();
+    const themeCollections = collectionSnap.docs
+        .map((d) => ({ id: d.id, name: String(d.data().name || d.data().title || "").trim(), rules: d.data().rules }))
+        .filter((c) => c.name && !isGadgetCollection(c.name) && !(Array.isArray(c.rules) && c.rules.length));
     const apiKey = await resolveOpenAIKey();
     const fetchFn = global.fetch || require("node-fetch");
+    const listingName = args.listingName || "";
     const res = await fetchFn("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
             model: "gpt-4o",
             temperature: 0.7,
-            max_tokens: 2200,
+            max_tokens: 2400,
             response_format: { type: "json_object" },
             messages: [
                 { role: "system", content: SYSTEM },
                 {
                     role: "user",
-                    content: `Design name: ${designName || designCode}\n` +
-                        `Design code: ${designCode}\n` +
-                        `Gadget: ${gadgetLabel}\n` +
-                        (listingName && listingName.toLowerCase() !== gadgetLabel.toLowerCase()
-                            ? `Product: a skin for the ${listingName} (name this device in the title)\n`
+                    content: `Design name: ${args.designName || args.designCode}\n` +
+                        `Design code: ${args.designCode}\n` +
+                        `Gadget: ${args.gadgetLabel}\n` +
+                        (listingName && listingName.toLowerCase() !== args.gadgetLabel.toLowerCase()
+                            ? `Product: a skin for ${listingName} devices (name this device family in the title)\n`
                             : "") +
-                        `Finish: ${finishLabel}\n` +
-                        `Material: ${source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
-                        `Variants offered: ${variants.map((v) => v.title).join(", ")}`,
+                        `Finish: ${args.finishLabel}\n` +
+                        `Material: ${args.source === "cutout" ? "die-cut printed sheet" : "printed vinyl roll"}\n` +
+                        (((_a = args.themes) === null || _a === void 0 ? void 0 : _a.length) ? `Design themes: ${args.themes.join(", ")}\n` : "") +
+                        `Variants offered: ${args.variantTitles.join(", ")}\n` +
+                        `Collections: ${themeCollections.map((c) => c.name).join(" | ")}`,
                 },
             ],
         }),
     });
     if (!res.ok) {
-        console.error("createListingForDesign: OpenAI failed", await res.text());
+        console.error("writeListingCopy: OpenAI failed", await res.text());
         throw new https_1.HttpsError("internal", "The copywriter call failed — try again");
     }
     const body = await res.json();
     let copy;
     try {
-        copy = JSON.parse(((_c = (_b = (_a = body.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) || "{}");
+        copy = JSON.parse(((_d = (_c = (_b = body.choices) === null || _b === void 0 ? void 0 : _b[0]) === null || _c === void 0 ? void 0 : _c.message) === null || _d === void 0 ? void 0 : _d.content) || "{}");
     }
-    catch (_d) {
+    catch (_e) {
         throw new https_1.HttpsError("internal", "The copywriter returned something unreadable");
     }
-    const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
-    const title = String(copy.title || `${designName || designCode} ${finishLabel} ${gadgetLabel} Skin`).trim();
-    let slug = slugify(String(copy.slug || title));
+    const title = String(copy.title || `${args.designName || args.designCode} ${args.finishLabel} ${listingName || args.gadgetLabel} Skin`).trim();
+    const tags = Array.isArray(copy.tags)
+        ? copy.tags.map((t) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 15)
+        : [];
+    const picked = new Set((Array.isArray(copy.collections) ? copy.collections : []).map((n) => String(n).trim().toLowerCase()));
+    return {
+        title,
+        slug: slugify(String(copy.slug || title)),
+        metaTitle: String(copy.metaTitle || `${title} | Skinly`).slice(0, 70),
+        metaDescription: String(copy.metaDescription || "").slice(0, 170),
+        description: String(copy.description || ""),
+        tags,
+        collectionIds: themeCollections.filter((c) => picked.has(c.name.toLowerCase())).map((c) => c.id),
+    };
+}
+exports.writeListingCopy = writeListingCopy;
+/**
+ * Sets a listing's studio-made collection links: the gadget's own collection
+ * plus the theme collections the copywriter chose. They carry
+ * source:"listing" — the rule-based sync removes only its own "auto" links,
+ * which is what used to wipe theme links as soon as a listing was saved.
+ */
+async function setListingCollections(db, productId, gadgetLabel, themeIds) {
+    const [collections, existing] = await Promise.all([
+        db.collection("collections").get(),
+        db.collection("collectionProducts").where("productId", "==", productId).get(),
+    ]);
+    const wanted = new Set(themeIds);
+    for (const d of collections.docs) {
+        const name = String(d.data().name || d.data().title || "").toLowerCase();
+        if (name === `${gadgetLabel.toLowerCase()} skins`)
+            wanted.add(d.id);
+    }
+    const batch = db.batch();
+    const now = Date.now();
+    const have = new Map(existing.docs.map((d) => [String(d.data().collectionId), d]));
+    for (const d of existing.docs) {
+        const x = d.data();
+        if (x.source === "listing" && !wanted.has(x.collectionId))
+            batch.delete(d.ref);
+    }
+    for (const cid of wanted) {
+        if (have.has(cid))
+            continue;
+        batch.set(db.collection("collectionProducts").doc(`${cid}_${productId}`), {
+            collectionId: cid,
+            productId,
+            source: "listing",
+            _creationTime: now,
+        });
+    }
+    await batch.commit();
+    return wanted.size;
+}
+exports.setListingCollections = setListingCollections;
+/** The catalogue's finish record for a printed finish ("3D Textured" → embossed). */
+async function resolveFinish(db, finish) {
+    const snap = await db.collection("finishTypes").get();
+    const needle = finish.toLowerCase();
+    const hit = needle
+        ? snap.docs.find((d) => {
+            const f = d.data();
+            const hay = `${f.name} ${f.displayName}`.toLowerCase();
+            if (/tranz|transparent|membrane/.test(needle))
+                return /transparent/.test(hay);
+            if (/3d|emboss|textur/.test(needle))
+                return /emboss/.test(hay);
+            return hay.includes(needle);
+        })
+        : undefined;
+    return {
+        id: hit === null || hit === void 0 ? void 0 : hit.id,
+        name: hit ? String(hit.data().name || "") : "",
+        label: hit ? String(hit.data().displayName || finish) : finish || "Matte",
+    };
+}
+const brandList = (v) => Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 20) : [];
+/** Creates the product, its variants and its collection links. */
+async function createListing(db, spec) {
+    var _a;
+    const designCode = String(spec.designCode || "").trim().toUpperCase();
+    const designName = String(spec.designName || "").trim();
+    const listingName = String(spec.listing || "").trim();
+    const publishNow = spec.publishNow === true;
+    const modelBrands = brandList(spec.modelBrands);
+    const modelBrandsExclude = brandList(spec.modelBrandsExclude);
+    const finish = String(spec.finish || "").trim();
+    const source = spec.source === "cutout" ? "cutout" : "roll";
+    const imageUrl = String(spec.imageUrl || "").trim();
+    const variants = Array.isArray(spec.variants) ? spec.variants : [];
+    if (!designCode)
+        throw new https_1.HttpsError("invalid-argument", "A design code is required");
+    if (!variants.length)
+        throw new https_1.HttpsError("invalid-argument", "At least one variant is required");
+    const gadgetType = await resolveGadget(db, String(spec.gadgetTypeId || ""), String(spec.gadget || "").trim());
+    const gadgetTypeId = gadgetType.id;
+    if (variants.some((v) => !(Number(v.price) > 0))) {
+        throw new https_1.HttpsError("invalid-argument", "Every variant needs a price");
+    }
+    // Refuse to make a second listing for a pair that already has one.
+    const skus = variants.map((v) => `${designCode}${v.skuTail ? `-${v.skuTail}` : ""}`.toUpperCase());
+    for (let i = 0; i < skus.length; i += 30) {
+        const existing = await db.collection("variants").where("sku", "in", skus.slice(i, i + 30)).get();
+        if (!existing.empty) {
+            throw new https_1.HttpsError("already-exists", `${existing.docs.map((d) => d.data().sku).join(", ")} already exists — refresh the studio.`);
+        }
+    }
+    const [finishInfo, tpl] = await Promise.all([resolveFinish(db, finish), templateForGadget(db, gadgetTypeId)]);
+    const finishTypeId = finishInfo.id || tpl.finishTypeId;
+    const copy = await writeListingCopy(db, {
+        designCode, designName, gadgetLabel: gadgetType.displayName, listingName,
+        finishLabel: finishInfo.label, source, variantTitles: variants.map((v) => v.title), themes: spec.themes,
+    });
+    let slug = copy.slug;
     // Slugs are the storefront's URLs; a collision would shadow a live page.
     for (let n = 2;; n++) {
         const clash = await db.collection("products").where("slug", "==", slug).limit(1).get();
         if (clash.empty)
             break;
-        slug = `${slugify(String(copy.slug || title))}-${n}`;
+        slug = `${copy.slug}-${n}`;
         if (n > 20)
             throw new https_1.HttpsError("internal", "Could not find a free slug");
     }
-    const tags = Array.isArray(copy.tags)
-        ? copy.tags.map((t) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 15)
-        : [];
     const now = Date.now();
     const productRef = db.collection("products").doc();
-    await productRef.set(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ _creationTime: now, title,
-        slug, description: String(copy.description || ""), metaTitle: String(copy.metaTitle || `${title} | Skinly`).slice(0, 70), metaDescription: String(copy.metaDescription || "").slice(0, 170), tags, status: "active", productCategory: "skin", productType: "physical", gadgetTypeId, gadgetCategory: gadgetType.name }, (finishTypeId ? { finishTypeId } : {})), (finishMatch ? { finishType: finishMatch.data().name } : {})), { hasMultipleVariants: variants.length > 1, images: imageUrl ? [{ url: imageUrl, alt: designCode }] : [], length: tpl.dims.length, breadth: tpl.dims.breadth, height: tpl.dims.height, weight: tpl.dims.weight, createdFromDesign: designCode }), (listingName ? { listingKind: listingName } : {})), { createdAt: now }));
+    await productRef.set(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign(Object.assign({ _creationTime: now, title: copy.title, slug, description: copy.description, metaTitle: copy.metaTitle, metaDescription: copy.metaDescription, tags: copy.tags, 
+        // Live now when asked; otherwise a draft until its first mockup is approved.
+        status: publishNow ? "active" : "draft" }, (publishNow ? { publishedAt: now } : { awaitingImage: true })), { productCategory: "skin", productType: "physical", gadgetTypeId, gadgetCategory: gadgetType.name }), (finishTypeId ? { finishTypeId } : {})), (finishInfo.name ? { finishType: finishInfo.name } : {})), { hasMultipleVariants: variants.length > 1, 
+        // The raw roll photo is kept for reference but is not a product picture.
+        images: [] }), (imageUrl ? { designImageUrl: imageUrl } : {})), { length: tpl.dims.length, breadth: tpl.dims.breadth, height: tpl.dims.height, weight: tpl.dims.weight, createdFromDesign: designCode }), (listingName ? { listingKind: listingName } : {})), (modelBrands.length ? { modelBrands } : {})), (modelBrandsExclude.length ? { modelBrandsExclude } : {})), (((_a = spec.themes) === null || _a === void 0 ? void 0 : _a.length) ? { designThemes: spec.themes } : {})), { createdAt: now }));
     const batch = db.batch();
     variants.forEach((v, i) => {
-        const ref = db.collection("variants").doc();
-        batch.set(ref, {
+        batch.set(db.collection("variants").doc(), {
             _creationTime: now + i,
             productId: productRef.id,
-            sku: `${designCode}${v.skuTail ? `-${v.skuTail}` : ""}`.toUpperCase(),
+            sku: skus[i],
             title: String(v.title || "Default Title"),
             price: Number(v.price),
             inventoryQuantity: 0,
@@ -326,46 +395,192 @@ exports.createListingForDesign = (0, https_1.onCall)(async (data, context) => {
             isDefaultVariant: variants.length === 1 && i === 0,
         });
     });
-    // Auto-collections: the gadget's own collection, plus any collection whose
-    // name the generated tags name back. Both are the rules the catalogue
-    // already follows, so a new listing lands where its siblings are.
-    const wanted = new Set();
-    const tagSet = new Set(tags.map((t) => t.toLowerCase()));
-    for (const d of collectionSnap.docs) {
-        const c = d.data();
-        const name = String(c.name || c.title || "").toLowerCase();
-        if (!name)
-            continue;
-        if (name === `${gadgetLabel.toLowerCase()} skins`)
-            wanted.add(d.id);
-        else if (tagSet.has(name))
-            wanted.add(d.id);
-    }
-    for (const cid of wanted) {
-        batch.set(db.collection("collectionProducts").doc(`${cid}_${productRef.id}`), {
-            collectionId: cid,
-            productId: productRef.id,
-            source: "auto",
-            _creationTime: now,
-        });
-    }
     await batch.commit();
+    const collections = await setListingCollections(db, productRef.id, gadgetType.displayName, copy.collectionIds);
+    return { productId: productRef.id, slug, title: copy.title, skus, collections };
+}
+exports.createListing = createListing;
+exports.createListingForDesign = (0, https_1.onCall)(async (data, context) => {
+    await (0, auth_1.requireAdmin)(context);
+    const db = admin.firestore();
+    const out = await createListing(db, {
+        designCode: data === null || data === void 0 ? void 0 : data.designCode,
+        designName: data === null || data === void 0 ? void 0 : data.designName,
+        gadgetTypeId: data === null || data === void 0 ? void 0 : data.gadgetTypeId,
+        gadget: data === null || data === void 0 ? void 0 : data.gadget,
+        listing: data === null || data === void 0 ? void 0 : data.listing,
+        publishNow: (data === null || data === void 0 ? void 0 : data.publishNow) === true,
+        modelBrands: data === null || data === void 0 ? void 0 : data.modelBrands,
+        modelBrandsExclude: data === null || data === void 0 ? void 0 : data.modelBrandsExclude,
+        finish: data === null || data === void 0 ? void 0 : data.finish,
+        source: data === null || data === void 0 ? void 0 : data.source,
+        imageUrl: data === null || data === void 0 ? void 0 : data.imageUrl,
+        themes: Array.isArray(data === null || data === void 0 ? void 0 : data.themes) ? data.themes : undefined,
+        variants: Array.isArray(data === null || data === void 0 ? void 0 : data.variants) ? data.variants : [],
+    });
     // The design already has stock; the new variants start at zero until this
     // reads the shelf and writes what it can actually make.
     try {
         const { syncStockForDesign } = await Promise.resolve().then(() => __importStar(require("./materials")));
-        await syncStockForDesign(db, [designCode]);
+        await syncStockForDesign(db, [String((data === null || data === void 0 ? void 0 : data.designCode) || "").toUpperCase()]);
     }
     catch (e) {
         console.warn("createListingForDesign: stock sync skipped", (e === null || e === void 0 ? void 0 : e.message) || e);
     }
+    return Object.assign({ success: true }, out);
+});
+/** Moves waiting restock requests from one variant to another. */
+async function moveRestockRequests(db, fromVariantId, toSku) {
+    const [waiting, target] = await Promise.all([
+        db.collection("stockNotifications").where("variantId", "==", fromVariantId).where("status", "==", "waiting").get(),
+        db.collection("variants").where("sku", "==", toSku).limit(1).get(),
+    ]);
+    if (waiting.empty || target.empty)
+        return 0;
+    const to = target.docs[0];
+    const tv = to.data();
+    const product = await db.collection("products").doc(String(tv.productId)).get();
+    const pd = (product.data() || {});
+    let moved = 0;
+    for (const n of waiting.docs) {
+        const x = n.data();
+        await db.collection("stockNotifications").doc(`${to.id}_${x.phoneNumber}`).set(Object.assign(Object.assign({}, x), { variantId: to.id, variantTitle: String(tv.title || ""), sku: String(tv.sku || ""), productId: String(tv.productId), productTitle: String(pd.title || ""), productSlug: String(pd.slug || ""), movedFrom: fromVariantId }));
+        await n.ref.delete();
+        moved++;
+    }
+    return moved;
+}
+exports.moveRestockRequests = moveRestockRequests;
+/**
+ * Brings an existing listing into the shape a studio listing has: its
+ * variants renamed, repriced or added per the listing's preset, its brand
+ * scope set, and — for listings from before the studio — its words and theme
+ * collections rewritten. The URL (slug) is kept: that is what search engines
+ * and shoppers already know.
+ */
+async function reviseListing(db, spec) {
+    var _a;
+    const ref = db.collection("products").doc(spec.productId);
+    const snap = await ref.get();
+    if (!snap.exists)
+        throw new https_1.HttpsError("not-found", `Product ${spec.productId} is gone`);
+    const product = snap.data();
+    const designCode = spec.designCode.toUpperCase();
+    const gadgetType = await resolveGadget(db, String(product.gadgetTypeId || ""), String(product.gadgetCategory || ""));
+    // A SKU may belong to one variant only.
+    const newSkus = spec.variantOps.filter((o) => o.op !== "delete").map((o) => String(o.sku).toUpperCase());
+    const ownIds = new Set(spec.variantOps.filter((o) => o.op !== "create").map((o) => o.id));
+    for (let i = 0; i < newSkus.length; i += 30) {
+        const clash = await db.collection("variants").where("sku", "in", newSkus.slice(i, i + 30)).get();
+        const foreign = clash.docs.filter((d) => !ownIds.has(d.id));
+        if (foreign.length) {
+            throw new https_1.HttpsError("already-exists", `${foreign.map((d) => d.data().sku).join(", ")} already belongs to another listing`);
+        }
+    }
+    const now = Date.now();
+    let moved = 0;
+    const weight = Number(product.weight) || 100;
+    // Creates and updates first, so a deleted variant's waiting customers have
+    // somewhere to go.
+    for (const op of spec.variantOps) {
+        if (op.op === "update") {
+            await db.collection("variants").doc(op.id).update(Object.assign(Object.assign({ sku: op.sku.toUpperCase(), title: op.title }, (Number(op.price) > 0 ? { price: Number(op.price) } : {})), { materialMultiplier: op.materialMultiplier, rNumber: designCode, revisedAt: now }));
+        }
+        else if (op.op === "create") {
+            await db.collection("variants").doc().set({
+                _creationTime: now,
+                productId: spec.productId,
+                sku: op.sku.toUpperCase(),
+                title: op.title,
+                price: Number(op.price),
+                inventoryQuantity: 0,
+                materialMultiplier: op.materialMultiplier,
+                rNumber: designCode,
+                weight,
+                weightUnit: "g",
+                isDefaultVariant: false,
+            });
+        }
+    }
+    for (const op of spec.variantOps) {
+        if (op.op !== "delete")
+            continue;
+        if (op.moveToSku)
+            moved += await moveRestockRequests(db, op.id, op.moveToSku.toUpperCase());
+        await db.collection("variants").doc(op.id).delete();
+    }
+    const remaining = await db.collection("variants").where("productId", "==", spec.productId).get();
+    const modelBrands = brandList(spec.modelBrands);
+    const modelBrandsExclude = brandList(spec.modelBrandsExclude);
+    const patch = Object.assign({ listingKind: spec.listing, modelBrands: modelBrands.length ? modelBrands : admin.firestore.FieldValue.delete(), modelBrandsExclude: modelBrandsExclude.length ? modelBrandsExclude : admin.firestore.FieldValue.delete(), hasMultipleVariants: remaining.size > 1, createdFromDesign: designCode, revisedAt: now, updatedAt: now }, (((_a = spec.themes) === null || _a === void 0 ? void 0 : _a.length) ? { designThemes: spec.themes } : {}));
+    let collections = 0;
+    if (spec.rewriteCopy) {
+        const finishInfo = await resolveFinish(db, String(spec.finish || product.finishType || ""));
+        const copy = await writeListingCopy(db, {
+            designCode,
+            designName: spec.designName,
+            gadgetLabel: gadgetType.displayName,
+            listingName: spec.listing,
+            finishLabel: finishInfo.label,
+            source: spec.source === "cutout" ? "cutout" : "roll",
+            variantTitles: remaining.docs.map((d) => String(d.data().title || "")),
+            themes: spec.themes,
+        });
+        Object.assign(patch, Object.assign(Object.assign({ title: copy.title, metaTitle: copy.metaTitle, metaDescription: copy.metaDescription, description: copy.description, tags: copy.tags }, (finishInfo.id ? { finishTypeId: finishInfo.id } : {})), (finishInfo.name ? { finishType: finishInfo.name } : {})));
+        collections = await setListingCollections(db, spec.productId, gadgetType.displayName, copy.collectionIds);
+    }
+    await ref.update(patch);
+    return { productId: spec.productId, slug: String(product.slug || ""), moved, collections };
+}
+exports.reviseListing = reviseListing;
+/**
+ * A first read of a design from its photo: a shop-ready name, the likely
+ * finish and the themes it belongs to. The admin confirms before anything
+ * uses it.
+ */
+exports.suggestDesignDetails = (0, https_1.onCall)(async (data, context) => {
+    var _a, _b, _c;
+    await (0, auth_1.requireAdmin)(context);
+    const imageUrl = String((data === null || data === void 0 ? void 0 : data.imageUrl) || "");
+    if (!/^https:\/\//.test(imageUrl))
+        throw new https_1.HttpsError("invalid-argument", "An https image URL is required");
+    const apiKey = await resolveOpenAIKey();
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+            model: "gpt-4o",
+            temperature: 0.3,
+            max_tokens: 400,
+            response_format: { type: "json_object" },
+            messages: [
+                {
+                    role: "system",
+                    content: "You name printed vinyl skin designs for an Indian gadget-skin shop from a photo of the printed roll or sheet. " +
+                        "Reply with JSON only: {\"name\": \"2-5 word shop name for the artwork, Title Case, no brand names unless the artwork is a logo design\", " +
+                        "\"finish\": \"Matte\" | \"3D Textured\" | \"Tranzy (transparent)\" | \"unknown\" (3D Textured if the surface shows raised relief; Tranzy if the design sits on clear film over white backing paper), " +
+                        "\"themes\": [\"1-4 lowercase themes such as anime, cars, marvel, abstract, nature, space, gaming, minimal, animals, music, sports, quotes, religious\"], " +
+                        "\"colors\": [\"1-3 lowercase dominant colours\"]}",
+                },
+                { role: "user", content: [{ type: "image_url", image_url: { url: imageUrl } }] },
+            ],
+        }),
+    });
+    if (!res.ok) {
+        console.error("suggestDesignDetails failed", await res.text());
+        throw new https_1.HttpsError("internal", "Could not read the design — fill the details in yourself");
+    }
+    const body = await res.json();
+    let out = {};
+    try {
+        out = JSON.parse(((_c = (_b = (_a = body.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) || "{}");
+    }
+    catch ( /* empty */_d) { /* empty */ }
     return {
-        success: true,
-        productId: productRef.id,
-        slug,
-        title,
-        skus: variants.map((v) => `${designCode}${v.skuTail ? `-${v.skuTail}` : ""}`.toUpperCase()),
-        collections: wanted.size,
+        name: String(out.name || "").slice(0, 60),
+        finish: ["Matte", "3D Textured", "Tranzy (transparent)"].includes(out.finish) ? out.finish : "",
+        themes: Array.isArray(out.themes) ? out.themes.map((t) => String(t).toLowerCase()).slice(0, 4) : [],
+        colors: Array.isArray(out.colors) ? out.colors.map((t) => String(t).toLowerCase()).slice(0, 3) : [],
     };
 });
 //# sourceMappingURL=listings.js.map

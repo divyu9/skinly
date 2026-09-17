@@ -7,7 +7,7 @@ var __asyncValues = (this && this.__asyncValues) || function (o) {
     function settle(resolve, reject, d, v) { Promise.resolve(v).then(function(v) { resolve({ value: v, done: d }); }, reject); }
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteR2Object = exports.getR2Object = exports.copyR2Object = exports.generateUploadUrl = exports.setupR2Cors = void 0;
+exports.deleteR2Object = exports.getR2Object = exports.copyR2Object = exports.generateUploadUrl = exports.setupR2Cors = exports.putR2Object = exports.r2PublicUrl = void 0;
 const https_1 = require("firebase-functions/v1/https");
 const client_s3_1 = require("@aws-sdk/client-s3");
 const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
@@ -24,6 +24,27 @@ const getR2Config = () => {
     }
     return { accountId, accessKeyId, secretAccessKey, bucketName, publicUrl };
 };
+/** One S3 client for the pipeline's own writes. */
+let pipelineClient = null;
+const pipelineS3 = () => {
+    const config = getR2Config();
+    pipelineClient || (pipelineClient = new client_s3_1.S3Client({
+        region: "auto",
+        endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+        credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
+    }));
+    return { s3: pipelineClient, config };
+};
+/** Public URL of an object key, each path segment encoded. */
+const r2PublicUrl = (key) => `${getR2Config().publicUrl.replace(/\/$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}`;
+exports.r2PublicUrl = r2PublicUrl;
+/** Stores bytes server-side (the launch pipeline) and returns the public URL. */
+async function putR2Object(key, body, contentType) {
+    const { s3, config } = pipelineS3();
+    await s3.send(new client_s3_1.PutObjectCommand({ Bucket: config.bucketName, Key: key, Body: body, ContentType: contentType }));
+    return (0, exports.r2PublicUrl)(key);
+}
+exports.putR2Object = putR2Object;
 const getAllowedOrigins = () => {
     const env = process.env.R2_ALLOWED_ORIGINS;
     const origins = (env ? env.split(",") : ["https://goskinly.com", "https://www.goskinly.com"])
