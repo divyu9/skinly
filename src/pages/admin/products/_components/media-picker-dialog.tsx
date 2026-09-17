@@ -32,6 +32,8 @@ interface MediaPickerDialogProps {
   /** URLs already on the product, so they can be shown as added and not re-added. */
   existingUrls?: string[];
   onSelect: (images: PickedImage[]) => void;
+  /** Pick exactly one image (a logo, a banner): a new click replaces the last. */
+  single?: boolean;
 }
 
 export function MediaPickerDialog({
@@ -39,6 +41,7 @@ export function MediaPickerDialog({
   onOpenChange,
   existingUrls = [],
   onSelect,
+  single = false,
 }: MediaPickerDialogProps) {
   const [folder, setFolder] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -71,7 +74,7 @@ export function MediaPickerDialog({
   const toggle = (item: { id: string; url: string; filename: string }) => {
     if (alreadyAdded.has(item.url)) return;
     setSelected((prev) => {
-      const next = { ...prev };
+      const next = single ? (prev[item.id] ? { ...prev } : {}) : { ...prev };
       if (next[item.id]) delete next[item.id];
       else next[item.id] = { url: item.url, alt: item.filename };
       return next;

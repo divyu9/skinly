@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { MediaPickerDialog } from "@/pages/admin/products/_components/media-picker-dialog.tsx";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -16,7 +17,10 @@ import {
   TrashIcon, 
   TagIcon,
   GripVerticalIcon,
-  SaveIcon
+  SaveIcon,
+  ImagesIcon,
+  UploadIcon,
+  Loader2Icon,
 } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import {
@@ -236,6 +240,41 @@ export function ExploreByBrandTab() {
       });
     }
     setIsDialogOpen(true);
+  };
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInput = useRef<HTMLInputElement>(null);
+  const uploadToLibrary = useAction(api.mediaLibrary.uploadAndAddToLibrary);
+
+  /** Uploads a logo into the media library (folder "brands") and uses it. */
+  const uploadLogo = async (file: File) => {
+    setUploadingLogo(true);
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result));
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const name = (formData.title || file.name.replace(/\.[^.]+$/, "")).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const result: any = await uploadToLibrary({
+        fileBase64: dataUrl,
+        filename: `${name}-logo`,
+        folder: "brands",
+        contentType: file.type || "image/png",
+        tags: ["brand-logo", name],
+      });
+      const url = result?.url || result?.publicUrl;
+      if (!url) throw new Error(result?.error || "Upload failed");
+      setFormData((prev) => ({ ...prev, imageUrl: url }));
+      toast.success("Logo uploaded");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploadingLogo(false);
+      if (logoInput.current) logoInput.current.value = "";
+    }
   };
 
   const handleCloseDialog = () => {
@@ -528,7 +567,24 @@ export function ExploreByBrandTab() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="card-image">Image URL *</Label>
+              <Label htmlFor="card-image">Image *</Label>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={() => setPickerOpen(true)}>
+                  <ImagesIcon className="mr-1.5 size-4" />
+                  Choose from media
+                </Button>
+                <input
+                  ref={logoInput}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadLogo(f); }}
+                />
+                <Button type="button" size="sm" variant="outline" disabled={uploadingLogo} onClick={() => logoInput.current?.click()}>
+                  {uploadingLogo ? <Loader2Icon className="mr-1.5 size-4 animate-spin" /> : <UploadIcon className="mr-1.5 size-4" />}
+                  Upload
+                </Button>
+              </div>
               <Input
                 id="card-image"
                 value={formData.imageUrl}
@@ -537,9 +593,12 @@ export function ExploreByBrandTab() {
               />
               {formData.imageUrl && (
                 <div className="mt-2">
-                  <img src={formData.imageUrl} alt="Preview" className="h-32 w-32 object-cover rounded border" />
+                  <img src={formData.imageUrl} alt="Preview" className="h-32 w-32 object-contain rounded border bg-white" />
                 </div>
               )}
+              <p className="text-xs text-muted-foreground">
+                A transparent PNG or WebP logo works best — it is also the brand badge on this brand's product cards.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -589,6 +648,15 @@ export function ExploreByBrandTab() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <MediaPickerDialog
+        open={pickerOpen}
+        onOpenChange={setPickerOpen}
+        single
+        onSelect={(images) => {
+          if (images[0]) setFormData((prev) => ({ ...prev, imageUrl: images[0].url }));
+        }}
+      />
     </div>
   );
 }
