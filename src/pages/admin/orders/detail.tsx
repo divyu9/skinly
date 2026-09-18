@@ -45,7 +45,7 @@ function OrderDetailPageInner() {
   const updateShippingAddress = useMutation(api.admin.orders.updateOrderShippingAddress);
   const updateOrderItems = useMutation(api.admin.orders.updateOrderItems);
   const createShipment = useAction(api.rapidshyp.createShipment);
-  const createOrderOnly = useAction(api.rapidshyp.createOrderOnly);
+  const createOrderOnly = useAction(api.rapidshyp.createRapidshypOrder);
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
   const refundToWallet = useMutation(api.admin.orders.refundToWallet);

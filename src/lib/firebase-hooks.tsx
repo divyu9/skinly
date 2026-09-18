@@ -4652,8 +4652,11 @@ export function useMutation(apiRef: any) {
       }
 
       // The order in RapidShyp with no courier picked, for a parcel that
-      // wants a person's eye before it ships.
-      if (collectionName === 'rapidshyp' && actionName === 'createOrderOnly') {
+      // wants a person's eye before it ships. The action is named after the
+      // function: useAction falls back to calling a callable by the action's
+      // own name, so a different name here reaches nothing and the admin is
+      // told "internal".
+      if (collectionName === 'rapidshyp' && actionName === 'createRapidshypOrder') {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const call = httpsCallable(getFunctions(), 'createRapidshypOrder');
         const response = await call(args);
