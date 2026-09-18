@@ -355,12 +355,15 @@ export function buildLaunchPlan(input: {
   if (!design.rawImageUrl) warnings.push("No raw design photo yet — pictures cannot be made");
 
   if (options.images && design.rawImageUrl) {
-    // Pictures go to the listings of this phase, and to any older listing
-    // that is already live — an out-of-phase listing that was converted
-    // (Charger) still needs its photo. A draft listing outside the phase,
-    // made ahead of its turn, waits: nobody can see it yet.
+    // Pictures go to the listings of this phase, to any older listing that
+    // is already live — an out-of-phase listing that was converted (Charger)
+    // still needs its photo — and to a kind this run had to create outside
+    // the phase because something else depends on it (moving the Xbox
+    // variants out of PlayStation Controller creates Xbox Controller, which
+    // then wants a picture of its own). A draft made ahead of its turn, that
+    // this run left untouched, waits: nobody can see it yet.
     for (const kind of covered) {
-      if (!inScope(kind) && keptFor.get(kind)?.status !== "active") continue;
+      if (!inScope(kind) && !needed.has(kind) && keptFor.get(kind)?.status !== "active") continue;
       const info = KIND_INFO.get(kind)!;
       const kindShots = shots.filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind);
       const template = readyTemplates.get(kind);
