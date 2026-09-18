@@ -1634,13 +1634,14 @@ function AdminProductsPageInner() {
       </Dialog>
 
 
-      {/* Bulk Price Edit Dialog - Temporarily disabled (needs full product data with variants) 
+      {/* products (getAllProductsBasic) already joins each product's own
+          variants in, so the dialog needs nothing extra fetched for it. */}
       <BulkPriceEditDialog
         open={showBulkPriceEdit}
         onOpenChange={setShowBulkPriceEdit}
-        products={[]}
+        products={products || []}
         selectedProductIds={selectedProducts}
-      /> */}
+      />
 
       {/* Tag Manager Dialog */}
       {managingTagsProduct && (

@@ -4,12 +4,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { SearchIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Link, useNavigate } from "react-router-dom";
+import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue";
 
-// Brand logo mapping removed as per migration
-const brandLogos: Record<string, string> = {};
+// The same logos the admin sets on the homepage's Explore by Brand section.
+let brandLogosPromise: Promise<Record<string, BrandLogo>> | null = null;
+const loadBrandLogos = () =>
+  (brandLogosPromise ||= loadCatalogue().then((c) => c?.brandLogos || {}).catch(() => ({} as Record<string, BrandLogo>)));
 
 // Fallback phone brands for instant cold start display
 const FALLBACK_PHONE_BRANDS = [
@@ -22,6 +25,14 @@ export function PhoneBrandSelector() {
   const navigate = useNavigate();
   const [selectedPhoneBrand, setSelectedPhoneBrand] = useState<string | null>(null);
   const [phoneModelSearch, setPhoneModelSearch] = useState("");
+  const [brandLogos, setBrandLogos] = useState<Record<string, BrandLogo>>({});
+  const [brokenLogo, setBrokenLogo] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let live = true;
+    void loadBrandLogos().then((logos) => { if (live) setBrandLogos(logos); });
+    return () => { live = false; };
+  }, []);
 
   // Fetch metadata from cache
   const metadata = useQuery(api.supportedModels.getMetadata);
@@ -82,17 +93,23 @@ export function PhoneBrandSelector() {
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 max-w-5xl mx-auto">
-            {phoneBrands.map(brand => (
+            {phoneBrands.map(brand => {
+              const key = brandKey(brand);
+              const logo = brandLogos[key];
+              const showLogo = !!logo?.image && !brokenLogo.has(key);
+              return (
               <button
                 key={brand}
                 onClick={() => handlePhoneBrandSelect(brand)}
                 className="p-6 rounded-xl border-2 border-border hover:border-primary hover:shadow-lg transition-all bg-white flex flex-col items-center gap-3"
               >
-                {brandLogos[brand] ? (
+                {showLogo ? (
                   <div className="size-16 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                    <img 
-                      src={brandLogos[brand]} 
+                    <img
+                      src={logo!.image}
                       alt={brand}
+                      loading="lazy"
+                      onError={() => setBrokenLogo((prev) => new Set(prev).add(key))}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -103,7 +120,8 @@ export function PhoneBrandSelector() {
                 )}
                 <span className="font-semibold text-center">{brand}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
 

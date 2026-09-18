@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { db } from "@/lib/firebase";
 import { useQuery } from "@/lib/firebase-hooks";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
-import { AlertTriangleIcon, CheckCircle2Icon, CircleDashedIcon, Loader2Icon, RocketIcon, XCircleIcon } from "lucide-react";
+import { AlertTriangleIcon, CheckCircle2Icon, CircleDashedIcon, Loader2Icon, RocketIcon, RotateCcwIcon, XCircleIcon } from "lucide-react";
 import { DEFAULT_BLOCKS, type MockupShot, type SharedBlocks, type CutOrientation } from "@/lib/ai-mockup-shots.ts";
 import { IMAGE_MODELS, formatInr } from "@/lib/ai-mockup-models.ts";
 import { buildLaunchPlan, type LaunchDesign, type LaunchPlan } from "@/lib/launch-plan.ts";
@@ -242,6 +242,34 @@ function StepList({ steps }: { steps: Array<{ id: string; label: string; status:
 }
 
 /** A launch's live progress, from its document. */
+/** Shown both inside a launch and in the recent-launches list, so the two agree. */
+const STATUS_LABEL: Record<string, string> = {
+  queued: "Waiting to start",
+  running: "Working",
+  "waiting-images": "Listings done · pictures rendering",
+  done: "Done",
+  "done-with-errors": "Done, with errors",
+};
+
+/**
+ * Puts a launch's failed steps back to pending and its status back to
+ * queued, so the worker — which only ever looks at queued, running and
+ * waiting-images — picks it up again within its next two-minute tick. Steps
+ * that already succeeded are left alone: a retry finishes what is left, it
+ * does not start over.
+ */
+async function retryFailedSteps(launchId: string, steps: any[]) {
+  const nextSteps = (steps || []).map((s) =>
+    s.status === "failed" ? { ...s, status: "pending", tries: 0, note: "" } : s
+  );
+  await updateDoc(doc(db, "designLaunches", launchId), {
+    steps: nextSteps,
+    status: "queued",
+    lastError: "",
+    updatedAt: Date.now(),
+  });
+}
+
 export function LaunchProgress({ launchId }: { launchId: string }) {
   const [launch, setLaunch] = useState<any>(null);
   const [images, setImages] = useState<{ running: number; review: number; failed: number; approved: number }>({ running: 0, review: 0, failed: 0, approved: 0 });
@@ -270,14 +298,19 @@ export function LaunchProgress({ launchId }: { launchId: string }) {
 
   if (!launch) return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2Icon className="size-4 animate-spin" /> Loading…</p>;
 
-  const statusLabel: Record<string, string> = {
-    queued: "Waiting to start",
-    running: "Working",
-    "waiting-images": "Listings done · pictures rendering",
-    done: "Done",
-    "done-with-errors": "Done, with errors",
-  };
   const busy = ["queued", "running", "waiting-images"].includes(launch.status);
+  const [retrying, setRetrying] = useState(false);
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await retryFailedSteps(launchId, steps);
+      toast.success(`Retrying ${counts.failed} failed step${counts.failed === 1 ? "" : "s"}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not retry");
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="space-y-3 rounded-xl border p-3">
@@ -285,7 +318,7 @@ export function LaunchProgress({ launchId }: { launchId: string }) {
         <span className="font-mono font-semibold">{launch.code}</span>
         <Badge className={busy ? "bg-violet-600" : launch.status === "done" ? "bg-emerald-600" : "bg-amber-500"}>
           {busy && <Loader2Icon className="mr-1 size-3 animate-spin" />}
-          {statusLabel[launch.status] || launch.status}
+          {STATUS_LABEL[launch.status] || launch.status}
         </Badge>
         <span className="text-xs text-muted-foreground tabular-nums">
           {counts.done}/{steps.length} steps{counts.failed ? ` · ${counts.failed} failed` : ""}
@@ -300,6 +333,12 @@ export function LaunchProgress({ launchId }: { launchId: string }) {
       </p>
       {launch.lastError && <p className="text-xs text-rose-600">{launch.lastError}</p>}
       <StepList steps={steps} />
+      {launch.status === "done-with-errors" && (
+        <Button variant="outline" className="w-full" disabled={retrying} onClick={() => void retry()}>
+          {retrying ? <Loader2Icon className="mr-2 size-4 animate-spin" /> : <RotateCcwIcon className="mr-2 size-4" />}
+          Retry {counts.failed} failed step{counts.failed === 1 ? "" : "s"}
+        </Button>
+      )}
       {images.review > 0 && (
         <Button asChild className="w-full">
           <Link to={`/backend-skinly/ai-mockups?design=${encodeURIComponent(launch.code)}`}>Review {images.review} picture{images.review === 1 ? "" : "s"}</Link>
@@ -312,6 +351,7 @@ export function LaunchProgress({ launchId }: { launchId: string }) {
 /** Recent launches, newest first. */
 export function RecentLaunches({ onOpen }: { onOpen: (id: string) => void }) {
   const [rows, setRows] = useState<any[] | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
   useEffect(() => onSnapshot(
     query(collection(db, "designLaunches"), orderBy("createdAt", "desc"), limit(15)),
     (s) => setRows(s.docs.map((d) => ({ _id: d.id, ...d.data() })))
@@ -322,13 +362,45 @@ export function RecentLaunches({ onOpen }: { onOpen: (id: string) => void }) {
       {rows.map((r) => {
         const steps: any[] = r.steps || [];
         const done = steps.filter((s) => s.status !== "pending").length;
+        const failed = steps.filter((s) => s.status === "failed").length;
+        const erred = r.status === "done-with-errors";
         return (
-          <button key={r._id} onClick={() => onOpen(r._id)} className="flex w-full items-center gap-2 rounded-lg border p-2 text-left text-sm hover:bg-muted/50">
-            <span className="font-mono font-semibold">{r.code}</span>
-            <span className="min-w-0 flex-1 truncate text-muted-foreground">{r.designName}</span>
-            <span className="text-xs tabular-nums text-muted-foreground">{done}/{steps.length}</span>
-            <Badge variant="outline" className="text-[10px]">{r.status}</Badge>
-          </button>
+          <div key={r._id} className="flex w-full items-center gap-2 rounded-lg border p-2 text-sm hover:bg-muted/50">
+            <button onClick={() => onOpen(r._id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+              <span className="font-mono font-semibold">{r.code}</span>
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">{r.designName}</span>
+              {/* What's left, at a glance — no need to open the design to
+                  find out how much work a "done with errors" run left behind. */}
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {done}/{steps.length}{erred ? ` · ${failed} failed` : ""}
+              </span>
+              <Badge variant="outline" className={`text-[10px] ${erred ? "border-amber-400 text-amber-700 dark:text-amber-400" : ""}`}>
+                {STATUS_LABEL[r.status] || r.status}
+              </Badge>
+            </button>
+            {erred && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 shrink-0 px-2"
+                disabled={retryingId === r._id}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  setRetryingId(r._id);
+                  try {
+                    await retryFailedSteps(r._id, steps);
+                    toast.success(`${r.code}: retrying ${failed} failed step${failed === 1 ? "" : "s"}`);
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Could not retry");
+                  } finally {
+                    setRetryingId(null);
+                  }
+                }}
+              >
+                {retryingId === r._id ? <Loader2Icon className="size-3.5 animate-spin" /> : <RotateCcwIcon className="size-3.5" />}
+              </Button>
+            )}
+          </div>
         );
       })}
     </div>

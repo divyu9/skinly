@@ -30,6 +30,7 @@ import { useQuery } from "@/lib/firebase-hooks";
 import { Sheet, SheetContent } from "@/components/ui/sheet.tsx";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { api } from "@/lib/firebase-api";
+import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue";
 import type { LucideIcon } from "lucide-react";
 
 interface DeviceSelectorDialogProps {
@@ -39,8 +40,15 @@ interface DeviceSelectorDialogProps {
   onRequestModel?: (category: string, brand: string) => void;
 }
 
-// Brand logo mapping removed
-const brandLogos: Record<string, string> = {};
+/**
+ * The logo the admin uploaded for the homepage's Explore by Brand section —
+ * the same source BrandBadge draws from on product cards, so a brand's icon
+ * looks the same everywhere it appears. Loaded once, shared by every open of
+ * this picker.
+ */
+let brandLogosPromise: Promise<Record<string, BrandLogo>> | null = null;
+const loadBrandLogos = () =>
+  (brandLogosPromise ||= loadCatalogue().then((c) => c?.brandLogos || {}).catch(() => ({} as Record<string, BrandLogo>)));
 
 // Icon mapping for gadget types
 const gadgetIcons: Record<string, LucideIcon> = {
@@ -67,6 +75,14 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   const [selectedDeviceType, setSelectedDeviceType] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [brandLogos, setBrandLogos] = useState<Record<string, BrandLogo>>({});
+  const [brokenLogo, setBrokenLogo] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let live = true;
+    void loadBrandLogos().then((logos) => { if (live) setBrandLogos(logos); });
+    return () => { live = false; };
+  }, []);
 
   // Fetch active gadget types from database
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive);
@@ -310,15 +326,25 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                 </div>
               ) : (
                 <div className="flex flex-col gap-2 sm:grid sm:grid-cols-3 sm:gap-2.5">
-                  {availableBrands.map(brand => (
+                  {availableBrands.map(brand => {
+                    const key = brandKey(brand);
+                    const logo = brandLogos[key];
+                    const showLogo = !!logo?.image && !brokenLogo.has(key);
+                    return (
                     <button
                       key={brand}
                       onClick={() => handleBrandSelect(brand)}
                       className="group flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 text-left transition-all duration-200 hover:-translate-y-px hover:border-foreground/25 hover:shadow-[0_6px_20px_-8px_rgb(0_0_0/0.18)]"
                     >
-                      {brandLogos[brand] ? (
+                      {showLogo ? (
                         <span className="inline-flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted">
-                          <img src={brandLogos[brand]} alt={brand} className="size-8 object-contain" />
+                          <img
+                            src={logo!.image}
+                            alt={brand}
+                            loading="lazy"
+                            onError={() => setBrokenLogo((prev) => new Set(prev).add(key))}
+                            className="size-8 object-contain"
+                          />
                         </span>
                       ) : (
                         <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-[15px] font-semibold text-muted-foreground transition-colors duration-200 group-hover:bg-foreground group-hover:text-background">
@@ -328,7 +354,8 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
                       <span className="min-w-0 flex-1 truncate text-[15px] font-medium tracking-tight">{brand}</span>
                       <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground/50 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

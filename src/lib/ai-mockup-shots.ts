@@ -1448,6 +1448,13 @@ Object.assign(LISTING_SCOPES, {
   "dji drone": { modelBrands: ["DJI"] },
   "dji drone controller": { modelBrands: ["DJI"] },
   "mac mini": { modelBrands: ["Apple"] },
+  // Android Phone is the phone-family catch-all: "everyone but Apple", not
+  // "everyone without their own named phone listing". The generic scopeOf()
+  // rule excludes every brand PHONE_BRANDS names — Samsung, OnePlus, Xiaomi,
+  // Vivo and the rest — which is only right once each of those has its own
+  // live listing (Phase 1 off). Under Phase 1, those brands have nowhere
+  // else to pick their model, so Android Phone has to keep taking them.
+  "android phone": { modelBrandsExclude: ["Apple"] },
 });
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

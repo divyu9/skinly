@@ -192,6 +192,22 @@ import { loadCatalogue, loadModelCatalogue } from "./catalogue";
 import { listingOf, presetFor } from "./ai-mockup-shots";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
+/**
+ * Search terms out of a query, lowercased.
+ *
+ * Product and model search used to test the WHOLE query as one contiguous
+ * phrase — "yellow tech phone" never matched "Yellow Tech Circuit Matte
+ * Android Phone Skin" because "Circuit Matte Android" sits between "Tech"
+ * and "Phone" in the title. Each word is checked on its own instead, so
+ * order and the words between them stop mattering.
+ */
+const matchWords = (q: string): string[] =>
+  String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
+const matchesAllWords = (haystack: string, words: string[]): boolean => {
+  const text = haystack.toLowerCase();
+  return words.length > 0 && words.every((w) => text.includes(w));
+};
+
 const TOTAL_PHONE_SKIN_SKUS = 359;
 
 // Mockups for 28 models (every iPhone before the 17, plus Nothing Phone 3/3A and
@@ -1674,21 +1690,18 @@ export function useQuery(apiRef: any, args?: any) {
           }
           const modelRows = await catalogueModels();
           if (modelRows) {
-            const term = searchParam.toLowerCase();
-            const hits = modelRows.filter((d: any) => `${d.brandName} ${d.modelName}`.toLowerCase().includes(term));
+            const words = matchWords(searchParam);
+            const hits = modelRows.filter((d: any) => matchesAllWords(`${d.brandName} ${d.modelName}`, words));
             if (active) setData(hits.slice(0, args?.limit || 10));
             return;
           }
           // Fetch all active models to search in-memory
           const q = query(collection(db, 'supportedModels'), where('isActive', '==', true));
           unsubscribe = onSnapshot(q, (snap) => {
-            const term = searchParam.toLowerCase();
+            const words = matchWords(searchParam);
             const filtered = snap.docs
               .map(d => ({ _id: d.id, ...d.data() }))
-              .filter((d: any) => {
-                const combined = `${d.brandName} ${d.modelName}`.toLowerCase();
-                return combined.includes(term);
-              });
+              .filter((d: any) => matchesAllWords(`${d.brandName} ${d.modelName}`, words));
             setData(filtered.slice(0, args?.limit || 10));
           });
         }
@@ -2270,22 +2283,20 @@ export function useQuery(apiRef: any, args?: any) {
           }
           const fromCatalogue = await catalogueProducts();
           if (fromCatalogue) {
-            const term = args.query.toLowerCase();
+            const words = matchWords(args.query);
             const hits = fromCatalogue.filter((d: any) =>
-              `${d.title} ${(d.tags || []).join(' ')}`.toLowerCase().includes(term));
+              matchesAllWords(`${d.title} ${(d.tags || []).join(' ')}`, words));
             const shown = await refreshProducts(hits.slice(0, (args?.limit || 15) + 3), path);
             if (active) setData(shown.slice(0, args?.limit || 15));
             return;
           }
           const q = query(collection(db, 'products'), where('status', '==', 'active'));
           unsubscribe = onSnapshot(q, async (snap) => {
-            const term = args.query.toLowerCase();
+            const words = matchWords(args.query);
             let docs = snap.docs
               .map(d => ({ _id: d.id, ...d.data() }))
-              .filter((d: any) => {
-                const searchString = `${d.title} ${d.tags?.join(' ') || ''} ${d.description || ''}`.toLowerCase();
-                return searchString.includes(term);
-              });
+              .filter((d: any) =>
+                matchesAllWords(`${d.title} ${d.tags?.join(' ') || ''} ${d.description || ''}`, words));
             docs = docs.slice(0, args?.limit || 15);
             
             // Fetch variants for these products
@@ -5901,6 +5912,50 @@ export function useMutation(apiRef: any) {
           await batch.commit();
         }
         return { success: true, variants: vs.size };
+      }
+
+      if (path === 'products.deleteAllProducts') {
+        /*
+         * The "Delete all products" nuke button, same bug as deleteProduct
+         * once was: no handler, so it fell through to the generic writer
+         * looking for an id in the args — and this call passes none at all,
+         * always "ID required for delete (deleteAllProducts)". Three confirm
+         * dialogs stand in front of this button; once past them, it deletes
+         * every product and every variant, in batches.
+         */
+        const [prodSnap, varSnap] = await Promise.all([
+          getDocs(collection(db, 'products')),
+          getDocs(collection(db, 'variants')),
+        ]);
+        const refs = [...varSnap.docs.map((d) => d.ref), ...prodSnap.docs.map((d) => d.ref)];
+        for (let i = 0; i < refs.length; i += 450) {
+          const batch = writeBatch(db);
+          refs.slice(i, i + 450).forEach((r) => batch.delete(r));
+          await batch.commit();
+        }
+        return { success: true, deletedProducts: prodSnap.size, deletedVariants: varSnap.size };
+      }
+
+      if (path === 'products.bulkUpdateVariantPrices') {
+        // Same missing-handler shape: the dialog was built and then wired to
+        // a mutation nobody implemented, so every "Apply Changes" click threw.
+        const updates: Array<{ variantId: string; newPrice: number }> = Array.isArray(args?.updates) ? args.updates : [];
+        if (!updates.length) throw new Error('No price changes to apply');
+        let successCount = 0, errorCount = 0;
+        for (let i = 0; i < updates.length; i += 450) {
+          const batch = writeBatch(db);
+          let inThisBatch = 0;
+          for (const u of updates.slice(i, i + 450)) {
+            if (!u?.variantId || !(Number(u.newPrice) >= 0)) { errorCount++; continue; }
+            batch.update(doc(db, 'variants', u.variantId), { price: Number(u.newPrice), updatedAt: Date.now() });
+            inThisBatch++;
+          }
+          if (inThisBatch) {
+            try { await batch.commit(); successCount += inThisBatch; }
+            catch (e) { console.error('bulkUpdateVariantPrices batch failed', e); errorCount += inThisBatch; }
+          }
+        }
+        return { success: true, successCount, errorCount };
       }
 
       if (path === 'products.cloneProduct') {
