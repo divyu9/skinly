@@ -1074,9 +1074,14 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         ? await rotateImageDataUrl(staged.dataUrl, staged.turns * 90)
         : staged.dataUrl;
       const stem = roll.code.toUpperCase().replace(/[^A-Z0-9-]/g, "");
+      // A key named only after the roll code overwrote the same R2 object on
+      // every replacement — same key, same public URL — so the browser and
+      // R2's own edge cache kept serving the old bytes at that URL forever,
+      // even though the write to Firestore had gone through. A fresh key per
+      // upload makes a replacement a genuinely new object with its own URL.
       const result: any = await uploadToLibrary({
         fileBase64: base64,
-        key: `design-raw/${stem}.webp`,
+        key: `design-raw/${stem}-${Date.now()}.webp`,
         filename: `${stem}.webp`,
         folder: "design-raw",
         contentType: staged.turns ? "image/webp" : (/data:([^;,]+)/.exec(base64)?.[1] || "image/jpeg"),

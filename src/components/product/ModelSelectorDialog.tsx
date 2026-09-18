@@ -22,6 +22,12 @@ interface ModelSelectorDialogProps {
   onRequestModel: () => void;
 }
 
+const chevronLeft = (
+  <svg viewBox="0 0 16 16" fill="none" className="size-4" aria-hidden="true">
+    <path d="M10 3.5 5.5 8l4.5 4.5" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export function ModelSelectorDialog({
   open,
   onOpenChange,
@@ -36,6 +42,9 @@ export function ModelSelectorDialog({
   onRequestModel,
 }: ModelSelectorDialogProps) {
   const brands = Object.keys(modelsByBrand).sort();
+  // A single brand opens straight on its models — there is no brand screen
+  // to return to, so the button had nothing to do but bounce straight back.
+  const hasBrandsToGoBackTo = brands.length > 1;
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,25 +105,32 @@ export function ModelSelectorDialog({
                   <p className="text-muted-foreground">
                     No models found matching "{searchQuery}"
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Can't find your model?
-                  </p>
-                  <Button variant="outline" onClick={onRequestModel}>
-                    Request Your Model →
-                  </Button>
                 </div>
               )}
             </div>
-            
-            <div className="pt-4 border-t">
-              <Button
-                variant="ghost"
-                onClick={onBackToBrands}
-                className="w-full"
-              >
-                ← Back to Brands
+
+            {/* Always offered, not only once a search comes up empty — most
+                shoppers whose model is missing scan the list rather than
+                type a name they already know isn't there. */}
+            <div className="flex items-center justify-between gap-2 pt-3 border-t text-sm">
+              <span className="text-muted-foreground">Can't find your model?</span>
+              <Button variant="link" className="h-auto p-0" onClick={onRequestModel}>
+                Request it →
               </Button>
             </div>
+
+            {hasBrandsToGoBackTo && (
+              <div className="pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={onBackToBrands}
+                  className="w-full"
+                >
+                  {chevronLeft}
+                  Back to Brands
+                </Button>
+              </div>
+            )}
           </>
         )}
       </DialogContent>
