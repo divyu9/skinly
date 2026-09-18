@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { toast } from "sonner";
+import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue.ts";
 import {
   MenuIcon,
   PackageIcon,
@@ -52,7 +53,23 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const [accountPanelOpen, setAccountPanelOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
-  const [shopExpanded, setShopExpanded] = useState(true); // Default to expanded
+  // Which collapsible section is open — one at a time, Shop open by default,
+  // same as before this had a second collapsible to share the state with.
+  const [expandedItem, setExpandedItem] = useState<string | null>("Shop");
+
+  const [brandLogos, setBrandLogos] = useState<Record<string, BrandLogo>>({});
+  useEffect(() => {
+    let live = true;
+    void loadCatalogue().then((c) => { if (live) setBrandLogos(c?.brandLogos || {}); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  // The same logos and links as the homepage's Explore by Brand section and
+  // every other device picker, so a shopper who knows their brand can jump
+  // straight to it from the menu instead of wading through every listing.
+  const brandSubItems = Object.values(brandLogos)
+    .filter((b) => b.name && b.href)
+    .sort((a, b) => a.name!.localeCompare(b.name!))
+    .map((b) => ({ label: b.name!, href: b.href!, logo: b.image }));
   
   // Use controlled state if provided, otherwise use internal state
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -115,6 +132,12 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
         href: `/products?productType=${cat.id}`,
       })),
     },
+    ...(brandSubItems.length ? [{
+      label: "Shop by Brand",
+      icon: ListIcon,
+      isCollapsible: true,
+      subItems: brandSubItems,
+    }] : []),
     {
       label: "Devices",
       icon: ListIcon,
@@ -156,36 +179,43 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
               // Collapsible item (Shop with categories)
               if (item.isCollapsible && item.subItems) {
                 return (
-                  <Collapsible key={item.label} open={shopExpanded} onOpenChange={setShopExpanded}>
+                  <Collapsible
+                    key={item.label}
+                    open={expandedItem === item.label}
+                    onOpenChange={(v) => setExpandedItem(v ? item.label : null)}
+                  >
                     <CollapsibleTrigger asChild>
                       <button className="w-full flex items-center justify-between gap-3 px-3 py-3 rounded-lg hover:bg-muted transition-colors text-left">
                         <div className="flex items-center gap-3">
                           <Icon className="size-5 text-muted-foreground" />
                           <span className="font-medium">{item.label}</span>
                         </div>
-                        {shopExpanded ? (
+                        {expandedItem === item.label ? (
                           <ChevronUpIcon className="size-4 text-muted-foreground" />
                         ) : (
                           <ChevronDownIcon className="size-4 text-muted-foreground" />
                         )}
                       </button>
                     </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-11 pr-3 space-y-1 mt-1">
-                      {/* Link to all products */}
-                      <button
-                        onClick={() => handleCategoryClick("/products")}
-                        className="w-full text-left block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
-                      >
-                        All Products
-                      </button>
-                      {/* Category links */}
-                      {item.subItems.map((subItem) => (
+                    <CollapsibleContent className="max-h-64 overflow-y-auto pl-11 pr-3 space-y-1 mt-1">
+                      {item.label === "Shop" && (
+                        <button
+                          onClick={() => handleCategoryClick("/products")}
+                          className="w-full text-left block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                        >
+                          All Products
+                        </button>
+                      )}
+                      {item.subItems.map((subItem: { label: string; href: string; logo?: string }) => (
                         <button
                           key={subItem.href}
                           onClick={() => handleCategoryClick(subItem.href)}
-                          className="w-full text-left block px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
+                          className="flex w-full items-center gap-2 text-left px-3 py-2 rounded-lg hover:bg-muted transition-colors text-sm"
                         >
-                          {subItem.label}
+                          {subItem.logo && (
+                            <img src={subItem.logo} alt="" loading="lazy" className="size-5 shrink-0 rounded-full object-contain" />
+                          )}
+                          <span className="truncate">{subItem.label}</span>
                         </button>
                       ))}
                     </CollapsibleContent>
