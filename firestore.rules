@@ -68,10 +68,15 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin() && !looksLikeASecret();
     }
+    // Both halves read `value` through get(): a settings document that has no
+    // `value` field at all — shipping, the counters, the pixel id — used to
+    // pass the `is string` test on the default and then fail evaluating
+    // `.value`, and a rule that errors is a rule that denies. Every such save
+    // was refused from the day this was written.
     function looksLikeASecret() {
       return request.resource.data.keys().hasAny(['authKey', 'apiKey', 'secret', 'password', 'token'])
         || (request.resource.data.get('value', '') is string
-            && request.resource.data.value.matches('(sk-|sk_|key-|Bearer ).*'));
+            && request.resource.data.get('value', '').matches('(sk-|sk_|key-|Bearer ).*'));
     }
     match /walletSettings/{id}           { allow read: if true; allow write: if isAdmin(); }
     match /codSettings/{id}              { allow read: if true; allow write: if isAdmin(); }
