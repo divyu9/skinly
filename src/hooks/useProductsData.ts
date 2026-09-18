@@ -151,13 +151,16 @@ export function useProductsData({
     
     if (!Array.isArray(sourceProducts)) return [];
 
-    // With a device chosen, a skin listing for another brand's devices (the
-    // Samsung Tab listing, for an iPad) does not belong in the grid.
-    const forBrand = urlParams.brand && urlParams.model
+    // A brand alone is enough to narrow the grid — it did nothing without a
+    // model too, which is why every homepage brand card and every `?brand=`
+    // link landed on the exact same unfiltered grid, Apple and Samsung and
+    // Xbox all still there, and one design showed as five or six near-
+    // identical cards with nothing separating them but the brand pill.
+    const forBrand = urlParams.brand
       ? sourceProducts.filter((p: any) => p.productCategory !== "skin" || brandInScope(p, urlParams.brand))
       : sourceProducts;
 
-    return forBrand.map((product: any) => ({
+    const withDesign = forBrand.map((product: any) => ({
       _id: product._id,
       slug: product.slug,
       title: product.title,
@@ -170,6 +173,7 @@ export function useProductsData({
       finishType: product.finishType,
       modelBrands: product.modelBrands,
       modelBrandsExclude: product.modelBrandsExclude,
+      createdFromDesign: product.createdFromDesign || "",
       variants: product.variants?.map((v: any) => ({
         _id: v._id,
         title: v.title,
@@ -180,6 +184,30 @@ export function useProductsData({
         available: (v.inventoryQuantity ?? v.inventory_quantity ?? 0) > 0,
       })) || [],
     }));
+
+    // Without a brand chosen, one design's brand listings — Apple iPhone,
+    // Samsung Galaxy, OnePlus, Android Phone, all the same artwork — showed
+    // side by side as near-identical cards, brand pill the only difference.
+    // Collapsed to one: the catch-all listing (no single named brand, so it
+    // fits the widest audience) if the design has one, else the cheapest,
+    // so a design reads as one card until a brand narrows it back down.
+    if (urlParams.brand) return withDesign;
+    const bySkinDesign = new Map<string, any[]>();
+    const passthrough: any[] = [];
+    for (const p of withDesign) {
+      if (p.productCategory !== "skin" || !p.createdFromDesign) { passthrough.push(p); continue; }
+      const group = bySkinDesign.get(p.createdFromDesign);
+      if (group) group.push(p); else bySkinDesign.set(p.createdFromDesign, [p]);
+    }
+    if (!bySkinDesign.size) return withDesign;
+    const startingPrice = (p: any) => p.variants.length ? Math.min(...p.variants.map((v: any) => v.price)) : Infinity;
+    const representatives = [...bySkinDesign.values()].map((group) => {
+      if (group.length === 1) return group[0];
+      const catchAll = group.filter((p) => !p.modelBrands?.length);
+      const pool = catchAll.length ? catchAll : group;
+      return pool.reduce((best, p) => (startingPrice(p) < startingPrice(best) ? p : best));
+    });
+    return [...passthrough, ...representatives];
   }, [productsData, accumulatedCollectionProducts, filters.collectionParam, collection,
       filters.productCategory, filters.gadgetFilter, filters.finishFilter, urlParams.brand, urlParams.model]);
   
