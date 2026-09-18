@@ -377,10 +377,11 @@ export default function ProductsPage() {
   const showGadgetBanner = !!activeDevice && filters.productCategory === 'skin' &&
     (!filters.gadgetFilter || !deviceCategory || filters.gadgetFilter === deviceCategory);
   
-  // Offered whenever skins are being browsed with no brand chosen — the
-  // fastest way to a clean, single-brand grid instead of one design showing
-  // as several near-identical cards, one per brand listing.
-  const showBrandPicker = filters.productCategory === 'skin' && !urlParams.brand;
+  // On every skins view, not only the unfiltered one: a saved device writes
+  // its own brand into the URL, so hiding the row once a brand was set meant
+  // anyone with a phone remembered never saw it at all. The row marks the
+  // active brand and tapping it again clears it.
+  const showBrandPicker = filters.productCategory === 'skin';
 
   const showCollectionPills = filters.productCategory === 'skin' &&
     filters.gadgetFilter === 'phone' && 

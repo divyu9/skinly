@@ -222,9 +222,17 @@ export function useProductsData({
     const src = Array.isArray(productsData) ? productsData : [];
     const seen = new Map<string, { listingKind: string; modelBrands?: string[] }>();
     for (const p of src as any[]) {
-      if (p.productCategory !== "skin" || !p.listingKind) continue;
+      if (p.productCategory !== "skin") continue;
       if (filters.gadgetFilter && p.gadgetCategory !== filters.gadgetFilter) continue;
-      if (!seen.has(p.listingKind)) seen.set(p.listingKind, { listingKind: p.listingKind, modelBrands: p.modelBrands });
+      // Keyed on the brands themselves, not on listingKind: the static
+      // catalogue the grid reads in production carries modelBrands but no
+      // listingKind, so asking for the kind left the row empty there. A
+      // listing that names no brand is the catch-all, one "Other" chip.
+      const brands: string[] = Array.isArray(p.modelBrands) ? p.modelBrands.filter(Boolean) : [];
+      const key = brands.length
+        ? brands.map((b) => String(b).toLowerCase()).sort().join("|")
+        : "other";
+      if (!seen.has(key)) seen.set(key, { listingKind: p.listingKind || key, modelBrands: brands });
     }
     return [...seen.values()].sort((a, b) => a.listingKind.localeCompare(b.listingKind));
   }, [productsData, filters.gadgetFilter]);
