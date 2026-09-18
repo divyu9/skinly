@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
-import { FileTextIcon, SendIcon, TruckIcon, XCircleIcon } from "lucide-react";
+import { FileTextIcon, PackagePlusIcon, SendIcon, TruckIcon, XCircleIcon } from "lucide-react";
 
 export interface ShippingFormData {
   awbNumber: string;
@@ -31,6 +31,10 @@ interface ShippingTrackingPanelProps {
   creatingShipment: boolean;
   cancellingShipment: boolean;
   onCreateShipment: () => void;
+  /** The order in RapidShyp with no courier assigned, processed there by hand. */
+  creatingOrderOnly?: boolean;
+  onCreateOrderOnly?: () => void;
+  rapidshypOrderId?: string;
   // Edit shipping dialog
   editingShipping: boolean;
   shippingForm: ShippingFormData;
@@ -64,6 +68,9 @@ export function ShippingTrackingPanel({
   creatingShipment,
   cancellingShipment,
   onCreateShipment,
+  creatingOrderOnly,
+  onCreateOrderOnly,
+  rapidshypOrderId,
   editingShipping,
   shippingForm,
   onOpenEditShipping,
@@ -140,21 +147,51 @@ export function ShippingTrackingPanel({
             </div>
           )}
 
+          {!awbNumber && rapidshypOrderId && (
+            <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">
+              In RapidShyp as order <span className="font-medium">{rapidshypOrderId}</span> with no courier yet —
+              pick one in the RapidShyp panel, or create the shipment here.
+            </p>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {!awbNumber ? (
-              <Button onClick={onCreateShipment} disabled={creatingShipment} className="flex-1">
-                {creatingShipment ? (
-                  <>
-                    <Spinner className="size-4 mr-2" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <SendIcon className="size-4 mr-2" />
-                    Create Shipment
-                  </>
+              <>
+                <Button onClick={onCreateShipment} disabled={creatingShipment || creatingOrderOnly} className="flex-1">
+                  {creatingShipment ? (
+                    <>
+                      <Spinner className="size-4 mr-2" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <SendIcon className="size-4 mr-2" />
+                      Create Shipment
+                    </>
+                  )}
+                </Button>
+                {onCreateOrderOnly && !rapidshypOrderId && (
+                  <Button
+                    variant="outline"
+                    onClick={onCreateOrderOnly}
+                    disabled={creatingShipment || creatingOrderOnly}
+                    className="flex-1"
+                    title="Books the order in RapidShyp without a courier or AWB, to process there by hand"
+                  >
+                    {creatingOrderOnly ? (
+                      <>
+                        <Spinner className="size-4 mr-2" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <PackagePlusIcon className="size-4 mr-2" />
+                        Order only, no shipment
+                      </>
+                    )}
+                  </Button>
                 )}
-              </Button>
+              </>
             ) : (
               <>
                 {labelUrl && (

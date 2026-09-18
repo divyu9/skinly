@@ -4650,6 +4650,15 @@ export function useMutation(apiRef: any) {
         const response = await callShipment(args);
         return response.data;
       }
+
+      // The order in RapidShyp with no courier picked, for a parcel that
+      // wants a person's eye before it ships.
+      if (collectionName === 'rapidshyp' && actionName === 'createOrderOnly') {
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const call = httpsCallable(getFunctions(), 'createRapidshypOrder');
+        const response = await call(args);
+        return response.data;
+      }
       
       // --- END CART & CHECKOUT ---
       if (collectionName === 'orders' || collectionName === 'admin') {

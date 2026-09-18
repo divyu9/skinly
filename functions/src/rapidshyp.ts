@@ -20,8 +20,44 @@ const getRapidShypConfig = () => {
   if (!apiKey) {
     throw new HttpsError("failed-precondition", "RapidShyp API key not configured.");
   }
-  return { apiKey, apiUrl };
+  // The order-only endpoint sits beside the wrapper: create_order books the
+  // order in the panel and leaves the courier to be chosen there.
+  const orderUrl = process.env.RAPIDSHYP_ORDER_URL || apiUrl.replace(/\/wrapper\/?$/, "/create_order");
+  return { apiKey, apiUrl, orderUrl };
 };
+
+/**
+ * The pickup point the parcel leaves from, by the name RapidShyp knows it by.
+ *
+ * It lives in the shipping settings so that renaming a pickup address in the
+ * RapidShyp panel is an admin edit, not a redeploy: RapidShyp matches this
+ * string exactly and answers "Pickup address not found with pickup address
+ * name" when it does not, which is a whole day's shipments stuck.
+ */
+async function pickupNames(db: admin.firestore.Firestore) {
+  const snap = await db.collection("settings").doc("shipping").get();
+  const s = snap.exists ? (snap.data() as any) : {};
+  return {
+    pickup: String(s.rapidshypPickupName || process.env.RAPIDSHYP_PICKUP_NAME || "SKINLY").trim(),
+    store: String(s.rapidshypStoreName || process.env.RAPIDSHYP_STORE_NAME || "DEFAULT").trim(),
+  };
+}
+
+/**
+ * RapidShyp answers 200 with {"status":"FAILED"} when it refuses an order, so
+ * a failure has to be read out of the body rather than the status code. Left
+ * unread, the admin saw the raw JSON and no idea what to fix.
+ */
+function refusal(result: any, pickup: string): string | null {
+  const status = String(result?.status || "").toUpperCase();
+  if (status && status !== "SUCCESS" && status !== "SUCCESSFUL") {
+    const remarks = String(result?.remarks || result?.message || "RapidShyp refused this order");
+    return /pickup address/i.test(remarks)
+      ? `${remarks} We sent "${pickup}". Open the RapidShyp panel, copy the pickup location name exactly as it appears there, and save it in Admin → Shipping.`
+      : remarks;
+  }
+  return null;
+}
 
 /** A finite number, or null. */
 const num = (v: any): number | null => {
@@ -72,16 +108,12 @@ function describeError(status: number, body: string): string {
   }
 }
 
-export const createShipment = onCall(async (data: any, context: any) => {
-  const { uid } = await requireAdmin(context);
-  await enforceDailyRateLimit({
-    key: `createShipment_${uid}`,
-    limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200),
-  });
-
-  const orderId = String(data?.orderId || "");
-  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
-
+/**
+ * Everything RapidShyp needs for one order: the same body for a shipment
+ * (wrapper) and for an order on its own (create_order), so the two can never
+ * describe the same parcel differently.
+ */
+async function buildOrderPayload(orderId: string) {
   const db = admin.firestore();
   const orderRef = db.collection("orders").doc(orderId);
   const orderDoc = await orderRef.get();
@@ -99,12 +131,6 @@ export const createShipment = onCall(async (data: any, context: any) => {
   if (!items.length) {
     throw new HttpsError("failed-precondition", "Order has no items");
   }
-  // Refuse rather than book a second consignment for one parcel.
-  if (order.awbNumber) {
-    throw new HttpsError("already-exists", `Shipment already created (AWB ${order.awbNumber})`);
-  }
-
-  const config = getRapidShypConfig();
 
   // Weight and dimensions come off the products, not the order lines.
   const productIds = [...new Set(items.map((i) => i?.productId).filter(Boolean))] as string[];
@@ -169,12 +195,13 @@ export const createShipment = onCall(async (data: any, context: any) => {
   };
 
   const orderedAt = num(order.createdAt) || num(order._creationTime) || Date.now();
+  const names = await pickupNames(db);
 
-  const shipmentPayload: Record<string, unknown> = {
+  const payload: Record<string, unknown> = {
     orderId: order.orderNumber || orderDoc.id,
     orderDate: new Date(orderedAt).toISOString().split("T")[0],
-    pickupAddressName: process.env.RAPIDSHYP_PICKUP_NAME || "SKINLY",
-    storeName: process.env.RAPIDSHYP_STORE_NAME || "DEFAULT",
+    pickupAddressName: names.pickup,
+    storeName: names.store,
     billingIsShipping: true,
     shippingAddress: address,
     billingAddress: address,
@@ -202,6 +229,26 @@ export const createShipment = onCall(async (data: any, context: any) => {
     },
   };
 
+  return { orderRef, order, orderDoc, payload, pickup: names.pickup };
+}
+
+export const createShipment = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  await enforceDailyRateLimit({
+    key: `createShipment_${uid}`,
+    limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200),
+  });
+
+  const orderId = String(data?.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+
+  const config = getRapidShypConfig();
+  const { orderRef, order, orderDoc, payload: shipmentPayload, pickup } = await buildOrderPayload(orderId);
+  // Refuse rather than book a second consignment for one parcel.
+  if (order.awbNumber) {
+    throw new HttpsError("already-exists", `Shipment already created (AWB ${order.awbNumber})`);
+  }
+
   console.log("RapidShyp createShipment", {
     order: order.orderNumber || orderDoc.id,
     url: config.apiUrl,
@@ -223,6 +270,12 @@ export const createShipment = onCall(async (data: any, context: any) => {
 
   const result: any = await response.json();
   console.log("RapidShyp createShipment response", JSON.stringify(result));
+
+  const refused = refusal(result, pickup);
+  if (refused) {
+    console.error("RapidShyp createShipment refused", JSON.stringify(result));
+    throw new HttpsError("failed-precondition", refused);
+  }
 
   const shipment = result?.shipment?.[0];
   if (!shipment) {
@@ -253,6 +306,84 @@ export const createShipment = onCall(async (data: any, context: any) => {
     labelUrl: shipment.labelURL,
     courierName: shipment.courierName,
     message: "Shipment created successfully",
+  };
+});
+
+/**
+ * The order in RapidShyp, and nothing more.
+ *
+ * Some parcels want a person's eye: an odd address, a heavy box, a courier
+ * chosen by hand. This books the order in the panel — no AWB, no courier, no
+ * money spent — and leaves the admin to process it there. A shipment can
+ * still be created from here afterwards; RapidShyp keys on the order id, so
+ * the same order is not booked twice.
+ */
+export const createRapidshypOrder = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  await enforceDailyRateLimit({
+    key: `createRapidshypOrder_${uid}`,
+    limit: Number(process.env.RAPIDSHYP_DAILY_LIMIT || 200),
+  });
+
+  const orderId = String(data?.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+
+  const config = getRapidShypConfig();
+  const { orderRef, order, payload, pickup } = await buildOrderPayload(orderId);
+  if (order.awbNumber) {
+    throw new HttpsError("already-exists", `This parcel already has AWB ${order.awbNumber}`);
+  }
+  if (order.rapidshypOrderId) {
+    throw new HttpsError("already-exists", `Already in RapidShyp as order ${order.rapidshypOrderId} — process it there`);
+  }
+
+  console.log("RapidShyp createOrder", { order: payload.orderId, url: config.orderUrl, payload });
+  const response = await fetch(config.orderUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "rapidshyp-token": config.apiKey },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    console.error("RapidShyp createOrder failed", { status: response.status, body });
+    throw new HttpsError("unavailable", describeError(response.status, body));
+  }
+
+  const result: any = await response.json();
+  console.log("RapidShyp createOrder response", JSON.stringify(result));
+  const refused = refusal(result, pickup);
+  if (refused) {
+    console.error("RapidShyp createOrder refused", JSON.stringify(result));
+    throw new HttpsError("failed-precondition", refused);
+  }
+
+  const rapidshypOrderId = String(result?.order_id || result?.orderId || payload.orderId);
+  const update: Record<string, unknown> = {
+    rapidshypOrderId,
+    shippingProvider: "rapidshyp",
+    shippingStatus: "Order created in RapidShyp",
+    updatedAt: Date.now(),
+  };
+  // Some accounts assign a courier on order creation anyway; take the AWB if
+  // one came back rather than leaving the order looking unshipped.
+  const shipment = result?.shipment?.[0];
+  if (shipment?.awb) {
+    update.awbNumber = shipment.awb;
+    update.trackingUrl = shipment.tracking_link || `https://app.rapidshyp.com/t/${shipment.awb}`;
+    update.shippingStatus = "Shipment Created";
+    if (shipment.courierName) update.courierName = shipment.courierName;
+    if (shipment.labelURL) update.labelUrl = shipment.labelURL;
+    if (shipment.shipmentId) update.shipmentId = shipment.shipmentId;
+  }
+  await orderRef.update(update);
+
+  return {
+    success: true,
+    rapidshypOrderId,
+    awbNumber: shipment?.awb || null,
+    message: shipment?.awb
+      ? `Order created in RapidShyp · AWB ${shipment.awb}`
+      : "Order created in RapidShyp — assign the courier there",
   };
 });
 

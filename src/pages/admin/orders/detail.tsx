@@ -45,6 +45,7 @@ function OrderDetailPageInner() {
   const updateShippingAddress = useMutation(api.admin.orders.updateOrderShippingAddress);
   const updateOrderItems = useMutation(api.admin.orders.updateOrderItems);
   const createShipment = useAction(api.rapidshyp.createShipment);
+  const createOrderOnly = useAction(api.rapidshyp.createOrderOnly);
   const cancelShipment = useAction(api.rapidshyp.cancelShipment);
   const restockInventory = useMutation(api.admin.orders.restockInventory);
   const refundToWallet = useMutation(api.admin.orders.refundToWallet);
@@ -75,6 +76,7 @@ function OrderDetailPageInner() {
   const [itemsForm, setItemsForm] = useState<ItemFormEntry[]>([]);
 
   const [creatingShipment, setCreatingShipment] = useState(false);
+  const [creatingOrderOnly, setCreatingOrderOnly] = useState(false);
   const [cancellingShipment, setCancellingShipment] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showRestockDialog, setShowRestockDialog] = useState(false);
@@ -216,6 +218,21 @@ function OrderDetailPageInner() {
       setShippingForm({ awbNumber: "", trackingUrl: "", shippingStatus: "" });
     } catch {
       toast.error("Failed to update shipping info");
+    }
+  };
+
+  // The order in RapidShyp with no courier chosen, to process there by hand.
+  const handleCreateOrderOnly = async () => {
+    if (!orderId) return;
+    setCreatingOrderOnly(true);
+    try {
+      const result: any = await createOrderOnly({ orderId });
+      toast.success(result?.message || "Order created in RapidShyp");
+    } catch (error) {
+      const e = error && typeof error === "object" && "data" in error ? (error.data as any) : null;
+      toast.error(e?.message || (error instanceof Error ? error.message : "Could not create the order"), { duration: 10000 });
+    } finally {
+      setCreatingOrderOnly(false);
     }
   };
 
@@ -507,6 +524,9 @@ function OrderDetailPageInner() {
             manualCourierCompany={order.manualCourierCompany}
             orderStatus={order.status}
             creatingShipment={creatingShipment}
+            creatingOrderOnly={creatingOrderOnly}
+            onCreateOrderOnly={handleCreateOrderOnly}
+            rapidshypOrderId={(order as any)?.rapidshypOrderId}
             cancellingShipment={cancellingShipment}
             onCreateShipment={handleCreateShipment}
             editingShipping={editingShipping}

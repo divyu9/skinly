@@ -18,6 +18,8 @@ export default function AdminShippingPage() {
   const [freeThreshold, setFreeThreshold] = useState<string>("");
   const [flatFee, setFlatFee] = useState<string>("");
   const [includesTax, setIncludesTax] = useState<boolean>(false);
+  const [pickupName, setPickupName] = useState<string>("");
+  const [storeName, setStoreName] = useState<string>("");
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -26,6 +28,8 @@ export default function AdminShippingPage() {
     setFreeThreshold(shippingSettings.freeShippingThreshold.toString());
     setFlatFee(shippingSettings.flatShippingFee.toString());
     setIncludesTax(shippingSettings.shippingIncludesTax);
+    setPickupName((shippingSettings as any).rapidshypPickupName || "");
+    setStoreName((shippingSettings as any).rapidshypStoreName || "");
     setIsInitialized(true);
   }
   
@@ -49,6 +53,8 @@ export default function AdminShippingPage() {
         freeShippingThreshold: threshold,
         flatShippingFee: fee,
         shippingIncludesTax: includesTax,
+        rapidshypPickupName: pickupName.trim(),
+        rapidshypStoreName: storeName.trim(),
       });
       toast.success("Shipping settings updated successfully!");
     } catch (error) {
@@ -156,6 +162,45 @@ export default function AdminShippingPage() {
               </div>
             </div>
             
+            {/* RapidShyp matches the pickup name exactly and refuses the
+                shipment when it differs, so renaming a pickup address in
+                their panel has to be reflected here. */}
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <p className="text-sm font-medium">RapidShyp</p>
+                <p className="text-sm text-muted-foreground">
+                  Copy these from the RapidShyp panel, spelled exactly as they appear there. A mismatch
+                  is the "Pickup address not found with pickup address name" error when creating a shipment.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="pickupName">Pickup location name</Label>
+                  <Input
+                    id="pickupName"
+                    value={pickupName}
+                    onChange={(e) => setPickupName(e.target.value)}
+                    placeholder="e.g. bibhab"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    RapidShyp → Settings → Pickup Addresses, the Location Name column
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="storeName">Store name</Label>
+                  <Input
+                    id="storeName"
+                    value={storeName}
+                    onChange={(e) => setStoreName(e.target.value)}
+                    placeholder="DEFAULT"
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Leave as DEFAULT unless RapidShyp shows more than one channel
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="pt-4 border-t">
               <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                 <p className="text-sm font-medium">Current Rules:</p>
