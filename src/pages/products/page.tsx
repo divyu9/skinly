@@ -461,6 +461,9 @@ export default function ProductsPage() {
             collectionName={collection?.name}
             deviceFilter={urlParams.device}
             finishFilter={filters.finishFilter}
+            gadgetFilter={filters.gadgetFilter}
+            brandFilter={urlParams.brand}
+            productCategory={filters.productCategory}
             resultsCount={products.length}
           />
 
