@@ -210,6 +210,24 @@ export function useProductsData({
     return [...passthrough, ...representatives];
   }, [productsData, accumulatedCollectionProducts, filters.collectionParam, collection,
       filters.productCategory, filters.gadgetFilter, filters.finishFilter, urlParams.brand, urlParams.model]);
+
+  /**
+   * The brands actually on offer for the gadget being browsed, read straight
+   * off the raw (pre-dedup, pre-brand-filter) product list rather than the
+   * grid — the grid above collapses each design to one representative brand,
+   * so by the time a design reaches the page most other brands may have been
+   * picked for zero designs and would look unavailable when they are not.
+   */
+  const availableBrands = useMemo(() => {
+    const src = Array.isArray(productsData) ? productsData : [];
+    const seen = new Map<string, { listingKind: string; modelBrands?: string[] }>();
+    for (const p of src as any[]) {
+      if (p.productCategory !== "skin" || !p.listingKind) continue;
+      if (filters.gadgetFilter && p.gadgetCategory !== filters.gadgetFilter) continue;
+      if (!seen.has(p.listingKind)) seen.set(p.listingKind, { listingKind: p.listingKind, modelBrands: p.modelBrands });
+    }
+    return [...seen.values()].sort((a, b) => a.listingKind.localeCompare(b.listingKind));
+  }, [productsData, filters.gadgetFilter]);
   
   // Apply search filter
   const filteredProducts = useMemo(() => {
@@ -421,5 +439,6 @@ export function useProductsData({
     isMockupsLoading,
     updateViewport,
     hasMockups: !!mockupResult?.mockups && Object.keys(mockupResult.mockups).length > 0,
+    availableBrands,
   };
 }

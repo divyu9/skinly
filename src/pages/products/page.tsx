@@ -30,6 +30,7 @@ import { useProductsData } from "@/hooks/useProductsData";
 import { writeActiveDevice } from "@/lib/active-device";
 import { CATEGORY_PAGES, canonicalListingPath } from "@/lib/category-paths.mjs";
 import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed } from "@/lib/announcement-dismissed.ts";
+import { BrandPicker } from "./_components/brand-picker.tsx";
 
 export default function ProductsPage() {
   // ============================================
@@ -134,6 +135,7 @@ export default function ProductsPage() {
     autoSortOOS,
     isMockupsLoading,
     updateViewport,
+    availableBrands,
   } = useProductsData({
     filters,
     urlParams,
@@ -375,7 +377,12 @@ export default function ProductsPage() {
   const showGadgetBanner = !!activeDevice && filters.productCategory === 'skin' &&
     (!filters.gadgetFilter || !deviceCategory || filters.gadgetFilter === deviceCategory);
   
-  const showCollectionPills = filters.productCategory === 'skin' && 
+  // Offered whenever skins are being browsed with no brand chosen — the
+  // fastest way to a clean, single-brand grid instead of one design showing
+  // as several near-identical cards, one per brand listing.
+  const showBrandPicker = filters.productCategory === 'skin' && !urlParams.brand;
+
+  const showCollectionPills = filters.productCategory === 'skin' &&
     filters.gadgetFilter === 'phone' && 
     allCollections && 
     allCollections.length > 0 && 
@@ -473,6 +480,9 @@ export default function ProductsPage() {
               />
             </div>
           )}
+
+          {/* Shop by Brand */}
+          {showBrandPicker && <BrandPicker brands={availableBrands} />}
 
           {/* Collection Pills */}
           {showCollectionPills && (
