@@ -36,6 +36,7 @@ import { Combobox } from "@/components/ui/combobox.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { toast } from "sonner";
 import { ExportModels, ImportModels } from "./models-import-export.tsx";
+import { ResyncBrandScopeButton } from "./resync-brand-scope.tsx";
 import {
   PlusIcon,
   UploadIcon,
@@ -519,6 +520,7 @@ export default function AdminModelsPage() {
                   <DownloadIcon className="size-4 mr-2" />
                   Export
                 </Button>
+                <ResyncBrandScopeButton />
                 {modelsDialog === "import" && models && gadgetTypes && (
                   <ImportModels models={models} gadgetTypes={gadgetTypes} onClose={() => setModelsDialog(null)} />
                 )}
