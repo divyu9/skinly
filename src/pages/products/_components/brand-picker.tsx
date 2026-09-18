@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue";
 
+/**
+ * The brands that lead the row, in this order — the ones people come looking
+ * for. Everything else follows alphabetically, and the catch-all last.
+ */
+const LEAD_BRANDS = ["apple", "samsung", "google", "oneplus", "nothing", "motorola"];
+
 let brandLogosPromise: Promise<Record<string, BrandLogo>> | null = null;
 const loadBrandLogos = () =>
   (brandLogosPromise ||= loadCatalogue().then((c) => c?.brandLogos || {}).catch(() => ({} as Record<string, BrandLogo>)));
@@ -66,10 +72,15 @@ export function BrandPicker({ brands }: { brands: BrandOption[] }) {
       });
     }
     const all = [...byBrand.values()];
-    // Named brands first, alphabetically; "Other" always last.
+    const rank = (c: Chip) => {
+      const lead = LEAD_BRANDS.indexOf(c.key);
+      return lead >= 0 ? lead : LEAD_BRANDS.length;
+    };
+    // The lead brands in their own order, then the rest alphabetically,
+    // then "Other" last.
     return all
       .filter((c) => c.key !== "other")
-      .sort((a, b) => a.label.localeCompare(b.label))
+      .sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
       .concat(all.filter((c) => c.key === "other"));
   }, [brands, logos]);
 

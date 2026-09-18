@@ -464,6 +464,10 @@ export default function ProductsPage() {
             resultsCount={products.length}
           />
 
+          {/* Shop by Brand — above the device box, because brand comes first
+              in the sequence a shopper works through: brand, then model. */}
+          {showBrandPicker && <BrandPicker brands={availableBrands} />}
+
           {/* Device Selection CTA */}
           {showDeviceCTA && (
             <DeviceSelectionCTA 
@@ -481,9 +485,6 @@ export default function ProductsPage() {
               />
             </div>
           )}
-
-          {/* Shop by Brand */}
-          {showBrandPicker && <BrandPicker brands={availableBrands} />}
 
           {/* Collection Pills */}
           {showCollectionPills && (
