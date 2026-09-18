@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu.tsx";
 import { BulkPriceEditDialog } from "./_components/bulk-price-edit-dialog.tsx";
+import { PriceRulesDialog } from "./_components/price-rules.tsx";
 import { RollsManagement } from "./_components/rolls-management.tsx";
 import { TagManagerDialog } from "./_components/tag-manager-dialog.tsx";
 
@@ -268,6 +269,7 @@ function AdminProductsPageInner() {
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
   const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<string>("all");
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
+  const [showPriceRules, setShowPriceRules] = useState(false);
   const [skuFilterCondition, setSkuFilterCondition] = useState<"starts-with" | "contains">("starts-with");
   const [skuFilterValue, setSkuFilterValue] = useState("");
   const [productNameCondition, setProductNameCondition] = useState<"starts-with" | "contains">("contains");
@@ -916,6 +918,10 @@ function AdminProductsPageInner() {
                     <DropdownMenuItem onClick={() => setShowBulkPriceEdit(true)}>
                       <DollarSignIcon className="size-4 mr-2" />
                       Bulk edit prices
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setShowPriceRules(true)}>
+                      <DollarSignIcon className="size-4 mr-2" />
+                      Price rules by gadget &amp; finish
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleClearAll}
@@ -1641,6 +1647,13 @@ function AdminProductsPageInner() {
         onOpenChange={setShowBulkPriceEdit}
         products={products || []}
         selectedProductIds={selectedProducts}
+      />
+
+      <PriceRulesDialog
+        open={showPriceRules}
+        onOpenChange={setShowPriceRules}
+        products={products}
+        gadgetTypes={gadgetTypes}
       />
 
       {/* Tag Manager Dialog */}
