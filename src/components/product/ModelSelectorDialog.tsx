@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import {
@@ -7,6 +8,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
+import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue";
+
+/** The same logos the admin sets on the homepage's Explore by Brand section. */
+let brandLogosPromise: Promise<Record<string, BrandLogo>> | null = null;
+const loadBrandLogos = () =>
+  (brandLogosPromise ||= loadCatalogue().then((c) => c?.brandLogos || {}).catch(() => ({} as Record<string, BrandLogo>)));
 
 interface ModelSelectorDialogProps {
   open: boolean;
@@ -45,7 +52,15 @@ export function ModelSelectorDialog({
   // A single brand opens straight on its models — there is no brand screen
   // to return to, so the button had nothing to do but bounce straight back.
   const hasBrandsToGoBackTo = brands.length > 1;
-  
+
+  const [brandLogos, setBrandLogos] = useState<Record<string, BrandLogo>>({});
+  const [brokenLogo, setBrokenLogo] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let live = true;
+    void loadBrandLogos().then((logos) => { if (live) setBrandLogos(logos); });
+    return () => { live = false; };
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
@@ -59,16 +74,36 @@ export function ModelSelectorDialog({
               </DialogDescription>
             </DialogHeader>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pr-2">
-              {brands.map((brand) => (
-                <Button
-                  key={brand}
-                  variant="outline"
-                  className="h-auto py-4"
-                  onClick={() => onBrandSelect(brand)}
-                >
-                  {brand}
-                </Button>
-              ))}
+              {brands.map((brand) => {
+                const key = brandKey(brand);
+                const logo = brandLogos[key];
+                const showLogo = !!logo?.image && !brokenLogo.has(key);
+                return (
+                  <Button
+                    key={brand}
+                    variant="outline"
+                    className="h-auto flex-col gap-2 py-4"
+                    onClick={() => onBrandSelect(brand)}
+                  >
+                    {showLogo ? (
+                      <span className="flex size-10 items-center justify-center overflow-hidden rounded-full bg-muted">
+                        <img
+                          src={logo!.image}
+                          alt=""
+                          loading="lazy"
+                          onError={() => setBrokenLogo((prev) => new Set(prev).add(key))}
+                          className="size-7 object-contain"
+                        />
+                      </span>
+                    ) : (
+                      <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold">
+                        {brand[0]?.toUpperCase()}
+                      </span>
+                    )}
+                    {brand}
+                  </Button>
+                );
+              })}
             </div>
           </>
         ) : (
