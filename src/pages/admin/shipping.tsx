@@ -58,8 +58,17 @@ export default function AdminShippingPage() {
       });
       toast.success("Shipping settings updated successfully!");
     } catch (error) {
-      toast.error("Failed to update shipping settings");
-      console.error(error);
+      // The reason matters here: a denied write and a bad number are different
+      // problems, and "Failed to update" told the admin neither.
+      const e = error as { code?: string; message?: string };
+      const denied = String(e?.code || "").includes("permission-denied");
+      toast.error(
+        denied
+          ? "The database refused the save — sign out and back in, then try again"
+          : e?.message || "Failed to update shipping settings",
+        { description: e?.code ? `Code: ${e.code}` : undefined, duration: 10000 }
+      );
+      console.error("shipping settings save failed", error);
     } finally {
       setIsSaving(false);
     }
