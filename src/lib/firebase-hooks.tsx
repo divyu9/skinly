@@ -141,18 +141,42 @@ async function refreshProducts(list: any[], label: string): Promise<any[]> {
     .filter(Boolean);
 }
 
-let createdSinceBuild: Promise<any[]> | null = null;
-/** Active products created after the catalogue was built, with variants. */
-function productsSinceBuild(builtAt: number): Promise<any[]> {
-  if (!createdSinceBuild) {
-    createdSinceBuild = (async () => {
+let sinceBuild: Promise<{ touched: Set<string>; active: any[] }> | null = null;
+/**
+ * The products the catalogue file has wrong, and their variants.
+ *
+ * Two questions, because a listing starts being sellable at two different
+ * moments. It may have been created after the build — that is what
+ * `_creationTime` answers. Or it may have been created before the build as a
+ * draft and gone live after it: a launch makes its listings as drafts when
+ * "Publish new listings now" is off, and each one flips to active when its
+ * first picture is approved, which can be an hour or a day later. Asking only
+ * the first question left 29 live listings out of search and off the grid
+ * after one launch, their pictures approved, their stock counted, and nothing
+ * to show for it until the next scheduled rebuild hours later.
+ *
+ * The answer also carries which products were touched at all, so the stale
+ * copy in the file is dropped rather than merged over — including one that
+ * has since been drafted or archived, which should disappear, not linger.
+ */
+function productsSinceBuild(builtAt: number) {
+  if (!sinceBuild) {
+    sinceBuild = (async () => {
       readLabel = 'catalogue:sinceBuild';
-      const snap = await getDocs(query(collection(db, 'products'), where('_creationTime', '>', builtAt)));
-      const rows = snap.docs.map((d) => ({ _id: d.id, ...d.data() } as any)).filter((p) => p.status === 'active');
-      return refreshProducts(rows, 'catalogue:sinceBuild');
-    })().catch(() => []);
+      // A product written before `updatedAt` existed, or never edited since it
+      // was made, is missing from one query or the other — hence both.
+      const [made, changed] = await Promise.all([
+        getDocs(query(collection(db, 'products'), where('_creationTime', '>', builtAt))),
+        getDocs(query(collection(db, 'products'), where('updatedAt', '>', builtAt))),
+      ]);
+      const rows = new Map<string, any>();
+      for (const d of [...made.docs, ...changed.docs]) rows.set(d.id, { _id: d.id, ...d.data() });
+      const touched = new Set(rows.keys());
+      const active = await refreshProducts([...rows.values()].filter((p) => p.status === 'active'), 'catalogue:sinceBuild');
+      return { touched, active };
+    })().catch(() => ({ touched: new Set<string>(), active: [] as any[] }));
   }
-  return createdSinceBuild;
+  return sinceBuild;
 }
 
 let modelsSinceBuild: Promise<any[]> | null = null;
@@ -183,9 +207,8 @@ async function catalogueModels(): Promise<any[] | null> {
 async function catalogueProducts(): Promise<any[] | null> {
   const cat = await loadCatalogue();
   if (!cat) return null;
-  const extra = await productsSinceBuild(cat.builtAt);
-  const known = new Set(cat.products.map((p) => p._id));
-  return [...extra.filter((p) => !known.has(p._id)), ...cat.products];
+  const { touched, active } = await productsSinceBuild(cat.builtAt);
+  return [...active, ...cat.products.filter((p) => !touched.has(p._id))];
 }
 import { collectionKey } from "./collection-key";
 import { loadCatalogue, loadModelCatalogue } from "./catalogue";
