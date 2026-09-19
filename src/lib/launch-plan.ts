@@ -47,8 +47,17 @@ export interface LaunchDesign {
 export interface LaunchOptions {
   phaseOnly: boolean;
   publishNow: boolean;
-  images: boolean;
-  useTemplates: boolean;
+  /**
+   * Where the pictures come from — one answer, not two switches.
+   *
+   * "Make pictures" and "Use templates where ready" were independent, so both
+   * could be on at once and the plan silently mixed the two: some angles free
+   * from a template, the rest billed to the model, with nothing on screen
+   * saying which would be which. Choosing outright means a run is one thing or
+   * the other, and an angle with no template is reported rather than quietly
+   * sent to the model.
+   */
+  pictures: "templates" | "model" | "none";
   regenerateImages: boolean;
   /** Rewrite the title, description and SEO of listings the studio already made. */
   rewriteCopy?: boolean;
@@ -354,7 +363,8 @@ export function buildLaunchPlan(input: {
   const isRoll = design.source === "roll";
   if (!design.rawImageUrl) warnings.push("No raw design photo yet — pictures cannot be made");
 
-  if (options.images && design.rawImageUrl) {
+  let missingTemplates = 0;
+  if (options.pictures !== "none" && design.rawImageUrl) {
     // Pictures go to the listings of this phase, to any older listing that
     // is already live — an out-of-phase listing that was converted (Charger)
     // still needs its photo — and to a kind this run had to create outside
@@ -373,7 +383,7 @@ export function buildLaunchPlan(input: {
       const kindShots = shots
         .filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind)
         .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.label).localeCompare(String(b.label)));
-      const templatesUsable = options.useTemplates && TEMPLATE_GADGETS.has(info.gadget) && (!isRoll || design.flatImageUrl);
+      const templatesUsable = options.pictures === "templates" && TEMPLATE_GADGETS.has(info.gadget) && (!isRoll || design.flatImageUrl);
       if (!kindShots.length) {
         warnings.push(`${info.listing}: no shots in the studio yet (Gadgets & prompts → add the built-in shots) — no picture planned`);
         continue;
@@ -413,6 +423,9 @@ export function buildLaunchPlan(input: {
           }
           continue;
         }
+        // Templates chosen: an angle without one is left for later, never
+        // billed to the model behind the admin's back.
+        if (options.pictures === "templates") { missingTemplates++; continue; }
         const orients: Array<CutOrientation | undefined> = shot.askCutOrientation && isRoll ? options.orientations : [undefined];
         for (const o of orients) {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
@@ -453,8 +466,17 @@ export function buildLaunchPlan(input: {
       }
     }
   }
-  if (isRoll && options.useTemplates && !design.flatImageUrl) {
-    warnings.push("Roll not calibrated — every templated angle falls back to the image model");
+  if (options.pictures === "templates" && isRoll && !design.flatImageUrl) {
+    warnings.push("Roll not calibrated — a template needs the flattened photo, so no picture can be made from one");
+  }
+  // Not when the roll is the problem: saying "no template yet" of angles that
+  // have one, because the flattened photo is missing, sends you to make them
+  // again instead of to the calibration.
+  if (missingTemplates && !(options.pictures === "templates" && isRoll && !design.flatImageUrl)) {
+    warnings.push(
+      `${missingTemplates} angle${missingTemplates === 1 ? " has" : "s have"} no template yet and ${missingTemplates === 1 ? "is" : "are"} skipped — `
+      + "make them in AI Mockup Studio → Templates, or run again with the image model"
+    );
   }
 
   // Revisions free the SKUs new listings need (an old "R-26-IPAD" tablet

@@ -50,8 +50,18 @@ export function LaunchPanel({ design, themes, onLaunched }: {
   const cheapest = [...IMAGE_MODELS].sort((a, b) => a.usd - b.usd)[0];
   const [phaseOnly, setPhaseOnly] = useState(pref("launch_phase1", "1") === "1");
   const [publishNow, setPublishNow] = useState(pref("launch_publish", "1") === "1");
-  const [images, setImages] = useState(pref("launch_images", "1") === "1");
-  const [templatesOn, setTemplatesOn] = useState(pref("launch_templates", "1") === "1");
+  /*
+   * One answer for where the pictures come from. It replaces a "Make
+   * pictures" switch and a "Use templates where ready" switch that could both
+   * be on, which left the plan mixing the two with nothing saying which angle
+   * went where. Carried over from whatever those two were last set to.
+   */
+  const [pictures, setPictures] = useState<"templates" | "model" | "none">(() => {
+    const saved = pref("launch_pictures", "");
+    if (saved === "templates" || saved === "model" || saved === "none") return saved;
+    if (pref("launch_images", "1") !== "1") return "none";
+    return pref("launch_templates", "1") === "1" ? "templates" : "model";
+  });
   const [regenerate, setRegenerate] = useState(false);
   const [rewriteCopy, setRewriteCopy] = useState(false);
   const [modelId, setModelId] = useState(pref("launch_model", cheapest.id));
@@ -66,7 +76,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
   const ready = shots !== undefined && settings !== undefined && gadgetTypes !== undefined && templates !== undefined;
 
   // Any change to the options makes the shown plan stale.
-  useEffect(() => { setPlan(null); }, [phaseOnly, publishNow, images, templatesOn, regenerate, rewriteCopy, modelId, orientation, design.code, design.finish, design.name, design.rawImageUrl, design.flatImageUrl]);
+  useEffect(() => { setPlan(null); }, [phaseOnly, publishNow, pictures, regenerate, rewriteCopy, modelId, orientation, design.code, design.finish, design.name, design.rawImageUrl, design.flatImageUrl]);
 
   const makePlan = async () => {
     setPlanning(true);
@@ -93,7 +103,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         gadgetTypeIds: Object.fromEntries((gadgetTypes || []).map((g) => [String(g.name), g._id])),
         jobs: jobSnap.docs.map((d) => d.data() as any),
         options: {
-          phaseOnly, publishNow, images, useTemplates: templatesOn, regenerateImages: regenerate, rewriteCopy, model, aspect: "1:1",
+          phaseOnly, publishNow, pictures, regenerateImages: regenerate, rewriteCopy, model, aspect: "1:1",
           orientations: orientation === "both" ? ["lengthwise", "widthwise"] : [orientation],
         },
       });
@@ -119,7 +129,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         flat: design.flatImageUrl
           ? { url: design.flatImageUrl, pxPerCm: design.flatPxPerCm || 40, widthCm: design.flatWidthCm || 29.5, lengthCm: design.flatLengthCm || 0 }
           : null,
-        options: { phaseOnly, publishNow, images, useTemplates: templatesOn, regenerate, rewriteCopy, model: model.label },
+        options: { phaseOnly, publishNow, pictures, regenerate, rewriteCopy, model: pictures === "model" ? model.label : "Template" },
         summary: plan.summary,
         warnings: plan.warnings,
         steps: plan.steps,
@@ -146,14 +156,22 @@ export function LaunchPanel({ design, themes, onLaunched }: {
    * a single template existed or none did — so a launch that quietly used the
    * image model for everything looked the same as one that could not.
    */
-  const readyAngles = templateRows(shots || [], phaseOnly)
+  const phaseAngles = templateRows(shots || [], phaseOnly);
+  const readyAngles = phaseAngles
     .filter((r) => templateForShot({ bySuffix, byListing }, r.listing, r.shot.suffix, r.isFirstShot)?.status === "ready");
   const needsCalibration = design.source === "roll" && !design.flatImageUrl;
-  const templateHint = !readyAngles.length
-    ? "No angle has a template yet — make them in AI Mockup Studio → Templates."
-    : needsCalibration
-      ? `${readyAngles.length} angle${readyAngles.length === 1 ? "" : "s"} ready, but this roll is not calibrated yet — calibrate it and they cost nothing.`
-      : `${readyAngles.length} angle${readyAngles.length === 1 ? "" : "s"} ready · free and true to scale. The rest still go to the model.`;
+  const missing = phaseAngles.length - readyAngles.length;
+  const pictureHint =
+    pictures === "none"
+      ? "Listings only — no pictures are made or paid for."
+      : pictures === "model"
+        ? `Every picture is generated, ${formatInr(model.usd)} each. Templates are ignored on this run.`
+        : !readyAngles.length
+          ? "No angle has a template yet — make them in AI Mockup Studio → Templates, or choose the image model."
+          : needsCalibration
+            ? `${readyAngles.length} of ${phaseAngles.length} angles have a template, but this roll is not calibrated — calibrate it first or nothing can be rendered.`
+            : `${readyAngles.length} of ${phaseAngles.length} angles have a template and cost nothing.`
+              + (missing ? ` The other ${missing} are skipped, not sent to the model.` : "");
 
   const toggle = (label: string, on: boolean, set: (v: boolean) => void, key?: string, hint?: string) => (
     <label className="flex items-start gap-2 text-sm">
@@ -170,20 +188,48 @@ export function LaunchPanel({ design, themes, onLaunched }: {
       <div className="grid gap-3 sm:grid-cols-2">
         {toggle("Phase 1 listings only", phaseOnly, setPhaseOnly, "launch_phase1", `The ${PHASE_1_LISTINGS.size} high-search listings. Old listings are converted whatever their kind.`)}
         {toggle("Publish new listings now", publishNow, setPublishNow, "launch_publish", "Off: new listings wait in draft for their first approved picture.")}
-        {toggle("Make pictures", images, setImages, "launch_images")}
-        {toggle("Use templates where ready", templatesOn, setTemplatesOn, "launch_templates", templateHint)}
         {toggle("Make pictures again", regenerate, setRegenerate, undefined, "Off: pictures this design already has are skipped.")}
         {toggle("Rewrite titles & descriptions", rewriteCopy, setRewriteCopy, undefined, "Also for listings already made; links (slugs) stay the same.")}
       </div>
-      {images && (
+
+      {/* One source for the pictures, chosen outright — see LaunchOptions. */}
+      <div className="space-y-1.5">
+        <Label className="text-xs">Pictures</Label>
+        <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
+          {([
+            ["templates", `From templates · ₹0${readyAngles.length ? ` · ${readyAngles.length} ready` : ""}`],
+            ["model", "From the image model"],
+            ["none", "No pictures"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={pictures === value}
+              onClick={() => { setPictures(value); setPref("launch_pictures", value); }}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                pictures === value ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">{pictureHint}</p>
+      </div>
+
+      {pictures !== "none" && (
         <div className="flex flex-wrap items-center gap-2">
-          <Label className="text-xs">Model</Label>
-          <Select value={modelId} onValueChange={(v) => { setModelId(v); setPref("launch_model", v); }}>
-            <SelectTrigger className="h-8 w-[240px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {IMAGE_MODELS.map((m) => <SelectItem key={m.id} value={m.id}>{m.label} · {formatInr(m.usd)}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          {pictures === "model" && (
+            <>
+              <Label className="text-xs">Model</Label>
+              <Select value={modelId} onValueChange={(v) => { setModelId(v); setPref("launch_model", v); }}>
+                <SelectTrigger className="h-8 w-[240px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {IMAGE_MODELS.map((m) => <SelectItem key={m.id} value={m.id}>{m.label} · {formatInr(m.usd)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </>
+          )}
           {design.source === "roll" && (
             <>
               <Label className="text-xs">Phone cut</Label>
