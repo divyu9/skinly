@@ -1246,6 +1246,35 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
   {
+    /*
+     * The flat lay. The standing pair shows the phone whole; this one shows
+     * the design, flat to the camera and filling the frame, which is what a
+     * shopper is really buying. The obvious angle to make from a real photo:
+     * one top-down shot of the phone, greened, and every design after it is
+     * that photograph.
+     */
+    label: "iPhone — top down, flat lay",
+    gadget: "phone",
+    suffix: "phone-iphone-flat",
+    listing: "Apple iPhone",
+    skuCodes: ["PH", "IPH"],
+    matchSingleVariant: true,
+    askCutOrientation: true,
+    order: 1,
+    isActive: true,
+    prompt:
+      "A single iPhone 17 Pro Max lying face down on a warm cream stone surface, photographed straight "
+        + "down from directly above so the whole back is flat and square to the camera, none of it "
+        + "foreshortened, filling most of the frame with a little space around it. Soft daylight falls "
+        + "across the surface with the dappled shadow of leaves over it; one green leaf reaches in at the "
+        + "top left corner and the pale rim of a ceramic dish at the top right, both softly out of focus. "
+        + "The phone is reproduced exactly as manufactured: a large slab with a polished side band, "
+        + "tightly rounded corners and, across the top of the back, a wide raised camera plateau spanning "
+        + "the full width with three large lenses in a triangle and the flash beside them. "
+        + PHONE_COVERAGE + CAMERA_COVERED + LOGO_CUT("Apple logo in the centre of the back")
+        + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+  },
+  {
     label: "Samsung S26 Ultra — back",
     gadget: "phone",
     suffix: "phone-samsung",
