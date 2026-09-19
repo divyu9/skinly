@@ -1713,7 +1713,7 @@ const gimbalShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
  * own phone in the listing rather than infer it from one unbranded handset.
  */
 const ANDROID_GROUP_SHOT: Omit<MockupShot, "_id"> = {
-  label: "Android Phone — the brands, top down",
+  label: "Android Phone — four brands, 2×2",
   gadget: "phone",
   suffix: "phone-android-group",
   listing: "Android Phone",
@@ -1723,17 +1723,22 @@ const ANDROID_GROUP_SHOT: Omit<MockupShot, "_id"> = {
   order: 6,
   isActive: true,
   prompt:
-    "Five different Android smartphones lying face down on a light oak desk, photographed straight down "
-    + "from directly above so every back is flat to the camera and none is foreshortened. They are, left "
-    + "to right, a realme, a CMF, an OPPO, a vivo and a Motorola handset, each reproduced exactly as that "
-    + "brand makes it — its own camera layout, its own corner radius, its own proportions — so the five "
-    + "read as five different phones at a glance. They are arranged in a loose fan, overlapping slightly "
-    + "at the corners, evenly lit, filling most of the frame. "
-    + "Every one of the five wears the same vinyl skin, in the same design at the same scale and the same "
-    + "orientation, as though cut from one sheet. {{fidelity}} {{cutOrientation}} "
+    "Four different Android smartphones lying face down on a light oak desk in a neat two-by-two grid, "
+    + "photographed straight down from directly above so every back is flat and square to the camera and "
+    + "none is foreshortened. All four stand upright in the frame, their long axes parallel, spaced evenly "
+    + "with a clear even gap between them — roughly a finger's width — so that NO phone touches, overlaps "
+    + "or casts itself over another. Each one is whole and completely visible, none cropped by the frame. "
+    + "They are a realme in the top left, a CMF in the top right, a vivo in the bottom left and a Motorola "
+    + "in the bottom right, each reproduced exactly as that brand makes it — its own camera layout, its own "
+    + "corner radius, its own proportions — so the four read as four different phones at a glance: the "
+    + "realme's circular camera module near the top centre, the CMF's exposed industrial screw detailing, "
+    + "the vivo's vertical pill-shaped module in the upper left, the Motorola's raised island with its "
+    + "batwing logo. "
+    + "All four wear the same vinyl skin, in the same design at the same scale and the same orientation, as "
+    + "though cut from one sheet. {{fidelity}} {{cutOrientation}} "
     + "On each phone the skin covers the whole back edge to edge and carries on up over the raised camera "
     + "module; only the camera lens glass, the flash and the sensor holes are cut out. No brand wordmark, "
-    + "logo or text is visible on any of the skins. Soft even daylight, gentle shadows under the phones, "
+    + "logo or text is visible on any of the skins. Soft even daylight, a gentle shadow under each phone, "
     + "no props, no people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
 };
 
