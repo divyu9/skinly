@@ -29,7 +29,7 @@ import {
 } from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, REFERENCE_PREAMBLE, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
-  isPhase1, listingSlug, TEMPLATE_GADGETS, deviceNameOf, cleanDesignName, TRUE_SIZE_CLAUSE,
+  isPhase1, listingSlug, TEMPLATE_GADGETS, deviceNameOf, cleanDesignName, TRUE_SIZE_CLAUSE, deviceAnchor,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
@@ -1129,7 +1129,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
       piece = null; // Fall back to the whole roll photo rather than not shooting.
     }
     const designUrl = piece?.url || roll.rawImageUrl;
-    const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "")
+    const promptSent = deviceAnchor(shot.gadget, listingOf(shot))
+      + (shot.referenceUrl ? REFERENCE_PREAMBLE : "")
       + (piece ? TRUE_SIZE_CLAUSE(piece.widthCm, piece.heightCm) : "")
       + expandPrompt(shot.prompt, blocks, {
         rNumber: roll.code,

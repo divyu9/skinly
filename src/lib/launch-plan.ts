@@ -1,5 +1,5 @@
 import {
-  STARTER_SHOTS, LISTING_PRESETS, LISTING_SCOPES, TEMPLATE_GADGETS, PHASE_1_LISTINGS, REFERENCE_PREAMBLE, TRUE_SIZE_CLAUSE,
+  STARTER_SHOTS, LISTING_PRESETS, LISTING_SCOPES, TEMPLATE_GADGETS, PHASE_1_LISTINGS, REFERENCE_PREAMBLE, TRUE_SIZE_CLAUSE, deviceAnchor,
   DEFAULT_SURFACE_CM,
   expandPrompt, listingOf, listingSlug, mockupFileStem, shotCodes,
   type MockupShot, type SharedBlocks, type CutOrientation, type PresetVariant,
@@ -418,7 +418,8 @@ export function buildLaunchPlan(input: {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
           if (already(suffix, kind)) continue;
           const crop = surface ? { widthCm: surface[0], heightCm: surface[1], rotate90: o === "widthwise" } : undefined;
-          const promptSent = (shot.referenceUrl ? REFERENCE_PREAMBLE : "")
+          const promptSent = deviceAnchor(shot.gadget, info.listing)
+            + (shot.referenceUrl ? REFERENCE_PREAMBLE : "")
             + (crop ? TRUE_SIZE_CLAUSE(crop.widthCm, crop.heightCm) : "")
             + expandPrompt(shot.prompt, blocks, {
             rNumber: code, designName: design.name, source: design.source, finish: design.finish,

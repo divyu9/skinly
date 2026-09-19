@@ -1,4 +1,4 @@
-import { Fragment, useState, useCallback } from "react";
+import { Fragment, useState, useCallback, useMemo } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { Button } from "@/components/ui/button.tsx";
@@ -118,13 +118,37 @@ export default function ProductDetailPage() {
     mockupState,
   } = useProductDetail();
   
-  // Product rules
-  const { needsDeviceSelector, isSkinProduct, isPhoneSkin } = useProductRules(productData);
   // Admin names for the breadcrumb's category step.
   const productCategories = useQuery(api.productCategories.listAll, {});
-  
-  // Device category for model selector
-  const deviceCategory = productData?.gadgetCategory || "phone";
+
+  /*
+   * Which gadget this listing is for.
+   *
+   * It used to be read off `gadgetCategory` alone, falling back to "phone" —
+   * and 160 of the older skins were saved with a `gadgetTypeId` but no
+   * `gadgetCategory`, so a laptop skin's page offered the phone brands to
+   * choose a model from and counted itself a phone skin. The id is the same
+   * fact under another name, so it answers when the name is missing. (The
+   * documents themselves are worth filling in: Product classification →
+   * Apply auto-classification does it, and then the grid's device-fit and
+   * gadget filters agree with this page.)
+   */
+  const gadgetTypes = useQuery(api.gadgetTypes.list, {}) as Array<{ _id: string; name?: string }> | undefined;
+  const deviceCategory = useMemo(() => {
+    const own = String(productData?.gadgetCategory || "").trim();
+    if (own) return own;
+    const id = String(productData?.gadgetTypeId || "").trim();
+    const named = id ? (gadgetTypes || []).find((g) => g._id === id)?.name : "";
+    return String(named || "").trim() || "phone";
+  }, [productData?.gadgetCategory, productData?.gadgetTypeId, gadgetTypes]);
+
+  // Product rules read the gadget too — "is this a phone skin?" was yes for
+  // every listing missing the field, whatever it was really for.
+  const productForRules = useMemo(
+    () => (productData ? { ...productData, gadgetCategory: deviceCategory } : productData),
+    [productData, deviceCategory]
+  );
+  const { needsDeviceSelector, isSkinProduct, isPhoneSkin } = useProductRules(productForRules);
   
   // Model selector hook
   const {

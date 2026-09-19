@@ -227,6 +227,25 @@ export const REFERENCE_PREAMBLE =
  * controller and a 26 x 39 cm one for a console has nothing left to guess
  * about how big the motifs are.
  */
+/**
+ * Said before anything else: what the photograph is of.
+ *
+ * With a true-size crop the model is handed a flat rectangle of pattern and no
+ * device at all, and on the cheapest quality setting it would sometimes keep
+ * the staging and the skin but invent the object under them — a pair of
+ * headphones or a vape wrapped in a laptop skin. Naming the gadget first, and
+ * forbidding the substitution outright, is what a long prompt with the device
+ * buried in a descriptive clause was not doing.
+ */
+export function deviceAnchor(gadget: string, listing?: string): string {
+  const noun = (GADGET_NOUNS[String(gadget || "").toLowerCase()] || "device").toLowerCase();
+  const named = listing && !new RegExp(noun, "i").test(listing) ? `${listing} ${noun}` : listing || noun;
+  return `This photograph is of one ${named}, and of nothing else. The object in the frame is a ${noun}: `
+    + `do not replace it with, or turn it into, any other product — no headphones, no speaker, no bottle, `
+    + `no case, no box, no vape and no other gadget. If the instructions below conflict with that, the `
+    + `${noun} wins. `;
+}
+
 export const TRUE_SIZE_CLAUSE = (widthCm: number, heightCm: number) =>
   `The design image is the exact piece of printed vinyl cut for this device: ${widthCm} cm by ${heightCm} cm `
   + "of the roll, at true size, already turned the way it sits on the device. That piece covers the device's "
@@ -1713,6 +1732,7 @@ const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|ca
 const GADGET_NOUNS: Record<string, string> = {
   phone: "Phone", tablet: "Tablet", laptop: "Laptop", charger: "Charger", lens: "Lens", camera: "Camera",
   gimbals: "Gimbal", controller: "Controller", console: "Console", drone: "Drone",
+  "mac-mini": "Mac mini",
 };
 export function deviceNameOf(listing: string, gadget: string): string {
   const name = String(listing || "").trim();
