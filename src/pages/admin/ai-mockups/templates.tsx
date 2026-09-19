@@ -172,11 +172,17 @@ const GREEN_FROM_PHOTO =
   + "The product's real lighting, soft shading and reflections still fall across that green so it reads "
   + "as a lit surface rather than a flat cut-out, and the green follows every curve and rounded edge of "
   + "the body. "
-  + "Everything a skin is cut around stays exactly as the photograph shows it, in its original colour and "
-  + "material: ports, sockets and connectors, metal pins and plugs, buttons, switches and dials, screens, "
-  + "camera lenses and glass, rubber grips, speaker grilles, vents, hinges and any printed brand logo or "
-  + "wordmark. Nothing else in the picture is green: not the background, not the surface it stands on, "
-  + "not any prop. ";
+  + "A raised camera bump, plateau or island is part of the skinned body, not an exception: the green "
+  + "carries on without a break up over its top face and down its sides, so it reads as part of the "
+  + "skinned back rather than a bare tile sitting on it. The same goes for every panel, rail and rounded "
+  + "edge of the body — if a skin would cover it, it is green. "
+  + "What stays exactly as the photograph shows it, in its original colour and material, is only what a "
+  + "skin is cut around: the round glass of each camera lens and the flash and sensor holes beside them, "
+  + "ports, sockets and connectors, metal pins and plugs, buttons, switches and dials, the screen, rubber "
+  + "grips, speaker grilles, vents, hinges, and any brand logo that is knocked out of the skin. Those "
+  + "openings are small and follow their own outlines — a lens is a circle the size of its glass, not a "
+  + "rectangle around the whole camera. Nothing else in the picture is green: not the background, not the "
+  + "surface it stands on, not any prop. ";
 
 const GREEN_FIDELITY =
   "The skin is a flat, perfectly uniform chroma-key green — pure #00FF00 — with no pattern, no print, no "
