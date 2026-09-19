@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
-import { CameraIcon, CrosshairIcon, ImageIcon, Loader2Icon, RulerIcon, SparklesIcon, UploadIcon, WandSparklesIcon } from "lucide-react";
+import { CameraIcon, CheckIcon, CrosshairIcon, ImageIcon, Loader2Icon, RulerIcon, SparklesIcon, UploadIcon, WandSparklesIcon } from "lucide-react";
 import {
   DEFAULT_BLOCKS, DEFAULT_SURFACE_CM, TEMPLATE_GADGETS, expandPrompt, isPhase1, listingOf, listingSlug, presetFor, shotCodes,
   type MockupShot, type SharedBlocks,
@@ -472,35 +472,55 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     a flat warp cannot follow the shape, or where the frame
                     holds two objects and one set of corners cannot cover
                     both. Picked per angle, so a launch is right everywhere. */}
-                <div className="flex gap-1 rounded-lg border bg-muted/40 p-0.5 text-[11px]">
-                  {([["template", "Template · ₹0"], ["model", `AI · ${formatInr(model.usd)}`]] as const).map(([value, label]) => {
-                    const chosen = usesTemplate(t) ? "template" : "model";
-                    const canTemplate = t?.status === "ready";
-                    return (
-                      <button
-                        key={value}
-                        type="button"
-                        disabled={isBusy || (value === "template" && !canTemplate)}
-                        title={value === "template" && !canTemplate ? "Make this angle's template first" : undefined}
-                        onClick={async () => {
-                          try {
-                            await saveTemplate({
-                              id: templateId(row.listing, row.shot.suffix), kind: "template",
-                              listing: row.listing, gadget: row.gadget,
-                              suffix: row.shot.suffix, shotLabel: row.shot.label, route: value,
-                            });
-                          } catch (e) {
-                            toast.error(e instanceof Error ? e.message : "Could not save");
-                          }
-                        }}
-                        className={`flex-1 rounded-md px-2 py-1 font-medium transition disabled:opacity-40 ${
-                          chosen === value ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
+                <div>
+                  <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Make this picture with
+                  </p>
+                  <div className="flex gap-1 rounded-lg bg-muted p-1 text-[11px]">
+                    {([["template", "Template · ₹0"], ["model", `AI · ${formatInr(model.usd)}`]] as const).map(([value, label]) => {
+                      const chosen = (usesTemplate(t) ? "template" : "model") === value;
+                      const canTemplate = t?.status === "ready";
+                      const off = isBusy || (value === "template" && !canTemplate);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={chosen}
+                          disabled={off}
+                          title={value === "template" && !canTemplate ? "Make this angle's template first" : undefined}
+                          onClick={async () => {
+                            try {
+                              await saveTemplate({
+                                id: templateId(row.listing, row.shot.suffix), kind: "template",
+                                listing: row.listing, gadget: row.gadget,
+                                suffix: row.shot.suffix, shotLabel: row.shot.label, route: value,
+                                // An older listing-level template comes across
+                                // with the choice; without this, saving a route
+                                // on a listing's first angle would create an
+                                // empty per-shot document that shadows it and
+                                // the photo and corners would read as missing.
+                                ...(t && !t.suffix
+                                  ? { imageUrl: t.imageUrl, quad: t.quad, widthCm: t.widthCm, heightCm: t.heightCm, status: t.status }
+                                  : {}),
+                              });
+                            } catch (e) {
+                              toast.error(e instanceof Error ? e.message : "Could not save");
+                            }
+                          }}
+                          className={`flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                            chosen
+                              ? value === "template"
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "bg-violet-600 text-white shadow-sm"
+                              : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
+                          }`}
+                        >
+                          {chosen && <CheckIcon className="size-3" />}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {/* Three ways to a template, in the order they are worth
