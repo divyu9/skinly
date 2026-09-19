@@ -293,6 +293,9 @@ const LISTING_BY_SUFFIX: Record<string, string> = {
   "laptop-open": "MacBook",
   "laptop-hand": "MacBook",
   "charger": "Apple Charger",
+  // The 20W port view is Apple's too. Unmapped, it fell back to the gadget's
+  // own name and made an Apple charger photo for the unbranded Charger listing.
+  "charger-port": "Apple Charger",
   "charger-macbook": "Apple Charger",
   "charger-hand": "Apple Charger",
   "camera": "Sony Camera",
@@ -1678,6 +1681,9 @@ export const PHASE_1_LISTINGS = new Set([
   "sony camera", "canon camera", "nikon camera",
   "sony lens", "canon lens", "nikon lens", "sigma lens", "tamron lens", "fujifilm lens", "camera lens",
   "dji gimbal", "zhiyun gimbal", "gimbal",
+  "apple charger", "samsung charger", "oneplus charger", "realme charger", "oppo charger",
+  "vivo charger", "xiaomi charger", "charger",
+  "mac mini", "tablet",
 ]);
 
 export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing || "").trim().toLowerCase());
