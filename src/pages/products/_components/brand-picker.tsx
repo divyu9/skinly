@@ -4,39 +4,53 @@ import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue";
 
 /**
  * The brands that lead the row, in this order — the ones people come looking
- * for. Everything else follows alphabetically, and the catch-all last.
+ * for. After them the brands we support the most models of for this gadget,
+ * so Dell, HP, Lenovo and Asus lead the laptop row and Nikon and Canon the
+ * lens one, instead of whatever happens to sort first alphabetically.
  */
 const LEAD_BRANDS = ["apple", "samsung", "google", "oneplus", "nothing", "motorola"];
+
+/** Misspellings in the model list that would otherwise show as a second chip. */
+const BRAND_ALIASES: Record<string, string> = { snoy: "sony" };
+
+/** Brands whose own spelling is not the one the model list happens to carry. */
+const BRAND_NAMES: Record<string, string> = { oneplus: "OnePlus", iqoo: "iQOO", playstation: "PlayStation" };
 
 let brandLogosPromise: Promise<Record<string, BrandLogo>> | null = null;
 const loadBrandLogos = () =>
   (brandLogosPromise ||= loadCatalogue().then((c) => c?.brandLogos || {}).catch(() => ({} as Record<string, BrandLogo>)));
 
-interface BrandOption {
-  listingKind: string;
-  modelBrands?: string[];
+export interface BrandOption {
+  /** The brand as the models and listings spell it — what goes in ?brand=. */
+  brand: string;
+  /** Supported models of this gadget from this brand. */
+  models: number;
+  /** Listings here that fit it — always at least one, or it is not offered. */
+  listings: number;
 }
 
 interface Chip {
   key: string;
-  /** What goes in ?brand= — a real brand, or "Other" for the catch-all listings. */
   filterBrand: string;
   label: string;
+  models: number;
   image?: string;
 }
+
+/** SIGMA and FUJIFILM are shouting; HP, LG and DJI are spelt that way. */
+const pretty = (name: string) =>
+  /^[A-Z0-9+]{4,}$/.test(name) ? name.charAt(0) + name.slice(1).toLowerCase() : name;
 
 /**
  * A tap-through row of brand circles above the skins grid — the same logos the
  * admin sets on the homepage's Explore by Brand section — so picking Apple or
- * Samsung lands on that brand's listings instead of a grid where one design
- * shows as several near-identical cards, one per brand.
+ * Vivo lands on that brand's listings instead of a grid where one design shows
+ * as several near-identical cards, one per brand.
  *
- * Chips are keyed by the brand they filter to, not by the listing kind: Xbox
- * Series X, Series S and the Xbox controller listing are all one Xbox chip,
- * and PS5 and the PlayStation controller are one PlayStation chip. A listing
- * that names no brand — Android Phone, Laptop, Tablet — is the "Other" chip;
- * "Other" matches nothing in any named listing's brand list, so it selects
- * exactly the catch-alls.
+ * Every brand we support models of for this gadget gets a chip, not only the
+ * brands a listing was cut specifically for: a Vivo or a Realme phone is fitted
+ * by the catch-all Android listings, a Lenovo laptop by the catch-all laptop
+ * ones, and a row that named neither read as "we don't do your phone".
  */
 export function BrandPicker({ brands }: { brands: BrandOption[] }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,46 +65,37 @@ export function BrandPicker({ brands }: { brands: BrandOption[] }) {
   const chips = useMemo<Chip[]>(() => {
     const byBrand = new Map<string, Chip>();
     for (const option of brands) {
-      const names = (option.modelBrands || []).filter(Boolean);
-      if (!names.length) {
-        if (!byBrand.has("other")) byBrand.set("other", { key: "other", filterBrand: "Other", label: "Other" });
-        continue;
-      }
-      // A listing often names a brand's aliases together — "One Plus" and
-      // "OnePlus", or Dell and Alienware. Whichever of them the admin
-      // uploaded a logo for is the one to show; otherwise the first.
-      const withLogo = names.find((n) => logos[brandKey(n)]?.image);
-      const primary = withLogo || names[0];
-      const key = brandKey(primary);
-      if (byBrand.has(key)) continue;
+      const raw = String(option.brand || "").trim();
+      if (!raw) continue;
+      const key = BRAND_ALIASES[brandKey(raw)] || brandKey(raw);
+      if (!key) continue;
+      const at = byBrand.get(key);
+      if (at) { at.models += option.models; continue; }
       const logo = logos[key];
       byBrand.set(key, {
         key,
-        filterBrand: primary,
-        label: logo?.name?.trim() || primary,
+        filterBrand: raw,
+        label: logo?.name?.trim() || BRAND_NAMES[key] || pretty(raw),
+        models: option.models,
         image: logo?.image,
       });
     }
-    const all = [...byBrand.values()];
     const rank = (c: Chip) => {
       const lead = LEAD_BRANDS.indexOf(c.key);
       return lead >= 0 ? lead : LEAD_BRANDS.length;
     };
-    // The lead brands in their own order, then the rest alphabetically,
-    // then "Other" last.
-    return all
-      .filter((c) => c.key !== "other")
-      .sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
-      .concat(all.filter((c) => c.key === "other"));
+    return [...byBrand.values()].sort(
+      (a, b) => rank(a) - rank(b) || b.models - a.models || a.label.localeCompare(b.label)
+    );
   }, [brands, logos]);
 
   if (chips.length < 2) return null;
 
-  const active = brandKey(searchParams.get("brand"));
+  const active = BRAND_ALIASES[brandKey(searchParams.get("brand"))] || brandKey(searchParams.get("brand"));
 
   const pick = (chip: Chip) => {
     const next = new URLSearchParams(searchParams);
-    if (brandKey(chip.filterBrand) === active) {
+    if (chip.key === active) {
       next.delete("brand");
     } else {
       next.set("brand", chip.filterBrand);

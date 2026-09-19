@@ -21,12 +21,22 @@ interface ExploreByBrandProps {
   };
 }
 
+/**
+ * The brand's logo, filling its card.
+ *
+ * The logos are square tiles — most of them a wordmark that runs nearly the
+ * full width — and they were drawn inside a `p-6` box at `max-h-[120px]`, so
+ * on a 95px card the mark came out 43px wide with white all around it and
+ * the 120px height spilling past the card's own edge. Sized to the card, a
+ * square tile lands exactly on it and a wider or taller one still fits whole,
+ * because object-contain never crops a logo to fill a corner.
+ */
 function BrandMark({ src, name }: { src?: string; name?: string }) {
   const [failed, setFailed] = useState(false);
   if (!src || failed) {
     return (
-      <div className="flex h-[120px] w-full items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10">
-        <span className="px-3 text-center text-xl font-bold tracking-tight text-foreground/70">
+      <div className="flex size-full items-center justify-center bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10">
+        <span className="px-2 text-center text-base font-bold leading-tight tracking-tight text-foreground/70">
           {name || "Brand"}
         </span>
       </div>
@@ -38,7 +48,7 @@ function BrandMark({ src, name }: { src?: string; name?: string }) {
       alt={name || "Brand"}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="max-h-[120px] max-w-full object-contain transition-transform group-hover:scale-110"
+      className="size-full object-contain transition-transform group-hover:scale-105"
     />
   );
 }
@@ -105,19 +115,25 @@ export function ExploreByBrand({ sectionId, config }: ExploreByBrandProps) {
                 '--desktop-height': desktopHeight,
               } as React.CSSProperties}
             >
-              {/* Brand Logo */}
-              <div className="p-6 flex flex-col items-center justify-center gap-3">
-                {/* The old Cloudinary account was deleted, so a share of these
-                    logo URLs 404. A broken-image icon on every other brand made
-                    the row look dead — fall back to the brand's own name. */}
-                <BrandMark src={card.imageUrl} name={card.title} />
-                {card.title && (
-                  <h3 className="font-semibold text-lg text-center">{card.title}</h3>
-                )}
-                {card.subtitle && (
-                  <p className="text-sm text-muted-foreground text-center">
-                    {card.subtitle}
-                  </p>
+              {/* Brand Logo. The old Cloudinary account was deleted, so a
+                  share of these logo URLs 404. A broken-image icon on every
+                  other brand made the row look dead — fall back to the
+                  brand's own name. A card that also carries a caption gives
+                  the logo the room that is left, so the text is never
+                  squeezed out; most carry none and the logo takes the card. */}
+              <div className="flex size-full min-h-0 flex-col items-center justify-center">
+                <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+                  <BrandMark src={card.imageUrl} name={card.title} />
+                </div>
+                {(card.title || card.subtitle) && (
+                  <div className="w-full shrink-0 px-2 pb-2 text-center">
+                    {card.title && (
+                      <h3 className="truncate text-sm font-semibold">{card.title}</h3>
+                    )}
+                    {card.subtitle && (
+                      <p className="truncate text-xs text-muted-foreground">{card.subtitle}</p>
+                    )}
+                  </div>
                 )}
               </div>
             </Link>

@@ -1,5 +1,6 @@
 import { usePaginatedQuery, useQuery } from "@/lib/firebase-hooks";
 import { brandInScope, productFitsDevice } from "@/lib/device-fit";
+import { loadCatalogue } from "@/lib/catalogue";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { FilterState, URLParams } from "./useProductFilters";
@@ -212,30 +213,77 @@ export function useProductsData({
       filters.productCategory, filters.gadgetFilter, filters.finishFilter, urlParams.brand, urlParams.model]);
 
   /**
-   * The brands actually on offer for the gadget being browsed, read straight
-   * off the raw (pre-dedup, pre-brand-filter) product list rather than the
-   * grid — the grid above collapses each design to one representative brand,
-   * so by the time a design reaches the page most other brands may have been
-   * picked for zero designs and would look unavailable when they are not.
+   * Every brand a shopper could be holding in this gadget, with how many
+   * listings actually fit it.
+   *
+   * It used to be read off the listings alone — one chip per distinct
+   * `modelBrands` set — so a brand only appeared once a listing had been cut
+   * specifically for it. That left the row saying Skinly sells phone skins
+   * for Apple, Samsung and three others, when the catch-all "Android Phone"
+   * listings fit a Vivo, a Realme, an Infinix or a CMF just as well: 334 of
+   * them each. Same for Lenovo and Asus laptops, Lenovo tablets, Nikon
+   * lenses, Apple and iQOO chargers.
+   *
+   * So the brands come from the models we support for this gadget, and a
+   * brand stays only if at least one listing here is in scope for it — the
+   * chip can never lead to an empty grid.
    */
+  const modelRows = useQuery(
+    api.supportedModels.listAll,
+    filters.productCategory === "skin"
+      ? { isActive: true, ...(filters.gadgetFilter ? { category: filters.gadgetFilter } : {}) }
+      : "skip"
+  );
+
+  /*
+   * Which listings exist is asked of the whole catalogue, not of the grid's
+   * own query: that one is paginated, so on the unfiltered skins view the
+   * first hundred products decided the answer, and the row showed seven
+   * brands where there are fifty.
+   */
+  const [catalogueProducts, setCatalogueProducts] = useState<any[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadCatalogue().then((c) => { if (live && c) setCatalogueProducts(c.products); });
+    return () => { live = false; };
+  }, []);
+
   const availableBrands = useMemo(() => {
-    const src = Array.isArray(productsData) ? productsData : [];
-    const seen = new Map<string, { listingKind: string; modelBrands?: string[] }>();
-    for (const p of src as any[]) {
-      if (p.productCategory !== "skin") continue;
-      if (filters.gadgetFilter && p.gadgetCategory !== filters.gadgetFilter) continue;
-      // Keyed on the brands themselves, not on listingKind: the static
-      // catalogue the grid reads in production carries modelBrands but no
-      // listingKind, so asking for the kind left the row empty there. A
-      // listing that names no brand is the catch-all, one "Other" chip.
-      const brands: string[] = Array.isArray(p.modelBrands) ? p.modelBrands.filter(Boolean) : [];
-      const key = brands.length
-        ? brands.map((b) => String(b).toLowerCase()).sort().join("|")
-        : "other";
-      if (!seen.has(key)) seen.set(key, { listingKind: p.listingKind || key, modelBrands: brands });
+    const everything = catalogueProducts || (Array.isArray(productsData) ? productsData : []);
+    const pool = everything.filter(
+      (p: any) => p.productCategory === "skin" && (!filters.gadgetFilter || p.gadgetCategory === filters.gadgetFilter)
+    );
+    if (!pool.length) return [];
+
+    // "One Plus" in the model list and "OnePlus" on a listing are one brand.
+    const key = (s: unknown) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    const candidates = new Map<string, { brand: string; models: number }>();
+    const add = (name: unknown, models: number) => {
+      const k = key(name);
+      if (!k) return;
+      const at = candidates.get(k);
+      if (at) at.models += models;
+      else candidates.set(k, { brand: String(name), models });
+    };
+    for (const m of (modelRows as any[]) || []) {
+      if (filters.gadgetFilter && m.category !== filters.gadgetFilter) continue;
+      add(m.brandName, 1);
     }
-    return [...seen.values()].sort((a, b) => a.listingKind.localeCompare(b.listingKind));
-  }, [productsData, filters.gadgetFilter]);
+    /*
+     * A listing's own brand list only fills in for a gadget we hold no models
+     * of at all. Where we do hold them, they are the better answer: the
+     * console listings name Microsoft beside Xbox and Sony beside PlayStation,
+     * which read as two chips for one console, and the phone ones name Redmi,
+     * whose handsets are filed under Xiaomi — so that chip led to a listing
+     * whose model list had no Redmi in it.
+     */
+    const haveModels = candidates.size > 0;
+    if (!haveModels) for (const p of pool) for (const b of (p.modelBrands || [])) add(b, 0);
+
+    return [...candidates.values()]
+      .map((c) => ({ ...c, listings: pool.filter((p: any) => brandInScope(p, c.brand)).length }))
+      .filter((c) => c.listings > 0);
+  }, [catalogueProducts, productsData, modelRows, filters.gadgetFilter]);
   
   // Apply search filter
   const filteredProducts = useMemo(() => {
