@@ -364,11 +364,14 @@ export function LaunchProgress({ launchId }: { launchId: string }) {
     done: steps.filter((s) => s.status === "done" || s.status === "skipped").length,
     failed: steps.filter((s) => s.status === "failed").length,
   }), [steps]);
+  // Above the early return, with the other hooks: the launch arrives a moment
+  // after the first render, so a hook below it is called on the second render
+  // and not the first, which is React error #310 and a blank page.
+  const [retrying, setRetrying] = useState(false);
 
   if (!launch) return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2Icon className="size-4 animate-spin" /> Loading…</p>;
 
   const busy = ["queued", "running", "waiting-images"].includes(launch.status);
-  const [retrying, setRetrying] = useState(false);
   const retry = async () => {
     setRetrying(true);
     try {

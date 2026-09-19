@@ -3735,12 +3735,6 @@ export function useQuery(apiRef: any, args?: any) {
             setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
           });
         }
-        else if (path === 'whatsapp.getApprovedTemplates') {
-          const q = query(collection(db, 'whatsappTemplates'));
-          unsubscribe = onSnapshot(q, (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
-          });
-        }
         else if (path === 'whatsapp.getWhatsAppProviderSettings') {
           unsubscribe = onSnapshot(doc(db, 'whatsappSettings', 'provider'), (snap) => {
             if (snap.exists()) {

@@ -1,6 +1,5 @@
 import convexPlugin from "@convex-dev/eslint-plugin";
 import js from "@eslint/js";
-import herculesPlugin from "@usehercules/eslint-plugin";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import { globalIgnores } from "eslint/config";
@@ -17,7 +16,6 @@ export default tseslint.config([
       reactHooks.configs["recommended-latest"],
       reactRefresh.configs.vite,
       convexPlugin.configs.recommended,
-      herculesPlugin.configs.recommended,
     ],
     rules: {
       "react-refresh/only-export-components": [
@@ -26,6 +24,10 @@ export default tseslint.config([
       ],
       "@typescript-eslint/no-unused-vars": "off",
       "prefer-const": "off",
+      // The Firestore shim and the admin pages are written against untyped
+      // documents; 674 of the 728 things lint had to say were this one rule,
+      // which is enough noise to stop anyone reading the other 54.
+      "@typescript-eslint/no-explicit-any": "off",
     },
     languageOptions: {
       ecmaVersion: 2020,
