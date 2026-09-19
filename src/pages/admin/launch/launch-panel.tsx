@@ -12,11 +12,11 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { AlertTriangleIcon, CheckCircle2Icon, CircleDashedIcon, Loader2Icon, RocketIcon, RotateCcwIcon, XCircleIcon } from "lucide-react";
-import { DEFAULT_BLOCKS, type MockupShot, type SharedBlocks, type CutOrientation } from "@/lib/ai-mockup-shots.ts";
+import { DEFAULT_BLOCKS, PHASE_1_LISTINGS, type MockupShot, type SharedBlocks, type CutOrientation } from "@/lib/ai-mockup-shots.ts";
 import { IMAGE_MODELS, formatInr } from "@/lib/ai-mockup-models.ts";
 import { buildLaunchPlan, type LaunchDesign, type LaunchPlan } from "@/lib/launch-plan.ts";
 import { loadDesignListings } from "@/lib/launch-plan-data.ts";
-import { useTemplates } from "@/pages/admin/ai-mockups/templates.tsx";
+import { useTemplates, templateRows, templateForShot } from "@/pages/admin/ai-mockups/templates.tsx";
 
 /**
  * Plans a design launch, shows exactly what it will do, and hands it to the
@@ -139,6 +139,22 @@ export function LaunchPanel({ design, themes, onLaunched }: {
 
   if (launchId) return <LaunchProgress launchId={launchId} />;
 
+  /*
+   * What each switch would actually do, counted rather than described. The
+   * phase hint used to say "the 12 high-search listings" from when there were
+   * twelve, and the templates hint promised "free and true to scale" whether
+   * a single template existed or none did — so a launch that quietly used the
+   * image model for everything looked the same as one that could not.
+   */
+  const readyAngles = templateRows(shots || [], phaseOnly)
+    .filter((r) => templateForShot({ bySuffix, byListing }, r.listing, r.shot.suffix, r.isFirstShot)?.status === "ready");
+  const needsCalibration = design.source === "roll" && !design.flatImageUrl;
+  const templateHint = !readyAngles.length
+    ? "No angle has a template yet — make them in AI Mockup Studio → Templates."
+    : needsCalibration
+      ? `${readyAngles.length} angle${readyAngles.length === 1 ? "" : "s"} ready, but this roll is not calibrated yet — calibrate it and they cost nothing.`
+      : `${readyAngles.length} angle${readyAngles.length === 1 ? "" : "s"} ready · free and true to scale. The rest still go to the model.`;
+
   const toggle = (label: string, on: boolean, set: (v: boolean) => void, key?: string, hint?: string) => (
     <label className="flex items-start gap-2 text-sm">
       <Switch checked={on} onCheckedChange={(v) => { set(v); if (key) setPref(key, v ? "1" : "0"); }} className="mt-0.5" />
@@ -152,10 +168,10 @@ export function LaunchPanel({ design, themes, onLaunched }: {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        {toggle("Phase 1 listings only", phaseOnly, setPhaseOnly, "launch_phase1", "The 12 high-search listings. Old listings are converted whatever their kind.")}
+        {toggle("Phase 1 listings only", phaseOnly, setPhaseOnly, "launch_phase1", `The ${PHASE_1_LISTINGS.size} high-search listings. Old listings are converted whatever their kind.`)}
         {toggle("Publish new listings now", publishNow, setPublishNow, "launch_publish", "Off: new listings wait in draft for their first approved picture.")}
         {toggle("Make pictures", images, setImages, "launch_images")}
-        {toggle("Use templates where ready", templatesOn, setTemplatesOn, "launch_templates", "Free and true to scale; needs a calibrated roll.")}
+        {toggle("Use templates where ready", templatesOn, setTemplatesOn, "launch_templates", templateHint)}
         {toggle("Make pictures again", regenerate, setRegenerate, undefined, "Off: pictures this design already has are skipped.")}
         {toggle("Rewrite titles & descriptions", rewriteCopy, setRewriteCopy, undefined, "Also for listings already made; links (slugs) stay the same.")}
       </div>
