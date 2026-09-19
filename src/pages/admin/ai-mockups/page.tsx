@@ -33,7 +33,7 @@ import {
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
-import { TemplatesTab, RollCalibration, useTemplateMockups, useTruePiece } from "./templates.tsx";
+import { TemplatesTab, RollCalibration, useTemplateMockups, useTruePiece, templateRows, templateForShot } from "./templates.tsx";
 import { RetireListings } from "./retire-listings.tsx";
 import { LaunchPanel } from "@/pages/admin/launch/launch-panel.tsx";
 import {
@@ -1252,22 +1252,25 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     return ids.size;
   }, [linkTargets]);
 
-  /** Listings whose picture a template can make for this design right now. */
-  const templatedGroups = useMemo(() =>
-    listingGroups.filter((g) =>
-      TEMPLATE_GADGETS.has(g.gadget) &&
-      (!phaseOnly || isPhase1(g.listing)) &&
-      templateMockups.byListing.get(g.listing.toLowerCase())?.status === "ready"
-    ), [listingGroups, phaseOnly, templateMockups.byListing]);
+  /**
+   * The angles a template can make for this design right now — one row per
+   * shot, not per listing, so a laptop's lid and its keyboard deck each get
+   * their own picture and an angle with no template is simply left out.
+   */
+  const templatedRows = useMemo(
+    () => templateRows(shots, phaseOnly).filter((r) =>
+      templateForShot(templateMockups, r.listing, r.shot.suffix, r.isFirstShot)?.status === "ready"),
+    [shots, phaseOnly, templateMockups]
+  );
 
   const makeTemplateMockups = async () => {
-    if (!templatedGroups.length) return toast.error("No listing has a ready template yet — set them up in the Templates tab");
+    if (!templatedRows.length) return toast.error("No angle has a ready template yet — set them up in the Templates tab");
     if (roll.source === "roll" && !roll.flatImageUrl) return toast.error("Calibrate this roll first");
-    setTplProgress({ done: 0, total: templatedGroups.length });
+    setTplProgress({ done: 0, total: templatedRows.length });
     try {
       const n = await templateMockups.run(
         roll,
-        templatedGroups,
+        templatedRows,
         cutOrientation === "both" ? ["lengthwise", "widthwise"] : [cutOrientation],
         jobs,
         (done, total) => setTplProgress({ done, total })
@@ -1612,14 +1615,14 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                 size="sm"
                 variant="outline"
                 className="h-7 border-emerald-400 text-xs text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300"
-                disabled={!!tplProgress || !templatedGroups.length}
-                title={templatedGroups.length ? "" : "Set up templates in the Templates tab first"}
+                disabled={!!tplProgress || !templatedRows.length}
+                title={templatedRows.length ? "" : "Set up templates in the Templates tab first"}
                 onClick={() => void makeTemplateMockups()}
               >
                 {tplProgress ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <ImageIcon className="mr-1 size-3" />}
                 {tplProgress
                   ? `Making ${tplProgress.done}/${tplProgress.total}…`
-                  : `Template mockups (${templatedGroups.length}) · ₹0`}
+                  : `Template mockups (${templatedRows.length}) · ₹0`}
               </Button>}
               {missingListings.length > 0 && (
                 <Button

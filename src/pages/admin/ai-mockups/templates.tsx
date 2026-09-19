@@ -36,6 +36,9 @@ export interface MockupTemplate {
   kind: "template";
   listing: string;
   gadget: string;
+  /** The shot this template is the photo for. Missing on the first ones made. */
+  suffix?: string;
+  shotLabel?: string;
   imageUrl?: string;
   quad?: Point[];
   widthCm?: number;
@@ -46,16 +49,89 @@ export interface MockupTemplate {
   updatedAt?: number;
 }
 
-export const templateId = (listing: string) => `template-${listingSlug(listing)}`;
+/*
+ * One template per shot, not per listing.
+ *
+ * A listing is several pictures: a laptop's lid and its keyboard deck, a PS5
+ * standing and a PS5 with its controllers, a camera with and without its lens.
+ * Templates began as one photo per listing, which made only the first of those
+ * — and because a listing with a ready template skipped the image model
+ * entirely, turning a template on took the other angles away. Each shot now
+ * carries its own template photo, corners and size, and any shot without one
+ * still goes to the image model as before.
+ *
+ * The first templates were saved under the listing alone. Those still serve
+ * the listing's first shot, so the corners already marked are not lost; saving
+ * that card again writes it under the shot.
+ */
+export const templateId = (listing: string, suffix: string) => `template-${listingSlug(listing)}--${suffix}`;
+export const legacyTemplateId = (listing: string) => `template-${listingSlug(listing)}`;
 
-export function useTemplates() {
+export interface TemplateIndex {
+  bySuffix: Map<string, MockupTemplate>;
+  byListing: Map<string, MockupTemplate>;
+}
+
+/** The template for one shot, falling back to the listing's own for its first shot. */
+export function templateForShot(index: TemplateIndex, listing: string, suffix: string, isFirstShot: boolean) {
+  return index.bySuffix.get(suffix) || (isFirstShot ? index.byListing.get(String(listing).toLowerCase()) : undefined);
+}
+
+export interface TemplateRow {
+  listing: string;
+  gadget: string;
+  shot: MockupShot;
+  /** The listing's first shot, the one a listing-level template stands in for. */
+  isFirstShot: boolean;
+}
+
+/**
+ * Every shot a template could be made for, grouped listing by listing and in a
+ * fixed order. The order matters twice: the first shot is the one an older
+ * listing-level template belongs to, and a row is generated from its own shot,
+ * so taking them in whatever order the shot library returned could put a phone
+ * photo on the laptop's template.
+ */
+export function templateRows(shots: MockupShot[], phaseOnly: boolean): TemplateRow[] {
+  const byListing = new Map<string, { listing: string; gadget: string; shots: MockupShot[] }>();
+  for (const s of shots) {
+    if (!TEMPLATE_GADGETS.has(s.gadget) || s.isActive === false) continue;
+    const listing = listingOf(s);
+    if (!presetFor(listing)) continue;
+    if (phaseOnly && !isPhase1(listing)) continue;
+    const k = listing.toLowerCase();
+    const row = byListing.get(k) || { listing, gadget: s.gadget, shots: [] };
+    row.shots.push(s);
+    byListing.set(k, row);
+  }
+  const out: TemplateRow[] = [];
+  for (const row of [...byListing.values()].sort((a, b) => a.gadget.localeCompare(b.gadget) || a.listing.localeCompare(b.listing))) {
+    row.shots.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.label).localeCompare(String(b.label)));
+    row.shots.forEach((shot, i) => out.push({ listing: row.listing, gadget: row.gadget, shot, isFirstShot: i === 0 }));
+  }
+  return out;
+}
+
+/**
+ * The job suffix for a template picture. The listing's first shot keeps the
+ * suffix template pictures have always had, so reruns recognise the picture
+ * they already made instead of making a second one beside it.
+ */
+export const templateJobSuffix = (row: TemplateRow, rotate90: boolean) =>
+  `tpl-${row.isFirstShot ? listingSlug(row.listing) : row.shot.suffix}${rotate90 ? "-wid" : ""}`;
+
+export function useTemplates(): TemplateIndex & { templates: MockupTemplate[] | undefined } {
   const rows = useQuery(api.aiMockups.getTemplates) as MockupTemplate[] | undefined;
-  const byListing = useMemo(() => {
-    const m = new Map<string, MockupTemplate>();
-    (rows || []).forEach((t) => m.set(String(t.listing).toLowerCase(), t));
-    return m;
+  const index = useMemo<TemplateIndex>(() => {
+    const bySuffix = new Map<string, MockupTemplate>();
+    const byListing = new Map<string, MockupTemplate>();
+    for (const t of rows || []) {
+      if (t.suffix) bySuffix.set(String(t.suffix), t);
+      else byListing.set(String(t.listing).toLowerCase(), t);
+    }
+    return { bySuffix, byListing };
   }, [rows]);
-  return { templates: rows, byListing };
+  return { templates: rows, ...index };
 }
 
 /** An R2 image as something a canvas may read, whatever the bucket's CORS says. */
@@ -101,7 +177,7 @@ const TEST_CHECKER = (() => {
 /* --------------------------------------------------------------- templates tab */
 
 export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: SharedBlocks }) {
-  const { templates, byListing } = useTemplates();
+  const { templates, ...index } = useTemplates();
   const saveTemplate = useMutation(api.aiMockups.saveTemplate);
   const submit = useAction(api.poyo.poyoSubmit);
   const status = useAction(api.poyo.poyoStatus);
@@ -109,39 +185,15 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
   const [phaseOnly, setPhaseOnly] = useState(true);
   const cheapest = [...IMAGE_MODELS].sort((a, b) => a.usd - b.usd)[0];
   const [modelId, setModelId] = useState(cheapest.id);
-  const [editing, setEditing] = useState<{ listing: string; gadget: string } | null>(null);
+  const [editing, setEditing] = useState<TemplateRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const uploadFor = useRef<{ listing: string; gadget: string } | null>(null);
+  const uploadFor = useRef<TemplateRow | null>(null);
   const greenUrl = useRef<string | null>(null);
   const polling = useRef(new Set<string>());
 
-  // One row per flat listing that has shots.
-  const listings = useMemo(() => {
-    const m = new Map<string, { listing: string; gadget: string; shots: MockupShot[] }>();
-    for (const s of shots) {
-      if (!TEMPLATE_GADGETS.has(s.gadget) || s.isActive === false) continue;
-      const listing = listingOf(s);
-      if (!presetFor(listing)) continue;
-      const k = listing.toLowerCase();
-      const row = m.get(k) || { listing, gadget: s.gadget, shots: [] };
-      row.shots.push(s);
-      m.set(k, row);
-    }
-    /*
-     * Each row's shots in a fixed order, because the first one is the shot the
-     * template is generated from. Taken in whatever order the shot library
-     * happened to return, "Laptop" could be generated from a shot that is not
-     * the laptop's own — and the card then shows the wrong device with the
-     * right name on it, which is only spotted by eye.
-     */
-    for (const row of m.values()) {
-      row.shots.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.label).localeCompare(String(b.label)));
-    }
-    return [...m.values()]
-      .filter((r) => !phaseOnly || isPhase1(r.listing))
-      .sort((a, b) => a.gadget.localeCompare(b.gadget) || a.listing.localeCompare(b.listing));
-  }, [shots, phaseOnly]);
+  // One row per shot of a templatable listing — one angle, one template.
+  const rows = useMemo<TemplateRow[]>(() => templateRows(shots, phaseOnly), [shots, phaseOnly]);
 
   // Collect finished generations.
   useEffect(() => {
@@ -165,7 +217,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
               const url = up?.url || up?.publicUrl;
               if (!url) throw new Error("Upload failed");
               await saveTemplate({ id: t._id, status: "needs-corners", imageUrl: url, taskId: "", quad: null });
-              toast.success(`${t.listing}: template ready — mark its corners`);
+              toast.success(`${t.shotLabel || t.listing}: template ready — mark its corners`);
             }
           } catch (e) {
             await saveTemplate({ id: t._id, status: "failed", error: e instanceof Error ? e.message : "Collect failed", taskId: "" });
@@ -180,33 +232,36 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
 
   const model = IMAGE_MODELS.find((m) => m.id === modelId) || cheapest;
 
-  const generate = async (row: { listing: string; gadget: string; shots: MockupShot[] }) => {
-    setBusy(row.listing);
+  const rowKey = (row: TemplateRow) => row.shot.suffix;
+
+  const generate = async (row: TemplateRow) => {
+    setBusy(rowKey(row));
     try {
       if (!greenUrl.current) {
         const up: any = await upload({ fileBase64: greenSwatch(), key: "mockup-templates/green-reference.png", contentType: "image/png" });
         greenUrl.current = up?.url || up?.publicUrl;
         if (!greenUrl.current) throw new Error("Could not upload the green reference");
       }
-      const shot = row.shots[0];
       const res: any = await submit({
         model: model.apiModel,
         size: resolveSize(model, "1:1"),
         resolution: model.resolution,
         quality: model.quality,
-        prompt: expandPrompt(shot.prompt, { ...DEFAULT_BLOCKS, ...blocks, fidelity: GREEN_FIDELITY }, { source: "roll", finish: "" }),
+        prompt: expandPrompt(row.shot.prompt, { ...DEFAULT_BLOCKS, ...blocks, fidelity: GREEN_FIDELITY }, { source: "roll", finish: "" }),
         imageUrls: [greenUrl.current],
       });
       await saveTemplate({
-        id: templateId(row.listing),
+        id: templateId(row.listing, row.shot.suffix),
         kind: "template",
         listing: row.listing,
         gadget: row.gadget,
+        suffix: row.shot.suffix,
+        shotLabel: row.shot.label,
         status: "generating",
         taskId: res.taskId,
         error: "",
       });
-      toast.success(`${row.listing}: generating (${formatInr(model.usd)})`);
+      toast.success(`${row.shot.label}: generating (${formatInr(model.usd)})`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start");
     } finally {
@@ -217,7 +272,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
   const onUpload = async (file: File) => {
     const target = uploadFor.current;
     if (!target) return;
-    setBusy(target.listing);
+    setBusy(rowKey(target));
     try {
       const dataUrl = await new Promise<string>((res, rej) => {
         const r = new FileReader();
@@ -227,13 +282,14 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
       });
       const up: any = await upload({
         fileBase64: dataUrl,
-        key: `mockup-templates/${listingSlug(target.listing)}-${Date.now()}.webp`,
+        key: `mockup-templates/${listingSlug(target.listing)}-${target.shot.suffix}-${Date.now()}.webp`,
         contentType: file.type || "image/jpeg",
       });
       const url = up?.url || up?.publicUrl;
       if (!url) throw new Error("Upload failed");
       await saveTemplate({
-        id: templateId(target.listing), kind: "template", listing: target.listing, gadget: target.gadget,
+        id: templateId(target.listing, target.shot.suffix), kind: "template",
+        listing: target.listing, gadget: target.gadget, suffix: target.shot.suffix, shotLabel: target.shot.label,
         imageUrl: url, status: "needs-corners", quad: null, error: "",
       });
       setEditing(target);
@@ -250,7 +306,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
     return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2Icon className="size-4 animate-spin" /> Loading templates…</p>;
   }
 
-  const ready = listings.filter((r) => byListing.get(r.listing.toLowerCase())?.status === "ready").length;
+  const ready = rows.filter((r) => templateForShot(index, r.listing, r.shot.suffix, r.isFirstShot)?.status === "ready").length;
 
   return (
     <div className="space-y-4">
@@ -259,9 +315,11 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
           <div>
             <h3 className="font-semibold">Template mockups</h3>
             <p className="text-sm text-muted-foreground">
-              One photo per listing with the skin in flat green. Once its corners and real size are set, every
-              design becomes that listing's picture at no cost and at true scale. Make each template once:
-              generate it (the cheapest model is enough), or upload your own photo with a green skin.
+              One photo per angle with the skin in flat green — a laptop's lid and its keyboard deck are two.
+              Once an angle's corners and real size are set, every design becomes that picture at no cost and
+              at true scale; any angle without a template still goes to the image model. Make each one once:
+              generate it (the cheapest model is enough), or upload your own photo with a green skin. Mark
+              only the flat face — a phone's side wrap and rounded edges fill themselves in.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -280,7 +338,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                 </SelectContent>
               </Select>
             </div>
-            <Badge variant="outline">{ready} of {listings.length} ready</Badge>
+            <Badge variant="outline">{ready} of {rows.length} ready</Badge>
           </div>
         </CardContent>
       </Card>
@@ -289,15 +347,15 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUpload(f); }} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {listings.map((row) => {
-          const t = byListing.get(row.listing.toLowerCase());
-          const isBusy = busy === row.listing || t?.status === "generating";
+        {rows.map((row) => {
+          const t = templateForShot(index, row.listing, row.shot.suffix, row.isFirstShot);
+          const isBusy = busy === rowKey(row) || t?.status === "generating";
           return (
-            <Card key={row.listing}>
+            <Card key={row.shot.suffix}>
               <CardContent className="space-y-2 p-3">
                 <div className="relative aspect-square overflow-hidden rounded-lg bg-muted">
                   {t?.imageUrl ? (
-                    <img src={t.imageUrl} alt={`${row.listing} template`} className="size-full object-cover" />
+                    <img src={t.imageUrl} alt={`${row.shot.label} template`} className="size-full object-cover" />
                   ) : (
                     <div className="flex size-full items-center justify-center text-muted-foreground/50">
                       {t?.status === "generating" ? <Loader2Icon className="size-6 animate-spin" /> : <ImageIcon className="size-7" />}
@@ -317,11 +375,11 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     {row.gadget}
                     {t?.widthCm && t?.heightCm ? ` · ${t.widthCm} × ${t.heightCm} cm` : ""}
                   </p>
-                  {/* Which shot the photo is generated from, so a template
-                      showing the wrong device is read off the card instead of
-                      spotted later in a listing. */}
-                  <p className="truncate text-[11px] text-muted-foreground/80" title={row.shots[0]?.label}>
-                    from “{row.shots[0]?.label || "no shot"}”
+                  {/* The angle this template is for, so a photo of the wrong
+                      device is read off the card instead of spotted later in a
+                      listing. */}
+                  <p className="truncate text-[11px] text-muted-foreground/80" title={row.shot.label}>
+                    {row.shot.label}
                   </p>
                   {t?.status === "failed" && <p className="text-[11px] text-rose-600">{t.error}</p>}
                 </div>
@@ -331,12 +389,12 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     {t?.imageUrl ? "Regenerate" : "Generate"}
                   </Button>
                   <Button size="sm" variant="outline" className="h-7 text-xs" disabled={isBusy}
-                    onClick={() => { uploadFor.current = { listing: row.listing, gadget: row.gadget }; fileRef.current?.click(); }}>
+                    onClick={() => { uploadFor.current = row; fileRef.current?.click(); }}>
                     <UploadIcon className="mr-1 size-3" />
                     Upload
                   </Button>
                   {t?.imageUrl && (
-                    <Button size="sm" className="h-7 text-xs" disabled={isBusy} onClick={() => setEditing({ listing: row.listing, gadget: row.gadget })}>
+                    <Button size="sm" className="h-7 text-xs" disabled={isBusy} onClick={() => setEditing(row)}>
                       <CrosshairIcon className="mr-1 size-3" />
                       Corners &amp; size
                     </Button>
@@ -348,13 +406,21 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
         })}
       </div>
 
-      {editing && byListing.get(editing.listing.toLowerCase())?.imageUrl && (
+      {editing && templateForShot(index, editing.listing, editing.shot.suffix, editing.isFirstShot)?.imageUrl && (
         <CornerEditor
-          template={byListing.get(editing.listing.toLowerCase())!}
+          template={templateForShot(index, editing.listing, editing.shot.suffix, editing.isFirstShot)!}
           onClose={() => setEditing(null)}
           onSave={async (quad, widthCm, heightCm) => {
-            await saveTemplate({ id: templateId(editing.listing), quad, widthCm, heightCm, status: "ready" });
-            toast.success(`${editing.listing}: template ready`);
+            // Saving moves an older listing-level template onto its shot, so
+            // the photo and the corners already marked carry over.
+            const from = templateForShot(index, editing.listing, editing.shot.suffix, editing.isFirstShot)!;
+            await saveTemplate({
+              id: templateId(editing.listing, editing.shot.suffix),
+              kind: "template", listing: editing.listing, gadget: editing.gadget,
+              suffix: editing.shot.suffix, shotLabel: editing.shot.label,
+              imageUrl: from.imageUrl, quad, widthCm, heightCm, status: "ready", error: "",
+            });
+            toast.success(`${editing.shot.label}: template ready`);
             setEditing(null);
           }}
         />
@@ -776,25 +842,28 @@ export interface TemplateDesign {
 }
 
 /**
- * Makes every templated listing's picture for one design and puts each in the
- * review queue as an ordinary job, so approve, reject and linking work as for
- * generated images.
+ * Makes a picture for every angle that has a ready template and puts each in
+ * the review queue as an ordinary job, so approve, reject and linking work as
+ * they do for generated images. Angles without a template are left alone —
+ * the image model still makes those.
  */
 export function useTemplateMockups() {
-  const { byListing } = useTemplates();
+  const { templates, ...index } = useTemplates();
   const loadCanvasImage = useCanvasImage();
   const upload = useAction(api.r2.uploadToR2);
   const createJob = useMutation(api.aiMockups.createDesignMockup);
 
   const run = useCallback(async (
     design: TemplateDesign,
-    groups: Array<{ listing: string; gadget: string; shots: MockupShot[] }>,
+    rows: TemplateRow[],
     orientations: Array<"lengthwise" | "widthwise">,
     existingJobs: Array<{ suffix: string; attempt?: number }>,
     onProgress?: (done: number, total: number) => void
   ) => {
-    const usable = groups.filter((g) => byListing.get(g.listing.toLowerCase())?.status === "ready");
-    if (!usable.length) throw new Error("No listing here has a ready template yet");
+    const usable = rows
+      .map((row) => ({ row, t: templateForShot(index, row.listing, row.shot.suffix, row.isFirstShot) }))
+      .filter((x): x is { row: TemplateRow; t: MockupTemplate } => x.t?.status === "ready");
+    if (!usable.length) throw new Error("No angle here has a ready template yet");
     const isRoll = design.source === "roll";
     if (isRoll && !design.flatImageUrl) throw new Error("Calibrate this roll first");
     const src = imageToData(await loadCanvasImage(isRoll ? design.flatImageUrl! : design.rawImageUrl!));
@@ -802,12 +871,11 @@ export function useTemplateMockups() {
     const rollW = isRoll ? Number(design.flatWidthCm) || src.width / ppc : 0;
     const rollL = isRoll ? Number(design.flatLengthCm) || src.height / ppc : 0;
 
-    const tasks = usable.flatMap((g) =>
-      (g.gadget === "phone" && isRoll ? orientations : (["lengthwise"] as const)).map((o) => ({ g, o }))
+    const tasks = usable.flatMap(({ row, t }) =>
+      (row.gadget === "phone" && isRoll ? orientations : (["lengthwise"] as const)).map((o) => ({ row, t, o }))
     );
     let done = 0;
-    for (const { g, o } of tasks) {
-      const t = byListing.get(g.listing.toLowerCase())!;
+    for (const { row, t, o } of tasks) {
       const tpl = imageToData(await loadCanvasImage(t.imageUrl!));
       const rotate90 = o === "widthwise";
       const pieceW = rotate90 ? t.heightCm! : t.widthCm!;
@@ -817,7 +885,7 @@ export function useTemplateMockups() {
         ? { x: Math.max(0, (rollW - pieceW) / 2), y: Math.max(0, (rollL - pieceH) / 2) }
         : undefined;
       const out = composite(tpl, { quad: t.quad!, widthCm: t.widthCm!, heightCm: t.heightCm! }, src, { pxPerCm: ppc, rotate90, offsetCm });
-      const suffix = `tpl-${listingSlug(g.listing)}${rotate90 ? "-wid" : ""}`;
+      const suffix = templateJobSuffix(row, rotate90);
       const attempt = existingJobs.filter((j) => j.suffix === suffix).reduce((n, j) => Math.max(n, j.attempt || 1), 0) + 1;
       const key = `ai-mockups-pending/${design.code.toUpperCase().replace(/[^A-Z0-9-]/g, "")}-${suffix}-${Date.now()}.webp`;
       const up: any = await upload({ fileBase64: canvasToWebp(dataToCanvas(out), 0.9), key, contentType: "image/webp" });
@@ -827,13 +895,13 @@ export function useTemplateMockups() {
         rNumber: design.code,
         designName: design.name || "",
         designSource: design.source,
-        shotLabel: `Template · ${g.listing}${rotate90 ? " · across the roll" : ""}`,
-        gadget: g.gadget,
-        listing: g.listing,
+        shotLabel: `Template · ${row.shot.label}${rotate90 ? " · across the roll" : ""}`,
+        gadget: row.gadget,
+        listing: row.listing,
         suffix,
-        skuCodes: [...new Set(g.shots.flatMap((s) => shotCodes(s)))],
-        variantTitles: [],
-        matchSingleVariant: g.shots.some((s) => s.matchSingleVariant),
+        skuCodes: shotCodes(row.shot),
+        variantTitles: row.shot.variantTitles || [],
+        matchSingleVariant: row.shot.matchSingleVariant || false,
         sourceUrl: isRoll ? design.flatImageUrl : design.rawImageUrl,
         status: "review",
         pendingKey: up?.key || key,
@@ -849,7 +917,7 @@ export function useTemplateMockups() {
       onProgress?.(done, tasks.length);
     }
     return done;
-  }, [byListing, loadCanvasImage, upload, createJob]);
+  }, [index, loadCanvasImage, upload, createJob]);
 
-  return { run, byListing };
+  return { run, templates, ...index };
 }

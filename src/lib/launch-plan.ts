@@ -365,31 +365,15 @@ export function buildLaunchPlan(input: {
     for (const kind of covered) {
       if (!inScope(kind) && !needed.has(kind) && keptFor.get(kind)?.status !== "active") continue;
       const info = KIND_INFO.get(kind)!;
-      const kindShots = shots.filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind);
-      const template = readyTemplates.get(kind);
-      const canTemplate = options.useTemplates && TEMPLATE_GADGETS.has(info.gadget) && template && (!isRoll || design.flatImageUrl);
-      const codes = [...new Set([...kindShots.flatMap((s) => shotCodes(s)), ...presetForDesign(kind, design.finish).map((p) => p.tail)])];
-      if (canTemplate) {
-        const orients: CutOrientation[] = info.gadget === "phone" && isRoll ? options.orientations : ["lengthwise"];
-        for (const o of orients) {
-          const suffix = `tpl-${listingSlug(info.listing)}${o === "widthwise" ? "-wid" : ""}`;
-          if (already(suffix, kind)) continue;
-          templateImages++;
-          images.push({
-            id: stepId(), type: "template", label: `Template picture · ${info.listing}${o === "widthwise" ? " · across" : ""}`, status: "pending",
-            templateId: template!._id, rotate90: o === "widthwise",
-            job: {
-              rNumber: code, designName: design.name || "", designSource: design.source,
-              shotLabel: `Template · ${info.listing}${o === "widthwise" ? " · across the roll" : ""}`,
-              gadget: info.gadget, listing: info.listing, suffix, skuCodes: codes, variantTitles: [],
-              matchSingleVariant: kindShots.some((s) => s.matchSingleVariant) || presetForDesign(kind, design.finish).length === 1,
-              sourceUrl: isRoll ? design.flatImageUrl : design.rawImageUrl,
-              attempt: attemptFor(suffix), modelLabel: "Template", aspect: "", credits: 0, costInr: 0,
-            },
-          });
-        }
-        continue;
-      }
+      /*
+       * Ordered, because the first shot of a listing is the one an older
+       * listing-level template belongs to and keeps the job suffix template
+       * pictures have always had.
+       */
+      const kindShots = shots
+        .filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind)
+        .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.label).localeCompare(String(b.label)));
+      const templatesUsable = options.useTemplates && TEMPLATE_GADGETS.has(info.gadget) && (!isRoll || design.flatImageUrl);
       if (!kindShots.length) {
         warnings.push(`${info.listing}: no shots in the studio yet (Gadgets & prompts → add the built-in shots) — no picture planned`);
         continue;
@@ -398,7 +382,37 @@ export function buildLaunchPlan(input: {
       // so the motifs come out as big as they really are — for every gadget
       // whose face is measured, not only the flat ones a template can cover.
       const surface = isRoll && design.flatImageUrl ? DEFAULT_SURFACE_CM[info.gadget] : undefined;
-      for (const shot of kindShots) {
+      for (const [shotIndex, shot] of kindShots.entries()) {
+        /*
+         * A template is per angle, so it replaces its own shot and no other.
+         * It used to be per listing and replaced every shot the listing had,
+         * which meant switching a laptop template on took its keyboard-deck
+         * picture away and left only the lid.
+         */
+        const template = templatesUsable
+          ? readyTemplates.get(shot.suffix) || (shotIndex === 0 ? readyTemplates.get(kind) : undefined)
+          : undefined;
+        if (template) {
+          const orients: CutOrientation[] = info.gadget === "phone" && isRoll ? options.orientations : ["lengthwise"];
+          for (const o of orients) {
+            const tplSuffix = `tpl-${shotIndex === 0 ? listingSlug(info.listing) : shot.suffix}${o === "widthwise" ? "-wid" : ""}`;
+            if (already(tplSuffix, kind)) continue;
+            templateImages++;
+            images.push({
+              id: stepId(), type: "template", label: `Template picture · ${shot.label}${o === "widthwise" ? " · across" : ""}`, status: "pending",
+              templateId: template._id, rotate90: o === "widthwise",
+              job: {
+                rNumber: code, designName: design.name || "", designSource: design.source, shotId: shot._id,
+                shotLabel: `Template · ${shot.label}${o === "widthwise" ? " · across the roll" : ""}`,
+                gadget: info.gadget, listing: info.listing, suffix: tplSuffix, skuCodes: shotCodes(shot),
+                variantTitles: shot.variantTitles || [], matchSingleVariant: shot.matchSingleVariant || false,
+                sourceUrl: isRoll ? design.flatImageUrl : design.rawImageUrl,
+                attempt: attemptFor(tplSuffix), modelLabel: "Template", aspect: "", credits: 0, costInr: 0,
+              },
+            });
+          }
+          continue;
+        }
         const orients: Array<CutOrientation | undefined> = shot.askCutOrientation && isRoll ? options.orientations : [undefined];
         for (const o of orients) {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
@@ -439,7 +453,7 @@ export function buildLaunchPlan(input: {
     }
   }
   if (isRoll && options.useTemplates && !design.flatImageUrl) {
-    warnings.push("Roll not calibrated — phone, laptop and tablet pictures fall back to the image model");
+    warnings.push("Roll not calibrated — every templated angle falls back to the image model");
   }
 
   // Revisions free the SKUs new listings need (an old "R-26-IPAD" tablet

@@ -45,7 +45,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
   const shots = useQuery(api.aiMockups.getPrompts) as MockupShot[] | undefined;
   const settings = useQuery(api.aiMockups.getSettings) as { blocks?: SharedBlocks } | null | undefined;
   const gadgetTypes = useQuery(api.gadgetTypes.list) as any[] | undefined;
-  const { templates, byListing } = useTemplates();
+  const { templates, byListing, bySuffix } = useTemplates();
 
   const cheapest = [...IMAGE_MODELS].sort((a, b) => a.usd - b.usd)[0];
   const [phaseOnly, setPhaseOnly] = useState(pref("launch_phase1", "1") === "1");
@@ -75,7 +75,14 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         loadDesignListings(design.code),
         getDocs(query(collection(db, "designMockups"), where("rNumber", "==", design.code))),
       ]);
+      /*
+       * Templates keyed by the shot they are the photo for, plus the older
+       * listing-level ones under the listing itself — the plan falls back to
+       * those for a listing's first shot, so corners marked before templates
+       * were per angle still count.
+       */
       const readyTemplates = new Map<string, { _id: string }>();
+      bySuffix.forEach((t, k) => { if (t.status === "ready") readyTemplates.set(k, { _id: t._id }); });
       byListing.forEach((t, k) => { if (t.status === "ready") readyTemplates.set(k, { _id: t._id }); });
       const p = buildLaunchPlan({
         design,
