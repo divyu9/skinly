@@ -236,7 +236,7 @@ export function buildLaunchPlan(input: {
   existing: ExistingListing[];
   shots: MockupShot[];
   blocks: SharedBlocks;
-  readyTemplates: Map<string, { _id: string }>;
+  readyTemplates: Map<string, { _id: string; widthCm?: number; heightCm?: number }>;
   gadgetTypeIds: Record<string, string>;
   jobs: Array<{ suffix: string; status: string; attempt?: number; url?: string }>;
   options: LaunchOptions;
@@ -418,6 +418,8 @@ export function buildLaunchPlan(input: {
                 variantTitles: shot.variantTitles || [], matchSingleVariant: shot.matchSingleVariant || false,
                 sourceUrl: isRoll ? design.flatImageUrl : design.rawImageUrl,
                 attempt: attemptFor(tplSuffix), modelLabel: "Template", aspect: "", credits: 0, costInr: 0,
+                // Exact by construction: the corners were measured against it.
+                pieceCm: template.widthCm && template.heightCm ? `${template.widthCm}×${template.heightCm}` : "",
               },
             });
           }

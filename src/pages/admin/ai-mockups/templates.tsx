@@ -167,11 +167,17 @@ const GREEN_FROM_PHOTO =
   + "object, the same model, the same angle, the same framing and crop, the same background and the same "
   + "lighting and shadows. Do not restyle it, do not move the camera, do not redraw the product and do "
   + "not change its proportions, its markings or where its openings are. "
-  + "Change one thing only: every surface a vinyl skin would cover is now a flat, perfectly uniform "
-  + "chroma-key green — pure #00FF00 — with no pattern, print, texture, lettering or gradient of its own. "
-  + "The product's real lighting, soft shading and reflections still fall across that green so it reads "
-  + "as a lit surface rather than a flat cut-out, and the green follows every curve and rounded edge of "
-  + "the body. "
+  + "Change one thing only: every surface a vinyl skin would cover is repainted chroma-key green. Its own "
+  + "colour, print, pattern, texture and lettering are gone — the hue underneath is now pure green, "
+  + "#00FF00 — but everything the light was doing to that surface is untouched. "
+  + "This is the same photograph with the paint changed, not a flat green shape pasted over the product. "
+  + "Keep the whole range of it: the lit side stays bright and the shaded side stays dark, the gradient "
+  + "that runs across a curve stays exactly where it was, the darkening as a surface turns away from the "
+  + "camera stays, the ambient occlusion in every corner and seam stays, and every glossy highlight, "
+  + "specular streak and soft reflection stays where it is and as bright as it is — a highlight that was "
+  + "nearly white stays nearly white. A dull surface stays dull and a glossy one stays glossy. The green "
+  + "should read as a lit, three-dimensional object; if any part of it comes out as one even fill of "
+  + "colour, the lighting has been lost and the picture is wrong. "
   + "A raised camera bump, plateau or island is part of the skinned body, not an exception: the green "
   + "carries on without a break up over its top face and down its sides, so it reads as part of the "
   + "skinned back rather than a bare tile sitting on it. The same goes for every panel, rail and rounded "
@@ -185,10 +191,13 @@ const GREEN_FROM_PHOTO =
   + "surface it stands on, not any prop. ";
 
 const GREEN_FIDELITY =
-  "The skin is a flat, perfectly uniform chroma-key green — pure #00FF00 — with no pattern, no print, no "
-  + "texture and no gradient of its own. Use the supplied reference only for that colour. The device's real "
-  + "lighting, soft shading and reflections still fall across the green so it reads as a lit surface. Nothing "
-  + "else in the picture is green: no plants, no green props, no green light. ";
+  "The skin's own colour is chroma-key green — pure #00FF00 — with no pattern, no print, no texture and no "
+  + "lettering of its own. Use the supplied reference only for that colour. Its lighting, though, is a real "
+  + "surface's: the lit side bright and the shaded side dark, the gradient running across every curve, the "
+  + "darkening where a surface turns away, the occlusion in every corner and seam, and the glossy highlights "
+  + "and soft reflections a vinyl wrap catches. The green must read as a lit, three-dimensional object, never "
+  + "as one even fill of colour. Nothing else in the picture is green: no plants, no green props, no green "
+  + "light. ";
 
 const TEST_CHECKER = (() => {
   // 1 cm squares at 20 px/cm, for checking a template's scale by eye.
@@ -979,6 +988,11 @@ export function useTemplateMockups() {
         pendingUrl: url,
         attempt,
         modelLabel: "Template",
+        // A template's scale is exact by construction — the surface's real
+        // size is what the corners were measured against. Without this the
+        // review card said "scale is the model's guess", which is the one
+        // thing a template picture is not.
+        pieceCm: `${t.widthCm}×${t.heightCm}`,
         aspect: "",
         credits: 0,
         costInr: 0,

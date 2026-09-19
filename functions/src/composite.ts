@@ -64,6 +64,9 @@ function sampleWrap(src: Raw, x: number, y: number, out: number[]) {
 }
 
 const greenness = (r: number, g: number, b: number) => Math.max(0, Math.min(1, (g - Math.max(r, b) - 25) / 70));
+/** How much of a template's white highlight is laid over the design. */
+const SPECULAR = 0.85;
+
 
 /** Left, right, up, down — the directions the green fill walks in. */
 const STEPS: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
@@ -100,11 +103,26 @@ export async function renderTemplateMockup(input: TemplateMockupInput): Promise<
   const xs = quad.map((p) => p.x), ys = quad.map((p) => p.y);
   const minX = Math.max(0, Math.floor(Math.min(...xs)) - 2), maxX = Math.min(tpl.width - 1, Math.ceil(Math.max(...xs)) + 2);
   const minY = Math.max(0, Math.floor(Math.min(...ys)) - 2), maxY = Math.min(tpl.height - 1, Math.ceil(Math.max(...ys)) + 2);
+  /*
+   * How the template's light is carried onto the design.
+   *
+   * A chroma-green surface holds its lighting in two separable parts. The
+   * green channel above whatever red and blue share is the surface's own
+   * colour, and it dims in shade — that part scales the design, the way a
+   * shadow does. What red and blue share is white light sitting on top of the
+   * green, a reflection or a gloss highlight — that part is added, the way a
+   * highlight does, and it cannot be recovered from the green channel alone
+   * because the green has already clipped at 255 wherever the surface is
+   * bright. Reading only the green channel and only multiplying was why
+   * templates came out looking like a flat sticker: the shading it could see
+   * was the little the model had left, and every highlight was invisible to
+   * it.
+   */
   const greens: number[] = [];
   for (let y = minY; y <= maxY; y += 3) {
     for (let x = minX; x <= maxX; x += 3) {
       const i = (y * tpl.width + x) * 4;
-      if (greenness(t[i], t[i + 1], t[i + 2]) > 0.9) greens.push(t[i + 1]);
+      if (greenness(t[i], t[i + 1], t[i + 2]) > 0.9) greens.push(t[i + 1] - Math.min(t[i], t[i + 2]));
     }
   }
   if (greens.length < 50) throw new Error("No green skin area found inside the template's corners");
@@ -134,9 +152,10 @@ export async function renderTemplateMockup(input: TemplateMockupInput): Promise<
       sy = (off.y + uy * heightCm) * ppc;
     }
     sampleWrap(design, sx, sy, px);
-    const light = Math.max(0.35, Math.min(1.15, t[i + 1] / neutral));
+    const spec = Math.min(t[i], t[i + 2]);
+    const shade = Math.max(0.3, Math.min(1.3, (t[i + 1] - spec) / neutral));
     for (let k = 0; k < 3; k++) {
-      const v = Math.min(255, px[k] * light);
+      const v = Math.min(255, px[k] * shade + spec * SPECULAR);
       out[i + k] = Math.round(t[i + k] * (1 - a) + v * a);
     }
   };

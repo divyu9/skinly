@@ -91,9 +91,10 @@ export function LaunchPanel({ design, themes, onLaunched }: {
        * those for a listing's first shot, so corners marked before templates
        * were per angle still count.
        */
-      const readyTemplates = new Map<string, { _id: string }>();
-      bySuffix.forEach((t, k) => { if (t.status === "ready") readyTemplates.set(k, { _id: t._id }); });
-      byListing.forEach((t, k) => { if (t.status === "ready") readyTemplates.set(k, { _id: t._id }); });
+      const readyTemplates = new Map<string, { _id: string; widthCm?: number; heightCm?: number }>();
+      const put = (t: any, k: string) => { if (t.status === "ready") readyTemplates.set(k, { _id: t._id, widthCm: t.widthCm, heightCm: t.heightCm }); };
+      bySuffix.forEach(put);
+      byListing.forEach(put);
       const p = buildLaunchPlan({
         design,
         existing,
