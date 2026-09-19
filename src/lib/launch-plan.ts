@@ -48,14 +48,18 @@ export interface LaunchOptions {
   phaseOnly: boolean;
   publishNow: boolean;
   /**
-   * Where the pictures come from — one answer, not two switches.
+   * Where the pictures come from.
    *
-   * "Make pictures" and "Use templates where ready" were independent, so both
-   * could be on at once and the plan silently mixed the two: some angles free
-   * from a template, the rest billed to the model, with nothing on screen
-   * saying which would be which. Choosing outright means a run is one thing or
-   * the other, and an angle with no template is reported rather than quietly
-   * sent to the model.
+   * "templates" means per angle: each one takes the route its card in the
+   * studio is set to, a template where that is chosen and ready and the image
+   * model everywhere else. A template is free and exact on a flat face; the
+   * model is the better answer where a flat warp cannot follow the shape, or
+   * where the frame holds two objects and one set of corners cannot cover
+   * both — so a run needs both, and the studio is where that is decided,
+   * angle by angle, once.
+   *
+   * "model" overrides all of it for one run, and "none" makes the listings
+   * without any pictures.
    */
   pictures: "templates" | "model" | "none";
   regenerateImages: boolean;
@@ -425,9 +429,7 @@ export function buildLaunchPlan(input: {
           }
           continue;
         }
-        // Templates chosen: an angle without one is left for later, never
-        // billed to the model behind the admin's back.
-        if (options.pictures === "templates") { missingTemplates++; continue; }
+        if (options.pictures === "templates") missingTemplates++;
         const orients: Array<CutOrientation | undefined> = shot.askCutOrientation && isRoll ? options.orientations : [undefined];
         for (const o of orients) {
           const suffix = o ? `${shot.suffix}-${o === "widthwise" ? "wid" : "len"}` : shot.suffix;
@@ -469,15 +471,14 @@ export function buildLaunchPlan(input: {
     }
   }
   if (options.pictures === "templates" && isRoll && !design.flatImageUrl) {
-    warnings.push("Roll not calibrated — a template needs the flattened photo, so no picture can be made from one");
+    warnings.push("Roll not calibrated — a template needs the flattened photo, so every angle falls to the image model");
   }
-  // Not when the roll is the problem: saying "no template yet" of angles that
-  // have one, because the flattened photo is missing, sends you to make them
-  // again instead of to the calibration.
-  if (missingTemplates && !(options.pictures === "templates" && isRoll && !design.flatImageUrl)) {
+  if (missingTemplates) {
+    // Not a problem, just the bill: these are the angles set to the model, or
+    // with no template made yet. Said plainly so the cost is never a surprise.
     warnings.push(
-      `${missingTemplates} angle${missingTemplates === 1 ? " has" : "s have"} no template yet and ${missingTemplates === 1 ? "is" : "are"} skipped — `
-      + "make them in AI Mockup Studio → Templates, or run again with the image model"
+      `${missingTemplates} angle${missingTemplates === 1 ? "" : "s"} come from the image model — either set to it, or with no `
+      + "template made yet. Their cost is in the figures above."
     );
   }
 

@@ -16,7 +16,7 @@ import { DEFAULT_BLOCKS, PHASE_1_LISTINGS, type MockupShot, type SharedBlocks, t
 import { IMAGE_MODELS, formatInr } from "@/lib/ai-mockup-models.ts";
 import { buildLaunchPlan, type LaunchDesign, type LaunchPlan } from "@/lib/launch-plan.ts";
 import { loadDesignListings } from "@/lib/launch-plan-data.ts";
-import { useTemplates, templateRows, templateForShot } from "@/pages/admin/ai-mockups/templates.tsx";
+import { useTemplates, templateRows, templateForShot, usesTemplate } from "@/pages/admin/ai-mockups/templates.tsx";
 
 /**
  * Plans a design launch, shows exactly what it will do, and hands it to the
@@ -92,7 +92,9 @@ export function LaunchPanel({ design, themes, onLaunched }: {
        * were per angle still count.
        */
       const readyTemplates = new Map<string, { _id: string; widthCm?: number; heightCm?: number }>();
-      const put = (t: any, k: string) => { if (t.status === "ready") readyTemplates.set(k, { _id: t._id, widthCm: t.widthCm, heightCm: t.heightCm }); };
+      // An angle switched to the image model on its card is not offered as a
+      // template here, so the plan sends it to the model like any other.
+      const put = (t: any, k: string) => { if (usesTemplate(t)) readyTemplates.set(k, { _id: t._id, widthCm: t.widthCm, heightCm: t.heightCm }); };
       bySuffix.forEach(put);
       byListing.forEach(put);
       const p = buildLaunchPlan({
@@ -159,20 +161,18 @@ export function LaunchPanel({ design, themes, onLaunched }: {
    */
   const phaseAngles = templateRows(shots || [], phaseOnly);
   const readyAngles = phaseAngles
-    .filter((r) => templateForShot({ bySuffix, byListing }, r.listing, r.shot.suffix, r.isFirstShot)?.status === "ready");
+    .filter((r) => usesTemplate(templateForShot({ bySuffix, byListing }, r.listing, r.shot.suffix, r.isFirstShot)));
   const needsCalibration = design.source === "roll" && !design.flatImageUrl;
-  const missing = phaseAngles.length - readyAngles.length;
+  const byModel = phaseAngles.length - readyAngles.length;
+  const modelCost = formatInr(model.usd * byModel);
   const pictureHint =
     pictures === "none"
       ? "Listings only — no pictures are made or paid for."
       : pictures === "model"
-        ? `Every picture is generated, ${formatInr(model.usd)} each. Templates are ignored on this run.`
-        : !readyAngles.length
-          ? "No angle has a template yet — make them in AI Mockup Studio → Templates, or choose the image model."
-          : needsCalibration
-            ? `${readyAngles.length} of ${phaseAngles.length} angles have a template, but this roll is not calibrated — calibrate it first or nothing can be rendered.`
-            : `${readyAngles.length} of ${phaseAngles.length} angles have a template and cost nothing.`
-              + (missing ? ` The other ${missing} are skipped, not sent to the model.` : "");
+        ? `All ${phaseAngles.length} angles are generated, ${formatInr(model.usd)} each — ${formatInr(model.usd * phaseAngles.length)} in all. Templates are ignored on this run.`
+        : needsCalibration && readyAngles.length
+          ? `${readyAngles.length} angles are set to use a template, but this roll is not calibrated — calibrate it first or they fall to the model.`
+          : `${readyAngles.length} of ${phaseAngles.length} angles come from a template at no cost; the other ${byModel} are generated, ${modelCost} in all. Set which is which on each card in AI Mockup Studio → Templates.`;
 
   const toggle = (label: string, on: boolean, set: (v: boolean) => void, key?: string, hint?: string) => (
     <label className="flex items-start gap-2 text-sm">
@@ -198,8 +198,8 @@ export function LaunchPanel({ design, themes, onLaunched }: {
         <Label className="text-xs">Pictures</Label>
         <div className="flex gap-1 rounded-lg border bg-muted/40 p-1">
           {([
-            ["templates", `From templates · ₹0${readyAngles.length ? ` · ${readyAngles.length} ready` : ""}`],
-            ["model", "From the image model"],
+            ["templates", `As set per angle${readyAngles.length ? ` · ${readyAngles.length} free` : ""}`],
+            ["model", "All from the image model"],
             ["none", "No pictures"],
           ] as const).map(([value, label]) => (
             <button

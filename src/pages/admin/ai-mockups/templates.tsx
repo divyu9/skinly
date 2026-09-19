@@ -40,6 +40,13 @@ export interface MockupTemplate {
   suffix?: string;
   /** The real product photo this template was painted green from, if any. */
   sourcePhotoUrl?: string;
+  /**
+   * Which way this one angle's picture is made. Unset means the template when
+   * it is ready, which is what everyone wants most of the time; "model" keeps
+   * the image model on an angle a flat warp does not suit — a lens barrel, a
+   * frame with two objects in it — even though its template is ready.
+   */
+  route?: "template" | "model";
   shotLabel?: string;
   imageUrl?: string;
   quad?: Point[];
@@ -78,6 +85,9 @@ export interface TemplateIndex {
 export function templateForShot(index: TemplateIndex, listing: string, suffix: string, isFirstShot: boolean) {
   return index.bySuffix.get(suffix) || (isFirstShot ? index.byListing.get(String(listing).toLowerCase()) : undefined);
 }
+
+/** Will this angle's picture come from its template? Ready, and not sent to the model. */
+export const usesTemplate = (t?: MockupTemplate) => t?.status === "ready" && t.route !== "model";
 
 export interface TemplateRow {
   listing: string;
@@ -225,6 +235,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
   const submit = useAction(api.poyo.poyoSubmit);
   const status = useAction(api.poyo.poyoStatus);
   const upload = useAction(api.r2.uploadToR2);
+  const updateShot = useMutation(api.aiMockups.updateMockupPrompt);
   const [phaseOnly, setPhaseOnly] = useState(true);
   const cheapest = [...IMAGE_MODELS].sort((a, b) => a.usd - b.usd)[0];
   const [modelId, setModelId] = useState(cheapest.id);
@@ -347,7 +358,17 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
           imageUrls: [url],
         });
         await saveTemplate({ ...common, status: "generating", taskId: res.taskId, sourcePhotoUrl: url, quad: null });
-        toast.success(`${target.shot.label}: painting the skin green (${formatInr(model.usd)})`);
+        /*
+         * The same photograph is what the image model needs too. As this
+         * angle's reference it fixes the pose, the framing and where the
+         * ports and pins are — which is exactly what the model was getting
+         * wrong on chargers — so one upload serves both routes and the two
+         * agree with each other.
+         */
+        if (target.shot._id) {
+          await updateShot({ promptId: target.shot._id, referenceUrl: url });
+        }
+        toast.success(`${target.shot.label}: painting the skin green (${formatInr(model.usd)}) · also set as the AI reference`);
         return;
       }
       await saveTemplate({ ...common, imageUrl: url, status: "needs-corners", quad: null });
@@ -365,7 +386,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
     return <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2Icon className="size-4 animate-spin" /> Loading templates…</p>;
   }
 
-  const ready = rows.filter((r) => templateForShot(index, r.listing, r.shot.suffix, r.isFirstShot)?.status === "ready").length;
+  const ready = rows.filter((r) => usesTemplate(templateForShot(index, r.listing, r.shot.suffix, r.isFirstShot))).length;
 
   return (
     <div className="space-y-4">
@@ -444,6 +465,42 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     {row.shot.label}
                   </p>
                   {t?.status === "failed" && <p className="text-[11px] text-rose-600">{t.error}</p>}
+                </div>
+
+                {/* Which way this one angle goes. A template is free and exact
+                    on a flat face; the image model is the better answer where
+                    a flat warp cannot follow the shape, or where the frame
+                    holds two objects and one set of corners cannot cover
+                    both. Picked per angle, so a launch is right everywhere. */}
+                <div className="flex gap-1 rounded-lg border bg-muted/40 p-0.5 text-[11px]">
+                  {([["template", "Template · ₹0"], ["model", `AI · ${formatInr(model.usd)}`]] as const).map(([value, label]) => {
+                    const chosen = usesTemplate(t) ? "template" : "model";
+                    const canTemplate = t?.status === "ready";
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        disabled={isBusy || (value === "template" && !canTemplate)}
+                        title={value === "template" && !canTemplate ? "Make this angle's template first" : undefined}
+                        onClick={async () => {
+                          try {
+                            await saveTemplate({
+                              id: templateId(row.listing, row.shot.suffix), kind: "template",
+                              listing: row.listing, gadget: row.gadget,
+                              suffix: row.shot.suffix, shotLabel: row.shot.label, route: value,
+                            });
+                          } catch (e) {
+                            toast.error(e instanceof Error ? e.message : "Could not save");
+                          }
+                        }}
+                        className={`flex-1 rounded-md px-2 py-1 font-medium transition disabled:opacity-40 ${
+                          chosen === value ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {/* Three ways to a template, in the order they are worth
@@ -942,8 +999,8 @@ export function useTemplateMockups() {
   ) => {
     const usable = rows
       .map((row) => ({ row, t: templateForShot(index, row.listing, row.shot.suffix, row.isFirstShot) }))
-      .filter((x): x is { row: TemplateRow; t: MockupTemplate } => x.t?.status === "ready");
-    if (!usable.length) throw new Error("No angle here has a ready template yet");
+      .filter((x): x is { row: TemplateRow; t: MockupTemplate } => usesTemplate(x.t));
+    if (!usable.length) throw new Error("No angle here is set to use a template");
     const isRoll = design.source === "roll";
     if (isRoll && !design.flatImageUrl) throw new Error("Calibrate this roll first");
     const src = imageToData(await loadCanvasImage(isRoll ? design.flatImageUrl! : design.rawImageUrl!));
