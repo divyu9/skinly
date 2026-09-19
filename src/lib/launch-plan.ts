@@ -1,5 +1,5 @@
 import {
-  STARTER_SHOTS, LISTING_PRESETS, LISTING_SCOPES, FLAT_GADGETS, PHASE_1_LISTINGS, REFERENCE_PREAMBLE, TRUE_SIZE_CLAUSE,
+  STARTER_SHOTS, LISTING_PRESETS, LISTING_SCOPES, TEMPLATE_GADGETS, PHASE_1_LISTINGS, REFERENCE_PREAMBLE, TRUE_SIZE_CLAUSE,
   DEFAULT_SURFACE_CM,
   expandPrompt, listingOf, listingSlug, mockupFileStem, shotCodes,
   type MockupShot, type SharedBlocks, type CutOrientation, type PresetVariant,
@@ -367,7 +367,7 @@ export function buildLaunchPlan(input: {
       const info = KIND_INFO.get(kind)!;
       const kindShots = shots.filter((s) => s.isActive !== false && listingOf(s).toLowerCase() === kind);
       const template = readyTemplates.get(kind);
-      const canTemplate = options.useTemplates && FLAT_GADGETS.has(info.gadget) && template && (!isRoll || design.flatImageUrl);
+      const canTemplate = options.useTemplates && TEMPLATE_GADGETS.has(info.gadget) && template && (!isRoll || design.flatImageUrl);
       const codes = [...new Set([...kindShots.flatMap((s) => shotCodes(s)), ...presetForDesign(kind, design.finish).map((p) => p.tail)])];
       if (canTemplate) {
         const orients: CutOrientation[] = info.gadget === "phone" && isRoll ? options.orientations : ["lengthwise"];

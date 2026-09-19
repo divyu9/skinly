@@ -29,7 +29,7 @@ import {
 } from "@/lib/local-backup.ts";
 import {
   STARTER_SHOTS, DEFAULT_BLOCKS, PLACEHOLDERS, REFERENCE_PREAMBLE, expandPrompt, mockupFileStem, listingOf, presetFor, shotCodes, scopeFor,
-  isPhase1, listingSlug, FLAT_GADGETS, deviceNameOf, cleanDesignName, TRUE_SIZE_CLAUSE,
+  isPhase1, listingSlug, TEMPLATE_GADGETS, deviceNameOf, cleanDesignName, TRUE_SIZE_CLAUSE,
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
@@ -765,7 +765,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
 }) {
   const rolls = useQuery(api.rollsManagement.getRollInventory) as any[] | undefined;
   const cutouts = useQuery(api.aiMockups.getCutouts) as any[] | undefined;
-  const jobs = useQuery(api.aiMockups.getJobs, { take: 300 }) as Job[] | undefined;
+  const approvedCounts = useQuery(api.aiMockups.getApprovedCounts) as Record<string, number> | undefined;
   const { shots, blocks, loading } = useShotLibrary();
   const [search, setSearch] = useState("");
   const [source, setSource] = useState<DesignSource | "all">("all");
@@ -807,10 +807,12 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
   }, [wanted, rolls, cutouts]);
 
   const selected = designs.find((d) => d._id === selectedRollId) || null;
-  const jobsForRoll = useMemo(
-    () => (jobs || []).filter((j) => selected && j.rNumber === selected.code),
-    [jobs, selected]
-  );
+  // This design's own mockups, asked for by design code. Reading a page of
+  // recent ones and filtering it here lost a design's work to the next day's.
+  const jobsForRoll = (useQuery(
+    api.aiMockups.getJobs,
+    selected ? { rNumber: selected.code } : "skip"
+  ) as Job[] | undefined) || [];
 
   if (rolls === undefined || cutouts === undefined || loading) {
     return <div className="space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}</div>;
@@ -839,7 +841,7 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
         <p className="text-xs text-muted-foreground">{designs.length} designs</p>
         <div className="max-h-[70vh] space-y-1.5 overflow-y-auto pr-1">
           {designs.map((d) => {
-            const done = (jobs || []).filter((j) => j.rNumber === d.code && j.status === "approved").length;
+            const done = approvedCounts?.[d.code] || 0;
             return (
               <button
                 key={d._id}
@@ -1253,7 +1255,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   /** Listings whose picture a template can make for this design right now. */
   const templatedGroups = useMemo(() =>
     listingGroups.filter((g) =>
-      FLAT_GADGETS.has(g.gadget) &&
+      TEMPLATE_GADGETS.has(g.gadget) &&
       (!phaseOnly || isPhase1(g.listing)) &&
       templateMockups.byListing.get(g.listing.toLowerCase())?.status === "ready"
     ), [listingGroups, phaseOnly, templateMockups.byListing]);

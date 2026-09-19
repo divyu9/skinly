@@ -1655,10 +1655,26 @@ export const PHASE_1_LISTINGS = new Set([
 export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing || "").trim().toLowerCase());
 
 /**
- * Listings whose picture can be made from a template rather than by AI: the
- * skin sits on one flat face that a single perspective warp can cover.
+ * Gadgets whose picture can be made from a template rather than by AI.
+ *
+ * A template is one photo with the skin area in flat chroma green, four
+ * corners marking its main face and that face's real size. The renderer warps
+ * the design onto those corners at true scale and then carries it on across
+ * every green pixel joined to them, so the parts that curve away — a phone's
+ * side wrap, a charger's other faces, a lens barrel, a controller's shoulders
+ * — take the print too instead of staying green. The face is exact; what
+ * wraps is an approximation, without the foreshortening a real curve has, so
+ * a template suits a gadget whose skin is mostly one face and falls short of
+ * the image model where the device is all curve.
+ *
+ * A gadget listed here still needs its own template marked ready before
+ * anything changes: without one the launch plan uses the image model, as it
+ * always did.
  */
-export const FLAT_GADGETS = new Set(["phone", "laptop", "tablet", "mac-mini"]);
+export const TEMPLATE_GADGETS = new Set([
+  "phone", "laptop", "tablet", "mac-mini",
+  "console", "controller", "drone", "camera", "lens", "gimbals", "charger",
+]);
 
 /**
  * The face a skin covers, in cm (width × height), by gadget.

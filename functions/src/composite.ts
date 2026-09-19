@@ -118,31 +118,73 @@ export async function renderTemplateMockup(input: TemplateMockupInput): Promise<
   const off = { x: Math.max(0, (rollW - pieceW) / 2), y: Math.max(0, (rollL - pieceH) / 2) };
   const px = [0, 0, 0];
 
+  const paint = (i: number, a: number, ux: number, uy: number) => {
+    let sx: number, sy: number;
+    if (fit) {
+      sx = Math.min(Math.max(ux, 0), 1) * (design.width - 1);
+      sy = Math.min(Math.max(uy, 0), 1) * (design.height - 1);
+    } else if (input.rotate90) {
+      sx = (off.x + (1 - uy) * heightCm) * ppc;
+      sy = (off.y + ux * widthCm) * ppc;
+    } else {
+      sx = (off.x + ux * widthCm) * ppc;
+      sy = (off.y + uy * heightCm) * ppc;
+    }
+    sampleWrap(design, sx, sy, px);
+    const light = Math.max(0.35, Math.min(1.15, t[i + 1] / neutral));
+    for (let k = 0; k < 3; k++) {
+      const v = Math.min(255, px[k] * light);
+      out[i + k] = Math.round(t[i + k] * (1 - a) + v * a);
+    }
+  };
+
+  /*
+   * The whole green skin, not only the part inside the marked corners.
+   *
+   * The corners mark one flat face, and the paint used to stop dead at them,
+   * so a phone photographed at an angle kept its green side wrap and its green
+   * rounded edges — and stretching the corners out over the sides to cover
+   * them warped the artwork across the face instead, because a flat four-point
+   * warp cannot bend around a corner. Filling every green pixel that is joined
+   * to the marked face, and reading the design beyond the corners where the
+   * wrap goes, gives both: the face at true scale, and the wrap carrying the
+   * same print on past the edge, which is what the real skin does.
+   *
+   * Connectivity is the safeguard — a green prop elsewhere in the frame is
+   * never touched — with a generous box around the face as a second one.
+   */
+  const w = tpl.width, h = tpl.height;
+  const span = Math.max(maxX - minX, maxY - minY);
+  const pad = Math.max(8, Math.round(span * 0.35));
+  const boxX0 = Math.max(0, minX - pad), boxX1 = Math.min(w - 1, maxX + pad);
+  const boxY0 = Math.max(0, minY - pad), boxY1 = Math.min(h - 1, maxY + pad);
+
+  const seen = new Uint8Array(w * h);
+  const stack: number[] = [];
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
-      const i = (y * tpl.width + x) * 4;
-      const a = greenness(t[i], t[i + 1], t[i + 2]);
-      if (a <= 0) continue;
+      const p = y * w + x;
+      const i = p * 4;
+      if (greenness(t[i], t[i + 1], t[i + 2]) <= 0) continue;
       const u = toUnit(x + 0.5, y + 0.5);
-      if (u.x < -0.02 || u.x > 1.02 || u.y < -0.02 || u.y > 1.02) continue;
-      let sx: number, sy: number;
-      if (fit) {
-        sx = Math.min(Math.max(u.x, 0), 1) * (design.width - 1);
-        sy = Math.min(Math.max(u.y, 0), 1) * (design.height - 1);
-      } else if (input.rotate90) {
-        sx = (off.x + (1 - u.y) * heightCm) * ppc;
-        sy = (off.y + u.x * widthCm) * ppc;
-      } else {
-        sx = (off.x + u.x * widthCm) * ppc;
-        sy = (off.y + u.y * heightCm) * ppc;
-      }
-      sampleWrap(design, sx, sy, px);
-      const light = Math.max(0.35, Math.min(1.15, t[i + 1] / neutral));
-      for (let k = 0; k < 3; k++) {
-        const v = Math.min(255, px[k] * light);
-        out[i + k] = Math.round(t[i + k] * (1 - a) + v * a);
-      }
+      if (u.x < 0 || u.x > 1 || u.y < 0 || u.y > 1) continue;
+      if (seen[p]) continue;
+      seen[p] = 1;
+      stack.push(p);
     }
+  }
+
+  for (let head = 0; head < stack.length; head++) {
+    const p = stack[head];
+    const x = p % w, y = (p - x) / w;
+    const i = p * 4;
+    const a = greenness(t[i], t[i + 1], t[i + 2]);
+    const u = toUnit(x + 0.5, y + 0.5);
+    paint(i, a, u.x, u.y);
+    if (x > boxX0) { const q = p - 1; if (!seen[q] && greenness(t[q * 4], t[q * 4 + 1], t[q * 4 + 2]) > 0) { seen[q] = 1; stack.push(q); } }
+    if (x < boxX1) { const q = p + 1; if (!seen[q] && greenness(t[q * 4], t[q * 4 + 1], t[q * 4 + 2]) > 0) { seen[q] = 1; stack.push(q); } }
+    if (y > boxY0) { const q = p - w; if (!seen[q] && greenness(t[q * 4], t[q * 4 + 1], t[q * 4 + 2]) > 0) { seen[q] = 1; stack.push(q); } }
+    if (y < boxY1) { const q = p + w; if (!seen[q] && greenness(t[q * 4], t[q * 4 + 1], t[q * 4 + 2]) > 0) { seen[q] = 1; stack.push(q); } }
   }
   return sharp(out, { raw: { width: tpl.width, height: tpl.height, channels: 4 } }).webp({ quality: 90 }).toBuffer();
 }

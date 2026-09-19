@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 import { CrosshairIcon, ImageIcon, Loader2Icon, RulerIcon, SparklesIcon, UploadIcon, WandSparklesIcon } from "lucide-react";
 import {
-  DEFAULT_BLOCKS, DEFAULT_SURFACE_CM, FLAT_GADGETS, expandPrompt, isPhase1, listingOf, listingSlug, presetFor, shotCodes,
+  DEFAULT_BLOCKS, DEFAULT_SURFACE_CM, TEMPLATE_GADGETS, expandPrompt, isPhase1, listingOf, listingSlug, presetFor, shotCodes,
   type MockupShot, type SharedBlocks,
 } from "@/lib/ai-mockup-shots.ts";
 import { IMAGE_MODELS, resolveSize, formatInr } from "@/lib/ai-mockup-models.ts";
@@ -120,13 +120,23 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
   const listings = useMemo(() => {
     const m = new Map<string, { listing: string; gadget: string; shots: MockupShot[] }>();
     for (const s of shots) {
-      if (!FLAT_GADGETS.has(s.gadget) || s.isActive === false) continue;
+      if (!TEMPLATE_GADGETS.has(s.gadget) || s.isActive === false) continue;
       const listing = listingOf(s);
       if (!presetFor(listing)) continue;
       const k = listing.toLowerCase();
       const row = m.get(k) || { listing, gadget: s.gadget, shots: [] };
       row.shots.push(s);
       m.set(k, row);
+    }
+    /*
+     * Each row's shots in a fixed order, because the first one is the shot the
+     * template is generated from. Taken in whatever order the shot library
+     * happened to return, "Laptop" could be generated from a shot that is not
+     * the laptop's own — and the card then shows the wrong device with the
+     * right name on it, which is only spotted by eye.
+     */
+    for (const row of m.values()) {
+      row.shots.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || String(a.label).localeCompare(String(b.label)));
     }
     return [...m.values()]
       .filter((r) => !phaseOnly || isPhase1(r.listing))
@@ -306,6 +316,12 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                   <p className="text-xs capitalize text-muted-foreground">
                     {row.gadget}
                     {t?.widthCm && t?.heightCm ? ` · ${t.widthCm} × ${t.heightCm} cm` : ""}
+                  </p>
+                  {/* Which shot the photo is generated from, so a template
+                      showing the wrong device is read off the card instead of
+                      spotted later in a listing. */}
+                  <p className="truncate text-[11px] text-muted-foreground/80" title={row.shots[0]?.label}>
+                    from “{row.shots[0]?.label || "no shot"}”
                   </p>
                   {t?.status === "failed" && <p className="text-[11px] text-rose-600">{t.error}</p>}
                 </div>

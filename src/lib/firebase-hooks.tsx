@@ -434,9 +434,43 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'aiMockups.getJobs') {
-          const q = query(collection(db, 'designMockups'), orderBy('createdAt', 'desc'), limit(args?.take || 200));
+          /*
+           * With `rNumber`, this design's mockups — all of them.
+           *
+           * The studio used to ask for the newest 300 across every design and
+           * then filter that list down to the one on screen, so a day's work
+           * disappeared from the studio as soon as the next day's generations
+           * and the launch pipeline's own mockups pushed it past 300. The
+           * pictures were never lost — they were on their listings the whole
+           * time — but the design read as if nothing had ever been made for
+           * it, and its approved count read 0.
+           */
+          const q = args?.rNumber
+            ? query(collection(db, 'designMockups'), where('rNumber', '==', String(args.rNumber)), limit(args?.take || 500))
+            : query(collection(db, 'designMockups'), orderBy('createdAt', 'desc'), limit(args?.take || 200));
           unsubscribe = onSnapshot(q, (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
+            const rows = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            // The per-design query cannot order on the server without a
+            // composite index, so it sorts here — the same newest-first order.
+            if (args?.rNumber) rows.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            setData(rows);
+          });
+        }
+        else if (path === 'aiMockups.getApprovedCounts') {
+          /*
+           * How many shots are finished per design, for the badges down the
+           * studio's design list. Counted off the approved mockups themselves
+           * rather than a page of recent ones, so a design that was finished
+           * last week still shows its count.
+           */
+          const q = query(collection(db, 'designMockups'), where('status', '==', 'approved'));
+          unsubscribe = onSnapshot(q, (snap) => {
+            const counts: Record<string, number> = {};
+            snap.docs.forEach((d) => {
+              const r = String((d.data() as any).rNumber || '').trim();
+              if (r) counts[r] = (counts[r] || 0) + 1;
+            });
+            setData(counts);
           });
         }
         else if (path === 'homepage.getActiveHeroSlides') {
