@@ -1668,7 +1668,16 @@ export const PHASE_1_LISTINGS = new Set([
   "macbook", "laptop",
   "apple ipad", "samsung galaxy tab",
   "ps5", "xbox series x", "xbox series s",
-  "playstation controller",
+  "playstation controller", "xbox controller",
+  "dji drone", "dji drone controller",
+  // A gadget joins the phase as a whole family, never as its leading brand
+  // alone: a listing's scope is "this brand" or "every brand none of the
+  // others named", so leaving Sigma, Tamron and Fujifilm out would leave 137
+  // lens models with no listing at all to land on — not even the catch-all,
+  // which excludes exactly the brands that do have one.
+  "sony camera", "canon camera", "nikon camera",
+  "sony lens", "canon lens", "nikon lens", "sigma lens", "tamron lens", "fujifilm lens", "camera lens",
+  "dji gimbal", "zhiyun gimbal", "gimbal",
 ]);
 
 export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing || "").trim().toLowerCase());

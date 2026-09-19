@@ -153,6 +153,9 @@ const greenness = (r: number, g: number, b: number) => {
   return Math.max(0, Math.min(1, (spill - 25) / 70));
 };
 
+/** Left, right, up, down — the directions the green fill walks in. */
+const STEPS: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
 /**
  * Lays the design onto the template's green surface.
  *
@@ -226,32 +229,49 @@ export function composite(template: ImageData, spec: TemplateSpec, design: Image
   const boxX0 = Math.max(0, minX - pad), boxX1 = Math.min(w - 1, maxX + pad);
   const boxY0 = Math.max(0, minY - pad), boxY1 = Math.min(h - 1, maxY + pad);
 
+  /*
+   * The flood crosses a thin non-green seam.
+   *
+   * On some device photos the side wrap is drawn as its own patch of green,
+   * cut off from the back face by the phone's dark frame edge — a few pixels
+   * of not-green. A strict neighbour-by-neighbour flood stopped at that line
+   * and left the wrap green on those templates while filling it on others.
+   * A step may therefore skip over up to `bridge` pixels to reach the next
+   * green one; the pixels skipped are the frame itself and stay untouched.
+   */
+  const bridge = Math.max(3, Math.min(12, Math.round(span * 0.025)));
+  const isGreen = (q: number) => greenness(t[q * 4], t[q * 4 + 1], t[q * 4 + 2]) > 0;
+
   const seen = new Uint8Array(w * h);
   const stack: number[] = [];
   for (let y = minY; y <= maxY; y++) {
     for (let x = minX; x <= maxX; x++) {
       const p = y * w + x;
-      const i = p * 4;
-      if (greenness(t[i], t[i + 1], t[i + 2]) <= 0) continue;
+      if (seen[p] || !isGreen(p)) continue;
       const u = toUnit(x + 0.5, y + 0.5);
       if (u.x < 0 || u.x > 1 || u.y < 0 || u.y > 1) continue;
-      if (seen[p]) continue;
       seen[p] = 1;
       stack.push(p);
     }
   }
 
-  const isGreen = (q: number) => greenness(t[q * 4], t[q * 4 + 1], t[q * 4 + 2]) > 0;
   for (let head = 0; head < stack.length; head++) {
     const p = stack[head];
     const x = p % w, y = (p - x) / w;
     const i = p * 4;
     const u = toUnit(x + 0.5, y + 0.5);
     paint(i, greenness(t[i], t[i + 1], t[i + 2]), u.x, u.y);
-    if (x > boxX0 && !seen[p - 1] && isGreen(p - 1)) { seen[p - 1] = 1; stack.push(p - 1); }
-    if (x < boxX1 && !seen[p + 1] && isGreen(p + 1)) { seen[p + 1] = 1; stack.push(p + 1); }
-    if (y > boxY0 && !seen[p - w] && isGreen(p - w)) { seen[p - w] = 1; stack.push(p - w); }
-    if (y < boxY1 && !seen[p + w] && isGreen(p + w)) { seen[p + w] = 1; stack.push(p + w); }
+    // Each direction: the nearest green pixel within `bridge` steps, if any.
+    for (const [dx, dy] of STEPS) {
+      for (let k = 1; k <= bridge; k++) {
+        const nx = x + dx * k, ny = y + dy * k;
+        if (nx < boxX0 || nx > boxX1 || ny < boxY0 || ny > boxY1) break;
+        const q = ny * w + nx;
+        if (!isGreen(q)) continue;
+        if (!seen[q]) { seen[q] = 1; stack.push(q); }
+        break;
+      }
+    }
   }
   return out;
 }
