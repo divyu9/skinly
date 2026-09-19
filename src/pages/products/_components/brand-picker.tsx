@@ -109,7 +109,10 @@ export function BrandPicker({ brands }: { brands: BrandOption[] }) {
 
   return (
     <div
-      className="-mx-4 mb-1 flex gap-3.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-2"
+      /* The top padding is the selected chip's ring: overflow-x-auto clips the
+         block axis too, and ring-2 with ring-offset-2 sits 4px outside the
+         circle, so the ring came out shaved flat along its top edge. */
+      className="-mx-4 mb-1 flex gap-3.5 overflow-x-auto px-4 pb-1 pt-1.5 sm:mx-0 sm:gap-4 sm:px-0 sm:pb-2 sm:pt-2"
       role="list"
       aria-label="Shop by brand"
     >

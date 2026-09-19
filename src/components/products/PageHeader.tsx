@@ -52,12 +52,27 @@ export const PageHeader = memo(function PageHeader({
             ? `${cap(finishFilter)} Finish`
             : "Shop";
 
+  /*
+   * The line under the heading. Narrowed down, the store's "more than 500
+   * designs across gadgets" is neither true nor the thing being looked at, so
+   * the filtered views answer the question a shopper has at that point
+   * instead — will it fit my phone — and the block keeps its two lines, so
+   * the brand row below it sits at the same height on every view.
+   */
+  // "your exact Apple phone model" — the brand keeps its capital, the gadget
+  // is a common noun in the middle of a sentence.
+  const fitFor = [brandLabel, gadgetLabel.toLowerCase()].filter(Boolean).join(" ") || "device";
+  const fitLine = `Every design cut to fit your exact ${fitFor} model`;
+
   const subtitle = searchQuery
     ? `${resultsCount} ${resultsCount === 1 ? "result" : "results"} for "${searchQuery}"`
-    : collectionName || brandLabel || gadgetLabel || deviceFilter || finishFilter
-      // Deep in the funnel the line is filler, and the space is a product row.
+    : collectionName
       ? ""
-      : "More than 500 Designs To Choose From Across Gadgets";
+      : brandLabel || gadgetLabel
+        ? fitLine
+        : deviceFilter || finishFilter
+          ? ""
+          : "More than 500 Designs To Choose From Across Gadgets";
 
   return (
     <div className="mb-2 space-y-0.5 text-center sm:mb-3 sm:space-y-1.5">
