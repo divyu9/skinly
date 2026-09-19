@@ -481,8 +481,26 @@ const LOGO_CUT = (logo: string) =>
 const CHARGER_COVERAGE =
   "A vinyl skin covers the whole body — every flat face and the rounded edges between them — as one "
   + "continuous wrap with the design running across the edges. {{fidelity}} Only the metal pins and the "
-  + "USB port opening stay uncovered, the vinyl cut cleanly around them. The skin is thin and perfectly "
-  + "smooth, with no bubbles and no lift. ";
+  + "USB port opening are left unskinned, wherever on the body they happen to be, the vinyl cut cleanly "
+  + "around them. The skin is thin and perfectly smooth, with no bubbles and no lift. ";
+
+/**
+ * Where a wall charger's openings are, said per view.
+ *
+ * An Indian adapter has its pins on one face and its USB port on the opposite
+ * one, so a single view never shows both. Left unsaid, the model put a port on
+ * the face it was pointing at whichever view was asked for, and every charger
+ * came out with its port on the front.
+ */
+const PINS_VIEW =
+  "The pins are on the face pointing away from the camera and only their metal tips show above the "
+  + "body. The USB port is on the opposite face and is NOT visible in this view: the face towards the "
+  + "camera is one unbroken surface with no port, no socket, no opening, no vent, no lettering and no "
+  + "moulded detail of any kind on it. ";
+
+const PORT_VIEW =
+  "This is the face that carries the USB port, and it is the only opening in frame. The pins are on the "
+  + "opposite face, pointing away from the camera, and are NOT visible in this view. ";
 
 const REAL =
   "Real manufactured product photographed as it actually is: exact factory proportions, crisp "
@@ -581,7 +599,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
         + "oak desk and photographed straight on at its own height, the pins pointing straight up. It is a "
         + "small glossy white cuboid about 27 by 27 by 36 millimetres with softly rounded vertical edges, "
         + "reproduced exactly as manufactured. The broad front face fills the centre of the frame with the two "
-        + "chrome pins rising from its top. " + CHARGER_COVERAGE
+        + "chrome pins rising from its top. " + PINS_VIEW + CHARGER_COVERAGE
         + "Soft daylight, a gentle contact shadow beneath it, a softly blurred plant and mug far behind. "
         + "No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
@@ -597,7 +615,7 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
       "A single Apple 20W USB-C power adapter lying on its back on a light oak desk and photographed straight "
         + "down at its bottom face, which fills the centre of the frame: a rounded rectangle with the single "
         + "oval USB-C port in the middle. It is reproduced exactly as manufactured, with softly rounded edges. "
-        + CHARGER_COVERAGE
+        + PORT_VIEW + CHARGER_COVERAGE
         + "Soft daylight, a gentle shadow, the desk grain softly out of focus around it. No people and no hands "
         + "anywhere in the frame. " + REAL + "{{staging}} ",
   },
@@ -1169,9 +1187,12 @@ export const STARTER_SHOTS: Omit<MockupShot, "_id">[] = [
       "An Apple Mac Mini M4 sitting on a light oak desk, photographed from a front three-quarter angle "
         + "slightly above so the flat square top face and two of the four aluminium side faces all read "
         + "clearly and the unit dominates the frame. This is the 2024 M4 model: a small square aluminium "
-        + "block only about 12.7 cm on each side and 5 cm tall, with tightly rounded corners, a power "
-        + "button and two USB-C ports plus a headphone jack on the front edge, and a recessed circular "
-        + "base ring underneath. A vinyl skin covers the flat top face AND all four flat side faces. "
+        + "block only about 12.7 cm on each side and 5 cm tall, with tightly rounded corners and a "
+        + "recessed circular base ring underneath. Its openings sit where Apple puts them and nowhere "
+        + "else: two USB-C ports and a headphone jack on the FRONT edge, and the power socket, Ethernet, "
+        + "HDMI and the Thunderbolt ports in a row across the BACK face. The left and right side faces "
+        + "are completely plain aluminium — no ports, no sockets, no slots, no vents and no lettering on "
+        + "either of them. A vinyl skin covers the flat top face AND all four flat side faces. "
         + "{{fidelity}} The pattern runs continuously over the top and down each side, wrapping the "
         + "rounded vertical corners so the unit reads as a single printed block with no bare aluminium "
         + "band anywhere around it. Only the ports are left out: the vinyl is die-cut precisely around "
@@ -1565,7 +1586,7 @@ const chargerShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
     prompt:
       `${b.device}, standing upright on a light oak desk and photographed straight on at its own height with `
       + "the pins pointing up; its broad front face fills the centre of the frame. It is reproduced exactly as "
-      + "manufactured. " + CHARGER_COVERAGE
+      + "manufactured. " + PINS_VIEW + CHARGER_COVERAGE
       + "Soft daylight and a gentle contact shadow. No people and no hands anywhere in the frame. "
       + REAL + "{{staging}} ",
   },
@@ -1581,7 +1602,7 @@ const chargerShots = (b: BrandListing): Omit<MockupShot, "_id">[] => [
     prompt:
       `${b.device}, lying on its back on a light oak desk and photographed straight down at the face with its `
       + "USB port, which fills the centre of the frame. It is reproduced exactly as manufactured. "
-      + CHARGER_COVERAGE
+      + PORT_VIEW + CHARGER_COVERAGE
       + "Soft daylight and a gentle shadow. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
   },
 ];

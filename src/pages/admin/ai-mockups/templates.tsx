@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
-import { CrosshairIcon, ImageIcon, Loader2Icon, RulerIcon, SparklesIcon, UploadIcon, WandSparklesIcon } from "lucide-react";
+import { CameraIcon, CrosshairIcon, ImageIcon, Loader2Icon, RulerIcon, SparklesIcon, UploadIcon, WandSparklesIcon } from "lucide-react";
 import {
   DEFAULT_BLOCKS, DEFAULT_SURFACE_CM, TEMPLATE_GADGETS, expandPrompt, isPhase1, listingOf, listingSlug, presetFor, shotCodes,
   type MockupShot, type SharedBlocks,
@@ -38,6 +38,8 @@ export interface MockupTemplate {
   gadget: string;
   /** The shot this template is the photo for. Missing on the first ones made. */
   suffix?: string;
+  /** The real product photo this template was painted green from, if any. */
+  sourcePhotoUrl?: string;
   shotLabel?: string;
   imageUrl?: string;
   quad?: Point[];
@@ -150,6 +152,32 @@ export function useCanvasImage() {
   }, [getObject]);
 }
 
+/**
+ * Turns a real product photo into a template.
+ *
+ * Generating the device from nothing but a prompt is where templates went
+ * wrong: the model drew chargers with the port on the front, a Mac mini with
+ * its ports down one side, a laptop that was a phone. A photograph settles all
+ * of that — the object, the angle, the framing and the lighting are already
+ * right — so the model is asked to change one thing only: paint the skinned
+ * surfaces flat chroma green and leave everything else exactly as it is.
+ */
+const GREEN_FROM_PHOTO =
+  "The supplied image is a photograph of a real product. Reproduce that photograph exactly: the same "
+  + "object, the same model, the same angle, the same framing and crop, the same background and the same "
+  + "lighting and shadows. Do not restyle it, do not move the camera, do not redraw the product and do "
+  + "not change its proportions, its markings or where its openings are. "
+  + "Change one thing only: every surface a vinyl skin would cover is now a flat, perfectly uniform "
+  + "chroma-key green — pure #00FF00 — with no pattern, print, texture, lettering or gradient of its own. "
+  + "The product's real lighting, soft shading and reflections still fall across that green so it reads "
+  + "as a lit surface rather than a flat cut-out, and the green follows every curve and rounded edge of "
+  + "the body. "
+  + "Everything a skin is cut around stays exactly as the photograph shows it, in its original colour and "
+  + "material: ports, sockets and connectors, metal pins and plugs, buttons, switches and dials, screens, "
+  + "camera lenses and glass, rubber grips, speaker grilles, vents, hinges and any printed brand logo or "
+  + "wordmark. Nothing else in the picture is green: not the background, not the surface it stands on, "
+  + "not any prop. ";
+
 const GREEN_FIDELITY =
   "The skin is a flat, perfectly uniform chroma-key green — pure #00FF00 — with no pattern, no print, no "
   + "texture and no gradient of its own. Use the supplied reference only for that colour. The device's real "
@@ -188,7 +216,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
   const [editing, setEditing] = useState<TemplateRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const uploadFor = useRef<TemplateRow | null>(null);
+  const uploadFor = useRef<{ row: TemplateRow; greenIt: boolean } | null>(null);
   const greenUrl = useRef<string | null>(null);
   const polling = useRef(new Set<string>());
 
@@ -270,8 +298,9 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
   };
 
   const onUpload = async (file: File) => {
-    const target = uploadFor.current;
-    if (!target) return;
+    const picked = uploadFor.current;
+    if (!picked) return;
+    const { row: target, greenIt } = picked;
     setBusy(rowKey(target));
     try {
       const dataUrl = await new Promise<string>((res, rej) => {
@@ -282,16 +311,31 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
       });
       const up: any = await upload({
         fileBase64: dataUrl,
-        key: `mockup-templates/${listingSlug(target.listing)}-${target.shot.suffix}-${Date.now()}.webp`,
+        key: `mockup-templates/${greenIt ? "source/" : ""}${listingSlug(target.listing)}-${target.shot.suffix}-${Date.now()}.webp`,
         contentType: file.type || "image/jpeg",
       });
       const url = up?.url || up?.publicUrl;
       if (!url) throw new Error("Upload failed");
-      await saveTemplate({
-        id: templateId(target.listing, target.shot.suffix), kind: "template",
+      const common = {
+        id: templateId(target.listing, target.shot.suffix), kind: "template" as const,
         listing: target.listing, gadget: target.gadget, suffix: target.shot.suffix, shotLabel: target.shot.label,
-        imageUrl: url, status: "needs-corners", quad: null, error: "",
-      });
+        error: "",
+      };
+      if (greenIt) {
+        // The photo is the product; the model only paints the skin green.
+        const res: any = await submit({
+          model: model.apiModel,
+          size: resolveSize(model, "1:1"),
+          resolution: model.resolution,
+          quality: model.quality,
+          prompt: GREEN_FROM_PHOTO,
+          imageUrls: [url],
+        });
+        await saveTemplate({ ...common, status: "generating", taskId: res.taskId, sourcePhotoUrl: url, quad: null });
+        toast.success(`${target.shot.label}: painting the skin green (${formatInr(model.usd)})`);
+        return;
+      }
+      await saveTemplate({ ...common, imageUrl: url, status: "needs-corners", quad: null });
       setEditing(target);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
@@ -317,9 +361,12 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
             <p className="text-sm text-muted-foreground">
               One photo per angle with the skin in flat green — a laptop's lid and its keyboard deck are two.
               Once an angle's corners and real size are set, every design becomes that picture at no cost and
-              at true scale; any angle without a template still goes to the image model. Make each one once:
-              generate it (the cheapest model is enough), or upload your own photo with a green skin. Mark
-              only the flat face — a phone's side wrap and rounded edges fill themselves in.
+              at true scale; any angle without a template still goes to the image model. Best route first:
+              <strong> From a photo</strong> takes a normal photo of the real device and paints only its
+              skinned surfaces green, so the ports, pins and proportions are the real ones.
+              <strong> Upload green</strong> is for a photo you have already greened, and
+              <strong> Generate</strong> lets the model invent the device. Mark only the flat face — a
+              phone's side wrap and rounded edges fill themselves in.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -384,14 +431,32 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                   {t?.status === "failed" && <p className="text-[11px] text-rose-600">{t.error}</p>}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={isBusy} onClick={() => void generate(row)}>
+                  {/* Three ways to a template, in the order they are worth
+                      trying: a photo of the real thing beats anything the
+                      model invents, and inventing it is the last resort. */}
+                  <Button
+                    size="sm" variant="outline" className="h-7 text-xs" disabled={isBusy}
+                    title="Upload a normal photo of the real device. The model paints the skinned surfaces green and leaves the ports, pins, lenses and logo alone."
+                    onClick={() => { uploadFor.current = { row, greenIt: true }; fileRef.current?.click(); }}
+                  >
+                    <CameraIcon className="mr-1 size-3" />
+                    From a photo
+                  </Button>
+                  <Button
+                    size="sm" variant="outline" className="h-7 text-xs" disabled={isBusy}
+                    title="Upload a photo whose skin area is already flat green."
+                    onClick={() => { uploadFor.current = { row, greenIt: false }; fileRef.current?.click(); }}
+                  >
+                    <UploadIcon className="mr-1 size-3" />
+                    Upload green
+                  </Button>
+                  <Button
+                    size="sm" variant="outline" className="h-7 text-xs" disabled={isBusy}
+                    title="Let the model invent the device from the shot's prompt."
+                    onClick={() => void generate(row)}
+                  >
                     <SparklesIcon className="mr-1 size-3" />
                     {t?.imageUrl ? "Regenerate" : "Generate"}
-                  </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={isBusy}
-                    onClick={() => { uploadFor.current = row; fileRef.current?.click(); }}>
-                    <UploadIcon className="mr-1 size-3" />
-                    Upload
                   </Button>
                   {t?.imageUrl && (
                     <Button size="sm" className="h-7 text-xs" disabled={isBusy} onClick={() => setEditing(row)}>
