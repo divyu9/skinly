@@ -47,6 +47,12 @@ export interface MockupTemplate {
    * frame with two objects in it — even though its template is ready.
    */
   route?: "template" | "model";
+  /**
+   * Another angle's shot suffix, whose photo, corners and size this angle
+   * borrows. Several brands ship the same adapter, so their charger angles are
+   * the same photograph — made once, marked once, used by all of them.
+   */
+  sameAs?: string;
   shotLabel?: string;
   imageUrl?: string;
   quad?: Point[];
@@ -81,9 +87,29 @@ export interface TemplateIndex {
   byListing: Map<string, MockupTemplate>;
 }
 
-/** The template for one shot, falling back to the listing's own for its first shot. */
+/**
+ * The template for one shot, falling back to the listing's own for its first
+ * shot, and following a link to another angle where one is set.
+ *
+ * The link is one hop on purpose: A may borrow B's photo, but B may not
+ * itself be borrowing, so there is no chain to walk and no cycle to guard.
+ * What comes back is the lender's document — its id is what the renderer
+ * loads — carrying this angle's own route, which stays its own.
+ */
 export function templateForShot(index: TemplateIndex, listing: string, suffix: string, isFirstShot: boolean) {
-  return index.bySuffix.get(suffix) || (isFirstShot ? index.byListing.get(String(listing).toLowerCase()) : undefined);
+  const own = index.bySuffix.get(suffix) || (isFirstShot ? index.byListing.get(String(listing).toLowerCase()) : undefined);
+  if (!own?.sameAs) return own;
+  const lent = index.bySuffix.get(own.sameAs);
+  if (!lent || lent.sameAs) return own;
+  return { ...lent, route: own.route ?? lent.route, sameAs: own.sameAs };
+}
+
+/** Angles whose template another angle may borrow: made here, not borrowed. */
+export function lendableTemplates(index: TemplateIndex, rows: TemplateRow[], not: string) {
+  return rows
+    .filter((r) => r.shot.suffix !== not)
+    .map((r) => ({ row: r, t: index.bySuffix.get(r.shot.suffix) }))
+    .filter((x): x is { row: TemplateRow; t: MockupTemplate } => !!x.t?.imageUrl && !x.t.sameAs);
 }
 
 /** Will this angle's picture come from its template? Ready, and not sent to the model. */
@@ -433,6 +459,8 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
         {rows.map((row) => {
           const t = templateForShot(index, row.listing, row.shot.suffix, row.isFirstShot);
           const isBusy = busy === rowKey(row) || t?.status === "generating";
+          const borrowedFrom = index.bySuffix.get(row.shot.suffix)?.sameAs || "";
+          const lendable = lendableTemplates(index, rows, row.shot.suffix);
           return (
             <Card key={row.shot.suffix}>
               <CardContent className="space-y-2 p-3">
@@ -522,7 +550,37 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     })}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
+                {/* Several brands ship the same adapter, so their angles are
+                    the same photograph. Borrowing one costs nothing to make
+                    and nothing to mark, and the pictures stay in step. */}
+                <div className="flex items-center gap-1.5">
+                  <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Photo</span>
+                  <select
+                    className="h-7 min-w-0 flex-1 rounded-md border bg-background px-1.5 text-[11px]"
+                    value={borrowedFrom || ""}
+                    disabled={isBusy}
+                    onChange={async (e) => {
+                      const from = e.target.value;
+                      try {
+                        await saveTemplate({
+                          id: templateId(row.listing, row.shot.suffix), kind: "template",
+                          listing: row.listing, gadget: row.gadget,
+                          suffix: row.shot.suffix, shotLabel: row.shot.label, sameAs: from,
+                        });
+                        toast.success(from ? "Linked — it uses that angle's photo" : "Unlinked — it has its own photo again");
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Could not save");
+                      }
+                    }}
+                  >
+                    <option value="">Its own</option>
+                    {lendable.map(({ row: r }) => (
+                      <option key={r.shot.suffix} value={r.shot.suffix}>Same as {r.shot.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={`flex flex-wrap gap-1.5 ${borrowedFrom ? "hidden" : ""}`}>
                   {/* Three ways to a template, in the order they are worth
                       trying: a photo of the real thing beats anything the
                       model invents, and inventing it is the last resort. */}
@@ -550,7 +608,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     <SparklesIcon className="mr-1 size-3" />
                     {t?.imageUrl ? "Regenerate" : "Generate"}
                   </Button>
-                  {t?.imageUrl && (
+                  {t?.imageUrl && !borrowedFrom && (
                     <Button size="sm" className="h-7 text-xs" disabled={isBusy} onClick={() => setEditing(row)}>
                       <CrosshairIcon className="mr-1 size-3" />
                       Corners &amp; size

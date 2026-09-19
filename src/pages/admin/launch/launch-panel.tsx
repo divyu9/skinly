@@ -91,12 +91,20 @@ export function LaunchPanel({ design, themes, onLaunched }: {
        * those for a listing's first shot, so corners marked before templates
        * were per angle still count.
        */
+      /*
+       * Resolved angle by angle rather than read straight off the documents:
+       * that way an angle switched to the image model on its card is left out,
+       * and one borrowing another angle's photo arrives with the lender's
+       * template — which is the document the renderer loads.
+       */
       const readyTemplates = new Map<string, { _id: string; widthCm?: number; heightCm?: number }>();
-      // An angle switched to the image model on its card is not offered as a
-      // template here, so the plan sends it to the model like any other.
-      const put = (t: any, k: string) => { if (usesTemplate(t)) readyTemplates.set(k, { _id: t._id, widthCm: t.widthCm, heightCm: t.heightCm }); };
-      bySuffix.forEach(put);
-      byListing.forEach(put);
+      for (const r of templateRows(shots || [], false)) {
+        const t = templateForShot({ bySuffix, byListing }, r.listing, r.shot.suffix, r.isFirstShot);
+        if (usesTemplate(t)) readyTemplates.set(r.shot.suffix, { _id: t!._id, widthCm: t!.widthCm, heightCm: t!.heightCm });
+      }
+      // The older listing-level templates still answer for a listing's first
+      // shot when nothing per-shot has been saved for it.
+      byListing.forEach((t, k) => { if (usesTemplate(t) && !readyTemplates.has(k)) readyTemplates.set(k, { _id: t._id, widthCm: t.widthCm, heightCm: t.heightCm }); });
       const p = buildLaunchPlan({
         design,
         existing,
