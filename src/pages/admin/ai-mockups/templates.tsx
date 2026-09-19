@@ -297,6 +297,19 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
               const url = up?.url || up?.publicUrl;
               if (!url) throw new Error("Upload failed");
               await saveTemplate({ id: t._id, status: "needs-corners", imageUrl: url, taskId: "", quad: null });
+              /*
+               * The greened photo is the best reference the image model can
+               * have for this angle: the same pose and framing as the real
+               * product, and the green draws exactly which surfaces the skin
+               * covers. It replaces the raw photo set when the upload
+               * started — only for an angle whose template came from a photo,
+               * never for one the model invented, which would be a reference
+               * to a guess.
+               */
+              if (t.sourcePhotoUrl && t.suffix) {
+                const shot = (shots || []).find((x) => x.suffix === t.suffix);
+                if (shot?._id) await updateShot({ promptId: shot._id, referenceUrl: url });
+              }
               toast.success(`${t.shotLabel || t.listing}: template ready — mark its corners`);
             }
           } catch (e) {
@@ -308,7 +321,7 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
       }
     }, 5000);
     return () => clearInterval(id);
-  }, [templates, status, upload, saveTemplate]);
+  }, [templates, status, upload, saveTemplate, updateShot, shots]);
 
   const model = IMAGE_MODELS.find((m) => m.id === modelId) || cheapest;
 
@@ -398,6 +411,8 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
         return;
       }
       await saveTemplate({ ...common, imageUrl: url, status: "needs-corners", quad: null });
+      // A hand-greened photo is as good a reference as one we greened.
+      if (target.shot._id) await updateShot({ promptId: target.shot._id, referenceUrl: url });
       setEditing(target);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");

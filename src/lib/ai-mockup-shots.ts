@@ -217,7 +217,16 @@ export const REFERENCE_PREAMBLE =
   "Two images are supplied. The FIRST is the printed design to put on the device — it is the only source of "
   + "the artwork. The SECOND is a composition reference only: copy its camera angle, framing, the device's "
   + "pose and exactly how the skin covers the device, its camera area and its edges; ignore the second "
-  + "image's colours, pattern, text and watermarks entirely. ";
+  + "image's colours, pattern, text and watermarks entirely. "
+  // The reference is often a template photo, where the skinned surfaces have
+  // been painted flat green. That is the most useful reference there is — it
+  // draws the coverage exactly — as long as the green is read as a marking
+  // and never as a colour.
+  + "If that second image shows the device with some of its surfaces in flat bright green, the green is not "
+  + "a colour to copy: it marks precisely which surfaces the skin covers and which stay bare. Put the "
+  + "printed design on exactly those green surfaces, leave everything the reference leaves unpainted — its "
+  + "ports, pins, buttons, lenses, grips and logo — exactly as it shows them, and put no green anywhere in "
+  + "the picture. ";
 
 /**
  * Said when the design image is the device's own piece of the roll, cut to
