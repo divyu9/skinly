@@ -1384,7 +1384,16 @@ const PHONE_BRANDS: BrandListing[] = [
   { listing: "Infinix", code: "INF", brands: ["Infinix"], device: "An Infinix Note 40 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
   { listing: "Tecno", code: "TEC", brands: ["Tecno"], device: "A Tecno Camon 30 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
   { listing: "Lava", code: "LAV", brands: ["Lava"], device: "A Lava Agni 3 smartphone", camera: "the camera module in the upper left, carrying its lenses and the flash" },
-  { listing: "Android Phone", code: "AND", device: "A modern Android smartphone with no brand logo", camera: "the camera island in the upper left, carrying its lenses and the flash" },
+  // The catch-all Android listing needs a phone that reads as Android at a
+  // glance. "A modern Android smartphone with no brand logo" left the model
+  // free to draw an iPhone, which is what it drew. The Phone (2a)'s stacked
+  // centre lenses and Glyph strips can be nothing else.
+  {
+    listing: "Android Phone", code: "AND",
+    device: "A Nothing Phone (2a) smartphone",
+    camera: "the two large circular camera lenses stacked one above the other in the top centre of the back, with the small flash beside them",
+    logo: "pair of curved Glyph LED light strips that loop around the camera lenses",
+  },
 ];
 
 const LAPTOP_BRANDS: BrandListing[] = [
@@ -1648,7 +1657,38 @@ const gimbalShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
     + "hands anywhere in the frame. " + REAL + "{{staging}} ",
 });
 
+/**
+ * The catch-all Android listing's second picture: the brands it covers, laid
+ * out together in one design, so a shopper on a Realme or a Vivo can see their
+ * own phone in the listing rather than infer it from one unbranded handset.
+ */
+const ANDROID_GROUP_SHOT: Omit<MockupShot, "_id"> = {
+  label: "Android Phone — the brands, top down",
+  gadget: "phone",
+  suffix: "phone-android-group",
+  listing: "Android Phone",
+  skuCodes: ["AND"],
+  matchSingleVariant: true,
+  askCutOrientation: true,
+  order: 6,
+  isActive: true,
+  prompt:
+    "Five different Android smartphones lying face down on a light oak desk, photographed straight down "
+    + "from directly above so every back is flat to the camera and none is foreshortened. They are, left "
+    + "to right, a realme, a CMF, an OPPO, a vivo and a Motorola handset, each reproduced exactly as that "
+    + "brand makes it — its own camera layout, its own corner radius, its own proportions — so the five "
+    + "read as five different phones at a glance. They are arranged in a loose fan, overlapping slightly "
+    + "at the corners, evenly lit, filling most of the frame. "
+    + "Every one of the five wears the same vinyl skin, in the same design at the same scale and the same "
+    + "orientation, as though cut from one sheet. {{fidelity}} {{cutOrientation}} "
+    + "On each phone the skin covers the whole back edge to edge and carries on up over the raised camera "
+    + "module; only the camera lens glass, the flash and the sensor holes are cut out. No brand wordmark, "
+    + "logo or text is visible on any of the skins. Soft even daylight, gentle shadows under the phones, "
+    + "no props, no people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+};
+
 STARTER_SHOTS.push(
+  ANDROID_GROUP_SHOT,
   ...PHONE_BRANDS.filter((b) => b.device).map(phoneShot),
   ...LAPTOP_BRANDS.filter((b) => b.device).flatMap(laptopShots),
   ...CHARGER_BRANDS.filter((b) => b.device).flatMap(chargerShots),
