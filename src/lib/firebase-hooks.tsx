@@ -5602,8 +5602,22 @@ export function useMutation(apiRef: any) {
           if (images.some((i: any) => (typeof i === 'string' ? i : i?.url) === args.url)) { alreadyThere++; continue; }
           // The listing's own pictures lead, in the order they were approved;
           // older pictures carried over from before follow them.
-          const added = { url: args.url, alt: args.alt || pdata.title || '', ...(listing ? { listing } : {}) };
-          const next = listing && kind
+          /*
+           * The picture is one file; what it is called here is this listing's
+           * own business. A shared picture came with the alt text and the
+           * listing tag of the angle that made it, so the Oppo charger's
+           * picture described itself as a Xiaomi charger to Google and to
+           * anyone reading with a screen reader. Where several listings share
+           * a picture, each takes its own title and its own tag.
+           */
+          const mine = allowed.length > 1 && kind && allowed.includes(kind);
+          const added = {
+            url: args.url,
+            alt: (mine ? pdata.title : args.alt) || pdata.title || '',
+            ...(mine ? { listing: kind } : listing ? { listing } : {}),
+          };
+          const tag = mine ? kind : listing;
+          const next = tag && kind
             ? [...images.filter((i: any) => i?.listing === kind), added, ...images.filter((i: any) => i?.listing !== kind)]
             : [...images, added];
           await updateDoc(pref, {
