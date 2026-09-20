@@ -154,6 +154,9 @@ const greenness = (r: number, g: number, b: number) => {
 };
 /** How much of a template's white highlight is laid over the design. */
 const SPECULAR = 0.85;
+/** How far past the marked face the design keeps being read, as a fraction of it. */
+const WRAP = 0.25;
+
 
 
 /** Left, right, up, down — the directions the green fill walks in. */
@@ -212,7 +215,21 @@ export function composite(template: ImageData, spec: TemplateSpec, design: Image
   const off = opts.offsetCm || { x: 0, y: 0 };
   const px = [0, 0, 0];
 
-  const paint = (i: number, a: number, ux: number, uy: number) => {
+  const paint = (i: number, a: number, rawX: number, rawY: number) => {
+    /*
+     * How far past the marked face the design is allowed to run.
+     *
+     * Just outside it, the piece really does carry on — that is the phone's
+     * side wrap, and reading the design there is what fills it. Far outside,
+     * two things go wrong at once: a four-point warp extrapolated that far
+     * stops meaning anything, and the reading walks off the piece into an
+     * unrelated stretch of the roll. A charger photographed at three-quarters
+     * has two more faces in green beyond its front one, and they came out as
+     * a slab of some other part of the design. Past the band the design holds
+     * its edge instead, which is what a wrap looks like as it turns away.
+     */
+    const ux = Math.max(-WRAP, Math.min(1 + WRAP, rawX));
+    const uy = Math.max(-WRAP, Math.min(1 + WRAP, rawY));
     let sx: number, sy: number;
     if (fit) {
       sx = Math.min(Math.max(ux, 0), 1) * (design.width - 1);
@@ -247,7 +264,15 @@ export function composite(template: ImageData, spec: TemplateSpec, design: Image
    */
   const w = template.width, h = template.height;
   const span = Math.max(maxX - minX, maxY - minY);
-  const pad = Math.max(8, Math.round(span * 0.35));
+  /*
+   * Room for the whole object, not just a hair past its marked face. A
+   * charger's body carries on well beyond the face its corners describe, and
+   * a tight box left the far half of it green while the near half was
+   * painted — the worst of both. Connectivity is the real guard on what gets
+   * painted, and the design holding its edge past the band means running
+   * further can no longer produce nonsense; this is only a sanity limit.
+   */
+  const pad = Math.max(24, Math.round(span * 1.5));
   const boxX0 = Math.max(0, minX - pad), boxX1 = Math.min(w - 1, maxX + pad);
   const boxY0 = Math.max(0, minY - pad), boxY1 = Math.min(h - 1, maxY + pad);
 
