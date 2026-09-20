@@ -846,20 +846,49 @@ export function useQuery(apiRef: any, args?: any) {
             setData([]);
             return;
           }
-          // Firebase doesn't support generic full text search natively. We will pull recent orders and filter in memory as a simple fallback
-          const q = query(collection(db, 'orders'), limit(100));
+          /*
+           * Firestore has no full-text search, so orders are pulled and
+           * filtered here. Two things were wrong with that.
+           *
+           * It read `limit(100)` with no ordering, so it searched an arbitrary
+           * hundred of the orders that exist — with 148 on file, roughly a
+           * third of them could not be found at all, and which third was up to
+           * Firestore. And it matched `customerName` and `phone` while the
+           * table beside it displays `shippingAddress.fullName` and
+           * `shippingAddress.phone`, so a name read off the screen often
+           * found nothing.
+           *
+           * The cap is a real ceiling, not a page size: past it, this needs
+           * proper pagination or a search index rather than a bigger number.
+           */
+          const q = query(collection(db, 'orders'), limit(1000));
           unsubscribe = onSnapshot(q, (snap) => {
-            const term = args.searchTerm.toLowerCase();
+            const term = args.searchTerm.trim().toLowerCase();
+            // "#4025", "4025" and "4025 " are the same search.
+            const bare = term.replace(/^#/, '');
+            const digits = term.replace(/\D/g, '');
             const docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            const filtered = docs.filter((d: any) => 
-              d.orderNumber?.toLowerCase().includes(term) ||
-              d.orderId?.toLowerCase().includes(term) ||
-              d.customerName?.toLowerCase().includes(term) ||
-              d.customerInfo?.name?.toLowerCase().includes(term) ||
-              d.email?.toLowerCase().includes(term) ||
-              d.customerInfo?.email?.toLowerCase().includes(term) ||
-              d.phone?.toLowerCase().includes(term) ||
-              d.customerInfo?.phone?.toLowerCase().includes(term)
+            const has = (v: any) => String(v || '').toLowerCase().includes(term);
+            const filtered = docs.filter((d: any) =>
+              has(d.orderNumber) ||
+              String(d.orderNumber || '').toLowerCase().replace(/^#/, '').includes(bare) ||
+              has(d.failedOrderNumber) ||
+              has(d.orderId) ||
+              has(d.customerName) ||
+              has(d.shippingAddress?.fullName) ||
+              has(d.customerInfo?.name) ||
+              has(d.email) ||
+              has(d.customerEmail) ||
+              has(d.guestEmail) ||
+              has(d.customerInfo?.email) ||
+              // A tracking number is how a customer service call usually starts.
+              has(d.awbNumber) ||
+              has(d.manualTrackingNumber) ||
+              (digits.length >= 6 && (
+                String(d.phone || '').replace(/\D/g, '').includes(digits) ||
+                String(d.shippingAddress?.phone || '').replace(/\D/g, '').includes(digits) ||
+                String(d.customerInfo?.phone || '').replace(/\D/g, '').includes(digits)
+              ))
             );
             filtered.sort((a: any, b: any) => {
               const aTime = a.createdAt || a._creationTime || 0;
