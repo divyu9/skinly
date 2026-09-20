@@ -973,7 +973,7 @@ export function useQuery(apiRef: any, args?: any) {
              */
             const counts = Object.fromEntries(ORDER_STATUSES.map((st) => [st, 0])) as Record<string, number>;
             for (const d of nonDeleted) {
-              const st = normalizeOrderStatus(d?.status, normalizePaymentStatus(getPayStatus(d)));
+              const st = normalizeOrderStatus(d?.status, normalizePaymentStatus(getPayStatus(d)), d);
               if (st in counts) counts[st] += 1;
             }
             /*
@@ -3530,6 +3530,14 @@ export function useQuery(apiRef: any, args?: any) {
           };
           fetchSitemap();
         }
+        else if (path === 'backup.getRecent') {
+          // Newest first, by the day key the backup writes itself under.
+          unsubscribe = onSnapshot(collection(db, 'backups'), (snap) => {
+            const rows = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            rows.sort((a: any, b: any) => String(b.day || '').localeCompare(String(a.day || '')));
+            setData(rows.slice(0, 7));
+          });
+        }
         else if (path === 'settings.getSetting') {
           unsubscribe = onSnapshot(doc(db, 'settings', args?.key || 'default'), (snap) => {
             setData(snap.exists() ? snap.data() : null);
@@ -6006,6 +6014,15 @@ export function useMutation(apiRef: any) {
         return { success: true, actionType: entry.actionType };
       }
 
+      if (path === 'backup.runBackupNow' || path === 'orders.runUnpaidSweep') {
+        // Both read or rewrite a lot; they belong on the server.
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const name = path.split('.')[1];
+        const call = httpsCallable(getFunctions(), name);
+        const res = await call(args || {});
+        return res.data;
+      }
+
       if (path === 'admin.orders.backfillOrderStatuses') {
         // A one-off rewrite of the statuses written before the vocabulary was
         // settled. Server-side because it reads every order.
@@ -7426,6 +7443,26 @@ export function useConvex() {
         );
         if (minPurchase > 0 && cartTotal < minPurchase) {
           throw new Error(`Minimum purchase of ₹${minPurchase} required`);
+        }
+
+        /*
+         * The same rules placeOrder enforces, checked here too.
+         *
+         * Not for safety — the server is what decides — but so a shopper is
+         * told at the moment they type the code rather than at the moment
+         * they try to pay. An expired or used-up coupon used to apply
+         * cleanly here and then be refused at the till.
+         */
+        const now = Date.now();
+        if (coupon.startDate && now < Number(coupon.startDate)) {
+          throw new Error("This coupon is not valid yet");
+        }
+        if (coupon.endDate && now > Number(coupon.endDate)) {
+          throw new Error("This coupon has expired");
+        }
+        const usageLimit = Number(coupon.usageLimit) || 0;
+        if (usageLimit > 0 && (Number(coupon.usageCount) || 0) >= usageLimit) {
+          throw new Error("This coupon has been fully used");
         }
 
         // Same story for the cap: the form writes `maxDiscount`.

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
-import { Loader2, Key, BarChart3, Database, Image as ImageIcon, UploadIcon, XIcon } from "lucide-react";
+import { Loader2, Key, BarChart3, Database, Image as ImageIcon, UploadIcon, XIcon, ShieldIcon, ClockIcon } from "lucide-react";
 
 export default function SettingsPage() {
   const metaPixelSetting = useQuery(api.settings.getSetting, { key: "META_PIXEL_ID" });
@@ -16,10 +16,77 @@ export default function SettingsPage() {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const updateHomepageSettings = useMutation(api.homepage.updateHomepageSettings);
   const uploadToR2 = useAction(api.r2.uploadToR2);
+  const recentBackups = useQuery(api.backup.getRecent) as any[] | undefined;
+  const runBackupNow = useMutation(api.backup.runBackupNow);
+  const unpaidHoursSetting = useQuery(api.settings.getSetting, { key: "AUTO_CANCEL_UNPAID_HOURS" });
+  const runUnpaidSweep = useMutation(api.orders.runUnpaidSweep);
   
   const [metaPixelId, setMetaPixelId] = useState("");
   const [isSettingUpCors, setIsSettingUpCors] = useState(false);
   const [isSavingPixel, setIsSavingPixel] = useState(false);
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [unpaidHours, setUnpaidHours] = useState("");
+  const [isSavingRule, setIsSavingRule] = useState(false);
+  const [isSweeping, setIsSweeping] = useState(false);
+
+  useEffect(() => {
+    const v = (unpaidHoursSetting as any)?.value;
+    if (v !== undefined && v !== null) setUnpaidHours(String(v));
+  }, [unpaidHoursSetting]);
+
+  const handleBackupNow = async () => {
+    setIsBackingUp(true);
+    try {
+      const res: any = await runBackupNow({});
+      toast.success(res?.message || "Backup complete", {
+        description: res?.sizeMb ? `${res.sizeMb} MB written to R2 under backups/${res.day}` : undefined,
+        duration: 8000,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "The backup did not finish");
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleSaveUnpaidRule = async () => {
+    const n = Number(unpaidHours);
+    if (unpaidHours.trim() !== "" && (!Number.isFinite(n) || (n !== 0 && n < 1))) {
+      toast.error("Enter a whole number of hours, or 0 to switch it off");
+      return;
+    }
+    setIsSavingRule(true);
+    try {
+      await updateSetting({ key: "AUTO_CANCEL_UNPAID_HOURS", value: Math.floor(n || 0) });
+      toast.success(n >= 1 ? `Unpaid orders will be cancelled after ${Math.floor(n)} hours` : "Auto-cancel switched off");
+    } catch {
+      toast.error("Could not save that");
+    } finally {
+      setIsSavingRule(false);
+    }
+  };
+
+  /** Counts first. Choosing the window means seeing whose orders it would take. */
+  const handlePreviewSweep = async (dryRun: boolean) => {
+    const n = Number(unpaidHours);
+    if (!Number.isFinite(n) || n < 1) {
+      toast.error("Enter a window of at least one hour to try");
+      return;
+    }
+    setIsSweeping(true);
+    try {
+      const res: any = await runUnpaidSweep({ hours: Math.floor(n), dryRun });
+      const list = (res?.orders || []).slice(0, 8).map((o: any) => o.orderNumber).join(", ");
+      toast[dryRun ? "warning" : "success"](res?.message || "Done", {
+        description: list || undefined,
+        duration: 12000,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "The sweep did not run");
+    } finally {
+      setIsSweeping(false);
+    }
+  };
 
   // Logo Settings
   const [logoImageUrl, setLogoImageUrl] = useState("");
@@ -361,6 +428,98 @@ export default function SettingsPage() {
                 Configure R2 CORS
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/*
+          A copy of the database somewhere else. There was none, and this shop
+          runs bulk rewrites by hand every week.
+        */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldIcon className="h-5 w-5" />
+              Backups
+            </CardTitle>
+            <CardDescription>
+              Every collection worth keeping is copied to R2 each night at 2:30 am, as one gzipped
+              JSON file per collection. Run one by hand before any large edit.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={handleBackupNow} disabled={isBackingUp} variant="secondary">
+              {isBackingUp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Back up now
+            </Button>
+
+            {recentBackups === undefined ? null : recentBackups.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No backup has run yet. The first one goes tonight, or press the button.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Last runs</p>
+                {recentBackups.map((b: any) => (
+                  <div key={b._id} className="flex items-center gap-3 text-sm">
+                    <span className={`size-2 rounded-full ${b.ok ? "bg-green-500" : "bg-red-500"}`} />
+                    <span className="font-medium tabular-nums">{b.day}</span>
+                    <span className="text-muted-foreground">
+                      {Number(b.totalDocs || 0).toLocaleString("en-IN")} documents
+                      {b.failed?.length ? ` · failed: ${b.failed.join(", ")}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/*
+          Unpaid orders hold their material off the shelf until something
+          closes them. Off by default: the window is a judgement about your own
+          customers, and nobody should find it running by accident.
+        */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClockIcon className="h-5 w-5" />
+              Unpaid orders
+            </CardTitle>
+            <CardDescription>
+              An order takes its sheets and metres off the shelf the moment it is placed, before the
+              payment. One abandoned at the payment page holds them until it is cancelled — and
+              cancelling puts them back. COD orders are never touched by this.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-40">
+                <Label htmlFor="unpaid-hours">Cancel after (hours)</Label>
+                <Input
+                  id="unpaid-hours"
+                  className="mt-1.5"
+                  inputMode="numeric"
+                  placeholder="0 = off"
+                  value={unpaidHours}
+                  onChange={(e) => setUnpaidHours(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleSaveUnpaidRule} disabled={isSavingRule}>
+                {isSavingRule && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+              <Button variant="outline" onClick={() => handlePreviewSweep(true)} disabled={isSweeping}>
+                {isSweeping && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Show me which
+              </Button>
+              <Button variant="outline" onClick={() => handlePreviewSweep(false)} disabled={isSweeping}>
+                Run once now
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              "Show me which" changes nothing — it counts what a window would take, which is how you
+              pick one. Cancelling sends the customer no message.
+            </p>
           </CardContent>
         </Card>
       </div>

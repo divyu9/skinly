@@ -49,12 +49,29 @@ const IS_STATUS = new Set<string>(ORDER_STATUSES as readonly string[]);
  * "failed" was never an order status: it describes the payment, which has its
  * own field, and an order whose payment failed is simply still awaiting it.
  */
-export function normalizeOrderStatus(raw: any, paymentStatus?: any): OrderStatus {
+export function normalizeOrderStatus(
+  raw: any,
+  paymentStatus?: any,
+  opts?: { paymentMethod?: any; prepaidAmount?: any }
+): OrderStatus {
   const v = String(raw || "").trim().toLowerCase();
   const paid = String(paymentStatus || "").trim().toLowerCase() === "success";
 
+  /*
+   * A COD order is not waiting for money.
+   *
+   * `placeOrder` writes "pending" for every order, COD included, so reading
+   * that as "unpaid" put COD orders in Pending Payment — where nobody packs
+   * them, because that tab is the one you ignore. The shop owes them a
+   * parcel; they owe the courier at the door. The exception is partial COD,
+   * where a slice really is due up front and really has not arrived.
+   */
+  const isCod = String(opts?.paymentMethod || "").trim().toLowerCase() === "cod";
+  const prepaidDue = Number(opts?.prepaidAmount) > 0;
+  const settled = paid || (isCod && !prepaidDue);
+
   if (!v || v === "pending" || v === "pending_payment" || v === "failed") {
-    return paid ? "processing" : "pending_payment";
+    return settled ? "processing" : "pending_payment";
   }
   if (IS_STATUS.has(v)) return v as OrderStatus;
 
@@ -62,7 +79,7 @@ export function normalizeOrderStatus(raw: any, paymentStatus?: any): OrderStatus
   // treated as one of the nine, because a tenth value means someone added a
   // writer that does not go through here.
   console.warn("normalizeOrderStatus: unknown status", { raw });
-  return paid ? "processing" : "pending_payment";
+  return settled ? "processing" : "pending_payment";
 }
 
 /**
@@ -168,7 +185,7 @@ export async function setOrderStatus(
     if (!snap.exists) return { kind: "missing" as const };
 
     const order = snap.data() as any;
-    const from = normalizeOrderStatus(order.status, order.paymentStatus);
+    const from = normalizeOrderStatus(order.status, order.paymentStatus, order);
 
     // Already there. The stored string may still be a legacy spelling of it,
     // so it is rewritten in the canonical one and nothing else happens.
@@ -450,7 +467,7 @@ export const backfillOrderStatuses = onCall(async (data: any, context: any) => {
   for (const d of snap.docs) {
     const o = d.data() as any;
     const from = String(o.status || "");
-    const to = normalizeOrderStatus(from, o.paymentStatus);
+    const to = normalizeOrderStatus(from, o.paymentStatus, o);
     if (from === to) continue;
     changes.push({ id: d.id, orderNumber: String(o.orderNumber || o.failedOrderNumber || d.id), from: from || "(blank)", to });
   }
@@ -482,7 +499,7 @@ export const backfillOrderStatuses = onCall(async (data: any, context: any) => {
     const hasAwb = !!String(o.awbNumber || o.manualTrackingNumber || "").trim();
     if (!hasAwb) continue;
     // Against the status it will have after the first pass, not the one on disk.
-    const after = changes.find((c) => c.id === d.id)?.to || normalizeOrderStatus(o.status, o.paymentStatus);
+    const after = changes.find((c) => c.id === d.id)?.to || normalizeOrderStatus(o.status, o.paymentStatus, o);
     if (after !== "processing") continue;
     labelled.push({ id: d.id, orderNumber: String(o.orderNumber || d.id) });
   }

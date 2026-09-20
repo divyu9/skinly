@@ -161,41 +161,83 @@ export const placeOrder = functions
     const shippingFee = itemsTotal >= freeShippingThreshold ? 0 : Math.max(0, flatShippingFee);
 
     // ── 3b. Re-derive every discount server-side ──────────────────────────────
+    /*
+     * Every rule the admin set on a coupon, enforced where it bills.
+     *
+     * The form writes seven of them — a window, a minimum, a cap, a usage
+     * limit, an email allowlist — and this read exactly one, `isActive`. So an
+     * expired coupon still worked, a "first 100 customers" coupon worked
+     * forever because nothing ever incremented `usageCount`, and a coupon
+     * meant for three named people worked for everyone. The list on the admin
+     * page showed "0 / 100" for all of them, which was true and useless.
+     *
+     * The count is claimed in a transaction before the order is written, so
+     * two people racing for the last use cannot both get it.
+     */
     let couponDiscount = 0;
     let walletCreditCouponAmount = 0;
+    let couponCode = "";
     if (couponId && typeof couponId === "string") {
-      const cSnap = await db.collection("coupons").doc(couponId).get();
+      const couponRef = db.collection("coupons").doc(couponId);
+      const cSnap = await couponRef.get();
       const c = cSnap.exists ? (cSnap.data() as any) : null;
+      if (!c) throw new HttpsError("failed-precondition", "That coupon no longer exists");
+      if (c.isActive !== true) throw new HttpsError("failed-precondition", "That coupon is no longer active");
+
+      const now = Date.now();
+      if (c.startDate && now < Number(c.startDate)) {
+        throw new HttpsError("failed-precondition", "That coupon is not valid yet");
+      }
+      if (c.endDate && now > Number(c.endDate)) {
+        throw new HttpsError("failed-precondition", "That coupon has expired");
+      }
+
+      // The form writes `minPurchase` and `maxDiscount`; this read
+      // `minPurchaseAmount` and `maxDiscountAmount`, names nothing has ever
+      // written — so every minimum an admin set was ignored on the line that
+      // actually bills, and every percentage cap with it.
+      const minPurchase = Number(c.minPurchase ?? c.minCartValue ?? c.minPurchaseAmount ?? 0);
+      const maxDiscount = Number(c.maxDiscount ?? c.maxDiscountAmount ?? 0);
+      if (minPurchase > 0 && itemsTotal < minPurchase) {
+        throw new HttpsError("failed-precondition", `This coupon needs a cart of at least ₹${minPurchase}`);
+      }
+
+      const allowed: string[] = Array.isArray(c.allowedCustomerEmails)
+        ? c.allowedCustomerEmails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean)
+        : [];
+      if (allowed.length && !allowed.includes(email)) {
+        throw new HttpsError("failed-precondition", "This coupon is not available on this account");
+      }
+
+      // Claim one use, or find out there are none left.
+      const limit = Number(c.usageLimit) || 0;
+      await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(couponRef);
+        const used = Number((fresh.data() as any)?.usageCount) || 0;
+        if (limit > 0 && used >= limit) {
+          throw new HttpsError("failed-precondition", "This coupon has been fully used");
+        }
+        tx.update(couponRef, { usageCount: used + 1, lastUsedAt: Date.now() });
+      });
+
+      couponCode = String(c.code || "");
+      if (c.discountType === "percentage") {
+        couponDiscount = Math.floor(itemsTotal * (Number(c.discountValue || 0) / 100));
+        if (maxDiscount > 0) couponDiscount = Math.min(couponDiscount, maxDiscount);
+      } else {
+        couponDiscount = Math.min(itemsTotal, Number(c.discountValue || 0));
+      }
       /*
-       * The same field names the apply step reads.
+       * A wallet-credit coupon pays out afterwards; it is not money off now.
        *
-       * This checked `minPurchaseAmount` and `maxDiscountAmount`, which the
-       * admin form has never written — it writes `minPurchase` and
-       * `maxDiscount`. So the minimum an admin set was ignored on the line
-       * that actually bills, and a percentage coupon's cap with it: the live
-       * 5OFF is set to a ₹250 minimum and would have applied to a ₹1 order.
+       * The amount is kept, which it never was: the order recorded a coupon
+       * worth ₹0 and nothing else, so the "₹100 wallet credit on delivery"
+       * the checkout page promised had nowhere to be read from and was never
+       * paid to anybody.
        */
-      const minPurchase = Number(c?.minPurchase ?? c?.minCartValue ?? c?.minPurchaseAmount ?? 0);
-      const maxDiscount = Number(c?.maxDiscount ?? c?.maxDiscountAmount ?? 0);
-      if (c && c.isActive === true && itemsTotal >= minPurchase) {
-        if (c.discountType === "percentage") {
-          couponDiscount = Math.floor(itemsTotal * (Number(c.discountValue || 0) / 100));
-          if (maxDiscount > 0) couponDiscount = Math.min(couponDiscount, maxDiscount);
-        } else {
-          couponDiscount = Math.min(itemsTotal, Number(c.discountValue || 0));
-        }
-        /*
-         * A wallet-credit coupon pays out afterwards; it is not money off now.
-         *
-         * The amount is kept, which it never was: the order recorded a coupon
-         * worth ₹0 and nothing else, so the "₹100 wallet credit on delivery"
-         * the checkout page promised had nowhere to be read from and was never
-         * paid to anybody.
-         */
-        if (c.isWalletCredit === true) {
-          walletCreditCouponAmount = couponDiscount;
-          couponDiscount = 0;
-        }
+      if (c.isWalletCredit === true || c.effectType === "wallet_credit") {
+        walletCreditCouponAmount = couponDiscount;
+        couponDiscount = 0;
       }
     }
 
@@ -270,6 +312,7 @@ export const placeOrder = functions
       itemsTotal,
       shippingFee,
       couponId: couponId || null,
+      couponCode,
       couponDiscount,
       walletUsed,
       // Paid into the wallet when the parcel lands — see creditWalletOnDelivery.

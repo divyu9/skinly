@@ -69,11 +69,20 @@ const IS_STATUS = new Set<string>(ORDER_STATUSES);
  * order status — the payment has its own field, and an order whose payment
  * failed is simply still waiting for it.
  */
-export function normalizeOrderStatus(value: any, paymentStatus?: string): string {
+export function normalizeOrderStatus(
+  value: any,
+  paymentStatus?: string,
+  opts?: { paymentMethod?: any; prepaidAmount?: any }
+): string {
   const v = String(value || "").toLowerCase();
   const paid = paymentStatus === "success";
+  // A COD order is not waiting for money — see the note in
+  // functions/src/orderStatus.ts. Partial COD, where a slice is due up front,
+  // is the exception.
+  const isCod = String(opts?.paymentMethod || "").toLowerCase() === "cod";
+  const settled = paid || (isCod && !(Number(opts?.prepaidAmount) > 0));
   if (!v || v === "pending" || v === "pending_payment" || v === "failed") {
-    return paid ? "processing" : "pending_payment";
+    return settled ? "processing" : "pending_payment";
   }
   return IS_STATUS.has(v) ? v : String(value);
 }
@@ -86,7 +95,7 @@ function num(value: any): number | null {
 
 export function normalizeOrder(order: any): any {
   const paymentStatus = normalizePaymentStatus(order?.paymentStatus || order?.paymentInfo?.status);
-  const status = normalizeOrderStatus(order?.status, paymentStatus);
+  const status = normalizeOrderStatus(order?.status, paymentStatus, order);
   const createdAt = toMillis(order?.createdAt) || toMillis(order?._creationTime) || 0;
 
   const items = Array.isArray(order?.items) ? order.items : [];

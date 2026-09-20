@@ -13,6 +13,8 @@ export * from "./r2";
 export * from "./orders";
 export * from "./ordersAdmin";
 export * from "./orderStatus";
+export * from "./backup";
+export * from "./orderSweeps";
 export * from "./trackOrder";
 export * from "./orderNotifications";
 export * from "./loginOtp";
