@@ -345,10 +345,10 @@ const bundle = (tail: string, name: string, prices: [number, number, number]): P
 
 const CONSOLE_PRICES: [number, number, number] = [799, 999, 1199];
 
-/** A tablet skin is the back, or the back plus front bezel and charger. */
+/** A tablet skin is the back alone, or the whole body — back, front bezel and charger. */
 const tabletViews = (tail: string): PresetVariant[] => [
   { tail, title: "Only Back", price: 249, materialMultiplier: 1 },
-  { tail: `${tail}F`, title: "Back + Front Bezel + Charger", price: 399, materialMultiplier: 1 },
+  { tail: `${tail}F`, title: "Full Body Wrap", price: 399, materialMultiplier: 1 },
 ];
 
 /**
