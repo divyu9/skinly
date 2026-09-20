@@ -41,7 +41,7 @@ function usableImage(items: any[]): string {
 }
 
 /** Queues one WhatsApp message, if that usecase is switched on. */
-async function queueWhatsApp(
+export async function queueWhatsApp(
   db: admin.firestore.Firestore,
   usecaseKey: string,
   phone: string,
@@ -72,11 +72,18 @@ async function queueWhatsApp(
   return true;
 }
 
-/** Sends the order-confirmed mail, if the key and template allow it. */
-async function sendConfirmationEmail(
+/**
+ * Sends one of the order mails, if the key and that template allow it.
+ *
+ * One sender for every usecase rather than one per mail: the four templates
+ * take the same six variables, and the only thing that differs between
+ * "confirmed" and "dispatched" is which row of emailUsecaseTemplates is read.
+ */
+export async function sendUsecaseEmail(
   db: admin.firestore.Firestore,
   order: any,
-  orderId: string
+  orderId: string,
+  usecaseKey: string
 ): Promise<boolean> {
   const authkey = process.env.MSG91_AUTH_TOKEN || "";
   if (!authkey) return false;
@@ -85,7 +92,7 @@ async function sendConfirmationEmail(
   if (!to) return false;
 
   const tpl = await db.collection("emailUsecaseTemplates")
-    .where("usecaseKey", "==", "order_confirmed").limit(1).get();
+    .where("usecaseKey", "==", usecaseKey).limit(1).get();
   if (tpl.empty || tpl.docs[0].data().enabled !== true) return false;
   const t = tpl.docs[0].data();
 
@@ -119,15 +126,15 @@ async function sendConfirmationEmail(
     createdAt: Date.now(),
     recipientEmail: to,
     recipientUserId: order.userId || null,
-    usecaseKey: "order_confirmed",
-    templateName: t.templateName || "order confirmed",
+    usecaseKey,
+    templateName: t.templateName || usecaseKey,
     msg91TemplateId: t.msg91TemplateId,
     relatedOrderId: orderId,
     status: res.ok ? "sent" : "failed",
     ...(res.ok ? {} : { errorMessage: text.slice(0, 500) }),
     retryCount: 0,
   });
-  if (!res.ok) console.error("order_confirmed email failed", { orderId, status: res.status, text });
+  if (!res.ok) console.error(`${usecaseKey} email failed`, { orderId, status: res.status, text });
   return res.ok;
 }
 
@@ -187,7 +194,7 @@ export async function notifyOrderPlaced(
       }, orderId);
     })(),
 
-    sendConfirmationEmail(db, order, orderId),
+    sendUsecaseEmail(db, order, orderId, "order_confirmed"),
   ]);
 
   const [customerWa, adminWa, mail] = results.map((r) =>

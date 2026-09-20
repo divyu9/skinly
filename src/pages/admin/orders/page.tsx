@@ -30,6 +30,8 @@ import { useState, useMemo } from "react";
 import type { Id } from "@/lib/firebase-api";
 import { PDFDocument } from "pdf-lib";
 import { ManualOrderDialog } from "./manual-order-dialog.tsx";
+import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
+import { ADMIN_STATUS_LABELS, STATUS_BADGE, STATUS_TAB } from "@/lib/order-label.ts";
 
 type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
@@ -71,6 +73,7 @@ function AdminOrdersPageInner() {
   const softDeleteOrders = useMutation(api.admin.orders.softDeleteOrders);
   const restoreOrders = useMutation(api.admin.orders.restoreOrders);
   const bulkUpdateOrderStatus = useMutation(api.admin.orders.bulkUpdateOrderStatus);
+  const backfillStatuses = useMutation(api.admin.orders.backfillOrderStatuses);
   const bulkUpdatePaymentStatus = useMutation(api.admin.orders.bulkUpdatePaymentStatus);
 
   const stats = useQuery(api.admin.orders.getOrderStats);
@@ -113,22 +116,23 @@ function AdminOrdersPageInner() {
     return filtered;
   }, [baseOrders, dateFilter, customStartDate, customEndDate]);
 
-  const computedStats = useMemo(() => {
+  const computedStats = useMemo<Record<string, number>>(() => {
     // Zeroes rather than null: the render below dereferences every field, and
     // it is only safe today because of an early return three hundred lines
     // away. Moving that guard would turn this into a blank admin page.
+    //
+    // One counter per status, taken off the list itself, so a status added to
+    // the vocabulary gets its tab and its number without being named here too.
+    const blank = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0])) as Record<string, number>;
     if (!displayOrders) return {
-      total: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0, rto: 0,
-      pending_payment: 0, failed: 0, deleted: 0, totalRevenue: 0, pendingPayments: 0,
+      ...blank, total: 0, failed: 0, deleted: 0, totalRevenue: 0, pendingPayments: 0,
     };
     return {
+      ...blank,
+      ...Object.fromEntries(
+        ORDER_STATUSES.map((s) => [s, displayOrders.filter((o: any) => o.status === s).length])
+      ),
       total: displayOrders.length,
-      processing: displayOrders.filter((o) => o.status === "processing").length,
-      shipped: displayOrders.filter((o) => o.status === "shipped").length,
-      delivered: displayOrders.filter((o) => o.status === "delivered").length,
-      cancelled: displayOrders.filter((o) => o.status === "cancelled").length,
-      rto: displayOrders.filter((o) => o.status === "rto").length,
-      pending_payment: displayOrders.filter((o) => o.status === "pending_payment").length,
       failed: displayOrders.filter((o) => normalizePaymentStatus(o.paymentStatus) === "failed").length,
       deleted: displayOrders.filter((o) => o.isDeleted).length,
       totalRevenue: displayOrders
@@ -144,26 +148,7 @@ function AdminOrdersPageInner() {
     };
   }, [displayOrders]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "processing":
-        return "bg-purple-500/10 text-purple-600 border-purple-500/20";
-      case "shipped":
-        return "bg-indigo-500/10 text-indigo-600 border-indigo-500/20";
-      case "delivered":
-        return "bg-green-500/10 text-green-600 border-green-500/20";
-      case "cancelled":
-        return "bg-red-500/10 text-red-600 border-red-500/20";
-      case "rto":
-        return "bg-orange-500/10 text-orange-600 border-orange-500/20";
-      case "pending_payment":
-        return "bg-yellow-500/10 text-yellow-600 border-yellow-500/20";
-      case "failed":
-        return "bg-red-500/10 text-red-600 border-red-500/20";
-      default:
-        return "";
-    }
-  };
+  const getStatusColor = (status: string) => STATUS_BADGE[status] || "";
 
   const getPaymentStatusColor = (status?: string) => {
     switch (status) {
@@ -503,6 +488,48 @@ function AdminOrdersPageInner() {
     }
   };
 
+  const [backfilling, setBackfilling] = useState(false);
+
+  /**
+   * Counts first, then asks.
+   *
+   * It rewrites every order's status, so it says what it is about to do and
+   * waits — a silent pass over the whole collection is not something to find
+   * out about afterwards.
+   */
+  const handleBackfillStatuses = async () => {
+    setBackfilling(true);
+    try {
+      const preview: any = await backfillStatuses({ dryRun: true });
+      if (!preview?.wouldChange) {
+        toast.success(`Nothing to fix — all ${preview?.scanned ?? 0} orders are already in the current vocabulary`);
+        return;
+      }
+      const moves = Object.entries(preview.byMove || {})
+        .map(([move, n]) => `${n} × ${move}`)
+        .join(", ");
+      toast.warning(`${preview.wouldChange} of ${preview.scanned} orders would be rewritten`, {
+        description: moves,
+        duration: 15000,
+        action: {
+          label: "Rewrite them",
+          onClick: async () => {
+            try {
+              const done: any = await backfillStatuses({ dryRun: false });
+              toast.success(done?.message || "Statuses rewritten");
+            } catch (e) {
+              toast.error(e instanceof Error ? e.message : "Could not rewrite the statuses");
+            }
+          },
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not read the statuses");
+    } finally {
+      setBackfilling(false);
+    }
+  };
+
   const handleBulkOrderStatus = async () => {
     if (selectedOrders.size === 0 || !bulkNewOrderStatus) return;
     try {
@@ -510,7 +537,11 @@ function AdminOrdersPageInner() {
         orderIds: Array.from(selectedOrders),
         status: bulkNewOrderStatus,
       });
-      toast.success(`${result.updatedCount} order(s) updated to "${bulkNewOrderStatus}"`);
+      // The server refuses a move the graph does not allow, so some of a
+      // selection can go through and some not. Say which, rather than
+      // reporting the whole batch as done.
+      if (result.blockedCount) toast.warning(result.message);
+      else toast.success(result.message || `${result.updatedCount} order(s) updated`);
       setSelectedOrders(new Set());
       setShowBulkOrderStatusDialog(false);
     } catch (error) {
@@ -632,6 +663,11 @@ function AdminOrdersPageInner() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={handleBackfillStatuses} disabled={backfilling}
+            title="Rewrites statuses written by older checkouts — the literal &quot;pending&quot; that COD orders still carry — into the current vocabulary">
+            {backfilling ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <ListChecksIcon className="size-4 mr-2" />}
+            Fix legacy statuses
+          </Button>
           <Button variant="default" onClick={() => setShowManualOrderDialog(true)}>
             <PlusIcon className="size-4 mr-2" />
             Create Manual Order
@@ -730,42 +766,14 @@ function AdminOrdersPageInner() {
       {/* Status Tabs */}
         <Tabs value={statusFilter} onValueChange={setStatusFilter}>
           <TabsList className="w-full justify-start overflow-x-auto h-auto py-2">
-            <TabsTrigger value="processing" className="flex items-center gap-2 data-[state=active]:bg-purple-500/10 dark:data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-600 data-[state=active]:shadow-none">
-              Processing
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/20">
-                {stats.processing}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="pending_payment" className="flex items-center gap-2 data-[state=active]:bg-yellow-500/10 dark:data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-600 data-[state=active]:shadow-none">
-              Pending Payment
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-yellow-500/10 text-yellow-600 border-yellow-500/20">
-                {stats.pending_payment}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="shipped" className="flex items-center gap-2 data-[state=active]:bg-indigo-500/10 dark:data-[state=active]:bg-indigo-500/20 data-[state=active]:text-indigo-600 data-[state=active]:shadow-none">
-              Shipped
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-indigo-500/10 text-indigo-600 border-indigo-500/20">
-                {stats.shipped}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="delivered" className="flex items-center gap-2 data-[state=active]:bg-green-500/10 dark:data-[state=active]:bg-green-500/20 data-[state=active]:text-green-600 data-[state=active]:shadow-none">
-              Delivered
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-green-500/10 text-green-600 border-green-500/20">
-                {stats.delivered}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="cancelled" className="flex items-center gap-2 data-[state=active]:bg-red-500/10 dark:data-[state=active]:bg-red-500/20 data-[state=active]:text-red-600 data-[state=active]:shadow-none">
-              Cancelled
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
-                {stats.cancelled}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="rto" className="flex items-center gap-2 data-[state=active]:bg-orange-500/10 dark:data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-600 data-[state=active]:shadow-none">
-              RTO
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-orange-500/10 text-orange-600 border-orange-500/20">
-                {stats.rto}
-              </Badge>
-            </TabsTrigger>
+            {ORDER_STATUSES.map((st) => (
+              <TabsTrigger key={st} value={st} className={`flex items-center gap-2 ${STATUS_TAB[st]}`}>
+                {ADMIN_STATUS_LABELS[st]}
+                <Badge variant="secondary" className={`ml-1 h-5 px-1.5 ${STATUS_BADGE[st]}`}>
+                  {stats[st]}
+                </Badge>
+              </TabsTrigger>
+            ))}
             <TabsTrigger value="failed" className="flex items-center gap-2 data-[state=active]:bg-red-500/10 dark:data-[state=active]:bg-red-500/20 data-[state=active]:text-red-600 data-[state=active]:shadow-none">
               Failed Orders
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
@@ -1248,12 +1256,9 @@ function AdminOrdersPageInner() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="processing">Processing</SelectItem>
-                <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                <SelectItem value="shipped">Shipped</SelectItem>
-                <SelectItem value="delivered">Delivered</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-                <SelectItem value="rto">RTO</SelectItem>
+                {ORDER_STATUSES.map((st) => (
+                  <SelectItem key={st} value={st}>{ADMIN_STATUS_LABELS[st]}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

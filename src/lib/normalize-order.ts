@@ -37,18 +37,45 @@ export function normalizePaymentStatus(value: any): string {
   return value;
 }
 
+/**
+ * The nine statuses an order can be in, in the order it passes through them.
+ *
+ * Kept in step with ORDER_STATUSES in functions/src/orderStatus.ts, which is
+ * where the moves between them are decided. This copy exists so the pages can
+ * list and label them without a round trip.
+ */
+export const ORDER_STATUSES = [
+  "pending_payment",
+  "processing",
+  "ready_to_ship",
+  "shipped",
+  "out_for_delivery",
+  "undelivered",
+  "delivered",
+  "cancelled",
+  "rto",
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+const IS_STATUS = new Set<string>(ORDER_STATUSES);
+
+/**
+ * What a stored status means, whatever wrote it.
+ *
+ * The same reconciliation the server does in orderStatus.ts, because orders
+ * written before the backfill still carry the literal "pending" that
+ * `placeOrder` wrote for every order, COD included. "failed" was never an
+ * order status — the payment has its own field, and an order whose payment
+ * failed is simply still waiting for it.
+ */
 export function normalizeOrderStatus(value: any, paymentStatus?: string): string {
   const v = String(value || "").toLowerCase();
-  if (paymentStatus === "success" && (v === "" || v === "pending" || v === "pending_payment")) return "processing";
-  if (v === "pending") return "pending_payment";
-  if (v === "pending_payment") return "pending_payment";
-  if (v === "processing") return "processing";
-  if (v === "shipped") return "shipped";
-  if (v === "delivered") return "delivered";
-  if (v === "cancelled") return "cancelled";
-  if (v === "rto") return "rto";
-  if (v === "failed") return "failed";
-  return value;
+  const paid = paymentStatus === "success";
+  if (!v || v === "pending" || v === "pending_payment" || v === "failed") {
+    return paid ? "processing" : "pending_payment";
+  }
+  return IS_STATUS.has(v) ? v : String(value);
 }
 
 /** A finite number, or null when the field is absent or unusable. */

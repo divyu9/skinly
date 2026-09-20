@@ -2,6 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
+import { setOrderStatus } from "./orderStatus";
 
 /**
  * RapidShyp shipment creation.
@@ -298,6 +299,22 @@ export const createShipment = onCall(async (data: any, context: any) => {
   if (shipment.shipmentId) update.shipmentId = shipment.shipmentId;
   await orderRef.update(update);
 
+  /*
+   * The order moves too. This used to write `shippingStatus` and stop, so an
+   * order with a printed label and a courier assigned still sat in Processing
+   * — while cancelling that same shipment did move the status. The parcel is
+   * not shipped yet (nobody has picked it up), so it becomes ready to ship,
+   * and the courier's first scan turns it into shipped through the webhook.
+   */
+  const moved = await setOrderStatus(admin.firestore(), orderId, "ready_to_ship", {
+    source: "shipment",
+    actor: uid,
+    reason: `AWB ${awbNumber}`,
+  });
+  if (moved.blocked) {
+    console.warn("createShipment: status left as it was", { orderId, ...moved });
+  }
+
   return {
     success: true,
     awbNumber,
@@ -377,6 +394,16 @@ export const createRapidshypOrder = onCall(async (data: any, context: any) => {
   }
   await orderRef.update(update);
 
+  // An order booked with no courier is still in the workshop; only an AWB
+  // means it is packed and waiting for a pickup.
+  if (shipment?.awb) {
+    await setOrderStatus(admin.firestore(), orderId, "ready_to_ship", {
+      source: "shipment",
+      actor: uid,
+      reason: `AWB ${shipment.awb}`,
+    });
+  }
+
   return {
     success: true,
     rapidshypOrderId,
@@ -388,7 +415,7 @@ export const createRapidshypOrder = onCall(async (data: any, context: any) => {
 });
 
 export const cancelShipment = onCall(async (data: any, context: any) => {
-  await requireAdmin(context);
+  const { uid } = await requireAdmin(context);
   const orderId = String(data?.orderId || "");
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
 
@@ -421,11 +448,27 @@ export const cancelShipment = onCall(async (data: any, context: any) => {
     shipmentId: admin.firestore.FieldValue.delete(),
     shippingProvider: admin.firestore.FieldValue.delete(),
     shippingStatus: "",
-    status: "processing",
     updatedAt: Date.now(),
   });
 
-  return { success: true, message: "Shipment cancelled successfully", orderNumber: order.orderNumber };
+  /*
+   * Back to the workshop — but asked for, not asserted. This wrote
+   * `status: "processing"` outright, which also reopened orders that had
+   * already been delivered or cancelled. The graph refuses those and says so.
+   */
+  const moved = await setOrderStatus(db, orderId, "processing", {
+    source: "shipment",
+    actor: uid,
+    reason: "Shipment cancelled",
+  });
+
+  return {
+    success: true,
+    message: moved.blocked
+      ? `Shipment cancelled. The order is ${moved.from} and was left there.`
+      : "Shipment cancelled successfully",
+    orderNumber: order.orderNumber,
+  };
 });
 
 /**
@@ -463,4 +506,59 @@ export const bulkFetchLabels = onCall(async (data: any, context: any) => {
   }
 
   return { success: errors.length === 0, labels, errors };
+});
+
+/**
+ * Tracking typed in by hand, for a parcel that went by some other courier.
+ *
+ * This lived in the browser shim and decided the status itself:
+ *
+ *     const statusUpdated = current === 'processing' || current === 'pending_payment';
+ *
+ * Two faults in one line. `pending_payment` meant an order nobody had paid for
+ * could be marked shipped, and the list left out "pending" — the value the
+ * live checkout actually writes — so the same button moved some orders and
+ * silently ignored others, depending on which generation of checkout had
+ * written them. Both disappear by asking setOrderStatus instead: it normalises
+ * the stored value first, and the graph has no edge from pending_payment to
+ * shipped.
+ */
+export const saveManualTracking = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  const trackingNumber = String(data?.trackingNumber || "").trim();
+  const courierCompany = String(data?.courierCompany || "").trim();
+
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+  if (!trackingNumber) throw new HttpsError("invalid-argument", "Tracking number is required");
+  if (!courierCompany) throw new HttpsError("invalid-argument", "Courier company is required");
+
+  const db = admin.firestore();
+  const ref = db.collection("orders").doc(orderId);
+  if (!(await ref.get()).exists) throw new HttpsError("not-found", "Order not found");
+
+  await ref.update({
+    manualTrackingNumber: trackingNumber,
+    manualCourierCompany: courierCompany,
+    shippingStatus: `Shipped via ${courierCompany}`,
+    shippingProvider: "manual",
+    updatedAt: Date.now(),
+  });
+
+  const moved = await setOrderStatus(db, orderId, "shipped", {
+    source: "manual-tracking",
+    actor: uid,
+    reason: `${courierCompany} ${trackingNumber}`,
+  });
+
+  return {
+    success: true,
+    statusUpdated: moved.changed,
+    status: moved.to || moved.from,
+    message: moved.changed
+      ? "Manual tracking saved — the order is now shipped and the customer has been told."
+      : moved.blocked
+        ? `Manual tracking saved. The order is ${moved.from}, so its status was left alone.`
+        : "Manual tracking saved.",
+  };
 });

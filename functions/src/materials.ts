@@ -473,3 +473,87 @@ export const materialMapping = onCall(async (_data: any, context: any) => {
     orphanStock,
   };
 });
+
+/**
+ * Puts an order's material back on the shelf when it is cancelled or comes back.
+ *
+ * `reserveMaterialForOrder` takes the sheets and metres the moment an order is
+ * placed, and nothing ever gave them back. Every cancellation and every RTO
+ * quietly cost the shelf its stock for good, so the counted figure drifted
+ * further below the real one with each one — and since availability is derived
+ * from that figure, listings went out of stock while the stock was in the
+ * drawer.
+ *
+ * What goes back is what actually came off (`before - after`), not what was
+ * asked for: a draw-down is clamped at zero, so an order that went short took
+ * less than it requested and must not be credited the difference.
+ *
+ * Guarded by `materialReleasedAt`, because cancelled → RTO is a real sequence
+ * and paying the stock back twice is the same bug in the other direction.
+ */
+export async function releaseMaterialForOrder(
+  db: admin.firestore.Firestore,
+  orderRef: admin.firestore.DocumentReference
+): Promise<Array<{ code: string; unit: string; returned: number }>> {
+  const taken = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(orderRef);
+    if (!snap.exists) return null;
+    const order = snap.data() as any;
+    if (order.materialReleasedAt) return null;
+    const consumed: any[] = Array.isArray(order.materialConsumed) ? order.materialConsumed : [];
+    if (!consumed.length) return null;
+    tx.update(orderRef, { materialReleasedAt: Date.now() });
+    return consumed;
+  });
+  if (!taken) return [];
+
+  const [rollSnap, cutoutSnap] = await Promise.all([
+    db.collection("rollInventory").get(),
+    db.collection("cutoutInventory").get(),
+  ]);
+  const stock = buildStockMap(rollSnap.docs, cutoutSnap.docs);
+
+  const back = new Map<string, { collection: string; docId: string; code: string; field: string; amount: number; unit: string }>();
+  for (const row of taken) {
+    const code = String(row?.code || "").trim().toUpperCase();
+    const entry = code ? stock.get(code) : undefined;
+    if (!entry) {
+      console.warn("releaseMaterial: no stock record for", { order: orderRef.id, code });
+      continue;
+    }
+    const amount = Number(row?.before) - Number(row?.after);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const collection = entry.kind === "cutout" ? "cutoutInventory" : "rollInventory";
+    const field = entry.kind === "cutout" ? "sheetsAvailable" : "metersAvailable";
+    const key = `${collection}/${entry.id}`;
+    const prev = back.get(key);
+    if (prev) prev.amount += amount;
+    else back.set(key, { collection, docId: entry.id, code: entry.code, field, amount, unit: entry.kind === "cutout" ? "sheets" : "m" });
+  }
+  if (!back.size) return [];
+
+  const returned = await db.runTransaction(async (tx) => {
+    const entries = [...back.values()];
+    const refs = entries.map((e) => db.collection(e.collection).doc(e.docId));
+    const snaps = await tx.getAll(...refs);
+    const applied: Array<{ code: string; unit: string; returned: number }> = [];
+    entries.forEach((e, i) => {
+      if (!snaps[i].exists) return;
+      const before = Number((snaps[i].data() as any)?.[e.field]) || 0;
+      const after = Number((before + e.amount).toFixed(4));
+      tx.update(refs[i], { [e.field]: after, updatedAt: Date.now() });
+      applied.push({ code: e.code, unit: e.unit, returned: e.amount });
+    });
+    return applied;
+  });
+
+  // The shelf moved, so what every variant on those designs can make moved too.
+  try {
+    await syncStockForDesign(db, returned.map((r) => r.code));
+  } catch (e: any) {
+    console.warn("releaseMaterial: restock sync skipped", { order: orderRef.id, error: e?.message || e });
+  }
+
+  console.log("releaseMaterial", { order: orderRef.id, returned });
+  return returned;
+}

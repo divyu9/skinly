@@ -104,14 +104,18 @@ function OrderDetailPageInner() {
     if (!orderId || !order) return;
     try {
       const oldStatus = order.status;
-      const result = await updateOrderStatus({ orderId: orderId as Id<"orders">, status });
-      if (result.whatsappErrors && result.whatsappErrors.length > 0) {
-        toast.warning("Status updated but WhatsApp notification failed", {
-          description: result.whatsappErrors[0], duration: 8000,
-        });
-      } else {
-        toast.success("Order status and WhatsApp notification sent");
+      const result: any = await updateOrderStatus({ orderId: orderId as Id<"orders">, status });
+      /*
+       * The server decides whether the move is legal, so a refusal is a normal
+       * answer and is shown as one. This used to read `result.whatsappErrors`
+       * off a string, so the else branch always ran and the toast claimed a
+       * WhatsApp message had gone out on every change — none ever had.
+       */
+      if (result?.blockedCount > 0) {
+        toast.warning(result.message || "That status change is not allowed", { duration: 8000 });
+        return;
       }
+      toast.success(result?.message || `Status set to ${status}`);
       let defaultEmailType: EmailType = "order_confirmed";
       if (status === "processing") defaultEmailType = "order_confirmed";
       else if (status === "shipped") defaultEmailType = "order_dispatched";
@@ -374,8 +378,7 @@ function OrderDetailPageInner() {
         courierCompany: manualTrackingForm.courierCompany,
       });
       if (result.success) {
-        const statusMsg = result.statusUpdated ? " Order status updated to shipped." : "";
-        toast.success(`Manual tracking saved successfully!${statusMsg}`);
+        toast.success(result.message || "Manual tracking saved", { duration: 6000 });
         setShowManualTrackingDialog(false);
         setManualTrackingForm({ trackingNumber: "", courierCompany: "" });
       }

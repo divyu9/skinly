@@ -10,7 +10,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { normalizeModelName } from '@/lib/mockups';
 import { normalizeImageForUpload, withExtension } from '@/lib/image-processing';
 
-import { normalizeOrder } from "./normalize-order.ts";
+import { normalizeOrder, normalizeOrderStatus, normalizePaymentStatus, ORDER_STATUSES } from "./normalize-order.ts";
 
 /*
  * Firestore read audit — off unless localStorage.skinly_read_audit === "1".
@@ -932,15 +932,25 @@ export function useQuery(apiRef: any, args?: any) {
             const nonDeleted = docs.filter((d) => !d?.isDeleted);
             const getPayStatus = (d: any) => d?.paymentStatus || d?.paymentInfo?.status;
 
+            /*
+             * Counted through the same normaliser the tabs filter by.
+             *
+             * These were counted off the raw `status`, so every order the live
+             * checkout wrote — which says "pending", not "processing" — fell
+             * into none of the tabs and the numbers above them never added up
+             * to the total. "pending_payment" was worse: it counted orders
+             * whose *payment* was pending, which is a different question and
+             * gave a figure that disagreed with the list it sat on.
+             */
+            const counts = Object.fromEntries(ORDER_STATUSES.map((st) => [st, 0])) as Record<string, number>;
+            for (const d of nonDeleted) {
+              const st = normalizeOrderStatus(d?.status, normalizePaymentStatus(getPayStatus(d)));
+              if (st in counts) counts[st] += 1;
+            }
             setData({
+              ...counts,
               total: nonDeleted.length,
-              processing: nonDeleted.filter((d) => d?.status === 'processing').length,
-              pending_payment: nonDeleted.filter((d) => getPayStatus(d) === 'pending' || !getPayStatus(d)).length,
-              shipped: nonDeleted.filter((d) => d?.status === 'shipped').length,
-              delivered: nonDeleted.filter((d) => d?.status === 'delivered').length,
-              cancelled: nonDeleted.filter((d) => d?.status === 'cancelled').length,
-              rto: nonDeleted.filter((d) => d?.status === 'rto').length,
-              failed: nonDeleted.filter((d) => getPayStatus(d) === 'failed').length,
+              failed: nonDeleted.filter((d) => normalizePaymentStatus(getPayStatus(d)) === 'failed').length,
               deleted: docs.filter((d) => d?.isDeleted).length,
             });
           });
@@ -4750,23 +4760,47 @@ export function useMutation(apiRef: any) {
           return docId;
         }
         
-        if (actualActionName === 'updateOrderStatus') {
-          await updateDoc(doc(db, trueCollection, args.orderId), { 
+        /*
+         * Status moves go to the server, never straight to the document.
+         *
+         * This used to write `status` here and return the order id, while the
+         * page read `result.whatsappErrors` off that string — always
+         * undefined, so it reported "status updated and WhatsApp notification
+         * sent" on every change, having sent nothing. The callable owns the
+         * transition graph, the history and the messages, and it answers with
+         * what actually happened.
+         */
+        if (actualActionName === 'updateOrderStatus' || actualActionName === 'setOrderStatus') {
+          const { getFunctions, httpsCallable } = await import('firebase/functions');
+          const call = httpsCallable(getFunctions(), 'setOrderStatusAdmin');
+          const res = await call({
+            orderId: args.orderId,
+            orderIds: args.orderIds,
             status: args.status,
-            updatedAt: Date.now()
+            reason: args.reason,
+            force: args.force === true,
+            notify: args.notify === true,
           });
-          return args.orderId;
+          return res.data;
         }
-        
+
+        /*
+         * Shipping details typed in by hand.
+         *
+         * The form sends awbNumber / trackingUrl / shippingStatus; this read
+         * courierName / trackingNumber / status, so every field it wrote was
+         * undefined — which Firestore rejects outright, meaning the Edit
+         * Shipping dialog had never once saved anything. It also forced the
+         * order to "shipped", which is not what editing an AWB means; the
+         * status dropdown is where that is decided.
+         */
         if (actualActionName === 'updateShippingInfo') {
-          await updateDoc(doc(db, trueCollection, args.orderId), { 
-            courierName: args.courierName,
-            trackingNumber: args.trackingNumber,
-            trackingUrl: args.trackingUrl,
-            status: args.status || 'shipped',
-            shippedAt: Date.now(),
-            updatedAt: Date.now()
-          });
+          const patch: Record<string, unknown> = { updatedAt: Date.now() };
+          if (args.awbNumber !== undefined) patch.awbNumber = String(args.awbNumber || '').trim();
+          if (args.trackingUrl !== undefined) patch.trackingUrl = String(args.trackingUrl || '').trim();
+          if (args.shippingStatus !== undefined) patch.shippingStatus = String(args.shippingStatus || '').trim();
+          if (args.courierName !== undefined) patch.courierName = String(args.courierName || '').trim();
+          await updateDoc(doc(db, trueCollection, args.orderId), patch);
           return args.orderId;
         }
         
@@ -4808,10 +4842,19 @@ export function useMutation(apiRef: any) {
           return args.orderId;
         }
         
+        /*
+         * Deleting and restoring leave the status alone.
+         *
+         * Soft-delete used to overwrite it with the literal "deleted", which is
+         * not one of the statuses and destroyed the only record of where the
+         * order had got to — and restore then guessed "processing", so a
+         * delivered order deleted by mistake came back as one still to pack.
+         * `isDeleted` is what deletion means; the status is not its business.
+         */
         if (actualActionName === 'softDeleteOrders') {
           const batch = writeBatch(db);
           args.orderIds.forEach((id: string) => {
-            batch.update(doc(db, 'orders', id), { isDeleted: true, status: 'deleted', updatedAt: Date.now() });
+            batch.update(doc(db, 'orders', id), { isDeleted: true, deletedAt: Date.now(), updatedAt: Date.now() });
           });
           await batch.commit();
           return { deletedCount: args.orderIds.length };
@@ -4820,19 +4863,19 @@ export function useMutation(apiRef: any) {
         if (actualActionName === 'restoreOrders') {
           const batch = writeBatch(db);
           args.orderIds.forEach((id: string) => {
-            batch.update(doc(db, 'orders', id), { isDeleted: false, status: 'processing', updatedAt: Date.now() });
+            batch.update(doc(db, 'orders', id), { isDeleted: false, updatedAt: Date.now() });
           });
           await batch.commit();
           return { restoredCount: args.orderIds.length };
         }
 
+        // Same door as the single change: a batch write here would have been
+        // the one route left that could put an order anywhere at all.
         if (actualActionName === 'bulkUpdateOrderStatus') {
-          const batch = writeBatch(db);
-          args.orderIds.forEach((id: string) => {
-            batch.update(doc(db, 'orders', id), { status: args.status, updatedAt: Date.now() });
-          });
-          await batch.commit();
-          return { updatedCount: args.orderIds.length };
+          const { getFunctions, httpsCallable } = await import('firebase/functions');
+          const call = httpsCallable(getFunctions(), 'setOrderStatusAdmin');
+          const res = await call({ orderIds: args.orderIds, status: args.status, force: args.force === true });
+          return res.data;
         }
 
         if (actualActionName === 'bulkUpdatePaymentStatus') {
@@ -5908,28 +5951,27 @@ export function useMutation(apiRef: any) {
         return { success: true, actionType: entry.actionType };
       }
 
+      if (path === 'admin.orders.backfillOrderStatuses') {
+        // A one-off rewrite of the statuses written before the vocabulary was
+        // settled. Server-side because it reads every order.
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const call = httpsCallable(getFunctions(), 'backfillOrderStatuses');
+        const res = await call({ dryRun: args?.dryRun === true });
+        return res.data;
+      }
+
       if (path === 'admin.manualTracking.saveManualTracking') {
-        if (!args.orderId) throw new Error('Missing orderId');
-        const trackingNumber = String(args.trackingNumber || '').trim();
-        const courierCompany = String(args.courierCompany || '').trim();
-        if (!trackingNumber) throw new Error('Tracking number is required');
-
-        const oref = doc(db, 'orders', args.orderId);
-        const osnap = await getDoc(oref);
-        if (!osnap.exists()) throw new Error('Order not found');
-        const current = String((osnap.data() as any).status || '');
-        // A tracking number means it has left the building, so move a
-        // still-processing order along with it.
-        const statusUpdated = current === 'processing' || current === 'pending_payment';
-
-        await updateDoc(oref, {
-          manualTrackingNumber: trackingNumber,
-          manualCourierCompany: courierCompany,
-          shippingStatus: 'Shipped (manual)',
-          ...(statusUpdated ? { status: 'shipped' } : {}),
-          updatedAt: Date.now(),
+        // Server-side, because saving a tracking number also moves the order,
+        // and that decision belongs to one place. See saveManualTracking in
+        // functions/src/rapidshyp.ts for what this used to get wrong.
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const call = httpsCallable(getFunctions(), 'saveManualTracking');
+        const res = await call({
+          orderId: args.orderId,
+          trackingNumber: args.trackingNumber,
+          courierCompany: args.courierCompany,
         });
-        return { success: true, statusUpdated };
+        return res.data;
       }
 
       if (path === 'admin.orders.restoreOrders') {

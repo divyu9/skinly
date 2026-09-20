@@ -322,7 +322,10 @@ export function ShippingTrackingPanel({
                   </DialogTitle>
                   <DialogDescription>
                     Add tracking details for orders shipped through non-RapidShyp couriers.
-                    {orderStatus === "processing" && " Order status will be updated to shipped."}
+                    {(orderStatus === "processing" || orderStatus === "ready_to_ship") &&
+                      " The order will be marked shipped and the customer told."}
+                    {orderStatus === "pending_payment" &&
+                      " This order has not been paid for, so its status will be left alone."}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">

@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";
 import { toast } from "sonner";
+import { ORDER_STATUSES, type OrderStatus } from "@/lib/normalize-order.ts";
+import { ADMIN_STATUS_LABELS } from "@/lib/order-label.ts";
 import { PlusIcon, TrashIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 
@@ -72,7 +74,7 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
   const [paymentMethod, setPaymentMethod] = useState("COD");
   const [shippingFee, setShippingFee] = useState(0);
   const [codFee, setCodFee] = useState(0);
-  const [status, setStatus] = useState<"processing" | "shipped" | "delivered" | "cancelled" | "rto">("processing");
+  const [status, setStatus] = useState<OrderStatus>("processing");
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "success" | "failed">("success");
 
   // Optional shipping info
@@ -460,11 +462,9 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="shipped">Shipped</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                      <SelectItem value="rto">RTO</SelectItem>
+                      {ORDER_STATUSES.map((st) => (
+                        <SelectItem key={st} value={st}>{ADMIN_STATUS_LABELS[st]}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

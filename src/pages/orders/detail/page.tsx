@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
-import { orderLabel, orderStatusLabel } from "@/lib/order-label.ts";
+import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 // PhonePe TypeScript declarations
 declare global {
   interface Window {
@@ -48,24 +48,10 @@ function OrderDetailPageInner() {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 5;
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500/20";
-      case "confirmed":
-        return "bg-blue-500/10 text-blue-500 border-blue-500/20";
-      case "processing":
-        return "bg-purple-500/10 text-purple-500 border-purple-500/20";
-      case "shipped":
-        return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
-      case "delivered":
-        return "bg-green-500/10 text-green-500 border-green-500/20";
-      case "cancelled":
-        return "bg-red-500/10 text-red-500 border-red-500/20";
-      default:
-        return "";
-    }
-  };
+  // One colour table, shared with the admin. This one listed "confirmed",
+  // which nothing has ever written, and knew none of the shipping stages, so
+  // an order out for delivery showed up in no colour at all.
+  const getStatusColor = (status: string) => STATUS_BADGE[status] || "";
 
   const formatDate = (timestamp?: number) => {
     if (!timestamp) return "N/A";

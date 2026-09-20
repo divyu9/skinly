@@ -14,6 +14,8 @@ import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hook
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
+import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
+import { ADMIN_STATUS_LABELS } from "@/lib/order-label.ts";
 import { useLocation } from "react-router-dom";
 
 function TaxExportPageInner() {
@@ -378,12 +380,9 @@ function TaxExportPageInner() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="processing">Processing</SelectItem>
-                  <SelectItem value="pending_payment">Pending Payment</SelectItem>
-                  <SelectItem value="shipped">Shipped</SelectItem>
-                  <SelectItem value="delivered">Delivered</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="rto">RTO</SelectItem>
+                  {ORDER_STATUSES.map((st) => (
+                    <SelectItem key={st} value={st}>{ADMIN_STATUS_LABELS[st]}</SelectItem>
+                  ))}
                   <SelectItem value="failed">Failed</SelectItem>
                 </SelectContent>
               </Select>

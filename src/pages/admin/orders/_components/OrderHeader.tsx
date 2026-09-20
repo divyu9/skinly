@@ -1,13 +1,9 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
+import { ADMIN_STATUS_LABELS, STATUS_BADGE } from "@/lib/order-label.ts";
 
-export type OrderStatus =
-  | "processing"
-  | "shipped"
-  | "delivered"
-  | "cancelled"
-  | "rto"
-  | "pending_payment"
-  | "failed";
+export type { OrderStatus } from "@/lib/normalize-order.ts";
+import type { OrderStatus } from "@/lib/normalize-order.ts";
 
 export type PaymentStatus = "pending" | "success" | "failed";
 
@@ -20,15 +16,7 @@ interface OrderHeaderProps {
   onPaymentStatusChange: (status: PaymentStatus) => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  processing: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  shipped: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
-  delivered: "bg-green-500/10 text-green-600 border-green-500/20",
-  cancelled: "bg-red-500/10 text-red-600 border-red-500/20",
-  rto: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  pending_payment: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
-  failed: "bg-red-500/10 text-red-600 border-red-500/20",
-};
+const STATUS_COLORS = STATUS_BADGE;
 
 const PAYMENT_COLORS: Record<string, string> = {
   success: "bg-green-500/10 text-green-600 border-green-500/20",
@@ -83,13 +71,9 @@ export function OrderHeader({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="pending_payment">Pending Payment</SelectItem>
-            <SelectItem value="processing">Processing</SelectItem>
-            <SelectItem value="shipped">Shipped</SelectItem>
-            <SelectItem value="delivered">Delivered</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-            <SelectItem value="failed">Failed</SelectItem>
-            <SelectItem value="rto">RTO</SelectItem>
+            {ORDER_STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>{ADMIN_STATUS_LABELS[s]}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

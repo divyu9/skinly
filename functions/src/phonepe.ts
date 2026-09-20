@@ -95,10 +95,26 @@ const applyPaymentResult = async (
 
   await doc.ref.update({
     paymentStatus: "success",
-    status: "processing",
     paymentAmountPaise: paid,
     paymentConfirmedVia: source,
     updatedAt: Date.now(),
+  });
+
+  /*
+   * The order moves through the same door as every other move.
+   *
+   * Writing `status: "processing"` in the update above was almost always
+   * right and occasionally wrong: an order dispatched while its payment was
+   * still settling would be pulled back to processing by the callback that
+   * finally confirmed it. The graph has no edge from shipped to processing,
+   * so it refuses that and leaves the order where it is. No message here —
+   * notifyOrderPlaced below is the one that belongs to this moment.
+   */
+  const { setOrderStatus } = await import("./orderStatus");
+  await setOrderStatus(admin.firestore(), doc.id, "processing", {
+    source: "payment",
+    reason: `Payment confirmed via ${source}`,
+    notify: false,
   });
 
   // The money is in, so now the customer hears about it. Not before: an
