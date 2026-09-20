@@ -68,19 +68,26 @@ export function normalizeOrderStatus(raw: any, paymentStatus?: any): OrderStatus
 /**
  * Which moves are allowed, and therefore which are not.
  *
- * Couriers replay events and deliver them out of order, so "in transit"
- * arriving after "delivered" is normal traffic, not a bug — the graph is what
- * makes it harmless. Everything flows forward; the three end states have no
- * exits at all, and an admin who genuinely needs one takes the override, which
- * is recorded as an override.
+ * What this exists to stop is an order walking *backwards*. Couriers replay
+ * events and deliver them out of order, so "picked up" arriving after
+ * "delivered" is normal traffic, not a bug, and the three end states have no
+ * exits at all — an admin who genuinely needs one takes the override, which is
+ * recorded as an override.
  *
- * `processing → shipped` skips a step on purpose: a parcel handed to a courier
- * at the counter never has an AWB in this system.
+ * Skipping forward is not the same thing and is allowed throughout. A parcel
+ * whose intermediate scans never arrived is still delivered; a parcel handed
+ * over at the counter never has an AWB here at all. The first version of this
+ * refused ready_to_ship → delivered, which is a real Tuesday afternoon and not
+ * a fault — the admin knows the thing arrived.
+ *
+ * The one forward move still refused is out of pending_payment, because
+ * "shipped" on an order nobody has paid for is the bug this table was written
+ * for in the first place.
  */
 const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending_payment: ["processing", "cancelled"],
-  processing: ["ready_to_ship", "shipped", "cancelled"],
-  ready_to_ship: ["shipped", "processing", "cancelled"],
+  processing: ["ready_to_ship", "shipped", "out_for_delivery", "delivered", "cancelled"],
+  ready_to_ship: ["shipped", "out_for_delivery", "delivered", "processing", "cancelled"],
   shipped: ["out_for_delivery", "undelivered", "delivered", "rto", "cancelled"],
   out_for_delivery: ["delivered", "undelivered", "rto"],
   undelivered: ["out_for_delivery", "shipped", "delivered", "rto"],

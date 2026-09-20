@@ -112,7 +112,28 @@ function OrderDetailPageInner() {
        * WhatsApp message had gone out on every change — none ever had.
        */
       if (result?.blockedCount > 0) {
-        toast.warning(result.message || "That status change is not allowed", { duration: 8000 });
+        /*
+         * Refused, not forbidden. The graph exists to stop a courier event
+         * walking an order backwards, and it cannot tell that apart from a
+         * person correcting a mistake — so the person is offered the move,
+         * and taking it is recorded on the order as an override.
+         */
+        toast.warning(result.message || "That status change is not allowed", {
+          duration: 12000,
+          action: {
+            label: "Do it anyway",
+            onClick: async () => {
+              try {
+                const forced: any = await updateOrderStatus({
+                  orderId: orderId as Id<"orders">, status, force: true,
+                } as any);
+                toast.success(forced?.message || `Status set to ${status}`);
+              } catch {
+                toast.error("Could not change the status");
+              }
+            },
+          },
+        });
         return;
       }
       toast.success(result?.message || `Status set to ${status}`);
