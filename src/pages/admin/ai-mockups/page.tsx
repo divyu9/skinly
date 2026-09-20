@@ -1924,7 +1924,12 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
 
       {launching && (
         <Dialog open onOpenChange={(o) => { if (!o) setLaunching(false); }}>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          {/* grid-cols-[minmax(0,1fr)]: a dialog is a CSS grid, and a grid
+              item's automatic minimum is its min-content width, so one wide
+              row inside stretched the column past the dialog and everything —
+              the description, the progress card's right border — was cut off
+              against it. */}
+          <DialogContent className="max-h-[90vh] grid-cols-[minmax(0,1fr)] overflow-y-auto overflow-x-hidden sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>Launch {roll.code}</DialogTitle>
               <DialogDescription>
@@ -1942,6 +1947,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                   flatWidthCm: roll.flatWidthCm, flatLengthCm: roll.flatLengthCm, usableFor: roll.usableFor,
                 }}
                 themes={roll.themes}
+                // Already on the review queue's own page: close, do not navigate.
+                onReview={() => setLaunching(false)}
               />
             )}
           </DialogContent>

@@ -36,11 +36,17 @@ const setPref = (key: string, value: string) => {
   try { localStorage.setItem(key, value); } catch { /* storage blocked */ }
 };
 
-export function LaunchPanel({ design, themes, onLaunched }: {
+export function LaunchPanel({ design, themes, onLaunched, onReview }: {
   design: LaunchDesign;
   /** Theme and colour words for the copywriter and collections. */
   themes?: string[];
   onLaunched?: (launchId: string) => void;
+  /**
+   * Called instead of following the link to the review queue, when the panel
+   * is already open on top of it — in the studio's dialog, "Review 42
+   * pictures" was a link to the page it was already on, so it did nothing.
+   */
+  onReview?: () => void;
 }) {
   const shots = useQuery(api.aiMockups.getPrompts) as MockupShot[] | undefined;
   const settings = useQuery(api.aiMockups.getSettings) as { blocks?: SharedBlocks } | null | undefined;
@@ -162,7 +168,7 @@ export function LaunchPanel({ design, themes, onLaunched }: {
     }
   };
 
-  if (launchId) return <LaunchProgress launchId={launchId} />;
+  if (launchId) return <LaunchProgress launchId={launchId} onReview={onReview} />;
 
   /*
    * What each switch would actually do, counted rather than described. The
@@ -313,7 +319,7 @@ function StepList({ steps }: { steps: Array<{ id: string; label: string; status:
             : s.status === "failed" ? <XCircleIcon className="mt-0.5 size-3.5 shrink-0 text-rose-600" />
             : s.status === "skipped" ? <CircleDashedIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
             : <CircleDashedIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground/50" />}
-          <span className="min-w-0">
+          <span className="min-w-0 break-words">
             {s.label}
             {s.note && <span className={`block truncate ${s.status === "failed" ? "text-rose-600" : "text-muted-foreground"}`}>{s.note}</span>}
           </span>
@@ -352,7 +358,7 @@ async function retryFailedSteps(launchId: string, steps: any[]) {
   });
 }
 
-export function LaunchProgress({ launchId }: { launchId: string }) {
+export function LaunchProgress({ launchId, onReview }: { launchId: string; onReview?: () => void }) {
   const [launch, setLaunch] = useState<any>(null);
   const [images, setImages] = useState<{ running: number; review: number; failed: number; approved: number }>({ running: 0, review: 0, failed: 0, approved: 0 });
 
@@ -425,9 +431,15 @@ export function LaunchProgress({ launchId }: { launchId: string }) {
         </Button>
       )}
       {images.review > 0 && (
-        <Button asChild className="w-full">
-          <Link to={`/backend-skinly/ai-mockups?design=${encodeURIComponent(launch.code)}`}>Review {images.review} picture{images.review === 1 ? "" : "s"}</Link>
-        </Button>
+        onReview ? (
+          <Button className="w-full" onClick={onReview}>
+            Review {images.review} picture{images.review === 1 ? "" : "s"}
+          </Button>
+        ) : (
+          <Button asChild className="w-full">
+            <Link to={`/backend-skinly/ai-mockups?design=${encodeURIComponent(launch.code)}`}>Review {images.review} picture{images.review === 1 ? "" : "s"}</Link>
+          </Button>
+        )
       )}
     </div>
   );
