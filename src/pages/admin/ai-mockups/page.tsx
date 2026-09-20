@@ -977,6 +977,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const [retiring, setRetiring] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [approvingAll, setApprovingAll] = useState<{ done: number; total: number } | null>(null);
+  const [rejectingAll, setRejectingAll] = useState<{ done: number; total: number } | null>(null);
   const [tplProgress, setTplProgress] = useState<{ done: number; total: number } | null>(null);
   const templateMockups = useTemplateMockups();
   const updatePrompt = useMutation(api.aiMockups.updateMockupPrompt);
@@ -1420,7 +1421,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     } finally { setBusyJob(null); }
   };
 
-  const reject = async (job: Job) => {
+  const reject = async (job: Job, quiet = false) => {
     if (!job.pendingKey) return;
     setBusyJob(job._id);
     try {
@@ -1435,7 +1436,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
         pendingUrl: "",
       });
       void deleteObject({ key: job.pendingKey }).catch(() => {});
-      toast.success(saved.where === "folder" ? `Saved to ${backupFolder}` : "Saved to Downloads");
+      if (!quiet) toast.success(saved.where === "folder" ? `Saved to ${backupFolder}` : "Saved to Downloads");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save the reject");
     } finally { setBusyJob(null); }
@@ -1838,7 +1839,7 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               <Button
                 size="sm"
                 className="h-7 bg-emerald-600 text-xs hover:bg-emerald-700"
-                disabled={!!approvingAll}
+                disabled={!!approvingAll || !!rejectingAll}
                 onClick={async () => {
                   const pending = jobs.filter((j) => j.status === "review" && j.pendingKey);
                   if (!confirm(`Approve all ${pending.length} pictures? Each is added to the media library and its listings. Reject the bad ones first.`)) return;
@@ -1853,6 +1854,32 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
               >
                 {approvingAll ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <ThumbsUpIcon className="mr-1 size-3" />}
                 {approvingAll ? `Approving ${approvingAll.done}/${approvingAll.total}` : `Approve all ${reviewCount}`}
+              </Button>
+            )}
+            {reviewCount > 1 && (
+              /* A whole run can be wrong at once — a template that turned out
+                 not to suit the shape, a prompt since fixed. Each still goes
+                 to the reject folder on the way out, exactly as one does. */
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-rose-200 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950/40"
+                disabled={!!approvingAll || !!rejectingAll}
+                onClick={async () => {
+                  const pending = jobs.filter((j) => j.status === "review" && j.pendingKey);
+                  const where = backupFolder ? backupFolder : "Downloads";
+                  if (!confirm(`Reject all ${pending.length} pictures? Each is saved to ${where} first, and none is added to a listing.`)) return;
+                  setRejectingAll({ done: 0, total: pending.length });
+                  for (let i = 0; i < pending.length; i++) {
+                    await reject(pending[i], true);
+                    setRejectingAll({ done: i + 1, total: pending.length });
+                  }
+                  setRejectingAll(null);
+                  toast.success(`${pending.length} rejected · saved to ${where}`);
+                }}
+              >
+                {rejectingAll ? <Loader2Icon className="mr-1 size-3 animate-spin" /> : <ThumbsDownIcon className="mr-1 size-3" />}
+                {rejectingAll ? `Rejecting ${rejectingAll.done}/${rejectingAll.total}` : `Reject all ${reviewCount}`}
               </Button>
             )}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
