@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Link } from "react-router-dom";
-import { PackageIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon, SlidersHorizontalIcon, XIcon, LayersIcon, CheckCircle2Icon, FileEditIcon } from "lucide-react";
+import { PackageIcon, PlusIcon, EditIcon, TrashIcon, SearchIcon, SaveIcon, ImageIcon, UploadIcon, FileSpreadsheetIcon, ImagesIcon, MoreVerticalIcon, DollarSignIcon, ChevronDownIcon, ChevronUpIcon, ChevronRightIcon, ExternalLinkIcon, TagIcon, ArrowUpIcon, ArrowDownIcon, SlidersHorizontalIcon, XIcon, LayersIcon, CheckCircle2Icon, FileEditIcon, RefreshCwIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
@@ -269,6 +269,22 @@ function AdminProductsPageInner() {
   const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
   const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<string>("all");
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
+  const [recounting, setRecounting] = useState(false);
+  const syncInventory = useMutation(api.rollsManagement.syncInventoryFromRolls);
+  const recountAllStock = async () => {
+    setRecounting(true);
+    try {
+      const res: any = await syncInventory({ syncAll: true });
+      const n = Number(res?.syncedCount) || 0;
+      toast.success(n
+        ? `${n} variant${n === 1 ? "" : "s"} recounted across ${res?.designs ?? "all"} designs`
+        : "Every listing already agrees with the shelf");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not recount stock");
+    } finally {
+      setRecounting(false);
+    }
+  };
   const [showPriceRules, setShowPriceRules] = useState(false);
   const [skuFilterCondition, setSkuFilterCondition] = useState<"starts-with" | "contains">("starts-with");
   const [skuFilterValue, setSkuFilterValue] = useState("");
@@ -922,6 +938,14 @@ function AdminProductsPageInner() {
                     <DropdownMenuItem onClick={() => setShowPriceRules(true)}>
                       <DollarSignIcon className="size-4 mr-2" />
                       Price rules by gadget &amp; finish
+                    </DropdownMenuItem>
+                    {/* Stock is worked out from the shelf rather than stored
+                        on the listing, so a listing made after the last count
+                        shows zero until something counts again. This counts
+                        every design at once, rolls and cutouts alike. */}
+                    <DropdownMenuItem onClick={() => void recountAllStock()} disabled={recounting}>
+                      <RefreshCwIcon className={`size-4 mr-2 ${recounting ? "animate-spin" : ""}`} />
+                      {recounting ? "Recounting stock…" : "Recount stock from materials"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={handleClearAll}

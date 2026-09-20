@@ -6171,24 +6171,40 @@ export function useMutation(apiRef: any) {
       }
 
       if (path === 'rollsManagement.syncInventoryFromRolls') {
-        // The real sum lives server-side; this is the same recalculation the
-        // cutouts tab runs, over one roll or all of them.
+        /*
+         * Counts what the shelf can make and writes it onto the variants —
+         * one design, or every design there is.
+         *
+         * "Every" now includes the cutouts. It read the rolls alone, so a
+         * precut design's listings were never in a sweep at all and could sit
+         * at zero however often this was run.
+         */
         const codes: string[] = [];
         if (args.syncAll) {
-          const rolls = await getDocs(collection(db, 'rollInventory'));
+          const [rolls, cutouts] = await Promise.all([
+            getDocs(collection(db, 'rollInventory')),
+            getDocs(collection(db, 'cutoutInventory')),
+          ]);
           rolls.docs.forEach((d) => { const r: any = d.data(); if (r.rNumber) codes.push(String(r.rNumber)); });
+          cutouts.docs.forEach((d) => { const c: any = d.data(); if (c.cutoutNumber) codes.push(String(c.cutoutNumber)); });
         } else if (args.rNumber) {
           codes.push(String(args.rNumber));
         }
         if (!codes.length) throw new Error('Nothing to sync');
         const fn = httpsCallable(functions, 'recalcMaterialStock');
         let syncedCount = 0;
-        // Chunked: one call with 64 codes reads every variant 64 times.
-        for (let i = 0; i < codes.length; i += 25) {
-          const res: any = await fn({ codes: codes.slice(i, i + 25) });
+        /*
+         * Codes go together, not in small batches. One call reads the variants
+         * and the products once and then answers for every code it was given,
+         * so splitting 70 codes into batches of 25 read the whole catalogue
+         * three times to do the work of one pass. The batch is large enough to
+         * be one call in practice and small enough to stay a sane payload.
+         */
+        for (let i = 0; i < codes.length; i += 400) {
+          const res: any = await fn({ codes: codes.slice(i, i + 400) });
           syncedCount += Number(res?.data?.updated) || 0;
         }
-        return { success: true, syncedCount };
+        return { success: true, syncedCount, designs: codes.length };
       }
 
       if (path === 'mockups.bulkImportMockups') {
