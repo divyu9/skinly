@@ -50,11 +50,19 @@ const COLLECTIONS = [
   // Customer-facing content
   "reviews", "ugcVideos", "stockNotifications", "abandonedCarts",
   // The studio's own definitions, not its output
-  "gadgetMockupPrompts", "gadgetMockupSettings", "mockupTemplates", "designLaunches",
+  "gadgetMockupPrompts", "gadgetMockupSettings", "designLaunches",
 ];
 
-/** Dates the way a person sorting a bucket listing wants them: newest last. */
-const dayKey = (d = new Date()) => d.toISOString().slice(0, 10);
+/**
+ * The day this run belongs to, in Indian time.
+ *
+ * UTC put the nightly 02:30 run — and a button pressed at one in the morning —
+ * into the previous day's folder, so every backup was filed under the date
+ * before the one anybody would call it. The bucket is read by a person looking
+ * for "the copy from Tuesday".
+ */
+const dayKey = (d = new Date()) =>
+  new Date(d.getTime() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
 
 interface CollectionResult {
   collection: string;

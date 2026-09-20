@@ -307,7 +307,16 @@ export const placeOrder = functions
       phone: shippingAddress?.phone || "",
       shippingAddress: shippingAddress || {},
       paymentMethod: paymentMethod || "prepaid",
-      status: "pending",
+      /*
+       * Written in the vocabulary everything else reads.
+       *
+       * This wrote the literal "pending" for every order, COD included, and
+       * left every reader to work out what that meant — which is how COD
+       * orders ended up filed under Pending Payment. A COD order with nothing
+       * due up front is ready to be packed the moment it is placed; anything
+       * else is waiting for money.
+       */
+      status: paymentMethod === "cod" && !(prepaidAmount > 0) ? "processing" : "pending_payment",
       paymentStatus: "pending",
       itemsTotal,
       shippingFee,

@@ -78,7 +78,6 @@ function AdminOrdersPageInner() {
   const softDeleteOrders = useMutation(api.admin.orders.softDeleteOrders);
   const restoreOrders = useMutation(api.admin.orders.restoreOrders);
   const bulkUpdateOrderStatus = useMutation(api.admin.orders.bulkUpdateOrderStatus);
-  const backfillStatuses = useMutation(api.admin.orders.backfillOrderStatuses);
   const bulkUpdatePaymentStatus = useMutation(api.admin.orders.bulkUpdatePaymentStatus);
 
   const stats = useQuery(api.admin.orders.getOrderStats);
@@ -508,48 +507,6 @@ function AdminOrdersPageInner() {
     }
   };
 
-  const [backfilling, setBackfilling] = useState(false);
-
-  /**
-   * Counts first, then asks.
-   *
-   * It rewrites every order's status, so it says what it is about to do and
-   * waits — a silent pass over the whole collection is not something to find
-   * out about afterwards.
-   */
-  const handleBackfillStatuses = async () => {
-    setBackfilling(true);
-    try {
-      const preview: any = await backfillStatuses({ dryRun: true });
-      if (!preview?.wouldChange) {
-        toast.success(`Nothing to fix — all ${preview?.scanned ?? 0} orders are already in the current vocabulary`);
-        return;
-      }
-      const moves = Object.entries(preview.byMove || {})
-        .map(([move, n]) => `${n} × ${move}`)
-        .join(", ");
-      toast.warning(`${preview.wouldChange} of ${preview.scanned} orders would be rewritten`, {
-        description: moves,
-        duration: 15000,
-        action: {
-          label: "Rewrite them",
-          onClick: async () => {
-            try {
-              const done: any = await backfillStatuses({ dryRun: false });
-              toast.success(done?.message || "Statuses rewritten");
-            } catch (e) {
-              toast.error(e instanceof Error ? e.message : "Could not rewrite the statuses");
-            }
-          },
-        },
-      });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read the statuses");
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
   const handleBulkOrderStatus = async () => {
     if (selectedOrders.size === 0 || !bulkNewOrderStatus) return;
     try {
@@ -708,11 +665,6 @@ function AdminOrdersPageInner() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="sticker-sm sticker-press rounded-lg" onClick={handleBackfillStatuses} disabled={backfilling}
-            title="Rewrites statuses written by older checkouts into the current vocabulary">
-            {backfilling ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <ListChecksIcon className="size-4 mr-2" />}
-            Fix legacy statuses
-          </Button>
           <Link
             to="/backend-skinly/tax-export"
             state={selectedOrders.size > 0 ? { selectedOrderIds: Array.from(selectedOrders) } : undefined}
