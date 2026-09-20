@@ -249,13 +249,20 @@ function parseGeneratedContent(text: string): ParsedContent {
 // Cloud Function
 // ---------------------------------------------------------------------------
 
-export const generateSEOContent = onCall(async (data: any, context: any) => {
-  const { uid } = await requireAdmin(context);
-  await enforceDailyRateLimit({
-    key: `generateSEOContent_${uid}`,
-    limit: Number(process.env.SEO_DAILY_LIMIT || 100),
-  });
-
+/**
+ * The generator itself, without the permission check around it.
+ *
+ * Pulled out so the nightly job that fills in missing model pages runs the
+ * same prompt, the same model and the same parser the admin screen does —
+ * two copies of this would drift, and the difference would show up as two
+ * kinds of page on the same site.
+ */
+export async function generateSeoContentCore(data: any): Promise<{
+  success: boolean;
+  contentHTML: string;
+  faqs: any[];
+  imageAltTexts: string[];
+}> {
   // Validate
   const validTypes: PageType[] = ["brand", "device", "product", "skin-type", "keyword"];
   const pageType: PageType = data?.pageType;
@@ -337,4 +344,14 @@ export const generateSEOContent = onCall(async (data: any, context: any) => {
     faqs:          parsed.faqs,
     imageAltTexts: parsed.imageAltTexts,
   };
+}
+
+/** The admin screen's door to it: same generator, with the checks in front. */
+export const generateSEOContent = onCall(async (data: any, context: any) => {
+  const { uid } = await requireAdmin(context);
+  await enforceDailyRateLimit({
+    key: `generateSEOContent_${uid}`,
+    limit: Number(process.env.SEO_DAILY_LIMIT || 100),
+  });
+  return generateSeoContentCore(data);
 });

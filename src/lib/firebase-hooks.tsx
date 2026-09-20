@@ -6080,7 +6080,7 @@ export function useMutation(apiRef: any) {
         return { success: true, actionType: entry.actionType };
       }
 
-      if (path === 'backup.runBackupNow' || path === 'orders.runUnpaidSweep' || path === 'orders.runDailyDigest') {
+      if (path === 'backup.runBackupNow' || path === 'orders.runUnpaidSweep' || path === 'orders.runDailyDigest' || path === 'seo.runSeoAutoPages') {
         // Both read or rewrite a lot; they belong on the server.
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const name = path.split('.')[1];

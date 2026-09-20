@@ -38,6 +38,9 @@ export interface Digest {
   unpaid: number;
   lowStock: Array<{ code: string; name: string; left: number; unit: string }>;
   outOfStockListings: number;
+  /** Models with no landing page, and pages written overnight awaiting a look. */
+  seoMissing: number;
+  seoWaiting: number;
 }
 
 export async function buildDigest(db: admin.firestore.Firestore): Promise<Digest> {
@@ -101,10 +104,23 @@ export async function buildDigest(db: admin.firestore.Firestore): Promise<Digest
     return !(Number(v.inventoryQuantity) > 0);
   }).length;
 
+  // Best-effort: the digest is about the shop, and a slow count of SEO pages
+  // must not be the reason the morning message fails to go out.
+  let seoMissing = 0, seoWaiting = 0;
+  try {
+    const { seoCoverage } = await import("./seoAuto");
+    const c = await seoCoverage(db);
+    seoMissing = c.modelsMissing;
+    seoWaiting = c.waitingToPublish;
+  } catch (e: any) {
+    console.warn("digest: SEO coverage skipped", e?.message || e);
+  }
+
   return {
     day, orders, revenue, cod, toPack, inTransit, needsAttention, unpaid,
     lowStock: lowStock.slice(0, 25),
     outOfStockListings,
+    seoMissing, seoWaiting,
   };
 }
 
@@ -117,6 +133,7 @@ function inWords(d: Digest): string {
     d.inTransit ? `${d.inTransit} on the way` : "",
     d.needsAttention ? `${d.needsAttention} failed delivery` : "",
     d.lowStock.length ? `${d.lowStock.length} designs running low` : "",
+    d.seoWaiting ? `${d.seoWaiting} new SEO pages waiting to be published` : "",
   ].filter(Boolean);
   return parts.join(", ");
 }
