@@ -17,6 +17,7 @@ import ProductDetailPage from "./pages/products/detail/product-detail.tsx";
 import CheckoutPage from "./pages/checkout/page.tsx";
 import CartPage from "./pages/cart/page.tsx";
 import OrdersPage from "./pages/orders/page.tsx";
+import TrackOrderPage from "./pages/track/page.tsx";
 import OrderDetailPage from "./pages/orders/detail/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
@@ -122,6 +123,9 @@ export default function App() {
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/orders" element={<OrdersPage />} />
+            {/* Guest-friendly: no login, the order number plus the contact it was placed with. */}
+            <Route path="/track" element={<TrackOrderPage />} />
+            <Route path="/track-order" element={<Navigate to="/track" replace />} />
             <Route path="/orders/:orderId" element={<OrderDetailPage />} />
             <Route path="/devices" element={<DevicesPage />} />
             <Route path="/payment/callback" element={<PaymentCallback />} />

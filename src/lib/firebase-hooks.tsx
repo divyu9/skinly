@@ -947,11 +947,29 @@ export function useQuery(apiRef: any, args?: any) {
               const st = normalizeOrderStatus(d?.status, normalizePaymentStatus(getPayStatus(d)));
               if (st in counts) counts[st] += 1;
             }
+            /*
+             * Money and payment counts belong here too.
+             *
+             * The cards above the table read these from the *filtered* list,
+             * so opening the Processing tab made the page announce "Total
+             * Orders 5" and "0 delivered" while the tabs beside it said 148
+             * and 14. Two sources for one question is one too many; the cards
+             * now read the same numbers the tabs do.
+             */
+            const money = (d: any) => Number(d?.total ?? d?.amountPayable) || 0;
+            const paid = nonDeleted.filter((d) => normalizePaymentStatus(getPayStatus(d)) === 'success');
             setData({
               ...counts,
               total: nonDeleted.length,
               failed: nonDeleted.filter((d) => normalizePaymentStatus(getPayStatus(d)) === 'failed').length,
               deleted: docs.filter((d) => d?.isDeleted).length,
+              revenue: paid.reduce((sum, d) => sum + money(d), 0),
+              paidOrders: paid.length,
+              pendingPayments: nonDeleted.filter((d) => {
+                const p = normalizePaymentStatus(getPayStatus(d));
+                return p === 'pending' || !p;
+              }).length,
+              failedPayments: nonDeleted.filter((d) => normalizePaymentStatus(getPayStatus(d)) === 'failed').length,
             });
           });
         }
@@ -4608,6 +4626,14 @@ export function useMutation(apiRef: any) {
         };
       }
       
+      // Public: no auth, the callable checks the contact against the order.
+      if (collectionName === 'orders' && actionName === 'trackOrder') {
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const call = httpsCallable(getFunctions(), 'trackOrder');
+        const res = await call({ orderNumber: args?.orderNumber, contact: args?.contact });
+        return res.data;
+      }
+
       if (collectionName === 'orders' && actionName === 'createOrder') {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const functions = getFunctions();

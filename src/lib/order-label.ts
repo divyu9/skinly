@@ -110,3 +110,16 @@ export const STATUS_TAB: Record<string, string> = {
   cancelled: "data-[state=active]:bg-red-500/10 dark:data-[state=active]:bg-red-500/20 data-[state=active]:text-red-600 data-[state=active]:shadow-none",
   rto: "data-[state=active]:bg-orange-500/10 dark:data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-600 data-[state=active]:shadow-none",
 };
+
+/** The dot beside a status in the pipeline row. */
+export const STATUS_DOT: Record<string, string> = {
+  pending_payment: "bg-yellow-500",
+  processing: "bg-purple-500",
+  ready_to_ship: "bg-sky-500",
+  shipped: "bg-indigo-500",
+  out_for_delivery: "bg-teal-500",
+  undelivered: "bg-amber-500",
+  delivered: "bg-green-500",
+  cancelled: "bg-red-500",
+  rto: "bg-orange-500",
+};

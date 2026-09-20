@@ -1,11 +1,11 @@
 import { useQuery, useAction, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Link, useNavigate } from "react-router-dom";
-import { PackageIcon, SearchIcon, TrendingUpIcon, CreditCardIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon, CalendarIcon, PlusIcon } from "lucide-react";
+import { PackageIcon, SearchIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon, CalendarIcon, PlusIcon, AlertTriangleIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -14,7 +14,6 @@ import { SignInButton } from "@/components/ui/signin.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +30,7 @@ import type { Id } from "@/lib/firebase-api";
 import { PDFDocument } from "pdf-lib";
 import { ManualOrderDialog } from "./manual-order-dialog.tsx";
 import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
-import { ADMIN_STATUS_LABELS, STATUS_BADGE, STATUS_TAB } from "@/lib/order-label.ts";
+import { ADMIN_STATUS_LABELS, STATUS_BADGE, STATUS_DOT } from "@/lib/order-label.ts";
 
 type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
@@ -190,6 +189,21 @@ function AdminOrdersPageInner() {
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  /**
+   * "14 min ago" — how fresh a courier update is, which is the only thing
+   * anyone wants to know about one at a glance.
+   */
+  function timeAgo(ts: number): string {
+    const secs = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (secs < 60) return "just now";
+    const mins = Math.round(secs / 60);
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.round(hrs / 24);
+    return days === 1 ? "yesterday" : `${days}d ago`;
   }
 
   const handleSelectOrder = (orderId: Id<"orders">, checked: boolean) => {
@@ -652,148 +666,143 @@ function AdminOrdersPageInner() {
     );
   }
 
+  /** A stat tile that also opens the tab it counts. */
+  const Tile = ({ label, value, sub, icon: Icon, tone, to }: {
+    label: string; value: string; sub: string; icon: any; tone: string; to?: string;
+  }) => (
+    <button
+      type="button"
+      onClick={to ? () => setStatusFilter(to) : undefined}
+      className={`tile ${to ? "tile-press cursor-pointer" : "cursor-default"} rounded-xl p-4 text-left`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className={`grid size-7 place-items-center rounded-md ${tone}`}>
+          <Icon className="size-4" />
+        </span>
+      </div>
+      <div className="mt-2 text-3xl font-bold tabular-nums leading-none">{value}</div>
+      <p className="mt-1.5 text-xs text-muted-foreground">{sub}</p>
+    </button>
+  );
+
+  const inTransit = stats.ready_to_ship + stats.shipped + stats.out_for_delivery;
+  const attention = stats.undelivered + stats.rto;
+
   return (
-    <div className="space-y-6">
+    <div className="admin-brandy space-y-6">
       {/* Page Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Order Management</h1>
-          <p className="text-muted-foreground">
-            Manage all customer orders and track payments
+          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          {/* The teal rule is the wordmark's own colour — it says whose shop this is. */}
+          <div className="mt-1.5 h-1 w-14 rounded-full bg-brand" />
+          <p className="mt-2 text-sm text-muted-foreground">
+            {stats.total} orders · {inTransit} on the way · {stats.processing} waiting to be packed
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleBackfillStatuses} disabled={backfilling}
-            title="Rewrites statuses written by older checkouts — the literal &quot;pending&quot; that COD orders still carry — into the current vocabulary">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" className="sticker-sm sticker-press rounded-lg" onClick={handleBackfillStatuses} disabled={backfilling}
+            title="Rewrites statuses written by older checkouts into the current vocabulary">
             {backfilling ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <ListChecksIcon className="size-4 mr-2" />}
             Fix legacy statuses
           </Button>
-          <Button variant="default" onClick={() => setShowManualOrderDialog(true)}>
-            <PlusIcon className="size-4 mr-2" />
-            Create Manual Order
-          </Button>
           <Link
             to="/backend-skinly/tax-export"
-            state={
-              selectedOrders.size > 0
-                ? { selectedOrderIds: Array.from(selectedOrders) }
-                : undefined
-            }
+            state={selectedOrders.size > 0 ? { selectedOrderIds: Array.from(selectedOrders) } : undefined}
           >
-            <Button variant="outline">
+            <Button variant="outline" className="sticker-sm sticker-press rounded-lg">
               <FileTextIcon className="size-4 mr-2" />
-              Export for Tax Filing
+              Export for Tax
             </Button>
           </Link>
+          <Button className="sticker-sm sticker-press rounded-lg" onClick={() => setShowManualOrderDialog(true)}>
+            <PlusIcon className="size-4 mr-2" />
+            New Order
+          </Button>
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Orders
-              </CardTitle>
-              <PackageIcon className="size-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{computedStats.total}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {computedStats.processing} processing
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Revenue
-              </CardTitle>
-              <IndianRupeeIcon className="size-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₹{computedStats.totalRevenue.toFixed(0)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {computedStats.successfulPayments} paid orders
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Payments
-              </CardTitle>
-              <CreditCardIcon className="size-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {computedStats.successfulPayments}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {computedStats.pendingPayments} pending, {computedStats.failedPayments} failed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Shipped
-              </CardTitle>
-              <TruckIcon className="size-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-indigo-600">
-              {computedStats.shipped}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {computedStats.delivered} delivered
-            </p>
-          </CardContent>
-        </Card>
+      {/*
+        Four numbers about the shop, not about whichever tab is open — and each
+        one opens the list behind it, because every one of them is a question
+        whose next step is "show me which".
+      */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
+        <Tile
+          label="Revenue" value={`₹${Number(stats.revenue || 0).toLocaleString("en-IN")}`}
+          sub={`${stats.paidOrders || 0} paid orders`}
+          icon={IndianRupeeIcon} tone="bg-brand/15 text-brand"
+        />
+        <Tile
+          label="To pack" value={String(stats.processing)}
+          sub={stats.processing ? "Ready for a label" : "Nothing waiting"}
+          icon={PackageIcon} tone="bg-purple-500/15 text-purple-600" to="processing"
+        />
+        <Tile
+          label="On the way" value={String(inTransit)}
+          sub={`${stats.delivered} delivered so far`}
+          icon={TruckIcon} tone="bg-indigo-500/15 text-indigo-600" to="shipped"
+        />
+        <Tile
+          label="Needs a look" value={String(attention)}
+          sub={attention ? "Failed delivery or returned" : "Nothing stuck"}
+          icon={attention ? AlertTriangleIcon : PackageCheckIcon}
+          tone={attention ? "bg-amber-500/15 text-amber-600" : "bg-green-500/15 text-green-600"}
+          to={stats.undelivered ? "undelivered" : "rto"}
+        />
       </div>
 
-      {/* Status Tabs */}
-        <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-          <TabsList className="w-full justify-start overflow-x-auto h-auto py-2">
-            {ORDER_STATUSES.map((st) => (
-              <TabsTrigger key={st} value={st} className={`flex items-center gap-2 ${STATUS_TAB[st]}`}>
+      {/*
+        The pipeline, left to right, in the order a parcel passes through it,
+        with the three views that are not stages set apart after a divider.
+        A count of zero is dimmed rather than hidden, so the row does not
+        reshuffle itself as the day goes on.
+      */}
+      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+        <div className="flex w-max items-center gap-1.5">
+          {ORDER_STATUSES.map((st) => {
+            const on = statusFilter === st;
+            const n = stats[st] || 0;
+            return (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setStatusFilter(st)}
+                className={`flex shrink-0 items-center gap-2 rounded-full border-2 px-3 py-1.5 text-sm font-medium transition-colors ${
+                  on ? `${STATUS_BADGE[st]} border-current` : "border-transparent text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <span className={`size-2 rounded-full ${STATUS_DOT[st]} ${n ? "" : "opacity-30"}`} />
                 {ADMIN_STATUS_LABELS[st]}
-                <Badge variant="secondary" className={`ml-1 h-5 px-1.5 ${STATUS_BADGE[st]}`}>
-                  {stats[st]}
-                </Badge>
-              </TabsTrigger>
-            ))}
-            <TabsTrigger value="failed" className="flex items-center gap-2 data-[state=active]:bg-red-500/10 dark:data-[state=active]:bg-red-500/20 data-[state=active]:text-red-600 data-[state=active]:shadow-none">
-              Failed Orders
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-red-500/10 text-red-600 border-red-500/20">
-                {stats.failed}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="deleted" className="flex items-center gap-2 data-[state=active]:bg-gray-500/10 dark:data-[state=active]:bg-gray-500/20 data-[state=active]:text-gray-600 data-[state=active]:shadow-none">
-              Deleted Orders
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5 bg-gray-500/10 text-gray-600 border-gray-500/20">
-                {stats.deleted}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="all" className="flex items-center gap-2 data-[state=active]:bg-primary/10 dark:data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-none">
-              All Orders
-              <Badge variant="secondary" className="ml-1 h-5 px-1.5">
-                {stats.total}
-              </Badge>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+                <span className={`tabular-nums text-xs font-semibold ${n ? "" : "opacity-40"}`}>{n}</span>
+              </button>
+            );
+          })}
+
+          <span className="mx-1 h-6 w-px shrink-0 bg-border" />
+
+          {([
+            ["failed", "Payment failed", stats.failed],
+            ["deleted", "Deleted", stats.deleted],
+            ["all", "All", stats.total],
+          ] as const).map(([value, label, n]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setStatusFilter(value)}
+              className={`flex shrink-0 items-center gap-2 rounded-full border-2 px-3 py-1.5 text-sm font-medium transition-colors ${
+                statusFilter === value
+                  ? "border-current bg-muted text-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {label}
+              <span className={`tabular-nums text-xs font-semibold ${n ? "" : "opacity-40"}`}>{n || 0}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Filters and Search */}
       <Card>
@@ -1018,114 +1027,140 @@ function AdminOrdersPageInner() {
           </EmptyHeader>
         </Empty>
       ) : (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b bg-muted/50">
-                  <tr>
-                    <th className="p-3 text-left">
-                      <Checkbox
-                        className="w-4 h-4 bg-background border-2 border-black/60 dark:border-white/60 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
-                        checked={
-                          displayOrders.length > 0 &&
-                          selectedOrders.size === displayOrders.length
-                        }
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </th>
-                    <th className="p-3 text-left text-sm font-medium">Order Number</th>
-                    <th className="p-3 text-left text-sm font-medium">Date & Time</th>
-                    <th className="p-3 text-left text-sm font-medium">Customer</th>
-                    <th className="p-3 text-left text-sm font-medium">Phone</th>
-                    <th className="p-3 text-left text-sm font-medium">City</th>
-                    <th className="p-3 text-left text-sm font-medium">Order Value</th>
-                    <th className="p-3 text-left text-sm font-medium">Items</th>
-                    <th className="p-3 text-left text-sm font-medium">Order Status</th>
-                    <th className="p-3 text-left text-sm font-medium">Payment</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayOrders.map((order) => (
+        <div className="tile overflow-hidden rounded-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b-2 border-ink/10 bg-muted/60">
+                <tr className="[&>th]:px-3 [&>th]:py-2.5 [&>th]:text-left [&>th]:text-[11px] [&>th]:font-semibold [&>th]:uppercase [&>th]:tracking-wider [&>th]:text-muted-foreground">
+                  <th className="w-10">
+                    <Checkbox
+                      className="w-4 h-4 bg-background border-2 border-black/60 dark:border-white/60 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
+                      checked={displayOrders.length > 0 && selectedOrders.size === displayOrders.length}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  </th>
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Ships to</th>
+                  <th className="!text-right">Value</th>
+                  <th>Status</th>
+                  <th>Tracking</th>
+                  <th>Payment</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {displayOrders.map((order) => {
+                  const pay = normalizePaymentStatus(order.paymentStatus) || "pending";
+                  const awb = order.awbNumber || order.manualTrackingNumber || "";
+                  const courier = order.courierName || order.manualCourierCompany || "";
+                  return (
                     <tr
                       key={order._id}
-                      className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                      className="cursor-pointer transition-colors hover:bg-brand/[0.04]"
                       onClick={(e) => {
-                        // Don't navigate if clicking checkbox
-                        if ((e.target as HTMLElement).closest('button[role="checkbox"]')) {
-                          return;
-                        }
+                        // Don't navigate if clicking the checkbox or a link
+                        const el = e.target as HTMLElement;
+                        if (el.closest('button[role="checkbox"]') || el.closest("a")) return;
                         navigate(`/backend-skinly/orders/${order._id}`);
                       }}
                     >
-                      <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           className="w-4 h-4 bg-background border-2 border-black/60 dark:border-white/60 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
                           checked={selectedOrders.has(order._id)}
-                          onCheckedChange={(checked) =>
-                            handleSelectOrder(order._id, checked as boolean)
-                          }
+                          onCheckedChange={(checked) => handleSelectOrder(order._id, checked as boolean)}
                         />
                       </td>
-                      <td className="p-3">
-                        <span className="font-mono text-sm font-medium">
+
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <div className="font-mono text-sm font-semibold">
                           {order.orderNumber || order.failedOrderNumber || "Pending"}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-sm">{formatDate(order._creationTime ?? order.createdAt)}</span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-sm font-medium">
-                          {order.shippingAddress?.fullName || "—"}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-sm">{order.shippingAddress?.phone || "—"}</span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-sm">{order.shippingAddress?.city || "—"}</span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-sm font-medium">
-                          ₹{(order.total || 0).toFixed(0)}
-                        </span>
-                      </td>
-                      <td className="p-3">
-                        <span className="text-sm">{order.items?.length ?? 0}</span>
-                      </td>
-                      <td className="p-3">
-                        <Badge variant="outline" className={getStatusColor(order.status)}>
-                          {order.status}
-                        </Badge>
-                      </td>
-                      <td className="p-3">
-                        <div className="flex flex-col gap-1">
-                          <Badge
-                            variant="outline"
-                            className={getPaymentStatusColor(normalizePaymentStatus(order.paymentStatus))}
-                          >
-                            {normalizePaymentStatus(order.paymentStatus) || "pending"}
-                          </Badge>
-                          {order.paymentMethod === "cod" && (
-                            <div className="flex items-center gap-1">
-                              <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-700 border-amber-500/20">
-                                COD
-                              </Badge>
-                              {order.codAmount && order.codAmount > 0 && (
-                                <span className="text-xs text-muted-foreground">₹{order.codAmount.toFixed(0)}</span>
-                              )}
-                            </div>
-                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatDate(order._creationTime ?? order.createdAt)}
                         </div>
                       </td>
+
+                      <td className="px-3 py-2.5">
+                        <div className="text-sm font-medium">
+                          {order.shippingAddress?.fullName || order.customerName || "—"}
+                        </div>
+                        <div className="text-xs tabular-nums text-muted-foreground">
+                          {order.shippingAddress?.phone || order.phone || "—"}
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-2.5">
+                        <div className="text-sm">{order.shippingAddress?.city || "—"}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {order.items?.length ?? 0} item{(order.items?.length ?? 0) === 1 ? "" : "s"}
+                        </div>
+                      </td>
+
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                        <div className="text-sm font-semibold tabular-nums">
+                          ₹{(order.total || 0).toFixed(0)}
+                        </div>
+                        {order.paymentMethod === "cod" && (
+                          <div className="text-xs text-amber-600">
+                            COD{order.codAmount > 0 ? ` ₹${order.codAmount.toFixed(0)}` : ""}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusColor(order.status)}`}>
+                          <span className={`size-1.5 rounded-full ${STATUS_DOT[order.status] || "bg-muted-foreground"}`} />
+                          {ADMIN_STATUS_LABELS[order.status] || order.status}
+                        </span>
+                      </td>
+
+                      {/*
+                        What the courier last said, on the row itself. It used
+                        to live two clicks away on the order page, so the only
+                        way to see that a parcel had stalled was to open every
+                        one of them.
+                      */}
+                      <td className="px-3 py-2.5">
+                        {awb ? (
+                          <>
+                            <div className="text-xs font-medium">
+                              {courier || "Courier"}
+                              {order.trackingUrl ? (
+                                <a
+                                  href={order.trackingUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="ml-1 font-mono text-brand hover:underline"
+                                >
+                                  {awb}
+                                </a>
+                              ) : (
+                                <span className="ml-1 font-mono text-muted-foreground">{awb}</span>
+                              )}
+                            </div>
+                            <div className="max-w-[16rem] truncate text-xs text-muted-foreground">
+                              {order.shippingStatus || "No update yet"}
+                              {order.lastTrackingEventAt ? ` · ${timeAgo(order.lastTrackingEventAt)}` : ""}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not shipped</span>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${getPaymentStatusColor(pay)}`}>
+                          {pay}
+                        </span>
+                      </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* Bulk Ship Confirmation Dialog */}

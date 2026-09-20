@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import { reserveMaterialForOrder } from "./materials";
+import { cashbackForLines } from "./cashback";
 import { notifyOrderPlaced } from "./orderNotifications";
 import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
@@ -87,6 +88,8 @@ export const placeOrder = functions
     );
 
     const priceMap = new Map<string, number>();
+    // The variant's own id as well, because a cashback rule can target one.
+    const variantIdMap = new Map<string, string>();
     if (productIds.length > 0) {
       // Firestore "in" supports up to 30 values; chunk just in case
       const chunks: string[][] = [];
@@ -95,7 +98,9 @@ export const placeOrder = functions
       for (const snap of snaps) {
         for (const d of snap.docs) {
           const v = d.data() as any;
-          priceMap.set(`${String(v.productId)}::${String(v.title)}`, Number(v.price || 0));
+          const key = `${String(v.productId)}::${String(v.title)}`;
+          priceMap.set(key, Number(v.price || 0));
+          variantIdMap.set(key, d.id);
         }
       }
     }
@@ -140,20 +145,61 @@ export const placeOrder = functions
 
     // ── 3b. Re-derive every discount server-side ──────────────────────────────
     let couponDiscount = 0;
+    let walletCreditCouponAmount = 0;
     if (couponId && typeof couponId === "string") {
       const cSnap = await db.collection("coupons").doc(couponId).get();
       const c = cSnap.exists ? (cSnap.data() as any) : null;
-      if (c && c.isActive === true && itemsTotal >= Number(c.minPurchaseAmount || 0)) {
+      /*
+       * The same field names the apply step reads.
+       *
+       * This checked `minPurchaseAmount` and `maxDiscountAmount`, which the
+       * admin form has never written — it writes `minPurchase` and
+       * `maxDiscount`. So the minimum an admin set was ignored on the line
+       * that actually bills, and a percentage coupon's cap with it: the live
+       * 5OFF is set to a ₹250 minimum and would have applied to a ₹1 order.
+       */
+      const minPurchase = Number(c?.minPurchase ?? c?.minCartValue ?? c?.minPurchaseAmount ?? 0);
+      const maxDiscount = Number(c?.maxDiscount ?? c?.maxDiscountAmount ?? 0);
+      if (c && c.isActive === true && itemsTotal >= minPurchase) {
         if (c.discountType === "percentage") {
           couponDiscount = Math.floor(itemsTotal * (Number(c.discountValue || 0) / 100));
-          if (c.maxDiscountAmount) couponDiscount = Math.min(couponDiscount, Number(c.maxDiscountAmount));
+          if (maxDiscount > 0) couponDiscount = Math.min(couponDiscount, maxDiscount);
         } else {
           couponDiscount = Math.min(itemsTotal, Number(c.discountValue || 0));
         }
-        // A wallet-credit coupon pays out afterwards; it is not money off now.
-        if (c.isWalletCredit === true) couponDiscount = 0;
+        /*
+         * A wallet-credit coupon pays out afterwards; it is not money off now.
+         *
+         * The amount is kept, which it never was: the order recorded a coupon
+         * worth ₹0 and nothing else, so the "₹100 wallet credit on delivery"
+         * the checkout page promised had nowhere to be read from and was never
+         * paid to anybody.
+         */
+        if (c.isWalletCredit === true) {
+          walletCreditCouponAmount = couponDiscount;
+          couponDiscount = 0;
+        }
       }
     }
+
+    // What this order earns back on delivery, settled now at today's rules.
+    const cashback = await cashbackForLines(
+      db,
+      orderItems.map((item) => {
+        const key = `${String(item?.productId)}::${String(item?.variant)}`;
+        return {
+          productId: String(item?.productId || ""),
+          variantId: variantIdMap.get(key),
+          unitPrice: priceMap.get(key) || 0,
+          quantity: Math.max(1, Math.floor(Number(item?.quantity || 1))),
+        };
+      }).filter((l) => l.productId),
+      itemsTotal
+    ).catch((e) => {
+      // Never lose an order over the cashback table.
+      console.error("placeOrder: cashback calculation failed", { order: orderId, error: e?.message || e });
+      return { total: 0, lines: [] };
+    });
 
     // Wallet is capped by the balance the server can see, never by the request.
     let walletUsed = 0;
@@ -209,6 +255,11 @@ export const placeOrder = functions
       couponId: couponId || null,
       couponDiscount,
       walletUsed,
+      // Paid into the wallet when the parcel lands — see creditWalletOnDelivery.
+      walletCreditCouponAmount,
+      cashbackAmount: cashback.total,
+      cashbackLines: cashback.lines,
+      creditOnDelivery: walletCreditCouponAmount + cashback.total,
       codFee,
       prepaidAmount,
       total: calculatedTotal,

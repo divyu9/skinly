@@ -51,7 +51,8 @@ export function SiteFooter() {
                 <h3 className="font-semibold text-sm mb-2">Support</h3>
                 <ul className="space-y-1.5 text-sm">
                   <li>
-                    <Link to="/orders" className="text-muted-foreground hover:text-primary transition-colors">
+                    {/* /orders needs a login; most orders here are guests'. */}
+                    <Link to="/track" className="text-muted-foreground hover:text-primary transition-colors">
                       Track Order
                     </Link>
                   </li>

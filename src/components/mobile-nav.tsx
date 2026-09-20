@@ -25,6 +25,7 @@ import {
   MenuIcon,
   PackageIcon,
   ShoppingBagIcon,
+  TruckIcon,
   UserIcon,
   ListIcon,
   LayoutGridIcon,
@@ -147,6 +148,13 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
       label: "My Orders",
       icon: ShoppingBagIcon,
       href: "/orders",
+    },
+    {
+      // Above My Account on purpose: the people who need this are the ones
+      // who never made an account, and /orders is no use to them.
+      label: "Track Order",
+      icon: TruckIcon,
+      href: "/track",
     },
     {
       label: "Gadget Selector",

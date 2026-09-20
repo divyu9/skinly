@@ -296,11 +296,19 @@ export async function notifyOrderStatus(
 }
 
 /**
- * Pays out a wallet-credit coupon when the parcel lands, once.
+ * Pays what the order earned into the customer's wallet when it lands, once.
  *
- * This lived inside the RapidShyp webhook, so a delivery recorded any other
- * way — by hand, or by a courier we do not have a webhook for — silently owed
- * the customer money. It belongs to the status, not to the route that
+ * Two promises are settled here, and neither was being kept. A wallet-credit
+ * coupon ("₹100 back on delivery") was read from `walletCreditCouponAmount`,
+ * a field `placeOrder` had never written — so the payout could not fire for
+ * anybody. And product cashback ("earn ₹40 back") was worked out in the
+ * browser for display only and thrown away at checkout. Both are now recorded
+ * on the order when it is placed, at the rules in force that day, and both
+ * are paid from here.
+ *
+ * This also used to live inside the RapidShyp webhook, so a delivery recorded
+ * any other way — by hand, or by a courier we have no webhook for — silently
+ * owed the customer money. It belongs to the status, not to the route that
  * reported it.
  */
 async function creditWalletOnDelivery(
@@ -308,11 +316,30 @@ async function creditWalletOnDelivery(
   orderRef: admin.firestore.DocumentReference,
   order: any
 ): Promise<void> {
-  const amount = Number(order?.walletCreditCouponAmount) || 0;
-  if (!(amount > 0) || !order?.userId || order?.walletCreditCredited) return;
+  const coupon = Number(order?.walletCreditCouponAmount) || 0;
+  const cashback = Number(order?.cashbackAmount) || 0;
+  const amount = Math.round((coupon + cashback) * 100) / 100;
+  if (!(amount > 0) || order?.walletCreditCredited) return;
+
+  if (!order?.userId || String(order.userId).startsWith("guest")) {
+    /*
+     * A guest has no wallet to pay into. Said out loud and marked on the
+     * order rather than dropped, because the customer was promised this at
+     * checkout and somebody has to be able to see who is owed what.
+     */
+    await orderRef.update({ creditOwedNoAccount: amount, updatedAt: Date.now() });
+    console.warn("creditWalletOnDelivery: no account to credit", {
+      order: order?.orderNumber, amount,
+    });
+    return;
+  }
 
   const userRef = db.collection("users").doc(String(order.userId));
   const txRef = db.collection("walletTransactions").doc();
+  const parts = [
+    coupon > 0 ? `coupon ₹${coupon}` : "",
+    cashback > 0 ? `cashback ₹${cashback}` : "",
+  ].filter(Boolean).join(" + ");
 
   await db.runTransaction(async (tx) => {
     const [orderSnap, userSnap] = await tx.getAll(orderRef, userRef);
@@ -322,22 +349,28 @@ async function creditWalletOnDelivery(
     if (!userSnap.exists) return;
 
     const before = Number((userSnap.data() as any)?.walletBalance) || 0;
-    const after = before + amount;
+    const after = Math.round((before + amount) * 100) / 100;
     tx.update(userRef, { walletBalance: after });
     tx.set(txRef, {
       userId: order.userId,
       transactionType: "credit",
       amount,
-      source: "coupon_credit",
+      source: coupon > 0 && cashback > 0 ? "delivery_credit" : coupon > 0 ? "coupon_credit" : "cashback",
       balanceBefore: before,
       balanceAfter: after,
-      description: `Wallet credit from coupon on order ${order.orderNumber || ""}`.trim(),
+      description: `Delivered order ${order.orderNumber || ""} — ${parts}`.trim(),
       relatedOrderId: orderRef.id,
       ...(order.couponId ? { relatedCouponId: order.couponId } : {}),
       createdAt: Date.now(),
     });
-    tx.update(orderRef, { walletCreditCredited: true });
+    tx.update(orderRef, {
+      walletCreditCredited: true,
+      walletCreditPaid: amount,
+      walletCreditPaidAt: Date.now(),
+    });
   });
+
+  console.log("creditWalletOnDelivery", { order: order?.orderNumber, amount, parts });
 }
 
 /* ------------------------------------------------------------- callables */

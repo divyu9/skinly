@@ -398,6 +398,35 @@ img[data-img-broken] {
 }
 
 /*
+ * …except where an admin screen is asked to carry the brand.
+ *
+ * Order Management is the screen this shop lives in all day, and the neutral
+ * pair made it read as somebody else's dashboard. This puts the teal back for
+ * one subtree, so the sticker treatment and the brand CTA are available there
+ * without loosening the rule for the rest of admin.
+ */
+.admin-brandy {
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+}
+
+/* A stat tile that reads as a decal on the page rather than a plain card. */
+.tile {
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 0 var(--ink);
+  background: var(--card);
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.tile-press:not(:disabled):hover {
+  transform: translate(1px, 1px);
+  box-shadow: 2px 2px 0 0 var(--ink);
+}
+.tile-press:not(:disabled):active {
+  transform: translate(3px, 3px);
+  box-shadow: 0 0 0 0 var(--ink);
+}
+
+/*
  * No zoom-on-focus, and no pinching back out afterwards.
  *
  * Mobile Safari zooms the page whenever a focused field's text is under 16px.
