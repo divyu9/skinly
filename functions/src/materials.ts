@@ -293,6 +293,7 @@ export async function syncStockForDesign(
     ref: admin.firestore.DocumentReference;
     units: number;
     sku: string;
+    before: number;
     changed: boolean;
   }> = [];
   for (const d of variantSnap.docs) {
@@ -320,6 +321,8 @@ export async function syncStockForDesign(
       ref: d.ref,
       units,
       sku: String(v.sku || ""),
+      // What it was, so a crossing back above zero can be spotted below.
+      before: Number(v.inventoryQuantity) || 0,
       changed: Number(v.inventoryQuantity) !== units,
     });
   }
@@ -332,6 +335,24 @@ export async function syncStockForDesign(
     );
     await batch.commit();
   }
+  /*
+   * Anything that crossed back above zero has people waiting on it.
+   *
+   * This is the moment stock actually returns — a roll added, sheets
+   * recounted, an order cancelled and its material put back — and until now
+   * nothing happened at it. Best-effort: a message that cannot be queued must
+   * never fail a stock recount.
+   */
+  const restocked = matched.filter((m) => m.before <= 0 && m.units > 0).map((m) => m.ref.id);
+  if (restocked.length) {
+    try {
+      const { notifyRestocked } = await import("./restock");
+      await notifyRestocked(db, restocked);
+    } catch (e: any) {
+      console.error("syncStockForDesign: restock notices skipped", { error: e?.message || e });
+    }
+  }
+
   return matched.map((m) => ({ sku: m.sku, units: m.units, changed: m.changed }));
 }
 
