@@ -977,6 +977,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const [retiring, setRetiring] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [approvingAll, setApprovingAll] = useState<{ done: number; total: number } | null>(null);
+  const [recounting, setRecounting] = useState(false);
+  const recalcStock = useAction(api.materials.recalcMaterialStock);
   const [rejectingAll, setRejectingAll] = useState<{ done: number; total: number } | null>(null);
   const [tplProgress, setTplProgress] = useState<{ done: number; total: number } | null>(null);
   const templateMockups = useTemplateMockups();
@@ -1588,6 +1590,25 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
                     {roll.flatImageUrl ? "Re-calibrate" : "Calibrate for template mockups"}
                   </Button>
                 )}
+                {/* Stock is worked out from the shelf, not stored on the
+                    listing, so a listing made after the last count sits at
+                    zero until something counts again. This is that something,
+                    for when a launch is not the thing that made it. */}
+                <Button size="sm" variant="outline" disabled={recounting} onClick={async () => {
+                  setRecounting(true);
+                  try {
+                    const res: any = await recalcStock({ codes: [roll.code] });
+                    const n = Number(res?.syncedCount ?? 0);
+                    toast.success(n
+                      ? `${n} variant${n === 1 ? "" : "s"} recounted from ${roll.code}'s shelf`
+                      : `${roll.code}: every listing already agrees with the shelf`);
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Could not recount");
+                  } finally { setRecounting(false); }
+                }}>
+                  {recounting ? <Loader2Icon className="mr-1.5 size-3.5 animate-spin" /> : <RefreshCwIcon className="mr-1.5 size-3.5" />}
+                  Recount stock
+                </Button>
                 {TEMPLATE_TOOLS && roll.source === "roll" && (
                   <span className={`text-[11px] ${roll.flatImageUrl ? "text-emerald-600" : "text-muted-foreground"}`}>
                     {roll.flatImageUrl ? `calibrated · ${roll.flatWidthCm} × ${roll.flatLengthCm} cm` : "not calibrated"}

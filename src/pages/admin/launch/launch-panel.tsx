@@ -348,7 +348,12 @@ const STATUS_LABEL: Record<string, string> = {
  */
 async function retryFailedSteps(launchId: string, steps: any[]) {
   const nextSteps = (steps || []).map((s) =>
-    s.status === "failed" ? { ...s, status: "pending", tries: 0, note: "" } : s
+    // The recount and the rebuild go again too: both summarise the whole
+    // design, and a listing this retry creates would otherwise be left out of
+    // a sweep that had already run — at zero stock, and off the storefront.
+    s.status === "failed" || s.type === "sync" || s.type === "rebuild"
+      ? { ...s, status: "pending", tries: 0, note: "" }
+      : s
   );
   await updateDoc(doc(db, "designLaunches", launchId), {
     steps: nextSteps,

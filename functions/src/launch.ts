@@ -320,6 +320,24 @@ export async function runLaunch(launchId: string, budgetMs: number) {
       await save();
     }
 
+    /*
+     * Recount the design's stock now everything that is going to exist does.
+     *
+     * The plan carries a "Recount stock" step, but it sits where it was
+     * planned — after the creates of that plan and nothing else. A listing
+     * made after it passed never got counted and sat at zero while the
+     * material mapping showed metres on the shelf: a retried create (Retry
+     * failed steps leaves an already-done sync alone), a run that resumed on
+     * a later tick, a second launch of the same design. One sweep here costs
+     * a single pass and cannot be outrun by anything this run does.
+     */
+    try {
+      const { syncStockForDesign } = await import("./materials");
+      await syncStockForDesign(db, [launch.code]);
+    } catch (e: any) {
+      console.warn(`launch ${launchId}: closing stock recount skipped`, e?.message || e);
+    }
+
     const left = await collect(db, launchId, launch.code, deadline - 20_000);
     const failed = launch.steps.filter((s) => s.status === "failed").length;
     await save({
