@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import * as crypto from "crypto";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { normalizeOrderStatus, type OrderStatus } from "./orderStatus";
 
@@ -109,8 +110,24 @@ async function lookUpOrder(data: any) {
    * that matters when the numbers run in sequence.
    */
   const contactKey = contact.toLowerCase().replace(/[^a-z0-9@.]/g, "").slice(0, 64);
-  await enforceDailyRateLimit({ key: `track_c_${contactKey}`, limit: Number(process.env.TRACK_DAILY_LIMIT || 60) });
-  await enforceDailyRateLimit({ key: `track_o_${numberVariants(orderNumber)[0]}`, limit: 30 });
+  const numberKey = crypto.createHash("sha1").update(numberVariants(orderNumber)[0] || "").digest("hex").slice(0, 16);
+  /*
+   * Belt and braces, twice over.
+   *
+   * The key is hashed rather than pasted in, because it becomes a Firestore
+   * document id and an order number with a slash in it is not a legal one —
+   * that is what turned "#40/25" into a bare "internal" with no message. And
+   * the calls are guarded here as well: a ceiling on how often someone may
+   * ask is worth having, but never at the price of refusing a customer who
+   * simply wants to know where their parcel is.
+   */
+  try {
+    await enforceDailyRateLimit({ key: `track_c_${contactKey}`, limit: Number(process.env.TRACK_DAILY_LIMIT || 60) });
+    await enforceDailyRateLimit({ key: `track_o_${numberKey}`, limit: 30 });
+  } catch (e: any) {
+    if (e instanceof HttpsError && e.code === "resource-exhausted") throw e;
+    console.warn("trackOrder: rate limit skipped", { error: e?.message || e });
+  }
 
   const db = admin.firestore();
   let doc: admin.firestore.QueryDocumentSnapshot | undefined;
@@ -160,6 +177,9 @@ async function lookUpOrder(data: any) {
 
   return {
     found: true,
+    // Bumped whenever this function's contract changes, so which build is
+    // live is a fact rather than a deduction.
+    v: 2,
     orderNumber: String(order.orderNumber || order.failedOrderNumber || ""),
     orderId: doc!.id,
     status,
