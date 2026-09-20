@@ -75,8 +75,15 @@ export default function SettingsPage() {
           : { dryRun: mode === "preview", limit: Number(seoPerDay) || undefined }
       );
       toast.success(res?.message || "Done", {
-        description: mode === "coverage" && res?.coverage?.brandsMissing?.length
-          ? `Brands with no page: ${res.coverage.brandsMissing.slice(0, 8).join(", ")}`
+        description: mode === "coverage"
+          ? [
+              res?.coverage?.brandsMissing?.length
+                ? `Brand + gadget missing: ${res.coverage.brandsMissing.slice(0, 6).join(", ")}`
+                : "",
+              res?.coverage?.themesMissing?.length
+                ? `Themes missing: ${res.coverage.themesMissing.slice(0, 6).join(", ")}`
+                : "",
+            ].filter(Boolean).join(" — ") || undefined
           : undefined,
         duration: 15000,
       });
@@ -670,13 +677,15 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
-              Model pages, written nightly
+              Landing pages, written nightly
             </CardTitle>
             <CardDescription>
-              Each night, newest models first, any model without a landing page gets one written by
-              the same generator the SEO screen uses. A phone added today has its page by tomorrow;
-              the backlog is chipped at from the front. The cap is what keeps one night's run from
-              spending a month of OpenAI budget.
+              Three kinds of page, written by the same generator the SEO screen uses: one per model
+              ("acer swift 5 skins"), one per brand and gadget ("dell laptop skins" — 366 models sit
+              behind that one, and none of these existed), and one per theme from your collections
+              ("anime phone skins"). A model added today gets its page tomorrow; after that it is
+              simply whichever missing page has the most stock behind it. The cap is what keeps one
+              night's run from spending a month of OpenAI budget.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -713,7 +722,9 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Left unpublished, new pages wait in SEO Pages and the morning digest counts them —
               thin or wrong pages at scale hurt a site more than missing ones, so it is worth
-              reading a few before turning publishing on.
+              reading a few before turning publishing on. A theme needs 25 products before it gets a
+              page at all, and 20 on one gadget: "anime phone" has 58 and earns one, "car" has ten
+              across the whole catalogue and does not.
             </p>
           </CardContent>
         </Card>

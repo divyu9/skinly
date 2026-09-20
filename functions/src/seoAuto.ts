@@ -65,6 +65,87 @@ export function metaDescriptionFrom(html: string): string {
   return sentence.replace(/\s+/g, " ").trim();
 }
 
+/* ------------------------------------------------------------------ naming */
+
+/**
+ * Brand names as a shopper types them, not as the database stores them.
+ *
+ * The database is full of shouting and spacing that came in with imported
+ * spreadsheets — "One Plus", "MICROSOFT", "ZHIYUN". A slug built straight from
+ * those gives `/one-plus-phone-skins`, and nobody searches "one plus".
+ */
+const BRAND_NAMES: Record<string, string> = {
+  "one plus": "OnePlus", "oneplus": "OnePlus",
+  microsoft: "Microsoft", alienware: "Alienware", razer: "Razer",
+  huawei: "Huawei", fujitsu: "Fujitsu", fujifilm: "Fujifilm",
+  sigma: "Sigma", tamron: "Tamron", tokina: "Tokina", viltrox: "Viltrox",
+  yongnuo: "Yongnuo", zhiyun: "Zhiyun", snoppa: "Snoppa", meike: "Meike",
+  leica: "Leica", moza: "Moza", feiyutech: "FeiyuTech", jooyontech: "Jooyontech",
+};
+
+/** The word a shopper uses for the thing, by gadget category. */
+const GADGET_NAMES: Record<string, string> = {
+  phone: "Phone", laptop: "Laptop", tablet: "Tablet", camera: "Camera",
+  lens: "Lens", controller: "Controller", console: "Console", drone: "Drone",
+  charger: "Charger", gimbals: "Gimbal", gimbal: "Gimbal", "mac-mini": "Mac mini",
+};
+
+/**
+ * The handful of pairs a shopper names differently from the two halves.
+ *
+ * Nobody searches "apple tablet skins" or "apple laptop skins" — they search
+ * iPad and MacBook. Sony's laptops have been VAIO for twenty years.
+ */
+const COMBO_NAMES: Record<string, string> = {
+  "apple|tablet": "Apple iPad",
+  "apple|laptop": "Apple MacBook",
+  "apple|phone": "Apple iPhone",
+  "sony|laptop": "Sony VAIO",
+  "samsung|tablet": "Samsung Galaxy Tab",
+  "samsung|phone": "Samsung Galaxy",
+};
+
+const pretty = (brand: string) =>
+  BRAND_NAMES[brand.trim().toLowerCase()] ||
+  (/^[A-Z0-9+ ]+$/.test(brand.trim())
+    // ALL CAPS names read as shouting on a page title; initialisms of three
+    // letters or fewer (HP, MSI, DJI, LG) are genuinely written that way.
+    ? (brand.trim().length <= 3 ? brand.trim() : brand.trim().replace(/\b(\w)(\w*)/g, (_, a, b) => a + b.toLowerCase()))
+    : brand.trim());
+
+export const slugify = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+/** "Apple" + "laptop" → { name: "Apple MacBook", slug: "apple-macbook-skins" } */
+export function brandGadgetName(brand: string, gadget: string): { name: string; slug: string } {
+  const key = `${slugify(brand)}|${String(gadget).toLowerCase()}`;
+  const name = COMBO_NAMES[key] || `${pretty(brand)} ${GADGET_NAMES[String(gadget).toLowerCase()] || gadget}`;
+  return { name, slug: `${slugify(name)}-skins` };
+}
+
+/* ---------------------------------------------------------------- targets */
+
+/** A page that ought to exist: what to call it and what it is about. */
+export interface Target {
+  kind: "model" | "brand-gadget" | "theme" | "theme-gadget";
+  slug: string;
+  name: string;
+  /** How much stock sits behind it — the order things get written in. */
+  depth: number;
+  filterConfig: Record<string, unknown>;
+  brandName?: string;
+}
+
+/**
+ * How much has to sit behind a page before it is worth having.
+ *
+ * A page with four products on it is a page Google will call thin, and enough
+ * of those drag down the pages that are good. These floors are deliberately
+ * cautious: "car skins" has ten designs across the whole catalogue and does
+ * not deserve a page yet; "anime phone skins" has fifty-eight and does.
+ */
+const FLOORS = { brandGadget: 5, theme: 25, themeGadget: 20 };
+
 export interface Coverage {
   models: number;
   brands: number;
@@ -72,45 +153,152 @@ export interface Coverage {
   modelsWithPage: number;
   modelsMissing: number;
   brandsMissing: string[];
+  themesMissing: string[];
+  byKind: Record<string, { total: number; have: number; missing: number }>;
   waitingToPublish: number;
+}
+
+/**
+ * Every page that ought to exist, in the order it is worth writing.
+ *
+ * Three tiers, and the middle one is the one that was missing entirely. A
+ * model page ("acer swift 5 skins") is precise but almost nobody searches it.
+ * A brand page ("lenovo skins") does not say whether it is about laptops or
+ * tablets. Between them sits "dell laptop skins" — 366 models behind it and a
+ * phrase people genuinely type — and there was not one of those on the site.
+ */
+export async function allTargets(db: admin.firestore.Firestore): Promise<Target[]> {
+  const [modelSnap, collSnap, cpSnap, prodSnap] = await Promise.all([
+    db.collection("supportedModels").get(),
+    db.collection("collections").get(),
+    db.collection("collectionProducts").get(),
+    db.collection("products").get(),
+  ]);
+
+  const models = modelSnap.docs
+    .map((d) => ({ id: d.id, ...(d.data() as any) }))
+    .filter((m) => m.isActive !== false && m.brandName && m.modelName);
+
+  const targets: Target[] = [];
+
+  // Tier 1 — one page per model, newest first (handled by the caller's sort).
+  for (const m of models) {
+    targets.push({
+      kind: "model",
+      slug: modelSlug(String(m.brandName), String(m.modelName)),
+      name: `${pretty(String(m.brandName))} ${m.modelName}`,
+      depth: 1,
+      brandName: String(m.brandName),
+      filterConfig: { brand: String(m.brandName), model: String(m.modelName) },
+      // Newest models are the ones being searched for today.
+      ...( { createdAt: Number(m._creationTime || m.createdAt) || 0 } as any),
+    });
+  }
+
+  // Tier 2 — brand × gadget, weighted by how many models sit behind it.
+  const pairs = new Map<string, { brand: string; gadget: string; n: number }>();
+  for (const m of models) {
+    const gadget = String(m.category || m.gadgetType || m.gadgetTypeId || "").toLowerCase();
+    if (!gadget) continue;
+    const key = `${m.brandName}|${gadget}`;
+    const cur = pairs.get(key) || { brand: String(m.brandName), gadget, n: 0 };
+    cur.n++;
+    pairs.set(key, cur);
+  }
+  for (const { brand, gadget, n } of pairs.values()) {
+    if (n < FLOORS.brandGadget) continue;
+    const { name, slug } = brandGadgetName(brand, gadget);
+    targets.push({
+      kind: "brand-gadget", slug, name, depth: n, brandName: brand,
+      filterConfig: { brand, gadget },
+    });
+  }
+
+  // Tier 3 — themes, from the curated collections rather than the tag soup.
+  const gadgetOf = new Map(prodSnap.docs.map((d) => [d.id, String((d.data() as any).gadgetCategory || "").toLowerCase()]));
+  const byCollection = new Map<string, string[]>();
+  for (const d of cpSnap.docs) {
+    const row = d.data() as any;
+    const key = String(row.collectionId || "");
+    if (!key) continue;
+    byCollection.set(key, [...(byCollection.get(key) || []), String(row.productId || "")]);
+  }
+  for (const d of collSnap.docs) {
+    const c = d.data() as any;
+    if (c.isActive === false) continue;
+    const name = String(c.name || "").trim();
+    if (!name) continue;
+    const productIds = byCollection.get(d.id) || [];
+    if (productIds.length >= FLOORS.theme) {
+      targets.push({
+        kind: "theme",
+        slug: `${slugify(name)}-skins`,
+        name: `${name} Skins`,
+        depth: productIds.length,
+        filterConfig: { collectionId: d.id, collection: name },
+      });
+    }
+    // …and the theme on one gadget, which is where the real searches are:
+    // "anime phone skins" beats "anime skins" every time.
+    const perGadget = new Map<string, number>();
+    for (const pid of productIds) {
+      const g = gadgetOf.get(pid);
+      if (g) perGadget.set(g, (perGadget.get(g) || 0) + 1);
+    }
+    for (const [g, n] of perGadget) {
+      if (n < FLOORS.themeGadget) continue;
+      const word = GADGET_NAMES[g] || g;
+      targets.push({
+        kind: "theme-gadget",
+        slug: `${slugify(`${name} ${word}`)}-skins`,
+        name: `${name} ${word} Skins`,
+        depth: n,
+        filterConfig: { collectionId: d.id, collection: name, gadget: g },
+      });
+    }
+  }
+
+  return targets;
 }
 
 /** What has a page and what does not — the number nobody could see. */
 export async function seoCoverage(db: admin.firestore.Firestore): Promise<Coverage> {
-  const [modelSnap, pageSnap] = await Promise.all([
-    db.collection("supportedModels").get(),
+  const [pageSnap, targets] = await Promise.all([
     db.collection("seoPages").get(),
+    allTargets(db),
   ]);
-
   const slugs = new Set(pageSnap.docs.map((d) => String((d.data() as any).slug || "")));
   const waitingToPublish = pageSnap.docs.filter(
     (d) => (d.data() as any).autoGenerated === true && (d.data() as any).isPublished !== true
   ).length;
 
-  const brands = new Set<string>();
-  let withPage = 0;
-  for (const d of modelSnap.docs) {
-    const m = d.data() as any;
-    if (m.isActive === false) continue;
-    const brand = String(m.brandName || "").trim();
-    if (brand) brands.add(brand);
-    if (slugs.has(modelSlug(brand, String(m.modelName || "")))) withPage++;
+  const byKind: Record<string, { total: number; have: number; missing: Target[] }> = {};
+  for (const t of targets) {
+    const b = (byKind[t.kind] ||= { total: 0, have: 0, missing: [] });
+    b.total++;
+    if (slugs.has(t.slug)) b.have++;
+    else b.missing.push(t);
   }
+  for (const b of Object.values(byKind)) b.missing.sort((a, z) => z.depth - a.depth);
 
-  const brandsMissing = [...brands].filter(
-    (b) => !slugs.has(`${b.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}-skins`)
-  );
-
-  const activeModels = modelSnap.docs.filter((d) => (d.data() as any).isActive !== false).length;
+  const models = byKind.model || { total: 0, have: 0, missing: [] };
   return {
-    models: activeModels,
-    brands: brands.size,
+    models: models.total,
+    brands: new Set(targets.filter((t) => t.brandName).map((t) => t.brandName)).size,
     pages: pageSnap.size,
-    modelsWithPage: withPage,
-    modelsMissing: activeModels - withPage,
-    brandsMissing,
+    modelsWithPage: models.have,
+    modelsMissing: models.missing.length,
+    // The tiers that were missing altogether, biggest first.
+    brandsMissing: (byKind["brand-gadget"]?.missing || []).slice(0, 40).map((t) => `${t.slug} (${t.depth})`),
+    themesMissing: [
+      ...(byKind.theme?.missing || []),
+      ...(byKind["theme-gadget"]?.missing || []),
+    ].sort((a, z) => z.depth - a.depth).slice(0, 40).map((t) => `${t.slug} (${t.depth})`),
+    byKind: Object.fromEntries(
+      Object.entries(byKind).map(([k, v]) => [k, { total: v.total, have: v.have, missing: v.missing.length }])
+    ),
     waitingToPublish,
-  };
+  } as Coverage;
 }
 
 export interface FillResult {
@@ -123,15 +311,16 @@ export interface FillResult {
 }
 
 /**
- * Writes pages for the models that have none, newest first.
+ * Writes the pages that are missing, the most valuable first.
  *
- * Newest first on purpose: a phone added today is the one people are searching
- * for today, and a page that arrives six months late has already missed its
- * traffic.
+ * Order matters more than it looks. A phone added yesterday is what people are
+ * searching for today, so anything new jumps the queue; after that it is
+ * simply whichever missing page has the most stock behind it, which is how
+ * "dell laptop skins" gets written before the four hundredth Acer model.
  */
 export async function fillMissingSeoPages(
   db: admin.firestore.Firestore,
-  opts: { limit?: number; dryRun?: boolean } = {}
+  opts: { limit?: number; dryRun?: boolean; kinds?: string[] } = {}
 ): Promise<FillResult> {
   const perDay = Number(opts.limit ?? (await setting(db, SETTINGS.perDay)) ?? 0);
   const out: FillResult = { considered: 0, created: 0, failed: 0, published: false, slugs: [], errors: [] };
@@ -140,72 +329,71 @@ export async function fillMissingSeoPages(
   const autoPublish = (await setting(db, SETTINGS.autoPublish)) === true;
   out.published = autoPublish;
 
-  const [modelSnap, pageSnap, templateSnap] = await Promise.all([
-    db.collection("supportedModels").get(),
+  const [pageSnap, templateSnap, targets] = await Promise.all([
     db.collection("seoPages").get(),
     db.collection("seoPageTemplates").get(),
+    allTargets(db),
   ]);
-
   const slugs = new Set(pageSnap.docs.map((d) => String((d.data() as any).slug || "")));
-  const deviceTemplate = templateSnap.docs
-    .map((d) => d.data() as any)
-    .find((t) => t.pageType === "device");
+  const template = templateSnap.docs.map((d) => d.data() as any).find((t) => t.pageType === "device");
 
-  const missing = modelSnap.docs
-    .map((d) => ({ id: d.id, ...(d.data() as any) }))
-    .filter((m) => m.isActive !== false && m.brandName && m.modelName)
-    .filter((m) => !slugs.has(modelSlug(String(m.brandName), String(m.modelName))))
-    .sort((a, b) => (Number(b._creationTime || b.createdAt) || 0) - (Number(a._creationTime || a.createdAt) || 0))
+  const fresh = Date.now() - 30 * 86400000;
+  const missing = targets
+    .filter((t) => !slugs.has(t.slug))
+    .filter((t) => !opts.kinds?.length || opts.kinds.includes(t.kind))
+    // A model added in the last month first; then by how much sits behind it.
+    .sort((a, z) => {
+      const an = a.kind === "model" && Number((a as any).createdAt) > fresh ? 1 : 0;
+      const zn = z.kind === "model" && Number((z as any).createdAt) > fresh ? 1 : 0;
+      return zn - an || z.depth - a.depth;
+    })
     .slice(0, perDay);
 
   out.considered = missing.length;
   if (opts.dryRun) {
-    out.slugs = missing.map((m) => modelSlug(String(m.brandName), String(m.modelName)));
+    out.slugs = missing.map((t) => `${t.slug} (${t.depth})`);
     return out;
   }
 
-  for (const m of missing) {
-    const device = `${m.brandName} ${m.modelName}`.trim();
-    const slug = modelSlug(String(m.brandName), String(m.modelName));
+  for (const t of missing) {
     try {
       const ai = await generateSeoContentCore({
         pageType: "device",
-        keywords: [device],
-        deviceCategory: device,
-        brandName: String(m.brandName),
+        keywords: [t.name],
+        deviceCategory: t.name,
+        ...(t.brandName ? { brandName: t.brandName } : {}),
       });
       if (!ai.contentHTML) throw new Error("no content came back");
 
-      const title = `${device} Skins & Wraps`;
+      const title = `${t.name} Skins & Wraps`.replace(/ Skins Skins/, " Skins");
       await db.collection("seoPages").add({
         pageType: "device",
-        slug,
+        slug: t.slug,
         h1Heading: title,
         metaTitle: title,
         metaDescription: metaDescriptionFrom(ai.contentHTML),
         contentHTML: ai.contentHTML,
         faqs: ai.faqs || [],
-        keywords: [device],
+        keywords: [t.name],
         imageAltTexts: ai.imageAltTexts || [],
-        filterConfig: { brand: String(m.brandName), model: String(m.modelName) },
-        ...(deviceTemplate?.layoutConfig?.sections
-          ? { layoutOverrides: { sections: deviceTemplate.layoutConfig.sections } }
-          : {}),
+        filterConfig: t.filterConfig,
+        ...(template?.layoutConfig?.sections ? { layoutOverrides: { sections: template.layoutConfig.sections } } : {}),
         isPublished: autoPublish,
         // Stamped, so these can be found, reviewed and — if the writing turns
         // out wrong — removed as a group.
         autoGenerated: true,
+        autoGeneratedKind: t.kind,
+        autoGeneratedDepth: t.depth,
         autoGeneratedAt: Date.now(),
-        supportedModelId: m.id,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
       out.created++;
-      out.slugs.push(slug);
+      out.slugs.push(t.slug);
     } catch (e: any) {
       out.failed++;
-      out.errors.push(`${slug}: ${e?.message || e}`);
-      console.error("seoAuto: page failed", { slug, error: e?.message || e });
+      out.errors.push(`${t.slug}: ${e?.message || e}`);
+      console.error("seoAuto: page failed", { slug: t.slug, error: e?.message || e });
     }
   }
 
@@ -231,11 +419,14 @@ export const runSeoAutoPages = functionsV1
     const db = admin.firestore();
     if (data?.coverageOnly === true) {
       const c = await seoCoverage(db);
+      const tiers = Object.entries(c.byKind || {})
+        .map(([k, v]: any) => `${k}: ${v.have}/${v.total}`)
+        .join(" · ");
       return {
         success: true,
         coverage: c,
-        message: `${c.modelsWithPage} of ${c.models} models have a page — ${c.modelsMissing} do not`
-          + (c.waitingToPublish ? `, and ${c.waitingToPublish} auto-written pages are waiting to be published` : ""),
+        message: `${c.modelsWithPage} of ${c.models} models have a page — ${tiers}`
+          + (c.waitingToPublish ? ` · ${c.waitingToPublish} waiting to be published` : ""),
       };
     }
     const limit = data?.limit === undefined ? undefined : Number(data.limit);
