@@ -3530,6 +3530,72 @@ export function useQuery(apiRef: any, args?: any) {
           };
           fetchSitemap();
         }
+        else if (path === 'admin.customers.getAll') {
+          /*
+           * A customer, in a shop whose orders are mostly guests'.
+           *
+           * There is a `users` collection, but a guest never appears in it —
+           * so grouping by user id would miss most of the people who have
+           * actually bought something. The email is what identifies a
+           * customer here, with the phone as a fallback for the handful of
+           * older orders that carry no email.
+           */
+          unsubscribe = onSnapshot(query(collection(db, 'orders'), limit(1000)), async (snap) => {
+            const rows = snap.docs
+              .map(d => normalizeOrder({ _id: d.id, ...d.data() }))
+              .filter((o: any) => !o.isDeleted);
+
+            const byKey = new Map<string, any>();
+            for (const o of rows) {
+              const email = String(o.email || o.customerEmail || o.guestEmail || '').trim().toLowerCase();
+              const phone = String(o.shippingAddress?.phone || o.phone || '').replace(/\D/g, '').slice(-10);
+              const key = email || (phone ? `p:${phone}` : '');
+              if (!key) continue;
+              const c = byKey.get(key) || {
+                key, email, phone,
+                name: o.shippingAddress?.fullName || o.customerName || '',
+                city: o.shippingAddress?.city || '',
+                userId: o.userId && !String(o.userId).startsWith('guest') ? o.userId : null,
+                orders: 0, spent: 0, delivered: 0, rto: 0, cancelled: 0, open: 0,
+                cod: 0, prepaid: 0, firstAt: Infinity, lastAt: 0, orderIds: [] as string[],
+              };
+              c.orders += 1;
+              c.orderIds.push(o._id);
+              if (!c.email && email) c.email = email;
+              if (!c.phone && phone) c.phone = phone;
+              if (!c.userId && o.userId && !String(o.userId).startsWith('guest')) c.userId = o.userId;
+              // Money counts only where money actually arrived.
+              if (normalizePaymentStatus(o.paymentStatus) === 'success' || o.status === 'delivered') {
+                c.spent += Number(o.total) || 0;
+              }
+              if (o.status === 'delivered') c.delivered += 1;
+              else if (o.status === 'rto') c.rto += 1;
+              else if (o.status === 'cancelled') c.cancelled += 1;
+              else c.open += 1;
+              if (String(o.paymentMethod || '').toLowerCase() === 'cod') c.cod += 1; else c.prepaid += 1;
+              const t = o._creationTime || o.createdAt || 0;
+              if (t) { c.firstAt = Math.min(c.firstAt, t); c.lastAt = Math.max(c.lastAt, t); }
+              byKey.set(key, c);
+            }
+
+            // Wallet balances, for the accounts that have one.
+            let wallets = new Map<string, number>();
+            try {
+              const us = await getDocs(query(collection(db, 'users'), limit(1000)));
+              wallets = new Map(us.docs.map(d => [d.id, Number((d.data() as any)?.walletBalance) || 0]));
+            } catch { /* balances are a nicety; the list is the point */ }
+
+            const list = [...byKey.values()].map((c: any) => ({
+              ...c,
+              firstAt: c.firstAt === Infinity ? 0 : c.firstAt,
+              wallet: c.userId ? (wallets.get(c.userId) || 0) : 0,
+              // Of the parcels that reached a conclusion, how many came back.
+              rtoRate: (c.delivered + c.rto) > 0 ? c.rto / (c.delivered + c.rto) : 0,
+            }));
+            list.sort((a: any, b: any) => b.lastAt - a.lastAt);
+            setData(list);
+          });
+        }
         else if (path === 'backup.getRecent') {
           // Newest first, by the day key the backup writes itself under.
           unsubscribe = onSnapshot(collection(db, 'backups'), (snap) => {

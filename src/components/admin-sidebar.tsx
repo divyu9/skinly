@@ -7,6 +7,7 @@ import {
   Smartphone,
   FileCode,
   ShoppingCart,
+  Users,
   Ticket,
   Star,
   ShoppingBag,
@@ -118,6 +119,7 @@ export function AdminSidebar() {
       icon: ShoppingCart,
       items: [
         { path: "/backend-skinly/orders", label: "Orders", icon: ShoppingCart },
+        { path: "/backend-skinly/customers", label: "Customers", icon: Users },
         { path: "/backend-skinly/abandoned-carts", label: "Abandoned Carts", icon: ShoppingBag },
         { path: "/backend-skinly/stock-notifications", label: "Stock Alerts", icon: Bell },
       ],

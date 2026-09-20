@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Input } from "@/components/ui/input.tsx";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PackageIcon, SearchIcon, TruckIcon, IndianRupeeIcon, FileTextIcon, ListChecksIcon, PackageCheckIcon, FileDownIcon, LoaderIcon, CalendarIcon, PlusIcon, AlertTriangleIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -36,9 +36,15 @@ type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
 function AdminOrdersPageInner() {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<string>("processing");
+  const [params] = useSearchParams();
+  /*
+   * ?q= seeds the search, so "See orders" on a customer lands here already
+   * filtered to them. The tab widens to All at the same time, or a customer
+   * whose orders are all delivered would open on an empty Processing list.
+   */
+  const [statusFilter, setStatusFilter] = useState<string>(params.get("q") ? "all" : "processing");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(params.get("q") || "");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
 
   // Date filter state

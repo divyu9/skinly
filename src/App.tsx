@@ -44,6 +44,7 @@ const NewProductPage = lazyWithReload(() => import("./pages/admin/products/new/p
 const EditProductPage = lazyWithReload(() => import("./pages/admin/products/edit/page.tsx"), "./pages/admin/products/edit/page.tsx");
 const BulkProductCreatorPage = lazyWithReload(() => import("./pages/admin/products/bulk/page.tsx"), "./pages/admin/products/bulk/page.tsx");
 const AdminOrdersPage = lazyWithReload(() => import("./pages/admin/orders/page.tsx"), "./pages/admin/orders/page.tsx");
+const AdminCustomersPage = lazyWithReload(() => import("./pages/admin/customers/page.tsx"), "./pages/admin/customers/page.tsx");
 const AdminOrderDetailPage = lazyWithReload(() => import("./pages/admin/orders/detail.tsx"), "./pages/admin/orders/detail.tsx");
 const AdminCouponsPage = lazyWithReload(() => import("./pages/admin/coupons/page.tsx"), "./pages/admin/coupons/page.tsx");
 const AdminReviewsPage = lazyWithReload(() => import("./pages/admin/reviews.tsx"), "./pages/admin/reviews.tsx");
@@ -143,6 +144,7 @@ export default function App() {
             <Route path="/backend-skinly/launch" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminQuickLaunchPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCollectionsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/orders" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrdersPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/customers" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCustomersPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/orders/:orderId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminOrderDetailPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/coupons" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCouponsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/reviews" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminReviewsPage /></AdminPageWrapper></Suspense>} />
