@@ -67,7 +67,32 @@ const JOURNEY: OrderStatus[] = [
   "delivered",
 ];
 
+/**
+ * Whatever goes wrong, the shopper gets a sentence.
+ *
+ * A callable that throws anything other than an HttpsError answers the browser
+ * with the bare word "internal", which is what a customer typing their order
+ * number saw. Everything unexpected is logged with its real cause and
+ * answered with something a person can act on.
+ */
 export const trackOrder = onCall(async (data: any, _context: any) => {
+  try {
+    return await lookUpOrder(data);
+  } catch (e: any) {
+    if (e instanceof HttpsError) throw e;
+    console.error("trackOrder failed", {
+      orderNumber: String(data?.orderNumber || "").slice(0, 32),
+      error: e?.message || e,
+      stack: e?.stack,
+    });
+    throw new HttpsError(
+      "internal",
+      "Something went wrong at our end, not yours. Try again in a moment, or message us on WhatsApp with your order number."
+    );
+  }
+});
+
+async function lookUpOrder(data: any) {
   const orderNumber = String(data?.orderNumber || "").trim();
   const contact = String(data?.contact || "").trim();
 
@@ -159,4 +184,4 @@ export const trackOrder = onCall(async (data: any, _context: any) => {
     creditOnDelivery: Number(order.creditOnDelivery) || 0,
     creditPaid: order.walletCreditCredited === true,
   };
-});
+}

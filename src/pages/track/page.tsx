@@ -78,8 +78,23 @@ export default function TrackOrderPage() {
       const res = (await track({ orderNumber, contact })) as Result;
       setResult(res);
     } catch (err: any) {
-      const msg = err?.message || err?.data?.message || "Something went wrong. Try again in a moment.";
-      setError(String(msg).replace(/^.*?:\s*/, ""));
+      /*
+       * A Firebase callable answers a thrown non-HttpsError with the bare word
+       * "internal", and a network failure with "unavailable" — neither is a
+       * sentence, and both were being printed at the shopper as-is. Only the
+       * messages the server wrote on purpose are shown; everything else gets
+       * one that says what to do next.
+       */
+      const code = String(err?.code || "");
+      const raw = String(err?.message || err?.data?.message || "");
+      const usable = raw.length > 25 && !/^(internal|unavailable|unknown|deadline)/i.test(raw);
+      setError(
+        usable
+          ? raw
+          : /resource-exhausted/.test(code)
+            ? "Too many tries for today. Message us on WhatsApp and we will look it up for you."
+            : "We could not reach the order service just now. Try again in a moment."
+      );
     } finally {
       setBusy(false);
     }
@@ -266,11 +281,23 @@ export default function TrackOrderPage() {
                 )}
               </section>
 
+              {/*
+                WhatsApp, with the order number already typed — /policies/contact
+                was a route that has never existed, so this was a 404 at the
+                exact moment someone needed help.
+              */}
               <p className="text-center text-sm text-muted-foreground">
                 Something not right?{" "}
-                <Link to="/policies/contact" className="font-medium text-brand underline-offset-2 hover:underline">
-                  Talk to us
-                </Link>
+                <a
+                  href={`https://wa.me/919761011121?text=${encodeURIComponent(
+                    `Hi Skinly, I need help with order ${result.orderNumber}`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-brand underline-offset-2 hover:underline"
+                >
+                  Message us on WhatsApp
+                </a>
               </p>
             </div>
           )}

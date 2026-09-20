@@ -18,8 +18,19 @@ export const enforceDailyRateLimit = async ({
   const db = admin.firestore();
   const now = new Date();
   const dayKey = toDayKey(now);
-  const docId = `${key}_${dayKey}`;
-  const ref = db.collection("rateLimits").doc(docId);
+  /*
+   * The key becomes a document id, so it has to be safe to be one.
+   *
+   * Callers pass user input into this — an order number, an email — and a
+   * Firestore id may not contain a slash. `.doc()` throws synchronously on
+   * one, and it threw from *outside* the guard below, so the limiter that
+   * exists to never fail a legitimate call was turning "#40/25" into a plain
+   * error and the caller into an "internal" with no message. Anything outside
+   * the safe set collapses to an underscore; two keys that collide only after
+   * that share a daily ceiling, which costs nothing here.
+   */
+  const safeKey = String(key).replace(/[^A-Za-z0-9@._-]+/g, "_").slice(0, 200) || "unkeyed";
+  const docId = `${safeKey}_${dayKey}`;
 
   // An atomic increment rather than a read-then-write transaction. Several
   // calls at once (approving a row of mockups quickly) contended on this one
@@ -28,6 +39,7 @@ export const enforceDailyRateLimit = async ({
   // the few calls racing at the boundary, which is fine for a daily ceiling.
   let count: number;
   try {
+    const ref = db.collection("rateLimits").doc(docId);
     await ref.set(
       {
         key,
@@ -37,10 +49,10 @@ export const enforceDailyRateLimit = async ({
       },
       { merge: true }
     );
-    count = Number((await ref.get()).data()?.count || 0);
+    count = Number((await db.collection("rateLimits").doc(docId).get()).data()?.count || 0);
   } catch (err: any) {
     // The limiter must never be the reason a legitimate call fails.
-    console.warn("rate limit check skipped", key, err?.message || err);
+    console.warn("rate limit check skipped", safeKey, err?.message || err);
     return;
   }
   if (count > limit) {
