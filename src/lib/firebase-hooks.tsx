@@ -5498,6 +5498,14 @@ export function useMutation(apiRef: any) {
         // sorts above "R-29-\uf8ff" because '0' > '-', so a longer design code
         // cannot leak in.
         const design = String(args.rNumber || '').trim();
+        /*
+         * The listing kinds this one picture may land on. Normally just its
+         * own; several when angles share a picture, because several brands
+         * ship the same device and one photograph serves all their listings.
+         */
+        const allowed = (Array.isArray(args.listings) && args.listings.length ? args.listings : [args.listing])
+          .map((l: string) => String(l || '').trim().toLowerCase())
+          .filter(Boolean);
         const codes = (args.skuCodes || []).map((c: string) => String(c).trim().toUpperCase()).filter(Boolean);
         // Titles are the fallback for SKUs with no view code. "Default" and
         // "Default Title" are excluded: they appear across every gadget and say
@@ -5576,7 +5584,7 @@ export function useMutation(apiRef: any) {
         // the single-variant rule, and "Only Top" pulled the generic laptop
         // shot onto the MacBook listing.
         const listing = String(args.listing || '').trim().toLowerCase();
-        const listingIsPreset = !!(listing && presetFor(listing));
+        const listingIsPreset = allowed.some((l: string) => !!presetFor(l));
 
         let linked = 0, alreadyThere = 0, wrongGadget = 0, wrongListing = 0;
         for (const pid of productIds) {
@@ -5589,7 +5597,7 @@ export function useMutation(apiRef: any) {
             if (!allowedTypeIds.has(gt)) { wrongGadget++; continue; }
           }
           const kind = String(pdata.listingKind || '').trim().toLowerCase();
-          if (listing && (kind ? kind !== listing : listingIsPreset)) { wrongListing++; continue; }
+          if (allowed.length && (kind ? !allowed.includes(kind) : listingIsPreset)) { wrongListing++; continue; }
           const images = Array.isArray(pdata.images) ? pdata.images : [];
           if (images.some((i: any) => (typeof i === 'string' ? i : i?.url) === args.url)) { alreadyThere++; continue; }
           // The listing's own pictures lead, in the order they were approved;

@@ -104,12 +104,33 @@ export function templateForShot(index: TemplateIndex, listing: string, suffix: s
   return { ...lent, route: own.route ?? lent.route, sameAs: own.sameAs };
 }
 
-/** Angles whose template another angle may borrow: made here, not borrowed. */
+/**
+ * The other angles that take this one's picture, and the listings they bring
+ * with them. One photograph of an adapter several brands all ship should
+ * become one picture on all of their listings, not the same work five times.
+ */
+export function sharedWith(index: TemplateIndex, rows: TemplateRow[], suffix: string) {
+  return rows.filter((r) => index.bySuffix.get(r.shot.suffix)?.sameAs === suffix && r.shot.suffix !== suffix);
+}
+
+/** Does this angle take another's picture rather than making its own? */
+export const followsAnother = (index: TemplateIndex, suffix: string) => {
+  const own = index.bySuffix.get(suffix)?.sameAs;
+  return own && own !== suffix ? own : "";
+};
+
+/**
+ * The angles this one could follow: any other angle of the same gadget that
+ * is not itself following something. It need not have a template — following
+ * an angle the image model draws is the point when the model's picture is the
+ * better one.
+ */
 export function lendableTemplates(index: TemplateIndex, rows: TemplateRow[], not: string) {
+  const self = rows.find((r) => r.shot.suffix === not);
   return rows
-    .filter((r) => r.shot.suffix !== not)
-    .map((r) => ({ row: r, t: index.bySuffix.get(r.shot.suffix) }))
-    .filter((x): x is { row: TemplateRow; t: MockupTemplate } => !!x.t?.imageUrl && !x.t.sameAs);
+    .filter((r) => r.shot.suffix !== not && r.gadget === self?.gadget)
+    .filter((r) => !index.bySuffix.get(r.shot.suffix)?.sameAs)
+    .map((row) => ({ row }));
 }
 
 /** Will this angle's picture come from its template? Ready, and not sent to the model. */
@@ -514,8 +535,10 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     on a flat face; the image model is the better answer where
                     a flat warp cannot follow the shape, or where the frame
                     holds two objects and one set of corners cannot cover
-                    both. Picked per angle, so a launch is right everywhere. */}
-                <div>
+                    both. Picked per angle, so a launch is right everywhere.
+                    An angle that takes another's picture has nothing to
+                    choose — the angle it follows decides for both. */}
+                <div className={borrowedFrom ? "hidden" : ""}>
                   <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     Make this picture with
                   </p>
@@ -565,11 +588,12 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                     })}
                   </div>
                 </div>
-                {/* Several brands ship the same adapter, so their angles are
-                    the same photograph. Borrowing one costs nothing to make
-                    and nothing to mark, and the pictures stay in step. */}
+                {/* Several brands ship the same adapter. One picture is made
+                    for the angle that owns it and lands on every listing that
+                    follows it — whichever way that angle makes it, template or
+                    model — so the work and the cost happen once. */}
                 <div className="flex items-center gap-1.5">
-                  <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Photo</span>
+                  <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Picture</span>
                   <select
                     className="h-7 min-w-0 flex-1 rounded-md border bg-background px-1.5 text-[11px]"
                     value={borrowedFrom || ""}
@@ -582,7 +606,9 @@ export function TemplatesTab({ shots, blocks }: { shots: MockupShot[]; blocks: S
                           listing: row.listing, gadget: row.gadget,
                           suffix: row.shot.suffix, shotLabel: row.shot.label, sameAs: from,
                         });
-                        toast.success(from ? "Linked — it uses that angle's photo" : "Unlinked — it has its own photo again");
+                        toast.success(from
+                          ? "Linked — that angle's picture will go on this listing too"
+                          : "Unlinked — this angle makes its own picture again");
                       } catch (err) {
                         toast.error(err instanceof Error ? err.message : "Could not save");
                       }
@@ -1091,6 +1117,7 @@ export function useTemplateMockups() {
     onProgress?: (done: number, total: number) => void
   ) => {
     const usable = rows
+      .filter((row) => !followsAnother(index, row.shot.suffix))
       .map((row) => ({ row, t: templateForShot(index, row.listing, row.shot.suffix, row.isFirstShot) }))
       .filter((x): x is { row: TemplateRow; t: MockupTemplate } => usesTemplate(x.t));
     if (!usable.length) throw new Error("No angle here is set to use a template");
@@ -1106,6 +1133,7 @@ export function useTemplateMockups() {
     );
     let done = 0;
     for (const { row, t, o } of tasks) {
+      const alsoFor = sharedWith(index, rows, row.shot.suffix);
       const tpl = imageToData(await loadCanvasImage(t.imageUrl!));
       const rotate90 = o === "widthwise";
       const pieceW = rotate90 ? t.heightCm! : t.widthCm!;
@@ -1129,7 +1157,8 @@ export function useTemplateMockups() {
         gadget: row.gadget,
         listing: row.listing,
         suffix,
-        skuCodes: shotCodes(row.shot),
+        skuCodes: [...new Set([...shotCodes(row.shot), ...alsoFor.flatMap((r) => shotCodes(r.shot))])],
+        ...(alsoFor.length ? { listings: [row.listing, ...alsoFor.map((r) => r.listing)] } : {}),
         variantTitles: row.shot.variantTitles || [],
         matchSingleVariant: row.shot.matchSingleVariant || false,
         sourceUrl: isRoll ? design.flatImageUrl : design.rawImageUrl,

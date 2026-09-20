@@ -69,6 +69,8 @@ type Job = {
   gadget: string;
   suffix: string;
   status: "queued" | "running" | "review" | "approved" | "rejected" | "failed";
+  /** Listing kinds this one picture belongs to, when angles share it. */
+  listings?: string[];
   taskId?: string;
   url?: string;
   r2Key?: string;
@@ -1397,6 +1399,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
           matchSingleVariant: job.matchSingleVariant,
           gadget: job.gadget,
           listing: job.listing || "",
+          // Several listings when angles share a picture; one otherwise.
+          listings: (job as any).listings || undefined,
           url,
           alt: job.listing && design
             ? `${design} ${device} skin`

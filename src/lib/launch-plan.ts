@@ -241,11 +241,17 @@ export function buildLaunchPlan(input: {
   shots: MockupShot[];
   blocks: SharedBlocks;
   readyTemplates: Map<string, { _id: string; widthCm?: number; heightCm?: number }>;
+  /**
+   * Angles that take another angle's picture rather than making their own,
+   * as follower suffix → the suffix it follows. Several brands ship the same
+   * charger, so one picture is made and lands on all their listings.
+   */
+  sharedPictures?: Map<string, string>;
   gadgetTypeIds: Record<string, string>;
   jobs: Array<{ suffix: string; status: string; attempt?: number; url?: string }>;
   options: LaunchOptions;
 }): LaunchPlan {
-  const { design, existing, shots, blocks, readyTemplates, gadgetTypeIds, jobs, options } = input;
+  const { design, existing, shots, blocks, readyTemplates, sharedPictures, gadgetTypeIds, jobs, options } = input;
   const code = design.code.toUpperCase();
   const warnings: string[] = [];
   const creates: PlanStep[] = [];
@@ -367,6 +373,29 @@ export function buildLaunchPlan(input: {
   const isRoll = design.source === "roll";
   if (!design.rawImageUrl) warnings.push("No raw design photo yet — pictures cannot be made");
 
+  /*
+   * Who is carrying whose picture. A follower plans nothing of its own; the
+   * angle it follows takes on its SKU codes and its listing, so the one
+   * picture reaches every listing that shares it.
+   */
+  const following = new Map<string, Array<{ codes: string[]; listing: string }>>();
+  const isFollower = new Set<string>();
+  for (const shot of shots) {
+    if (shot.isActive === false) continue;
+    const leads = sharedPictures?.get(shot.suffix);
+    if (!leads || leads === shot.suffix) continue;
+    isFollower.add(shot.suffix);
+    const also = following.get(leads) || [];
+    also.push({ codes: shotCodes(shot), listing: listingOf(shot) });
+    following.set(leads, also);
+  }
+  const sharedCodes = (shot: MockupShot) =>
+    [...new Set([...shotCodes(shot), ...(following.get(shot.suffix) || []).flatMap((f) => f.codes)])];
+  const sharedListings = (shot: MockupShot, own: string) => {
+    const also = following.get(shot.suffix) || [];
+    return also.length ? [own, ...also.map((f) => f.listing)] : undefined;
+  };
+
   let missingTemplates = 0;
   if (options.pictures !== "none" && design.rawImageUrl) {
     // Pictures go to the listings of this phase, to any older listing that
@@ -397,6 +426,8 @@ export function buildLaunchPlan(input: {
       // whose face is measured, not only the flat ones a template can cover.
       const surface = isRoll && design.flatImageUrl ? DEFAULT_SURFACE_CM[info.gadget] : undefined;
       for (const [shotIndex, shot] of kindShots.entries()) {
+        // Its picture is another angle's; that angle carries its listing.
+        if (isFollower.has(shot.suffix)) continue;
         /*
          * A template is per angle, so it replaces its own shot and no other.
          * It used to be per listing and replaced every shot the listing had,
@@ -418,7 +449,8 @@ export function buildLaunchPlan(input: {
               job: {
                 rNumber: code, designName: design.name || "", designSource: design.source, shotId: shot._id,
                 shotLabel: `Template · ${shot.label}${o === "widthwise" ? " · across the roll" : ""}`,
-                gadget: info.gadget, listing: info.listing, suffix: tplSuffix, skuCodes: shotCodes(shot),
+                gadget: info.gadget, listing: info.listing, suffix: tplSuffix, skuCodes: sharedCodes(shot),
+                ...(sharedListings(shot, info.listing) ? { listings: sharedListings(shot, info.listing) } : {}),
                 variantTitles: shot.variantTitles || [], matchSingleVariant: shot.matchSingleVariant || false,
                 sourceUrl: isRoll ? design.flatImageUrl : design.rawImageUrl,
                 attempt: attemptFor(tplSuffix), modelLabel: "Template", aspect: "", credits: 0, costInr: 0,
@@ -459,7 +491,8 @@ export function buildLaunchPlan(input: {
             job: {
               rNumber: code, designName: design.name || "", designSource: design.source, shotId: shot._id,
               shotLabel: o ? `${shot.label} · ${o === "widthwise" ? "across" : "along"} the roll` : shot.label,
-              gadget: shot.gadget, listing: info.listing, suffix, skuCodes: shotCodes(shot),
+              gadget: shot.gadget, listing: info.listing, suffix, skuCodes: sharedCodes(shot),
+              ...(sharedListings(shot, info.listing) ? { listings: sharedListings(shot, info.listing) } : {}),
               variantTitles: shot.variantTitles || [], matchSingleVariant: shot.matchSingleVariant || false,
               sourceUrl: design.rawImageUrl, attempt: attemptFor(suffix), modelLabel: options.model.label,
               pieceCm: crop ? `${crop.widthCm}×${crop.heightCm}` : "",

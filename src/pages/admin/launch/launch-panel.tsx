@@ -105,12 +105,16 @@ export function LaunchPanel({ design, themes, onLaunched }: {
       // The older listing-level templates still answer for a listing's first
       // shot when nothing per-shot has been saved for it.
       byListing.forEach((t, k) => { if (usesTemplate(t) && !readyTemplates.has(k)) readyTemplates.set(k, { _id: t._id, widthCm: t.widthCm, heightCm: t.heightCm }); });
+      // Angles set to take another angle's picture, from their own cards.
+      const sharedPictures = new Map<string, string>();
+      bySuffix.forEach((t, k) => { if (t.sameAs && t.sameAs !== k) sharedPictures.set(k, t.sameAs); });
       const p = buildLaunchPlan({
         design,
         existing,
         shots: shots || [],
         blocks: { ...DEFAULT_BLOCKS, ...(settings?.blocks || {}) },
         readyTemplates,
+        sharedPictures,
         gadgetTypeIds: Object.fromEntries((gadgetTypes || []).map((g) => [String(g.name), g._id])),
         jobs: jobSnap.docs.map((d) => d.data() as any),
         options: {
