@@ -82,6 +82,23 @@ export const placeOrder = functions
       throw new HttpsError("failed-precondition", "Cannot create order with an empty cart");
     }
 
+    /*
+     * An order has to have a usable email address.
+     *
+     * The checkout page has asked for one for a while, but only the browser
+     * was checking — so every other way in left it blank, and orders exist
+     * with no email at all. Those customers cannot be sent a confirmation, a
+     * dispatch note or a delivery note, and cannot look their own order up on
+     * the tracking page. Checked here, where it cannot be skipped.
+     */
+    const email = String(customerEmail || guestEmail || "").trim().toLowerCase();
+    if (!email) {
+      throw new HttpsError("failed-precondition", "An email address is required to place an order");
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      throw new HttpsError("failed-precondition", `"${email}" is not a valid email address`);
+    }
+
     // ── 3. Batch-fetch all variant prices in ONE Firestore query ──────────────
     const productIds = Array.from(
       new Set(orderItems.map((i) => i?.productId).filter((p): p is string => typeof p === "string" && p.length > 0))
@@ -244,7 +261,7 @@ export const placeOrder = functions
       orderNumber,
       userId: uid || reqSessionId || "guest",
       customerName: shippingAddress?.fullName || "Guest",
-      email: customerEmail || guestEmail || "",
+      email,
       phone: shippingAddress?.phone || "",
       shippingAddress: shippingAddress || {},
       paymentMethod: paymentMethod || "prepaid",

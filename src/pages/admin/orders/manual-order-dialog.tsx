@@ -153,6 +153,16 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
       toast.error("Customer phone is required");
       return;
     }
+    // An order with no email can be told nothing and looked up by nobody —
+    // no confirmation, no dispatch note, and no guest tracking.
+    if (!customerEmail.trim()) {
+      toast.error("Customer email is required");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(customerEmail.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
     if (!addressLine1.trim()) {
       toast.error("Address line 1 is required");
       return;
@@ -252,13 +262,14 @@ export function ManualOrderDialog({ open, onOpenChange }: ManualOrderDialogProps
                   />
                 </div>
                 <div className="col-span-2 space-y-2">
-                  <Label htmlFor="customerEmail">Email (Optional)</Label>
+                  <Label htmlFor="customerEmail">Email *</Label>
                   <Input
                     id="customerEmail"
                     type="email"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     placeholder="customer@example.com"
+                    required
                   />
                 </div>
               </div>

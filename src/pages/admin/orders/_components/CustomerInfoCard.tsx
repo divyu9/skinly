@@ -3,7 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
-import { EditIcon } from "lucide-react";
+import { EditIcon, CopyIcon, AlertTriangleIcon, MessageCircleIcon, CheckIcon } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export interface CustomerFormData {
   fullName: string;
@@ -48,6 +50,39 @@ interface CustomerInfoCardProps {
   onSaveAddress: () => void;
 }
 
+
+/**
+ * One click instead of a careful selection.
+ *
+ * Packing an order means reading a phone number or an address off this screen
+ * and typing it somewhere else, which is exactly where a digit gets lost.
+ */
+function Copy({ value, what, label }: { value: string; what: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      title={`Copy ${what.toLowerCase()}`}
+      className={label
+        ? "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+        : "text-muted-foreground hover:text-foreground"}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setDone(true);
+          toast.success(`${what} copied`);
+          setTimeout(() => setDone(false), 1500);
+        } catch {
+          toast.error("Could not copy — your browser blocked it");
+        }
+      }}
+    >
+      {done ? <CheckIcon className="size-3.5 text-green-600" /> : <CopyIcon className="size-3.5" />}
+      {label}
+    </button>
+  );
+}
+
 export function CustomerInfoCard({
   shippingAddress,
   email,
@@ -89,14 +124,54 @@ export function CustomerInfoCard({
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase mb-1">Phone</p>
-                <p className="font-medium">{shippingAddress.phone}</p>
-              </div>
-              {email && (
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase mb-1">Email</p>
-                  <p className="font-medium break-all">{email}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="font-medium tabular-nums">{shippingAddress.phone || "—"}</p>
+                  {shippingAddress.phone && (
+                    <>
+                      <Copy value={shippingAddress.phone} what="Phone" />
+                      <a
+                        href={`https://wa.me/91${String(shippingAddress.phone).replace(/\D/g, "").slice(-10)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Message this customer on WhatsApp"
+                        className="text-muted-foreground hover:text-green-600"
+                      >
+                        <MessageCircleIcon className="size-3.5" />
+                      </a>
+                    </>
+                  )}
                 </div>
-              )}
+              </div>
+              {/*
+                A missing email used to render nothing at all, so nobody ever
+                noticed one. It is the address every confirmation, dispatch and
+                delivery note goes to, and the credential a guest tracks their
+                order with — so its absence is said out loud, with the way to
+                fix it beside it.
+              */}
+              <div>
+                <p className="text-xs text-muted-foreground uppercase mb-1">Email</p>
+                {email ? (
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium break-all">{email}</p>
+                    <Copy value={email} what="Email" />
+                  </div>
+                ) : (
+                  <div className="rounded-lg border-2 border-amber-500/30 bg-amber-500/10 p-2.5">
+                    <p className="flex items-start gap-1.5 text-sm font-medium text-amber-800 dark:text-amber-200">
+                      <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
+                      No email on this order
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800/80 dark:text-amber-200/80">
+                      No confirmation, dispatch or delivery note can be sent, and the customer
+                      cannot track it themselves.
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-2 h-7" onClick={onOpenEditCustomer}>
+                      Add an email
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Shipping Address */}
@@ -116,7 +191,21 @@ export function CustomerInfoCard({
                 <p className="text-sm leading-relaxed">
                   {shippingAddress.city}, {shippingAddress.state}
                 </p>
-                <p className="text-sm font-medium">{shippingAddress.pincode}</p>
+                <p className="text-sm font-medium tabular-nums">{shippingAddress.pincode}</p>
+                {/* Copied as one block, the way it goes onto a label. */}
+                <div className="mt-2">
+                  <Copy
+                    label="Copy address"
+                    what="Address"
+                    value={[
+                      shippingAddress.fullName,
+                      shippingAddress.addressLine1,
+                      shippingAddress.addressLine2,
+                      `${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.pincode}`,
+                      shippingAddress.phone,
+                    ].filter(Boolean).join("\n")}
+                  />
+                </div>
               </div>
             </div>
           </div>

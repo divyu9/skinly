@@ -34,6 +34,13 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
     throw new HttpsError("failed-precondition", "Cannot create order with an empty cart");
   }
 
+  // Same rule as placeOrder: an order with no email can be told nothing and
+  // looked up by nobody.
+  const email = String(customerEmail || guestEmail || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    throw new HttpsError("failed-precondition", "A valid email address is required to place an order");
+  }
+
   // 2. Generate Order Number (Transactionally to avoid duplicates)
   const counterRef = db.collection('settings').doc('order_counter');
   let orderNumber = '';
@@ -102,7 +109,7 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
     orderNumber: orderNumber,
     userId: uid || reqSessionId || 'guest',
     customerName: shippingAddress?.fullName || 'Guest',
-    email: customerEmail || guestEmail || '',
+    email,
     phone: shippingAddress?.phone || '',
     shippingAddress: shippingAddress || {},
     paymentMethod: paymentMethod || 'prepaid',

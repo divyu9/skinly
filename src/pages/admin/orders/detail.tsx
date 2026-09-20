@@ -17,6 +17,7 @@ import { CustomerInfoCard, type CustomerFormData, type AddressFormData } from ".
 import { OrderItemsTable, type ItemFormEntry } from "./_components/OrderItemsTable.tsx";
 import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRefundPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
+import { OrderTimeline } from "./_components/OrderTimeline.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
 import { WhatsAppPanel, type EmailType } from "./_components/WhatsAppPanel.tsx";
 
@@ -504,7 +505,7 @@ function OrderDetailPageInner() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="admin-brandy space-y-6">
       {/* Back */}
       <div>
         <Link to="/backend-skinly/orders">
@@ -583,6 +584,8 @@ function OrderDetailPageInner() {
             onManualTrackingFormChange={setManualTrackingForm}
             onSaveManualTracking={handleSaveManualTracking}
           />
+
+          <OrderTimeline order={order as any} />
 
           <RtoActionsPanel
             orderStatus={order.status}
