@@ -1,5 +1,6 @@
 import { useAction, useQuery, useMutation } from "@/lib/firebase-hooks";
 import { MaterialSection, useMaterialDesigns, inferDesignCode } from "../_components/material-section.tsx";
+import { ListingPictures } from "../_components/listing-pictures.tsx";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
@@ -516,6 +517,19 @@ function EditProductPageInner() {
               />
             </CardContent>
           </Card>
+
+          {/* The pictures this listing should have, and the missing ones. */}
+          {product && (
+            <ListingPictures
+              product={{
+                _id: String(productId),
+                title: formData.title,
+                listingKind: (product as any).listingKind,
+                images: formData.images,
+                variants: variants,
+              }}
+            />
+          )}
 
           {/* Variants */}
           <Card>

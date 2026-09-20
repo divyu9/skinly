@@ -33,7 +33,8 @@ import {
   type MockupShot, type SharedBlocks, type DesignSource, type CutOrientation,
 } from "@/lib/ai-mockup-shots.ts";
 import { rotateImageDataUrl } from "@/lib/image-processing.ts";
-import { TemplatesTab, RollCalibration, useTemplateMockups, useTruePiece, templateRows, templateForShot } from "./templates.tsx";
+import { TemplatesTab, RollCalibration, useTemplateMockups, templateRows, templateForShot } from "./templates.tsx";
+import { useRunShot } from "./run-shot.ts";
 import { RetireListings } from "./retire-listings.tsx";
 import { LaunchPanel } from "@/pages/admin/launch/launch-panel.tsx";
 import {
@@ -924,7 +925,6 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
   const deleteObject = useAction(api.r2.deleteR2Object);
   const addMediaItem = useMutation(api.mediaLibrary.createMediaItem);
   const linkToProducts = useMutation(api.aiMockups.linkMockupToProducts);
-  const truePieceFor = useTruePiece();
   const tidyImages = useMutation(api.aiMockups.tidyListingImages);
   const [tidying, setTidying] = useState(false);
   const tidy = async () => {
@@ -1109,84 +1109,8 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     }
   };
 
-  const runShot = async (
-    shot: MockupShot,
-    useModel: typeof model,
-    useSize: string,
-    orientation?: CutOrientation
-  ) => {
-    // Two cuts of one design are two different pictures, so they need two
-    // filenames; without the tail the second would overwrite the first.
-    const suffix = orientation ? `${shot.suffix}-${orientation === "widthwise" ? "wid" : "len"}` : shot.suffix;
-    // Numbered by file name, not by shot: two shots that share a suffix used to
-    // both be attempt 1, write the same file, and the second approval then
-    // failed because the first had already moved it away.
-    const attempt = jobs.filter((j) => j.suffix === suffix).reduce((n, j) => Math.max(n, j.attempt || 1), 0) + 1;
-    const label = orientation ? `${shot.label} · ${orientation === "widthwise" ? "across" : "along"} the roll` : shot.label;
-    let jobId: string | null = null;
-    // A calibrated roll hands the model the device's own piece at true size,
-    // the way the launch pipeline does, so the motifs come out life-size. The
-    // piece is already turned, so the prompt must not turn it again.
-    let piece: { url: string; widthCm: number; heightCm: number } | null = null;
-    try {
-      piece = await truePieceFor(roll, shot.gadget, orientation === "widthwise");
-    } catch {
-      piece = null; // Fall back to the whole roll photo rather than not shooting.
-    }
-    const designUrl = piece?.url || roll.rawImageUrl;
-    const promptSent = deviceAnchor(shot.gadget, listingOf(shot))
-      + (shot.referenceUrl ? REFERENCE_PREAMBLE : "")
-      + (piece ? TRUE_SIZE_CLAUSE(piece.widthCm, piece.heightCm) : "")
-      + expandPrompt(shot.prompt, blocks, {
-        rNumber: roll.code,
-        designName: roll.name,
-        source: roll.source,
-        finish: roll.finish,
-        cutOrientation: piece ? undefined : orientation,
-      });
-    try {
-      jobId = (await createJob({
-        promptSent,
-        referenceUrl: shot.referenceUrl || "",
-        rNumber: roll.code,
-        designName: roll.name || "",
-        designSource: roll.source,
-        shotId: shot._id,
-        shotLabel: label,
-        gadget: shot.gadget,
-        listing: listingOf(shot),
-        suffix,
-        skuCodes: shotCodes(shot),
-        variantTitles: shot.variantTitles || [],
-        matchSingleVariant: shot.matchSingleVariant || false,
-        sourceUrl: designUrl,
-        pieceCm: piece ? `${piece.widthCm}×${piece.heightCm}` : "",
-        status: "queued",
-        attempt,
-        modelLabel: useModel.label,
-        aspect: useSize,
-        credits: useModel.credits,
-        costInr: Number((useModel.usd * USD_TO_INR).toFixed(2)),
-        createdAt: Date.now(),
-      })) as string;
-
-      const res: any = await submit({
-        model: useModel.apiModel,
-        size: useSize,
-        resolution: useModel.resolution,
-        quality: useModel.quality,
-        prompt: promptSent,
-        imageUrls: shot.referenceUrl ? [designUrl, shot.referenceUrl] : [designUrl],
-      });
-      await updateJob({ mockupId: jobId, taskId: res.taskId, status: "running" });
-      return true;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Submit failed";
-      if (jobId) await updateJob({ mockupId: jobId, status: "failed", error: msg });
-      toast.error(`${shot.label}: ${msg}`);
-      return false;
-    }
-  };
+  // One copy of this, shared with the product page's own picture card.
+  const runShot = useRunShot(roll, jobs, blocks);
 
   /** How many images a pick actually costs, once cut orientations are counted. */
   const orientationsFor = useCallback(
