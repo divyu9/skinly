@@ -20,6 +20,9 @@ export default function SettingsPage() {
   const runBackupNow = useMutation(api.backup.runBackupNow);
   const unpaidHoursSetting = useQuery(api.settings.getSetting, { key: "AUTO_CANCEL_UNPAID_HOURS" });
   const runUnpaidSweep = useMutation(api.orders.runUnpaidSweep);
+  const runDailyDigest = useMutation(api.orders.runDailyDigest);
+  const rollFloorSetting = useQuery(api.settings.getSetting, { key: "LOW_STOCK_ROLL_METRES" });
+  const sheetFloorSetting = useQuery(api.settings.getSetting, { key: "LOW_STOCK_CUTOUT_SHEETS" });
   
   const [metaPixelId, setMetaPixelId] = useState("");
   const [isSettingUpCors, setIsSettingUpCors] = useState(false);
@@ -28,6 +31,51 @@ export default function SettingsPage() {
   const [unpaidHours, setUnpaidHours] = useState("");
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [isSweeping, setIsSweeping] = useState(false);
+  const [rollFloor, setRollFloor] = useState("");
+  const [sheetFloor, setSheetFloor] = useState("");
+  const [isSavingFloors, setIsSavingFloors] = useState(false);
+  const [isDigesting, setIsDigesting] = useState(false);
+
+  useEffect(() => {
+    const v = (rollFloorSetting as any)?.value;
+    if (v !== undefined && v !== null) setRollFloor(String(v));
+  }, [rollFloorSetting]);
+  useEffect(() => {
+    const v = (sheetFloorSetting as any)?.value;
+    if (v !== undefined && v !== null) setSheetFloor(String(v));
+  }, [sheetFloorSetting]);
+
+  const handleSaveFloors = async () => {
+    setIsSavingFloors(true);
+    try {
+      await Promise.all([
+        updateSetting({ key: "LOW_STOCK_ROLL_METRES", value: Number(rollFloor) || 0 }),
+        updateSetting({ key: "LOW_STOCK_CUTOUT_SHEETS", value: Number(sheetFloor) || 0 }),
+      ]);
+      toast.success("Low-stock levels saved");
+    } catch {
+      toast.error("Could not save those");
+    } finally {
+      setIsSavingFloors(false);
+    }
+  };
+
+  const handleRunDigest = async () => {
+    setIsDigesting(true);
+    try {
+      const res: any = await runDailyDigest({});
+      const low = (res?.digest?.lowStock || []).slice(0, 6)
+        .map((l: any) => `${l.code} (${l.left}${l.unit === "m" ? "m" : " sheets"})`).join(", ");
+      toast.success(res?.message || "Digest built", {
+        description: low ? `Running low: ${low}` : "Nothing running low",
+        duration: 15000,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not build the digest");
+    } finally {
+      setIsDigesting(false);
+    }
+  };
 
   useEffect(() => {
     const v = (unpaidHoursSetting as any)?.value;
@@ -520,6 +568,46 @@ export default function SettingsPage() {
               "Show me which" changes nothing — it counts what a window would take, which is how you
               pick one. Cancelling sends the customer no message.
             </p>
+          </CardContent>
+        </Card>
+
+        {/*
+          Nothing watched the shelf. A roll running out was discovered when a
+          listing went out of stock, which is a day too late.
+        */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Morning digest
+            </CardTitle>
+            <CardDescription>
+              At 9:00 every morning: yesterday's orders and takings, what is waiting to be packed,
+              what is stuck, and which designs are running low. Sent on WhatsApp to the admin number
+              if an <code>admin_daily_digest</code> usecase exists, and recorded either way.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="w-44">
+                <Label htmlFor="roll-floor">Roll is low at (metres)</Label>
+                <Input id="roll-floor" className="mt-1.5" inputMode="decimal" placeholder="5"
+                  value={rollFloor} onChange={(e) => setRollFloor(e.target.value)} />
+              </div>
+              <div className="w-44">
+                <Label htmlFor="sheet-floor">Cutout is low at (sheets)</Label>
+                <Input id="sheet-floor" className="mt-1.5" inputMode="numeric" placeholder="3"
+                  value={sheetFloor} onChange={(e) => setSheetFloor(e.target.value)} />
+              </div>
+              <Button onClick={handleSaveFloors} disabled={isSavingFloors}>
+                {isSavingFloors && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+              <Button variant="outline" onClick={handleRunDigest} disabled={isDigesting}>
+                {isDigesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Show me today's
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
