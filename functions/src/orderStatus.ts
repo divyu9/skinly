@@ -458,18 +458,52 @@ export const backfillOrderStatuses = onCall(async (data: any, context: any) => {
     }
   }
 
+  /*
+   * Second pass: a parcel with an AWB is not still being made.
+   *
+   * `createShipment` wrote no status at all until this week, so every order
+   * booked with a courier before then sits in Processing with a label already
+   * printed — the tracking page shows "Preparing" beside a live AWB. These are
+   * lifted to ready_to_ship, and the courier's next scan carries them on from
+   * there. Quietly: the customer was not told when it happened and would not
+   * thank us for hearing about it now.
+   */
+  const labelled: Array<{ id: string; orderNumber: string }> = [];
+  for (const d of snap.docs) {
+    const o = d.data() as any;
+    if (o.isDeleted === true) continue;
+    const hasAwb = !!String(o.awbNumber || o.manualTrackingNumber || "").trim();
+    if (!hasAwb) continue;
+    // Against the status it will have after the first pass, not the one on disk.
+    const after = changes.find((c) => c.id === d.id)?.to || normalizeOrderStatus(o.status, o.paymentStatus);
+    if (after !== "processing") continue;
+    labelled.push({ id: d.id, orderNumber: String(o.orderNumber || d.id) });
+  }
+
+  if (!dryRun) {
+    for (const l of labelled) {
+      await setOrderStatus(db, l.id, "ready_to_ship", {
+        source: "backfill",
+        reason: "Has a courier AWB",
+        notify: false,
+      });
+    }
+  }
+
   const byMove: Record<string, number> = {};
   for (const c of changes) byMove[`${c.from} → ${c.to}`] = (byMove[`${c.from} → ${c.to}`] || 0) + 1;
+  if (labelled.length) byMove["processing → ready_to_ship (has AWB)"] = labelled.length;
 
+  const total = changes.length + labelled.length;
   return {
     success: true,
     scanned: snap.size,
-    changed: dryRun ? 0 : changes.length,
-    wouldChange: changes.length,
+    changed: dryRun ? 0 : total,
+    wouldChange: total,
     byMove,
     dryRun,
     message: dryRun
-      ? `${changes.length} of ${snap.size} orders would be rewritten`
-      : `${changes.length} of ${snap.size} orders rewritten`,
+      ? `${total} of ${snap.size} orders would be rewritten`
+      : `${total} of ${snap.size} orders rewritten`,
   };
 });

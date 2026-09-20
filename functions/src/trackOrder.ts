@@ -120,7 +120,11 @@ export const trackOrder = onCall(async (data: any, _context: any) => {
     title: String(i?.productTitle || "Item"),
     quantity: Number(i?.quantity) || 1,
     image: String(i?.productImage || "").includes("res.cloudinary.com") ? "" : String(i?.productImage || ""),
-    variant: String(i?.variant || i?.phoneModel || ""),
+    // "Default" / "Default Title" is a Shopify-era placeholder, not a choice
+    // the shopper made; showing it under the product name reads as a fault.
+    variant: /^default(\s*title)?$/i.test(String(i?.variant || "").trim())
+      ? String(i?.phoneModel || "")
+      : String(i?.variant || i?.phoneModel || ""),
   }));
 
   // Only the moves a shopper would recognise, and only what they say.
