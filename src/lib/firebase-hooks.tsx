@@ -5643,13 +5643,28 @@ export function useMutation(apiRef: any) {
           getDocs(query(collection(db, 'variants'), where('sku', '==', design))),
           getDocs(query(collection(db, 'designMockups'), where('rNumber', '==', design))),
         ]);
-        const kindByUrl = new Map<string, { kind: string; explicit: boolean }>();
+        /*
+         * Which listings each picture belongs to — often one, sometimes
+         * several. Angles that share a picture (the brands that all ship the
+         * same charger) put every listing it serves on the job, and reading
+         * only the first of them made the picture look misplaced on the other
+         * five: it was moved off each of them in turn, and a listing left with
+         * nothing went back to draft. Which is exactly what happened to Oppo,
+         * OnePlus, Realme, Samsung and Vivo Charger.
+         */
+        const kindByUrl = new Map<string, { kinds: string[]; explicit: boolean; shared: boolean }>();
         jobSnap.docs.forEach((d) => {
           const j: any = d.data();
           if (!j.url) return;
-          if (j.listing) { kindByUrl.set(String(j.url), { kind: String(j.listing).trim().toLowerCase(), explicit: true }); return; }
+          const named = (Array.isArray(j.listings) && j.listings.length ? j.listings : j.listing ? [j.listing] : [])
+            .map((l: string) => String(l || '').trim().toLowerCase())
+            .filter(Boolean);
+          if (named.length) {
+            kindByUrl.set(String(j.url), { kinds: named, explicit: true, shared: named.length > 1 });
+            return;
+          }
           const kind = listingOf({ suffix: String(j.suffix || '').replace(/-(len|wid)$/, ''), gadget: j.gadget }).toLowerCase();
-          if (presetFor(kind)) kindByUrl.set(String(j.url), { kind, explicit: false });
+          if (presetFor(kind)) kindByUrl.set(String(j.url), { kinds: [kind], explicit: false, shared: false });
         });
         const productIds = new Set<string>();
         [...snap.docs, ...wholeSnap.docs].forEach((d) => { const pid = (d.data() as any).productId; if (pid) productIds.add(pid); });
@@ -5675,20 +5690,26 @@ export function useMutation(apiRef: any) {
           const slot = plan.get(p.id)!;
           for (const img of p.images) {
             const url = urlOf(img);
-            const tagged = typeof img === 'object' && img?.listing ? { kind: String(img.listing), explicit: true } : null;
-            const from = tagged || kindByUrl.get(url);
+            // A job speaks for its picture wherever the tag disagrees: the tag
+            // says where a picture sits, the job says where it belongs.
+            const fromJob = kindByUrl.get(url);
+            const tagged = typeof img === 'object' && img?.listing
+              ? { kinds: [String(img.listing).trim().toLowerCase()], explicit: true, shared: false }
+              : null;
+            const from = fromJob || tagged;
             if (!from) { slot.old.push(img); continue; }
-            if (from.kind === p.kind) {
+            if (from.kinds.includes(p.kind)) {
               (from.explicit ? slot.own : slot.mapped).push(asObject(img, p.kind, p.data.title || ''));
               continue;
             }
-            const target = byKind.get(from.kind);
+            const belongsTo = from.kinds.find((k) => byKind.has(k)) || from.kinds[0];
+            const target = byKind.get(belongsTo);
             if (target) {
               const tslot = plan.get(target.id)!;
               if (target.images.some((x) => urlOf(x) === url) || tslot.mapped.some((x) => urlOf(x) === url)) {
                 removed++;
               } else {
-                (from.explicit ? tslot.own : tslot.mapped).push(asObject(img, from.kind, target.data.title || ''));
+                (from.explicit ? tslot.own : tslot.mapped).push(asObject(img, belongsTo, target.data.title || ''));
                 moved++;
               }
             } else if (from.explicit) {
@@ -5696,6 +5717,27 @@ export function useMutation(apiRef: any) {
             } else {
               slot.old.push(img);
             }
+          }
+        }
+
+        /*
+         * A shared picture onto every listing that shares it.
+         *
+         * Only the shared ones, and only where the listing has not got it
+         * already — enough to put right a listing the old reading emptied,
+         * without resurrecting a picture somebody deleted from a listing of
+         * its own.
+         */
+        let added = 0;
+        for (const [url, from] of kindByUrl) {
+          if (!from.shared) continue;
+          for (const kind of from.kinds) {
+            const target = byKind.get(kind);
+            if (!target) continue;
+            const tslot = plan.get(target.id)!;
+            if ([...tslot.own, ...tslot.mapped, ...tslot.old].some((x) => urlOf(x) === url)) continue;
+            tslot.own.push({ url, alt: target.data.title || '', listing: kind });
+            added++;
           }
         }
 
@@ -5718,7 +5760,7 @@ export function useMutation(apiRef: any) {
           changed++;
           if (emptied) hidden.push(String(p.data.listingKind || p.data.title || p.id));
         }
-        return { success: true, removed, moved, changed, hidden, products: products.length };
+        return { success: true, removed, moved, added, changed, hidden, products: products.length };
       }
 
       if (path === 'stockNotifications.deleteRequest') {

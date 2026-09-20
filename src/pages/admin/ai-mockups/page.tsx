@@ -962,10 +962,19 @@ function RollPanel({ roll, shots, blocks, picked, setPicked, modelId, setModelId
     try {
       const res: any = await tidyImages({ rNumber: roll.code });
       toast.success(res?.changed
-        ? `Photos fixed on ${res.changed} listing${res.changed > 1 ? "s" : ""} · ${res.moved} moved to the right listing · ${res.removed} removed`
+        ? `Photos fixed on ${res.changed} listing${res.changed > 1 ? "s" : ""} · ${res.moved} moved · ${res.added || 0} shared onto a listing that was missing one · ${res.removed} removed`
         : "Every listing already has the right photos");
       if (res?.hidden?.length) {
-        toast.message(`Back in draft until a photo is approved: ${res.hidden.join(", ")}`, { duration: 10000 });
+        // What happened, and the two ways out — a dead-end notice about six
+        // listings going dark is worse than no notice at all.
+        toast.message(
+          `Back in draft until a photo is approved: ${res.hidden.join(", ")}`,
+          {
+            duration: 14000,
+            description: "Make one from the listing's own Pictures card on its product page, "
+              + "or point its angle at another angle's picture in Templates — then run this again.",
+          }
+        );
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not fix the photos");
