@@ -71,19 +71,46 @@ function courierStatus(code: string, shipmentStatus: string): OrderStatus | null
   return null;
 }
 
-/** When the courier says this happened, in ms, or now if it will not say. */
+/**
+ * A RapidShyp date, in ms.
+ *
+ * They write "19-04-2025 22:37:00" — day first, space instead of a T, and no
+ * zone, all three of which `Date.parse` either refuses or reads as an American
+ * date. The times are Indian, so the parsed parts are shifted back by IST
+ * rather than treated as UTC.
+ */
+function parseRsDate(v: any): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v < 1e12 ? v * 1000 : v;
+  const s = String(v || "").trim();
+  if (!s) return 0;
+  const m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m) {
+    const [, d, mo, y, h, mi, sec] = m;
+    return Date.UTC(+y, +mo - 1, +d, +(h || 0), +(mi || 0), +(sec || 0)) - 5.5 * 3600 * 1000;
+  }
+  const t = Date.parse(s);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * When the courier says this happened, in ms, or now if it will not say.
+ *
+ * The field names here are the ones RapidShyp's own webhook preview shows.
+ * The names guessed before this payload was in hand — current_tracking_status_time,
+ * event_time, updated_at — appear nowhere in it, so every event was falling
+ * through to "now" and the out-of-order guard had nothing to compare.
+ */
 function eventTime(shipment: any, record: any): number {
   const candidates = [
-    shipment?.current_tracking_status_time,
-    shipment?.status_time,
-    shipment?.event_time,
-    shipment?.updated_at,
-    record?.event_time,
+    shipment?.current_status_date,
+    shipment?.rto_delivered_date,
+    shipment?.delivered_date,
+    shipment?.awb_assigned_date,
+    record?.creation_date,
   ];
   for (const c of candidates) {
-    if (typeof c === "number" && Number.isFinite(c)) return c < 1e12 ? c * 1000 : c;
-    const t = c ? Date.parse(String(c)) : NaN;
-    if (Number.isFinite(t)) return t;
+    const t = parseRsDate(c);
+    if (t) return t;
   }
   return Date.now();
 }
@@ -143,6 +170,47 @@ async function applyShipment(
       status: shipmentStatus,
       description: statusDesc,
     };
+
+    /*
+     * Everything else the payload carries that somebody will want.
+     *
+     * The courier is often assigned after the shipment is booked, so the name
+     * stored at creation goes stale. The expected delivery date is what a
+     * customer is really asking for on the tracking page. And the NDR reason —
+     * "Customer Refused Delivery" — is the whole story behind a failed
+     * delivery; without it an undelivered parcel is a status with no cause,
+     * and nobody can act on it.
+     */
+    const courier = String(shipment?.child_courier_name || shipment?.courier_name || "").trim();
+    if (courier) update.courierName = courier;
+
+    const edd = parseRsDate(shipment?.edd || shipment?.current_courier_edd);
+    if (edd) update.expectedDeliveryAt = edd;
+
+    const ndrDesc = String(shipment?.latest_ndr_reason_desc || "").trim();
+    if (ndrDesc) {
+      update.ndr = {
+        code: String(shipment?.latest_ndr_reason_code || ""),
+        reason: ndrDesc,
+        at: parseRsDate(shipment?.latest_ndr_date) || at,
+      };
+    }
+
+    // The courier's own scan list, newest last, so the tracking page can show
+    // the journey the parcel actually took rather than the six stages we model.
+    const scans = Array.isArray(shipment?.track_scans) ? shipment.track_scans : [];
+    if (scans.length) {
+      update.trackScans = scans
+        .map((sc: any) => ({
+          at: parseRsDate(sc?.scan_datetime),
+          scan: String(sc?.scan || ""),
+          location: String(sc?.scan_location || ""),
+          code: String(sc?.rapidshyp_status_code || ""),
+        }))
+        .filter((sc: any) => sc.at && sc.scan)
+        .sort((a: any, b: any) => a.at - b.at)
+        .slice(-40);
+    }
   }
   await doc.ref.update(update);
 

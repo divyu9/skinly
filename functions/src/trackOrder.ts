@@ -179,7 +179,7 @@ async function lookUpOrder(data: any) {
     found: true,
     // Bumped whenever this function's contract changes, so which build is
     // live is a fact rather than a deduction.
-    v: 2,
+    v: 3,
     orderNumber: String(order.orderNumber || order.failedOrderNumber || ""),
     orderId: doc!.id,
     status,
@@ -198,6 +198,15 @@ async function lookUpOrder(data: any) {
     trackingUrl: String(order.trackingUrl || ""),
     shippingStatus: String(order.shippingStatus || ""),
     lastEventAt: Number(order.lastTrackingEventAt) || 0,
+    expectedDeliveryAt: Number(order.expectedDeliveryAt) || 0,
+    // Why a delivery failed, in the courier's words. The reason code stays
+    // behind; "Customer Refused Delivery" is the part a person can act on.
+    ndrReason: String(order.ndr?.reason || ""),
+    // The courier's own scans, which say far more than our six stages do.
+    scans: (Array.isArray(order.trackScans) ? order.trackScans : [])
+      .map((sc: any) => ({ at: Number(sc?.at) || 0, scan: String(sc?.scan || ""), location: String(sc?.location || "") }))
+      .filter((sc: any) => sc.at && sc.scan)
+      .slice(-25),
     // Where it is going, to the city only — enough to recognise the order,
     // not enough to be an address.
     city: String(order.shippingAddress?.city || ""),

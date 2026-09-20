@@ -40,6 +40,9 @@ type Result = {
   trackingUrl: string;
   shippingStatus: string;
   lastEventAt: number;
+  expectedDeliveryAt: number;
+  ndrReason: string;
+  scans: Array<{ at: number; scan: string; location: string }>;
   city: string;
   creditOnDelivery: number;
   creditPaid: boolean;
@@ -232,12 +235,46 @@ export default function TrackOrderPage() {
                       {result.lastEventAt ? ` · ${fmtTime(result.lastEventAt)}` : ""}
                     </p>
                   )}
+                  {result.expectedDeliveryAt > 0 && result.status !== "delivered" && (
+                    <p className="mt-1 text-sm font-medium text-brand">
+                      Expected by {fmt(result.expectedDeliveryAt)}
+                    </p>
+                  )}
+                  {/*
+                    Why the courier could not deliver, in their words. Without
+                    it an attempted delivery is a status with no cause, and the
+                    customer has nothing to act on.
+                  */}
+                  {result.ndrReason && result.status === "undelivered" && (
+                    <p className="mt-2 rounded-lg bg-amber-500/10 p-2.5 text-sm text-amber-800 dark:text-amber-200">
+                      The courier noted: {result.ndrReason}. They will try again — reply on WhatsApp if
+                      the address or the timing needs changing.
+                    </p>
+                  )}
                   {result.trackingUrl && (
                     <a href={result.trackingUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block">
                       <Button variant="outline" className="sticker-sm sticker-press rounded-lg">
                         Live tracking <ExternalLinkIcon className="ml-2 size-4" />
                       </Button>
                     </a>
+                  )}
+
+                  {/* The courier's own scans — the detail our six stages flatten away. */}
+                  {result.scans.length > 0 && (
+                    <details className="mt-4 group">
+                      <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                        Every scan ({result.scans.length})
+                      </summary>
+                      <ol className="mt-3 space-y-2 border-l-2 border-dashed border-ink/20 pl-4">
+                        {[...result.scans].reverse().map((sc, i) => (
+                          <li key={i} className="text-sm">
+                            <span className="font-medium">{sc.scan}</span>
+                            {sc.location && <span className="text-muted-foreground"> · {sc.location}</span>}
+                            <div className="text-xs text-muted-foreground">{fmtTime(sc.at)}</div>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
                   )}
                 </section>
               )}
