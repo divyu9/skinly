@@ -798,16 +798,36 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
       .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }));
   }, [rolls, cutouts, search, source]);
 
-  // "Open in studio" from the coverage table: /backend-skinly/ai-mockups?design=R-12
+  /*
+   * "Open in studio": /backend-skinly/ai-mockups?design=R-13
+   *
+   * Matched against the same list the sidebar draws, trimmed the same way. It
+   * used to read the raw rNumber, so a code saved with a stray space was in
+   * the list and yet unfindable, and the page just said "pick a design on the
+   * left" as though the link had never carried one.
+   */
   const [params] = useSearchParams();
-  const wanted = params.get("design");
+  const wanted = (params.get("design") || "").trim();
+  const norm = (v: string) => v.trim().toUpperCase().replace(/\s+/g, "").replace(/-0+(\d)/g, "-$1");
+  const allDesigns = useMemo(() => [
+    ...(rolls || []).map((r) => ({ id: r._id, code: String(r.rNumber || "") })),
+    ...(cutouts || []).map((c) => ({ id: c._id, code: String(c.cutoutNumber || "") })),
+  ], [rolls, cutouts]);
+  const askedFor = wanted ? allDesigns.find((d) => norm(d.code) === norm(wanted)) : undefined;
+  const askedForId = askedFor?.id;
   useEffect(() => {
-    if (!wanted || !rolls || !cutouts) return;
-    const norm = (s: string) => s.toUpperCase().replace(/-0+(\d)/g, "-$1");
-    const hit = [...rolls.map((r) => ({ id: r._id, code: String(r.rNumber || "") })), ...cutouts.map((c) => ({ id: c._id, code: String(c.cutoutNumber || "") }))]
-      .find((d) => norm(d.code) === norm(wanted));
-    if (hit) setSelectedRollId(hit.id);
-  }, [wanted, rolls, cutouts]);
+    if (askedForId) setSelectedRollId(askedForId);
+  }, [askedForId, setSelectedRollId]);
+
+  /*
+   * The list is filtered by the search box and the rolls/cutouts tabs, and the
+   * design in the URL has to survive both. Without this, arriving with a
+   * filter left over from last time selected a design that the filter then
+   * hid, and the panel stayed empty with nothing to say why.
+   */
+  useEffect(() => {
+    if (askedForId) { setSearch(""); setSource("all"); }
+  }, [askedForId]);
 
   const selected = designs.find((d) => d._id === selectedRollId) || null;
   // This design's own mockups, asked for by design code. Reading a page of
@@ -890,8 +910,18 @@ function Studio({ selectedRollId, setSelectedRollId, picked, setPicked, modelId,
           onManageShots={onManageShots}
         />
       ) : (
-        <Card><CardContent className="flex min-h-[300px] items-center justify-center text-muted-foreground">
-          Pick a design on the left to start.
+        <Card><CardContent className="flex min-h-[300px] flex-col items-center justify-center gap-1 text-center text-muted-foreground">
+          {wanted && !askedFor ? (
+            <>
+              <p className="font-medium text-foreground">No design here is called {wanted}</p>
+              <p className="text-sm">
+                The link asked for it, but neither the rolls nor the cutouts have that code.
+                Check it in Rolls &amp; cutouts, or pick a design on the left.
+              </p>
+            </>
+          ) : (
+            <p>Pick a design on the left to start.</p>
+          )}
         </CardContent></Card>
       )}
     </div>
