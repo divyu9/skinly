@@ -168,7 +168,7 @@ export function AdminSidebar() {
         { path: "/backend-skinly/cod", label: "COD Settings", icon: CreditCard },
         { path: "/backend-skinly/shipping", label: "Shipping Settings", icon: Truck },
         { path: "/backend-skinly/settings", label: "Settings", icon: Settings },
-        { path: "/backend-skinly/oos", label: "OOS Settings", icon: Settings },
+        { path: "/backend-skinly/oos", label: "Listing order", icon: Settings },
         { path: "/backend-skinly/bugs", label: "Bug Reports", icon: Bug },
       ],
     },

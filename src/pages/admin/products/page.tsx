@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { AdminLayout } from "@/components/admin-layout.tsx";
+import { hasUsableImage } from "@/lib/image-fallback";
 import { toast } from "sonner";
 import type { Id } from "@/lib/firebase-api";
 import { useState, useMemo, useRef, useEffect, Fragment } from "react";
@@ -292,6 +293,15 @@ function AdminProductsPageInner() {
   const [productNameValue, setProductNameValue] = useState("");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
+  /*
+   * Products with nothing to show.
+   *
+   * 791 of them carry Cloudinary URLs that answer 401, so "has images" and
+   * "shows an image" are different questions — hasUsableImage asks the second
+   * one, and the storefront's push-down setting asks the same function, so
+   * what is listed here is exactly what gets pushed down there.
+   */
+  const [imageFilter, setImageFilter] = useState<"all" | "missing" | "has">("all");
   const [expandedProducts, setExpandedProducts] = useState<Set<Id<"products">>>(new Set());
 
   // Tag manager state
@@ -743,6 +753,11 @@ function AdminProductsPageInner() {
       filtered = filtered.filter((product) => product.status === statusFilter);
     }
 
+    if (imageFilter !== "all") {
+      filtered = filtered.filter((product: any) =>
+        imageFilter === "missing" ? !hasUsableImage(product.images) : hasUsableImage(product.images));
+    }
+
     // Sort based on active column
     const sorted = [...filtered].sort((a, b) => {
       if (activeSortColumn === "inventory") {
@@ -769,12 +784,12 @@ function AdminProductsPageInner() {
     });
 
     return sorted;
-  }, [products, gadgetTypeNameById, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, activeSortColumn, inventorySortOrder]);
+  }, [products, gadgetTypeNameById, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, imageFilter, activeSortColumn, inventorySortOrder]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, itemsPerPage]);
+  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, imageFilter, itemsPerPage]);
 
   // Paginate filtered products
   const paginatedProducts = useMemo(() => {
@@ -792,6 +807,7 @@ function AdminProductsPageInner() {
     setSkuFilterValue("");
     setProductNameValue("");
     setStatusFilter("all");
+    setImageFilter("all");
     setActiveSortColumn(null);
     setInventorySortOrder("desc");
     setBackendSortBy("latest");
@@ -803,6 +819,12 @@ function AdminProductsPageInner() {
     const chips: { label: string; clear: () => void }[] = [];
     if (searchQuery.trim()) chips.push({ label: `Search: "${searchQuery.trim()}"`, clear: () => setSearchQuery("") });
     if (statusFilter !== "all") chips.push({ label: `Status: ${statusFilter}`, clear: () => setStatusFilter("all") });
+    if (imageFilter !== "all") {
+      chips.push({
+        label: imageFilter === "missing" ? "No images" : "Has images",
+        clear: () => setImageFilter("all"),
+      });
+    }
     if (gadgetCategoryFilter !== "all") {
       const label = gadgetCategoryOptions.find((c) => c.value === gadgetCategoryFilter)?.label ?? gadgetCategoryFilter;
       chips.push({ label: `Category: ${label}`, clear: () => setGadgetCategoryFilter("all") });
@@ -821,7 +843,7 @@ function AdminProductsPageInner() {
       });
     }
     return chips;
-  }, [searchQuery, statusFilter, gadgetCategoryFilter, skuLetterFilter, skuFilterValue, skuFilterCondition, productNameValue, productNameCondition]);
+  }, [searchQuery, statusFilter, imageFilter, gadgetCategoryFilter, skuLetterFilter, skuFilterValue, skuFilterCondition, productNameValue, productNameCondition]);
 
   const activeFilterCount = activeFilterChips.length;
 
@@ -1000,6 +1022,20 @@ function AdminProductsPageInner() {
                   {(["all", "active", "draft", "archived"] as const).map((v) => (
                     <FilterChip key={v} active={statusFilter === v} onClick={() => setStatusFilter(v)}>
                       {v === "all" ? "All" : v.charAt(0).toUpperCase() + v.slice(1)}
+                    </FilterChip>
+                  ))}
+                </FilterRow>
+
+                <FilterRow label="Images">
+                  {([["all", "All"], ["missing", "No images"], ["has", "Has images"]] as const).map(([v, label]) => (
+                    <FilterChip key={v} active={imageFilter === v} onClick={() => setImageFilter(v)}>
+                      {label}
+                      {v !== "all" && (
+                        <span className="ml-1.5 opacity-60">
+                          {products.filter((p: any) =>
+                            v === "missing" ? !hasUsableImage(p.images) : hasUsableImage(p.images)).length}
+                        </span>
+                      )}
                     </FilterChip>
                   ))}
                 </FilterRow>

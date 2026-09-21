@@ -1,6 +1,7 @@
 import { usePaginatedQuery, useQuery } from "@/lib/firebase-hooks";
 import { brandInScope, productFitsDevice } from "@/lib/device-fit";
 import { loadCatalogue } from "@/lib/catalogue";
+import { hasUsableImage } from "@/lib/image-fallback";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import type { FilterState, URLParams } from "./useProductFilters";
@@ -57,6 +58,9 @@ export function useProductsData({
 }: UseProductsDataParams) {
   // Get OOS sorting setting
   const autoSortOOS = useQuery(api.settings.getSetting, { key: "autoSortOutOfStock" });
+  // And the same question for pictures: a card with nothing to show sells
+  // nothing, so it can be sent to the end rather than take a top row.
+  const autoSortNoImage = useQuery(api.settings.getSetting, { key: "autoSortNoImage" });
   
   // Track viewport for batch mockup loading
   const [viewportStart, setViewportStart] = useState(0);
@@ -349,10 +353,24 @@ export function useProductsData({
         return 0;
       });
     }
-    
+
+    /*
+     * Pictureless products last, if the admin asked for it.
+     *
+     * Last of all the sorts, because it is the coarsest: whatever order the
+     * rest of this settled on holds inside each group, and a product nobody
+     * can see the design of goes below one they can. `hasUsableImage` is the
+     * same function the admin's "No images" filter uses, so the listing there
+     * and the order here can never disagree. Not a filter — the product is
+     * still buyable, still findable by search, just not in the first row.
+     */
+    if (autoSortNoImage?.value === true) {
+      result.sort((a, b) => Number(hasUsableImage(b.images)) - Number(hasUsableImage(a.images)));
+    }
+
     return result;
   }, [filteredProducts, filters.sortBy, filters.stockFilter, filters.productCategory,
-      device?.brand, device?.model, autoSortOOS?.value]);
+      device?.brand, device?.model, autoSortOOS?.value, autoSortNoImage?.value]);
   
   // ============================================
   // VIEWPORT-BASED BATCH MOCKUP LOADING

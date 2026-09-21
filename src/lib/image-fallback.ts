@@ -49,3 +49,24 @@ export function isDeadImageUrl(url?: string | null): boolean {
   if (!url) return false;
   return DEAD_IMAGE_HOSTS.some((h) => url.includes(h));
 }
+
+/**
+ * Whether a product has a picture anyone can actually see.
+ *
+ * "Has images" was never the same question as "shows an image": 791 products
+ * carry Cloudinary URLs that answer 401, so a product with four images can
+ * still render four grey boxes. Both the admin filter and the storefront
+ * ordering ask this one function, so a product the admin lists as having no
+ * image is exactly the one the storefront pushes down.
+ *
+ * Images are stored either as strings or as `{ url }`, depending on how old
+ * the row is.
+ */
+export function usableImageUrls(images?: unknown): string[] {
+  if (!Array.isArray(images)) return [];
+  return images
+    .map((i) => (typeof i === "string" ? i : (i as { url?: string })?.url))
+    .filter((u): u is string => typeof u === "string" && /^https?:\/\//.test(u) && !isDeadImageUrl(u));
+}
+
+export const hasUsableImage = (images?: unknown): boolean => usableImageUrls(images).length > 0;
