@@ -105,6 +105,18 @@ const COMBO_NAMES: Record<string, string> = {
   "samsung|tablet": "Samsung Galaxy Tab",
   "samsung|phone": "Samsung Galaxy",
   "microsoft|console": "Xbox",
+  /*
+   * Each of these was checked against the models we actually carry, not
+   * against what the brand sells: every one of Google's 27 phones is a Pixel,
+   * all 7 LG laptops are Grams, all 13 Xiaomi tablets are a Pad of some kind,
+   * and every HMD phone is named "HMD …" with 13 of the 18 saying Nokia. A
+   * page may only promise a line the catalogue can fill — naming Samsung's
+   * laptop page "Galaxy Book" would promise 21 of them and deliver one.
+   */
+  "google|phone": "Google Pixel",
+  "lg|laptop": "LG Gram",
+  "xiaomi|tablet": "Xiaomi Pad",
+  "hmd|phone": "HMD Nokia",
 };
 
 const pretty = (brand: string) =>

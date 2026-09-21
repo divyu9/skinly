@@ -400,6 +400,13 @@ const BRAND_GADGET_LABELS = {
   "samsung|tablet": ["Galaxy Tab", "Galaxy Tabs"],
   "sony|laptop": ["VAIO", "VAIO laptops"],
   "microsoft|console": ["Xbox", "Xbox consoles"],
+  // Checked against the models we carry: all 27 Google phones are Pixels, all
+  // 7 LG laptops are Grams, all 13 Xiaomi tablets are a Pad, and every HMD
+  // phone is named "HMD …". Same list the page generator names pages from.
+  "google|phone": ["Pixel", "Pixels"],
+  "lg|laptop": ["Gram", "Gram laptops"],
+  "xiaomi|tablet": ["Pad", "Pads"],
+  "hmd|phone": ["Nokia", "Nokia phones"],
 };
 
 const PLAIN_GADGETS = {
