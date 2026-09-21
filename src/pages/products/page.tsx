@@ -26,6 +26,7 @@ import {
 
 // Hooks
 import { useProductFilters } from "@/hooks/useProductFilters";
+import { StyleStrip } from "@/components/products/StyleStrip.tsx";
 import { useProductsData } from "@/hooks/useProductsData";
 import { writeActiveDevice } from "@/lib/active-device";
 import { CATEGORY_PAGES, canonicalListingPath } from "@/lib/category-paths.mjs";
@@ -466,6 +467,12 @@ export default function ProductsPage() {
             productCategory={filters.productCategory}
             resultsCount={products.length}
           />
+
+          {/* The styles, for anyone who came here by the footer's "All
+              styles" and would otherwise find a product grid and no styles. */}
+          {filters.productCategory === "skin" && !filters.searchQuery && !filters.collectionParam && (
+            <StyleStrip gadget={filters.gadgetFilter} />
+          )}
 
           {/* Shop by Brand — above the device box, because brand comes first
               in the sequence a shopper works through: brand, then model. */}

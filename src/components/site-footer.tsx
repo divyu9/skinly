@@ -1,12 +1,41 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { BugIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BugReportModal } from "./bug-report-modal.tsx";
 import { BrandLogo } from "./brand-logo.tsx";
+import { GADGET_PAGES } from "@/lib/category-paths.mjs";
+import { loadCatalogue, type ThemePage } from "@/lib/catalogue";
+
+/*
+ * The gadgets worth a footer slot, in the order they earn one.
+ *
+ * Nine gadget pages exist; six fit a footer column without turning it into a
+ * directory. /skins holds the full list and the styles, and the footer links
+ * there too, so nothing is more than one hop away.
+ */
+const FOOTER_GADGETS: Array<[keyof typeof GADGET_PAGES, string]> = [
+  ["phone", "Phone skins"],
+  ["laptop", "Laptop skins"],
+  ["tablet", "iPad & tablet skins"],
+  ["console", "Console skins"],
+  ["camera", "Camera skins"],
+  ["lens", "Lens skins"],
+];
 
 export function SiteFooter() {
   const [bugReportOpen, setBugReportOpen] = useState(false);
+  /*
+   * Which styles to offer, read from the build rather than written here, so
+   * the footer cannot outlive the pages it links to. It renders without them
+   * — a footer that waits for a fetch is a footer that flickers.
+   */
+  const [themes, setThemes] = useState<ThemePage[]>([]);
+  useEffect(() => {
+    let live = true;
+    void loadCatalogue().then((c) => { if (live && c?.themes?.length) setThemes(c.themes.slice(0, 6)); });
+    return () => { live = false; };
+  }, []);
 
   return (
     <>
@@ -23,7 +52,44 @@ export function SiteFooter() {
             </div>
 
             {/* Links Grid - Compact 4 columns on desktop, 2 on mobile */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8 flex-1 max-w-3xl">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8 flex-1 max-w-4xl">
+              {/* What we cut for. These are the pages people search for by
+                  name — "laptop skins", "camera skins" — and until now the
+                  footer offered none of them. */}
+              <div>
+                <h3 className="font-semibold text-sm mb-2">Skins for</h3>
+                <ul className="space-y-1.5 text-sm">
+                  {FOOTER_GADGETS.map(([gadget, label]) => (
+                    <li key={gadget}>
+                      <Link to={GADGET_PAGES[gadget]} className="text-muted-foreground hover:text-primary transition-colors">
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* The biggest style pages, and the hub that holds the rest. */}
+              {themes.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-sm mb-2">Popular styles</h3>
+                  <ul className="space-y-1.5 text-sm">
+                    {themes.map((t) => (
+                      <li key={t.slug}>
+                        <Link to={`/${t.slug}`} className="text-muted-foreground hover:text-primary transition-colors">
+                          {t.name}
+                        </Link>
+                      </li>
+                    ))}
+                    <li>
+                      <Link to="/skins" className="font-medium hover:text-primary transition-colors">
+                        All styles →
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
               {/* Shop */}
               <div>
                 <h3 className="font-semibold text-sm mb-2">Shop</h3>

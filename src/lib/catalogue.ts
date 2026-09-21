@@ -52,11 +52,21 @@ export interface BrandLogo {
   name?: string;
 }
 
+/** A style page — a theme or finish somebody can browse by. Biggest first. */
+export interface ThemePage {
+  slug: string;
+  name: string;
+  total: number;
+  gadget: string | null;
+}
+
 export interface Catalogue {
   builtAt: number;
   products: CatalogueProduct[];
   /** From the homepage's Explore by Brand cards, keyed by brandKey(). */
   brandLogos: Record<string, BrandLogo>;
+  /** Every style page, written by the build so nothing links to a page that went. */
+  themes: ThemePage[];
 }
 
 /** "One Plus", "OnePlus" and "oneplus-skins" are one brand. */
@@ -77,7 +87,12 @@ export function loadCatalogue(): Promise<Catalogue | null> {
       for (const p of body.products) {
         p.tags = Array.isArray(p.tags) ? p.tags.map((t: number | string) => (typeof t === "number" ? tagList[t] : t)).filter(Boolean) : [];
       }
-      return { builtAt: body.builtAt, products: body.products, brandLogos: body.brandLogos || {} } as Catalogue;
+      return {
+        builtAt: body.builtAt,
+        products: body.products,
+        brandLogos: body.brandLogos || {},
+        themes: Array.isArray(body.themes) ? body.themes : [],
+      } as Catalogue;
     })
     .catch(() => null);
   return pending;

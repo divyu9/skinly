@@ -677,7 +677,78 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
   };
 }
 
-function seoPage(s, info, knownPaths) {
+/**
+ * Every theme and finish page, with what sits behind it.
+ *
+ * 58 of these could be reached from nowhere. A brand page links down to its
+ * models and across to its own gadgets, and a product page links back to the
+ * pages that sell it — but nothing in the site listed a theme, so /abstract-
+ * skins with its 870 designs, /minimalist-skins with 409 and /blue-skins with
+ * 330 were reachable only from the sitemap. This is the list that fixes that,
+ * used twice: as a hub on /skins, and as the row of themes on every page that
+ * is about one gadget.
+ */
+function themeIndex(seoDocs, seoInfo) {
+  const rows = [];
+  for (const doc of seoDocs) {
+    const info = seoInfo.get(doc.slug);
+    if (!info || info.empty || !info.total) continue;
+    const t = info.target || {};
+    const isTheme =
+      t.kind === "theme" || t.kind === "finish" ||
+      (t.kind === "keyword" && ((t.collections || []).length || (t.titleWords || []).length));
+    if (!isTheme) continue;
+    rows.push({
+      slug: doc.slug,
+      name: tidyHeading(doc.h1Heading || doc.metaTitle || titleCase(doc.slug)),
+      gadget: t.gadget || null,
+      total: info.total,
+      // What the page shows, so three URLs of one page can be spotted.
+      sig: (info.products || []).slice(0, 8).map((x) => x._id).join(","),
+    });
+  }
+
+  /*
+   * One link per page, not one per URL.
+   *
+   * /abstract-skins, /patterned-geometric-skins and /abstract-patterns-skins
+   * are the Abstract collection three times over — same 870 designs, same
+   * products, three slugs. Linking all three from the hub would hand Google
+   * three copies of one page with a link each, which is the opposite of the
+   * point. The shortest slug wins, being the one closest to what somebody
+   * types; the others stay live and unlinked until they are merged properly.
+   */
+  const best = new Map();
+  for (const r of rows) {
+    const key = r.sig || r.slug;
+    const seen = best.get(key);
+    if (!seen || r.slug.length < seen.slug.length) best.set(key, r);
+  }
+  // Biggest first: the page with 870 designs behind it is the one worth
+  // finding, and a list nobody scrolls should put it at the top.
+  return [...best.values()].sort((a, b) => b.total - a.total);
+}
+
+/**
+ * "Matte Phone Skins Skins & Wraps" → "Matte Phone Skins".
+ *
+ * The headings were generated from collection names that already ended in
+ * "Skins", the same way the slugs were, and these are the pages that predate
+ * the fix. The stored heading is left alone; only the link text is tidied.
+ */
+const tidyHeading = (raw) =>
+  String(raw || "")
+    .replace(/\s*&\s*wraps?\s*$/i, "")
+    .replace(/\b(skins?)\b(\s+\1\b)+/gi, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const themeLinks = (rows) =>
+  rows
+    .map((r) => `<li><a href="${SITE}/${esc(r.slug)}">${esc(r.name)}</a> <span>(${r.total} designs)</span></li>`)
+    .join("");
+
+function seoPage(s, info, knownPaths, themes = []) {
   const url = `${SITE}/${s.slug}`;
   const h1 = s.h1Heading || s.metaTitle || titleCase(s.slug);
   const trail = [
@@ -770,6 +841,28 @@ function seoPage(s, info, knownPaths) {
     .filter((m) => m.href && m.href.startsWith("/") && !m.href.startsWith("/products?"))
     .map((m) => `<li><a href="${SITE}${esc(m.href)}">${esc(`${m.brand} ${m.model}`)} skins</a></li>`)
     .join("");
+
+  /*
+   * The styles somebody on this page can actually buy for this gadget.
+   *
+   * A Vivo phone page and an abstract phone page are about the same designs
+   * from two directions, and nothing joined them: a shopper who wanted a
+   * pattern rather than a brand had to go back to the shop and start again,
+   * and Google saw two topics where there is one. Themes cut to this page's
+   * gadget come first — "Abstract phone skins" beats "Abstract skins" for
+   * somebody holding a phone — and the broad ones fill the rest.
+   *
+   * Never on a theme page itself: a list of themes on a theme page is a ring
+   * of pages linking to each other, which is a pattern rather than a help.
+   */
+  const ownGadget = info?.target?.gadget;
+  const isThemePage = ["theme", "finish"].includes(info?.target?.kind);
+  const themeRow = isThemePage || !themes.length
+    ? []
+    : [
+        ...themes.filter((t) => ownGadget && t.gadget === ownGadget),
+        ...themes.filter((t) => !t.gadget),
+      ].filter((t) => t.slug !== s.slug).slice(0, 12);
   return {
     route: `/${s.slug}`,
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
@@ -789,6 +882,7 @@ function seoPage(s, info, knownPaths) {
       (productLinks ? `<ul>${productLinks}</ul>` : "") +
       (gadgetLinks ? `<h2>More from ${esc(info?.target?.brand || "this brand")}</h2><ul>${gadgetLinks}</ul>` : "") +
       (modelLinks ? `<h2>Skins for other ${esc(info?.target?.brand || "")} models</h2><ul>${modelLinks}</ul>`.replace("other  models", "other models") : "") +
+      (themeRow.length ? `<h2>Browse by style</h2><ul>${themeLinks(themeRow)}</ul>` : "") +
       faqs.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
   };
 }
@@ -971,7 +1065,7 @@ function brandLogos(sections, cards) {
   return out;
 }
 
-async function writeCatalogue(active, variantsByProduct, logos = {}) {
+async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []) {
   const tagsOf = (t) =>
     (Array.isArray(t) ? t : typeof t === "string" ? t.split(",") : []).map((x) => String(x).trim()).filter(Boolean);
   const products = active.map((p) => ({
@@ -1014,7 +1108,17 @@ async function writeCatalogue(active, variantsByProduct, logos = {}) {
     });
   }
   await fs.mkdir(path.join(DIST, "data"), { recursive: true });
-  const body = JSON.stringify({ builtAt: Date.now(), tagList, products, brandLogos: logos });
+  /*
+   * Every style page, biggest first.
+   *
+   * Kept here rather than hard-coded in a component so nothing can outlive
+   * the pages it links to. The footer takes the first six — a footer is a few
+   * well-chosen links on every page, not a directory — and /skins shows them
+   * all, which is the page a reader lands on when the footer says "All
+   * styles".
+   */
+  const themeRows = themes.map((t) => ({ slug: t.slug, name: t.name, total: t.total, gadget: t.gadget || null }));
+  const body = JSON.stringify({ builtAt: Date.now(), tagList, products, brandLogos: logos, themes: themeRows });
   await fs.writeFile(path.join(DIST, "data", "catalogue.json"), body);
   return body.length;
 }
@@ -1045,7 +1149,7 @@ async function writeModels(models) {
 
 // ─── category listings ────────────────────────────────────────────────────────
 
-function categoryPages(products, variantsByProduct) {
+function categoryPages(products, variantsByProduct, themes = []) {
   const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
   return Object.entries(CATEGORY_PAGES).map(([category, meta]) => {
     const rows = products
@@ -1083,7 +1187,22 @@ function categoryPages(products, variantsByProduct) {
           { name: meta.heading, url },
         ]),
       ],
-      body: `<h1>${esc(meta.heading)}</h1><p>${esc(meta.description)}</p>${links ? `<ul>${links}</ul>` : ""}`,
+      body:
+        `<h1>${esc(meta.heading)}</h1><p>${esc(meta.description)}</p>` +
+        (links ? `<ul>${links}</ul>` : "") +
+        /*
+         * The theme hub, and the only page that has one.
+         *
+         * Skins are what the themes are about, so this is where the list
+         * belongs — and one good inbound link is what an orphan needs, not
+         * the same block repeated on three hundred pages, which is the
+         * boilerplate Google discounts. The whole list, uncapped: fifty-odd
+         * links on the page that exists to list them is a directory, not a
+         * wall.
+         */
+        (category === "skin" && themes.length
+          ? `<h2>Skins by style</h2><ul>${themeLinks(themes)}</ul>`
+          : ""),
     };
   });
 }
@@ -1337,7 +1456,9 @@ async function main() {
     ...seoDocs.map((d) => `/${d.slug}`),
     ...active.map((p) => `/products/${p.slug}`),
   ]);
-  const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug), knownPaths));
+  const themes = themeIndex(seoDocs, seoInfo);
+  if (themes.length) log(`themes: ${themes.length} style pages, now linked from /skins and from every gadget page`);
+  const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug), knownPaths, themes));
   if (safeHtml.dead) log(`dropped ${safeHtml.dead} generated links pointing at pages that do not exist`);
   for (const p of seo) await writePage(p.route, render(template, p));
 
@@ -1389,12 +1510,12 @@ async function main() {
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
 
-  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []));
+  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes);
   log(`catalogue: ${active.length} products, ${Math.round(catalogueBytes / 1024)} KB`);
   const modelFile = await writeModels(data.models);
   log(`models: ${modelFile.count} active, ${Math.round(modelFile.bytes / 1024)} KB`);
 
-  const categories = categoryPages(active, variantsByProduct);
+  const categories = categoryPages(active, variantsByProduct, themes);
   for (const p of categories) await writePage(p.route, render(template, p));
 
   // The listing points skins-for-one-gadget at these pages; say so if one is gone.
