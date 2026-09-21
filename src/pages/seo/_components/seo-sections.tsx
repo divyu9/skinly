@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { brandGadgetLabel } from "@/lib/seo-pages.mjs";
 import { ProductCard } from "@/components/products/ProductCard.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import type { SeoPageData } from "../use-seo-page-data";
@@ -120,13 +121,6 @@ export function SeoModelsSection({ data }: { data: SeoPageData | undefined }) {
   );
 }
 
-/** The word a shopper uses for a gadget, not the database's category id. */
-const GADGET_WORDS: Record<string, string> = {
-  phone: "Phones", laptop: "Laptops", tablet: "Tablets", camera: "Cameras",
-  lens: "Lenses", controller: "Controllers", console: "Consoles", drone: "Drones",
-  charger: "Chargers", gimbals: "Gimbals", "mac-mini": "Mac mini",
-};
-
 /**
  * The brand's other shelves.
  *
@@ -154,7 +148,8 @@ export function SeoBrandGadgetsSection({ data }: { data: SeoPageData | undefined
                 to={g.href}
                 className="inline-flex flex-col items-center rounded-xl border-2 border-ink/15 bg-card px-5 py-3 transition-colors hover:border-ink/40"
               >
-                <span className="text-sm font-semibold">{brand} {GADGET_WORDS[g.gadget] || g.gadget}</span>
+                {/* "Apple Phones" is a phrase nobody says; it is iPhones. */}
+                <span className="text-sm font-semibold">{brandGadgetLabel(brand, g.gadget, true)}</span>
                 <span className="text-xs text-muted-foreground">{g.count} models</span>
               </Link>
             </li>

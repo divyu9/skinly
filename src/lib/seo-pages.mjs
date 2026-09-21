@@ -377,3 +377,47 @@ export function seoCopy(page, targetIn, stats) {
 }
 
 export const gadgetLabel = (g) => GADGET_LABEL[g] || "";
+
+/**
+ * What a brand calls its own gadgets.
+ *
+ * "Apple Phones" is a phrase nobody says or searches — it is iPhone, MacBook
+ * and iPad, and a hub row that says otherwise reads as though it were written
+ * by somebody who does not sell them. Samsung's phones are Galaxy; Sony's
+ * laptops have been VAIO for twenty years; Microsoft's console is an Xbox.
+ *
+ * Kept in step with COMBO_NAMES in functions/src/seoAuto.ts, which names the
+ * pages themselves — the two have to agree or a link says one thing and the
+ * page it opens says another.
+ */
+const BRAND_GADGET_LABELS = {
+  "apple|phone": ["iPhone", "iPhones"],
+  "apple|laptop": ["MacBook", "MacBooks"],
+  "apple|tablet": ["iPad", "iPads"],
+  "apple|mac-mini": ["Mac mini", "Mac mini"],
+  "apple|charger": ["Charger", "Chargers"],
+  "samsung|phone": ["Galaxy", "Galaxy phones"],
+  "samsung|tablet": ["Galaxy Tab", "Galaxy Tabs"],
+  "sony|laptop": ["VAIO", "VAIO laptops"],
+  "microsoft|console": ["Xbox", "Xbox consoles"],
+};
+
+const PLAIN_GADGETS = {
+  phone: ["Phone", "Phones"], laptop: ["Laptop", "Laptops"], tablet: ["Tablet", "Tablets"],
+  camera: ["Camera", "Cameras"], lens: ["Lens", "Lenses"], controller: ["Controller", "Controllers"],
+  console: ["Console", "Consoles"], drone: ["Drone", "Drones"], charger: ["Charger", "Chargers"],
+  gimbals: ["Gimbal", "Gimbals"], gimbal: ["Gimbal", "Gimbals"], "mac-mini": ["Mac mini", "Mac mini"],
+};
+
+/**
+ * "Apple" + "laptop" → "Apple MacBooks".
+ *
+ * @param plural true for a row of shelves ("Apple iPhones"), false for one
+ *   thing ("Apple iPhone").
+ */
+export function brandGadgetLabel(brand, gadget, plural = false) {
+  const key = `${slugify(String(brand || ""))}|${String(gadget || "").toLowerCase()}`;
+  const pair = BRAND_GADGET_LABELS[key] || PLAIN_GADGETS[String(gadget || "").toLowerCase()];
+  const word = pair ? pair[plural ? 1 : 0] : gadget;
+  return `${brand} ${word}`.trim();
+}

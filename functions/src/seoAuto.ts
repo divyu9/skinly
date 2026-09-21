@@ -104,6 +104,7 @@ const COMBO_NAMES: Record<string, string> = {
   "sony|laptop": "Sony VAIO",
   "samsung|tablet": "Samsung Galaxy Tab",
   "samsung|phone": "Samsung Galaxy",
+  "microsoft|console": "Xbox",
 };
 
 const pretty = (brand: string) =>

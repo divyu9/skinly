@@ -19,6 +19,8 @@ export interface SeoSelection {
 
 export function slugify(s: unknown): string;
 export function gadgetLabel(g?: string): string;
+/** "Apple" + "laptop" → "Apple MacBooks". Plural for a row of shelves. */
+export function brandGadgetLabel(brand?: string, gadget?: string, plural?: boolean): string;
 export function resolveSeoTarget(
   page: { slug?: string; pageType?: string; h1Heading?: string },
   models: Array<{ brandName?: string; modelName?: string; category?: string; isActive?: boolean }>,

@@ -28,7 +28,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
-import { resolveSeoTarget, selectSeoProducts, seoCopy } from "../src/lib/seo-pages.mjs";
+import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel } from "../src/lib/seo-pages.mjs";
 import { CATEGORY_PAGES, GADGET_PAGES } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
@@ -601,7 +601,7 @@ function seoPage(s, info, knownPaths) {
    */
   const gadgetLinks = (info?.brandGadgets || [])
     .filter((g) => g.slug)
-    .map((g) => `<li><a href="${SITE}/${esc(g.slug)}">${esc(`${info.target?.brand} ${g.gadget}`)} skins</a> <span>(${g.count} models)</span></li>`)
+    .map((g) => `<li><a href="${SITE}/${esc(g.slug)}">${esc(brandGadgetLabel(info.target?.brand, g.gadget, true))} skins</a> <span>(${g.count} models)</span></li>`)
     .join("");
 
   const modelLinks = (info?.models || [])
