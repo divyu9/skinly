@@ -109,14 +109,21 @@ const COMBO_NAMES: Record<string, string> = {
    * Each of these was checked against the models we actually carry, not
    * against what the brand sells: every one of Google's 27 phones is a Pixel,
    * all 7 LG laptops are Grams, all 13 Xiaomi tablets are a Pad of some kind,
-   * and every HMD phone is named "HMD …" with 13 of the 18 saying Nokia. A
-   * page may only promise a line the catalogue can fill — naming Samsung's
-   * laptop page "Galaxy Book" would promise 21 of them and deliver one.
+   * and every HMD phone is named "HMD …" with 13 of the 18 saying Nokia.
    */
   "google|phone": "Google Pixel",
   "lg|laptop": "LG Gram",
   "xiaomi|tablet": "Xiaomi Pad",
   "hmd|phone": "HMD Nokia",
+  /*
+   * Samsung's laptops are the one entry here that names where the catalogue
+   * is going rather than where it is. One of the 21 we list today is a Galaxy
+   * Book; the rest are RV509, NT450RSE, Notebook 9 — machines from before the
+   * line was renamed. Samsung has shipped nothing but Galaxy Books for
+   * several years, so every model added from here will be one, and the page
+   * is named for the search that will keep being made.
+   */
+  "samsung|laptop": "Samsung Galaxy Book",
 };
 
 const pretty = (brand: string) =>

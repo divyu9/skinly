@@ -407,6 +407,9 @@ const BRAND_GADGET_LABELS = {
   "lg|laptop": ["Gram", "Gram laptops"],
   "xiaomi|tablet": ["Pad", "Pads"],
   "hmd|phone": ["Nokia", "Nokia phones"],
+  // Named for the line Samsung has shipped for years and will keep shipping,
+  // not for the older notebooks still in the model list.
+  "samsung|laptop": ["Galaxy Book", "Galaxy Books"],
 };
 
 const PLAIN_GADGETS = {
