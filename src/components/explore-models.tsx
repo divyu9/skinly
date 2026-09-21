@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useDropdownHeight } from "@/hooks/use-dropdown-height.ts";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Input } from "@/components/ui/input.tsx";
@@ -14,6 +15,8 @@ interface ExploreModelsProps {
 
 export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const { maxHeight: dropdownHeight } = useDropdownHeight(searchBoxRef);
   const [debouncedQuery] = useDebounce(searchQuery, 300);
   const [showResults, setShowResults] = useState(false);
 
@@ -131,7 +134,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
         </div>
 
         {/* Search Input */}
-        <div className="relative">
+        <div className="relative" ref={searchBoxRef}>
           <SearchIcon className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-primary sm:left-4" />
           <Input
             type="text"
@@ -166,9 +169,14 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
           </Button>
         </div>
 
-        {/* Search Results */}
+        {/*
+          Search Results, sized against what the phone can actually show
+          rather than against the page: with the keyboard up, a vh-based panel
+          ran on underneath it and the models at the bottom of the list could
+          be read but never tapped.
+        */}
         {showResults && searchQuery.trim().length > 0 && (
-          <Card className="border-2 shadow-xl max-h-[60vh] overflow-y-auto">
+          <Card className="border-2 shadow-xl overflow-y-auto" style={{ maxHeight: dropdownHeight ?? "60vh" }}>
             <CardContent className="p-4">
               {debouncedQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
                 // Loading

@@ -419,7 +419,13 @@ export default function DevicesPage() {
                 </div>
               </PopoverTrigger>
               <PopoverContent
-                className="w-[var(--radix-popover-trigger-width)] p-0 max-h-[400px] overflow-y-auto"
+                /*
+                 * Never taller than the space actually below the trigger.
+                 * A flat 400px ran under the phone keyboard, so the models at
+                 * the bottom could be read but not tapped; Radix measures the
+                 * room it has and publishes it as this variable.
+                 */
+                className="w-[var(--radix-popover-trigger-width)] p-0 overflow-y-auto max-h-[min(400px,var(--radix-popover-content-available-height))]"
                 align="start"
                 onOpenAutoFocus={(e) => e.preventDefault()}
               >

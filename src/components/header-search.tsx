@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { useDropdownHeight } from "@/hooks/use-dropdown-height.ts";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Link, useLocation } from "react-router-dom";
@@ -22,6 +23,8 @@ interface HeaderSearchProps {
 export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const searchBoxRef = useRef<HTMLDivElement>(null);
+  const { maxHeight: dropdownHeight } = useDropdownHeight(searchBoxRef);
   const [showResults, setShowResults] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [debouncedQuery] = useDebounce(searchQuery, 300);
@@ -140,7 +143,7 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
 
   return (
     <div className="relative w-full max-w-md">
-      <div className="relative">
+      <div className="relative" ref={searchBoxRef}>
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <Input
           type="text"
@@ -164,9 +167,13 @@ export function HeaderSearch({ onRequestModelClick }: HeaderSearchProps) {
         />
       </div>
 
-      {/* Search Results Dropdown */}
+      {/* Search Results Dropdown — height from the visible area, not vh: see
+          use-dropdown-height.ts for why the keyboard makes that necessary. */}
       {showResults && searchQuery.trim().length > 0 && (
-        <Card className="absolute top-full mt-2 w-full max-w-2xl left-0 md:left-auto md:right-0 max-h-[70vh] overflow-y-auto border-2 shadow-xl z-50">
+        <Card
+          className="absolute top-full mt-2 w-full max-w-2xl left-0 md:left-auto md:right-0 overflow-y-auto border-2 shadow-xl z-50"
+          style={{ maxHeight: dropdownHeight ?? "70vh" }}
+        >
           <CardContent className="p-4">
             {debouncedQuery.trim().length >= 2 && (deviceSearchResults === undefined || productSearchResults === undefined) ? (
               // Loading state
