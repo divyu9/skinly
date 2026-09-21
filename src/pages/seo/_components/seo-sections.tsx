@@ -69,6 +69,8 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
               product={product}
               brandFilter={onDevice ? t.brand! : null}
               modelFilter={onDevice ? t.model! : null}
+              // A brand page knows the brand even when it names no model.
+              brandHint={t.brand ?? null}
               deviceCategory={onDevice ? t.gadget : null}
               autoSortOOS={false}
             />

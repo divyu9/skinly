@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { BrandBadge } from "@/components/products/BrandBadge.tsx";
-import { productFitsDevice } from "@/lib/device-fit";
+import { brandInScope, productFitsDevice } from "@/lib/device-fit";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
@@ -11,6 +11,16 @@ interface ProductCardProps {
   product: Product;
   brandFilter: string | null;
   modelFilter: string | null;
+  /**
+   * The brand this listing is about, when no particular device is chosen.
+   *
+   * Somebody on /vivo-phone-skins has told us they own a Vivo. Following a
+   * card from there and being asked "which brand?" throws that away and makes
+   * them answer a question the page they came from already answered. Separate
+   * from `brandFilter`, which is half of a chosen device and decides whether
+   * a card says "fits yours" — this only rides along in the link.
+   */
+  brandHint?: string | null;
   /** What kind of gadget the device is — "phone", "tablet". */
   deviceCategory?: string | null;
   autoSortOOS: boolean;
@@ -22,6 +32,7 @@ export const ProductCard = memo(function ProductCard({
   product,
   brandFilter,
   modelFilter,
+  brandHint = null,
   deviceCategory,
   autoSortOOS,
 }: ProductCardProps) {
@@ -82,7 +93,12 @@ export const ProductCard = memo(function ProductCard({
   // canonical does; /products/detail?slug= split the signal between two URLs.
   const deviceQuery = deviceFitsProduct && modelFilter && brandFilter
     ? `?${new URLSearchParams({ model: modelFilter, brand: brandFilter }).toString()}`
-    : '';
+    // No model, but we know whose phone it is. `brandInScope` keeps the hint
+    // off a listing that brand has no version of, for the same reason the
+    // device is not carried onto a product it does not fit.
+    : brandHint && brandInScope(product, brandHint)
+      ? `?${new URLSearchParams({ brand: brandHint }).toString()}`
+      : '';
   const productUrl = `/products/${product.slug}${deviceQuery}`;
   
   return (

@@ -9,6 +9,8 @@ interface ProductGridProps {
   products: Product[];
   brandFilter: string | null;
   modelFilter: string | null;
+  /** The brand a listing is narrowed to, carried onto each card's link. */
+  brandHint?: string | null;
   deviceCategory?: string | null;
   autoSortOOS: boolean;
   isLoading: boolean;
@@ -21,6 +23,7 @@ export const ProductGrid = memo(function ProductGrid({
   products,
   brandFilter,
   modelFilter,
+  brandHint = null,
   deviceCategory,
   autoSortOOS,
   isLoading,
@@ -104,6 +107,7 @@ export const ProductGrid = memo(function ProductGrid({
               product={product}
               brandFilter={brandFilter}
               modelFilter={modelFilter}
+              brandHint={brandHint ?? brandFilter}
               deviceCategory={deviceCategory}
               autoSortOOS={autoSortOOS}
             />

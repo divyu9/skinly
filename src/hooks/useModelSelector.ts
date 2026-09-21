@@ -89,12 +89,27 @@ export function useModelSelector(
     return Object.keys(modelsByBrand).sort();
   }, [modelsByBrand]);
   
-  // One brand to choose from is no choice: open straight on its models.
+  /*
+   * Open on the models, not the brands, whenever the brand is already known.
+   *
+   * One brand to choose from is no choice. Neither is arriving from
+   * /vivo-phone-skins and being asked which brand you own — the page that
+   * sent you here answered that, and its product links now carry `?brand=`.
+   * Matched loosely because the link spells it as the catalogue does ("One
+   * Plus") and the model list may not.
+   */
+  const urlBrand = searchParams.get("brand");
   useEffect(() => {
-    if (selectorState.dialogOpen && !selectorState.selectedBrand && allBrands.length === 1) {
+    if (!selectorState.dialogOpen || selectorState.selectedBrand) return;
+    if (allBrands.length === 1) {
       setSelectorState(prev => ({ ...prev, selectedBrand: allBrands[0] }));
+      return;
     }
-  }, [selectorState.dialogOpen, selectorState.selectedBrand, allBrands]);
+    if (!urlBrand) return;
+    const key = (b: string) => b.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const hit = allBrands.find((b) => key(b) === key(urlBrand));
+    if (hit) setSelectorState(prev => ({ ...prev, selectedBrand: hit }));
+  }, [selectorState.dialogOpen, selectorState.selectedBrand, allBrands, urlBrand]);
 
   // Filter models based on search
   const filteredModels = useMemo(() => {
