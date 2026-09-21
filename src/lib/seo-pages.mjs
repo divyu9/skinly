@@ -218,6 +218,28 @@ export function selectSeoProducts(target, products, variantsByProduct, collectio
 
   let rows = pool;
   if (target.gadget) rows = rows.filter((p) => p.gadgetCategory === target.gadget);
+
+  /*
+   * A brand page shows that brand's listings.
+   *
+   * This filtered by gadget, finish, collection and title words and never by
+   * brand — so /samsung-skins listed the OnePlus and Apple versions of a
+   * design alongside the Samsung one, which is the wrong product on the page
+   * a shopper reached by searching for their phone.
+   *
+   * A listing scoped to brands belongs on those brands' pages. One with no
+   * scope is the older generic kind and fits any brand it does not exclude —
+   * dropping those would empty half the catalogue off every brand page.
+   */
+  if (target.brand) {
+    const key = (b) => String(b || "").toLowerCase().replace(/\s+/g, "");
+    const want = key(target.brand);
+    const scoped = (p) => (p.modelBrands || []).some((b) => key(b) === want);
+    const excluded = (p) => (p.modelBrandsExclude || []).some((b) => key(b) === want);
+    rows = rows.filter((p) => ((p.modelBrands || []).length ? scoped(p) : !excluded(p)));
+    // The brand's own listings first: whoever came here searched for that name.
+    rows = [...rows].sort((a, b) => Number(scoped(b)) - Number(scoped(a)));
+  }
   if (target.finish) rows = rows.filter((p) => p.finishType === target.finish);
   if (target.collections?.length) {
     const want = new Set(target.collections);
