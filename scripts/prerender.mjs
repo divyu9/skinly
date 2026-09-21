@@ -579,7 +579,6 @@ function seoPage(s, info) {
    */
   const modelLinks = (info?.models || [])
     .filter((m) => m.href && m.href.startsWith("/") && !m.href.startsWith("/products?"))
-    .slice(0, 30)
     .map((m) => `<li><a href="${SITE}${esc(m.href)}">${esc(`${m.brand} ${m.model}`)} skins</a></li>`)
     .join("");
   return {
@@ -891,7 +890,16 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
         Number(b.category === target.gadget) - Number(a.category === target.gadget) ||
         b.model.localeCompare(a.model, "en", { numeric: true, sensitivity: "base" }),
     );
-    const models = ranked.slice(0, 80).map((m) => {
+    /*
+     * Every model, not a sample of them.
+     *
+     * The list was cut at eighty, which on Dell's 366 laptops hid four in
+     * five. A long list is the point: it is the proof that the catalogue
+     * really does cover the reader's device, and it is how a page reaches the
+     * ones beneath it. Capped high rather than not at all — past a few hundred
+     * links a page starts spreading itself too thin to help any of them.
+     */
+    const models = ranked.slice(0, 300).map((m) => {
       const slug = pageForModel.get(`${m.brand}|${m.model}`);
       const q = new URLSearchParams({ productType: "skin", gadget: m.category || target.gadget || "phone", brand: m.brand, model: m.model });
       return { brand: m.brand, model: m.model.replace(/\s+/g, " ").trim(), href: slug ? `/${slug}` : `/products?${q.toString()}` };

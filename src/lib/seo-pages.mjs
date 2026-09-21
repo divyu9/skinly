@@ -154,7 +154,6 @@ export function resolveSeoTarget(page, models, collectionNames = []) {
        */
       const siblings = active
         .filter((x) => x.brandName === m.brandName && x.category === m.category && x.modelName !== m.modelName)
-        .slice(0, 40)
         .map((x) => ({ brand: x.brandName, model: x.modelName, category: x.category }));
       return { kind: "model", brand: m.brandName, model: m.modelName, gadget: m.category, models: siblings };
     }
@@ -164,7 +163,7 @@ export function resolveSeoTarget(page, models, collectionNames = []) {
         kind: "family",
         brand: family[0].brandName,
         gadget: majority(family),
-        models: family.slice(0, 60).map((m) => ({ brand: m.brandName, model: m.modelName, category: m.category })),
+        models: family.map((m) => ({ brand: m.brandName, model: m.modelName, category: m.category })),
       };
     }
 
