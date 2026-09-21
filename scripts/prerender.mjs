@@ -28,7 +28,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
-import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel } from "../src/lib/seo-pages.mjs";
+import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, slugify } from "../src/lib/seo-pages.mjs";
 import { CATEGORY_PAGES, GADGET_PAGES } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
@@ -352,7 +352,54 @@ const crumbLinks = (items) =>
 
 // ─── pages ────────────────────────────────────────────────────────────────────
 
-function staticPages() {
+/**
+ * What the three hand-written pages can say about the real catalogue.
+ *
+ * The landing pages carry ~940 words of their own in the HTML a crawler is
+ * served, and product pages ~310. The homepage carried 50, /products 33 and
+ * /devices 9 — everything else arrived only after React had run and fetched
+ * from Firestore. Google does render, but these are the three most important
+ * URLs on the site, and they were the three with nothing in them.
+ *
+ * Nothing here is written by hand: the gadget counts, brand counts and design
+ * total are read from the same catalogue the rest of the build uses, so they
+ * cannot drift from what the shop actually sells.
+ */
+function siteHub(active, models, seoSlugs) {
+  const byGadget = new Map();
+  for (const p of active) {
+    const g = p.gadgetCategory;
+    if (!g) continue;
+    byGadget.set(g, (byGadget.get(g) || 0) + 1);
+  }
+  const gadgets = [...byGadget.entries()]
+    .filter(([g]) => GADGET_PAGES[g])
+    .sort((a, b) => b[1] - a[1])
+    .map(([gadget, count]) => ({ gadget, count, href: GADGET_PAGES[gadget] }));
+
+  const byBrand = new Map();
+  for (const m of models) {
+    if (!m?.brandName || m.isActive === false) continue;
+    const row = byBrand.get(m.brandName) || { models: 0, gadgets: new Set() };
+    row.models += 1;
+    if (m.category) row.gadgets.add(m.category);
+    byBrand.set(m.brandName, row);
+  }
+  const brands = [...byBrand.entries()]
+    .sort((a, b) => b[1].models - a[1].models)
+    .map(([brand, row]) => {
+      // A brand hub exists only where a page was written for it; a link to a
+      // page this build does not produce is a 404 with extra steps.
+      const slug = `${slugify(brand)}-skins`;
+      return { brand, models: row.models, href: seoSlugs.has(slug) ? `/${slug}` : null };
+    });
+
+  return { gadgets, brands, designs: active.length, models: models.filter((m) => m.isActive !== false).length };
+}
+
+const hubList = (items) => items.length ? `<ul>${items.join("")}</ul>` : "";
+
+function staticPages(hub) {
   const homeDescription =
     "Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149.";
   const productsDescription =
@@ -394,7 +441,23 @@ function staticPages() {
           },
         },
       ],
-      body: `<h1>GoSkinly — premium device skins</h1><p>${esc(homeDescription)}</p><p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/devices">Supported devices</a></p>`,
+      body:
+        `<h1>GoSkinly — premium device skins</h1><p>${esc(homeDescription)}</p>` +
+        (hub
+          ? `<p>${hub.designs} designs, cut for ${hub.models} models across ${hub.brands.length} brands.</p>` +
+            `<h2>Shop by gadget</h2>` +
+            hubList(hub.gadgets.map((g) =>
+              `<li><a href="${SITE}${esc(g.href)}">${esc(gadgetLabel(g.gadget) || g.gadget)} skins</a> <span>(${g.count} designs)</span></li>`)) +
+            `<h2>Shop by category</h2>` +
+            hubList(Object.values(CATEGORY_PAGES).map((c) =>
+              `<li><a href="${SITE}${esc(c.path)}">${esc(c.heading)}</a></li>`)) +
+            `<h2>Brands we cut for</h2>` +
+            hubList(hub.brands.slice(0, 40).map((b) =>
+              b.href
+                ? `<li><a href="${SITE}${esc(b.href)}">${esc(b.brand)} skins</a> <span>(${b.models} models)</span></li>`
+                : `<li>${esc(b.brand)} <span>(${b.models} models)</span></li>`))
+          : "") +
+        `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/devices">Supported devices</a></p>`,
     },
     {
       route: "/products",
@@ -402,7 +465,17 @@ function staticPages() {
       description: productsDescription,
       canonical: `${SITE}/products`,
       priority: "0.9",
-      body: `<h1>Shop</h1><p>${esc(productsDescription)}</p>`,
+      body:
+        `<h1>Shop</h1><p>${esc(productsDescription)}</p>` +
+        (hub
+          ? `<p>${hub.designs} designs in stock across ${hub.gadgets.length} gadget types.</p>` +
+            `<h2>Categories</h2>` +
+            hubList(Object.values(CATEGORY_PAGES).map((c) =>
+              `<li><a href="${SITE}${esc(c.path)}">${esc(c.heading)}</a> — ${esc(clip(c.description, 110))}</li>`)) +
+            `<h2>Skins by gadget</h2>` +
+            hubList(hub.gadgets.map((g) =>
+              `<li><a href="${SITE}${esc(g.href)}">${esc(gadgetLabel(g.gadget) || g.gadget)} skins</a> <span>(${g.count} designs)</span></li>`))
+          : ""),
     },
     {
       route: "/devices",
@@ -411,6 +484,20 @@ function staticPages() {
         "Browse all phone, laptop, tablet, and gadget models supported by GoSkinly. Find your device and shop custom-cut vinyl skins starting ₹149. Free shipping above ₹499.",
       canonical: `${SITE}/devices`,
       priority: "0.9",
+      body:
+        `<h1>Supported devices</h1>` +
+        (hub
+          ? `<p>Every skin is printed and cut for one model. We cut for ${hub.models} models across ` +
+            `${hub.brands.length} brands — pick yours and the listing narrows to what fits it.</p>` +
+            `<h2>By brand</h2>` +
+            hubList(hub.brands.map((b) =>
+              b.href
+                ? `<li><a href="${SITE}${esc(b.href)}">${esc(b.brand)} skins</a> <span>(${b.models} models)</span></li>`
+                : `<li>${esc(b.brand)} <span>(${b.models} models)</span></li>`)) +
+            `<h2>By gadget</h2>` +
+            hubList(hub.gadgets.map((g) =>
+              `<li><a href="${SITE}${esc(g.href)}">${esc(gadgetLabel(g.gadget) || g.gadget)} skins</a> <span>(${g.count} designs)</span></li>`))
+          : ""),
     },
     policy("privacy", "Privacy Policy | GoSkinly",
       "Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy."),
@@ -448,7 +535,42 @@ function magnetoPage(products, variantsByProduct) {
  *   left every one of 1,717 product pages with three links on it — home, its
  *   category, and a query-string filter Google does not index.
  */
-function productPage(p, variants, categoryNames, shipping, links = {}) {
+/**
+ * The star rating Google shows beside a result, from reviews people wrote.
+ *
+ * Only real ones: a rating emitted for a product nobody reviewed is a
+ * structured-data violation, and the markup has to agree with what the page
+ * itself displays. So this returns nothing at all until a product has a
+ * review, and the numbers come from the same `reviews` rows the product page
+ * renders.
+ */
+function ratingFor(reviews) {
+  const rated = (reviews || []).filter((r) => Number(r.rating) >= 1 && Number(r.rating) <= 5);
+  if (!rated.length) return {};
+  const mean = rated.reduce((sum, r) => sum + Number(r.rating), 0) / rated.length;
+  return {
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: Math.round(mean * 10) / 10,
+      reviewCount: rated.length,
+      bestRating: 5,
+      worstRating: 1,
+    },
+    review: rated
+      .filter((r) => String(r.comment || "").trim())
+      .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
+      .slice(0, 5)
+      .map((r) => ({
+        "@type": "Review",
+        reviewRating: { "@type": "Rating", ratingValue: Number(r.rating), bestRating: 5, worstRating: 1 },
+        author: { "@type": "Person", name: String(r.userName || "Verified buyer").slice(0, 60) },
+        reviewBody: clip(stripHtml(r.comment), 400),
+        ...(isoDate(r.createdAt) ? { datePublished: isoDate(r.createdAt).slice(0, 10) } : {}),
+      })),
+  };
+}
+
+function productPage(p, variants, categoryNames, shipping, links = {}, reviews = []) {
   const url = `${SITE}/products/${p.slug}`;
   const priced = variants.filter((v) => Number(v.price) > 0);
   const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
@@ -491,6 +613,7 @@ function productPage(p, variants, categoryNames, shipping, links = {}) {
     ...(image ? { image } : {}),
     ...(variants[0]?.sku ? { sku: variants[0].sku } : {}),
     brand: { "@type": "Brand", name: "GoSkinly" },
+    ...ratingFor(reviews),
     offers: {
       "@type": "Offer",
       price,
@@ -718,6 +841,53 @@ async function writeSitemaps(pagesList, productList) {
     files.map(([name]) => `  <sitemap>\n    <loc>${SITE}/${name}</loc>\n    <lastmod>${now}</lastmod>\n  </sitemap>`).join("\n") +
     `\n</sitemapindex>\n`;
   await fs.writeFile(path.join(DIST, "sitemap.xml"), index);
+}
+
+/*
+ * IndexNow: tell Bing, Yandex, Naver and Seznam what changed, tonight.
+ *
+ * Google does not participate, so this changes nothing there — but the other
+ * engines move from "whenever they next crawl a 2,000-URL site" to minutes,
+ * for one HTTP request per build. The protocol is a shared secret only in
+ * form: ownership is proved by serving the key back at a public URL, which is
+ * why the key is written into dist rather than kept out of the repo.
+ *
+ * Only what actually changed is submitted. Sending all 2,000 URLs every night
+ * is what gets a host throttled, and the nightly rebuild exists to refresh
+ * data, not to claim every page is new.
+ */
+const INDEXNOW_KEY = process.env.INDEXNOW_KEY || "05da6902fa7d4e47f5084f259923eb63";
+const INDEXNOW_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+async function submitIndexNow(pages) {
+  const cutoff = Date.now() - INDEXNOW_WINDOW_MS;
+  const fresh = pages
+    .filter((p) => p.canonical && Number(p.lastmod) > cutoff)
+    .map((p) => p.canonical);
+  // The homepage always goes, so a build that changed only data still tells
+  // the engines the site moved.
+  const urlList = [...new Set([`${SITE}/`, ...fresh])].slice(0, 10000);
+  if (urlList.length <= 1) {
+    log("IndexNow: nothing changed in the last 48h");
+    return;
+  }
+  try {
+    const res = await fetch("https://api.indexnow.org/IndexNow", {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        host: "goskinly.com",
+        key: INDEXNOW_KEY,
+        keyLocation: `${SITE}/${INDEXNOW_KEY}.txt`,
+        urlList,
+      }),
+    });
+    // 200 and 202 both mean accepted; 422 means the key file did not check out.
+    log(`IndexNow: submitted ${urlList.length} URLs, HTTP ${res.status}`);
+  } catch (err) {
+    // A search engine being unreachable is not a reason to fail a deploy.
+    log(`IndexNow: submission failed (${err?.message || err})`);
+  }
 }
 
 /*
@@ -1078,16 +1248,20 @@ async function main() {
       readCollection(project, "homepageSections").catch(() => []),
       readCollection(project, "homepageSectionCards").catch(() => []),
     ]);
-    data = { products, variants, seoPages, categories, shipping, models, collections, memberships, sections, sectionCards };
+    // Ratings for the Product markup. A separate read because a site with no
+    // reviews yet must still build.
+    const reviews = await readCollection(project, "reviews").catch(() => []);
+    data = { products, variants, seoPages, categories, shipping, models, collections, memberships, sections, sectionCards, reviews };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
   }
 
-  const statics = staticPages();
-  for (const p of statics) await writePage(p.route, render(template, p));
-
   if (!data) {
-    await writeSitemaps(statics, []);
+    // Firestore is unreachable: the three hub pages ship with their heads and
+    // headings and without the catalogue they would otherwise list.
+    const bare = staticPages(null);
+    for (const p of bare) await writePage(p.route, render(template, p));
+    await writeSitemaps(bare, []);
     await writeHtaccess(false);
     return;
   }
@@ -1104,6 +1278,27 @@ async function main() {
 
   const active = data.products.filter((p) => p.status === "active" && p.slug && !/[/?#\s]/.test(p.slug));
 
+  /*
+   * A catalogue that came back empty is a bad read, not an empty shop.
+   *
+   * On the night the admin's "Delete all products" took 1,938 products with
+   * it, this script ran happily against the hole it left: it wrote 358 landing
+   * pages with nothing to sell, no product pages at all, and a sitemap that
+   * dropped 1,997 URLs. The deploy that followed would have handed Google a
+   * site where every product page 404s — a far more expensive failure than the
+   * deletion, which was fixable in minutes.
+   *
+   * The shop has had products since the day it opened, so zero of them beside
+   * a full set of SEO pages and models can only mean the read failed. Stopping
+   * leaves the previous build in place, which is exactly right: yesterday's
+   * pages are worth more than today's empty ones.
+   */
+  if (!active.length && (data.seoPages.length || data.models.length)) {
+    log(`refusing to build: 0 products, but ${data.seoPages.length} SEO pages and ${data.models.length} models were read`);
+    log("the previous deploy stays live; check the catalogue before rebuilding");
+    throw Object.assign(new Error("empty catalogue"), { fatal: true });
+  }
+
   const productSlugs = new Set(active.map((p) => p.slug));
   const seoDocs = data.seoPages
     .filter((s) => s.isPublished && s.slug && /^[a-z0-9][a-z0-9-]*$/.test(s.slug))
@@ -1113,6 +1308,14 @@ async function main() {
    * product page wants to link to the pages its design is sold on and those
    * are decided here. Nothing else about the order changed.
    */
+  /*
+   * Written now rather than before the catalogue was read, because these three
+   * are what the hub links come from. Their routes are fixed either way, so
+   * `knownPaths` below is unaffected by the move.
+   */
+  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))));
+  for (const p of statics) await writePage(p.route, render(template, p));
+
   const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);
   /*
    * Every path this build actually writes, so a link in the generated copy
@@ -1155,6 +1358,13 @@ async function main() {
     siblings.set(key, [...(siblings.get(key) || []), p]);
   }
 
+  const reviewsByProduct = new Map();
+  for (const r of data.reviews || []) {
+    if (!r?.productId) continue;
+    reviewsByProduct.set(r.productId, [...(reviewsByProduct.get(r.productId) || []), r]);
+  }
+  if (reviewsByProduct.size) log(`reviews: ${data.reviews.length} across ${reviewsByProduct.size} products`);
+
   const productPages = active.map((p) =>
     productPage(p, variantsByProduct.get(p._id) || [], categoryNames, data.shipping, {
       fits: pagesForProduct.get(p._id) || [],
@@ -1162,7 +1372,7 @@ async function main() {
         .filter((q) => q._id !== p._id)
         .slice(0, 8)
         .map((q) => ({ slug: q.slug, title: q.title })),
-    }),
+    }, reviewsByProduct.get(p._id) || []),
   );
   for (const p of productPages) await writePage(p.route, render(template, p));
 
@@ -1183,10 +1393,10 @@ async function main() {
     if (!published.has(route)) log(`warning: ${gadget} listings canonicalise to ${route}, which is not a published SEO page`);
   }
 
-  await writeSitemaps(
-    [...statics, magneto, ...categories.filter((p) => !p.empty), ...seo.filter((p) => !p.empty)],
-    productPages,
-  );
+  const indexable = [...statics, magneto, ...categories.filter((p) => !p.empty), ...seo.filter((p) => !p.empty)];
+  await writeSitemaps(indexable, productPages);
+  await fs.writeFile(path.join(DIST, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY);
+  await submitIndexNow([...indexable, ...productPages]);
   const retired = data.products.filter((p) =>
     p.status === "archived" && p.slug && /^[a-z0-9][a-z0-9-]*$/.test(p.slug) && !productSlugs.has(p.slug) &&
     typeof p.redirectTo === "string" && /^\/[a-z0-9/-]*$/.test(p.redirectTo)
@@ -1208,4 +1418,14 @@ main().catch(async (err) => {
     const t = await fs.readFile(path.join(DIST, "index.html"), "utf8").catch(() => "");
     if (t) await fs.writeFile(path.join(DIST, "app.html"), t);
   }
+  /*
+   * One exception to "never fail the build".
+   *
+   * Everything else here degrades to the app shell, which still serves every
+   * page — slower for a crawler, fine for a person. An empty catalogue is
+   * different: shipping it replaces a site of 2,000 indexed pages with a shell
+   * that has nothing to render. Failing the build is what keeps the previous
+   * deploy, and the previous deploy is the correct site.
+   */
+  if (err?.fatal) process.exit(1);
 });
