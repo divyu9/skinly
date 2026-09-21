@@ -409,7 +409,7 @@ export interface FillResult {
  */
 export async function fillMissingSeoPages(
   db: admin.firestore.Firestore,
-  opts: { limit?: number; dryRun?: boolean; kinds?: string[] } = {}
+  opts: { limit?: number; dryRun?: boolean; kinds?: string[]; gadgets?: string[] } = {}
 ): Promise<FillResult> {
   // Before anything else, and regardless of the cap.
   const repaired = opts.dryRun ? 0 : await repairAutoPageTypes(db);
@@ -435,12 +435,27 @@ export async function fillMissingSeoPages(
   const missing = targets
     .filter((t) => !slugs.has(t.slug))
     .filter((t) => !opts.kinds?.length || opts.kinds.includes(t.kind))
+    /*
+     * Narrowed by gadget, so the work can be done in the order it is worth
+     * doing rather than all at once. A console page and a phone page cost the
+     * same to write and are worth six times apart; running the console,
+     * camera and lens pages first and phones last is the whole strategy.
+     */
+    .filter((t) => !opts.gadgets?.length || (t.gadget ? opts.gadgets.includes(t.gadget) : true))
     // A model added in the last month first; then by how much sits behind it.
     .sort((a, z) => {
       const an = a.kind === "model" && Number((a as any).createdAt) > fresh ? 1 : 0;
       const zn = z.kind === "model" && Number((z as any).createdAt) > fresh ? 1 : 0;
       const worth = (t: Target) => t.depth * (Number((t as any).weight) || 1);
-      return zn - an || worth(z) - worth(a);
+      /*
+       * Among model pages, which are all worth the same on paper, the one
+       * added most recently goes first. The database has no release date —
+       * the only timestamp is when the row was imported — so this is a proxy
+       * for "recent device", and a good one going forward: models are added
+       * as they launch.
+       */
+      return zn - an || worth(z) - worth(a)
+        || (Number((z as any).createdAt) || 0) - (Number((a as any).createdAt) || 0);
     })
     .slice(0, perDay);
 
@@ -538,7 +553,12 @@ export const runSeoAutoPages = functionsV1
       };
     }
     const limit = data?.limit === undefined ? undefined : Number(data.limit);
-    const out = await fillMissingSeoPages(db, { limit, dryRun: data?.dryRun === true });
+    const out = await fillMissingSeoPages(db, {
+      limit,
+      dryRun: data?.dryRun === true,
+      kinds: Array.isArray(data?.kinds) ? data.kinds.map(String) : undefined,
+      gadgets: Array.isArray(data?.gadgets) ? data.gadgets.map(String) : undefined,
+    });
     if (!out.considered) {
       const fixed = out.repaired ? `${out.repaired} existing page${out.repaired === 1 ? "" : "s"} repaired. ` : "";
       const after = out.rebuild ? ` ${out.rebuild}.` : "";

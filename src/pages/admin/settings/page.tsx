@@ -66,6 +66,52 @@ export default function SettingsPage() {
     }
   };
 
+  /*
+   * The work in the order it is worth doing.
+   *
+   * A console page and a phone page cost the same to write and are worth six
+   * times apart — ₹1,199 a sale against ₹199, and almost nobody competing for
+   * the first. So the high-value shelves go first and phones go last, rather
+   * than everything at once on a domain with no authority yet.
+   */
+  const PHASES = [
+    {
+      n: 1, label: "High-value shelves", about: "console · camera · lens · gimbal · drone · Mac mini",
+      kinds: ["brand-gadget"],
+      gadgets: ["console", "camera", "lens", "gimbals", "drone", "mac-mini", "controller"],
+    },
+    {
+      n: 2, label: "Laptops & tablets", about: "Dell, HP, Lenovo, Asus — 1,357 models behind them",
+      kinds: ["brand-gadget"], gadgets: ["laptop", "tablet"],
+    },
+    {
+      n: 3, label: "Their model pages", about: "newest first, everything except phones",
+      kinds: ["model"],
+      gadgets: ["laptop", "tablet", "camera", "lens", "console", "gimbals", "drone", "mac-mini", "controller"],
+    },
+    { n: 4, label: "Themes", about: "only where 25+ designs back one", kinds: ["theme", "theme-gadget"] },
+    { n: 5, label: "Phones", about: "last — cheapest basket, most competition", kinds: ["model", "brand-gadget"], gadgets: ["phone", "charger"] },
+  ];
+  const [phaseBusy, setPhaseBusy] = useState<number | null>(null);
+
+  const runPhase = async (phase: (typeof PHASES)[number], dryRun: boolean) => {
+    setPhaseBusy(phase.n);
+    try {
+      const res: any = await runSeoAutoPages({
+        kinds: phase.kinds, gadgets: phase.gadgets,
+        dryRun, limit: Number(seoPerDay) || 25,
+      });
+      toast[dryRun ? "warning" : "success"](`Phase ${phase.n} — ${res?.message || "done"}`, {
+        description: (res?.slugs || []).slice(0, 6).join(", ") || undefined,
+        duration: 15000,
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "That did not run");
+    } finally {
+      setPhaseBusy(null);
+    }
+  };
+
   const handleSeo = async (mode: "coverage" | "preview" | "run") => {
     setIsSeoRunning(true);
     try {
@@ -719,6 +765,37 @@ export default function SettingsPage() {
               <Button variant="outline" onClick={() => handleSeo("run")} disabled={isSeoRunning}>
                 Write them now
               </Button>
+            </div>
+
+            {/* One phase at a time, highest value first. */}
+            <div className="rounded-lg border-2 border-dashed border-ink/15 p-3">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Or work through it in order
+              </p>
+              <div className="space-y-2">
+                {PHASES.map((ph) => (
+                  <div key={ph.n} className="flex flex-wrap items-center gap-2">
+                    <span className="w-6 text-sm font-bold tabular-nums text-muted-foreground">{ph.n}</span>
+                    <div className="min-w-[13rem] flex-1">
+                      <p className="text-sm font-medium">{ph.label}</p>
+                      <p className="text-xs text-muted-foreground">{ph.about}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" disabled={phaseBusy !== null}
+                      onClick={() => runPhase(ph, true)}>
+                      {phaseBusy === ph.n && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                      Preview
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={phaseBusy !== null}
+                      onClick={() => runPhase(ph, false)}>
+                      Write
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Each run writes at most the nightly cap above. Preview changes nothing — it counts
+                and names what a phase would write, which is how you decide whether to.
+              </p>
             </div>
 
             <p className="text-xs text-muted-foreground">
