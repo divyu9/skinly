@@ -648,8 +648,17 @@ export default function SEOPagesPage() {
         </Card>
       )}
 
-      {/* Pages Table */}
+      {/*
+        Pages Table
+
+        Eight columns of long titles and long slugs pushed Actions past the
+        right edge, so the menu that manages a page could not be reached at
+        all. Two things fix it together: the text wraps instead of running on,
+        and Actions is pinned to the right — so on a narrow screen the row
+        scrolls under a column that stays put rather than out of reach.
+      */}
       <Card>
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -665,7 +674,7 @@ export default function SEOPagesPage() {
               <TableHead>What it shows</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="sticky right-0 bg-card text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -684,14 +693,14 @@ export default function SEOPagesPage() {
                       onCheckedChange={() => toggleSelectPage(page._id)}
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{page.metaTitle}</TableCell>
+                  <TableCell className="min-w-[14rem] max-w-[22rem] font-medium whitespace-normal break-words">{page.metaTitle}</TableCell>
                   <TableCell>
                     <Badge variant="secondary" className={getPageTypeBadgeColor(page.pageType)}>
                       {page.pageType}
                     </Badge>
                   </TableCell>
-                  <TableCell className="font-mono text-sm text-muted-foreground">/{page.slug}</TableCell>
-                  <TableCell className="text-sm">
+                  <TableCell className="max-w-[16rem] font-mono text-xs text-muted-foreground whitespace-normal break-all">/{page.slug}</TableCell>
+                  <TableCell className="max-w-[18rem] text-sm whitespace-normal">
                     <SeoHealthCell health={healthOf(page)} />
                   </TableCell>
                   <TableCell>
@@ -704,7 +713,7 @@ export default function SEOPagesPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(page.createdAt).toLocaleDateString()}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="sticky right-0 bg-card text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -809,6 +818,7 @@ export default function SEOPagesPage() {
             )}
           </TableBody>
         </Table>
+        </div>
         {filteredPages.length > 0 && (
           <div className="flex items-center justify-between px-4 py-3 border-t">
             <div className="text-sm text-muted-foreground">

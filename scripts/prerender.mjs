@@ -659,10 +659,30 @@ function urlset(pages, withImages) {
   );
 }
 
+/**
+ * How many URLs go in one sitemap file.
+ *
+ * The spec allows fifty thousand, and one file of 1,717 products with their
+ * images came to just under a megabyte — which Cloudflare kept answering with
+ * a 525 after fourteen seconds, so Search Console reported "sitemap could not
+ * be read" and the product URLs went undiscovered. Nothing was wrong with the
+ * file; a megabyte was simply more than the origin would reliably hand over.
+ *
+ * Five hundred keeps each file around a quarter of a megabyte, and the index
+ * already supports as many children as it needs.
+ */
+const SITEMAP_CHUNK = 500;
+
 async function writeSitemaps(pagesList, productList) {
   const now = new Date().toISOString();
   const files = [["sitemap-pages.xml", urlset(pagesList, false)]];
-  if (productList.length) files.push(["sitemap-products.xml", urlset(productList, true)]);
+  for (let i = 0; i < productList.length; i += SITEMAP_CHUNK) {
+    const part = productList.slice(i, i + SITEMAP_CHUNK);
+    const n = Math.floor(i / SITEMAP_CHUNK) + 1;
+    // The first file keeps its old name, so the URL Search Console already
+    // knows stays valid instead of turning into a 404.
+    files.push([n === 1 ? "sitemap-products.xml" : `sitemap-products-${n}.xml`, urlset(part, true)]);
+  }
   for (const [name, xml] of files) await fs.writeFile(path.join(DIST, name), xml);
   const index =
     `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
