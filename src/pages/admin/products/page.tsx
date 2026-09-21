@@ -336,40 +336,40 @@ function AdminProductsPageInner() {
   }, [stockLevelsArray]);
   const deleteProduct = useMutation(api.products.deleteProduct);
   const updateProduct = useMutation(api.products.updateProduct);
-  const deleteAllProducts = useMutation(api.products.deleteAllProducts);
   const bulkUpdateVariants = useMutation(api.products.bulkUpdateVariants);
   const cloneProduct = useMutation(api.products.cloneProduct);
 
-  const handleClearAll = async () => {
+  const handleDeleteSelected = async () => {
+    const ids = [...selectedProducts];
+    if (!ids.length) return;
+    const names = ids
+      .map((id) => products.find((p: any) => p._id === id)?.title)
+      .filter(Boolean)
+      .slice(0, 5);
+    // Naming them is the difference between confirming a count and confirming
+    // the thing you actually picked.
     if (
       !confirm(
-        "⚠️ WARNING: This will permanently delete ALL products and variants from your database. This action cannot be undone. Are you absolutely sure?"
+        `Delete ${ids.length} product${ids.length === 1 ? "" : "s"} and their variants?\n\n` +
+        names.map((n) => `• ${n}`).join("\n") +
+        (ids.length > names.length ? `\n…and ${ids.length - names.length} more` : "") +
+        `\n\nThis cannot be undone.`
       )
     ) {
       return;
     }
 
-    // Double confirmation for safety
-    if (!confirm("Last chance! Type 'DELETE' in the next dialog to confirm.")) {
-      return;
-    }
-
-    const userInput = prompt("Type 'DELETE' to confirm deletion of all products:");
-    if (userInput !== "DELETE") {
-      toast.error("Deletion cancelled - confirmation text did not match.");
-      return;
-    }
-
     setIsDeleting(true);
+    let done = 0;
+    const failed: string[] = [];
     try {
-      const result = await deleteAllProducts({});
-      toast.success(
-        `All products cleared! Deleted ${result.deletedProducts} products and ${result.deletedVariants} variants.`
-      );
-    } catch (error) {
-      toast.error(
-        `Failed to delete products: ${error instanceof Error ? error.message : "Unknown error"}`
-      );
+      for (const productId of ids) {
+        try { await deleteProduct({ productId }); done++; }
+        catch (e: any) { failed.push(e?.message || String(e)); }
+      }
+      setSelectedProducts([]);
+      if (failed.length) toast.error(`Deleted ${done}; ${failed.length} failed — ${failed[0]}`);
+      else toast.success(`Deleted ${done} product${done === 1 ? "" : "s"} and their variants`);
     } finally {
       setIsDeleting(false);
     }
@@ -947,14 +947,33 @@ function AdminProductsPageInner() {
                       <RefreshCwIcon className={`size-4 mr-2 ${recounting ? "animate-spin" : ""}`} />
                       {recounting ? "Recounting stock…" : "Recount stock from materials"}
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleClearAll}
-                      disabled={isDeleting}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <TrashIcon className="size-4 mr-2" />
-                      {isDeleting ? "Clearing..." : "Delete all products"}
-                    </DropdownMenuItem>
+                    {/*
+                      * Deleting acts on what is ticked, and nothing else.
+                      *
+                      * "Delete all products" used to sit here, one row under
+                      * the stock recount, and it ignored the selection
+                      * entirely. Somebody ticked two products, opened a menu
+                      * called Bulk actions beside a badge reading "2
+                      * selected", and read "all" as "all of the ones I
+                      * picked". Three confirmations did not help, because
+                      * they were confirming the thing they meant to do. It
+                      * took the catalogue with it: 1,938 products and 3,378
+                      * variants. The menu no longer offers a way to empty the
+                      * catalogue at all — that is not a routine action, and
+                      * this is the menu for routine actions.
+                      */}
+                    {selectedProducts.length > 0 && (
+                      <DropdownMenuItem
+                        onClick={handleDeleteSelected}
+                        disabled={isDeleting}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <TrashIcon className="size-4 mr-2" />
+                        {isDeleting
+                          ? "Deleting…"
+                          : `Delete ${selectedProducts.length} selected product${selectedProducts.length === 1 ? "" : "s"}`}
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
