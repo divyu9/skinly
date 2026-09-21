@@ -144,15 +144,43 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
     }
   }, [open, initialDeviceType]);
 
-  // Get brands for selected device type from cache
-  const availableBrands = useMemo(() => {
+  /*
+   * The brands we carry for the chosen gadget.
+   *
+   * `modelMetadata/current` is a cache nobody in this repo writes any more, so
+   * it knows the categories that existed when it was last built and none of
+   * the ones added since — gimbals, controllers, a Mac mini under whichever of
+   * the two spellings it happened to use. A gadget missing from it showed
+   * "No brands available for this device type" on a category we sell, so the
+   * cache is now a fast path rather than the answer: when it has nothing, the
+   * models themselves are asked.
+   */
+  const metadataBrands = useMemo(() => {
     if (!metadata || !selectedDeviceType) return [];
-    
-    const categoryKey = selectedDeviceType === "mac-mini" ? "macMini" : selectedDeviceType;
-    const categoryData = metadata.byCategory[categoryKey as keyof typeof metadata.byCategory];
-    
-    return categoryData?.brands || [];
+    const byCategory = (metadata.byCategory || {}) as Record<string, { brands?: string[]; count?: number }>;
+    // Both spellings, because the cache and the catalogue disagree on this one.
+    const keys = selectedDeviceType === "mac-mini"
+      ? ["macMini", "mac-mini"]
+      : [selectedDeviceType, selectedDeviceType.replace(/-([a-z])/g, (_, c) => c.toUpperCase())];
+    for (const k of keys) {
+      const brands = byCategory[k]?.brands;
+      if (brands?.length) return brands;
+    }
+    return [];
   }, [metadata, selectedDeviceType]);
+
+  const categoryModels = useQuery(
+    api.supportedModels.getModelsByCategory,
+    selectedDeviceType && metadata && !metadataBrands.length
+      ? { category: selectedDeviceType, isActive: true }
+      : "skip",
+  );
+
+  const availableBrands = useMemo(() => {
+    if (metadataBrands.length) return metadataBrands;
+    const rows = (categoryModels as Array<{ brandName?: string }> | undefined) || [];
+    return [...new Set(rows.map((m) => m.brandName).filter(Boolean) as string[])].sort();
+  }, [metadataBrands, categoryModels]);
 
   // Get models for selected brand with search filter
   const availableModels = useMemo(() => {
@@ -209,9 +237,17 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   // considered rather than decorative.
   const modelCountFor = (name: string): number | null => {
     if (!metadata) return null;
-    const key = name === "mac-mini" ? "macMini" : name;
-    const c = (metadata.byCategory as any)?.[key]?.count;
-    return typeof c === "number" && c > 0 ? c : null;
+    const byCategory = (metadata.byCategory || {}) as Record<string, { count?: number }>;
+    const keys = name === "mac-mini"
+      ? ["macMini", "mac-mini"]
+      : [name, name.replace(/-([a-z])/g, (_, c) => c.toUpperCase())];
+    for (const k of keys) {
+      const c = byCategory[k]?.count;
+      if (typeof c === "number" && c > 0) return c;
+    }
+    // Absent from the cache is not the same as absent from the catalogue; the
+    // count is decoration, so it simply goes unsaid.
+    return null;
   };
 
   // Get selected gadget display name

@@ -591,6 +591,17 @@ function seoPage(s, info, knownPaths) {
   const unresolved =
     t.kind === "keyword" && !t.brand && !t.gadget && !t.finish
     && !(t.collections || []).length && !(t.titleWords || []).length;
+  /*
+   * A model we do not carry, under a brand we do.
+   *
+   * The page still fills with that brand's products, which is right for the
+   * person who landed on it — but 7 Samsung pages named after 7 models we do
+   * not list all show the same 362 designs, so to Google they are one page
+   * under seven URLs. It asks to be ranked again by itself: the day the model
+   * is added to Supported Models the target resolves to `model`, and this
+   * flag clears on the next build.
+   */
+  const unlisted = t.kind === "unlisted";
 
   const text = stripHtml(s.contentHTML);
   // The same copy, with its headings, lists and internal links intact.
@@ -631,8 +642,8 @@ function seoPage(s, info, knownPaths) {
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
     description: info?.description || s.metaDescription || clip(text, 155),
     // Nothing to sell here right now: keep the page for people, not for search.
-    robots: empty || unresolved ? "noindex, follow" : undefined,
-    empty: empty || unresolved,
+    robots: empty || unresolved || unlisted ? "noindex, follow" : undefined,
+    empty: empty || unresolved || unlisted,
     canonical: url,
     image: liveImage(s.heroImageUrl) ? s.heroImageUrl : undefined,
     jsonLd: jsonLdList,

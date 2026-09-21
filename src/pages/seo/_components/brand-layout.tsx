@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { Sparkles, Package, Truck } from "lucide-react";
 import { SiteHeader } from "@/components/site-header.tsx";
 import { SiteFooter } from "@/components/site-footer.tsx";
-import { GadgetSelector } from "@/components/gadget-selector.tsx";
+import { GadgetSelector, type DeviceType } from "@/components/gadget-selector.tsx";
 import { PhoneBrandSelector } from "@/components/phone-brand-selector.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { useState, useRef } from "react";
@@ -16,7 +16,6 @@ import { sanitizeHtml } from "@/lib/sanitize-html";
 import type { SeoPageData } from "../use-seo-page-data";
 import { SeoBrandGadgetsSection, SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
 
-type DeviceType = "laptop" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
 interface BrandPageLayoutProps {
   page: Doc<"seoPages">;
@@ -155,7 +154,7 @@ export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
   // Section mapper
   const sectionComponents: Record<string, () => React.ReactNode> = {
     "hero": renderHero,
-    "gadget-selector": () => <GadgetSelector onDeviceSelect={openDialogForDevice} onPhoneSelect={scrollToPhoneBrandSelector} />,
+    "gadget-selector": () => <GadgetSelector onDeviceSelect={openDialogForDevice} />,
     // On a page about one brand, the hub of that brand's own gadgets is what
     // belongs here; the grid of every other brand sends the reader away.
     "phone-brand-selector": () =>

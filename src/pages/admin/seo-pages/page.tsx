@@ -80,23 +80,47 @@ const KIND_LABEL: Record<SeoTarget["kind"], string> = {
   keyword: "Keyword",
 };
 
+/**
+ * A page whose slug matched nothing the catalogue knows.
+ *
+ * The filters then have nothing to filter on, so the page lists every design
+ * we sell — and a handful of such pages carry identical content under
+ * different URLs, which is the duplicate-content case Google acts on. It read
+ * as "Keyword — 1654 designs" here, indistinguishable from a healthy page,
+ * while being the worst state a page can be in.
+ */
+const matchesEverything = (t: SeoTarget) =>
+  t.kind === "keyword" && !t.brand && !t.gadget && !t.finish
+  && !(t.collections || []).length && !(t.titleWords || []).length;
+
 function SeoHealthCell({ health }: { health: { target: SeoTarget; total: number } | null }) {
   if (!health) return <span className="text-muted-foreground">…</span>;
   const { target, total } = health;
   const subject = target.model || target.brand || target.gadget || target.finish || target.collections?.join(", ") || "";
+  const broad = matchesEverything(target);
+  const bad = broad || target.kind === "unlisted";
   return (
     <div className="flex flex-col gap-1">
       <div className="flex flex-wrap items-center gap-1">
-        <Badge variant={target.kind === "unlisted" ? "destructive" : "outline"}>{KIND_LABEL[target.kind]}</Badge>
-        {subject && target.kind !== "unlisted" && <span className="text-muted-foreground">{subject}</span>}
+        <Badge variant={bad ? "destructive" : "outline"}>
+          {broad ? "Matches everything" : KIND_LABEL[target.kind]}
+        </Badge>
+        {subject && !bad && <span className="text-muted-foreground">{subject}</span>}
       </div>
       {total === 0 ? (
         <span className="text-amber-700 dark:text-amber-400">No designs — hidden from Google</span>
       ) : (
-        <span className="text-muted-foreground">{total} designs</span>
+        <span className={broad ? "text-destructive" : "text-muted-foreground"}>{total} designs</span>
+      )}
+      {broad && (
+        <span className="text-muted-foreground">
+          Slug names nothing we sell — hidden from Google. Rename it after a collection or brand we carry, or unpublish
+        </span>
       )}
       {target.kind === "unlisted" && (
-        <span className="text-muted-foreground">Add the model to Supported Models, or unpublish</span>
+        <span className="text-muted-foreground">
+          Hidden from Google until the model is added to Supported Models — or unpublish
+        </span>
       )}
     </div>
   );
@@ -148,7 +172,7 @@ export default function SEOPagesPage() {
   }, [health]);
   const needsAttention = (page: { slug: string; pageType?: string; h1Heading?: string }) => {
     const h = healthOf(page);
-    return !!h && (h.target.kind === "unlisted" || h.total === 0);
+    return !!h && (h.target.kind === "unlisted" || h.total === 0 || matchesEverything(h.target));
   };
 
   const pages = useQuery(api.seoPages.listPages, {
