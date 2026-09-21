@@ -124,6 +124,22 @@ const COMBO_NAMES: Record<string, string> = {
    * is named for the search that will keep being made.
    */
   "samsung|laptop": "Samsung Galaxy Book",
+  /*
+   * The Android tablet makers who all settled on "Pad". Checked the same way:
+   * all 7 OnePlus tablets are a Pad, all 5 Realme, all 4 Oppo, all 3 Honor.
+   * Oppo and Honor sit under the five-model floor, so no page is written for
+   * them yet — the name is here for the day they cross it.
+   *
+   * Motorola's six are split — four Moto Pads and two older Tab G models —
+   * and it goes the way Samsung's laptops did: named for the line it ships
+   * now and will keep shipping.
+   */
+  "one-plus|tablet": "OnePlus Pad",
+  "oneplus|tablet": "OnePlus Pad",
+  "realme|tablet": "Realme Pad",
+  "oppo|tablet": "Oppo Pad",
+  "honor|tablet": "Honor Pad",
+  "motorola|tablet": "Moto Pad",
 };
 
 const pretty = (brand: string) =>

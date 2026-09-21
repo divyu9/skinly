@@ -410,6 +410,13 @@ const BRAND_GADGET_LABELS = {
   // Named for the line Samsung has shipped for years and will keep shipping,
   // not for the older notebooks still in the model list.
   "samsung|laptop": ["Galaxy Book", "Galaxy Books"],
+  // Every OnePlus, Realme, Oppo and Honor tablet we carry is a Pad.
+  "one-plus|tablet": ["Pad", "Pads"],
+  "oneplus|tablet": ["Pad", "Pads"],
+  "realme|tablet": ["Pad", "Pads"],
+  "oppo|tablet": ["Pad", "Pads"],
+  "honor|tablet": ["Pad", "Pads"],
+  "motorola|tablet": ["Moto Pad", "Moto Pads"],
 };
 
 const PLAIN_GADGETS = {
