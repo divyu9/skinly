@@ -111,11 +111,12 @@ const safeHref = (raw) => {
   return null;
 };
 
-function safeHtml(raw) {
+function safeHtml(raw, knownPaths) {
   const withoutScripts = String(raw ?? "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ");
   // Links opened but not kept: their closing tag has to go with them, or the
   // markup ends up with a stray </a> hanging after the words.
   let openLinks = 0;
+  let deadLinks = 0;
   const out = withoutScripts.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (whole, tagRaw, attrs) => {
     const tag = tagRaw.toLowerCase();
     const closing = whole.startsWith("</");
@@ -127,14 +128,28 @@ function safeHtml(raw) {
       }
       const href = safeHref((attrs.match(/\shref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i) || [])
         .slice(2).find((x) => x !== undefined));
-      // A link that cannot be trusted keeps its words and loses its link.
+      /*
+       * A link that cannot be trusted keeps its words and loses its link —
+       * and so does one that points at a page which does not exist.
+       *
+       * The generator's prompt shows an example anchor, and the model copies
+       * it: Poco's page came back linking to /poco-galaxy-s25-ultra-skins.
+       * It will always be able to invent a slug, so the build checks each one
+       * against the pages it is actually writing. A dead internal link is
+       * worse than no link.
+       */
       if (!href) return "";
+      if (knownPaths && !knownPaths.has(href.replace(SITE, "") || "/")) {
+        deadLinks++;
+        return "";
+      }
       openLinks++;
       return `<a href="${esc(href)}">`;
     }
     if (!ALLOWED_TAGS.has(tag)) return " ";
     return closing ? `</${tag}>` : `<${tag}>`;
   });
+  if (deadLinks) safeHtml.dead = (safeHtml.dead || 0) + deadLinks;
   // Tidy what the removals left behind.
   return out.replace(/\s+/g, " ").replace(/> </g, "><").trim();
 }
@@ -529,7 +544,7 @@ function productPage(p, variants, categoryNames, shipping, links = {}) {
   };
 }
 
-function seoPage(s, info) {
+function seoPage(s, info, knownPaths) {
   const url = `${SITE}/${s.slug}`;
   const h1 = s.h1Heading || s.metaTitle || titleCase(s.slug);
   const trail = [
@@ -561,7 +576,7 @@ function seoPage(s, info) {
   }
   const text = stripHtml(s.contentHTML);
   // The same copy, with its headings, lists and internal links intact.
-  const richText = clipHtml(safeHtml(s.contentHTML), 12000);
+  const richText = clipHtml(safeHtml(s.contentHTML, knownPaths), 12000);
   const empty = info && info.total === 0;
   const productLinks = (info?.products || [])
     .slice(0, 24)
@@ -1050,7 +1065,18 @@ async function main() {
    * are decided here. Nothing else about the order changed.
    */
   const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);
-  const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug)));
+  /*
+   * Every path this build actually writes, so a link in the generated copy
+   * that points anywhere else is dropped rather than shipped as a 404.
+   */
+  const knownPaths = new Set([
+    "/", "/products", "/devices", "/magneto-x",
+    ...statics.map((p) => p.route),
+    ...seoDocs.map((d) => `/${d.slug}`),
+    ...active.map((p) => `/products/${p.slug}`),
+  ]);
+  const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug), knownPaths));
+  if (safeHtml.dead) log(`dropped ${safeHtml.dead} generated links pointing at pages that do not exist`);
   for (const p of seo) await writePage(p.route, render(template, p));
 
   /*

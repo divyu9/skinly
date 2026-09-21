@@ -188,12 +188,14 @@ CONTENT RULES:
    - Never claim cash on delivery — orders are prepaid only
    - Use ₹ symbol (not $ or Rs)
 
-5. INTERNAL LINK ANCHORS — exactly 3:
-   Place naturally within the content. Use slugs derived from the brand/models mentioned.
-   Examples:
+5. INTERNAL LINK ANCHORS — at most 2, and only these:
      <a href="/${bSlug}-skins">${brand} Skins</a>
-     <a href="/${bSlug}-galaxy-s25-ultra-skins">${brand} Galaxy S25 Ultra Skins</a>
-     <a href="/matte-finish-phone-skins">Matte Finish Phone Skins</a>
+   and, if a model from DEVICE MODELS TO MENTION is named in the copy, that
+   model's own page built the same way: /<brand>-<model>-skins, lower case,
+   spaces as hyphens.
+   Invent no other link. Do not link a model that is not in the list above,
+   and do not copy any example slug from these instructions — a link to a page
+   that does not exist is worse than no link, and the build drops it.
 
 6. FAQS — exactly 7:
    - First 3 questions MUST contain the primary keyword "${pk}"
