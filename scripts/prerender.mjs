@@ -362,7 +362,13 @@ function magnetoPage(products, variantsByProduct) {
   };
 }
 
-function productPage(p, variants, categoryNames, shipping) {
+/**
+ * @param links  where this design can also be read about: the landing pages
+ *   whose device it fits, and a few designs like it. Both were absent, which
+ *   left every one of 1,717 product pages with three links on it — home, its
+ *   category, and a query-string filter Google does not index.
+ */
+function productPage(p, variants, categoryNames, shipping, links = {}) {
   const url = `${SITE}/products/${p.slug}`;
   const priced = variants.filter((v) => Number(v.price) > 0);
   const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
@@ -437,7 +443,24 @@ function productPage(p, variants, categoryNames, shipping) {
       crumbLinks(trail) +
       `<h1>${esc(p.title)}</h1>` +
       (price ? `<p>Price: ₹${price}</p>` : "") +
-      (plain ? `<p>${esc(clip(plain, 1200))}</p>` : ""),
+      (plain ? `<p>${esc(clip(plain, 1200))}</p>` : "") +
+      /*
+       * "Also cut for…" is the honest headline as well as the useful one: one
+       * design really is sold for every device it fits, and saying so links a
+       * product to the pages that rank for those devices. This is the biggest
+       * link surface the site has — 1,717 designs times the models each fits —
+       * and none of it existed.
+       */
+      (links.fits?.length
+        ? `<h2>Also cut for</h2><ul>${links.fits
+            .map((f) => `<li><a href="${SITE}/${esc(f.slug)}">${esc(f.title)}</a></li>`)
+            .join("")}</ul>`
+        : "") +
+      (links.similar?.length
+        ? `<h2>More designs like this</h2><ul>${links.similar
+            .map((q) => `<li><a href="${SITE}/products/${esc(q.slug)}">${esc(q.title)}</a></li>`)
+            .join("")}</ul>`
+        : ""),
   };
 }
 
@@ -477,6 +500,21 @@ function seoPage(s, info) {
     .slice(0, 24)
     .map((p) => `<li><a href="${SITE}/products/${esc(p.slug)}">${esc(p.title)}</a></li>`)
     .join("");
+  /*
+   * The models this page covers, as links.
+   *
+   * `info.models` has been computed all along — each one already carries the
+   * href of its own landing page where it has one — and it was going only to
+   * the client-side page. In the prerendered HTML these are what join 265
+   * landing pages into a graph instead of leaving them 265 islands that only
+   * the sitemap knows about. A page that links to its siblings passes them
+   * weight; a page that links to nothing passes nothing.
+   */
+  const modelLinks = (info?.models || [])
+    .filter((m) => m.href && m.href.startsWith("/") && !m.href.startsWith("/products?"))
+    .slice(0, 30)
+    .map((m) => `<li><a href="${SITE}${esc(m.href)}">${esc(`${m.brand} ${m.model}`)} skins</a></li>`)
+    .join("");
   return {
     route: `/${s.slug}`,
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
@@ -494,6 +532,7 @@ function seoPage(s, info) {
       `<h1>${esc(h1)}</h1>` +
       (text ? `<p>${esc(clip(text, 3000))}</p>` : "") +
       (productLinks ? `<ul>${productLinks}</ul>` : "") +
+      (modelLinks ? `<h2>Skins for other models</h2><ul>${modelLinks}</ul>` : "") +
       faqs.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
   };
 }
@@ -878,16 +917,57 @@ async function main() {
   );
 
   const active = data.products.filter((p) => p.status === "active" && p.slug && !/[/?#\s]/.test(p.slug));
-  const productPages = active.map((p) => productPage(p, variantsByProduct.get(p._id) || [], categoryNames, data.shipping));
-  for (const p of productPages) await writePage(p.route, render(template, p));
 
   const productSlugs = new Set(active.map((p) => p.slug));
   const seoDocs = data.seoPages
     .filter((s) => s.isPublished && s.slug && /^[a-z0-9][a-z0-9-]*$/.test(s.slug))
     .filter((s) => !REDIRECTED_SLUGS.has(s.slug) && !RESERVED.has(s.slug) && !productSlugs.has(s.slug));
+  /*
+   * The SEO pages are worked out before the product pages now, because a
+   * product page wants to link to the pages its design is sold on and those
+   * are decided here. Nothing else about the order changed.
+   */
   const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);
   const seo = seoDocs.map((s) => seoPage(s, seoInfo.get(s.slug)));
   for (const p of seo) await writePage(p.route, render(template, p));
+
+  /*
+   * Which landing pages each design appears on, by turning the page → products
+   * index the other way up. A design fits hundreds of devices, so the list is
+   * capped: twelve links a shopper might follow, not a wall nobody reads and
+   * Google discounts.
+   */
+  const pagesForProduct = new Map();
+  for (const info of seoInfo.values()) {
+    if (!info || info.total === 0) continue;
+    for (const prod of info.products || []) {
+      if (!prod?._id) continue;
+      const list = pagesForProduct.get(prod._id) || [];
+      // `info.listing` is a query-string URL, not a name — using it here put
+      // "/products?productType=skin&brand=Samsung…" in the link text.
+      if (list.length < 12) list.push({ slug: info.slug, title: info.title || info.slug });
+      pagesForProduct.set(prod._id, list);
+    }
+  }
+
+  // Designs like this one: same gadget and same finish, which is what a
+  // shopper who did not want this pattern is actually looking for.
+  const siblings = new Map();
+  for (const p of active) {
+    const key = `${p.gadgetCategory || ""}|${p.finishType || ""}`;
+    siblings.set(key, [...(siblings.get(key) || []), p]);
+  }
+
+  const productPages = active.map((p) =>
+    productPage(p, variantsByProduct.get(p._id) || [], categoryNames, data.shipping, {
+      fits: pagesForProduct.get(p._id) || [],
+      similar: (siblings.get(`${p.gadgetCategory || ""}|${p.finishType || ""}`) || [])
+        .filter((q) => q._id !== p._id)
+        .slice(0, 8)
+        .map((q) => ({ slug: q.slug, title: q.title })),
+    }),
+  );
+  for (const p of productPages) await writePage(p.route, render(template, p));
 
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
