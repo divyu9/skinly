@@ -119,3 +119,48 @@ export function SeoModelsSection({ data }: { data: SeoPageData | undefined }) {
     </section>
   );
 }
+
+/** The word a shopper uses for a gadget, not the database's category id. */
+const GADGET_WORDS: Record<string, string> = {
+  phone: "Phones", laptop: "Laptops", tablet: "Tablets", camera: "Cameras",
+  lens: "Lenses", controller: "Controllers", console: "Consoles", drone: "Drones",
+  charger: "Chargers", gimbals: "Gimbals", "mac-mini": "Mac mini",
+};
+
+/**
+ * The brand's other shelves.
+ *
+ * A brand page is about whichever gadget that brand mostly makes, so Samsung's
+ * page is phones and its 74 tablets appear nowhere on it. What was offered
+ * instead was the whole brand grid — every competitor's name on a page
+ * somebody reached by searching for this one.
+ */
+export function SeoBrandGadgetsSection({ data }: { data: SeoPageData | undefined }) {
+  const rows = data?.brandGadgets || [];
+  const brand = data?.target?.brand || "";
+  // One shelf is not a hub; it is the page you are already on.
+  if (!data || !brand || rows.length < 2) return null;
+  return (
+    <section className="container mx-auto px-4 py-10 md:py-14">
+      <div className="mx-auto max-w-5xl">
+        <h2 className="mb-2 text-center text-2xl font-bold sm:text-3xl">More from {brand}</h2>
+        <p className="mb-6 text-center text-sm text-muted-foreground">
+          Every {brand} gadget we cut skins for.
+        </p>
+        <ul className="flex flex-wrap justify-center gap-3">
+          {rows.map((g: any) => (
+            <li key={g.gadget}>
+              <Link
+                to={g.href}
+                className="inline-flex flex-col items-center rounded-xl border-2 border-ink/15 bg-card px-5 py-3 transition-colors hover:border-ink/40"
+              >
+                <span className="text-sm font-semibold">{brand} {GADGET_WORDS[g.gadget] || g.gadget}</span>
+                <span className="text-xs text-muted-foreground">{g.count} models</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}

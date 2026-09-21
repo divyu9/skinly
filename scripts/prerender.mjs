@@ -577,6 +577,18 @@ function seoPage(s, info) {
    * the sitemap knows about. A page that links to its siblings passes them
    * weight; a page that links to nothing passes nothing.
    */
+  /*
+   * The hub row: this brand's own gadget pages, before the model list.
+   *
+   * Only the ones that have a page of their own — a link to a query string is
+   * a link Google will not follow anywhere useful, and the hub is here to pass
+   * weight down the brand's own chain.
+   */
+  const gadgetLinks = (info?.brandGadgets || [])
+    .filter((g) => g.slug)
+    .map((g) => `<li><a href="${SITE}/${esc(g.slug)}">${esc(`${info.target?.brand} ${g.gadget}`)} skins</a> <span>(${g.count} models)</span></li>`)
+    .join("");
+
   const modelLinks = (info?.models || [])
     .filter((m) => m.href && m.href.startsWith("/") && !m.href.startsWith("/products?"))
     .map((m) => `<li><a href="${SITE}${esc(m.href)}">${esc(`${m.brand} ${m.model}`)} skins</a></li>`)
@@ -598,6 +610,7 @@ function seoPage(s, info) {
       `<h1>${esc(h1)}</h1>` +
       (richText || (text ? `<p>${esc(clip(text, 3000))}</p>` : "")) +
       (productLinks ? `<ul>${productLinks}</ul>` : "") +
+      (gadgetLinks ? `<h2>More from ${esc(info?.target?.brand || "this brand")}</h2><ul>${gadgetLinks}</ul>` : "") +
       (modelLinks ? `<h2>Skins for other ${esc(info?.target?.brand || "")} models</h2><ul>${modelLinks}</ul>`.replace("other  models", "other models") : "") +
       faqs.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
   };
@@ -853,8 +866,14 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
 
   // A device's own SEO page, so brand pages can link models to it.
   const pageForModel = new Map();
+  const pageForBrandGadget = new Map();
   for (const { s, target } of resolved) {
     if (target.kind === "model") pageForModel.set(`${target.brand}|${target.model}`, s.slug);
+    // A brand page that is about one gadget — "dell laptop skins" — is where
+    // a brand hub should send someone who wants that gadget.
+    if (target.kind === "brand" && target.brand && target.gadget) {
+      pageForBrandGadget.set(`${target.brand}|${target.gadget}`, s.slug);
+    }
   }
 
   await fs.mkdir(path.join(DIST, "seo-data"), { recursive: true });
@@ -905,9 +924,37 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
       return { brand: m.brand, model: m.model.replace(/\s+/g, " ").trim(), href: slug ? `/${slug}` : `/products?${q.toString()}` };
     });
 
+    /*
+     * The brand's other shelves.
+     *
+     * A brand page shows one gadget — whichever that brand mostly makes — so
+     * Samsung's page is phones and its 74 tablets are nowhere on it. Without
+     * this a visitor who wants a tablet skin is offered the entire brand grid
+     * instead, every competitor's name included, and the charger page nobody
+     * can reach from anywhere is never reached.
+     */
+    const brandGadgets = target.brand
+      ? Object.entries(
+          (data.models || [])
+            .filter((m) => m && m.isActive !== false && m.brandName === target.brand && m.category)
+            .reduce((acc, m) => ({ ...acc, [m.category]: (acc[m.category] || 0) + 1 }), {}),
+        )
+          .map(([gadget, count]) => ({
+            gadget,
+            count,
+            slug: pageForBrandGadget.get(`${target.brand}|${gadget}`) || null,
+            href:
+              pageForBrandGadget.get(`${target.brand}|${gadget}`)
+                ? `/${pageForBrandGadget.get(`${target.brand}|${gadget}`)}`
+                : `/products?${new URLSearchParams({ productType: "skin", gadget, brand: target.brand }).toString()}`,
+          }))
+          .sort((a, b) => b.count - a.count)
+      : [];
+
     const info = {
       slug: s.slug,
       target: { ...target, models: undefined },
+      brandGadgets,
       title: copy.title,
       description: copy.description,
       listing: copy.listing,

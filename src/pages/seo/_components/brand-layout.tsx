@@ -14,7 +14,7 @@ import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog
 import { useState, useRef } from "react";
 import { sanitizeHtml } from "@/lib/sanitize-html";
 import type { SeoPageData } from "../use-seo-page-data";
-import { SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
+import { SeoBrandGadgetsSection, SeoModelsSection, SeoProductsSection } from "./seo-sections.tsx";
 
 type DeviceType = "laptop" | "camera" | "lens" | "tablet" | "macmini" | "console" | "drone" | "charger";
 
@@ -128,7 +128,7 @@ export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
   const renderProducts = () => (
     <>
       <SeoProductsSection data={data} heading={`Shop ${brandName} skins`} />
-      {data && ["brand", "family", "unlisted"].includes(data.target.kind) && <SeoModelsSection data={data} />}
+      {data && ["brand", "family", "unlisted", "model"].includes(data.target.kind) && <SeoModelsSection data={data} />}
     </>
   );
 
@@ -156,7 +156,12 @@ export default function BrandPageLayout({ page, data }: BrandPageLayoutProps) {
   const sectionComponents: Record<string, () => React.ReactNode> = {
     "hero": renderHero,
     "gadget-selector": () => <GadgetSelector onDeviceSelect={openDialogForDevice} onPhoneSelect={scrollToPhoneBrandSelector} />,
-    "phone-brand-selector": () => <div ref={phoneBrandSelectorRef}><PhoneBrandSelector /></div>,
+    // On a page about one brand, the hub of that brand's own gadgets is what
+    // belongs here; the grid of every other brand sends the reader away.
+    "phone-brand-selector": () =>
+      data?.target?.brand
+        ? <SeoBrandGadgetsSection data={data} />
+        : <div ref={phoneBrandSelectorRef}><PhoneBrandSelector /></div>,
     "intro": renderIntro,
     "products": renderProducts,
     "faqs": renderFaqs,

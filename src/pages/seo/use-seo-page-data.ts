@@ -17,6 +17,8 @@ export interface SeoPageData {
   finishes: string[];
   mockups: number;
   models: Array<{ brand: string; model: string; href: string }>;
+  /** This brand's other gadget pages — the hub row. Absent on themes. */
+  brandGadgets?: Array<{ gadget: string; count: number; slug: string | null; href: string }>;
   products: Product[];
 }
 
@@ -72,7 +74,7 @@ export function useSeoPageData(page: Page | null | undefined): SeoPageData | und
       minPrice: sel.minPrice,
       finishes: sel.finishes,
       mockups: 0,
-      models: (target.models || []).slice(0, 80).map((m) => ({
+      models: (target.models || []).slice(0, 300).map((m) => ({
         brand: m.brand,
         model: m.model,
         href: `/products?${new URLSearchParams({
