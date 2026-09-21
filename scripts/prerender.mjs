@@ -85,6 +85,71 @@ const stripHtml = (s) =>
 
 const clip = (s, n) => (s.length <= n ? s : s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…");
 
+/**
+ * The generated copy, kept as markup instead of flattened to a paragraph.
+ *
+ * Every page's prompt asks the model for three internal links inside the
+ * prose, and it writes them — then `stripHtml` turned them into text and
+ * `esc` made sure they could never be anything else. Eight hundred links
+ * across the landing pages, written and thrown away on every build.
+ *
+ * They are worth keeping, and the copy reads better with its own headings and
+ * lists. But this is model output that an admin can also edit by hand, so
+ * nothing is trusted: a small list of tags survives, every attribute is
+ * dropped except an href, and an href has to point somewhere on this site.
+ * That rules out javascript:, data:, on* handlers and style in one go, by
+ * allowing rather than forbidding.
+ */
+const ALLOWED_TAGS = new Set(["p", "h2", "h3", "h4", "ul", "ol", "li", "strong", "em", "b", "i", "br"]);
+
+const safeHref = (raw) => {
+  const href = String(raw || "").trim();
+  if (href.startsWith("/") && !href.startsWith("//")) return `${SITE}${href}`;
+  if (href.startsWith(`${SITE}/`) || href === SITE) return href;
+  // Anything else — another origin, a scheme, a protocol-relative URL — is
+  // not what this content is for.
+  return null;
+};
+
+function safeHtml(raw) {
+  const withoutScripts = String(raw ?? "").replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ");
+  // Links opened but not kept: their closing tag has to go with them, or the
+  // markup ends up with a stray </a> hanging after the words.
+  let openLinks = 0;
+  const out = withoutScripts.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b([^>]*)>/g, (whole, tagRaw, attrs) => {
+    const tag = tagRaw.toLowerCase();
+    const closing = whole.startsWith("</");
+    if (tag === "a") {
+      if (closing) {
+        if (openLinks === 0) return "";
+        openLinks--;
+        return "</a>";
+      }
+      const href = safeHref((attrs.match(/\shref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i) || [])
+        .slice(2).find((x) => x !== undefined));
+      // A link that cannot be trusted keeps its words and loses its link.
+      if (!href) return "";
+      openLinks++;
+      return `<a href="${esc(href)}">`;
+    }
+    if (!ALLOWED_TAGS.has(tag)) return " ";
+    return closing ? `</${tag}>` : `<${tag}>`;
+  });
+  // Tidy what the removals left behind.
+  return out.replace(/\s+/g, " ").replace(/> </g, "><").trim();
+}
+
+/** Cuts long markup at the end of a block, never in the middle of a tag. */
+function clipHtml(html, n) {
+  if (html.length <= n) return html;
+  const cut = html.slice(0, n);
+  const end = Math.max(
+    cut.lastIndexOf("</p>"), cut.lastIndexOf("</li>"), cut.lastIndexOf("</ul>"),
+    cut.lastIndexOf("</ol>"), cut.lastIndexOf("</h2>"), cut.lastIndexOf("</h3>"),
+  );
+  return end > 0 ? cut.slice(0, end + cut.slice(end).indexOf(">") + 1) : stripHtml(cut);
+}
+
 const titleCase = (slug) =>
   String(slug)
     .split("-")
@@ -495,6 +560,8 @@ function seoPage(s, info) {
     });
   }
   const text = stripHtml(s.contentHTML);
+  // The same copy, with its headings, lists and internal links intact.
+  const richText = clipHtml(safeHtml(s.contentHTML), 12000);
   const empty = info && info.total === 0;
   const productLinks = (info?.products || [])
     .slice(0, 24)
@@ -530,7 +597,7 @@ function seoPage(s, info) {
     body:
       crumbLinks(trail) +
       `<h1>${esc(h1)}</h1>` +
-      (text ? `<p>${esc(clip(text, 3000))}</p>` : "") +
+      (richText || (text ? `<p>${esc(clip(text, 3000))}</p>` : "")) +
       (productLinks ? `<ul>${productLinks}</ul>` : "") +
       (modelLinks ? `<h2>Skins for other models</h2><ul>${modelLinks}</ul>` : "") +
       faqs.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
