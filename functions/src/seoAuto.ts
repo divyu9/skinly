@@ -2,6 +2,7 @@ import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { generateSeoContentCore } from "./seo";
+import { requestRebuild } from "./rebuild";
 
 /**
  * Model pages that make themselves.
@@ -394,6 +395,8 @@ export interface FillResult {
   errors: string[];
   /** Pages whose stored type was fixed on the way in. */
   repaired: number;
+  /** What the storefront rebuild request said, when one was made. */
+  rebuild?: string;
 }
 
 /**
@@ -490,7 +493,17 @@ export async function fillMissingSeoPages(
     }
   }
 
-  console.log("fillMissingSeoPages", { created: out.created, failed: out.failed, autoPublish });
+  /*
+   * Nothing here pushes a commit, and Hostinger deploys on pushes — so a page
+   * written or repaired now would sit unrendered until 3 am unless somebody
+   * asked. Asked here instead.
+   */
+  if (out.created || repaired) {
+    const r = await requestRebuild(`seo pages: ${out.created} written, ${repaired} repaired`);
+    out.rebuild = r.note;
+  }
+
+  console.log("fillMissingSeoPages", { created: out.created, failed: out.failed, autoPublish, repaired });
   return out;
 }
 
@@ -528,9 +541,10 @@ export const runSeoAutoPages = functionsV1
     const out = await fillMissingSeoPages(db, { limit, dryRun: data?.dryRun === true });
     if (!out.considered) {
       const fixed = out.repaired ? `${out.repaired} existing page${out.repaired === 1 ? "" : "s"} repaired. ` : "";
+      const after = out.rebuild ? ` ${out.rebuild}.` : "";
       return {
         ...out,
-        message: fixed + (limit
+        message: fixed + after + (limit
           ? "No page left to write for that number."
           : "No new pages written — set \"Pages a night\" above zero, or type a number and press this again."),
       };
@@ -540,6 +554,7 @@ export const runSeoAutoPages = functionsV1
       message: (out.repaired ? `${out.repaired} repaired · ` : "") + (data?.dryRun === true
         ? `${out.considered} pages would be written: ${out.slugs.slice(0, 5).join(", ")}…`
         : `${out.created} pages written${out.failed ? `, ${out.failed} failed` : ""}`
-          + (out.published ? " and published" : " — waiting to be published")),
+          + (out.published ? " and published" : " — waiting to be published")
+          + (out.rebuild ? `. ${out.rebuild}` : "")),
     };
   });

@@ -722,6 +722,8 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-xs text-muted-foreground">
+              Writing or repairing a page asks the storefront to rebuild itself, so a new page is
+              live in about five minutes without going near GitHub.
               Left unpublished, new pages wait in SEO Pages and the morning digest counts them —
               thin or wrong pages at scale hurt a site more than missing ones, so it is worth
               reading a few before turning publishing on. A theme needs 25 products before it gets a
