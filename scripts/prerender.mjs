@@ -574,6 +574,24 @@ function seoPage(s, info, knownPaths) {
       })),
     });
   }
+  /*
+   * A page that matches everything matched nothing.
+   *
+   * "plaid tartan" is not a brand, a gadget, a finish or a collection this
+   * catalogue knows, so the target resolved to a bare keyword and the filters
+   * had nothing to filter on — leaving a page that lists all 1,654 designs.
+   * Several such pages carry identical content under different URLs, which is
+   * the duplicate-content case Google penalises rather than ignores.
+   *
+   * The page stays for people who reach it; it simply stops asking to be
+   * ranked. Giving it a real meaning is a job for the admin: add the model to
+   * Supported Models, or name the collection the page is about.
+   */
+  const t = info?.target || {};
+  const unresolved =
+    t.kind === "keyword" && !t.brand && !t.gadget && !t.finish
+    && !(t.collections || []).length && !(t.titleWords || []).length;
+
   const text = stripHtml(s.contentHTML);
   // The same copy, with its headings, lists and internal links intact.
   const richText = clipHtml(safeHtml(s.contentHTML, knownPaths), 12000);
@@ -613,8 +631,8 @@ function seoPage(s, info, knownPaths) {
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
     description: info?.description || s.metaDescription || clip(text, 155),
     // Nothing to sell here right now: keep the page for people, not for search.
-    robots: empty ? "noindex, follow" : undefined,
-    empty,
+    robots: empty || unresolved ? "noindex, follow" : undefined,
+    empty: empty || unresolved,
     canonical: url,
     image: liveImage(s.heroImageUrl) ? s.heroImageUrl : undefined,
     jsonLd: jsonLdList,
