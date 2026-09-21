@@ -144,7 +144,19 @@ export function resolveSeoTarget(page, models, collectionNames = []) {
 
     if ((exact.length || prefixed.length === 1) && !series) {
       const m = exact[0] || prefixed[0];
-      return { kind: "model", brand: m.brandName, model: m.modelName, gadget: m.category };
+      /*
+       * The brand's other models, so a model page is not a dead end.
+       *
+       * Somebody who lands on the Poco X8 Power page with a Poco X7 in their
+       * pocket had nowhere to go, and the page passed nothing to its
+       * siblings — which is what turns a hundred model pages into one topic
+       * Google understands rather than a hundred unrelated documents.
+       */
+      const siblings = active
+        .filter((x) => x.brandName === m.brandName && x.category === m.category && x.modelName !== m.modelName)
+        .slice(0, 40)
+        .map((x) => ({ brand: x.brandName, model: x.modelName, category: x.category }));
+      return { kind: "model", brand: m.brandName, model: m.modelName, gadget: m.category, models: siblings };
     }
     const family = [...exact, ...prefixed];
     if (family.length > 1 && words.length >= 2) {

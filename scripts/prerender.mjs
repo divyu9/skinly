@@ -599,7 +599,7 @@ function seoPage(s, info) {
       `<h1>${esc(h1)}</h1>` +
       (richText || (text ? `<p>${esc(clip(text, 3000))}</p>` : "")) +
       (productLinks ? `<ul>${productLinks}</ul>` : "") +
-      (modelLinks ? `<h2>Skins for other models</h2><ul>${modelLinks}</ul>` : "") +
+      (modelLinks ? `<h2>Skins for other ${esc(info?.target?.brand || "")} models</h2><ul>${modelLinks}</ul>`.replace("other  models", "other models") : "") +
       faqs.map((f) => `<h3>${esc(f.question)}</h3><p>${esc(f.answer)}</p>`).join(""),
   };
 }
