@@ -79,6 +79,17 @@ RewriteRule ^samsung-galaxy-s24-skins-1$ https://goskinly.com/samsung-galaxy-s24
 RewriteRule ^mac-mini-skins-1$ https://goskinly.com/mac-mini-skins [R=301,L]
 RewriteRule ^master-skins$ https://goskinly.com/products [R=301,L]
 
+# Slugs that stuttered: the generator appended "-skins" and the gadget word to
+# collection names that already ended in "Skins", so "Lens Skins" on lenses
+# became /lens-skins-lens-skins. Twelve of them, pointed at the page each was
+# a worse copy of.
+RewriteRule ^(lens-skins-skins|lens-skins-lens-skins)$ https://goskinly.com/lenses-skins [R=301,L]
+RewriteRule ^charger-skins-skins$ https://goskinly.com/chargers-skins [R=301,L]
+RewriteRule ^(camera-skins-skins|camera-skins-camera-skins)$ https://goskinly.com/camera-skins [R=301,L]
+RewriteRule ^(laptop-skins-skins|laptop-skins-laptop-skins)$ https://goskinly.com/laptop-skins [R=301,L]
+RewriteRule ^matte-phone-skins-phone-skins$ https://goskinly.com/matte-phone-skins [R=301,L]
+RewriteRule ^3d-embossed-phone-skins-phone-skins$ https://goskinly.com/3d-embossed-phone-skins [R=301,L]
+
 # ─── The homepage ───────────────────────────────────────────────────────────
 # "/" is a directory, not a file, so the routing below would 404 it before
 # DirectoryIndex ever ran.

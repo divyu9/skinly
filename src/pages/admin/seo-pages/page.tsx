@@ -3,6 +3,7 @@ import { resolveSeoTarget, selectSeoProducts, type SeoTarget } from "@/lib/seo-p
 import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
+import { PendingPagesDialog } from "./_components/pending-pages.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Card } from "@/components/ui/card.tsx";
 import {
@@ -585,6 +586,7 @@ export default function SEOPagesPage() {
               </>
             )}
           </Button>
+          <PendingPagesDialog />
           <Button variant="outline" asChild>
             <Link to="/backend-skinly/seo-pages/auto-generate">
               <Wand2 className="mr-2 h-4 w-4" />

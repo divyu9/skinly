@@ -118,6 +118,23 @@ const pretty = (brand: string) =>
 export const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 
+/**
+ * A collection's name with the merchandising suffix taken off.
+ *
+ * These names are written for the shop's own navigation, not for a slug, and
+ * most of them already say what they are: "Lens Skins", "Matte Phone Skins",
+ * "Samsung Skins". Appending "skins" to those gave /lens-skins-skins, and
+ * appending the gadget as well gave /lens-skins-lens-skins — twelve pages
+ * whose URL and title both stuttered. The theme is what is left once the
+ * category word is removed.
+ */
+const themeBase = (name: string) =>
+  name.replace(/\s*&\s*wraps?\s*$/i, "").replace(/\s+(skins?|wraps?)\s*$/i, "").trim() || name.trim();
+
+/** Whether a name already says which gadget it is for, so we do not say it twice. */
+const namesGadget = (name: string, word: string) =>
+  new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}s?\\b`, "i").test(name);
+
 /** "Apple" + "laptop" → { name: "Apple MacBook", slug: "apple-macbook-skins" } */
 export function brandGadgetName(brand: string, gadget: string): { name: string; slug: string } {
   const key = `${slugify(brand)}|${String(gadget).toLowerCase()}`;
@@ -273,12 +290,13 @@ export async function allTargets(db: admin.firestore.Firestore): Promise<Target[
     if (c.isActive === false) continue;
     const name = String(c.name || "").trim();
     if (!name) continue;
+    const base = themeBase(name);
     const productIds = byCollection.get(d.id) || [];
     if (productIds.length >= FLOORS.theme) {
       targets.push({
         kind: "theme",
-        slug: `${slugify(name)}-skins`,
-        name: `${name} Skins`,
+        slug: `${slugify(base)}-skins`,
+        name: `${base} Skins`,
         depth: productIds.length,
         filterConfig: { collectionId: d.id, collection: name },
       });
@@ -293,10 +311,13 @@ export async function allTargets(db: admin.firestore.Firestore): Promise<Target[
     for (const [g, n] of perGadget) {
       if (n < FLOORS.themeGadget) continue;
       const word = GADGET_NAMES[g] || g;
+      // "Matte Phone Skins" on phones is the theme page over again, under a
+      // longer URL. One page, not two that compete for the same search.
+      if (namesGadget(base, word)) continue;
       targets.push({
         kind: "theme-gadget",
-        slug: `${slugify(`${name} ${word}`)}-skins`,
-        name: `${name} ${word} Skins`,
+        slug: `${slugify(`${base} ${word}`)}-skins`,
+        name: `${base} ${word} Skins`,
         depth: n,
         gadget: g,
         filterConfig: { collectionId: d.id, collection: name, gadget: g },
@@ -307,7 +328,20 @@ export async function allTargets(db: admin.firestore.Firestore): Promise<Target[
   // Stamped on the way out, so the caller sorts by what a page is worth
   // rather than merely by how many things sit behind it.
   for (const t of targets) (t as any).weight = weightOf(t.gadget);
-  return targets;
+
+  /*
+   * One target per slug. Two collections can reduce to the same theme —
+   * "Camera Skins" and "Camera" both become /camera-skins — and a tier can
+   * collide with a broader one. Whichever has more behind it wins, so the
+   * page that survives is the one worth ranking.
+   */
+  const bySlug = new Map<string, Target>();
+  for (const t of targets) {
+    if (!t.slug) continue;
+    const seen = bySlug.get(t.slug);
+    if (!seen || t.depth > seen.depth) bySlug.set(t.slug, t);
+  }
+  return [...bySlug.values()];
 }
 
 /** What has a page and what does not — the number nobody could see. */
@@ -376,6 +410,43 @@ const pageTypeFor = (kind: Target["kind"]) =>
  * there is budget to write new ones, and putting this behind the cap meant it
  * never ran on an account that had not set one.
  */
+/**
+ * Every page that ought to exist and does not, with nothing capped.
+ *
+ * `fillMissingSeoPages` already worked this out, but only ever to write the
+ * top N of it — so the admin could see a count and a sample and had no way to
+ * say "that one, that one, and the seven console pages". This is the same
+ * list, whole, in the order it is worth doing, for a person to choose from.
+ */
+export async function listMissingSeoPages(db: admin.firestore.Firestore) {
+  const [pageSnap, targets] = await Promise.all([
+    db.collection("seoPages").select("slug").get(),
+    allTargets(db),
+  ]);
+  const have = new Set(pageSnap.docs.map((d) => String((d.data() as any).slug || "")));
+  const fresh = Date.now() - 30 * 86400000;
+  const worth = (t: Target) => t.depth * (Number((t as any).weight) || 1);
+  return targets
+    .filter((t) => !have.has(t.slug))
+    .sort((a, z) => {
+      const an = a.kind === "model" && Number((a as any).createdAt) > fresh ? 1 : 0;
+      const zn = z.kind === "model" && Number((z as any).createdAt) > fresh ? 1 : 0;
+      return zn - an || worth(z) - worth(a)
+        || (Number((z as any).createdAt) || 0) - (Number((a as any).createdAt) || 0);
+    })
+    .map((t) => ({
+      slug: t.slug,
+      name: t.name,
+      kind: t.kind,
+      gadget: t.gadget || null,
+      brand: (t as any).brandName || null,
+      depth: t.depth,
+      weight: Number((t as any).weight) || 1,
+      worth: Math.round(worth(t)),
+      fresh: t.kind === "model" && Number((t as any).createdAt) > fresh,
+    }));
+}
+
 export async function repairAutoPageTypes(db: admin.firestore.Firestore): Promise<number> {
   const snap = await db.collection("seoPages").where("autoGenerated", "==", true).get();
   const wrong = snap.docs.filter((d) => (d.data() as any).pageType === "device");
@@ -410,12 +481,20 @@ export interface FillResult {
  */
 export async function fillMissingSeoPages(
   db: admin.firestore.Firestore,
-  opts: { limit?: number; dryRun?: boolean; kinds?: string[]; gadgets?: string[] } = {}
+  opts: { limit?: number; dryRun?: boolean; kinds?: string[]; gadgets?: string[]; slugs?: string[] } = {}
 ): Promise<FillResult> {
   // Before anything else, and regardless of the cap.
   const repaired = opts.dryRun ? 0 : await repairAutoPageTypes(db);
 
-  const perDay = Number(opts.limit ?? (await setting(db, SETTINGS.perDay)) ?? 0);
+  /*
+   * A named list of slugs is a person pointing at a screen, so it ignores the
+   * nightly cap entirely — the cap exists to pace an unattended job, not to
+   * argue with somebody who has just ticked eleven boxes.
+   */
+  const picked = (opts.slugs || []).map(String).filter(Boolean);
+  const perDay = picked.length
+    ? picked.length
+    : Number(opts.limit ?? (await setting(db, SETTINGS.perDay)) ?? 0);
   const out: FillResult = { considered: 0, created: 0, failed: 0, published: false, slugs: [], errors: [], repaired };
   if (!(perDay > 0)) return out;
 
@@ -433,8 +512,10 @@ export async function fillMissingSeoPages(
     templates.find((t) => t.pageType === pageTypeFor(kind)) || templates.find((t) => t.pageType === "device");
 
   const fresh = Date.now() - 30 * 86400000;
+  const want = new Set(picked);
   const missing = targets
     .filter((t) => !slugs.has(t.slug))
+    .filter((t) => !want.size || want.has(t.slug))
     .filter((t) => !opts.kinds?.length || opts.kinds.includes(t.kind))
     /*
      * Narrowed by gadget, so the work can be done in the order it is worth
@@ -553,12 +634,18 @@ export const runSeoAutoPages = functionsV1
           + (c.waitingToPublish ? ` · ${c.waitingToPublish} waiting to be published` : ""),
       };
     }
+    // The whole pending list, for the screen that lets an admin pick from it.
+    if (data?.pendingOnly === true) {
+      return { success: true, pending: await listMissingSeoPages(db) };
+    }
     const limit = data?.limit === undefined ? undefined : Number(data.limit);
     const out = await fillMissingSeoPages(db, {
       limit,
       dryRun: data?.dryRun === true,
       kinds: Array.isArray(data?.kinds) ? data.kinds.map(String) : undefined,
       gadgets: Array.isArray(data?.gadgets) ? data.gadgets.map(String) : undefined,
+      // Capped so one click cannot start a job that outlives the function.
+      slugs: Array.isArray(data?.slugs) ? data.slugs.map(String).slice(0, 50) : undefined,
     });
     if (!out.considered) {
       const fixed = out.repaired ? `${out.repaired} existing page${out.repaired === 1 ? "" : "s"} repaired. ` : "";

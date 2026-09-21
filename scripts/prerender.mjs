@@ -44,6 +44,16 @@ const REDIRECTED_SLUGS = new Set([
   "samsung-galaxy-s24-skins-1",
   "mac-mini-skins-1",
   "master-skins",
+  // Slugs that stuttered; .htaccess sends each to the page it duplicated.
+  "lens-skins-skins",
+  "lens-skins-lens-skins",
+  "charger-skins-skins",
+  "camera-skins-skins",
+  "camera-skins-camera-skins",
+  "laptop-skins-skins",
+  "laptop-skins-laptop-skins",
+  "matte-phone-skins-phone-skins",
+  "3d-embossed-phone-skins-phone-skins",
 ]);
 
 /** First path segments the app owns; an SEO page may not shadow them. */
