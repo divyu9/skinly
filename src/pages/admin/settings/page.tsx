@@ -683,9 +683,11 @@ export default function SettingsPage() {
               Three kinds of page, written by the same generator the SEO screen uses: one per model
               ("acer swift 5 skins"), one per brand and gadget ("dell laptop skins" — 366 models sit
               behind that one, and none of these existed), and one per theme from your collections
-              ("anime phone skins"). A model added today gets its page tomorrow; after that it is
-              simply whichever missing page has the most stock behind it. The cap is what keeps one
-              night's run from spending a month of OpenAI budget.
+              ("anime phone skins"). A model added today gets its page tomorrow; after that the order is
+              what a page is worth — how much sits behind it, times what that kind of thing sells
+              for. A console skin's median is ₹1,199 and a phone skin's is ₹199, so a console page
+              is written before six phone ones. The cap is what keeps one night's run from spending
+              a month of OpenAI budget.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

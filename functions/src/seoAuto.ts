@@ -134,6 +134,8 @@ export interface Target {
   depth: number;
   filterConfig: Record<string, unknown>;
   brandName?: string;
+  /** Which gadget this page sells, where it is about one. */
+  gadget?: string;
 }
 
 /**
@@ -168,12 +170,52 @@ export interface Coverage {
  * phrase people genuinely type — and there was not one of those on the site.
  */
 export async function allTargets(db: admin.firestore.Firestore): Promise<Target[]> {
-  const [modelSnap, collSnap, cpSnap, prodSnap] = await Promise.all([
+  const [modelSnap, collSnap, cpSnap, prodSnap, variantSnap] = await Promise.all([
     db.collection("supportedModels").get(),
     db.collection("collections").get(),
     db.collection("collectionProducts").get(),
     db.collection("products").get(),
+    db.collection("variants").get(),
   ]);
+
+  /*
+   * What a page of each gadget is worth, measured rather than assumed.
+   *
+   * A page is worth writing in proportion to what the thing behind it sells
+   * for, and these differ by six times: a console skin's median is ₹1,199 and
+   * a phone skin's is ₹199. Twenty-seven phone landing pages had been written
+   * and one console page — which is the effort spent exactly backwards.
+   *
+   * Taken from the catalogue each night rather than written down here, so
+   * retiring old stock or repricing a range moves the queue on its own.
+   */
+  const priceOf = new Map<string, number>();
+  for (const d of variantSnap.docs) {
+    const v = d.data() as any;
+    const price = Number(v.price) || 0;
+    if (!price) continue;
+    const pid = String(v.productId || "");
+    priceOf.set(pid, Math.max(priceOf.get(pid) || 0, price));
+  }
+  const pricesByGadget = new Map<string, number[]>();
+  for (const d of prodSnap.docs) {
+    const p = d.data() as any;
+    const g = String(p.gadgetCategory || "").toLowerCase();
+    const price = priceOf.get(d.id);
+    if (!g || !price) continue;
+    pricesByGadget.set(g, [...(pricesByGadget.get(g) || []), price]);
+  }
+  const median = (xs: number[]) => {
+    const a = [...xs].sort((x, y) => x - y);
+    return a.length ? a[Math.floor(a.length / 2)] : 0;
+  };
+  const allMedian = median([...pricesByGadget.values()].flat()) || 200;
+  /** 1.0 is an average-priced gadget; a console page is worth several of them. */
+  const weightOf = (g?: string) => {
+    if (!g) return 1;
+    const m = median(pricesByGadget.get(String(g).toLowerCase()) || []);
+    return m ? Math.max(0.3, Math.min(8, m / allMedian)) : 1;
+  };
 
   const models = modelSnap.docs
     .map((d) => ({ id: d.id, ...(d.data() as any) }))
@@ -189,6 +231,7 @@ export async function allTargets(db: admin.firestore.Firestore): Promise<Target[
       name: `${pretty(String(m.brandName))} ${m.modelName}`,
       depth: 1,
       brandName: String(m.brandName),
+      gadget: String(m.category || m.gadgetType || "").toLowerCase() || undefined,
       filterConfig: { brand: String(m.brandName), model: String(m.modelName) },
       // Newest models are the ones being searched for today.
       ...( { createdAt: Number(m._creationTime || m.createdAt) || 0 } as any),
@@ -209,7 +252,7 @@ export async function allTargets(db: admin.firestore.Firestore): Promise<Target[
     if (n < FLOORS.brandGadget) continue;
     const { name, slug } = brandGadgetName(brand, gadget);
     targets.push({
-      kind: "brand-gadget", slug, name, depth: n, brandName: brand,
+      kind: "brand-gadget", slug, name, depth: n, brandName: brand, gadget,
       filterConfig: { brand, gadget },
     });
   }
@@ -253,11 +296,15 @@ export async function allTargets(db: admin.firestore.Firestore): Promise<Target[
         slug: `${slugify(`${name} ${word}`)}-skins`,
         name: `${name} ${word} Skins`,
         depth: n,
+        gadget: g,
         filterConfig: { collectionId: d.id, collection: name, gadget: g },
       });
     }
   }
 
+  // Stamped on the way out, so the caller sorts by what a page is worth
+  // rather than merely by how many things sit behind it.
+  for (const t of targets) (t as any).weight = weightOf(t.gadget);
   return targets;
 }
 
@@ -345,7 +392,8 @@ export async function fillMissingSeoPages(
     .sort((a, z) => {
       const an = a.kind === "model" && Number((a as any).createdAt) > fresh ? 1 : 0;
       const zn = z.kind === "model" && Number((z as any).createdAt) > fresh ? 1 : 0;
-      return zn - an || z.depth - a.depth;
+      const worth = (t: Target) => t.depth * (Number((t as any).weight) || 1);
+      return zn - an || worth(z) - worth(a);
     })
     .slice(0, perDay);
 
