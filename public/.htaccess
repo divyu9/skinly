@@ -12,7 +12,22 @@ ErrorDocument 404 /404.html
 
 <IfModule mod_headers.c>
   <FilesMatch "\.html$">
-    Header set Cache-Control "no-cache"
+    # Every page is written by the build and changes only on a deploy, yet
+    # "no-cache" sent every request — every visitor's, and every one of
+    # Googlebot's two thousand — all the way to Hostinger. Measured from
+    # outside: /devices averaged 6.5s and timed out once in six, every HTML
+    # response came back cf-cache-status: DYNAMIC, and Search Console has
+    # 1,076 URLs it discovered and has not crawled. A slow origin is the
+    # reason Google gives for that.
+    #
+    # The browser still revalidates on every view, so a deploy is never
+    # served stale to somebody with the page already open; the edge may hold
+    # it for ten minutes, and may keep serving yesterday's copy for a day
+    # while it fetches today's rather than making anyone wait for the origin.
+    #
+    # Cloudflare does not cache HTML on its own whatever this says — that
+    # needs a Cache Rule in the dashboard. This makes the page eligible.
+    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=600, stale-while-revalidate=86400"
   </FilesMatch>
   <FilesMatch "^404\.html$">
     Header set X-Robots-Tag "noindex"
@@ -22,8 +37,9 @@ ErrorDocument 404 /404.html
   <FilesMatch "\.json$">
     Header set X-Robots-Tag "noindex"
     # Rebuilt at most daily; ten minutes of browser cache saves a refetch on
-    # every page of a visit without holding stale data for long.
-    Header set Cache-Control "public, max-age=600"
+    # every page of a visit without holding stale data for long, and the edge
+    # may hold it an hour and serve yesterday's while it fetches today's.
+    Header set Cache-Control "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
   </FilesMatch>
 </IfModule>
 
