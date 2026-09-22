@@ -12,11 +12,17 @@
          prerendered, and a hardcoded canonical here told every page on the
          site that it was a copy of the homepage. -->
     <!--seo-head-->
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💚</text></svg>"
-    />
+    <!-- Google's favicon crawler fetches a URL; it cannot read a data: URI,
+         which is what stood here, and /favicon.ico answered 404. Both are why
+         the tab and the search result showed a blank page icon. The mark is
+         the logo's own "s", which is the only part of a wordmark that stays
+         legible at sixteen pixels. -->
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#2abc9d" />
 
     <!-- Facebook Domain Verification -->
     <meta name="facebook-domain-verification" content="vm0bjui4j2eqmsl9csnumdym9zepkk" />

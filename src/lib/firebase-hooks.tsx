@@ -2123,6 +2123,23 @@ export function useQuery(apiRef: any, args?: any) {
           const q = query(collection(db, 'collections'));
           unsubscribe = onSnapshot(q, (snap) => {
             const docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            /*
+             * The order the admin chose, not the order Firestore happened to
+             * return them in.
+             *
+             * Nothing sorted these, so the row of collection chips on the shop
+             * was in document order — which is arbitrary, and put "Camera
+             * Skins" and "Drone Skins" in front of Anime and Marvel. Only the
+             * first seven show before "N more", so that order decides what
+             * anybody sees. A collection with no order yet sorts after the
+             * ones that have one, alphabetically, so adding a collection puts
+             * it at the end rather than somewhere random.
+             */
+            docs.sort((a: any, b: any) => {
+              const ao = Number.isFinite(Number(a.displayOrder)) ? Number(a.displayOrder) : Infinity;
+              const bo = Number.isFinite(Number(b.displayOrder)) ? Number(b.displayOrder) : Infinity;
+              return ao - bo || String(a.name || '').localeCompare(String(b.name || ''));
+            });
             setData(docs);
           });
         }
@@ -2133,6 +2150,12 @@ export function useQuery(apiRef: any, args?: any) {
             if (args?.category) {
               cols = cols.filter((c: any) => c.category === args.category);
             }
+            // Same order the chips use, so the two never disagree.
+            cols.sort((a: any, b: any) => {
+              const ao = Number.isFinite(Number(a.displayOrder)) ? Number(a.displayOrder) : Infinity;
+              const bo = Number.isFinite(Number(b.displayOrder)) ? Number(b.displayOrder) : Infinity;
+              return ao - bo || String(a.name || '').localeCompare(String(b.name || ''));
+            });
             setData(cols);
           });
         }

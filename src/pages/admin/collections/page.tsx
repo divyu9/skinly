@@ -3,7 +3,7 @@ import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { Link } from "react-router-dom";
-import { FolderIcon, PlusIcon, EditIcon, TrashIcon, SparklesIcon, XIcon, PackageIcon, SearchIcon, ImageIcon, RefreshCwIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronUpIcon, EditIcon, FolderIcon, ImageIcon, PackageIcon, PlusIcon, RefreshCwIcon, SearchIcon, SparklesIcon, TrashIcon, XIcon } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
@@ -53,6 +53,46 @@ function AdminCollectionsPageInner() {
   const [matchLogic, setMatchLogic] = useState<"all" | "any">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [syncingCollectionId, setSyncingCollectionId] = useState<Id<"collections"> | null>(null);
+  const [reordering, setReordering] = useState(false);
+
+  /*
+   * The order the shop shows these in.
+   *
+   * Nothing sorted collections, so the chip row on the listing was in whatever
+   * order Firestore returned — and only the first seven show before "N more",
+   * so that arbitrary order decided what anybody saw. Moving a row writes a
+   * `displayOrder` on it and on the one it swapped with; the storefront sorts
+   * by that, putting collections with no order yet at the end alphabetically,
+   * so a new collection appears last rather than somewhere random.
+   *
+   * Only meaningful when the list is not filtered — a move inside a search
+   * result would swap two rows that are not next to each other on the shop.
+   */
+  const move = async (index: number, delta: number) => {
+    const list = collections || [];
+    const target = index + delta;
+    if (target < 0 || target >= list.length) return;
+    setReordering(true);
+    try {
+      await Promise.all([
+        updateCollection({ collectionId: list[index]._id, displayOrder: target }),
+        updateCollection({ collectionId: list[target]._id, displayOrder: index }),
+      ]);
+      // Anything still unnumbered keeps drifting to the end until it is moved,
+      // so the numbers are settled in one pass the first time this is used.
+      const unnumbered = list.some((c: any) => !Number.isFinite(Number(c.displayOrder)));
+      if (unnumbered) {
+        const next = [...list];
+        [next[index], next[target]] = [next[target], next[index]];
+        await Promise.all(next.map((c: any, i: number) =>
+          Number(c.displayOrder) === i ? null : updateCollection({ collectionId: c._id, displayOrder: i })));
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not reorder");
+    } finally {
+      setReordering(false);
+    }
+  };
   const [formData, setFormData] = useState({
     name: "",
     slug: "",
@@ -551,6 +591,7 @@ function AdminCollectionsPageInner() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[72px]">Order</TableHead>
                 <TableHead className="w-[80px]">Image</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Products</TableHead>
@@ -559,8 +600,28 @@ function AdminCollectionsPageInner() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredCollections.map((collection) => (
+              {filteredCollections.map((collection: any, index: number) => (
                 <TableRow key={collection._id}>
+                  <TableCell>
+                    {/* Hidden while searching: the row above a filtered row is
+                        not the row above it on the shop. */}
+                    {searchQuery.trim() ? (
+                      <span className="text-muted-foreground tabular-nums">{index + 1}</span>
+                    ) : (
+                      <div className="flex flex-col">
+                        <Button variant="ghost" size="icon" className="size-6"
+                                disabled={reordering || index === 0}
+                                onClick={() => void move(index, -1)} aria-label="Move up">
+                          <ChevronUpIcon className="size-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-6"
+                                disabled={reordering || index === filteredCollections.length - 1}
+                                onClick={() => void move(index, 1)} aria-label="Move down">
+                          <ChevronDownIcon className="size-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {collection.image ? (
                       <div className="size-16 bg-muted rounded overflow-hidden">
