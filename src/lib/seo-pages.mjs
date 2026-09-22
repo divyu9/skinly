@@ -220,6 +220,57 @@ const live = (u) => typeof u === "string" && /^https?:\/\//.test(u) && !u.includ
  * @param variantsByProduct Map<productId, variant[]>
  * @param collectionsByProduct Map<productId, Set<collectionName>>
  */
+/**
+ * The design-on-a-gadget a product row is a copy of.
+ *
+ * A design is a separate row for every gadget and brand it was cut for —
+ * "Colourful Abstract Pattern Matte" exists 36 times, five of them phones —
+ * and the SKU says which is which: R-41-IPH, R-41-SAM and R-41-OPL are all
+ * R-41. The gadget is part of the key because R-19 alone spans eleven of
+ * them: on a page that is not narrowed to one gadget, folding by the design
+ * number would drop the laptop version into the phone version and lose ten
+ * real products.
+ *
+ * Two things this deliberately leaves alone. The older series — L, M, T, A —
+ * carry no brand suffix at all: one row each, sold for every model, and no
+ * two of them share a number, so nothing of theirs is ever folded. And a SKU
+ * that does not parse falls back to the row's own id, so an unusual one keeps
+ * its place rather than joining somebody else's design.
+ */
+export const designKey = (p) => {
+  const sku = (p?.variants || []).find((v) => v?.sku)?.sku || "";
+  const m = String(sku).match(/^([A-Za-z]+-\d+)(?:-.+)?$/);
+  const gadget = String(p?.gadgetCategory || "").toLowerCase();
+  return m ? `${gadget}|${m[1].toUpperCase()}` : `id:${p?._id}`;
+};
+
+/**
+ * One row per design, choosing the copy cut for the brand we care about.
+ *
+ * Preference order: the brand asked for, then the row that fits the most
+ * brands (the generic "Android Phone Skin" over the OnePlus one), then
+ * whichever came first, so the caller's ordering survives.
+ */
+export function oneRowPerDesign(rows, preferBrand) {
+  const key = (b) => String(b ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const want = key(preferBrand);
+  const rank = (p) => {
+    const brands = (p.modelBrands || []).map(key).filter(Boolean);
+    if (want && brands.includes(want)) return 0;
+    return brands.length ? 2 : 1;
+  };
+  const width = (p) => (p.modelBrands || []).length || Infinity;
+  const best = new Map();
+  for (const p of rows) {
+    const k = designKey(p);
+    const seen = best.get(k);
+    if (!seen || rank(p) < rank(seen) || (rank(p) === rank(seen) && width(p) > width(seen))) {
+      best.set(k, p);
+    }
+  }
+  return [...best.values()];
+}
+
 export function selectSeoProducts(target, products, variantsByProduct, collectionsByProduct) {
   const pool = products.filter((p) => p.status === "active" && p.slug && p.productCategory === "skin");
   const titleHas = (p, list) => {
@@ -295,6 +346,17 @@ export function selectSeoProducts(target, products, variantsByProduct, collectio
       productCategory: p.productCategory,
       gadgetCategory: p.gadgetCategory,
       finishType: p.finishType,
+      /*
+       * Which brands a design was cut for.
+       *
+       * The page carries one row per brand a design fits, so the grid needs
+       * to know which is which — without this every version of a design looks
+       * alike and the first one wins, which is how a page showing an iPhone
+       * owner their own phone showed them a OnePlus instead.
+       */
+      ...(Array.isArray(p.modelBrands) && p.modelBrands.length ? { modelBrands: p.modelBrands } : {}),
+      ...(Array.isArray(p.modelBrandsExclude) && p.modelBrandsExclude.length
+        ? { modelBrandsExclude: p.modelBrandsExclude } : {}),
       images: (p.images || [])
         .map((i) => (typeof i === "string" ? { url: i } : i))
         .filter((i) => live(i?.url))

@@ -28,7 +28,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
-import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, slugify } from "../src/lib/seo-pages.mjs";
+import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify } from "../src/lib/seo-pages.mjs";
 import { CATEGORY_PAGES, GADGET_PAGES } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
@@ -1245,7 +1245,17 @@ async function seoPageData(project, seoDocs, data, variantsByProduct) {
     const sel = selectSeoProducts(target, data.products, variantsByProduct, collectionsByProduct);
     const copy = seoCopy(s, target, sel);
 
-    let products = sel.products.slice(0, 48);
+    /*
+     * Forty-eight designs, not forty-eight rows of the same few.
+     *
+     * A design is a row per gadget and brand it fits — R-01 alone is 54 of
+     * them — so the first forty-eight products on a phone page were about
+     * eighteen designs, each shown two or three times under a different
+     * brand's name. Folding them here rather than in the browser keeps the
+     * page's data file the same size while filling it with distinct designs,
+     * and the brand the page is about picks which copy of each survives.
+     */
+    let products = oneRowPerDesign(sel.products, target.brand).slice(0, 48);
     let mockups = 0;
     if (target.kind === "model") {
       try {

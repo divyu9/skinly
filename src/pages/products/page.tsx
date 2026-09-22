@@ -469,8 +469,12 @@ export default function ProductsPage() {
           />
 
           {/* The styles, for anyone who came here by the footer's "All
-              styles" and would otherwise find a product grid and no styles. */}
-          {filters.productCategory === "skin" && !filters.searchQuery && !filters.collectionParam && (
+              styles" and would otherwise find a product grid and no styles.
+              It stands down once a device is chosen: CollectionPills below
+              filters this same list in place and keeps the device, which is
+              the better tool and was already here. */}
+          {filters.productCategory === "skin" && !showCollectionPills
+            && !filters.searchQuery && !filters.collectionParam && (
             <StyleStrip gadget={filters.gadgetFilter} />
           )}
 

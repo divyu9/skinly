@@ -37,3 +37,9 @@ export function seoCopy(
   target: SeoTarget,
   stats: SeoSelection,
 ): { title: string; description: string; listing: string };
+
+/** The design-on-a-gadget a product row is a copy of; see seo-pages.mjs. */
+export function designKey(p: unknown): string;
+
+/** One row per design, preferring the copy cut for `preferBrand`. */
+export function oneRowPerDesign<T>(rows: T[], preferBrand?: string | null): T[];

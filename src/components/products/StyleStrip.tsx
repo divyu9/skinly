@@ -27,15 +27,23 @@ export function StyleStrip({ gadget }: { gadget?: string | null }) {
     : themes.filter((t) => !t.gadget);
   if (shown.length < 3) return null;
 
+  /*
+   * One row that scrolls, not a block that wraps.
+   *
+   * Eighteen chips wrapped to eight rows on a phone and pushed the products
+   * off the screen — on a listing, the products are the page. A single row
+   * that scrolls sideways costs one row's height whatever the count, which is
+   * how the category bar above it already behaves.
+   */
   return (
-    <section className="mb-6">
-      <h2 className="mb-2 text-sm font-semibold">Browse by style</h2>
-      <div className="flex flex-wrap gap-2">
+    <section className="mb-4 -mx-3 sm:mx-0">
+      <h2 className="mb-2 px-3 text-sm font-semibold sm:px-0">Browse by style</h2>
+      <div className="flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
         {shown.slice(0, 18).map((t) => (
           <Link
             key={t.slug}
             to={`/${t.slug}`}
-            className="sticker sticker-press inline-flex items-center gap-1.5 rounded-full border-2 border-ink/15 bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:border-ink"
+            className="sticker sticker-press inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-ink/15 bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:border-ink"
           >
             {t.name}
             <span className="text-xs text-muted-foreground tabular-nums">{t.total}</span>

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { brandGadgetLabel } from "@/lib/seo-pages.mjs";
+import { useDeviceDetection } from "@/hooks/useDeviceDetection";
+import { brandGadgetLabel, oneRowPerDesign } from "@/lib/seo-pages.mjs";
 import { ProductCard } from "@/components/products/ProductCard.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import type { SeoPageData } from "../use-seo-page-data";
@@ -14,6 +15,20 @@ import type { SeoPageData } from "../use-seo-page-data";
  * we have the photo and opens with the model already chosen.
  */
 export function SeoProductsSection({ data, heading }: { data: SeoPageData | undefined; heading: string }) {
+  /*
+   * The device this visitor already told us about.
+   *
+   * A page named after a style names no device, so every card fell back to a
+   * stock photo and /matte-phone-skins showed the same design on a Samsung, a
+   * OnePlus and an iPhone in turn — to somebody who had picked an iPhone 13
+   * Pro twenty seconds earlier. The page still lists exactly the products it
+   * listed, so what a crawler was served does not change; the cards simply
+   * render for the phone in the reader's pocket and carry it onward in their
+   * links. A saved phone against a laptop page matches no variant, so those
+   * cards are left alone by the fit check that was already there.
+   */
+  const { device: savedDevice } = useDeviceDetection();
+
   if (data === undefined) {
     return (
       <section className="border-y-2 border-ink/10 bg-card/60">
@@ -31,6 +46,19 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
 
   const t = data.target;
   const onDevice = t.kind === "model" && t.brand && t.model;
+  /*
+   * The brand to show each design on: the page's own if it names one, else
+   * whatever the reader last told us they own.
+   */
+  const forBrand = t.brand ?? savedDevice?.brand ?? null;
+  /*
+   * One card per design, from the same function the build uses.
+   *
+   * The prerendered pages already arrive folded, so this changes nothing for
+   * them; it is here for the pages the app resolves itself, and because two
+   * copies of this rule would eventually disagree.
+   */
+  const cards = oneRowPerDesign(data.products as any[], forBrand) as typeof data.products;
 
   if (data.total === 0) {
     return (
@@ -57,20 +85,20 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
         <div className="mx-auto mb-8 max-w-2xl text-center">
           <h2 className="text-2xl font-bold sm:text-3xl text-balance">{heading}</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {data.total} designs
+            {cards.length} designs
             {data.minPrice ? ` · from ₹${data.minPrice}` : ""}
             {onDevice ? ` · each cut for the ${t.model}` : " · each cut for your exact device"}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {data.products.map((product) => (
+          {cards.map((product) => (
             <ProductCard
               key={product._id}
               product={product}
-              brandFilter={onDevice ? t.brand! : null}
-              modelFilter={onDevice ? t.model! : null}
+              brandFilter={onDevice ? t.brand! : (savedDevice?.brand ?? null)}
+              modelFilter={onDevice ? t.model! : (savedDevice?.model ?? null)}
               // A brand page knows the brand even when it names no model.
-              brandHint={t.brand ?? null}
+              brandHint={t.brand ?? savedDevice?.brand ?? null}
               deviceCategory={onDevice ? t.gadget : null}
               autoSortOOS={false}
             />
@@ -82,7 +110,7 @@ export function SeoProductsSection({ data, heading }: { data: SeoPageData | unde
               to={data.listing}
               className="sticker sticker-press inline-flex h-12 items-center rounded-2xl bg-brand px-6 font-bold text-brand-foreground"
             >
-              See all {data.total} designs
+              See all {data.total} in this style
             </Link>
           </div>
         )}
