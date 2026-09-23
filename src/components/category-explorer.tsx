@@ -1,3 +1,5 @@
+import { useDragScroll } from "@/hooks/use-drag-scroll";
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
@@ -12,6 +14,7 @@ interface CategoryExplorerProps {
 export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
   const categories = useQuery(api.homepage.getActiveCategoryDisplaySettings);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const row = useDragScroll<HTMLDivElement>();
 
   // Loading state
   if (categories === undefined) {
@@ -76,9 +79,35 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
           Explore by Category
         </h2>
 
-        {/* Horizontal Scrolling Cards - matches hero slider structure */}
+        {/* Horizontal Scrolling Cards - matches hero slider structure.
+            A finger swipes this on a phone; on a desktop the arrows page it
+            and a press-and-drag moves it, since a hidden scrollbar leaves a
+            mouse no way to reach the cards past the edge. */}
+        <div className="relative">
+        {row.canBack && (
+          <button
+            type="button"
+            aria-label="Previous categories"
+            onClick={() => row.page(-1)}
+            className="absolute left-2 top-1/2 z-10 hidden -translate-y-1/2 size-11 items-center justify-center rounded-full border-2 border-ink bg-card shadow-lg transition hover:scale-105 md:flex"
+          >
+            <ChevronLeftIcon className="size-5" />
+          </button>
+        )}
+        {row.canForward && (
+          <button
+            type="button"
+            aria-label="More categories"
+            onClick={() => row.page(1)}
+            className="absolute right-2 top-1/2 z-10 hidden -translate-y-1/2 size-11 items-center justify-center rounded-full border-2 border-ink bg-card shadow-lg transition hover:scale-105 md:flex"
+          >
+            <ChevronRightIcon className="size-5" />
+          </button>
+        )}
         <div
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+          ref={row.ref}
+          {...row.bind}
+          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide md:cursor-grab md:active:cursor-grabbing select-none"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}
@@ -148,6 +177,7 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
               </Link>
             );
           })}
+        </div>
         </div>
 
         {/* Device Selector Dialog for Skins */}

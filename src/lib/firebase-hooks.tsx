@@ -348,7 +348,22 @@ export function useQuery(apiRef: any, args?: any) {
              * 0.65 layout shift and most of the page's CLS.
              */
             if (snap.empty && snap.metadata.fromCache) return;
-            let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            /*
+             * A section's config, as an object, whichever way it was saved.
+             *
+             * Some sections store config as an object and some as a JSON
+             * string — Most Trendy's is `"{\"title\":\"Most Trendy\",...,
+             * \"cardWidth\":280}"` — and every component reads it as an
+             * object. On a string, `config.cardWidth` is undefined, so each
+             * card took its image's natural size: 1360px tall on a 335px
+             * phone, one of them 1204px wide, under a heading with no text.
+             * It surfaced once "trendy" products existed for it to show.
+             */
+            const asObject = (c: unknown) => {
+              if (typeof c !== 'string') return c;
+              try { return JSON.parse(c); } catch { return {}; }
+            };
+            let data = snap.docs.map(d => { const x: any = d.data(); return { _id: d.id, ...x, config: asObject(x.config) }; });
             data = data.filter((d: any) => d.isActive === true).sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
             setData(data);
           });

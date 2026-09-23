@@ -19,7 +19,17 @@ interface MostTrendyProps {
   };
 }
 
-export function MostTrendy({ config }: MostTrendyProps) {
+export function MostTrendy({ config: raw }: MostTrendyProps) {
+  // A card with no width takes its image's natural size, so a config missing
+  // these — or one saved before they existed — still lays out as intended.
+  const config = {
+    ...raw,
+    title: raw?.title || "Most Trendy",
+    tags: Array.isArray(raw?.tags) ? raw.tags : [],
+    maxProducts: Number(raw?.maxProducts) || 20,
+    cardWidth: Number(raw?.cardWidth) || 280,
+    cardHeight: Number(raw?.cardHeight) || 380,
+  };
   const products = useQuery(api.homepage.getProductsByTags, {
     tags: config.tags,
     maxProducts: config.maxProducts,
