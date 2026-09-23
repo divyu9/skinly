@@ -38,9 +38,31 @@ export const r2PublicUrl = (key: string) =>
   `${getR2Config().publicUrl.replace(/\/$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}`;
 
 /** Stores bytes server-side (the launch pipeline) and returns the public URL. */
+/**
+ * How long a browser may keep an object without asking again.
+ *
+ * Nothing set this, so every picture came back with no Cache-Control and
+ * Lighthouse counted six megabytes of them as "inefficient cache lifetime" —
+ * each visit fetched them over again.
+ *
+ * Two kinds of key, two answers. A media-library upload is named with the
+ * moment it was made (`…_1788719002788.webp`) and its derived `_opt` copy
+ * likewise: that name will never hold anything else, so a year, immutable.
+ * A mockup is named after what it shows — `mockups/Apple/iPhone 17/R-41.webp`
+ * — and is regenerated in place when the picture is redone, so it gets a day
+ * and is refreshed quietly after that.
+ */
+export const cacheControlFor = (key: string) =>
+  /^media-library\//.test(key)
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=86400, stale-while-revalidate=604800";
+
 export async function putR2Object(key: string, body: Buffer, contentType: string): Promise<string> {
   const { s3, config } = pipelineS3();
-  await s3.send(new PutObjectCommand({ Bucket: config.bucketName, Key: key, Body: body, ContentType: contentType }));
+  await s3.send(new PutObjectCommand({
+    Bucket: config.bucketName, Key: key, Body: body, ContentType: contentType,
+    CacheControl: cacheControlFor(key),
+  }));
   return r2PublicUrl(key);
 }
 

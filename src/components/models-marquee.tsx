@@ -58,13 +58,16 @@ export function ModelsMarquee() {
   const modelsToShow = [...marqueeModels, ...marqueeModels, ...marqueeModels];
 
   return (
-    <div className="w-full overflow-hidden border-y-2 border-ink/20 bg-blush/30">
+    // The loaded strip keeps MARQUEE_H as well. On phones the brand bar over
+    // the row made it 86px, so the page moved down 14px the moment the models
+    // arrived — the largest layout shift left on the homepage.
+    <div className={`w-full overflow-hidden border-y-2 border-ink/20 bg-blush/30 ${MARQUEE_H}`}>
       {/* Mobile: Simple centered marquee */}
-      <div className="md:hidden">
-        <div className="border-b-2 border-ink/20 bg-brand py-2 text-center text-xs font-extrabold tracking-wide text-brand-foreground">
+      <div className="flex h-full flex-col md:hidden">
+        <div className="border-b-2 border-ink/20 bg-brand py-1.5 text-center text-xs font-extrabold tracking-wide text-brand-foreground">
           ✨ NOW SUPPORTING
         </div>
-        <div className="py-3 overflow-hidden relative">
+        <div className="relative flex min-h-0 flex-1 items-center overflow-hidden">
           <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap">
             {modelsToShow.map((model, idx) => {
               const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
@@ -85,7 +88,7 @@ export function ModelsMarquee() {
       </div>
 
       {/* Desktop: Horizontal marquee with label */}
-      <div className="hidden md:flex items-center gap-4 py-3">
+      <div className="hidden h-full md:flex items-center gap-4">
         <div className="flex flex-shrink-0 items-center gap-2 rounded-r-full border-y-2 border-r-2 border-ink bg-brand px-6 py-2 text-sm font-extrabold text-brand-foreground">
           <span className="text-base">✨</span>
           <span className="whitespace-nowrap tracking-wide">NOW SUPPORTING:</span>

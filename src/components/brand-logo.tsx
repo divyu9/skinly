@@ -65,12 +65,17 @@ export function BrandLogo({
   }
 
   const imgContent = logoUrl ? (
+    // Not high priority: at fetchpriority="high" this 89 KB file raced the
+    // hero slide, which is the page's largest paint, for the same connection.
+    // The width and height give the box its shape before the file arrives
+    // (the wordmark is 5:2), so the header does not reflow when it lands.
     <img
       src={logoUrl}
       alt="GoSkinly"
-      fetchpriority="high"
+      width={120}
+      height={48}
       loading="eager"
-      decoding="sync"
+      decoding="async"
       className={cn("h-10 md:h-12 w-auto max-w-[200px] object-contain", imgClassName)}
     />
   ) : (

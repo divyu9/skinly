@@ -12,6 +12,39 @@
          prerendered, and a hardcoded canonical here told every page on the
          site that it was a copy of the homepage. -->
     <!--seo-head-->
+    <!-- A page whose own bundle is gone reloads itself, once.
+         Every page is cached at the edge for a few minutes, and every deploy
+         replaces the hashed bundles under /assets with new names. For those
+         minutes the edge can hand out yesterday's HTML pointing at files that
+         now answer 404 — a blank, unstyled page. When one of our own assets
+         fails, this asks again with a query string the edge has never seen,
+         which fetches the current HTML. A session flag stops it looping if
+         the fresh copy fails too; lazily loaded chunks already heal the same
+         way through lazyWithReload. -->
+    <script>
+      (function () {
+        var KEY = "__assetReload";
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          if (!t || t === window) return;
+          var src = t.src || t.href || "";
+          if (src.indexOf(location.origin + "/assets/") !== 0) return;
+          try { if (sessionStorage.getItem(KEY)) return; sessionStorage.setItem(KEY, "1"); } catch (_) { return; }
+          var u = new URL(location.href);
+          u.searchParams.set("_v", String(Date.now()));
+          location.replace(u.toString());
+        }, true);
+        window.addEventListener("load", function () {
+          try { sessionStorage.removeItem(KEY); } catch (_) {}
+          // Leave nobody holding a URL with the cache-buster in it.
+          if (location.search.indexOf("_v=") !== -1) {
+            var u = new URL(location.href);
+            u.searchParams.delete("_v");
+            history.replaceState(history.state, "", u.pathname + (u.search === "?" ? "" : u.search) + u.hash);
+          }
+        });
+      })();
+    </script>
     <!-- Google's favicon crawler fetches a URL; it cannot read a data: URI,
          which is what stood here, and /favicon.ico answered 404. Both are why
          the tab and the search result showed a blank page icon. The mark is
@@ -40,12 +73,12 @@
     <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
     <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
     <link rel="dns-prefetch" href="https://connect.facebook.net" />
-    <link rel="dns-prefetch" href="https://mercury.phonepe.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
 
 
-    <!-- PhonePe Checkout Script - Deferred for performance -->
-    <script src="https://mercury.phonepe.com/web/bundle/checkout.js" defer></script>
+    <!-- No PhonePe checkout.js: payment goes by redirect to PhonePe's own page
+         and nothing calls window.PhonePeCheckout, so every visitor downloaded
+         a script from a fourth host for nothing. -->
 
     <!-- Google Analytics - Aggressively deferred (5s or user interaction) -->
     <script>
@@ -128,8 +161,11 @@
     <script>
       (function () {
         try {
-          var theme = localStorage.getItem("theme");
-          if (theme === "system" || !theme) {
+          // No stored choice means light: that is the ThemeProvider's
+          // defaultTheme. Reading it as "system" painted dark-mode phones
+          // black until the app booted and switched them back to white.
+          var theme = localStorage.getItem("theme") || "light";
+          if (theme === "system") {
             var prefersDark = window.matchMedia(
               "(prefers-color-scheme: dark)",
             ).matches;
@@ -162,8 +198,10 @@
       .bg-background{background-color:var(--background)}.border-b{border-bottom-width:1px}
       .border-border{border-color:var(--border)}
       
-      /* Critical image loading optimization */
-      img{content-visibility:auto;contain-intrinsic-size:1200px}
+      /* No content-visibility on images. `img{content-visibility:auto;
+         contain-intrinsic-size:1200px}` stood here: every image off screen
+         was laid out as a 1200px box until it rendered and then shrank to its
+         real size, which is a layout shift for everything below it. */
       
       /* Hide content during load to prevent FOUC */
       #root{min-height:100vh}

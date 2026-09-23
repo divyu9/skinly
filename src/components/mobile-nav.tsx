@@ -59,11 +59,16 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
   const [expandedItem, setExpandedItem] = useState<string | null>("Shop");
 
   const [brandLogos, setBrandLogos] = useState<Record<string, BrandLogo>>({});
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  // The logos live in the full product catalogue — a couple of hundred KB — and
+  // this menu is mounted on every page, closed. Fetching on mount pulled that
+  // file down during every page load for a drawer most visitors never open.
   useEffect(() => {
+    if (!open) return;
     let live = true;
     void loadCatalogue().then((c) => { if (live) setBrandLogos(c?.brandLogos || {}); }).catch(() => {});
     return () => { live = false; };
-  }, []);
+  }, [open]);
   // The same logos and links as the homepage's Explore by Brand section and
   // every other device picker, so a shopper who knows their brand can jump
   // straight to it from the menu instead of wading through every listing.
@@ -73,7 +78,6 @@ export function MobileNav({ open: controlledOpen, onOpenChange, onGadgetSelector
     .map((b) => ({ label: b.name!, href: b.href!, logo: b.image }));
   
   // Use controlled state if provided, otherwise use internal state
-  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   
   const navigate = useNavigate();

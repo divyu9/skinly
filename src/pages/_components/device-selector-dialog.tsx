@@ -78,11 +78,15 @@ export function DeviceSelectorDialog({ open, onOpenChange, initialDeviceType, on
   const [brandLogos, setBrandLogos] = useState<Record<string, BrandLogo>>({});
   const [brokenLogo, setBrokenLogo] = useState<Set<string>>(new Set());
 
+  // Only once the picker opens. It is mounted, closed, under the homepage's
+  // category cards, and fetching on mount pulled the whole product catalogue
+  // (the logos live in it) down while the hero image was still arriving.
   useEffect(() => {
+    if (!open) return;
     let live = true;
     void loadBrandLogos().then((logos) => { if (live) setBrandLogos(logos); });
     return () => { live = false; };
-  }, []);
+  }, [open]);
 
   // Fetch active gadget types from database
   const gadgetTypes = useQuery(api.gadgetTypes.listAllActive);

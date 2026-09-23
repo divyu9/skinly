@@ -1,8 +1,9 @@
-import { useQuery } from "@/lib/firebase-hooks";
+import { useQuery, localCopyOf } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { useRef, useState, useEffect, useCallback } from "react";
+import { usePageLoaded } from "@/hooks/use-page-loaded";
 
 export function HeroSlider() {
   const heroSlides = useQuery(api.homepage.getActiveHeroSlides);
@@ -44,6 +45,17 @@ export function HeroSlider() {
       src: slide.imageUrl,
     };
   }, [isMobile]);
+
+  /*
+   * Slides past the ones on screen wait for the page to finish loading.
+   * `loading="lazy"` does not hold them back: the browser's lazy margin is
+   * over a thousand pixels, so every slide of a sideways row counts as "near"
+   * and all five downloaded together. On a phone the first slide is the
+   * page's largest paint, and it was sharing the connection with four
+   * pictures nobody could see yet.
+   */
+  const restReady = usePageLoaded();
+  const onScreen = isMobile ? 1 : 3;
 
   // Track scroll position to update active dot
   useEffect(() => {
@@ -101,8 +113,9 @@ export function HeroSlider() {
           paddingRight: '16px',
         }}
       >
-        {heroSlides.map((slide) => {
+        {heroSlides.map((slide, index) => {
           const layout = getSlideLayout(slide);
+          const held = index >= onScreen && !restReady;
           
           return (
             <div
@@ -124,7 +137,7 @@ export function HeroSlider() {
             >
               {/* Background Image - Simplified for better performance */}
               <img
-                src={layout.src}
+                src={held ? undefined : localCopyOf(layout.src)}
                 alt={slide.heading || "Hero slide"}
                 loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
                 fetchpriority={slide._id === heroSlides[0]._id ? "high" : "auto"}

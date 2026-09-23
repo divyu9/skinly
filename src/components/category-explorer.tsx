@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 import { useState } from "react";
+import { usePageLoaded } from "@/hooks/use-page-loaded";
 
 interface CategoryExplorerProps {
   onRequestModel?: (category: string, brand: string) => void;
@@ -15,6 +16,9 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
   const categories = useQuery(api.homepage.getActiveCategoryDisplaySettings);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const row = useDragScroll<HTMLDivElement>();
+  // The cards sit at the fold. Their pictures wait for the page to load so
+  // they do not split the connection with the hero above them.
+  const pageLoaded = usePageLoaded();
 
   // Loading state
   if (categories === undefined) {
@@ -150,7 +154,7 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
                     alt at all. On a shop the alt is the category name, which is
                     also what someone would have searched for. */}
                 <img
-                  src={getCategoryImage(category.categoryName, category.imageUrl)}
+                  src={pageLoaded ? getCategoryImage(category.categoryName, category.imageUrl) : undefined}
                   alt={category.displayName || category.categoryName || "Skins category"}
                   loading="lazy"
                   decoding="async"

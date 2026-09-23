@@ -22,7 +22,7 @@ import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
 import { auth } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } from "firebase/auth";
 import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
 import { BrandLogo } from "./brand-logo.tsx";
 
@@ -38,7 +38,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
 
   const handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
     } catch (err) {
       console.error(err);
     }

@@ -93,22 +93,29 @@ export function UgcVideos() {
                     />
                   ) : (
                     <>
-                      {/* Thumbnail Image */}
-                      <div
-                        className="absolute inset-0 bg-cover bg-center cursor-pointer"
-                        style={{
-                          backgroundImage: video.thumbnailUrl
-                            ? `url(${video.thumbnailUrl})`
-                            : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                        }}
-                        onClick={() => handleVideoClick(video._id)}
-                      >
-                        {/* Dark overlay */}
-                        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors" />
-                      </div>
+                      {/* Thumbnail Image — an <img> rather than a CSS
+                          background, because a background cannot be lazy:
+                          all six downloaded with the page wherever the
+                          section sat. */}
+                      {video.thumbnailUrl ? (
+                        <img
+                          src={video.thumbnailUrl}
+                          alt=""
+                          width={280}
+                          height={480}
+                          loading="lazy"
+                          decoding="async"
+                          className="absolute inset-0 h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-[linear-gradient(135deg,#667eea_0%,#764ba2_100%)]" />
+                      )}
+                      <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors" />
 
                       {/* Play Button Overlay */}
                       <button
+                        type="button"
+                        aria-label="Play customer video"
                         onClick={() => handleVideoClick(video._id)}
                         className="absolute inset-0 flex items-center justify-center z-10"
                       >

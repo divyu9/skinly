@@ -138,6 +138,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
           <SearchIcon className="absolute left-3.5 top-1/2 size-5 -translate-y-1/2 text-primary sm:left-4" />
           <Input
             type="text"
+            aria-label="Search devices or designs"
             placeholder="Search devices or designs"
             value={searchQuery}
             onChange={(e) => {
@@ -157,6 +158,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
           />
           <Button
             size="lg"
+            aria-label="Search"
             className="absolute right-1 top-1/2 size-12 -translate-y-1/2 rounded-full p-0 shadow-md sm:h-12 sm:w-auto sm:px-6"
             onClick={() => {
               if (searchQuery.trim().length > 0) {

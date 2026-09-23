@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { BugIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BugReportModal } from "./bug-report-modal.tsx";
 import { BrandLogo } from "./brand-logo.tsx";
 import { GADGET_PAGES } from "@/lib/category-paths.mjs";
@@ -31,15 +31,29 @@ export function SiteFooter() {
    * — a footer that waits for a fetch is a footer that flickers.
    */
   const [themes, setThemes] = useState<ThemePage[]>([]);
+  /*
+   * Fetched when the footer comes near the screen, not when the page mounts.
+   * The styles live in the catalogue file, 216 KB, and asking for it at mount
+   * put that download alongside the hero picture on every first visit — on a
+   * phone, a second of bandwidth the largest paint had to share.
+   */
+  const footerRef = useRef<HTMLElement>(null);
   useEffect(() => {
+    const el = footerRef.current;
+    if (!el) return;
     let live = true;
-    void loadCatalogue().then((c) => { if (live && c?.themes?.length) setThemes(c.themes.slice(0, 6)); });
-    return () => { live = false; };
+    const load = () => void loadCatalogue().then((c) => { if (live && c?.themes?.length) setThemes(c.themes.slice(0, 6)); });
+    if (typeof IntersectionObserver === "undefined") { load(); return () => { live = false; }; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { io.disconnect(); load(); }
+    }, { rootMargin: "800px 0px" });
+    io.observe(el);
+    return () => { live = false; io.disconnect(); };
   }, []);
 
   return (
     <>
-      <footer className="py-8 px-4 bg-white border-t">
+      <footer ref={footerRef} className="py-8 px-4 bg-white border-t">
         <div className="container mx-auto max-w-7xl">
           {/* Main Footer Content */}
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8 mb-6">

@@ -341,13 +341,118 @@ function seedFor(p) {
   return `<script id="__seed" type="application/json">${JSON.stringify(p.seed).replace(/</g, "\\u003c")}</script>`;
 }
 
+/*
+ * The homepage's first answers, and its hero, before any JavaScript runs.
+ *
+ * Lighthouse on a throttled phone put the hero behind a 1.2 MB bundle, then a
+ * Firestore read for the sections, then another for the slides: a render
+ * delay of 2.9 seconds after the image had already arrived. Two things end
+ * that. The rows the build just read go into the page, so the app's first
+ * render already has the real slides (firebase-hooks starts those two queries
+ * from here). And the first slide is drawn as plain HTML inside #root, in the
+ * place the app will draw it — 241px down at 90vw × 60vw on a phone, 228px at
+ * 600 × 400 from 768px up, measured off the running page — so it paints as
+ * soon as it downloads. React replaces it on its first render with the same
+ * picture in the same box, already decoded, so nothing moves.
+ */
+function homeSeedFor(p) {
+  if (!p.homeSeed) return "";
+  return `<script id="__homeSeed" type="application/json">${JSON.stringify(p.homeSeed).replace(/</g, "\\u003c")}</script>`;
+}
+
+/**
+ * Copies of the first hero slide's pictures, served from the site itself.
+ *
+ * From r2.dev the largest paint needed a second connection — DNS, TCP and TLS
+ * to another host — before a byte of the picture could move, three round
+ * trips a phone pays in full. From goskinly.com it rides the connection the
+ * HTML already opened and sits in Cloudflare's cache beside it. The copies are
+ * named after the originals, which carry their upload time, so a changed slide
+ * is a new file and the old one can be cached forever. The map of original to
+ * copy goes into the page seed so the slider shows the same file React-side
+ * rather than downloading the picture a second time.
+ */
+async function localHero(first) {
+  const map = {};
+  const urls = [first?.imageUrl, first?.mobileImageUrl].filter((u) => typeof u === "string" && /^https:\/\//.test(u));
+  await fs.mkdir(path.join(DIST, "assets"), { recursive: true });
+  for (const url of [...new Set(urls)]) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const type = res.headers.get("content-type") || "";
+      const ext = (url.match(/\.(webp|avif|png|jpe?g)(?:$|\?)/i)?.[1] || (type.includes("webp") ? "webp" : "")).toLowerCase();
+      if (!ext) continue;
+      const base = decodeURIComponent(url.split("/").pop().split("?")[0]).replace(/\.[a-z0-9]+$/i, "").replace(/[^A-Za-z0-9_-]+/g, "_").slice(0, 80);
+      const name = `hero-${base}.${ext}`;
+      await fs.writeFile(path.join(DIST, "assets", name), Buffer.from(await res.arrayBuffer()));
+      map[url] = `/assets/${name}`;
+    } catch { /* the shell falls back to the original URL */ }
+  }
+  return map;
+}
+
+function homeShell(first, local = {}) {
+  if (!first?.imageUrl) return "";
+  const desktop = local[first.imageUrl] || first.imageUrl;
+  const mobileSrc = first.mobileImageUrl || first.imageUrl;
+  const mobile = local[mobileSrc] || mobileSrc;
+  return (
+    `<div aria-hidden="true" class="hero-shell">` +
+      `<style>.hero-shell{padding-top:241px}.hero-shell>div{width:90vw;height:60vw;border-radius:1rem;overflow:hidden;background:#f2f2f2}` +
+      `.hero-shell img{width:100%;height:100%;object-fit:cover;display:block}` +
+      `@media (min-width:768px){.hero-shell{padding-top:228px}.hero-shell>div{width:600px;height:400px}}</style>` +
+      `<div><picture>` +
+        `<source media="(max-width: 767px)" srcset="${esc(mobile)}">` +
+        `<img src="${esc(desktop)}" fetchpriority="high" decoding="async" width="1200" height="800" alt="">` +
+      `</picture></div>` +
+    `</div>`
+  );
+}
+
+/**
+ * On the homepage, the app's code waits for the hero picture.
+ *
+ * The picture is in the HTML now, but the bundle was requested at the same
+ * instant — 440 KB of script against a 50 KB image on one phone connection.
+ * The bytes share the pipe, so the hero arrived last, and on a throttled phone
+ * that was the whole of the largest-paint time. The shell is only a picture:
+ * nothing on it needs the code until it has been seen. So the script tags are
+ * lifted out and put back the moment the picture has loaded (or failed), with
+ * a ceiling of 2.5 seconds so a slow image never holds the app hostage. The
+ * total download is the same; the order is the one the visitor sees.
+ */
+function heroFirst(html) {
+  const mod = html.match(/<script type="module" crossorigin src="([^"]+)"><\/script>\s*/);
+  if (!mod) return html;
+  const preloads = [...html.matchAll(/<link rel="modulepreload" crossorigin href="([^"]+)">\s*/g)];
+  html = html.replace(mod[0], "");
+  for (const m of preloads) html = html.replace(m[0], "");
+  const boot =
+    `<script>(function(){var d=false;function go(){if(d)return;d=true;` +
+    `${JSON.stringify(preloads.map((m) => m[1]))}.forEach(function(h){var l=document.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;document.head.appendChild(l)});` +
+    `var s=document.createElement("script");s.type="module";s.crossOrigin="";s.src=${JSON.stringify(mod[1])};document.head.appendChild(s)}` +
+    `var i=document.querySelector(".hero-shell img");if(!i||i.complete){go();return}` +
+    `i.addEventListener("load",go);i.addEventListener("error",go);setTimeout(go,2500)})();</script>`;
+  return html.replace("</body>", `${boot}\n</body>`);
+}
+
 function render(template, p) {
   let html = template.replace(/<title>[\s\S]*?<\/title>\s*/, "");
   html = html.replace("<!--seo-head-->", headFor(p));
-  html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p));
+  html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p) + homeSeedFor(p));
+  if (p.rootHtml) {
+    html = html.replace('<div id="root"></div>', `<div id="root">${p.rootHtml}</div>`);
+    html = heroFirst(html);
+  }
   // The hero image is only the LCP on the homepage; anywhere else the preload
   // is a wasted download on the most constrained connection.
   if (!p.keepHero) html = html.replace(/\s*<link rel="preload" as="image" data-hero[^>]*>/g, "");
+  // The preload names the same file the shell shows, or it is a second
+  // download of the hero from the other host.
+  for (const [orig, local] of Object.entries(p.homeSeed?.heroLocal || {})) {
+    html = html.split(`href="${esc(orig)}"`).join(`href="${local}"`).split(`href="${orig}"`).join(`href="${local}"`);
+  }
   return html;
 }
 
@@ -424,7 +529,7 @@ function siteHub(active, models, seoSlugs) {
 
 const hubList = (items) => items.length ? `<ul>${items.join("")}</ul>` : "";
 
-function staticPages(hub) {
+function staticPages(hub, home = null) {
   const homeDescription =
     "Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149.";
   const productsDescription =
@@ -443,6 +548,7 @@ function staticPages(hub) {
       description: homeDescription,
       canonical: `${SITE}/`,
       keepHero: true,
+      ...(home ? { homeSeed: home.seed, rootHtml: home.shell } : {}),
       priority: "1.0",
       jsonLd: [
         {
@@ -1406,14 +1512,15 @@ async function main() {
       readCollection(project, "collections"),
       readCollection(project, "collectionProducts"),
     ]);
-    const [sections, sectionCards] = await Promise.all([
+    const [sections, sectionCards, heroSlides] = await Promise.all([
       readCollection(project, "homepageSections").catch(() => []),
       readCollection(project, "homepageSectionCards").catch(() => []),
+      readCollection(project, "heroSlides").catch(() => []),
     ]);
     // Ratings for the Product markup. A separate read because a site with no
     // reviews yet must still build.
     const reviews = await readCollection(project, "reviews").catch(() => []);
-    data = { products, variants, seoPages, categories, shipping, models, collections, memberships, sections, sectionCards, reviews };
+    data = { products, variants, seoPages, categories, shipping, models, collections, memberships, sections, sectionCards, reviews, heroSlides };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
   }
@@ -1475,7 +1582,27 @@ async function main() {
    * are what the hub links come from. Their routes are fixed either way, so
    * `knownPaths` below is unaffected by the move.
    */
-  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))));
+  // What the homepage's two first queries will return, shaped exactly as
+  // firebase-hooks shapes them: active rows in order, section config parsed
+  // from the JSON string some sections store it as.
+  const asObject = (c) => { if (typeof c !== "string") return c; try { return JSON.parse(c); } catch { return {}; } };
+  const liveSlides = (data.heroSlides || [])
+    .filter((x) => x.isActive === true)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  const liveSections = (data.sections || [])
+    .filter((x) => x.isActive === true)
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map((x) => ({ ...x, config: asObject(x.config) }));
+  const heroLocal = liveSlides.length ? await localHero(liveSlides[0]) : {};
+  const home = liveSlides.length ? {
+    seed: {
+      "homepage.getActiveHeroSlides": liveSlides,
+      "homepage.getActiveHomepageSections": liveSections,
+      heroLocal,
+    },
+    shell: homeShell(liveSlides[0], heroLocal),
+  } : null;
+  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home);
   for (const p of statics) await writePage(p.route, render(template, p));
 
   const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);

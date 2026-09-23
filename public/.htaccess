@@ -27,7 +27,22 @@ ErrorDocument 404 /404.html
     #
     # Cloudflare does not cache HTML on its own whatever this says — that
     # needs a Cache Rule in the dashboard. This makes the page eligible.
-    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=600, stale-while-revalidate=86400"
+    # Stale for an hour at most, not a day: an old page names bundles a
+    # deploy has deleted. index.html reloads itself when that happens, but
+    # the less often it has to, the better.
+    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=600, stale-while-revalidate=3600"
+  </FilesMatch>
+  # Bundles are named after a hash of their contents, so a given name never
+  # changes: keep it for a year and never ask again. They were getting the
+  # host's default of seven days, and Lighthouse counted every one of them
+  # against the page as "inefficient cache lifetime".
+  <FilesMatch "\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  # The homepage's hero copies, named after the upload they came from, so a
+  # new slide is a new file and an old name never changes content.
+  <FilesMatch "^hero-.+\.(webp|avif|png|jpe?g)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
   <FilesMatch "^404\.html$">
     Header set X-Robots-Tag "noindex"

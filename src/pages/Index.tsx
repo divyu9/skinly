@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -38,9 +38,38 @@ const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ defa
  * reads source text; assembled from a template it emits nothing at all.
  */
 function LazySection({ reserve, children }: { reserve: string; children: React.ReactNode }) {
+  /*
+   * Mounted when it is about to be seen, not before.
+   *
+   * "Lazy" here only ever meant the code was split: every section still
+   * mounted on the first render, so each one fetched its chunk, its Firestore
+   * data and its pictures while the hero was loading. Lighthouse counted 2.3 MB
+   * on the wire before the hero finished on a throttled phone — the customer
+   * videos' thumbnails from the old host, the trendy cards, the full product
+   * catalogue for the brand badges — which is why the hero took 7.5 seconds
+   * to arrive. A section now waits until it is within a screen or so of view.
+   * The reserved height is held throughout, so nothing below it moves.
+   */
+  const ref = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+  // Until the page has loaded, only a section actually on screen mounts; the
+  // screen-ahead margin applies after that. With the margin from the start,
+  // sections under the fold fetched their pictures while the hero, the
+  // page's largest paint, was still arriving.
+  const loaded = usePageLoaded();
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || near) return;
+    if (!("IntersectionObserver" in window)) { setNear(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setNear(true); io.disconnect(); }
+    }, { rootMargin: loaded ? "600px 0px" : "0px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near, loaded]);
   return (
-    <div className={reserve}>
-      <Suspense fallback={<SectionSkeleton />}>{children}</Suspense>
+    <div ref={ref} className={reserve}>
+      {near ? <Suspense fallback={<SectionSkeleton />}>{children}</Suspense> : <SectionSkeleton />}
     </div>
   );
 }
@@ -54,6 +83,7 @@ function SectionSkeleton() {
   );
 }
 import { Button } from "@/components/ui/button.tsx";
+import { usePageLoaded } from "@/hooks/use-page-loaded";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
@@ -268,7 +298,7 @@ export default function Index() {
           shift was recorded against BODY and why it counted the whole document
           as displaced. Padding creates the same gap without collapsing. */}
       <div style={{ paddingTop: `${headerOffset}px` }}>
-        <Suspense fallback={<div className="h-10" />}>
+        <Suspense fallback={<div className="h-[72px]" />}>
           <ModelsMarquee />
         </Suspense>
       </div>

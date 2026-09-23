@@ -320,8 +320,46 @@ function stripUndefinedDeep(value: any): any {
 }
 
 
+/*
+ * First answers the build already knew, handed over in the homepage's HTML.
+ *
+ * The hero waited for a 1.2 MB bundle, then for Firestore to say which
+ * sections exist, then for Firestore to say which slides — and showed
+ * skeletons all that while, although the build had read exactly those rows a
+ * few minutes earlier to write the page. A query listed here starts from what
+ * the build saw and is replaced by the live answer the moment it arrives, so
+ * the first render can draw the real hero. Argument-free queries only: there
+ * is nothing to match against otherwise.
+ */
+let homeSeed: Record<string, unknown> | null | undefined;
+const SEEDABLE = new Set(['homepage.getActiveHeroSlides', 'homepage.getActiveHomepageSections']);
+function seededValue(path: string, args: any): any {
+  if (!SEEDABLE.has(path) || (args && args !== 'skip' && Object.keys(args).length)) return undefined;
+  if (homeSeed === undefined) {
+    try {
+      const el = typeof document !== 'undefined' ? document.getElementById('__homeSeed') : null;
+      homeSeed = el?.textContent ? JSON.parse(el.textContent) : null;
+    } catch {
+      homeSeed = null;
+    }
+  }
+  return homeSeed?.[path];
+}
+
+/**
+ * The site's own copy of a picture the build saved next to the page, or the
+ * URL unchanged. The homepage's first hero slide is copied so its largest
+ * paint needs no second connection; the slider asks here so it shows that
+ * same file instead of fetching the original as well.
+ */
+export function localCopyOf(url: string | undefined): string | undefined {
+  if (!url) return url;
+  seededValue('homepage.getActiveHeroSlides', undefined);
+  return (homeSeed?.heroLocal as Record<string, string> | undefined)?.[url] || url;
+}
+
 export function useQuery(apiRef: any, args?: any) {
-  const [data, setData] = useState<any>(undefined);
+  const [data, setData] = useState<any>(() => seededValue(getPath(apiRef), args));
   const [error, setError] = useState<Error | null>(null);
   const path = getPath(apiRef);
 
@@ -4625,10 +4663,10 @@ export function useMutation(apiRef: any) {
 
         if (actionName === 'initializeDefaultHeroImages') {
           const heroImageMap: Record<string, string> = {
-            brand: "https://cdn.hercules.app/file_TTzspgzZHTPer5BlbFkBEwTv",
-            device: "https://cdn.hercules.app/file_SLIDqJBWTItllHEEDr05Il5U",
-            keyword: "https://cdn.hercules.app/file_iIOCvr6i3EsGFeGd2zOn77Qm",
-            "skin-type": "https://cdn.hercules.app/file_iIOCvr6i3EsGFeGd2zOn77Qm",
+            brand: "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/media-library/seo-hero-brand.webp",
+            device: "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/media-library/seo-hero-device.webp",
+            keyword: "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/media-library/seo-hero-keyword.webp",
+            "skin-type": "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/media-library/seo-hero-keyword.webp",
           };
           const existing = await getDocs(templatesCollection);
           const batch = writeBatch(db);
