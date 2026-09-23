@@ -418,9 +418,12 @@ function homeShell(first, local = {}) {
  * The bytes share the pipe, so the hero arrived last, and on a throttled phone
  * that was the whole of the largest-paint time. The shell is only a picture:
  * nothing on it needs the code until it has been seen. So the script tags are
- * lifted out and put back the moment the picture has loaded (or failed), with
- * a ceiling of 2.5 seconds so a slow image never holds the app hostage. The
- * total download is the same; the order is the one the visitor sees.
+ * lifted out and put back once the picture has been painted — the frame after
+ * it loads, because "loaded" is not "on screen": when the bundle landed right
+ * behind the picture, a second of script evaluation ran first and the hero
+ * sat decoded but unpainted. A failed picture boots at once, and a ceiling of
+ * 2.5 seconds keeps a slow image from holding the app hostage. The total
+ * download is the same; the order is the one the visitor sees.
  */
 function heroFirst(html) {
   const mod = html.match(/<script type="module" crossorigin src="([^"]+)"><\/script>\s*/);
@@ -432,8 +435,9 @@ function heroFirst(html) {
     `<script>(function(){var d=false;function go(){if(d)return;d=true;` +
     `${JSON.stringify(preloads.map((m) => m[1]))}.forEach(function(h){var l=document.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;document.head.appendChild(l)});` +
     `var s=document.createElement("script");s.type="module";s.crossOrigin="";s.src=${JSON.stringify(mod[1])};document.head.appendChild(s)}` +
-    `var i=document.querySelector(".hero-shell img");if(!i||i.complete){go();return}` +
-    `i.addEventListener("load",go);i.addEventListener("error",go);setTimeout(go,2500)})();</script>`;
+    `function painted(){requestAnimationFrame(function(){setTimeout(go,0)})}` +
+    `var i=document.querySelector(".hero-shell img");if(!i){go();return}if(i.complete){painted();return}` +
+    `i.addEventListener("load",painted);i.addEventListener("error",go);setTimeout(go,2500)})();</script>`;
   return html.replace("</body>", `${boot}\n</body>`);
 }
 
