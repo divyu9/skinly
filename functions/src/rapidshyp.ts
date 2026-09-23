@@ -114,6 +114,61 @@ function describeError(status: number, body: string): string {
  * (wrapper) and for an order on its own (create_order), so the two can never
  * describe the same parcel differently.
  */
+/**
+ * A real SKU for every line, and no SKU twice.
+ *
+ * Orders never kept the SKU — placeOrder looked each variant up to price it
+ * and threw the rest away — so this sent `item.sku || item.variant`, which is
+ * always the variant's name. RapidShyp answered "Invalid stock keeping unit"
+ * for "iPhone 12", and "Same sku cannot be in multiple order" for #4030, whose
+ * two MacBook skins were both "Only Top".
+ *
+ * Orders placed from now on carry their SKU. For the ones that do not, in
+ * order of trust: the variant as it stands today; the SKU the mockup image was
+ * named after, which survives the product being deleted (#4030's third line
+ * is a product that no longer exists, pictured as `..._R-41-MBLP.jpg`); and
+ * last a made-up one, deterministic and free of spaces, so the shipment still
+ * goes out and the label says which line it was.
+ *
+ * Two lines of the same product and variant are one line with more units.
+ * Two different things that land on one SKU keep both, the second suffixed —
+ * merging those would under-declare what is in the box.
+ */
+const cleanSku = (s: string) => s.trim().replace(/\s+/g, "-").replace(/[^A-Za-z0-9._\-\/]/g, "");
+
+async function resolveLines(db: admin.firestore.Firestore, items: any[]) {
+  const pids = [...new Set(items.map((i) => String(i?.productId || "")).filter(Boolean))];
+  const live = new Map<string, string>();
+  for (let i = 0; i < pids.length; i += 30) {
+    const snap = await db.collection("variants").where("productId", "in", pids.slice(i, i + 30)).get();
+    for (const d of snap.docs) {
+      const v = d.data() as any;
+      if (v.sku) live.set(`${v.productId}::${v.title}`, String(v.sku));
+    }
+  }
+  const fromImage = (url: unknown) => {
+    const m = String(url || "").match(/_([A-Za-z]+-\d+(?:-[A-Za-z0-9]+)?)\.(?:jpe?g|png|webp)$/);
+    return m ? m[1] : "";
+  };
+
+  const byLine = new Map<string, any>();
+  for (const item of items) {
+    const key = `${item?.productId}::${item?.variant}`;
+    const seen = byLine.get(key);
+    if (seen) { seen.units += Number(item?.quantity) || 1; continue; }
+    const raw = item?.sku || live.get(key) || fromImage(item?.productImage)
+      || `NA-${String(item?.productId || "x").slice(0, 8)}-${item?.variant || "item"}`;
+    byLine.set(key, { item, sku: cleanSku(String(raw)), units: Number(item?.quantity) || 1 });
+  }
+
+  const used = new Map<string, number>();
+  return [...byLine.values()].map((line) => {
+    const n = (used.get(line.sku) || 0) + 1;
+    used.set(line.sku, n);
+    return { ...line, sku: n === 1 ? line.sku : `${line.sku}-${n}` };
+  });
+}
+
 async function buildOrderPayload(orderId: string) {
   const db = admin.firestore();
   const orderRef = db.collection("orders").doc(orderId);
@@ -195,6 +250,7 @@ async function buildOrderPayload(orderId: string) {
     email,
   };
 
+  const lines = await resolveLines(db, items);
   const orderedAt = num(order.createdAt) || num(order._creationTime) || Date.now();
   const names = await pickupNames(db);
 
@@ -206,13 +262,13 @@ async function buildOrderPayload(orderId: string) {
     billingIsShipping: true,
     shippingAddress: address,
     billingAddress: address,
-    orderItems: items.map((item: any) => {
+    orderItems: lines.map(({ item, sku, units }) => {
       const price = num(item?.price) ?? 0;
       // Prices are GST-inclusive, so the tax component is price × 0.18/1.18.
       return {
         itemName: item.productTitle,
-        sku: item.sku || item.variant,
-        units: num(item?.quantity) ?? 1,
+        sku,
+        units,
         unitPrice: price,
         tax: Number((price * (0.18 / 1.18)).toFixed(2)),
         hsn: "39269099",

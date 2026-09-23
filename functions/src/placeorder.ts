@@ -107,6 +107,8 @@ export const placeOrder = functions
     const priceMap = new Map<string, number>();
     // The variant's own id as well, because a cashback rule can target one.
     const variantIdMap = new Map<string, string>();
+    // And its SKU, which the courier needs and which the order never kept.
+    const skuMap = new Map<string, string>();
     if (productIds.length > 0) {
       // Firestore "in" supports up to 30 values; chunk just in case
       const chunks: string[][] = [];
@@ -118,6 +120,7 @@ export const placeOrder = functions
           const key = `${String(v.productId)}::${String(v.title)}`;
           priceMap.set(key, Number(v.price || 0));
           variantIdMap.set(key, d.id);
+          if (v.sku) skuMap.set(key, String(v.sku).trim());
         }
       }
     }
@@ -334,7 +337,29 @@ export const placeOrder = functions
       total: calculatedTotal,
       // The only figure any payment step may charge.
       amountPayable,
-      items: orderItems,
+      /*
+       * Each line carries its own SKU and variant id from the moment it is
+       * sold.
+       *
+       * They were looked up here to price the order and then thrown away, so
+       * everything downstream had to find them again — and could not when the
+       * catalogue had moved on. #4030 bought a MacBook skin whose product was
+       * deleted two days later: nothing could say what its SKU had been, and
+       * the courier call fell back to sending the variant's name. Two
+       * MacBook lines both named "Only Top", and RapidShyp refused the order
+       * for carrying the same SKU twice. An order is a record of what was
+       * sold; it should not depend on the catalogue still agreeing.
+       */
+      items: orderItems.map((item) => {
+        const key = `${String(item?.productId)}::${String(item?.variant)}`;
+        const sku = skuMap.get(key);
+        const variantId = variantIdMap.get(key);
+        return {
+          ...item,
+          ...(sku ? { sku } : {}),
+          ...(variantId ? { variantId } : {}),
+        };
+      }),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

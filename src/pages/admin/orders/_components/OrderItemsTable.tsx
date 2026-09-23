@@ -10,8 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EditIcon, ExternalLinkIcon, TrashIcon } from "lucide-react";
+import { EditIcon, ExternalLinkIcon, ImageOffIcon, TrashIcon } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export interface OrderItem {
   productId: string;
@@ -70,6 +73,39 @@ export function OrderItemsTable({
 }: OrderItemsTableProps) {
   const items = Array.isArray(itemsProp) ? itemsProp : [];
   const missing = !Array.isArray(itemsProp);
+
+  /*
+   * What each line's product is today.
+   *
+   * An order keeps the title and a picture from the moment it was placed,
+   * which is right — but the picture was the device mockup the cart showed,
+   * and mockups are regenerated: #4030's two MacBook lines point at files
+   * that now answer 404, so the admin showed an order with no pictures. The
+   * slug was never kept either, so there was no way to open the product on
+   * the shop. Both are read from the product as it stands, and a product that
+   * has since been deleted says so rather than leading to a 404.
+   */
+  const [live, setLive] = useState<Record<string, { slug?: string; image?: string; gone?: boolean }>>({});
+  const idsKey = items.map((i) => i.productId).join("|");
+  useEffect(() => {
+    let alive = true;
+    const ids = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+    void Promise.all(ids.map(async (id) => {
+      try {
+        const snap = await getDoc(doc(db, "products", id));
+        if (!snap.exists()) return [id, { gone: true }] as const;
+        const p: any = snap.data();
+        const first = (p.images || []).map((x: any) => (typeof x === "string" ? x : x?.url)).find(Boolean);
+        return [id, { slug: p.slug, image: first }] as const;
+      } catch {
+        return [id, {}] as const;
+      }
+    })).then((rows) => { if (alive) setLive(Object.fromEntries(rows)); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey]);
+  const [broken, setBroken] = useState<Record<number, boolean>>({});
+
   return (
     <>
       <Card>
@@ -95,15 +131,26 @@ export function OrderItemsTable({
                 key={idx}
                 className="flex gap-4 pb-4 border-b last:border-b-0 last:pb-0"
               >
-                {item.productImage && (
-                  <div className="size-20 bg-muted rounded-lg overflow-hidden shrink-0">
-                    <img
-                      src={item.productImage}
-                      alt={item.productTitle}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                )}
+                {(() => {
+                  // The picture the order kept, then the product's own picture
+                  // if that one has since gone, then an honest empty box.
+                  const fallback = live[item.productId]?.image;
+                  const src = !broken[idx] ? item.productImage || fallback : fallback;
+                  return (
+                    <div className="size-20 bg-muted rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                      {src && !(broken[idx] && src === item.productImage) ? (
+                        <img
+                          src={src}
+                          alt={item.productTitle}
+                          className="w-full h-full object-cover"
+                          onError={() => setBroken((b) => ({ ...b, [idx]: true }))}
+                        />
+                      ) : (
+                        <ImageOffIcon className="size-6 text-muted-foreground" />
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="flex-1 space-y-1">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -114,8 +161,11 @@ export function OrderItemsTable({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
                       <DropdownMenuItem asChild>
+                        {/* The route is /backend-skinly/products/:id — the
+                            "/edit/" this used to carry matched nothing, so
+                            every one of these opened a 404. */}
                         <Link
-                          to={`/backend-skinly/products/edit/${item.productId}`}
+                          to={`/backend-skinly/products/${item.productId}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="cursor-pointer w-full"
@@ -123,10 +173,10 @@ export function OrderItemsTable({
                           Open in Backend
                         </Link>
                       </DropdownMenuItem>
-                      {item.slug && (
+                      {(item.slug || live[item.productId]?.slug) && (
                         <DropdownMenuItem asChild>
                           <a
-                            href={`/product/${item.slug}`}
+                            href={`/products/${item.slug || live[item.productId]?.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="cursor-pointer w-full"
@@ -138,7 +188,13 @@ export function OrderItemsTable({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   <div className="text-sm text-muted-foreground space-y-0.5">
+                    {live[item.productId]?.gone && (
+                      <Badge variant="outline" className="text-amber-700 border-amber-300 dark:text-amber-400">
+                        Product deleted since this order
+                      </Badge>
+                    )}
                     <p>Variant: {item.variant}</p>
+                    {item.sku && <p>SKU: <span className="font-mono">{item.sku}</span></p>}
                     {item.phoneModel && <p>Model: {item.phoneModel}</p>}
                     {item.phoneBrand && <p>Brand: {item.phoneBrand}</p>}
                     {item.coverage && (
