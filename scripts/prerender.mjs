@@ -326,10 +326,25 @@ function noscriptFor(p) {
   return `<noscript><main class="prerender-summary">${p.body}</main></noscript>`;
 }
 
+/*
+ * What the page needs to draw itself, handed over in the HTML.
+ *
+ * A landing page showed skeletons until two Firestore queries came back —
+ * "is this slug a product?" and "what is this page?" — and only then drew its
+ * heading. The heading is the page's largest paint, so Lighthouse measured a
+ * render delay of 8.9s on a phone, all of it spent waiting to be told things
+ * this script already knew when it wrote the file. The page reads this on its
+ * first render and paints at once; the live queries still run and take over.
+ */
+function seedFor(p) {
+  if (!p.seed) return "";
+  return `<script id="__seed" type="application/json">${JSON.stringify(p.seed).replace(/</g, "\\u003c")}</script>`;
+}
+
 function render(template, p) {
   let html = template.replace(/<title>[\s\S]*?<\/title>\s*/, "");
   html = html.replace("<!--seo-head-->", headFor(p));
-  html = html.replace("<!--seo-body-->", noscriptFor(p));
+  html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p));
   // The hero image is only the LCP on the homepage; anywhere else the preload
   // is a wasted download on the most constrained connection.
   if (!p.keepHero) html = html.replace(/\s*<link rel="preload" as="image" data-hero[^>]*>/g, "");
@@ -865,6 +880,14 @@ function seoPage(s, info, knownPaths, themes = []) {
       ].filter((t) => t.slug !== s.slug).slice(0, 12);
   return {
     route: `/${s.slug}`,
+    seed: {
+      slug: s.slug,
+      // The stored page as the app would read it, minus bookkeeping it never
+      // draws. Timestamps are plain numbers here, as they are everywhere else
+      // the app reads this collection.
+      page: Object.fromEntries(Object.entries(s).filter(([k]) =>
+        !["generationLog", "aiPrompt", "rawResponse", "embedding"].includes(k))),
+    },
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
     description: info?.description || s.metaDescription || clip(text, 155),
     // Nothing to sell here right now: keep the page for people, not for search.

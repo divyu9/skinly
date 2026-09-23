@@ -186,7 +186,7 @@ export async function normalizeImageForUpload(
   declaredContentType?: string,
   options: { quality?: number; maxDimension?: number } = {}
 ): Promise<NormalizedUpload> {
-  const { quality = 0.85, maxDimension = 2400 } = options;
+  const { quality = 0.82, maxDimension = 2000 } = options;
 
   const original = base64ToBytes(base64);
   const format = sniffFormat(original);
@@ -209,7 +209,19 @@ export async function normalizeImageForUpload(
     const sourceHeight = source.height;
     const scale = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
 
-    if (format.mime === "image/webp" && scale === 1) {
+    /*
+     * A WebP is not automatically a small file.
+     *
+     * This passed every WebP within the size cap straight through, on the
+     * reasoning that WebP is already compressed. It can be lossless: the
+     * homepage's category banners were 2752×1536 WebPs at 1.3–1.5 bytes a
+     * pixel, five to six megabytes each, and the homepage asked a phone for
+     * 54 MB of pictures. A WebP is kept as it is only when it is already
+     * lean — under about a third of a byte a pixel, which a lossy encode at
+     * this quality comes in well below.
+     */
+    const lean = original.byteLength / Math.max(1, sourceWidth * sourceHeight) < 0.35;
+    if (format.mime === "image/webp" && scale === 1 && lean) {
       if ("close" in source) source.close();
       return { ...passthrough(), width: sourceWidth, height: sourceHeight };
     }

@@ -1,4 +1,5 @@
 import { useParams, Navigate } from "react-router-dom";
+import { useState } from "react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Helmet } from "react-helmet-async";
@@ -11,14 +12,41 @@ import ProductPageLayout from "./_components/product-layout.tsx";
 import NotFound from "../NotFound.tsx";
 import { useSeoPageData } from "./use-seo-page-data";
 
+/*
+ * The page as the build wrote it, if the build wrote this one.
+ *
+ * Read once, on the first render, from the JSON the prerender placed in the
+ * HTML — so the heading and hero paint as soon as the bundle runs rather than
+ * after two Firestore round trips. Only trusted for the slug it was written
+ * for: a client-side navigation to another landing page finds a seed for the
+ * page it started on, and ignores it.
+ */
+function readSeed(slug: string): { page: any } | null {
+  if (typeof document === "undefined") return null;
+  try {
+    const el = document.getElementById("__seed");
+    if (!el?.textContent) return null;
+    const seed = JSON.parse(el.textContent);
+    return seed?.slug === slug && seed?.page ? { page: seed.page } : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function SEOPage() {
   const params = useParams<{ slug?: string }>();
   // Extract slug from either :slug param or root-level param
   const slug = params.slug || "";
-  
+  const [seed] = useState(() => readSeed(slug));
+  const seeded = seed && seed.page.slug === slug ? seed : null;
+
   // Check if this slug belongs to a product first (for SEO-friendly product URLs)
-  const product = useQuery(api.products.getProductBySlug, { slug });
-  const page = useQuery(api.seoPages.getPageBySlug, { slug });
+  const productLive = useQuery(api.products.getProductBySlug, { slug });
+  const pageLive = useQuery(api.seoPages.getPageBySlug, { slug });
+  // The live answers win as soon as they arrive; until then, a page the build
+  // wrote is known to be a landing page and not a product.
+  const page = pageLive !== undefined ? pageLive : seeded?.page;
+  const product = productLive !== undefined ? productLive : seeded ? null : undefined;
   const data = useSeoPageData(page && page.isPublished ? page : null);
 
   // Loading state
