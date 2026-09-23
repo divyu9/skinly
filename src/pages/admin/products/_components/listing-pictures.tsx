@@ -38,6 +38,15 @@ interface Job {
  * each made the way its card in the studio says, and they land in the same
  * review queue as everything else.
  */
+/*
+ * Every button here is type="button".
+ *
+ * This card sits inside the product edit page's <form>, and a <button> in a
+ * form submits it unless told otherwise. So "Make pictures" saved the product
+ * instead — and a product with no picture fails the save's own check, "Please
+ * add at least one product image". The one listing this button exists for was
+ * the one it could never help.
+ */
 export function ListingPictures({ product }: {
   product: {
     _id: string;
@@ -221,7 +230,7 @@ export function ListingPictures({ product }: {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
+              <Button type="button"
                 size="sm"
                 disabled={!picked.length || !!busy}
                 onClick={() => void generate()}
@@ -232,7 +241,7 @@ export function ListingPictures({ product }: {
                   : `Make ${picked.length || ""} ${picked.length === 1 ? "picture" : "pictures"}${aiPicked ? ` · ${formatInr(model.usd * aiPicked)}` : picked.length ? " · ₹0" : ""}`}
               </Button>
               {missing.length > 0 && !busy && (
-                <Button size="sm" variant="ghost" className="h-8 text-xs"
+                <Button type="button" size="sm" variant="ghost" className="h-8 text-xs"
                   onClick={() => setPicked(missing.map((a) => a.row.shot.suffix))}>
                   Pick the {missing.length} missing
                 </Button>

@@ -47,7 +47,9 @@ const applyPaymentResult = async (
   merchantTransactionId: string,
   state: PaymentState,
   paidPaise: unknown,
-  source: "status-check" | "callback"
+  source: "status-check" | "callback",
+  // Why PhonePe said no, as it said it. Only used on a failure.
+  reason?: { code?: unknown; responseCode?: unknown; instrument?: unknown }
 ): Promise<{ paymentStatus: string; orderId: string | null; changed: boolean }> => {
   const paymentStatus = state === "COMPLETED" ? "success" : state === "FAILED" ? "failed" : "pending";
 
@@ -74,7 +76,22 @@ const applyPaymentResult = async (
 
   if (paymentStatus === "failed") {
     if (order.paymentStatus === "failed") return { paymentStatus, orderId: doc.id, changed: false };
-    await doc.ref.update({ paymentStatus: "failed", updatedAt: Date.now(), paymentFailedVia: source });
+    /*
+     * The reason, kept.
+     *
+     * Twelve of the last forty orders failed at PhonePe — one customer three
+     * times running at the same amount — and each was saved as nothing more
+     * than "failed via callback". Whether that is people changing their mind,
+     * a bank declining, or UPI timing out is the difference between nothing to
+     * do and money being turned away, and PhonePe says which in every
+     * callback. It was read and thrown away.
+     */
+    const why = {
+      ...(reason?.code ? { paymentFailureCode: String(reason.code) } : {}),
+      ...(reason?.responseCode ? { paymentFailureReason: String(reason.responseCode) } : {}),
+      ...(reason?.instrument ? { paymentFailureInstrument: String(reason.instrument) } : {}),
+    };
+    await doc.ref.update({ paymentStatus: "failed", updatedAt: Date.now(), paymentFailedVia: source, ...why });
     return { paymentStatus, orderId: doc.id, changed: true };
   }
 
@@ -416,7 +433,11 @@ export const paymentCallback = onRequest(async (req: any, res: any) => {
     const state = d.state || (payload?.code === "PAYMENT_SUCCESS" ? "COMPLETED"
       : payload?.code === "PAYMENT_ERROR" ? "FAILED" : undefined);
 
-    const applied = await applyPaymentResult(merchantTransactionId, state, d.amount, "callback");
+    const applied = await applyPaymentResult(merchantTransactionId, state, d.amount, "callback", {
+      code: payload?.code,
+      responseCode: d.responseCode || d.errorCode || d.detailedErrorCode,
+      instrument: d.paymentInstrument?.type || d.paymentDetails?.[0]?.paymentMode,
+    });
     console.log("PhonePe callback applied", {
       merchantTransactionId, state, code: payload?.code, ...applied,
     });

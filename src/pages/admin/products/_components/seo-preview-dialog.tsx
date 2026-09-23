@@ -186,11 +186,11 @@ export function SEOPreviewDialog({
         </ScrollArea>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
             <XIcon className="h-4 w-4 mr-2" />
             Cancel
           </Button>
-          <Button onClick={onApply} disabled={isApplying}>
+          <Button type="button" onClick={onApply} disabled={isApplying}>
             <CheckIcon className="h-4 w-4 mr-2" />
             {isApplying ? "Applying..." : "Apply Changes"}
           </Button>

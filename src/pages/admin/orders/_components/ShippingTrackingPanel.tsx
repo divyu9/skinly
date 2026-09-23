@@ -15,6 +15,7 @@ export interface ShippingFormData {
 export interface ManualTrackingFormData {
   trackingNumber: string;
   courierCompany: string;
+  trackingUrl?: string;
 }
 
 interface ShippingTrackingPanelProps {
@@ -143,6 +144,16 @@ export function ShippingTrackingPanel({
                 <p className="text-sm">
                   <span className="font-medium">Courier:</span> {manualCourierCompany}
                 </p>
+              )}
+              {!awbNumber && trackingUrl && (
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-blue-700 underline-offset-2 hover:underline dark:text-blue-300"
+                >
+                  Open courier tracking →
+                </a>
               )}
             </div>
           )}
@@ -346,6 +357,21 @@ export function ShippingTrackingPanel({
                       value={manualTrackingForm.courierCompany}
                       onChange={(e) => onManualTrackingFormChange({ ...manualTrackingForm, courierCompany: e.target.value })}
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="manual-url">Tracking Link</Label>
+                    <Input
+                      id="manual-url"
+                      type="url"
+                      inputMode="url"
+                      placeholder="https://courier.com/track/…"
+                      value={manualTrackingForm.trackingUrl || ""}
+                      onChange={(e) => onManualTrackingFormChange({ ...manualTrackingForm, trackingUrl: e.target.value })}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      The courier's own tracking page. A courier we did not book through RapidShyp
+                      sends us no scans, so this link is how the customer follows the parcel.
+                    </p>
                   </div>
                 </div>
                 <DialogFooter>

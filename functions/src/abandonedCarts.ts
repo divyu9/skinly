@@ -158,7 +158,187 @@ const sendReminderEmail = async (cart: any, couponCode: string | null): Promise<
   return true;
 };
 
+/* ------------------------------------------------------------- detection */
+
+/*
+ * Finding the abandoned carts in the first place.
+ *
+ * Nothing had created one since 3 April. On Convex a job scanned every cart
+ * each half hour and wrote these rows; the move to Firebase brought across the
+ * half that sends reminders and the admin page that lists them, and left the
+ * half that finds them behind. So the reminder job ran every thirty minutes
+ * over an empty queue, and the admin page showed April.
+ *
+ * Two places a customer walks away, both with a way to reach them:
+ *
+ *   An order that was never paid for. The customer filled in their name,
+ *   email and phone and chose what they wanted, then PhonePe failed or they
+ *   closed the tab. Twelve of the last forty orders ended this way — one
+ *   customer three times over at the same amount. These are the warmest
+ *   carts there are.
+ *
+ *   A signed-in customer's cart with things in it and no order since. Their
+ *   account has the email. A guest's cart has no contact at all, so it is
+ *   left alone — there is nobody to write to.
+ *
+ * One row per customer, keyed by email (phone when there is none), so three
+ * failed attempts are one reminder, not three. Somebody who came back and
+ * paid is not a lost cart, and an open row for them is marked recovered.
+ * Nothing older than a week is picked up, so switching reminders on does not
+ * write to everybody who wandered off in the spring.
+ */
+const LOOKBACK_MS = 7 * 86400_000;
+// Long enough that somebody still on the payment page is not "abandoned".
+const IDLE_MS = 60 * 60_000;
+
+const contactKey = (email?: unknown, phone?: unknown) => {
+  const e = String(email || "").trim().toLowerCase();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) return `e:${e}`;
+  const p = String(phone || "").replace(/\D/g, "").slice(-10);
+  return p.length === 10 ? `p:${p}` : "";
+};
+const rowId = (key: string) =>
+  `c_${require("crypto").createHash("sha1").update(key).digest("hex").slice(0, 24)}`;
+
+type Found = {
+  key: string; userEmail: string; userPhone: string; userName: string; userId: string | null;
+  items: any[]; cartTotal: number; abandonedAt: number; source: "checkout" | "cart"; orderId?: string;
+};
+
+export async function detectAbandonedCarts(): Promise<{ found: number; created: number; updated: number; recovered: number }> {
+  const db = admin.firestore();
+  const now = Date.now();
+  const since = now - LOOKBACK_MS;
+
+  // Paid orders tell us who came back. Looked at over twice the window, so a
+  // customer who paid just before an old failed attempt is still counted.
+  const orders = await db.collection("orders").where("createdAt", ">=", since - LOOKBACK_MS).get();
+  const paidAt = new Map<string, number>();
+  for (const d of orders.docs) {
+    const o = d.data() as any;
+    const settled = o.paymentStatus === "success" || (o.paymentMethod === "cod" && !o.isDeleted);
+    if (!settled) continue;
+    for (const k of [contactKey(o.email || o.customerEmail || o.guestEmail), contactKey(null, o.phone || o.shippingAddress?.phone)]) {
+      if (k) paidAt.set(k, Math.max(paidAt.get(k) || 0, Number(o.createdAt) || 0));
+    }
+  }
+  const cameBack = (key: string, phoneKey: string, after: number) =>
+    (paidAt.get(key) || 0) > after || (!!phoneKey && (paidAt.get(phoneKey) || 0) > after);
+
+  const found = new Map<string, Found>();
+
+  // 1. Checkouts that were never paid for.
+  for (const d of orders.docs) {
+    const o = d.data() as any;
+    const at = Number(o.createdAt) || 0;
+    if (at < since || at > now - IDLE_MS || o.isDeleted) continue;
+    if (o.paymentMethod === "cod") continue;
+    if (o.paymentStatus === "success") continue;
+    const email = o.email || o.customerEmail || o.guestEmail;
+    const phone = o.phone || o.shippingAddress?.phone;
+    const key = contactKey(email, phone);
+    if (!key) continue;
+    if (cameBack(key, contactKey(null, phone), at)) continue;
+    const prev = found.get(key);
+    if (prev && prev.abandonedAt >= at) continue; // keep the latest attempt
+    found.set(key, {
+      key, source: "checkout", orderId: d.id,
+      userEmail: String(email || ""), userPhone: String(phone || ""),
+      userName: String(o.shippingAddress?.fullName || o.customerName || ""),
+      userId: o.userId && !String(o.userId).startsWith("guest") ? String(o.userId) : null,
+      items: (o.items || []).map((i: any) => ({
+        productId: i.productId, productTitle: i.productTitle, productImage: i.productImage,
+        variant: i.variant, price: i.price, quantity: i.quantity,
+      })),
+      cartTotal: Number(o.total ?? o.amountPayable) || 0,
+      abandonedAt: at,
+    });
+  }
+
+  // 2. Signed-in customers' carts.
+  const cart = await db.collection("cart").get();
+  const byUser = new Map<string, any[]>();
+  for (const d of cart.docs) {
+    const r = d.data() as any;
+    const uid = String(r.userId || "");
+    if (!uid || uid.startsWith("guest")) continue;
+    byUser.set(uid, [...(byUser.get(uid) || []), r]);
+  }
+  for (const [uid, rows] of byUser) {
+    const at = Math.max(...rows.map((r) => Number(r.addedAt) || 0));
+    if (at < since || at > now - IDLE_MS) continue;
+    const u = await db.collection("users").doc(uid).get();
+    const user = (u.exists ? u.data() : {}) as any;
+    const key = contactKey(user.email, user.phone);
+    if (!key || found.has(key)) continue; // a checkout attempt says more than a cart
+    if (cameBack(key, contactKey(null, user.phone), at)) continue;
+    found.set(key, {
+      key, source: "cart", userId: uid,
+      userEmail: String(user.email || ""), userPhone: String(user.phone || ""),
+      userName: String(user.name || user.fullName || user.displayName || ""),
+      items: rows.map((r) => ({
+        productId: r.productId, productTitle: r.productTitle, productImage: r.productImage,
+        variant: r.variant, price: r.price, quantity: r.quantity,
+      })),
+      cartTotal: rows.reduce((n, r) => n + (Number(r.price) || 0) * (Number(r.quantity) || 1), 0),
+      abandonedAt: at,
+    });
+  }
+
+  // Write: new rows start a reminder cycle; open rows are refreshed without
+  // touching their reminder count; a closed row from an earlier abandonment
+  // starts over, because this is a new one.
+  let created = 0, updated = 0;
+  for (const f of found.values()) {
+    const ref = db.collection("abandonedCarts").doc(rowId(f.key));
+    const snap = await ref.get();
+    const { key, ...fields } = f;
+    const base = { ...fields, contactKey: key, lastSeenAt: now };
+    if (!snap.exists) {
+      await ref.set({ ...base, status: "abandoned", reminderCount: 0, createdAt: now });
+      created++;
+      continue;
+    }
+    const cur = snap.data() as any;
+    const closed = cur.status === "recovered" || cur.status === "expired";
+    if (closed && f.abandonedAt > Number(cur.closedAt || cur.recoveredAt || 0)) {
+      await ref.set({ ...base, status: "abandoned", reminderCount: 0, reminderSentAt: null, createdAt: now });
+      created++;
+    } else if (!closed) {
+      await ref.update({ items: f.items, cartTotal: f.cartTotal, lastSeenAt: now, ...(f.orderId ? { orderId: f.orderId } : {}) });
+      updated++;
+    }
+  }
+
+  // Customers who came back and paid since their cart was written down.
+  let recovered = 0;
+  // Only rows this detector wrote carry a contactKey, which keeps the 4,830
+  // rows from before the move out of a query that runs every half hour.
+  const open = await db.collection("abandonedCarts").where("contactKey", ">", "").get();
+  for (const d of open.docs) {
+    const c = d.data() as any;
+    if (c.status !== "abandoned" && c.status !== "reminded") continue;
+    const key = String(c.contactKey || contactKey(c.userEmail, c.userPhone));
+    if (key && cameBack(key, contactKey(null, c.userPhone), Number(c.abandonedAt) || 0)) {
+      await d.ref.update({ status: "recovered", recoveredAt: now, closedAt: now });
+      recovered++;
+    }
+  }
+
+  return { found: found.size, created, updated, recovered };
+}
+
 const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipped: string }> => {
+  // Finding carts is not the same as writing to people about them: it runs
+  // whether or not reminders are switched on, so the admin page is true
+  // either way.
+  try {
+    const d = await detectAbandonedCarts();
+    console.log("abandoned carts detected", d);
+  } catch (e: any) {
+    console.error("abandoned cart detection failed", e?.message || e);
+  }
+
   const s = await readSettings();
   if (!s.enabled) return { sent: 0, claimed: 0, skipped: "disabled in settings" };
 

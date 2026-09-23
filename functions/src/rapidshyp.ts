@@ -584,6 +584,21 @@ export const saveManualTracking = onCall(async (data: any, context: any) => {
   const orderId = String(data?.orderId || "");
   const trackingNumber = String(data?.trackingNumber || "").trim();
   const courierCompany = String(data?.courierCompany || "").trim();
+  /*
+   * The courier's own tracking page.
+   *
+   * A courier RapidShyp did not book has no API here, so there is no scan
+   * history this site can show — the only way a customer follows the parcel
+   * is the courier's tracking page. The dialog that took this link only
+   * appeared for RapidShyp shipments (it lives behind "has an AWB"), so a
+   * manual shipment had nowhere to put one, and the customer's order page
+   * had nothing to link to.
+   */
+  const rawUrl = String(data?.trackingUrl || "").trim();
+  const trackingUrl = rawUrl && !/^https?:\/\//i.test(rawUrl) ? `https://${rawUrl}` : rawUrl;
+  if (trackingUrl) {
+    try { new URL(trackingUrl); } catch { throw new HttpsError("invalid-argument", "That tracking link is not a valid URL"); }
+  }
 
   if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
   if (!trackingNumber) throw new HttpsError("invalid-argument", "Tracking number is required");
@@ -596,6 +611,9 @@ export const saveManualTracking = onCall(async (data: any, context: any) => {
   await ref.update({
     manualTrackingNumber: trackingNumber,
     manualCourierCompany: courierCompany,
+    // The same field a RapidShyp shipment fills, so the customer's order page
+    // and /track show the link without knowing which kind of shipment it is.
+    ...(trackingUrl ? { trackingUrl, manualTrackingUrl: trackingUrl } : {}),
     shippingStatus: `Shipped via ${courierCompany}`,
     shippingProvider: "manual",
     updatedAt: Date.now(),

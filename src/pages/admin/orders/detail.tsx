@@ -398,11 +398,12 @@ function OrderDetailPageInner() {
         orderId: orderId as Id<"orders">,
         trackingNumber: manualTrackingForm.trackingNumber,
         courierCompany: manualTrackingForm.courierCompany,
+        trackingUrl: manualTrackingForm.trackingUrl || "",
       });
       if (result.success) {
         toast.success(result.message || "Manual tracking saved", { duration: 6000 });
         setShowManualTrackingDialog(false);
-        setManualTrackingForm({ trackingNumber: "", courierCompany: "" });
+        setManualTrackingForm({ trackingNumber: "", courierCompany: "", trackingUrl: "" });
       }
     } catch (error) {
       let msg = "Failed to save manual tracking";
@@ -483,7 +484,10 @@ function OrderDetailPageInner() {
     );
   }
 
-  const orderEmail = order.user?.email || order.customerEmail || order.guestEmail;
+  // `email` is where placeOrder writes it, and it was the one field not read
+  // here — so every order placed through checkout showed "No email on this
+  // order" while carrying one. The others are older orders' spellings.
+  const orderEmail = order.email || order.user?.email || order.customerEmail || order.guestEmail;
   const rawShippingAddress =
     order.shippingAddress && typeof order.shippingAddress === "object"
       ? order.shippingAddress
@@ -577,6 +581,7 @@ function OrderDetailPageInner() {
               setManualTrackingForm({
                 trackingNumber: order.manualTrackingNumber || "",
                 courierCompany: order.manualCourierCompany || "",
+                trackingUrl: order.manualTrackingUrl || "",
               });
               setShowManualTrackingDialog(true);
             }}
