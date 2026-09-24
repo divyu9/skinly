@@ -30,7 +30,14 @@ ErrorDocument 404 /404.html
     # Stale for an hour at most, not a day: an old page names bundles a
     # deploy has deleted. index.html reloads itself when that happens, but
     # the less often it has to, the better.
-    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=600, stale-while-revalidate=3600"
+    #
+    # no-transform keeps Cloudflare from rewriting the page. On the Free plan
+    # it injects its bot-detection script (/cdn-cgi/challenge-platform/…/jsd)
+    # into every HTML response and it cannot be switched off in the
+    # dashboard; that script ran before the first paint and held it back by
+    # most of a second on a phone, and was the largest long task PageSpeed
+    # found. Cloudflare documents no-transform as the way to opt a page out.
+    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=600, stale-while-revalidate=3600, no-transform"
   </FilesMatch>
   # Bundles are named after a hash of their contents, so a given name never
   # changes: keep it for a year and never ask again. They were getting the
