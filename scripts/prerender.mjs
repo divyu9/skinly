@@ -431,13 +431,25 @@ function heroFirst(html) {
   const preloads = [...html.matchAll(/<link rel="modulepreload" crossorigin href="([^"]+)">\s*/g)];
   html = html.replace(mod[0], "");
   for (const m of preloads) html = html.replace(m[0], "");
+  // The stylesheet stops blocking the first paint too: the shell carries its
+  // own inline style and needs none of it, and PageSpeed charged 550 ms of
+  // render-blocking to it. The app still never renders unstyled — the boot
+  // below waits for the sheet as well as the picture.
+  const css = html.match(/<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/);
+  if (css) {
+    html = html.replace(css[0],
+      `<link rel="preload" as="style" crossorigin href="${css[1]}" id="__appCss" onload="this.onload=null;this.rel='stylesheet'">` +
+      `<noscript><link rel="stylesheet" crossorigin href="${css[1]}"></noscript>`);
+  }
   const boot =
-    `<script>(function(){var d=false;function go(){if(d)return;d=true;` +
+    `<script>(function(){var d=false,t0=Date.now();function css(){var l=document.getElementById("__appCss");return !l||(l.rel==="stylesheet"&&!!l.sheet)}` +
+    `function go(){if(d)return;if(!css()&&Date.now()-t0<6000){requestAnimationFrame(go);return}d=true;` +
     `${JSON.stringify(preloads.map((m) => m[1]))}.forEach(function(h){var l=document.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;document.head.appendChild(l)});` +
     `var s=document.createElement("script");s.type="module";s.crossOrigin="";s.src=${JSON.stringify(mod[1])};document.head.appendChild(s)}` +
     `function painted(){requestAnimationFrame(function(){setTimeout(go,0)})}` +
     `var i=document.querySelector(".hero-shell img");if(!i){go();return}if(i.complete){painted();return}` +
-    `i.addEventListener("load",painted);i.addEventListener("error",go);setTimeout(go,2500)})();</script>`;
+    `i.addEventListener("load",painted);i.addEventListener("error",go);setTimeout(go,2500);` +
+    `setTimeout(function(){var l=document.getElementById("__appCss");if(l&&l.rel!=="stylesheet")l.rel="stylesheet"},4000)})();</script>`;
   return html.replace("</body>", `${boot}\n</body>`);
 }
 
