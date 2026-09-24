@@ -189,8 +189,7 @@ export function SiteFooter() {
                   </a>
                   <div className="text-xs leading-relaxed pt-1">
                     <p className="font-medium text-foreground">Mad House Media</p>
-                    <p>603, Bibhab Grande, Fatehabad Road</p>
-                    <p>Agra 282003</p>
+                    <p>Agra, Uttar Pradesh 282003</p>
                   </div>
                 </div>
               </div>

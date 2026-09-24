@@ -41,14 +41,14 @@ export const HOME_META = {
   heading: "GoSkinly — mobile skins and device skins cut for your exact model",
 };
 /*
- * The business, as search engines should know it: one name, one address, one
- * phone, the same everywhere. Merchant Center, the site footer and the
- * policies all say this address (it moved from Noida, then Khandari Road);
- * mismatched contact details are something Merchant Center reviews for.
+ * The business, as search engines should know it: one name, one city, one
+ * phone, the same everywhere. The street address is a private residence, so
+ * the site and its schema stop at the city and PIN; Merchant Center holds the
+ * full address, which it uses for verification and does not publish.
  */
 export const BUSINESS = {
   name: "GoSkinly",
-  street: "603, Bibhab Grande, Fatehabad Road",
+  legalName: "Mad House Media",
   city: "Agra",
   region: "Uttar Pradesh",
   postalCode: "282003",
@@ -60,12 +60,12 @@ export const ORGANIZATION_LD = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: BUSINESS.name,
+  legalName: BUSINESS.legalName,
   url: SITE,
   logo: `${SITE}/logo.webp`,
   description: `Vinyl skins cut to fit ${claim(CATALOGUE_CLAIMS.models)} phones, laptops, consoles, cameras and more.`,
   address: {
     "@type": "PostalAddress",
-    streetAddress: BUSINESS.street,
     addressLocality: BUSINESS.city,
     addressRegion: BUSINESS.region,
     postalCode: BUSINESS.postalCode,

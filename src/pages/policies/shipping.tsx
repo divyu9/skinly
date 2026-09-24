@@ -126,7 +126,7 @@ export default function ShippingPolicy() {
               <p className="mb-4">For any questions about our Shipping Policy, please contact us:</p>
               <div className="bg-muted p-4 rounded-lg">
                 <p className="font-semibold mb-2">Mad House Media</p>
-                <p className="mb-1">603, Bibhab Grande, Fatehabad Road, Agra 282003</p>
+                <p className="mb-1">Agra, Uttar Pradesh 282003</p>
                 <p className="mb-1">Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></p>
                 <p>WhatsApp: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></p>
               </div>
