@@ -1,13 +1,36 @@
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { cn } from "@/lib/utils.ts";
+import { useEffect, useState } from "react";
 
 /** The strip's reserved height. Measured at 72px on both breakpoints — the
  *  mobile layout stacks a brand bar over the row, the wide one sets them side
  *  by side, and they land on the same height. */
 const MARQUEE_H = "h-[72px]";
 
+/*
+ * The ticker starts moving on the visitor's first touch, scroll or key.
+ * Moving from the first frame, it never let the page look finished: speed
+ * measurements compare screenshots until nothing changes, and a strip that
+ * scrolls forever at the top of the screen held PageSpeed's Speed Index at
+ * 17.8 seconds on a page that was fully drawn in two. Someone reading the
+ * page sees the first few models at once and the strip in motion as soon as
+ * they do anything.
+ */
+function useStartOnInteraction() {
+  const [moving, setMoving] = useState(false);
+  useEffect(() => {
+    if (moving) return;
+    const events = ["pointerdown", "touchstart", "scroll", "keydown", "wheel", "mousemove"] as const;
+    const go = () => setMoving(true);
+    events.forEach((e) => window.addEventListener(e, go, { once: true, passive: true }));
+    return () => events.forEach((e) => window.removeEventListener(e, go));
+  }, [moving]);
+  return moving;
+}
+
 export function ModelsMarquee() {
+  const moving = useStartOnInteraction();
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
   const marqueeModels = useQuery(
     api.homepage.getMarqueeModels,
@@ -68,7 +91,7 @@ export function ModelsMarquee() {
           ✨ NOW SUPPORTING
         </div>
         <div className="relative flex min-h-0 flex-1 items-center overflow-hidden">
-          <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap">
+          <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap" style={{ animationPlayState: moving ? "running" : "paused" }}>
             {modelsToShow.map((model, idx) => {
               const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
               const emoji = emojis[idx % emojis.length];
@@ -94,7 +117,7 @@ export function ModelsMarquee() {
           <span className="whitespace-nowrap tracking-wide">NOW SUPPORTING:</span>
         </div>
         <div className="flex-1 overflow-hidden relative">
-          <div className="animate-marquee flex gap-3 whitespace-nowrap">
+          <div className="animate-marquee flex gap-3 whitespace-nowrap" style={{ animationPlayState: moving ? "running" : "paused" }}>
             {modelsToShow.map((model, idx) => {
               const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
               const emoji = emojis[idx % emojis.length];
