@@ -300,7 +300,7 @@ STRUCTURE (these headings, in this order, with the name filled in):
 <h2>Skin or case?</h2> — honest comparison, no specs.
 <h2>How to apply it</h2> — 4-step <ul>.
 ${b.siblings?.length ? `<h2>Other ${b.brand || ""} models</h2> — one sentence naming: ${b.siblings.join(", ")}.` : ""}
-LENGTH: 450-650 words in contentHTML. Use each of these phrases once, naturally: ${kw}.
+LENGTH: at least 550 words in contentHTML (aim for 600). Use each of these phrases once, naturally: ${kw}.
 FAQS: 5, specific to buying a skin for the ${b.name} (fit, finishes, application, removal, delivery). No prices.
 imageAltTexts: 4, each naming the ${b.name} and a design from the brief.`;
   }
@@ -315,7 +315,7 @@ STRUCTURE:
 <h2>Designs and themes</h2> — mention 5-8 names from sampleDesigns.
 <h2>Finishes</h2> — only the finishes in the brief.
 <h2>How ordering works</h2> — pick model, pick design, it is printed and cut to order, paid online, shipped across India.
-LENGTH: 500-700 words. Use each of these phrases once, naturally: ${kw}.
+LENGTH: at least 600 words (aim for 650). Use each of these phrases once, naturally: ${kw}.
 FAQS: 6 about ${b.brand} ${b.gadgetWord} skins (model coverage, fit, finishes, removal, delivery). No prices.
 imageAltTexts: 4.`;
   }
@@ -330,7 +330,7 @@ STRUCTURE:
 <h2>Gadgets it comes on</h2> — the gadgetsCovered, cut to order for the exact model.
 <h2>Finishes</h2> — only the finishes in the brief.
 <h2>Choosing your design</h2> — practical tips (colour of the device, finish, how busy the art is).
-LENGTH: 450-650 words. Use "${b.name.toLowerCase()}" 3-4 times naturally.
+LENGTH: at least 550 words (aim for 600). Use "${b.name.toLowerCase()}" 3-4 times naturally.
 FAQS: 5 about this theme's skins. No prices.
 imageAltTexts: 4.`;
   }
@@ -338,7 +338,7 @@ imageAltTexts: 4.`;
 BRIEF:
 ${brief}
 STRUCTURE: 4-5 <h2> sections that help someone choose a skin for this; mention designs from sampleDesigns and only the finishes in the brief.
-LENGTH: 450-650 words. FAQS: 5. imageAltTexts: 4. No prices.`;
+LENGTH: at least 550 words. FAQS: 5. imageAltTexts: 4. No prices.`;
 }
 
 /* ---------------------------------------------------------------- quality */
@@ -350,9 +350,12 @@ export function qualityIssues(html: string, faqs: any[], facts: SiteFacts, kind:
   const issues: string[] = [];
   const text = `${textOf(html)} ${(faqs || []).map((f) => `${f?.question || ""} ${f?.answer || ""}`).join(" ")}`;
   const words = textOf(html).split(" ").filter(Boolean).length;
-  const floor = kind === "brand-gadget" ? 400 : 350;
+  // Enough to say something real; the prompt asks for more, and GPT-4o
+  // writes a little under what it is asked for.
+  const floor = kind === "brand-gadget" ? 350 : 300;
   if (words < floor) issues.push(`only ${words} words (needs ${floor})`);
-  const prices = [...text.matchAll(/(?:₹|rs\.?\s?|inr\s?)\s?(\d[\d,]*)/gi)].map((m) => Number(m[1].replace(/,/g, "")));
+  // ₹, "Rs." (with its full stop — "DJI RS 3" is a gimbal) or INR before a number.
+  const prices = [...text.matchAll(/(?:₹|\bRs\.|\bINR)\s?(\d[\d,]*)/g)].map((m) => Number(m[1].replace(/,/g, "")));
   const stray = prices.filter((p) => p !== facts.freeShippingAt);
   if (stray.length) issues.push(`mentions a price (₹${stray.slice(0, 3).join(", ₹")})`);
   if (/cash on delivery|\bCOD\b/i.test(text)) issues.push("mentions cash on delivery");
@@ -383,7 +386,17 @@ async function callModel(system: string, user: string): Promise<{ contentHTML: s
   if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const data: any = await res.json();
   const parsed = parseGeneratedContent(data.choices?.[0]?.message?.content || "");
-  return { ...parsed, contentHTML: parsed.contentHTML.replace(/<a\b[^>]*>(.*?)<\/a>/gi, "$1") };
+  // Words the prompt forbids but the model still reaches for are swapped
+  // rather than failing a whole page over one adjective.
+  const tidy = (t: string) => String(t || "")
+    .replace(/\bseamlessly\b/gi, "smoothly").replace(/\bseamless\b/gi, "smooth")
+    .replace(/\belevates?\b/gi, "lifts").replace(/\bunleash(es)?\b/gi, "bring$1 out")
+    .replace(/\bgame-changer\b/gi, "big help").replace(/\btop-notch\b/gi, "high-quality");
+  return {
+    contentHTML: tidy(parsed.contentHTML.replace(/<a\b[^>]*>(.*?)<\/a>/gi, "$1")),
+    faqs: (parsed.faqs || []).map((f: any) => ({ ...f, question: tidy(f?.question), answer: tidy(f?.answer) })),
+    imageAltTexts: parsed.imageAltTexts || [],
+  };
 }
 
 export interface Written {
