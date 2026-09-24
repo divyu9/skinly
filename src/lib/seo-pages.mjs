@@ -523,6 +523,16 @@ export function productSeoTitle(p) {
     .replace(/\s*[|–-]\s*(go\s*skinly|skinly|premium finish)\s*$/i, "")
     .replace(/\s+by\s+(go\s*)?skinly(\.com)?\b/gi, "")
     .trim() || String(p?.title || "").trim();
+  // A stored SEO title that drops the design is worse than the product's own
+  // name: 252 listings shared titles like "Samsung Charger Skin" (19 of them)
+  // because the design was left out. If the product title names words the
+  // stored one lacks, the product title wins.
+  const own = String(p?.title || "").trim();
+  if (own && p?.metaTitle) {
+    const words = (t) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2));
+    const have = words(base);
+    if ([...words(own)].some((w) => !have.has(w))) base = own;
+  }
   // "Sony Camera | Yellow Tech Circuit" names the device first; lead with the design.
   if (/\s\|\s/.test(base)) {
     const [device, ...rest] = base.split(/\s\|\s/);
