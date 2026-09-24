@@ -1,4 +1,5 @@
 import { useQuery } from "@/lib/firebase-hooks";
+import { responsiveImg } from "@/lib/image-cdn";
 import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
@@ -100,8 +101,10 @@ export function FeatureBanner() {
         >
           {/* Background Image */}
           <img
-            src={banner.backgroundImage}
+            {...responsiveImg(banner.backgroundImage, [640, 960, 1280, 1600], "(min-width: 1280px) 1200px, 100vw")}
             alt={banner.heading || "Skinly feature banner"}
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
 
@@ -166,8 +169,10 @@ export function FeatureBanner() {
                 >
                   {/* Background Image */}
                   <img
-                    src={banner.backgroundImage}
+                    {...responsiveImg(banner.backgroundImage, [640, 960, 1280, 1600], "(min-width: 1280px) 1200px, 100vw")}
                     alt={banner.heading || "Skinly feature banner"}
+                    loading="lazy"
+                    decoding="async"
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
 

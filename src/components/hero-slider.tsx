@@ -1,4 +1,5 @@
 import { useQuery, localCopyOf } from "@/lib/firebase-hooks";
+import { responsiveImg } from "@/lib/image-cdn";
 import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
@@ -137,7 +138,13 @@ export function HeroSlider() {
             >
               {/* Background Image - Simplified for better performance */}
               <img
-                src={held ? undefined : localCopyOf(layout.src)}
+                {...(held
+                  ? {}
+                  // The first slide's own copy on goskinly.com is the page's
+                  // largest paint and stays as it is; the rest are resized.
+                  : localCopyOf(layout.src) !== layout.src
+                    ? { src: localCopyOf(layout.src) }
+                    : responsiveImg(layout.src, [480, 640, 800, 1200], isMobile ? "90vw" : "600px"))}
                 alt={slide.heading || "Hero slide"}
                 loading={slide._id === heroSlides[0]._id ? "eager" : "lazy"}
                 fetchpriority={slide._id === heroSlides[0]._id ? "high" : "auto"}

@@ -1,4 +1,5 @@
 import { useDragScroll } from "@/hooks/use-drag-scroll";
+import { responsiveImg } from "@/lib/image-cdn";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -154,7 +155,9 @@ export function CategoryExplorer({ onRequestModel }: CategoryExplorerProps) {
                     alt at all. On a shop the alt is the category name, which is
                     also what someone would have searched for. */}
                 <img
-                  src={pageLoaded ? getCategoryImage(category.categoryName, category.imageUrl) : undefined}
+                  {...(pageLoaded
+                    ? responsiveImg(getCategoryImage(category.categoryName, category.imageUrl), [320, 480, 640, 900], "(min-width: 768px) 23vw, 70vw")
+                    : {})}
                   alt={category.displayName || category.categoryName || "Skins category"}
                   loading="lazy"
                   decoding="async"

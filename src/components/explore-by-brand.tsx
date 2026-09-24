@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { responsiveImg } from "@/lib/image-cdn";
 import { Link } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -44,7 +45,7 @@ function BrandMark({ src, name }: { src?: string; name?: string }) {
   }
   return (
     <img
-      src={src}
+      {...responsiveImg(src, [160, 320], "160px", 85)}
       alt={name || "Brand"}
       loading="lazy"
       onError={() => setFailed(true)}

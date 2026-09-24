@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { responsiveImg } from "@/lib/image-cdn";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
@@ -84,9 +85,10 @@ export function ExploreByGadget({ sectionId, config }: ExploreByGadgetProps) {
             >
               {/* Background Image */}
               <img
-                src={card.imageUrl}
+                {...responsiveImg(card.imageUrl, [320, 480, 640, 900], "(min-width: 768px) 320px, 80vw")}
                 alt={card.title}
                 loading="lazy"
+                decoding="async"
                 className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-110"
               />
 

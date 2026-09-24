@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { responsiveImg } from "@/lib/image-cdn";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -90,7 +91,7 @@ export function MostTrendy({ config: raw }: MostTrendyProps) {
                     >
                       {product.images[0] && (
                         <img
-                          src={product.images[0].url}
+                          {...responsiveImg(product.images[0].url, [240, 360, 480, 640], `(min-width: 768px) ${config.cardWidth}px, 60vw`)}
                           alt={product.title}
                           loading="lazy"
                           decoding="async"
