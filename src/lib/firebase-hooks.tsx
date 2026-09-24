@@ -213,23 +213,8 @@ async function catalogueProducts(): Promise<any[] | null> {
 import { collectionKey } from "./collection-key";
 import { loadCatalogue, loadModelCatalogue } from "./catalogue";
 import { listingOf, presetFor } from "./ai-mockup-shots";
+import { searchRows } from "./search-match";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
-
-/**
- * Search terms out of a query, lowercased.
- *
- * Product and model search used to test the WHOLE query as one contiguous
- * phrase — "yellow tech phone" never matched "Yellow Tech Circuit Matte
- * Android Phone Skin" because "Circuit Matte Android" sits between "Tech"
- * and "Phone" in the title. Each word is checked on its own instead, so
- * order and the words between them stop mattering.
- */
-const matchWords = (q: string): string[] =>
-  String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
-const matchesAllWords = (haystack: string, words: string[]): boolean => {
-  const text = haystack.toLowerCase();
-  return words.length > 0 && words.every((w) => text.includes(w));
-};
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
 
@@ -1857,18 +1842,15 @@ export function useQuery(apiRef: any, args?: any) {
           }
           const modelRows = await catalogueModels();
           if (modelRows) {
-            const words = matchWords(searchParam);
-            const hits = modelRows.filter((d: any) => matchesAllWords(`${d.brandName} ${d.modelName}`, words));
+            const hits = searchRows(modelRows, searchParam, (d: any) => String(d.modelName || ''), (d: any) => `${d.brandName} ${d.modelName}`);
             if (active) setData(hits.slice(0, args?.limit || 10));
             return;
           }
           // Fetch all active models to search in-memory
           const q = query(collection(db, 'supportedModels'), where('isActive', '==', true));
           unsubscribe = onSnapshot(q, (snap) => {
-            const words = matchWords(searchParam);
-            const filtered = snap.docs
-              .map(d => ({ _id: d.id, ...d.data() }))
-              .filter((d: any) => matchesAllWords(`${d.brandName} ${d.modelName}`, words));
+            const filtered = searchRows(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any)), searchParam,
+              (d: any) => String(d.modelName || ''), (d: any) => `${d.brandName} ${d.modelName}`);
             setData(filtered.slice(0, args?.limit || 10));
           });
         }
@@ -2473,20 +2455,17 @@ export function useQuery(apiRef: any, args?: any) {
           }
           const fromCatalogue = await catalogueProducts();
           if (fromCatalogue) {
-            const words = matchWords(args.query);
-            const hits = fromCatalogue.filter((d: any) =>
-              matchesAllWords(`${d.title} ${(d.tags || []).join(' ')}`, words));
+            const hits = searchRows(fromCatalogue, args.query, (d: any) => String(d.title || ''),
+              (d: any) => `${d.title} ${(d.tags || []).join(' ')}`);
             const shown = await refreshProducts(hits.slice(0, (args?.limit || 15) + 3), path);
             if (active) setData(shown.slice(0, args?.limit || 15));
             return;
           }
           const q = query(collection(db, 'products'), where('status', '==', 'active'));
           unsubscribe = onSnapshot(q, async (snap) => {
-            const words = matchWords(args.query);
-            let docs = snap.docs
-              .map(d => ({ _id: d.id, ...d.data() }))
-              .filter((d: any) =>
-                matchesAllWords(`${d.title} ${d.tags?.join(' ') || ''} ${d.description || ''}`, words));
+            let docs = searchRows(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any)), args.query,
+              (d: any) => String(d.title || ''),
+              (d: any) => `${d.title} ${d.tags?.join(' ') || ''} ${d.description || ''}`);
             docs = docs.slice(0, args?.limit || 15);
             
             // Fetch variants for these products
