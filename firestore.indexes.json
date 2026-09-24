@@ -27,6 +27,34 @@
           "order": "ASCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "abandonedCarts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "reminderCount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "abandonedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "abandonedCarts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "reminderCount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "reminderSentAt",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

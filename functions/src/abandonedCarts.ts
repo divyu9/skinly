@@ -116,7 +116,68 @@ const createRecoveryCoupon = async (cart: any, s: Settings): Promise<string | nu
   }
 };
 
-const sendReminderEmail = async (cart: any, couponCode: string | null): Promise<boolean> => {
+const SITE = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
+const rupees = (n: unknown) => Math.round(Number(n) || 0).toLocaleString("en-IN");
+/** A picture the mail can show; the old Cloudinary account answers 401. */
+const mailImage = (u: unknown) => {
+  const url = String(u || "");
+  // Mockup keys carry spaces ("mockups/Apple/iPhone 17/…"), which some mail
+  // clients will not fetch unencoded.
+  return /^https:\/\//.test(url) && !url.includes("res.cloudinary.com") ? url.replace(/ /g, "%20") : "";
+};
+
+/**
+ * Everything the reminder template can print.
+ *
+ * The template in MSG91 asked for customerName, productName, amount,
+ * couponCode, couponDescription and cartLink, and this sent customer_name,
+ * cart_total, item_count and coupon_code — so every reminder went out with
+ * the name, the products and the code blank. Both spellings are sent now, and
+ * the redesigned template adds up to three item rows with pictures.
+ */
+const reminderVariables = (cart: any, couponCode: string | null, s: Settings) => {
+  const items: any[] = Array.isArray(cart.items) ? cart.items : [];
+  const first = String(cart.userName || "").trim().split(/\s+/)[0] || "";
+  const titles = items.map((i) => String(i?.productTitle || "").trim()).filter(Boolean);
+  const productName = titles.length <= 1 ? (titles[0] || "your skins")
+    : `${titles[0]} and ${titles.length - 1} more`;
+  const off = s.couponDiscountType === "fixed"
+    ? `₹${rupees(s.couponDiscountValue)} off`
+    : `${Number(s.couponDiscountValue)}% off`;
+  const vars: Record<string, string> = {
+    // the original names
+    customer_name: first || "there",
+    cart_total: String(cart.cartTotal ?? ""),
+    item_count: String(items.length),
+    coupon_code: couponCode || "",
+    // the template's names
+    customerName: first || "there",
+    productName,
+    amount: rupees(cart.cartTotal),
+    itemCount: String(items.length),
+    itemWord: items.length === 1 ? "item" : "items",
+    couponCode: couponCode || "",
+    couponOff: couponCode ? off : "",
+    couponDescription: couponCode
+      ? `${off} your order · valid for ${Number(s.couponValidityDays) || 7} days · one use`
+      : "",
+    cartLink: `${SITE}/cart?utm_source=email&utm_medium=abandoned_cart&utm_campaign=reminder_${Number(cart.reminderCount) || 1}`,
+    shopLink: `${SITE}/products?utm_source=email&utm_medium=abandoned_cart`,
+  };
+  items.slice(0, 3).forEach((it, i) => {
+    const n = i + 1;
+    vars[`item${n}Name`] = String(it?.productTitle || "Skin");
+    const variant = String(it?.variant || "").trim();
+    vars[`item${n}Variant`] = /^default title$/i.test(variant) ? "" : variant;
+    vars[`item${n}Image`] = mailImage(it?.productImage);
+    vars[`item${n}Price`] = it?.price != null ? rupees(Number(it.price) * (Number(it.quantity) || 1)) : "";
+    vars[`item${n}Qty`] = String(Number(it?.quantity) || 1);
+  });
+  vars.moreItems = items.length > 3 ? `+ ${items.length - 3} more in your cart` : "";
+  return vars;
+};
+
+const sendReminderEmail = async (cart: any, couponCode: string | null, s: Settings): Promise<boolean> => {
   const authkey = process.env.MSG91_AUTH_TOKEN || "";
   if (!authkey) {
     console.error("MSG91_AUTH_TOKEN not configured — skipping send");
@@ -137,12 +198,7 @@ const sendReminderEmail = async (cart: any, couponCode: string | null): Promise<
     template_id: tpl.docs[0].data().msg91TemplateId,
     recipients: [{
       to: [{ email: cart.userEmail, name: cart.userName || "" }],
-      variables: {
-        customer_name: cart.userName || "there",
-        cart_total: String(cart.cartTotal ?? ""),
-        item_count: String((cart.items || []).length),
-        coupon_code: couponCode || "",
-      },
+      variables: reminderVariables(cart, couponCode, s),
     }],
     from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
     domain: "mail.goskinly.com",
@@ -387,7 +443,7 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
     }
 
     const coupon = await createRecoveryCoupon(cart, s);
-    if (await sendReminderEmail(cart, coupon)) sent++;
+    if (await sendReminderEmail(cart, coupon, s)) sent++;
   }
 
   return { sent, claimed, skipped: "" };
@@ -462,7 +518,7 @@ export const sendAbandonedCartReminderNow = onCall(async (data: any, context: an
   }
 
   const coupon = await createRecoveryCoupon(cart, s);
-  const emailSent = await sendReminderEmail(cart, coupon);
+  const emailSent = await sendReminderEmail(cart, coupon, s);
   if (!emailSent) {
     await giveBack();
     return { success: false, emailSent: false, whatsappSent: false, reason: "The email service refused it; see the function log." };
