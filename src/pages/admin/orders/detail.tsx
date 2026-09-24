@@ -659,6 +659,9 @@ function OrderDetailPageInner() {
             subtotal={order.subtotal}
             shippingFee={order.shippingFee}
             codFee={order.codFee}
+            couponDiscount={(order as any).couponDiscount ?? (order as any).discountAmount}
+            couponCode={(order as any).couponCode}
+            walletUsed={(order as any).walletUsed}
             prepaidAmount={order.prepaidAmount}
             codAmount={order.codAmount}
             totalGstAmount={order.totalGstAmount}

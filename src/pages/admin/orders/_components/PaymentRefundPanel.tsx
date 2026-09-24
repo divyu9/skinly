@@ -18,6 +18,9 @@ interface PaymentRefundPanelProps {
   subtotal: number;
   shippingFee: number;
   codFee?: number;
+  couponDiscount?: number;
+  couponCode?: string;
+  walletUsed?: number;
   prepaidAmount?: number;
   codAmount?: number;
   totalGstAmount?: number;
@@ -60,6 +63,9 @@ export function PaymentRefundPanel({
   subtotal,
   shippingFee,
   codFee,
+  couponDiscount,
+  couponCode,
+  walletUsed,
   prepaidAmount,
   codAmount,
   totalGstAmount,
@@ -111,6 +117,23 @@ export function PaymentRefundPanel({
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">COD Fee</span>
               <span>₹{codFee.toFixed(0)}</span>
+            </div>
+          )}
+          {/* Money taken off the order. Without these lines the summary read
+              ₹49 + ₹70 = ₹117 whenever a coupon was used (#4040: a ₹2
+              abandoned-cart coupon). */}
+          {couponDiscount !== undefined && couponDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                Coupon{couponCode ? <span className="ml-1 font-mono text-xs">({couponCode})</span> : null}
+              </span>
+              <span className="text-green-600">−₹{couponDiscount.toFixed(0)}</span>
+            </div>
+          )}
+          {walletUsed !== undefined && walletUsed > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Wallet used</span>
+              <span className="text-green-600">−₹{walletUsed.toFixed(0)}</span>
             </div>
           )}
           {totalGstAmount !== undefined && (

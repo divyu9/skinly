@@ -515,6 +515,21 @@ function OrderDetailPageInner() {
                       <span>₹{(order.codFee ?? 0).toFixed(0)}</span>
                     </div>
                   )}
+                  {/* What came off, so the lines add up to the total. */}
+                  {Number((order as any).couponDiscount ?? (order as any).discountAmount) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>
+                        Coupon{(order as any).couponCode ? <span className="ml-1 font-mono text-xs">({(order as any).couponCode})</span> : null}
+                      </span>
+                      <span className="text-green-600">−₹{Number((order as any).couponDiscount ?? (order as any).discountAmount).toFixed(0)}</span>
+                    </div>
+                  )}
+                  {Number((order as any).walletUsed) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Wallet</span>
+                      <span className="text-green-600">−₹{Number((order as any).walletUsed).toFixed(0)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />
