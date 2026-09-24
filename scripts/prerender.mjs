@@ -889,7 +889,9 @@ function seoPage(s, info, knownPaths, themes = []) {
       "@context": "https://schema.org",
       "@type": "CollectionPage",
       name: h1,
-      description: s.metaDescription,
+      // The live description (counts, finishes, today's lowest price) the
+      // build writes from the catalogue; the stored one is only a fallback.
+      description: info?.description || s.metaDescription,
       url,
       provider: { "@type": "Organization", name: "GoSkinly", url: SITE },
     },

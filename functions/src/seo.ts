@@ -31,7 +31,7 @@ interface ParsedContent {
 // Frontend uses the same convention: settings.getSetting({ key: "openaiApiKey" })
 // ---------------------------------------------------------------------------
 
-const resolveOpenAIKey = async (): Promise<string> => {
+export const resolveOpenAIKey = async (): Promise<string> => {
   // Environment only. This used to read settings/openaiApiKey — a document in a
   // world-readable collection, under a third spelling of the name that never
   // existed, so SEO generation had been failing on a missing key while two
@@ -72,9 +72,10 @@ const SYSTEM_PROMPT = `You are an SEO content writer for GoSkinly, an Indian pho
 BRAND FACTS (always accurate):
 - Brand name: GoSkinly
 - Products: vinyl skins/wraps for phones, laptops, tablets, cameras, drones, chargers, gaming consoles, Mac Mini
-- Price: starting from ₹149
-- Shipping: delivery across India; free shipping on orders above ₹499; prepaid orders only (no cash on delivery)
-- Models supported: 1000+ device models
+- Prices: never state one. Prices change (sales, cashback) and the page shows the live price itself.
+- Ordering: every skin is printed and cut to order for the exact model chosen, so orders are paid online (UPI, cards, netbanking) when placed. Never mention cash on delivery.
+- Shipping: delivery across India; free shipping on orders of ₹500 and above
+- Models supported: 3,600+ models from 55 brands; 340+ designs
 - Finish types: matte, 3D textured/embossed, transparent
 - Popular design themes: anime, 3D textured, carbon fiber, marble, camouflage, god/religious, gaming, abstract
 
@@ -151,7 +152,7 @@ DESIGN TYPES AVAILABLE: ${DESIGN_THEMES}${notesSection}
 OUTPUT: Valid JSON only, no markdown, no backticks.
 
 {
-  "contentHTML": "<h2>Best ${pk} in India — Starting ₹149</h2>...",
+  "contentHTML": "<h2>${pk} in India, cut to order</h2>...",
   "faqs": [...],
   "imageAltTexts": [...]
 }
@@ -161,8 +162,8 @@ CONTENT RULES:
 1. LENGTH: 750–900 words. Not more, not less.
 
 2. STRUCTURE (use exactly this order):
-   <h2>Best ${pk} in India — Starting ₹149</h2>
-   [2-paragraph intro — mention GoSkinly brand, ₹149 price, cut for the exact model]
+   <h2>${pk} in India, cut to order</h2>
+   [2-paragraph intro — mention GoSkinly brand, printed and cut for the exact model after ordering]
 
    <h2>Popular ${brand} Models We Support</h2>
    [mention 6–8 specific models by exact name from DEVICE MODELS TO MENTION]
@@ -183,9 +184,8 @@ CONTENT RULES:
      "vinyl wrap", "matte finish skin", "scratch protection", "no residue removal"
 
 4. INDIA CONTEXT — MANDATORY:
-   - Mention "starting from ₹149" in intro paragraph
-   - Mention "free shipping above ₹499"
-   - Never claim cash on delivery — orders are prepaid only
+   - Never state a price; the only ₹ figure allowed is "free shipping on orders of ₹500 and above"
+   - Never mention cash on delivery; skins are made to order and paid online
    - Use ₹ symbol (not $ or Rs)
 
 5. INTERNAL LINK ANCHORS — at most 2, and only these:
@@ -207,8 +207,7 @@ CONTENT RULES:
 7. IMAGE ALT TEXTS — exactly 15:
    Pattern: "[design] [brand] [model] phone skin India"
    Example: "anime Naruto Samsung Galaxy S24 phone skin India"
-   Include ₹149 price mention in exactly 3 of them.
-   Example: "matte black Samsung skin ₹149 India"
+   No prices in alt texts.
 
 8. AVOID:
    - Any competitor brand names
@@ -221,7 +220,7 @@ CONTENT RULES:
 // Response parser — uses JSON mode response; regex fallback for safety
 // ---------------------------------------------------------------------------
 
-function parseGeneratedContent(text: string): ParsedContent {
+export function parseGeneratedContent(text: string): ParsedContent {
   try {
     const parsed = JSON.parse(text);
     return {

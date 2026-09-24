@@ -6160,7 +6160,9 @@ export function useMutation(apiRef: any) {
         // Both read or rewrite a lot; they belong on the server.
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const name = path.split('.')[1];
-        const call = httpsCallable(getFunctions(), name);
+        // The client gives up after 70 s by default; writing a batch of SEO
+        // pages takes several minutes, and the function allows nine.
+        const call = httpsCallable(getFunctions(), name, { timeout: 540_000 });
         const res = await call(args || {});
         return res.data;
       }

@@ -21,9 +21,6 @@ export default function SettingsPage() {
   const unpaidHoursSetting = useQuery(api.settings.getSetting, { key: "AUTO_CANCEL_UNPAID_HOURS" });
   const runUnpaidSweep = useMutation(api.orders.runUnpaidSweep);
   const runDailyDigest = useMutation(api.orders.runDailyDigest);
-  const runSeoAutoPages = useMutation(api.seo.runSeoAutoPages);
-  const seoPerDaySetting = useQuery(api.settings.getSetting, { key: "SEO_AUTO_PAGES_PER_DAY" });
-  const seoPublishSetting = useQuery(api.settings.getSetting, { key: "SEO_AUTO_PUBLISH" });
   const rollFloorSetting = useQuery(api.settings.getSetting, { key: "LOW_STOCK_ROLL_METRES" });
   const sheetFloorSetting = useQuery(api.settings.getSetting, { key: "LOW_STOCK_CUTOUT_SHEETS" });
   
@@ -38,107 +35,6 @@ export default function SettingsPage() {
   const [sheetFloor, setSheetFloor] = useState("");
   const [isSavingFloors, setIsSavingFloors] = useState(false);
   const [isDigesting, setIsDigesting] = useState(false);
-  const [seoPerDay, setSeoPerDay] = useState("");
-  const [seoPublish, setSeoPublish] = useState(false);
-  const [isSavingSeo, setIsSavingSeo] = useState(false);
-  const [isSeoRunning, setIsSeoRunning] = useState(false);
-
-  useEffect(() => {
-    const v = (seoPerDaySetting as any)?.value;
-    if (v !== undefined && v !== null) setSeoPerDay(String(v));
-  }, [seoPerDaySetting]);
-  useEffect(() => {
-    setSeoPublish((seoPublishSetting as any)?.value === true);
-  }, [seoPublishSetting]);
-
-  const handleSaveSeoAuto = async () => {
-    setIsSavingSeo(true);
-    try {
-      await Promise.all([
-        updateSetting({ key: "SEO_AUTO_PAGES_PER_DAY", value: Math.max(0, Math.floor(Number(seoPerDay) || 0)) }),
-        updateSetting({ key: "SEO_AUTO_PUBLISH", value: seoPublish }),
-      ]);
-      toast.success("Saved");
-    } catch {
-      toast.error("Could not save that");
-    } finally {
-      setIsSavingSeo(false);
-    }
-  };
-
-  /*
-   * The work in the order it is worth doing.
-   *
-   * A console page and a phone page cost the same to write and are worth six
-   * times apart — ₹1,199 a sale against ₹199, and almost nobody competing for
-   * the first. So the high-value shelves go first and phones go last, rather
-   * than everything at once on a domain with no authority yet.
-   */
-  const PHASES = [
-    {
-      n: 1, label: "High-value shelves", about: "console · camera · lens · gimbal · drone · Mac mini",
-      kinds: ["brand-gadget"],
-      gadgets: ["console", "camera", "lens", "gimbals", "drone", "mac-mini", "controller"],
-    },
-    {
-      n: 2, label: "Laptops & tablets", about: "Dell, HP, Lenovo, Asus — 1,357 models behind them",
-      kinds: ["brand-gadget"], gadgets: ["laptop", "tablet"],
-    },
-    {
-      n: 3, label: "Their model pages", about: "newest first, everything except phones",
-      kinds: ["model"],
-      gadgets: ["laptop", "tablet", "camera", "lens", "console", "gimbals", "drone", "mac-mini", "controller"],
-    },
-    { n: 4, label: "Themes", about: "only where 25+ designs back one", kinds: ["theme", "theme-gadget"] },
-    { n: 5, label: "Phones", about: "last — cheapest basket, most competition", kinds: ["model", "brand-gadget"], gadgets: ["phone", "charger"] },
-  ];
-  const [phaseBusy, setPhaseBusy] = useState<number | null>(null);
-
-  const runPhase = async (phase: (typeof PHASES)[number], dryRun: boolean) => {
-    setPhaseBusy(phase.n);
-    try {
-      const res: any = await runSeoAutoPages({
-        kinds: phase.kinds, gadgets: phase.gadgets,
-        dryRun, limit: Number(seoPerDay) || 25,
-      });
-      toast[dryRun ? "warning" : "success"](`Phase ${phase.n} — ${res?.message || "done"}`, {
-        description: (res?.slugs || []).slice(0, 6).join(", ") || undefined,
-        duration: 15000,
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "That did not run");
-    } finally {
-      setPhaseBusy(null);
-    }
-  };
-
-  const handleSeo = async (mode: "coverage" | "preview" | "run") => {
-    setIsSeoRunning(true);
-    try {
-      const res: any = await runSeoAutoPages(
-        mode === "coverage"
-          ? { coverageOnly: true }
-          : { dryRun: mode === "preview", limit: Number(seoPerDay) || undefined }
-      );
-      toast.success(res?.message || "Done", {
-        description: mode === "coverage"
-          ? [
-              res?.coverage?.brandsMissing?.length
-                ? `Brand + gadget missing: ${res.coverage.brandsMissing.slice(0, 6).join(", ")}`
-                : "",
-              res?.coverage?.themesMissing?.length
-                ? `Themes missing: ${res.coverage.themesMissing.slice(0, 6).join(", ")}`
-                : "",
-            ].filter(Boolean).join(" — ") || undefined
-          : undefined,
-        duration: 15000,
-      });
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "That did not run");
-    } finally {
-      setIsSeoRunning(false);
-    }
-  };
 
   useEffect(() => {
     const v = (rollFloorSetting as any)?.value;
@@ -715,99 +611,17 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/*
-          3,684 models, 230 landing pages. The machinery to write one has
-          existed for a while; nothing ever noticed a model had none.
-        */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
-              Landing pages, written nightly
+              Landing pages
             </CardTitle>
             <CardDescription>
-              Three kinds of page, written by the same generator the SEO screen uses: one per model
-              ("acer swift 5 skins"), one per brand and gadget ("dell laptop skins" — 366 models sit
-              behind that one, and none of these existed), and one per theme from your collections
-              ("anime phone skins"). A model added today gets its page tomorrow; after that the order is
-              what a page is worth — how much sits behind it, times what that kind of thing sells
-              for. A console skin's median is ₹1,199 and a phone skin's is ₹199, so a console page
-              is written before six phone ones. The cap is what keeps one night's run from spending
-              a month of OpenAI budget.
+              The nightly SEO landing pages now live under SEO &amp; Content →{" "}
+              <a href="/backend-skinly/seo-automation" className="underline">SEO Automation</a>.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap items-end gap-3">
-              <div className="w-40">
-                <Label htmlFor="seo-per-day">Pages a night</Label>
-                <Input id="seo-per-day" className="mt-1.5" inputMode="numeric" placeholder="0 = off"
-                  value={seoPerDay} onChange={(e) => setSeoPerDay(e.target.value)} />
-              </div>
-              <label className="flex items-center gap-2 pb-2 text-sm">
-                <input type="checkbox" className="size-4" checked={seoPublish}
-                  onChange={(e) => setSeoPublish(e.target.checked)} />
-                Publish them straight away
-              </label>
-              <Button onClick={handleSaveSeoAuto} disabled={isSavingSeo}>
-                {isSavingSeo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save
-              </Button>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => handleSeo("coverage")} disabled={isSeoRunning}>
-                {isSeoRunning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                How many are missing?
-              </Button>
-              <Button variant="outline" onClick={() => handleSeo("preview")} disabled={isSeoRunning}>
-                Show me tonight's
-              </Button>
-              <Button variant="outline" onClick={() => handleSeo("run")} disabled={isSeoRunning}>
-                Write them now
-              </Button>
-            </div>
-
-            {/* One phase at a time, highest value first. */}
-            <div className="rounded-lg border-2 border-dashed border-ink/15 p-3">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Or work through it in order
-              </p>
-              <div className="space-y-2">
-                {PHASES.map((ph) => (
-                  <div key={ph.n} className="flex flex-wrap items-center gap-2">
-                    <span className="w-6 text-sm font-bold tabular-nums text-muted-foreground">{ph.n}</span>
-                    <div className="min-w-[13rem] flex-1">
-                      <p className="text-sm font-medium">{ph.label}</p>
-                      <p className="text-xs text-muted-foreground">{ph.about}</p>
-                    </div>
-                    <Button size="sm" variant="ghost" disabled={phaseBusy !== null}
-                      onClick={() => runPhase(ph, true)}>
-                      {phaseBusy === ph.n && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                      Preview
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={phaseBusy !== null}
-                      onClick={() => runPhase(ph, false)}>
-                      Write
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Each run writes at most the nightly cap above. Preview changes nothing — it counts
-                and names what a phase would write, which is how you decide whether to.
-              </p>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              Writing or repairing a page asks the storefront to rebuild itself, so a new page is
-              live in about five minutes without going near GitHub.
-              Left unpublished, new pages wait in SEO Pages and the morning digest counts them —
-              thin or wrong pages at scale hurt a site more than missing ones, so it is worth
-              reading a few before turning publishing on. A theme needs 25 products before it gets a
-              page at all, and 20 on one gadget: "anime phone" has 58 and earns one, "car" has ten
-              across the whole catalogue and does not.
-            </p>
-          </CardContent>
         </Card>
       </div>
     </AdminLayout>

@@ -144,6 +144,7 @@ export function AdminSidebar() {
         { path: "/backend-skinly/homepage", label: "Homepage", icon: Home },
         { path: "/backend-skinly/seo-templates", label: "SEO Templates", icon: Layout },
         { path: "/backend-skinly/seo-pages", label: "SEO Pages", icon: FileText },
+        { path: "/backend-skinly/seo-automation", label: "SEO Automation", icon: Sparkles },
         { path: "/backend-skinly/seo-generator", label: "SEO Generator", icon: Sparkles },
         { path: "/backend-skinly/sitemap", label: "Sitemap", icon: Map },
       ],
