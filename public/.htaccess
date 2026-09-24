@@ -137,6 +137,11 @@ RewriteRule ^$ /index.html [L]
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteRule ^ - [L]
 
+# >>> stale assets
+# Written by scripts/prerender.mjs: yesterday's entry bundle names, sent on
+# to today's. Empty until a build runs.
+# <<< stale assets
+
 # A missing asset is a 404, never the app's HTML.
 RewriteRule ^(assets|magneto)/ - [R=404,L]
 

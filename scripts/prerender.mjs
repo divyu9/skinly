@@ -1161,9 +1161,50 @@ RewriteRule ^(account|auth|backend-skinly|admin|cart|checkout|orders|payment|moc
 # just is not reported to crawlers as a page until the next build.
 RewriteRule ^ - [R=404,L]`;
 
+/**
+ * Old entry-bundle names, redirected to this build's.
+ *
+ * Every deploy renames the hashed bundles and deletes the old ones, while
+ * Cloudflare may go on handing out the previous HTML for a few minutes. That
+ * page asked for files that were gone, reloaded itself to fetch fresh HTML,
+ * and a reload landing mid-deploy failed outright: PageSpeed and GTmetrix
+ * both reported a client-side redirect to chrome-error:// on the day of ten
+ * deploys. The page only needs its entry script, its stylesheet and the
+ * vendor chunks it preloads, so any missing name of those shapes now
+ * redirects (302, so no edge keeps the new file under the old name) to the
+ * current one. Route chunks are left alone: a tab already running old code
+ * must not mix in new modules, and it recovers by reloading as before.
+ */
+async function staleAssetRules() {
+  const files = await fs.readdir(path.join(DIST, "assets"));
+  const rules = [];
+  for (const f of files) {
+    const m = f.match(/^(index|vendor-[a-z]+)-[A-Za-z0-9_-]{8}\.(js|css)$/);
+    if (!m) continue;
+    const [, prefix, ext] = m;
+    const same = files.filter((g) => new RegExp(`^${prefix}-[A-Za-z0-9_-]{8}\\.${ext}$`).test(g));
+    if (same.length !== 1) continue; // ambiguous: leave it to the 404
+    rules.push(`RewriteRule ^assets/${prefix}-[A-Za-z0-9_-]{8}\\.${ext}$ /assets/${f} [R=302,L]`);
+  }
+  return rules.join("\n");
+}
+
 async function writeHtaccess(strict, retired = []) {
   const file = path.join(DIST, ".htaccess");
-  const src = await fs.readFile(file, "utf8");
+  let src = await fs.readFile(file, "utf8");
+  const sa = src.indexOf("# >>> stale assets");
+  const se = src.indexOf("# <<< stale assets");
+  if (sa !== -1 && se !== -1) {
+    const rules = await staleAssetRules();
+    src = src.slice(0, sa) +
+      `# >>> stale assets (written by scripts/prerender.mjs)\n` +
+      (rules
+        ? "# Each only when the file asked for is not on disk.\n" +
+          rules.split("\n").map((r) => `RewriteCond %{REQUEST_FILENAME} !-f\n${r}`).join("\n") + "\n"
+        : "") +
+      src.slice(se);
+    await fs.writeFile(file, src);
+  }
   const start = src.indexOf("# >>> routing");
   const end = src.indexOf("# <<< routing");
   if (start === -1 || end === -1) throw new Error(".htaccess is missing its routing markers");
