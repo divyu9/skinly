@@ -100,7 +100,7 @@ export function MobileBottomNav() {
             aria-haspopup="dialog"
             aria-expanded={shopOpen}
             className={`flex h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
-              shopSectionActive ? "text-primary" : "text-muted-foreground"
+              shopSectionActive ? "text-brand-deep" : "text-muted-foreground"
             }`}
           >
             <LayoutGridIcon className="size-5" strokeWidth={shopSectionActive ? 2.4 : 1.8} />
@@ -201,7 +201,7 @@ function TabLink({
         aria-current={active ? "page" : undefined}
         // 56px tall: comfortably over the 44px minimum for a thumb.
         className={`relative flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
-          active ? "text-primary" : "text-muted-foreground"
+          active ? "text-brand-deep" : "text-muted-foreground"
         }`}
       >
         <span className="relative">

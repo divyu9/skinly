@@ -282,7 +282,7 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
                 <button
                   onClick={handleSearchToggle}
                   className="group flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full bg-muted/70 px-3 text-left ring-1 ring-border/60 transition-colors hover:bg-muted"
-                  aria-label="Search"
+                  aria-label="Search skins"
                 >
                   <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
                   <span className="truncate text-[13px] text-muted-foreground">Search skins</span>
