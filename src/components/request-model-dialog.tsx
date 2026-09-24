@@ -63,7 +63,8 @@ export function RequestModelDialog({
         brandName: brand,
         modelName: model,
         category,
-        whatsappPhone: phone,
+        // Digits and a leading + only: the rules refuse anything else.
+        whatsappPhone: phone.replace(/[^\d+]/g, ""),
       });
       toast.success("Request submitted! We'll notify you when it's available.");
       onOpenChange(false);

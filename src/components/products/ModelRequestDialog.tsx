@@ -71,7 +71,8 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
         brandName: brand.trim(),
         modelName: model.trim(),
         category: category,
-        whatsappPhone: phone.trim(),
+        // Digits and a leading + only: the rules refuse anything else.
+        whatsappPhone: phone.replace(/[^\d+]/g, ""),
       });
       toast.success("Model request submitted! We'll notify you when it's added.");
       onOpenChange(false);
