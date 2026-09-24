@@ -542,7 +542,9 @@ export function productSeoTitle(p) {
   if (isSkin) {
     if (p?.gadgetCategory === "phone") {
       // "… Phone Skin", "… Phone", "… Skin" all end as "… Mobile Back Skin".
-      const core = base.replace(/\s*(?:[-–]\s*)?(?:(?:android|mobile)\s+)?(?:phone\s*)?(?:back\s*)?skins?$/i, "")
+      // Whole words only: "iPhone Skin" ends in "Phone Skin" too, and without
+      // the boundaries every iPhone listing came out "Apple i Mobile Back Skin".
+      const core = base.replace(/\s*(?:[-–]\s*)?(?:(?:android|mobile)\s+)?(?:\bphone\s*)?(?:\bback\s*)?\bskins?$/i, "")
         .replace(/\s+phone$/i, "").trim();
       base = /\bmobile\b/i.test(core) ? `${core} Skin` : `${core} Mobile Back Skin`;
     } else if (!/\bskins?\b/i.test(base)) {
