@@ -1,7 +1,7 @@
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { cn } from "@/lib/utils.ts";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** The strip's reserved height. Measured at 72px on both breakpoints — the
  *  mobile layout stacks a brand bar over the row, the wide one sets them side
@@ -29,6 +29,29 @@ function useStartOnInteraction() {
   return moving;
 }
 
+/*
+ * How long one lap takes, worked out from how long a lap is. A fixed duration
+ * made the speed depend on the list: 7.5s over a phone-width strip of thirty
+ * models was ~450px a second, too fast to read a single name. A lap is one
+ * copy of the list (a third of the track), so seconds = that width / speed.
+ */
+function useLapSeconds(pxPerSecond: number, deps: unknown) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [seconds, setSeconds] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const lap = el.scrollWidth / 3;
+      if (lap > 0) setSeconds(Math.max(10, lap / pxPerSecond));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [pxPerSecond, deps]);
+  return { ref, seconds };
+}
+
 export function ModelsMarquee() {
   const moving = useStartOnInteraction();
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
@@ -38,6 +61,8 @@ export function ModelsMarquee() {
       ? { maxModels: homepageSettings.marqueeMaxModels }
       : "skip"
   );
+  const mobileLap = useLapSeconds(40, marqueeModels);
+  const desktopLap = useLapSeconds(55, marqueeModels);
 
   /*
    * This strip sits above `main`, so anything it does to its own height moves
@@ -91,14 +116,21 @@ export function ModelsMarquee() {
           ✨ NOW SUPPORTING
         </div>
         <div className="relative flex min-h-0 flex-1 items-center overflow-hidden">
-          <div className="animate-marquee-mobile flex gap-4 whitespace-nowrap" style={{ animationPlayState: moving ? "running" : "paused" }}>
+          <div
+            ref={mobileLap.ref}
+            className="animate-marquee-mobile flex whitespace-nowrap"
+            style={{
+              animationPlayState: moving ? "running" : "paused",
+              ...(mobileLap.seconds ? { animationDuration: `${mobileLap.seconds}s` } : {}),
+            }}
+          >
             {modelsToShow.map((model, idx) => {
               const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
               const emoji = emojis[idx % emojis.length];
               return (
                 <span 
                   key={idx} 
-                  className="text-sm text-foreground font-semibold inline-flex items-center gap-2"
+                  className="text-sm text-foreground font-semibold inline-flex items-center gap-2 pr-4"
                 >
                   <span className="text-base">{emoji}</span>
                   <span>{model}</span>
@@ -117,14 +149,21 @@ export function ModelsMarquee() {
           <span className="whitespace-nowrap tracking-wide">NOW SUPPORTING:</span>
         </div>
         <div className="flex-1 overflow-hidden relative">
-          <div className="animate-marquee flex gap-3 whitespace-nowrap" style={{ animationPlayState: moving ? "running" : "paused" }}>
+          <div
+            ref={desktopLap.ref}
+            className="animate-marquee-models flex whitespace-nowrap"
+            style={{
+              animationPlayState: moving ? "running" : "paused",
+              ...(desktopLap.seconds ? { animationDuration: `${desktopLap.seconds}s` } : {}),
+            }}
+          >
             {modelsToShow.map((model, idx) => {
               const emojis = ['🔥', '🚀', '✨', '⭐', '💫', '🌟', '⚡', '🎯'];
               const emoji = emojis[idx % emojis.length];
               return (
                 <span 
                   key={idx} 
-                  className="text-sm text-foreground/90 font-medium inline-flex items-center gap-2"
+                  className="text-sm text-foreground/90 font-medium inline-flex items-center gap-2 pr-3"
                 >
                   <span>{emoji}</span>
                   <span>{model}</span>

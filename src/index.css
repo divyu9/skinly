@@ -220,9 +220,27 @@
   animation: marquee 15s linear infinite;
 }
 
-/* Mobile marquee - 2x faster */
-.animate-marquee-mobile {
-  animation: marquee 7.5s linear infinite;
+/*
+ * The homepage models strip. Its track holds the list three times, so one
+ * lap is a third of it; the component sets the duration from the measured
+ * width so the speed is the same however many models there are. The fallback
+ * here only covers the frame before that measurement.
+ */
+@keyframes marquee-thirds {
+  from { transform: translateX(0); }
+  to { transform: translateX(-33.3333%); }
+}
+
+.animate-marquee-mobile,
+.animate-marquee-models {
+  animation: marquee-thirds 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee-mobile,
+  .animate-marquee-models {
+    animation: none;
+  }
 }
 
 /* Shake animation for Buy Now button - loops with pauses */
