@@ -5468,11 +5468,34 @@ export function useMutation(apiRef: any) {
         const existing = await getDocs(query(collection(db, 'mockups'),
           where('brand', '==', brand), where('model', '==', model), where('sku', '==', sku), limit(1)));
 
+        /*
+         * Which supported model this is. The storefront finds mockups by name,
+         * but the model page's counts and the SEO pages find them by id, and
+         * without it an upload counts for nothing there. Exact name first,
+         * then the brand's models compared the way filenames are written.
+         */
+        let supportedModelId = "";
+        if (brand) {
+          const exact = await getDocs(query(collection(db, 'supportedModels'),
+            where('brandName', '==', brand), where('modelName', '==', model), limit(1)));
+          if (!exact.empty) supportedModelId = exact.docs[0].id;
+          else {
+            // "Oppo_Oppo A57_T-16" is the Oppo "A57": the brand is sometimes
+            // written into the model part of the filename too.
+            const n = (x: string) => normalizeModelName(x).toLowerCase();
+            const wanted = new Set([n(model), n(model).replace(new RegExp(`^${n(brand)}`), "")]);
+            const all = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', brand)));
+            const hit = all.docs.find((d) => wanted.has(n(String(d.data().modelName || ""))));
+            if (hit) supportedModelId = hit.id;
+          }
+        }
+
         const payload = {
           brand, model, sku,
           r2Key: args.r2Key || `mockups/${brand}/${model}/${sku}.webp`,
           r2Bucket: 'skinly',
           storageProvider: 'r2',
+          ...(supportedModelId ? { supportedModelId } : {}),
         };
 
         if (existing.empty) {

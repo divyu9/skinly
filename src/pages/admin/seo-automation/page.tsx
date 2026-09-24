@@ -167,8 +167,8 @@ export default function SeoAutomationPage() {
             <CardTitle className="flex items-center gap-2"><Clock3 className="h-5 w-5" /> New models (last 30 days)</CardTitle>
             <CardDescription>
               When a model is added (or a request approved), its page is written automatically on the next nightly run —
-              once it is ready. A phone is ready when it has {`${20}`} mockups of its own, or as soon as a customer orders or asks
-              for it. A laptop, tablet or camera model gets its own page only once someone orders or asks for it; until then the
+              once it is ready. Every new phone is ready straight away, as is any phone from a major brand; an older phone from a
+              small brand waits until a customer orders or asks for it. A laptop, tablet or camera model gets its own page only once someone orders or asks for it; until then the
               brand + gadget hub ("Dell Laptop Skins") serves it, which keeps near-identical pages off the site.
             </CardDescription>
           </CardHeader>
@@ -177,12 +177,12 @@ export default function SeoAutomationPage() {
               <Stat label="Added" value={s?.newModels.total ?? "—"} />
               <Stat label="Have a page" value={s?.newModels.withPage ?? "—"} />
               <Stat label="Written tonight" value={s?.newModels.ready ?? "—"} hint={s?.settings.perDay ? "ready" : "turn the nightly run on"} />
-              <Stat label="Waiting for mockups" value={s?.newModels.waitingMockups ?? "—"} />
+              <Stat label="Waiting for demand" value={s?.newModels.waitingMockups ?? "—"} />
               <Stat label="Served by hub page" value={s?.newModels.hubCovers ?? "—"} />
             </div>
             {!!s?.newModels.waitingNames?.length && (
               <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Waiting for mockups: </span>
+                <span className="font-medium text-foreground">Waiting for demand: </span>
                 {s.newModels.waitingNames.join(", ")}
               </p>
             )}
@@ -232,7 +232,7 @@ export default function SeoAutomationPage() {
                 <thead>
                   <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="py-2 pr-4">Kind</th><th className="py-2 pr-4 text-right">Pages</th>
-                    <th className="py-2 pr-4 text-right">Ready</th><th className="py-2 pr-4 text-right">Waiting for mockups</th>
+                    <th className="py-2 pr-4 text-right">Ready</th><th className="py-2 pr-4 text-right">Waiting for demand</th>
                     <th className="py-2 text-right">Served by hub</th>
                   </tr>
                 </thead>
@@ -251,7 +251,7 @@ export default function SeoAutomationPage() {
             </div>
             {model && (
               <p className="mt-3 text-xs text-muted-foreground">
-                {model.waitingMockups.toLocaleString("en-IN")} phone models become ready as their mockups are made;
+                {model.waitingMockups.toLocaleString("en-IN")} older phones from small brands wait for an order or a request (their brand page serves them);
                 {" "}{model.hubCovers.toLocaleString("en-IN")} other models are covered by their brand + gadget page.
               </p>
             )}

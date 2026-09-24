@@ -468,12 +468,16 @@ export async function repairAutoPageTypes(db: admin.firestore.Firestore): Promis
 /**
  * Whether a missing page may be written, and why not.
  *
- * Only 323 of 3,695 models have their own mockups — every one of them a
- * phone. A page for a model with none shows the same designs in the same
- * pictures as its neighbours under a different name, and a thousand of those
- * is what Google calls doorway pages. So:
+ * Only 393 of 3,695 models have their own mockups — every one a phone, all
+ * from the January import, and nothing makes model-wise mockups any more. So
+ * mockups can vouch for a phone page but cannot be what it waits for: a phone
+ * added this month would wait forever. A page for a model nobody looks for
+ * shows the same designs as its neighbours under a different name, and a
+ * thousand of those is what Google calls doorway pages. So:
  *
- *  - a phone model waits until it has 20 mockups of its own;
+ *  - a phone model is ready when it is new (last 30 days), from a brand most
+ *    of India shops for, has 20 mockups of its own, or has been ordered or
+ *    asked for; the long tail of small, old phones stays with its brand page;
  *  - any other model gets a page only once someone has ordered or asked for
  *    it — until then "Dell laptop skins" is the page that serves it;
  *  - brand-and-gadget and theme pages are always ready (their floors are
@@ -485,7 +489,11 @@ export type Readiness = "ready" | "waiting-mockups" | "hub-covers";
 export function readiness(t: Target, ctx: WriterContext): Readiness {
   if (t.kind !== "model") return "ready";
   const demand = (ctx.ordered.get(demandKey(t.brandName, t.modelName)) || 0) + (ctx.requested.get(demandKey(t.brandName, t.modelName)) || 0);
-  if (t.gadget === "phone") return (ctx.mockups.get(String(t.modelId)) || 0) >= MOCKUP_GATE || demand > 0 ? "ready" : "waiting-mockups";
+  if (t.gadget === "phone") {
+    const fresh = Number((t as any).createdAt) > Date.now() - 30 * 86400000;
+    const big = BIG_PHONE_BRANDS.has(String(t.brandName || "").toLowerCase());
+    return fresh || big || demand > 0 || (ctx.mockups.get(String(t.modelId)) || 0) >= MOCKUP_GATE ? "ready" : "waiting-mockups";
+  }
   return demand > 0 ? "ready" : "hub-covers";
 }
 
