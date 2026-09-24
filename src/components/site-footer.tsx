@@ -189,8 +189,8 @@ export function SiteFooter() {
                   </a>
                   <div className="text-xs leading-relaxed pt-1">
                     <p className="font-medium text-foreground">Mad House Media</p>
-                    <p>G-2, Ganpati Vilas</p>
-                    <p>Khandari Road, Agra 282002</p>
+                    <p>603, Bibhab Grande, Fatehabad Road</p>
+                    <p>Agra 282003</p>
                   </div>
                 </div>
               </div>

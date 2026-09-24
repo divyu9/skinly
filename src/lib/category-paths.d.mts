@@ -7,3 +7,5 @@ export const CATALOGUE_CLAIMS: { models: number; designs: number; brands: number
 export function claim(n: number): string;
 export const HOME_META: { title: string; description: string; heading: string };
 export const PRODUCTS_META: { title: string; description: string };
+export const BUSINESS: { name: string; street: string; city: string; region: string; postalCode: string; country: string; phone: string; email: string };
+export const ORGANIZATION_LD: Record<string, unknown>;

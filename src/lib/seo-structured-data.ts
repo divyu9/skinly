@@ -1,3 +1,4 @@
+import { ORGANIZATION_LD } from "@/lib/category-paths.mjs";
 import type { Doc } from "@/lib/firebase-api";
 
 /**
@@ -93,20 +94,7 @@ export function generateBreadcrumbStructuredData(
  * Generate Organization structured data
  */
 export function generateOrganizationStructuredData() {
-  return {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "GoSkinly",
-    "url": "https://goskinly.com",
-    "logo": "https://goskinly.com/og-default.jpg",
-    "description": "Premium phone skins and protection accessories for all devices",
-    "contactPoint": {
-      "@type": "ContactPoint",
-      "contactType": "Customer Service",
-      "email": "support@goskinly.com"
-    },
-    "sameAs": []
-  };
+  return ORGANIZATION_LD;
 }
 
 /**

@@ -29,7 +29,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
-import { CATEGORY_PAGES, GADGET_PAGES, HOME_META, PRODUCTS_META, CATALOGUE_CLAIMS } from "../src/lib/category-paths.mjs";
+import { CATEGORY_PAGES, GADGET_PAGES, HOME_META, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -565,15 +565,8 @@ function staticPages(hub, home = null) {
       ...(home ? { homeSeed: home.seed, rootHtml: home.shell } : {}),
       priority: "1.0",
       jsonLd: [
-        {
-          "@context": "https://schema.org",
-          "@type": "Organization",
-          name: "GoSkinly",
-          url: SITE,
-          // A stable URL, identical to the one Index.tsx gives Helmet.
-          logo: `${SITE}/logo.webp`,
-          description: "Vinyl skins cut to fit 1000+ phones, laptops, consoles, cameras and more.",
-        },
+        // Shared with Index.tsx's Helmet (src/lib/category-paths.mjs).
+        ORGANIZATION_LD,
         {
           "@context": "https://schema.org",
           "@type": "WebSite",

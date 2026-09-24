@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { HOME_META } from "@/lib/category-paths.mjs";
+import { HOME_META, ORGANIZATION_LD } from "@/lib/category-paths.mjs";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -91,14 +91,7 @@ import { toast } from "sonner";
 import { announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
 
 
-const HOME_ORGANIZATION_LD = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "GoSkinly",
-  url: "https://goskinly.com",
-  logo: "https://goskinly.com/logo.webp",
-  description: "Vinyl skins cut to fit 1000+ phones, laptops, consoles, cameras and more.",
-};
+const HOME_ORGANIZATION_LD = ORGANIZATION_LD;
 
 const HOME_WEBSITE_LD = {
   "@context": "https://schema.org",

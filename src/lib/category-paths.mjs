@@ -40,6 +40,47 @@ export const HOME_META = {
   description: `Mobile, laptop, tablet, console & camera skins cut for ${claim(C.models)} models across ${C.brands} brands. ${claim(C.designs)} designs in matte & 3D textured finishes. Free shipping above ₹499.`,
   heading: "GoSkinly — mobile skins and device skins cut for your exact model",
 };
+/*
+ * The business, as search engines should know it: one name, one address, one
+ * phone, the same everywhere. Merchant Center, the site footer and the
+ * policies all say this address (it moved from Noida, then Khandari Road);
+ * mismatched contact details are something Merchant Center reviews for.
+ */
+export const BUSINESS = {
+  name: "GoSkinly",
+  street: "603, Bibhab Grande, Fatehabad Road",
+  city: "Agra",
+  region: "Uttar Pradesh",
+  postalCode: "282003",
+  country: "IN",
+  phone: "+91-9761011121",
+  email: "prgoskinly@gmail.com",
+};
+export const ORGANIZATION_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: BUSINESS.name,
+  url: SITE,
+  logo: `${SITE}/logo.webp`,
+  description: `Vinyl skins cut to fit ${claim(CATALOGUE_CLAIMS.models)} phones, laptops, consoles, cameras and more.`,
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: BUSINESS.street,
+    addressLocality: BUSINESS.city,
+    addressRegion: BUSINESS.region,
+    postalCode: BUSINESS.postalCode,
+    addressCountry: BUSINESS.country,
+  },
+  contactPoint: {
+    "@type": "ContactPoint",
+    contactType: "customer service",
+    telephone: BUSINESS.phone,
+    email: BUSINESS.email,
+    areaServed: "IN",
+    availableLanguage: ["English", "Hindi"],
+  },
+};
+
 export const PRODUCTS_META = {
   title: "Shop Mobile Skins, Laptop Skins & Gadget Accessories | GoSkinly",
   description: `Browse ${claim(C.designs)} skin designs for ${claim(C.models)} phones, laptops, tablets, consoles and cameras, plus cases and accessories. Free shipping above ₹499.`,
