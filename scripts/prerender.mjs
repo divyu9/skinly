@@ -999,9 +999,12 @@ function seoPage(s, info, knownPaths, themes = []) {
       slug: s.slug,
       // The stored page as the app would read it, minus bookkeeping it never
       // draws. Timestamps are plain numbers here, as they are everywhere else
-      // the app reads this collection.
+      // the app reads this collection. The rewrite's backup of the old copy
+      // stays out too: it still quotes old prices, and it would ship twice
+      // the words in every page for nobody to read.
       page: Object.fromEntries(Object.entries(s).filter(([k]) =>
-        !["generationLog", "aiPrompt", "rawResponse", "embedding"].includes(k))),
+        !["generationLog", "aiPrompt", "rawResponse", "embedding", "previousContentHTML", "previousFaqs",
+          "qualityIssues", "rewriteIssues", "rewriteTriedAt"].includes(k))),
     },
     title: info?.title || s.metaTitle || `${h1} | GoSkinly`,
     description: info?.description || s.metaDescription || clip(text, 155),
