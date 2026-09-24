@@ -3,7 +3,6 @@ import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, bro
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
-import type { Analytics } from "firebase/analytics";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
@@ -47,27 +46,12 @@ export const storage = getStorage(app);
 export const functions = getFunctions(app, "us-central1");
 
 /*
- * Firebase Analytics, started once the page has finished loading.
- *
- * Initialising it here loaded gtag.js for this project's measurement id the
- * moment the bundle ran — 155 KB competing with the hero image on a phone,
- * and the one analytics script the five-second defer in index.html never
- * covered. Nothing reads the handle; it exists for the automatic page view,
- * which still fires, just after the page is up.
+ * No Firebase Analytics. It reported to G-XRY71Y8B66, a second GA4 property
+ * nobody reads; the site's analytics is G-16S5XDYGYR, loaded by index.html,
+ * which already receives every page view and event. The extra tag cost
+ * ~150 KB of gtag.js and a share of the main-thread time PageSpeed counted
+ * against the page.
  */
-export let analytics: Analytics | null = null;
-if (typeof window !== "undefined") {
-  const start = () => {
-    const idle = (window as any).requestIdleCallback || ((cb: () => void) => setTimeout(cb, 1500));
-    idle(() => {
-      import("firebase/analytics").then(({ getAnalytics, isSupported }) =>
-        isSupported().then((ok) => { if (ok) analytics = getAnalytics(app); })
-      ).catch(() => {});
-    });
-  };
-  if (document.readyState === "complete") start();
-  else window.addEventListener("load", start, { once: true });
-}
 
 export { appCheck };
 export default app;
