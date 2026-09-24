@@ -108,6 +108,7 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
   const newOrder = {
     orderNumber: orderNumber,
     userId: uid || reqSessionId || 'guest',
+    ...(uid ? { ownerUid: uid } : {}),
     customerName: shippingAddress?.fullName || 'Guest',
     email,
     phone: shippingAddress?.phone || '',
@@ -158,10 +159,30 @@ export const claimGuestOrders = functions.https.onCall(async (_data: any, contex
     for (const d of snap.docs) {
       const o = d.data() as any;
       if (!String(o.userId || "").startsWith("guest-")) continue;
-      await d.ref.update({ userId: uid, claimedFromGuestId: o.userId, claimedAt: Date.now() });
+      await d.ref.update({ userId: uid, ownerUid: uid, claimedFromGuestId: o.userId, claimedAt: Date.now() });
       claimed++;
     }
   }
-  if (claimed) console.log("claimGuestOrders", { uid, claimed });
-  return { claimed };
+
+  /*
+   * Orders and wallet rows from before the move to Firebase carry the old
+   * backend's user-document id, and their customers have not signed in since,
+   * so nothing could say whose they were (ownership.ts). The users document
+   * holds the email; this sign-in has now proved it. Only ownerUid is set:
+   * userId still names the document the wallet balance lives on.
+   */
+  let linked = 0;
+  const userDocs = await Promise.all(variants.map((e) => db.collection("users").where("email", "==", e).limit(10).get()));
+  for (const u of userDocs.flatMap((s) => s.docs)) {
+    for (const col of ["orders", "walletTransactions"]) {
+      const rows = await db.collection(col).where("userId", "==", u.id).limit(200).get();
+      for (const r of rows.docs) {
+        if ((r.data() as any).ownerUid) continue;
+        await r.ref.update({ ownerUid: uid });
+        linked++;
+      }
+    }
+  }
+  if (claimed || linked) console.log("claimGuestOrders", { uid, claimed, linked });
+  return { claimed, linked };
 });

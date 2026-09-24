@@ -1,6 +1,7 @@
 import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { queueWhatsApp } from "./orderNotifications";
+import { enforceDailyRateLimit } from "./rate-limit";
 
 const COUNTER = "counters/modelRequests";
 
@@ -40,7 +41,14 @@ export const onModelRequestCreated = functionsV1.firestore
     // on the site and thinking about their phone.
     const request = { ...data, ...patch };
     const claimed = await claimOnce(snap.ref, "requestAckAt");
-    if (claimed) await notify(db, snap.id, request, "model_requested");
+    if (!claimed) return null;
+    const limited = await overAckLimit(String(data.whatsappPhone || ""));
+    if (limited) {
+      await snap.ref.update({ ackSkipped: limited });
+      console.warn("model_requested not sent", { id: snap.id, limited });
+      return null;
+    }
+    await notify(db, snap.id, request, "model_requested");
     return null;
   });
 
@@ -63,6 +71,24 @@ export const onModelRequestUpdated = functionsV1.firestore
     if (claimed) await notify(admin.firestore(), change.after.id, after, "model_added");
     return null;
   });
+
+/**
+ * Anyone can file a request without signing in, and each one texts the number
+ * in it from our WhatsApp account. A person asks for a model or two; a script
+ * asks for hundreds. So: three acknowledgements a day to one number, and 60 a
+ * day in all (the shop gets about one request a day). The request itself is
+ * always kept; only the message is held back. Returns why, or null to send.
+ */
+async function overAckLimit(phone: string): Promise<string | null> {
+  const digits = phone.replace(/\D/g, "").slice(-10);
+  try {
+    await enforceDailyRateLimit({ key: `model_ack_all`, limit: 60 });
+    if (digits) await enforceDailyRateLimit({ key: `model_ack_${digits}`, limit: 3 });
+    return null;
+  } catch (e: any) {
+    return e?.code === "resource-exhausted" ? "daily message limit reached" : null;
+  }
+}
 
 /** Sets a timestamp field only if it is unset; true for the one caller that set it. */
 async function claimOnce(ref: admin.firestore.DocumentReference, field: string): Promise<boolean> {

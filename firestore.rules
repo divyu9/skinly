@@ -122,16 +122,14 @@ service cloud.firestore {
 
     // ── Orders ────────────────────────────────────────────────────────────────
     // One order is fetchable by anyone holding its document id — that is how
-    // guest tracking works, and the ids are unguessable. Listing now needs a
-    // signed-in caller, which ends the anonymous dump of the whole order book.
-    //
-    // Deliberately not yet scoped to the caller's own orders: `userId` on live
-    // data is a mix of auth uids, legacy user-doc ids, session ids and nulls, so
-    // `resource.data.userId == request.auth.uid` would hide 48 real orders from
-    // the customers who placed them. Tightening needs the userId backfill.
+    // guest tracking works, and the ids are unguessable.
     match /orders/{orderId} {
       allow get: if true;
-      allow list: if isSignedIn();
+      // A customer lists only their own orders, by ownerUid (set at checkout,
+      // on a guest claim, and backfilled; see functions/src/ownership.ts).
+      // This was `isSignedIn()`, which let any Google account read every
+      // customer's name, phone and address.
+      allow list: if isAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
       allow write: if isAdmin();
     }
 
@@ -149,9 +147,9 @@ service cloud.firestore {
 
     // ── Money ─────────────────────────────────────────────────────────────────
     match /walletTransactions/{txnId} {
-      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      // Same legacy-id caveat as orders: rows still carry the old user-doc id.
-      allow list: if isSignedIn();
+      allow get: if isAdmin() || (isSignedIn() && (resource.data.userId == request.auth.uid
+                                                  || resource.data.ownerUid == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.ownerUid == request.auth.uid);
       allow write: if isAdmin();
     }
 
@@ -162,11 +160,48 @@ service cloud.firestore {
     }
 
     // ── Customer-submitted forms ──────────────────────────────────────────────
-    // Anyone may submit; only admins may read them back.
-    match /bugReports/{id}        { allow create: if true; allow read, update, delete: if isAdmin(); }
-    match /bugAttachments/{id}    { allow create: if true; allow read, update, delete: if isAdmin(); }
-    match /modelRequests/{id}     { allow create: if true; allow read, update, delete: if isAdmin(); }
-    match /stockNotifications/{id}{ allow create: if true; allow read, update, delete: if isAdmin(); }
+    // Anyone may submit; only admins may read them back. Each form may carry
+    // only the fields the site sends, at sane sizes: a model request sends a
+    // WhatsApp to the number in it, and a "notify me" row gets one on restock,
+    // so an open `create: if true` let a script point our WhatsApp account at
+    // any number, as often as it liked. Volume is capped where the messages
+    // are sent (modelRequests.ts, restock.ts); these stop the junk rows.
+    function str(v, max) { return v is string && v.size() <= max; }
+    function phoneLike(v) { return v is string && v.matches('^[+]?[0-9 ]{10,16}$'); }
+
+    match /bugReports/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['bugId', 'userEmail', 'userPhone', 'bugDetails',
+                         'userId', 'status', 'pageUrl', 'userAgent', 'createdAt'])
+                    && str(request.resource.data.bugDetails, 5000)
+                    && request.resource.data.get('status', 'open') == 'open';
+      allow read, update, delete: if isAdmin();
+    }
+    match /bugAttachments/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['bugReportId', 'fileId', 'fileName', 'fileSize', 'fileType', 'createdAt'])
+                    && exists(/databases/$(database)/documents/bugReports/$(request.resource.data.bugReportId));
+      allow read, update, delete: if isAdmin();
+    }
+    match /modelRequests/{id} {
+      allow create: if isAdmin() || (
+                       request.resource.data.keys().hasOnly(['brandName', 'modelName', 'category', 'whatsappPhone',
+                         '_creationTime', 'userId', 'userEmail'])
+                    && str(request.resource.data.brandName, 60) && request.resource.data.brandName.size() > 0
+                    && str(request.resource.data.modelName, 80) && request.resource.data.modelName.size() > 0
+                    && str(request.resource.data.get('category', ''), 20)
+                    && phoneLike(request.resource.data.whatsappPhone));
+      allow read, update, delete: if isAdmin();
+    }
+    match /stockNotifications/{id} {
+      allow create: if isAdmin() || (
+                       request.resource.data.keys().hasOnly(['variantId', 'productId', 'productTitle', 'productSlug',
+                         'variantTitle', 'sku', 'phoneNumber', 'userId', 'userEmail', 'status', 'createdAt'])
+                    && request.resource.data.status == 'waiting'
+                    && request.resource.data.phoneNumber is string
+                    && request.resource.data.phoneNumber.matches('^[6-9][0-9]{9}$')
+                    && id == request.resource.data.variantId + '_' + request.resource.data.phoneNumber
+                    && exists(/databases/$(database)/documents/variants/$(request.resource.data.variantId)));
+      allow read, update, delete: if isAdmin();
+    }
 
     // ── Login codes ───────────────────────────────────────────────────────────
     // Only the Admin SDK inside Cloud Functions touches these. With the

@@ -21,6 +21,8 @@ import * as admin from "firebase-admin";
  * a usecase that does not exist or is switched off — that is a decision
  * somebody made, not an error to raise from a stock recount.
  */
+const RESTOCK_CAP = 100;
+
 export async function notifyRestocked(
   db: admin.firestore.Firestore,
   variantIds: string[]
@@ -50,9 +52,20 @@ export async function notifyRestocked(
       : null;
     const product = (productSnap?.data() || {}) as any;
 
+    /*
+     * One message per number, and at most RESTOCK_CAP per variant per restock.
+     * Anyone can leave a number here, so without a ceiling a restock would
+     * text however many a script planted; and each message is four writes,
+     * so past 125 the batch was over Firestore's 500 and nobody heard at all.
+     * The ones past the cap stay waiting for the next restock.
+     */
     const batch = db.batch();
+    const seen = new Set<string>();
     for (const d of waiting.docs) {
       const n = d.data() as any;
+      if (seen.size >= RESTOCK_CAP) break;
+      if (seen.has(String(n.phoneNumber))) continue;
+      seen.add(String(n.phoneNumber));
       const msgRef = db.collection("whatsappMessages").doc();
       batch.set(msgRef, {
         usecaseKey: "back_in_stock",

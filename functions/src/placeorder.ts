@@ -305,6 +305,8 @@ export const placeOrder = functions
     await docRef.set({
       orderNumber,
       userId: uid || reqSessionId || "guest",
+      // The sign-in that may list this order (see ownership.ts).
+      ...(uid ? { ownerUid: uid } : {}),
       customerName: shippingAddress?.fullName || "Guest",
       email,
       phone: shippingAddress?.phone || "",

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { db, functions } from './firebase';
+import { db, functions, auth as firebaseAuth } from './firebase';
 import { 
   collection, query, where, getDocs as fsGetDocs, onSnapshot as fsOnSnapshot, doc, getDoc as fsGetDoc,
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
@@ -755,7 +755,10 @@ export function useQuery(apiRef: any, args?: any) {
 
             // Removed orderBy('createdAt', 'desc') to avoid requiring a composite index.
             // Sorting is done in-memory.
-            const q = query(collection(db, 'orders'), where('userId', 'in', await userIdCandidates(user)));
+            // By ownerUid, the one field the rules let a customer list on:
+            // userId is a mix of sign-in ids, old user-document ids and guest
+            // sessions (see functions/src/ownership.ts).
+            const q = query(collection(db, 'orders'), where('ownerUid', '==', user.uid));
             
             innerUnsubscribe = onSnapshot(q, (snap) => {
               // Normalised like the admin reads are. The customer pages print
@@ -843,7 +846,7 @@ export function useQuery(apiRef: any, args?: any) {
               setData(null);
               return;
             }
-            const q = query(collection(db, 'orders'), where('userId', 'in', await userIdCandidates(user)), limit(1));
+            const q = query(collection(db, 'orders'), where('ownerUid', '==', user.uid), limit(1));
             innerUnsubscribe = onSnapshot(q, (snap) => {
               if (snap.empty) {
                 setData(null);
@@ -867,7 +870,11 @@ export function useQuery(apiRef: any, args?: any) {
           }
           // The order stores PhonePe's id as paymentTransactionId; this asked
           // for paymentId, which no order has, so it never found one.
-          const q = query(collection(db, 'orders'), where('paymentTransactionId', '==', args.merchantTransactionId), limit(1));
+          // Only a signed-in customer may search orders, and only their own.
+          const me = firebaseAuth.currentUser;
+          if (!me) { setData(null); return; }
+          const q = query(collection(db, 'orders'), where('ownerUid', '==', me.uid),
+            where('paymentTransactionId', '==', args.merchantTransactionId), limit(1));
           unsubscribe = onSnapshot(q, (snap) => {
             setData(snap.empty ? null : { _id: snap.docs[0].id, ...snap.docs[0].data() });
           });
@@ -1301,7 +1308,7 @@ export function useQuery(apiRef: any, args?: any) {
               const userData = snap.exists() ? snap.data() : {};
               
               // Now fetch transactions to calculate stats
-              const q = query(collection(db, 'walletTransactions'), where('userId', 'in', await userIdCandidates(user)));
+              const q = query(collection(db, 'walletTransactions'), where('ownerUid', '==', user.uid));
               const txSnap = await getDocs(q);
               
               let currentBalance = userData.walletBalance || 0;
@@ -1345,7 +1352,7 @@ export function useQuery(apiRef: any, args?: any) {
               return;
             }
 
-            const q = query(collection(db, 'walletTransactions'), where('userId', 'in', await userIdCandidates(user)));
+            const q = query(collection(db, 'walletTransactions'), where('ownerUid', '==', user.uid));
             innerUnsubscribe = onSnapshot(q, (snap) => {
               const docs = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
               docs.sort((a: any, b: any) => (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
@@ -7680,7 +7687,9 @@ export function useConvex() {
       }
       if (path === 'orders.getOrderByMerchantTransaction') {
         if (!args?.merchantTransactionId) return null;
-        const snap = await getDocs(query(collection(db, 'orders'),
+        const me = firebaseAuth.currentUser;
+        if (!me) return null;
+        const snap = await getDocs(query(collection(db, 'orders'), where('ownerUid', '==', me.uid),
           where('paymentTransactionId', '==', String(args.merchantTransactionId)), limit(1)));
         return snap.empty ? null : normalizeOrder({ _id: snap.docs[0].id, ...snap.docs[0].data() });
       }
