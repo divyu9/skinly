@@ -37,7 +37,14 @@ ErrorDocument 404 /404.html
     # dashboard; that script ran before the first paint and held it back by
     # most of a second on a phone, and was the largest long task PageSpeed
     # found. Cloudflare documents no-transform as the way to opt a page out.
-    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=600, stale-while-revalidate=3600, no-transform"
+    #
+    # Two minutes at the edge, not ten. Each deploy renames the bundles, and
+    # for as long as the edge held the old HTML, visitors got a page whose
+    # route chunks were gone (it reloads itself to recover, which PageSpeed
+    # and GTmetrix report as a failed redirect). On a day of ten deploys that
+    # was most of the day. Two minutes costs Hostinger one HTML fetch per
+    # edge per page every two minutes.
+    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=120, stale-while-revalidate=120, no-transform"
   </FilesMatch>
   # Bundles are named after a hash of their contents, so a given name never
   # changes: keep it for a year and never ask again. They were getting the
