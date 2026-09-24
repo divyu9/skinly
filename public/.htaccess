@@ -44,7 +44,11 @@ ErrorDocument 404 /404.html
     # and GTmetrix report as a failed redirect). On a day of ten deploys that
     # was most of the day. Two minutes costs Hostinger one HTML fetch per
     # edge per page every two minutes.
-    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=120, stale-while-revalidate=120, no-transform"
+    #
+    # stale-if-error: when Hostinger fails the refresh (it did on 3 of 20
+    # uncached requests on 24 Sep — two 30-second timeouts and a 525), the
+    # edge serves the copy it has for up to a day instead of an error page.
+    Header set Cache-Control "public, max-age=0, must-revalidate, s-maxage=120, stale-while-revalidate=120, stale-if-error=86400, no-transform"
   </FilesMatch>
   # Bundles are named after a hash of their contents, so a given name never
   # changes: keep it for a year and never ask again. They were getting the
@@ -68,7 +72,7 @@ ErrorDocument 404 /404.html
     # Rebuilt at most daily; ten minutes of browser cache saves a refetch on
     # every page of a visit without holding stale data for long, and the edge
     # may hold it an hour and serve yesterday's while it fetches today's.
-    Header set Cache-Control "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400"
+    Header set Cache-Control "public, max-age=600, s-maxage=3600, stale-while-revalidate=86400, stale-if-error=86400"
   </FilesMatch>
 </IfModule>
 
