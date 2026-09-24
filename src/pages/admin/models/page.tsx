@@ -924,7 +924,8 @@ export default function AdminModelsPage() {
                           </a>
                         </TableCell>
                         <TableCell>
-                          {new Date(request.requestedAt).toLocaleDateString()}
+                          {/* A request is dated by a trigger a second after it is written; until then, by when it was written. */}
+                          {new Date(request.requestedAt || request._creationTime).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </TableCell>
                         <TableCell>
                           {request.status === "pending" && (
