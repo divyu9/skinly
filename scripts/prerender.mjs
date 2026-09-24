@@ -28,8 +28,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
-import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify } from "../src/lib/seo-pages.mjs";
-import { CATEGORY_PAGES, GADGET_PAGES } from "../src/lib/category-paths.mjs";
+import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
+import { CATEGORY_PAGES, GADGET_PAGES, HOME_META, PRODUCTS_META, CATALOGUE_CLAIMS } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -546,10 +546,8 @@ function siteHub(active, models, seoSlugs) {
 const hubList = (items) => items.length ? `<ul>${items.join("")}</ul>` : "";
 
 function staticPages(hub, home = null) {
-  const homeDescription =
-    "Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149.";
-  const productsDescription =
-    "Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application. Starting ₹149. Free shipping above ₹499.";
+  const homeDescription = HOME_META.description;
+  const productsDescription = PRODUCTS_META.description;
   const policy = (slug, title, description) => ({
     route: `/policies/${slug}`,
     title,
@@ -560,7 +558,7 @@ function staticPages(hub, home = null) {
   return [
     {
       route: "/",
-      title: "GoSkinly - Premium Device Skins & Accessories | Starting ₹149",
+      title: HOME_META.title,
       description: homeDescription,
       canonical: `${SITE}/`,
       keepHero: true,
@@ -589,7 +587,7 @@ function staticPages(hub, home = null) {
         },
       ],
       body:
-        `<h1>GoSkinly — premium device skins</h1><p>${esc(homeDescription)}</p>` +
+        `<h1>${esc(HOME_META.heading)}</h1><p>${esc(homeDescription)}</p>` +
         (hub
           ? `<p>${hub.designs} designs, cut for ${hub.models} models across ${hub.brands.length} brands.</p>` +
             `<h2>Shop by gadget</h2>` +
@@ -608,7 +606,7 @@ function staticPages(hub, home = null) {
     },
     {
       route: "/products",
-      title: "Shop Premium Phone Skins & Gadget Accessories | GoSkinly",
+      title: PRODUCTS_META.title,
       description: productsDescription,
       canonical: `${SITE}/products`,
       priority: "0.9",
@@ -730,7 +728,7 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
   const image = [...(p.images || []).map((i) => (typeof i === "string" ? i : i?.url))].find(liveImage);
 
   const plain = stripHtml(p.description);
-  const title = p.metaTitle || `${p.title} | GoSkinly`;
+  const title = productSeoTitle(p);
   const description = p.metaDescription || clip(plain || `Shop ${p.title} at GoSkinly.`, 155);
 
   // Same trail the product page draws (src/lib/product-breadcrumb.ts).
@@ -1251,6 +1249,66 @@ function brandLogos(sections, cards) {
   return out;
 }
 
+// ─── Google Merchant Center feed ──────────────────────────────────────────────
+
+/**
+ * /merchant-feed.xml: every sellable listing in Google's product-feed format,
+ * for free listings in the Shopping tab and image results.
+ *
+ * Price and availability are worked out exactly as the product page's Product
+ * schema does (cheapest in-stock variant, else cheapest priced one), because
+ * Merchant Center compares the feed with the page and disapproves items that
+ * disagree. Listings without a live picture or a price are left out; Google
+ * rejects those anyway. Shipping (free above ₹499) is set in the Merchant
+ * Center account, not here.
+ */
+const GOOGLE_CATEGORY = {
+  phone: "Electronics > Communications > Telephony > Mobile Phone Accessories",
+  tablet: "Electronics > Computers > Tablet Computers",
+  laptop: "Electronics > Computers > Laptops",
+};
+async function writeMerchantFeed(active, variantsByProduct) {
+  const x = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
+  const items = [];
+  for (const p of active) {
+    const variants = variantsByProduct.get(p._id) || [];
+    const priced = variants.filter((v) => Number(v.price) > 0);
+    if (!priced.length) continue;
+    const inStock = priced.filter((v) => stock(v) > 0);
+    const price = Math.min(...(inStock.length ? inStock : priced).map((v) => Number(v.price)));
+    const images = (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).filter(liveImage).map((u) => u.replace(/ /g, "%20"));
+    if (!images.length) continue;
+    const title = productSeoTitle(p).replace(/\s*\|\s*GoSkinly$/, "");
+    const desc = clip(stripHtml(p.description) || p.metaDescription || `${title}, printed and cut for your exact device.`, 4900);
+    const type = [p.productCategory === "skin" ? "Skins" : titleCase(p.productCategory || "Accessories"), p.gadgetCategory && titleCase(p.gadgetCategory)].filter(Boolean).join(" > ");
+    const gcat = p.productCategory === "skin" ? GOOGLE_CATEGORY[p.gadgetCategory] : null;
+    items.push(
+      `<item>` +
+      `<g:id>${x(p._id)}</g:id>` +
+      `<g:title>${x(title.slice(0, 150))}</g:title>` +
+      `<g:description>${x(desc)}</g:description>` +
+      `<g:link>${x(`${SITE}/products/${p.slug}`)}</g:link>` +
+      `<g:image_link>${x(images[0])}</g:image_link>` +
+      images.slice(1, 10).map((u) => `<g:additional_image_link>${x(u)}</g:additional_image_link>`).join("") +
+      `<g:availability>${inStock.length ? "in_stock" : "out_of_stock"}</g:availability>` +
+      `<g:price>${price.toFixed(2)} INR</g:price>` +
+      `<g:brand>GoSkinly</g:brand>` +
+      `<g:condition>new</g:condition>` +
+      `<g:identifier_exists>no</g:identifier_exists>` +
+      (gcat ? `<g:google_product_category>${x(gcat)}</g:google_product_category>` : "") +
+      (type ? `<g:product_type>${x(type)}</g:product_type>` : "") +
+      `</item>`
+    );
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0"><channel>` +
+    `<title>GoSkinly</title><link>${SITE}</link><description>GoSkinly product feed</description>\n` +
+    items.join("\n") + `\n</channel></rss>\n`;
+  await fs.writeFile(path.join(DIST, "merchant-feed.xml"), xml);
+  return items.length;
+}
+
 async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []) {
   const tagsOf = (t) =>
     (Array.isArray(t) ? t : typeof t === "string" ? t.split(",") : []).map((x) => String(x).trim()).filter(Boolean);
@@ -1659,6 +1717,18 @@ async function main() {
     },
     shell: homeShell(liveSlides[0], heroLocal),
   } : null;
+  {
+    // The copy's counts (src/lib/category-paths.mjs) may undersell, never oversell.
+    const modelsNow = (data.models || []).filter((m) => m.isActive !== false).length;
+    const designsNow = new Set(active.filter((p) => p.productCategory === "skin")
+      .flatMap((p) => (variantsByProduct.get(p._id) || []).map((v) => String(v.sku || "").toUpperCase().match(/^([A-Z]{1,3})-?(\d{1,4})/))
+      .filter(Boolean).map((m) => `${m[1]}-${Number(m[2])}`))).size;
+    const tag = (claimed, now, what) => now < claimed
+      ? console.warn(`[prerender] WARNING: copy claims ${claimed}+ ${what} but the catalogue has ${now}; lower CATALOGUE_CLAIMS`)
+      : now >= claimed * 1.25 && console.log(`[prerender] note: ${now} ${what} now, copy says ${claimed}+; CATALOGUE_CLAIMS can go up`);
+    tag(CATALOGUE_CLAIMS.models, modelsNow, "models");
+    tag(CATALOGUE_CLAIMS.designs, designsNow, "designs");
+  }
   const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home);
   for (const p of statics) await writePage(p.route, render(template, p));
 
@@ -1728,6 +1798,8 @@ async function main() {
   await writePage(magneto.route, render(template, magneto));
 
   const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes);
+  const feedItems = await writeMerchantFeed(active, variantsByProduct);
+  console.log(`[prerender] merchant feed: ${feedItems} items`);
   log(`catalogue: ${active.length} products, ${Math.round(catalogueBytes / 1024)} KB`);
   const modelFile = await writeModels(data.models);
   log(`models: ${modelFile.count} active, ${Math.round(modelFile.bytes / 1024)} KB`);

@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { PRODUCTS_META } from "@/lib/category-paths.mjs";
 import { Helmet } from "react-helmet-async";
 
 interface ProductsSEOHeadProps {
@@ -9,8 +10,8 @@ interface ProductsSEOHeadProps {
 }
 
 export const ProductsSEOHead = memo(function ProductsSEOHead({
-  title = "Shop Premium Phone Skins & Gadget Accessories | GoSkinly",
-  description = "Browse 500+ unique phone skins and gadget accessories. Premium quality, perfect fit, bubble-free application. Starting ₹149. Free shipping above ₹499.",
+  title = PRODUCTS_META.title,
+  description = PRODUCTS_META.description,
   canonicalPath = "/products",
 }: ProductsSEOHeadProps) {
   const imageUrl = "https://goskinly.com/og-default.jpg";

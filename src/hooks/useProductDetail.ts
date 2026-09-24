@@ -1,4 +1,5 @@
 import { useQuery } from "@/lib/firebase-hooks";
+import { productSeoTitle } from "@/lib/seo-pages.mjs";
 import { brandInScope } from "@/lib/device-fit";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useEffect } from "react";
@@ -304,8 +305,10 @@ export function useProductDetail() {
     const productPrice = productData.variants && productData.variants[productState.selectedVariant]?.price || 0;
     
     return {
-      title: productData.metaTitle || `${productData.title} | Skinly`,
-      description: productData.metaDescription || `Shop ${productData.title} at Skinly. Premium quality skins and wraps.`,
+      // Built the same way as the prerendered page, so the title Google
+      // indexed does not change once the app takes over.
+      title: productSeoTitle(productData),
+      description: productData.metaDescription || `Shop ${productData.title} at GoSkinly. Premium quality skins and wraps.`,
       url: productUrl,
       image: productImage,
       price: productPrice,

@@ -43,3 +43,14 @@ export function designKey(p: unknown): string;
 
 /** One row per design, preferring the copy cut for `preferBrand`. */
 export function oneRowPerDesign<T>(rows: T[], preferBrand?: string | null): T[];
+
+/** The brand name every page title ends with. */
+export const SITE_NAME: string;
+
+/** A product page's <title>; see seo-pages.mjs. */
+export function productSeoTitle(p: {
+  metaTitle?: string | null;
+  title?: string | null;
+  productCategory?: string | null;
+  gadgetCategory?: string | null;
+}): string;

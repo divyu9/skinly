@@ -500,3 +500,44 @@ export function brandGadgetLabel(brand, gadget, plural = false) {
   const word = pair ? pair[plural ? 1 : 0] : gadget;
   return `${brand} ${word}`.trim();
 }
+
+/**
+ * The <title> of a product page, built the same way at build time and in the
+ * browser.
+ *
+ * 781 of 1,447 product titles never said what the thing was — "RGB Zig Zag
+ * OnePlus Phone | Skinly", "Black Board Doodles PS5 | Skinly" — so a search
+ * for a PS5 skin had nothing on the page naming one. None said "mobile",
+ * which is how most people in India search for a phone skin ("mobile back
+ * skin"), and the brand was "Skinly" in 1,264 titles and "GoSkinly" in 43.
+ * Now: a skin's title always names it a skin, a phone skin reads "Mobile Back
+ * Skin", and every title ends "| GoSkinly", which matches the domain and is
+ * not shared with the skincare brands called Skinly.
+ */
+export const SITE_NAME = "GoSkinly";
+
+export function productSeoTitle(p) {
+  const raw = String(p?.metaTitle || p?.title || "").trim();
+  // Drop whatever brand suffix the stored title carried.
+  let base = raw
+    .replace(/\s*[|–-]\s*(go\s*skinly|skinly|premium finish)\s*$/i, "")
+    .replace(/\s+by\s+(go\s*)?skinly(\.com)?\b/gi, "")
+    .trim() || String(p?.title || "").trim();
+  // "Sony Camera | Yellow Tech Circuit" names the device first; lead with the design.
+  if (/\s\|\s/.test(base)) {
+    const [device, ...rest] = base.split(/\s\|\s/);
+    base = `${rest.join(" ")} ${device}`.trim();
+  }
+  const isSkin = p?.productCategory === "skin" || (!p?.productCategory && /\bskins?\b/i.test(base));
+  if (isSkin) {
+    if (p?.gadgetCategory === "phone") {
+      // "… Phone Skin", "… Phone", "… Skin" all end as "… Mobile Back Skin".
+      const core = base.replace(/\s*(?:[-–]\s*)?(?:(?:android|mobile)\s+)?(?:phone\s*)?(?:back\s*)?skins?$/i, "")
+        .replace(/\s+phone$/i, "").trim();
+      base = /\bmobile\b/i.test(core) ? `${core} Skin` : `${core} Mobile Back Skin`;
+    } else if (!/\bskins?\b/i.test(base)) {
+      base = `${base} Skin`;
+    }
+  }
+  return `${base} | ${SITE_NAME}`;
+}

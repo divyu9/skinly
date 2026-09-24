@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { HOME_META } from "@/lib/category-paths.mjs";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -268,12 +269,12 @@ export default function Index() {
   return (
     <>
       <Helmet>
-        <title>GoSkinly - Premium Device Skins & Accessories | Starting ₹149</title>
-        <meta name="description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149." />
+        <title>{HOME_META.title}</title>
+        <meta name="description" content={HOME_META.description} />
         <link rel="canonical" href="https://goskinly.com/" />
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="GoSkinly - Premium Device Skins & Accessories | Starting ₹149" />
-        <meta property="og:description" content="Shop premium vinyl skins for phones, laptops, tablets & more. 1000+ models supported, each skin cut for your exact device. Free shipping above ₹499. Starting ₹149." />
+        <meta property="og:title" content={HOME_META.title} />
+        <meta property="og:description" content={HOME_META.description} />
         <meta property="og:url" content="https://goskinly.com/" />
         <meta property="og:site_name" content="GoSkinly" />
         {/* Same objects scripts/prerender.mjs writes into the homepage HTML.

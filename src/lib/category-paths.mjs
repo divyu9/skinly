@@ -13,10 +13,42 @@
 
 export const SITE = "https://goskinly.com";
 
+/*
+ * What the catalogue can honestly claim, in one place. The homepage said
+ * "1000+ models", /products "500+" designs and /skins "800+ designs"; the
+ * catalogue holds 3,695 models across 55 brands and 348 skin designs (by SKU
+ * code). scripts/prerender.mjs counts both on every build and warns when these
+ * fall behind, so they only ever undersell.
+ */
+export const CATALOGUE_CLAIMS = {
+  models: 3600,
+  designs: 340,
+  brands: 55,
+};
+export const claim = (n) => `${Number(n).toLocaleString("en-IN")}+`;
+
+/*
+ * Homepage and /products head copy, shared by the prerendered HTML and the
+ * app's Helmet so the title Google indexed does not change when the app
+ * mounts. Both lead with how India searches ("mobile skins", "back skins")
+ * and carry the real counts; the homepage title used to be the brand name
+ * and "Premium Device Skins & Accessories".
+ */
+const C = CATALOGUE_CLAIMS;
+export const HOME_META = {
+  title: `Mobile Back Skins & Device Skins for ${claim(C.models)} Models | GoSkinly`,
+  description: `Mobile, laptop, tablet, console & camera skins cut for ${claim(C.models)} models across ${C.brands} brands. ${claim(C.designs)} designs in matte & 3D textured finishes. Free shipping above ₹499.`,
+  heading: "GoSkinly — mobile skins and device skins cut for your exact model",
+};
+export const PRODUCTS_META = {
+  title: "Shop Mobile Skins, Laptop Skins & Gadget Accessories | GoSkinly",
+  description: `Browse ${claim(C.designs)} skin designs for ${claim(C.models)} phones, laptops, tablets, consoles and cameras, plus cases and accessories. Free shipping above ₹499.`,
+};
+
 export const CATEGORY_PAGES = {
   skin: {
     path: "/skins",
-    title: "Device Skins – 800+ Designs Cut for 1000+ Models | GoSkinly",
+    title: `Device & Mobile Skins – ${claim(CATALOGUE_CLAIMS.designs)} Designs, ${claim(CATALOGUE_CLAIMS.models)} Models | GoSkinly`,
     description:
       "Vinyl skins for phones, laptops, consoles, cameras and more, each printed and cut for your exact model. Matte, 3D textured and transparent finishes from ₹149. Free shipping above ₹499.",
     heading: "Skins",
