@@ -15,12 +15,39 @@ export default function PaymentCallback() {
   const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
   const [status, setStatus] = useState<"loading" | "success" | "failed" | "error">("loading");
   const [merchantTransactionId, setMerchantTransactionId] = useState<string | null>(null);
-  
-  // Fetch order only when payment is successful and we have merchantTransactionId
-  const order = useQuery(
-    api.orders.getOrderByMerchantTransaction,
-    status === "success" && merchantTransactionId ? { merchantTransactionId } : "skip"
+  /*
+   * What checkout left in this tab before sending the customer to PhonePe.
+   *
+   * The status check needs to know whose order this is: a signed-in customer
+   * is known by their account, a guest by the checkout's guest id and the
+   * order id. This page sent the transaction id alone, so for every guest —
+   * most customers — the check came back UNAUTHENTICATED and the page said
+   * "Unable to Verify Payment" over an order PhonePe's webhook had already
+   * marked paid.
+   */
+  const [saved] = useState(() => {
+    try {
+      return {
+        txnId: sessionStorage.getItem("skinly_merchant_txn_id"),
+        orderId: sessionStorage.getItem("skinly_order_id"),
+        sessionId: sessionStorage.getItem("skinly_guest_session_id"),
+      };
+    } catch {
+      return { txnId: null, orderId: null, sessionId: null };
+    }
+  });
+
+  // The order itself, read by id (public by id), or by transaction for a
+  // signed-in customer whose tab no longer holds the id.
+  const orderById = useQuery(
+    api.orders.getOrderPublic,
+    status === "success" && saved.orderId ? { orderId: saved.orderId } : "skip"
   );
+  const orderByTxn = useQuery(
+    api.orders.getOrderByMerchantTransaction,
+    status === "success" && !saved.orderId && merchantTransactionId ? { merchantTransactionId } : "skip"
+  );
+  const order = orderById || orderByTxn;
   
   // Track purchase and auto-redirect when order is loaded
   const [hasTracked, setHasTracked] = useState(false);
@@ -49,10 +76,13 @@ export default function PaymentCallback() {
   // Get merchant transaction ID from URL params
   useEffect(() => {
     // PhonePe sends merchantOrderId in the redirect URL
+    // PhonePe's redirect arrives with no parameters at all; the id checkout
+    // saved in this tab is the one that matters.
     const txnId = searchParams.get("merchantOrderId") ||
-                  searchParams.get("merchantTransactionId") || 
+                  searchParams.get("merchantTransactionId") ||
                   searchParams.get("transactionId") ||
-                  searchParams.get("id");
+                  searchParams.get("id") ||
+                  saved.txnId;
     
     console.log("Callback URL params:", Object.fromEntries(searchParams.entries()));
     console.log("Extracted transaction ID:", txnId);
@@ -74,6 +104,8 @@ export default function PaymentCallback() {
       // Check payment status with PhonePe
       const result = await checkPaymentStatus({
         merchantTransactionId: txnId,
+        ...(saved.orderId ? { orderId: saved.orderId } : {}),
+        ...(saved.sessionId ? { sessionId: saved.sessionId } : {}),
       });
 
       console.log("Payment status result:", result);
@@ -101,9 +133,11 @@ export default function PaymentCallback() {
       // Fallback: Check order status directly from our database
       console.log("Attempting to verify payment via database fallback...");
       try {
-        const order = await convex.query(api.orders.getOrderByMerchantTransaction, {
-          merchantTransactionId: txnId,
-        });
+        // Read by id where we have it: anyone may read an order by its id,
+        // while the transaction lookup needs a signed-in customer.
+        const order: any = saved.orderId
+          ? await convex.query(api.orders.getOrderPublic, { orderId: saved.orderId })
+          : await convex.query(api.orders.getOrderByMerchantTransaction, { merchantTransactionId: txnId });
         
         if (order) {
           console.log("Database fallback - Order found:", order.paymentStatus);

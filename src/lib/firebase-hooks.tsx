@@ -739,6 +739,20 @@ export function useQuery(apiRef: any, args?: any) {
               return;
             }
             
+            // Orders placed as a guest with this account's verified email are
+            // moved into it first (once per sign-in per tab); the listener
+            // below then picks them up as their userId changes.
+            const claimKey = `skinly_claimed_${user.uid}`;
+            try {
+              if (!sessionStorage.getItem(claimKey)) {
+                sessionStorage.setItem(claimKey, '1');
+                void httpsCallable(functions, 'claimGuestOrders')({}).catch((e) => {
+                  sessionStorage.removeItem(claimKey);
+                  console.warn('claimGuestOrders failed', e);
+                });
+              }
+            } catch { /* storage blocked: skip the claim */ }
+
             // Removed orderBy('createdAt', 'desc') to avoid requiring a composite index.
             // Sorting is done in-memory.
             const q = query(collection(db, 'orders'), where('userId', 'in', await userIdCandidates(user)));
@@ -851,7 +865,9 @@ export function useQuery(apiRef: any, args?: any) {
             setData(null);
             return;
           }
-          const q = query(collection(db, 'orders'), where('paymentId', '==', args.merchantTransactionId), limit(1));
+          // The order stores PhonePe's id as paymentTransactionId; this asked
+          // for paymentId, which no order has, so it never found one.
+          const q = query(collection(db, 'orders'), where('paymentTransactionId', '==', args.merchantTransactionId), limit(1));
           unsubscribe = onSnapshot(q, (snap) => {
             setData(snap.empty ? null : { _id: snap.docs[0].id, ...snap.docs[0].data() });
           });
@@ -7629,6 +7645,21 @@ export function useConvex() {
         };
       }
       
+      // One-off order reads for the payment return page. Without these every
+      // query here returned null, so its "check our own database" fallback
+      // always concluded the order did not exist.
+      if (path === 'orders.getOrderPublic') {
+        if (!args?.orderId) return null;
+        const snap = await getDoc(doc(db, 'orders', String(args.orderId)));
+        return snap.exists() ? normalizeOrder({ _id: snap.id, ...snap.data() }) : null;
+      }
+      if (path === 'orders.getOrderByMerchantTransaction') {
+        if (!args?.merchantTransactionId) return null;
+        const snap = await getDocs(query(collection(db, 'orders'),
+          where('paymentTransactionId', '==', String(args.merchantTransactionId)), limit(1)));
+        return snap.empty ? null : normalizeOrder({ _id: snap.docs[0].id, ...snap.docs[0].data() });
+      }
+
       console.log(`Manual query called for ${path} with args:`, args);
       return null;
     },

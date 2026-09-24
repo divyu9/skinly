@@ -131,3 +131,37 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
     trackingToken: `TRACK-${docRef.id}`
   };
 });
+
+/**
+ * Moves a signed-in customer's guest orders into their account.
+ *
+ * Most customers check out without signing in, so their orders are filed
+ * under a throwaway guest id, and "My Orders" — which reads by account — came
+ * up empty when they signed in later to look for them. An order placed with
+ * the same email the customer has now proved they own is theirs: Google
+ * sign-in vouches for the address (email_verified), and nothing short of
+ * that is accepted. Only orders still under a guest id move; an order that
+ * already belongs to an account is never touched.
+ */
+export const claimGuestOrders = functions.https.onCall(async (_data: any, context: any) => {
+  const uid = context?.auth?.uid;
+  const token = context?.auth?.token || {};
+  if (!uid) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
+  const email = String(token.email || "").trim();
+  if (!email || token.email_verified !== true) return { claimed: 0, reason: "no verified email" };
+
+  const db = admin.firestore();
+  const variants = [...new Set([email, email.toLowerCase()])];
+  const snaps = await Promise.all(variants.map((e) => db.collection("orders").where("email", "==", e).limit(100).get()));
+  let claimed = 0;
+  for (const snap of snaps) {
+    for (const d of snap.docs) {
+      const o = d.data() as any;
+      if (!String(o.userId || "").startsWith("guest-")) continue;
+      await d.ref.update({ userId: uid, claimedFromGuestId: o.userId, claimedAt: Date.now() });
+      claimed++;
+    }
+  }
+  if (claimed) console.log("claimGuestOrders", { uid, claimed });
+  return { claimed };
+});
