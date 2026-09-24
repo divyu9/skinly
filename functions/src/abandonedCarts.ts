@@ -89,8 +89,12 @@ const claimReminderSlot = async (
 };
 
 const createRecoveryCoupon = async (cart: any, s: Settings): Promise<string | null> => {
+  // A zero discount is "no coupon", not a code worth nothing: the template
+  // prints whatever code it is given, and a customer who types one in and
+  // gets nothing off is worse than one who was never offered it.
+  if (!(Number(s.couponDiscountValue) > 0)) return null;
   try {
-    const code = `${s.couponPrefix}${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const code = `${s.couponPrefix || "COMEBACK"}${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     await admin.firestore().collection("coupons").add({
       code,
       discountType: s.couponDiscountType,
@@ -402,6 +406,68 @@ export const processAbandonedCartReminders = functionsV1.pubsub
 export const runAbandonedCartReminders = onCall(async (_data: any, context: any) => {
   await requireAdmin(context);
   return runReminderPass();
+});
+
+/** The dashboard's "Scan": finds carts now instead of at the next half hour. */
+export const scanAbandonedCarts = onCall(async (_data: any, context: any) => {
+  await requireAdmin(context);
+  const d = await detectAbandonedCarts();
+  return { ...d, tracked: d.created + d.updated };
+});
+
+/**
+ * One reminder to one cart, now, from the dashboard.
+ *
+ * It goes through the same claim as the cron — the per-cart cap still holds,
+ * so a button pressed twice cannot mail anyone a third time — but ignores
+ * the delay, because asking for it by hand is the point. If the mail does not
+ * go out the claim is given back, so the admin can try again once whatever
+ * stopped it is fixed; the cron never gives a claim back, which is what keeps
+ * it from resending in a loop.
+ */
+export const sendAbandonedCartReminderNow = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const cartId = String(data?.cartId || "");
+  if (!cartId) throw new HttpsError("invalid-argument", "cartId is required");
+
+  const db = admin.firestore();
+  const ref = db.collection("abandonedCarts").doc(cartId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Cart not found");
+  const before = snap.data() as any;
+  if (!before.userEmail) return { success: false, emailSent: false, whatsappSent: false, reason: "This cart has no email address." };
+
+  const count = Number(before.reminderCount || 0);
+  const cart = await claimReminderSlot(cartId, count);
+  if (!cart) {
+    return {
+      success: false, emailSent: false, whatsappSent: false,
+      reason: count >= MAX_REMINDERS_PER_CART
+        ? `Already reminded ${count} times, which is the limit.`
+        : "This cart is closed (recovered or expired).",
+    };
+  }
+
+  const s = await readSettings();
+  const giveBack = () => ref.update({
+    reminderCount: count,
+    reminderSentAt: before.reminderSentAt ?? null,
+    status: before.status || "abandoned",
+  });
+  try {
+    await enforceDailyRateLimit({ key: "abandonedCartEmails", limit: s.dailyEmailCap });
+  } catch {
+    await giveBack();
+    return { success: false, emailSent: false, whatsappSent: false, reason: "Today's email limit is reached." };
+  }
+
+  const coupon = await createRecoveryCoupon(cart, s);
+  const emailSent = await sendReminderEmail(cart, coupon);
+  if (!emailSent) {
+    await giveBack();
+    return { success: false, emailSent: false, whatsappSent: false, reason: "The email service refused it; see the function log." };
+  }
+  return { success: true, emailSent: true, whatsappSent: false, coupon };
 });
 
 /** Marks a cart recovered so it can never be chased again. */

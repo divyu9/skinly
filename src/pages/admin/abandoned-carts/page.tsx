@@ -110,9 +110,17 @@ function AbandonedCartsPageInner() {
     setProcessing(true);
     try {
       const result = await processAllCarts({});
-      toast.success(`Processed ${result.processed} abandoned carts`);
-    } catch (error) {
-      toast.error("Failed to process abandoned carts");
+      if (result?.skipped) {
+        toast.info(`Nothing sent: reminders are ${result.skipped}.`);
+      } else {
+        toast.success(
+          result?.sent
+            ? `Sent ${result.sent} reminder email${result.sent === 1 ? "" : "s"}`
+            : "No carts are due a reminder yet"
+        );
+      }
+    } catch (error: any) {
+      toast.error(`Failed to process abandoned carts: ${error?.message || "unknown error"}`);
     } finally {
       setProcessing(false);
     }
@@ -121,15 +129,13 @@ function AbandonedCartsPageInner() {
   const handleSendReminder = async (cartId: any) => {
     try {
       const result = await sendReminder({ cartId: cartId as any });
-      if (result.success) {
-        toast.success(
-          `Reminder sent! Email: ${result.emailSent ? "✓" : "✗"}, WhatsApp: ${result.whatsappSent ? "✓" : "✗"}`
-        );
+      if (result?.success) {
+        toast.success(result.coupon ? `Reminder emailed with coupon ${result.coupon}` : "Reminder emailed");
       } else {
-        toast.error("Failed to send reminder");
+        toast.error(`Reminder not sent: ${result?.reason || "unknown reason"}`);
       }
-    } catch (error) {
-      toast.error("Failed to send reminder");
+    } catch (error: any) {
+      toast.error(`Failed to send reminder: ${error?.message || "unknown error"}`);
     }
   };
 

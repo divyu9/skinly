@@ -4882,12 +4882,17 @@ export function useMutation(apiRef: any) {
         const fns = getFunctions();
         // Scanning is the cron's job; the dashboard only triggers a pass or
         // retires a single cart, both of which respect the per-cart cap.
-        if (actionName === 'processAbandonedCarts' || actionName === 'sendAbandonedCartReminder') {
+        if (actionName === 'processAbandonedCarts') {
           const res: any = await httpsCallable(fns, 'runAbandonedCartReminders')({});
           return res.data;
         }
+        if (actionName === 'sendAbandonedCartReminder') {
+          const res: any = await httpsCallable(fns, 'sendAbandonedCartReminderNow')(args || {});
+          return res.data;
+        }
         if (actionName === 'scanAndTrackAbandonedCarts') {
-          return { success: true, scanned: 0, note: "Carts are tracked at checkout; no scan needed." };
+          const res: any = await httpsCallable(fns, 'scanAbandonedCarts')({});
+          return res.data;
         }
       }
 
@@ -7388,6 +7393,22 @@ export function useAction(apiRef: any) {
         }
         return { success: true };
       }
+    }
+
+    // The abandoned-cart page calls these through useAction, which fell
+    // through to the default below and asked for Cloud Functions named
+    // processAbandonedCarts / sendAbandonedCartReminder / scanAndTrack… —
+    // none of which exist — so every button failed without reaching the
+    // server. (The mapping that did exist sat in useMutation, which the page
+    // never uses.)
+    if (collectionName === 'abandonedCartsActions') {
+      const name =
+        actionName === 'processAbandonedCarts' ? 'runAbandonedCartReminders'
+        : actionName === 'sendAbandonedCartReminder' ? 'sendAbandonedCartReminderNow'
+        : actionName === 'scanAndTrackAbandonedCarts' ? 'scanAbandonedCarts'
+        : actionName;
+      const res: any = await httpsCallable(functions, name)(args || {});
+      return res.data;
     }
 
     // Default to calling cloud function
