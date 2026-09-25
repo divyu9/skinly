@@ -410,6 +410,71 @@ function homeShell(first, local = {}) {
   );
 }
 
+/*
+ * A product page's main photo, painted before the app loads.
+ *
+ * Lighthouse on a phone put product pages at 55 with the photo in at 7.7 s:
+ * nothing named it until 1.27 MB of script had run and Firestore had answered,
+ * and then it came from r2.dev at upload size over a second connection. Now
+ * the HTML draws it, resized and from goskinly.com (src/lib/image-cdn.ts,
+ * productMainImg — same URLs, same sizes, so the app reuses this download).
+ *
+ * It is drawn over the page, not inside #root: the app's first renders are a
+ * skeleton while it asks Firestore for the product, and replacing the photo
+ * with that would show it, take it away and show it again. The overlay copies
+ * the page's own markup above the photo — header gap, breadcrumb, the "cut to
+ * fit" note, the grid, the card — with the same classes, invisible except for
+ * the card, so the photo sits where the app will draw it at every width. It
+ * goes the moment the app's own photo has loaded, or the visitor navigates,
+ * or after 15 seconds whatever happens.
+ */
+const R2_PUBLIC = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/";
+const CDN_HOST = "https://cdn.goskinly.com/";
+const PRODUCT_MAIN_SIZES = "(min-width: 1024px) 432px, (min-width: 768px) 42vw, calc(100vw - 50px)";
+
+function productImageUrl(url, width) {
+  const key = url.startsWith(R2_PUBLIC) ? url.slice(R2_PUBLIC.length)
+    : url.startsWith(CDN_HOST) && !url.startsWith(`${CDN_HOST}cdn-cgi/`) ? url.slice(CDN_HOST.length)
+    : null;
+  if (!key) return null;
+  return `https://goskinly.com/cdn-cgi/image/width=${width},quality=75,format=auto,fit=scale-down,onerror=redirect/${CDN_HOST}${key}`;
+}
+
+function productPhoto(url) {
+  const small = url && productImageUrl(url, 640);
+  if (!small) return null;
+  return { src: small, srcset: `${small} 640w, ${productImageUrl(url, 960)} 960w`, sizes: PRODUCT_MAIN_SIZES };
+}
+
+function productShell(s) {
+  const note = s.isSkin
+    ? `<div class="mb-5 flex items-center gap-3 rounded-2xl border-2 border-ink/15 p-3.5" style="visibility:hidden">` +
+        `<span class="inline-flex size-9 shrink-0"></span>` +
+        `<p class="text-[13px] leading-snug sm:text-sm"><span class="font-semibold">Cut to fit your exact model.</span> ` +
+        `<span>Pick your device and we print and cut this design for it — the photo shows the design, not your model.</span></p>` +
+      `</div>`
+    : "";
+  return (
+    `<div id="__photoShell" aria-hidden="true" style="position:absolute;top:0;left:0;right:0;z-index:30;pointer-events:none">` +
+      `<div class="relative px-4 pb-12" style="padding-top:104px"><div class="relative container mx-auto max-w-6xl">` +
+        `<div class="mb-3 py-1 text-[13px]" style="visibility:hidden">&nbsp;</div>` +
+        note +
+        `<div class="grid md:grid-cols-[45%_1fr] lg:grid-cols-[450px_1fr] gap-6 md:gap-8"><div>` +
+          `<div class="rounded-3xl border-2 border-ink/15 bg-card p-1.5"><div class="space-y-3">` +
+            `<div class="aspect-square overflow-hidden rounded-xl bg-muted border border-border relative">` +
+              `<img src="${esc(s.photo.src)}" srcset="${esc(s.photo.srcset)}" sizes="${esc(s.photo.sizes)}" ` +
+                `fetchpriority="high" decoding="async" width="640" height="640" alt="" class="w-full h-full object-cover">` +
+            `</div>` +
+          `</div></div>` +
+        `</div><div></div></div>` +
+      `</div></div>` +
+    `</div>` +
+    `<script>(function(){var t0=Date.now(),p=location.pathname;function done(){var s=document.getElementById("__photoShell");if(s)s.remove();clearInterval(iv)}` +
+    `var iv=setInterval(function(){if(location.pathname!==p||Date.now()-t0>15000)return done();` +
+    `var m=document.querySelector("#root [data-main-photo]");if(m&&m.complete&&m.naturalWidth)(document.hidden?done():requestAnimationFrame(function(){requestAnimationFrame(done)}))},100)})();</script>`
+  );
+}
+
 /**
  * On the homepage, the app's code waits for the hero picture.
  *
@@ -425,7 +490,7 @@ function homeShell(first, local = {}) {
  * 2.5 seconds keeps a slow image from holding the app hostage. The total
  * download is the same; the order is the one the visitor sees.
  */
-function heroFirst(html) {
+function heroFirst(html, { selector = ".hero-shell img", keepCss = false } = {}) {
   const mod = html.match(/<script type="module" crossorigin src="([^"]+)"><\/script>\s*/);
   if (!mod) return html;
   const preloads = [...html.matchAll(/<link rel="modulepreload" crossorigin href="([^"]+)">\s*/g)];
@@ -435,7 +500,7 @@ function heroFirst(html) {
   // own inline style and needs none of it, and PageSpeed charged 550 ms of
   // render-blocking to it. The app still never renders unstyled — the boot
   // below waits for the sheet as well as the picture.
-  const css = html.match(/<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/);
+  const css = keepCss ? null : html.match(/<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/);
   if (css) {
     html = html.replace(css[0],
       `<link rel="preload" as="style" crossorigin href="${css[1]}" id="__appCss" onload="this.onload=null;this.rel='stylesheet'">` +
@@ -447,19 +512,33 @@ function heroFirst(html) {
     `${JSON.stringify(preloads.map((m) => m[1]))}.forEach(function(h){var l=document.createElement("link");l.rel="modulepreload";l.crossOrigin="";l.href=h;document.head.appendChild(l)});` +
     `var s=document.createElement("script");s.type="module";s.crossOrigin="";s.src=${JSON.stringify(mod[1])};document.head.appendChild(s)}` +
     `function painted(){requestAnimationFrame(function(){setTimeout(go,0)})}` +
-    `var i=document.querySelector(".hero-shell img");if(!i){go();return}if(i.complete){painted();return}` +
-    `i.addEventListener("load",painted);i.addEventListener("error",go);setTimeout(go,2500);` +
+    // The ceiling is set first: in a background tab requestAnimationFrame
+    // never runs, so a picture already complete when this ran used to wait
+    // for the tab to be shown before the app started at all.
+    `setTimeout(go,2500);var i=document.querySelector(${JSON.stringify(selector)});if(!i){go();return}if(i.complete){painted();return}` +
+    `i.addEventListener("load",painted);i.addEventListener("error",go);` +
     `setTimeout(function(){var l=document.getElementById("__appCss");if(l&&l.rel!=="stylesheet")l.rel="stylesheet"},4000)})();</script>`;
   return html.replace("</body>", `${boot}\n</body>`);
 }
 
 function render(template, p) {
   let html = template.replace(/<title>[\s\S]*?<\/title>\s*/, "");
-  html = html.replace("<!--seo-head-->", headFor(p));
+  // The product photo is asked for first thing in <head>, ahead of the
+  // stylesheet and the bundle it would otherwise queue behind.
+  const ph = p.photoShell?.photo;
+  const photoPreload = ph
+    ? `<link rel="preload" as="image" imagesrcset="${esc(ph.srcset)}" imagesizes="${esc(ph.sizes)}" fetchpriority="high" />\n    `
+    : "";
+  html = html.replace("<!--seo-head-->", photoPreload + headFor(p));
   html = html.replace("<!--seo-body-->", noscriptFor(p) + seedFor(p) + homeSeedFor(p));
   if (p.rootHtml) {
     html = html.replace('<div id="root"></div>', `<div id="root">${p.rootHtml}</div>`);
     html = heroFirst(html);
+  }
+  if (p.photoShell) {
+    html = html.replace('<div id="root"></div>', `<div id="root"></div>${productShell(p.photoShell)}`);
+    // The stylesheet stays blocking here: the overlay is laid out by it.
+    html = heroFirst(html, { selector: "#__photoShell img", keepCss: true });
   }
   // The hero image is only the LCP on the homepage; anywhere else the preload
   // is a wasted download on the most constrained connection.
@@ -763,12 +842,19 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
     },
   };
 
+  // Only when the photo the app will show first is this one: it shows
+  // images[0] as stored, live or not.
+  const first = (p.images || [])[0];
+  const photo = image && (typeof first === "string" ? first : first?.url) === image ? productPhoto(image) : null;
+  const isSkin = p.productCategory ? p.productCategory === "skin" : Boolean(p.finishType || p.finishTypeId);
+
   return {
     route: `/products/${p.slug}`,
     title,
     description,
     canonical: url,
     ogType: "product",
+    ...(photo ? { photoShell: { photo, isSkin } } : {}),
     image,
     extraMeta: [
       ["product:price:amount", String(price)],

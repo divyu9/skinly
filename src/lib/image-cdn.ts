@@ -60,3 +60,39 @@ export function responsiveImg(
   const mid = widths[Math.floor(widths.length / 2)];
   return { src: sizedImage(url, mid, quality), srcSet, sizes };
 }
+
+/*
+ * Product photos, resized, from goskinly.com itself.
+ *
+ * A product page's largest paint is its main photo, and it came from r2.dev
+ * at upload size: 70–90 KB of 1200px webp for a 362px box, over a second
+ * connection the phone had to open first. Lighthouse put the product page at
+ * 55 with the photo arriving 7.7 s in. Resized on the site's own host it rides
+ * the connection the HTML already opened, and it is ~26 KB as AVIF.
+ *
+ * Two widths only, 640 and 960, shared by the main photo, the thumbnails and
+ * every product card, so one product costs at most two of the month's 5,000
+ * free resizes and a card's photo is already cached when its page opens.
+ *
+ * scripts/prerender.mjs writes the same URLs and the same `sizes` into each
+ * product page's HTML so the photo paints before the app loads; the three
+ * must stay identical or the browser downloads the photo twice.
+ */
+const SITE_RESIZE = "https://goskinly.com/cdn-cgi/image/";
+
+export function productImageUrl(url: string | undefined | null, width: 640 | 960 = 640): string | undefined {
+  if (!url) return url ?? undefined;
+  const key = IMAGE_CDN_ON ? r2Key(url) : null;
+  if (!key) return url;
+  return `${SITE_RESIZE}width=${width},quality=75,format=auto,fit=scale-down,onerror=redirect/${CDN}${key}`;
+}
+
+/** The main photo's box: 100vw less padding and borders on a phone, 42% of the row from md, 432px from lg. */
+export const PRODUCT_MAIN_SIZES = "(min-width: 1024px) 432px, (min-width: 768px) 42vw, calc(100vw - 50px)";
+
+export function productMainImg(url: string | undefined | null): { src?: string; srcSet?: string; sizes?: string } {
+  if (!url) return {};
+  const small = productImageUrl(url, 640);
+  if (small === url) return { src: url };
+  return { src: small, srcSet: `${small} 640w, ${productImageUrl(url, 960)} 960w`, sizes: PRODUCT_MAIN_SIZES };
+}

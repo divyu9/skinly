@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ImageOffIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
+import { productImageUrl } from "@/lib/image-cdn";
 
 /**
  * A product image that degrades to a neutral placeholder instead of the
@@ -33,7 +34,10 @@ export function ProductThumb({
 
   return (
     <img
-      src={src}
+      // The 640px copy the product page also uses: a card shown at ~170px
+      // was downloading the 1200px original, and opening it now finds the
+      // photo already cached.
+      src={productImageUrl(src, 640)}
       alt={alt}
       loading="lazy"
       decoding="async"

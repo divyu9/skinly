@@ -1,6 +1,7 @@
 import { useMemo, useCallback, useState } from "react";
 import { PackageIcon, SmartphoneIcon } from "lucide-react";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
+import { productImageUrl, productMainImg } from "@/lib/image-cdn";
 
 interface ProductImage {
   url: string;
@@ -36,9 +37,9 @@ export function ProductImages({
 }: ProductImagesProps) {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
-  const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    const failedUrl = e.currentTarget.src;
-    
+  // By the photo's own URL, not the element's src: that is a resized copy.
+  const handleImageError = useCallback((failedUrl: string) => {
+
     // Add to failed images list so we don't render it in the thumbnails
     setFailedImages(prev => {
       const newSet = new Set(prev);
@@ -89,12 +90,17 @@ export function ProductImages({
       >
         {selectedImage && !failedImages.has(selectedImage) ? (
           <>
+            {/* Same src, srcset and sizes the page's HTML already painted
+                (scripts/prerender.mjs), so this reuses that download. */}
             <img
-              src={selectedImage}
+              {...productMainImg(selectedImage)}
               alt={productTitle}
               className="w-full h-full object-cover"
+              width={640}
+              height={640}
               draggable={false}
-              onError={handleImageError}
+              data-main-photo=""
+              onError={() => handleImageError(selectedImage)}
             />
             
             {/* Changing device refetches the mockup, and the old picture used
@@ -193,9 +199,11 @@ export function ProductImages({
               }`}
             >
               <img
-                src={image.url}
+                src={productImageUrl(image.url, 640)}
                 alt={image.alt || productTitle}
                 className="w-full h-full object-cover"
+                decoding="async"
+                fetchPriority="low"
                 onError={(e) => {
                   (e.target as HTMLImageElement).parentElement!.style.display = 'none';
                 }}
