@@ -41,11 +41,11 @@ const GROUP: Record<string, string> = {
   motorola: "motorola", moto: "motorola", huawei: "huawei", honor: "huawei", nokia: "nokia", hmd: "nokia",
   google: "google", nothing: "nothing", cmf: "nothing", microsoft: "microsoft", surface: "microsoft",
   sonyericssion: "sony", "sony ericsson": "sony", snoy: "sony", feiyutech: "feiyu", feiyu: "feiyu", "feiyu tech": "feiyu",
-  lenovo: "lenovo", lg: "lg", dji: "dji", ai: "aiplus", "ai+": "aiplus", sumsung: "samsung",
+  lenovo: "lenovo", lg: "lg", dji: "dji", ai: "aiplus", "ai+": "aiplus",
   playstation: "console", xbox: "console", nintendo: "console", valve: "console", "steam deck": "console",
 };
 const DROP: Record<string, string[]> = {
-  apple: ["apple"], samsung: ["samsung", "sumsung", "galaxy"], xiaomi: ["xiaomi"], vivo: ["vivo"], oppo: ["oppo"], realme: ["realme"],
+  apple: ["apple"], samsung: ["samsung", "galaxy"], xiaomi: ["xiaomi"], vivo: ["vivo"], oppo: ["oppo"], realme: ["realme"],
   oneplus: ["one plus", "oneplus"], motorola: ["motorola", "moto"], huawei: ["huawei"], nokia: ["nokia", "hmd"],
   google: ["google"], nothing: ["nothing"], microsoft: ["microsoft"], dji: ["dji"], aiplus: ["ai plus", "ai"],
   feiyu: ["feiyu tech", "feiyutech", "feiyu"], canon: ["canon", "eos"], nikon: ["nikon"], sony: ["sony"],
@@ -122,7 +122,7 @@ function candidates(model: string): string[] {
 
 // ── classifying vendor files ─────────────────────────────────────────────────
 const PHONE_SKIP = new Set(["smoke cover", "soft transparent cover", "hd cover", "hd cover (mirror)", "soft transparent cover (mirror)", "camera cut",
-  "mobile decals", "car keys", "shape", "motomo back cover", "keychain", "mobile 2d cases", "deulec case", "cards",
+  "acrylic mirror", "acrylic", "mobile decals", "car keys", "shape", "motomo back cover", "keychain", "mobile 2d cases", "deulec case", "cards",
   "charger", "macbook", "idea"]);
 const TABLET = /\b(ipad|tab|pad|matepad|tablet|kindle)\b/i;
 const WEARABLE = /watch|\bbuds?\b|\bband\b|airpods/i;
@@ -136,9 +136,7 @@ function mobicareClass(cat: string, brand: string, model: string): { gadget: Gad
     if (bl === "drone") return { gadget: "dji", brand: model.split(" ")[0] || "DJI", model };
     if (bl === "gaming consoles" || bl === "nintendo") return { gadget: "console", brand: CONSOLE_BRAND(`${brand} ${model}`), model };
     if (PHONE_SKIP.has(bl)) return null;
-    // Acrylic folders name the brand in the file ("Sumsung Galaxy A37 (5G)"), like "Other".
-    // Mobicare adds a new phone's acrylic files first, so they are the earliest sign of it.
-    if (bl === "other" || bl === "acrylic" || bl === "acrylic mirror") {
+    if (bl === "other") {
       model = model.replace(/^ai\s*(?:\+|plus)\s+/i, "AI+ ");
       const first = model.split(" ")[0] || "";
       brand = first; model = model.slice(first.length).trim() || model;
