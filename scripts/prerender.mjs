@@ -1308,6 +1308,17 @@ async function writeHtaccess(strict, retired = []) {
  * /data/catalogue.json: every active product with the fields the listing, tag
  * rows, related rows and search use, and its variants. See src/lib/catalogue.ts.
  */
+/** "R-44" from the design upload (design-raw/R-44-….webp) or a variant SKU (R-44-IPH). */
+function designCode(p, variants = []) {
+  const fromUpload = /\/design-raw\/([A-Z]+-\d+)-/.exec(String(p.designImageUrl || ""))?.[1];
+  if (fromUpload) return fromUpload;
+  for (const v of variants) {
+    const m = /^([A-Z]+-\d+)-[A-Z]/.exec(String(v.sku || ""));
+    if (m) return m[1];
+  }
+  return "";
+}
+
 /** "One Plus", "OnePlus", "oneplus-skins" all key to "oneplus". */
 const brandKey = (s) => String(s || "").toLowerCase().replace(/-skins$/, "").replace(/[^a-z0-9]+/g, "");
 
@@ -1408,6 +1419,10 @@ async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []
     ...(Array.isArray(p.modelBrands) && p.modelBrands.length ? { modelBrands: p.modelBrands } : {}),
     ...(Array.isArray(p.modelBrandsExclude) && p.modelBrandsExclude.length ? { modelBrandsExclude: p.modelBrandsExclude } : {}),
     finishTypeId: p.finishTypeId,
+    // The design this listing prints — R-44 on the iPhone, the laptop and the
+    // charger alike — so a product page can offer the same design for the
+    // buyer's other devices ("Complete Your Setup").
+    ...(designCode(p, variantsByProduct.get(p._id)) ? { design: designCode(p, variantsByProduct.get(p._id)) } : {}),
     tags: tagsOf(p.tags),
     // One image — cards show the first — and never a dead Cloudinary link.
     images: (p.images || [])

@@ -82,7 +82,7 @@ export async function notifyRestocked(
           product_url: `https://goskinly.com/products/${n.productSlug || product.slug || ""}`,
           product_price: variant.price ? `₹${variant.price}` : "",
           shop_url: "https://goskinly.com",
-          company_name: "Skinly",
+          company_name: "GoSkinly",
           customer_name: "there",
           stock_notification: "back in stock",
         },

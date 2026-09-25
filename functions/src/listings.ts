@@ -181,10 +181,11 @@ export const getListingTemplate = onCall(async (data: any, context: any) => {
   };
 });
 
-const SYSTEM = `You write product listings for Skinly, an Indian D2C brand selling precision-cut vinyl
+const SYSTEM = `You write product listings for GoSkinly, an Indian D2C brand selling precision-cut vinyl
 skins and wraps for laptops, phones, consoles, cameras, drones and other gadgets.
 
 Write for a real shopper and for Google at the same time. Indian English, warm but not breathless.
+The brand is GoSkinly, always one word with the capital G and S; never just "Skinly".
 Never invent a specification you were not given — no dimensions, no materials beyond the finish you
 are told about, no compatibility claims about specific device models, no warranty terms, no prices.
 
@@ -192,7 +193,7 @@ Reply with JSON only, in exactly this shape:
 {
   "title": "60-70 characters. The design name, the finish, the device exactly as given in Device, the word Skin.",
   "slug": "lowercase-hyphenated-from-the-title, no stop words dropped mid-phrase, under 70 chars",
-  "metaTitle": "under 60 characters, ends with | Skinly",
+  "metaTitle": "under 60 characters, ends with | GoSkinly",
   "metaDescription": "140-155 characters, one sentence of benefit plus a light call to action",
   "description": "350-500 words of markdown. Open with one bold hook line. Then four or five short
     sections with an emoji and a bold heading each: the design, the finish and feel, precision fit
@@ -375,7 +376,7 @@ export async function writeListingCopy(
   let title = String(copy.title || "").trim();
   if (!title || !says(title)) title = `${designName} ${args.finishLabel} ${device} Skin`.replace(/\s+/g, " ").trim();
   let metaTitle = String(copy.metaTitle || "").trim();
-  if (!metaTitle || !says(metaTitle)) metaTitle = `${designName} ${device} Skin | Skinly`;
+  if (!metaTitle || !says(metaTitle)) metaTitle = `${designName} ${device} Skin | GoSkinly`;
   const tags: string[] = Array.isArray(copy.tags)
     ? copy.tags.map((t: any) => String(t).toLowerCase().trim()).filter(Boolean).slice(0, 15)
     : [];

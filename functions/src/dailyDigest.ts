@@ -153,7 +153,7 @@ export async function sendDigest(db: admin.firestore.Firestore): Promise<Digest>
         to_pack: String(digest.toPack),
         needs_attention: String(digest.needsAttention + digest.lowStock.length),
         low_stock: digest.lowStock.slice(0, 5).map((l) => `${l.code} (${l.left}${l.unit === "m" ? "m" : " sheets"})`).join(", ") || "none",
-        company_name: "Skinly",
+        company_name: "GoSkinly",
       }, digest.day);
     }
   } catch (e: any) {

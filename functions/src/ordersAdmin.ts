@@ -224,7 +224,7 @@ export const sendOrderStatusEmail = onCall(async (data: any, context: any) => {
         orderLink: `${(process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "")}/orders/${orderId}`,
       },
     }],
-    from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
+    from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
     domain: "mail.goskinly.com",
   };
 

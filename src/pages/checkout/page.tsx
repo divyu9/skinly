@@ -305,7 +305,7 @@ function CheckoutPageInner() {
         code: code.trim(),
         cartTotal: subtotal,
         userEmail: formData.email || undefined,
-        cartItems: cartItems.map((i) => ({ productId: i.productId, productTitle: i.productTitle, price: i.price, quantity: i.quantity })),
+        cartItems: cartItems.map((i) => ({ productId: i.productId, productTitle: i.productTitle, variant: i.variant, price: i.price, quantity: i.quantity })),
       });
       if (!result) {
         setCouponMessage({ type: "error", text: "That coupon could not be found" });

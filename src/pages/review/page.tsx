@@ -213,7 +213,7 @@ export default function ReviewPage() {
                     </div>
 
                     {d.saved ? (
-                      <p className="mt-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand">
+                      <p className="mt-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-deep">
                         <CheckCircle2Icon className="size-4" /> Review posted — thank you!
                       </p>
                     ) : (

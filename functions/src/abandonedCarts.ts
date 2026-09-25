@@ -200,7 +200,7 @@ const sendReminderEmail = async (cart: any, couponCode: string | null, s: Settin
       to: [{ email: cart.userEmail, name: cart.userName || "" }],
       variables: reminderVariables(cart, couponCode, s),
     }],
-    from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
+    from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
     domain: "mail.goskinly.com",
   };
 

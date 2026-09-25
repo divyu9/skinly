@@ -7,6 +7,39 @@ import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
 
+/**
+ * The part of the cart a coupon applies to, in rupees, or null when the
+ * coupon is for everything. A line counts if its variant, a collection its
+ * product is in, or a word in its product's name is one the coupon names.
+ */
+export async function couponEligibleTotal(
+  db: admin.firestore.Firestore,
+  c: any,
+  lines: Array<{ productId: string; variantId: string; amount: number }>
+): Promise<number | null> {
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(String).filter(Boolean) : []);
+  const variants = new Set(list(c.applicableVariantIds));
+  const collections = list(c.applicableCollectionIds);
+  const words = list(c.applicableProductKeywords).map((w) => w.toLowerCase().trim()).filter(Boolean);
+  if (!variants.size && !collections.length && !words.length) return null;
+
+  const inCollection = new Set<string>();
+  for (let i = 0; i < collections.length; i += 30) {
+    const snap = await db.collection("collectionProducts").where("collectionId", "in", collections.slice(i, i + 30)).get();
+    snap.docs.forEach((d) => inCollection.add(String(d.data().productId)));
+  }
+  const titles = new Map<string, string>();
+  if (words.length) {
+    const ids = [...new Set(lines.map((l) => l.productId).filter(Boolean))];
+    const docs = ids.length ? await db.getAll(...ids.map((id) => db.collection("products").doc(id))) : [];
+    docs.forEach((d) => titles.set(d.id, String((d.data() as any)?.title || "").toLowerCase()));
+  }
+  return lines
+    .filter((l) => variants.has(l.variantId) || inCollection.has(l.productId) ||
+      words.some((w) => (titles.get(l.productId) || "").includes(w)))
+    .reduce((sum, l) => sum + l.amount, 0);
+}
+
 /** Atomic counter increment — runs in background while cart is being fetched */
 const reserveOrderNumber = async (db: admin.firestore.Firestore): Promise<string> => {
   const counterRef = db.collection("settings").doc("order_counter");
@@ -212,6 +245,23 @@ export const placeOrder = functions
         throw new HttpsError("failed-precondition", "This coupon is not available on this account");
       }
 
+      /*
+       * What the coupon is for. The form lets an admin tie a coupon to
+       * variants, collections or words in the product name, and nothing here
+       * read any of them: MAG300, "₹300 off Magneto X", took ₹300 off any
+       * cart over ₹1,500 of anything. The discount is now worked out on the
+       * lines it is for, and a cart with none of them is told so.
+       */
+      const eligible = await couponEligibleTotal(db, c, orderItems.map((item) => {
+        const key = `${String(item?.productId)}::${String(item?.variant)}`;
+        const qty = Math.max(1, Math.floor(Number(item?.quantity || 1)));
+        return { productId: String(item?.productId || ""), variantId: variantIdMap.get(key) || "", amount: (priceMap.get(key) || 0) * qty };
+      }));
+      const discountBase = eligible ?? itemsTotal;
+      if (eligible !== null && eligible <= 0) {
+        throw new HttpsError("failed-precondition", "This coupon doesn't apply to anything in your cart");
+      }
+
       // Claim one use, or find out there are none left.
       const limit = Number(c.usageLimit) || 0;
       await db.runTransaction(async (tx) => {
@@ -225,10 +275,10 @@ export const placeOrder = functions
 
       couponCode = String(c.code || "");
       if (c.discountType === "percentage") {
-        couponDiscount = Math.floor(itemsTotal * (Number(c.discountValue || 0) / 100));
+        couponDiscount = Math.floor(discountBase * (Number(c.discountValue || 0) / 100));
         if (maxDiscount > 0) couponDiscount = Math.min(couponDiscount, maxDiscount);
       } else {
-        couponDiscount = Math.min(itemsTotal, Number(c.discountValue || 0));
+        couponDiscount = Math.min(discountBase, Number(c.discountValue || 0));
       }
       /*
        * A wallet-credit coupon pays out afterwards; it is not money off now.

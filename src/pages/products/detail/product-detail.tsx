@@ -375,6 +375,8 @@ export default function ProductDetailPage() {
       {/* Padding measured off the header rather than guessed: `pt-[72px]`
           left the breadcrumb 20px behind it, since the announcement bar sits
           above the header and pushes its bottom edge to 92. */}
+      {/* The page's one <main>, so assistive tech can jump past the header. */}
+      <main>
       <section className="relative px-4 pb-12" style={{ paddingTop: headerOffset + 12 }}>
         {/* Wash behind the artwork, in the sleeve's own three colours —
             teal, pink, yellow. It used to be violet, fuchsia and sky, which
@@ -652,6 +654,7 @@ export default function ProductDetailPage() {
           <ReviewSection reviews={reviews} />
         </div>
       </section>
+      </main>
       
       {/* Customer clips for this product, in the corner next to Buy Now. */}
       <ProductUgcFloat productId={productData._id} stickyBarVisible={productState.showStickyBar} />

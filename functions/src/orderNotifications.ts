@@ -116,7 +116,7 @@ export async function sendUsecaseEmail(
           orderLink: orderLinkFor(orderId),
         },
       }],
-      from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
+      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
       domain: "mail.goskinly.com",
     }),
   });

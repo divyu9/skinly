@@ -204,6 +204,80 @@ async function catalogueModels(): Promise<any[] | null> {
  * anything created since. null when there is no catalogue file, in which case
  * callers use their original Firestore reads.
  */
+/*
+ * What a coupon is for, as a test on a product line — the same rule placeOrder
+ * bills by (functions/src/placeorder.ts, couponEligibleTotal). Null when the
+ * coupon is for everything. MAG300 is "₹300 off Magneto X" and was offered on
+ * every phone skin's page, because nothing here read its variants.
+ */
+async function couponScope(c: any): Promise<null | ((line: { productId: string; variant?: string; variantId?: string; title?: string }) => boolean)> {
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(String).filter(Boolean) : []);
+  const variantIds = list(c.applicableVariantIds);
+  const collections = list(c.applicableCollectionIds);
+  const words = list(c.applicableProductKeywords).map((w) => w.toLowerCase().trim()).filter(Boolean);
+  if (!variantIds.length && !collections.length && !words.length) return null;
+  const variantKeys = new Set<string>();
+  await Promise.all(variantIds.slice(0, 30).map(async (id) => {
+    const v = await getDoc(doc(db, 'variants', id));
+    if (v.exists()) variantKeys.add(`${v.data().productId}::${String(v.data().title).trim()}`);
+  }));
+  const inCollection = new Set<string>();
+  for (let i = 0; i < collections.length; i += 30) {
+    const snap = await getDocs(query(collection(db, 'collectionProducts'), where('collectionId', 'in', collections.slice(i, i + 30))));
+    snap.docs.forEach((d) => inCollection.add(String(d.data().productId)));
+  }
+  return (line) =>
+    variantIds.includes(String(line.variantId || '')) ||
+    variantKeys.has(`${line.productId}::${String(line.variant || '').trim()}`) ||
+    (!line.variant && !line.variantId && [...variantKeys].some((k) => k.startsWith(`${line.productId}::`))) ||
+    inCollection.has(line.productId) ||
+    words.some((w) => String(line.title || '').toLowerCase().includes(w));
+}
+
+/*
+ * "Complete Your Setup" for a skin: the same design on the buyer's other
+ * devices first, then other designs for the same device.
+ *
+ * It took the first six skins in the catalogue, whatever they were, so an
+ * iPhone skin's page offered a gimbal skin at ₹499, a Tamron lens and three
+ * chargers. The design a person has just chosen, on their laptop and their
+ * charger, is the one thing on the page most likely to go in the same order.
+ * One per device, most-owned devices first, so it is never six lens skins.
+ */
+const SETUP_GADGET_ORDER = ['phone', 'laptop', 'tablet', 'charger', 'controller', 'console', 'mac-mini', 'camera', 'drone', 'gimbals', 'lens'];
+function designOf(p: any): string {
+  const up = /\/design-raw\/([A-Z]+-\d+)-/.exec(String(p?.designImageUrl || ''))?.[1];
+  if (up) return up;
+  if (p?.design) return String(p.design);
+  for (const v of p?.variants || []) {
+    const m = /^([A-Z]+-\d+)-[A-Z]/.exec(String(v?.sku || ''));
+    if (m) return m[1];
+  }
+  return '';
+}
+function setupPicks(product: any, productId: string, candidates: any[]): any[] {
+  const withPhoto = candidates.filter((p) => p.productCategory === product.productCategory && p.images?.[0]?.url);
+  const rank = (g: string) => { const i = SETUP_GADGET_ORDER.indexOf(g); return i < 0 ? 99 : i; };
+  const design = designOf(product);
+  const out: any[] = [];
+  const seenGadget = new Set<string>([String(product.gadgetCategory || '')]);
+  if (design) {
+    const family = withPhoto
+      .filter((p) => designOf(p) === design && p.gadgetCategory !== product.gadgetCategory)
+      .sort((a, b) => rank(a.gadgetCategory) - rank(b.gadgetCategory));
+    for (const p of family) {
+      if (seenGadget.has(p.gadgetCategory)) continue;
+      seenGadget.add(p.gadgetCategory);
+      out.push(p);
+    }
+  }
+  const picked = new Set(out.map((p) => p._id).concat(productId));
+  const sameDevice = withPhoto
+    .filter((p) => p.gadgetCategory === product.gadgetCategory && !picked.has(p._id) && designOf(p) !== design)
+    .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0));
+  return [...out, ...sameDevice];
+}
+
 async function catalogueProducts(): Promise<any[] | null> {
   const cat = await loadCatalogue();
   if (!cat) return null;
@@ -3279,13 +3353,23 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'coupons.getCouponsForProduct') {
           unsubscribe = onSnapshot(
             query(collection(db, 'coupons'), where('isActive', '==', true)),
-            (snap) => {
+            async (snap) => {
               const now = Date.now();
-              setData(snap.docs
+              const open = snap.docs
                 .map(d => ({ _id: d.id, ...d.data() } as any))
                 .filter(c => (!c.expiresAt || c.expiresAt > now) &&
+                             (!c.startDate || Number(c.startDate) <= now) &&
+                             (!c.endDate || Number(c.endDate) >= now) &&
                              (!c.usageLimit || (c.usageCount || 0) < c.usageLimit) &&
-                             c.isPublic !== false));
+                             !(Array.isArray(c.allowedCustomerEmails) && c.allowedCustomerEmails.length) &&
+                             c.isPublic !== false);
+              // Only offers this product can use.
+              const title = args?.productId ? String((await getDoc(doc(db, 'products', args.productId))).data()?.title || '') : '';
+              const fits = await Promise.all(open.map(async (c) => {
+                const test = await couponScope(c);
+                return !test || test({ productId: String(args?.productId || ''), title });
+              }));
+              if (active) setData(open.filter((_, i) => fits[i]));
             }
           );
         }
@@ -3350,7 +3434,7 @@ export function useQuery(apiRef: any, args?: any) {
                 const wanted = new Set(config.manualProductIds);
                 picked = candidates.filter(p => wanted.has(p._id));
               } else if (config.sourceType === 'same-category' && product.productCategory) {
-                picked = candidates.filter(p => p.productCategory === product.productCategory);
+                picked = setupPicks(product, args.productId, candidates);
               } else if (config.sourceType === 'tag-based' && config.filterTags?.length) {
                 picked = candidates.filter(p => p.tags?.some((t: string) => config.filterTags.includes(t)));
               }
@@ -6465,18 +6549,21 @@ export function useMutation(apiRef: any) {
             const rsnap = await getDoc(doc(db, 'modelRequests', id));
             if (!rsnap.exists()) throw new Error('request not found');
             const r: any = rsnap.data();
-            const brandName = String(r.brandName || r.brand || '').trim();
-            const modelName = String(r.modelName || r.model || '').trim();
+            // One space between words: 732 models had doubled, leading or
+            // trailing ones, which split one phone into two rows.
+            const brandName = String(r.brandName || r.brand || '').replace(/\s+/g, ' ').trim();
+            const modelName = String(r.modelName || r.model || '').replace(/\s+/g, ' ').trim();
             if (!brandName || !modelName) throw new Error('request has no brand or model');
 
             // Approving the same model twice would put a duplicate in the
-            // picker, so an existing row just gets reactivated.
-            const existing = await getDocs(query(
-              collection(db, 'supportedModels'),
-              where('brandName', '==', brandName),
-              where('modelName', '==', modelName),
-              limit(1)
-            ));
+            // picker, so an existing row just gets reactivated — matched
+            // without regard to case, as "NARZO 50A PRIME" and "Narzo 50A
+            // Prime" had become two models.
+            const sameBrand = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', brandName)));
+            const match = sameBrand.docs.find((d) =>
+              String(d.data().modelName || '').replace(/\s+/g, ' ').trim().toLowerCase() === modelName.toLowerCase() &&
+              !d.data().mergedInto);
+            const existing = { empty: !match, docs: match ? [match] : [] };
             if (existing.empty) {
               // Without a category the model never appears in a picker, which
               // filters by it; _creationTime lets the storefront see it before
@@ -6913,6 +7000,11 @@ export function useMutation(apiRef: any) {
       // Generic add/update
       if (actionName.includes('create') || actionName.includes('add') || actionName.includes('insert')) {
         const clean: Record<string, unknown> = Object.fromEntries(Object.entries(args).filter(([, v]) => v !== undefined));
+        if (targetCollection === 'supportedModels') {
+          for (const k of ['brandName', 'modelName']) {
+            if (typeof clean[k] === 'string') clean[k] = (clean[k] as string).replace(/\s+/g, ' ').trim();
+          }
+        }
         // The storefront finds products added since its last build by this.
         if (clean._creationTime === undefined) clean._creationTime = Date.now();
         const docRef = await addDoc(collection(db, targetCollection), clean);
@@ -7658,15 +7750,25 @@ export function useConvex() {
         // Same story for the cap: the form writes `maxDiscount`.
         const maxDiscount = Number(coupon.maxDiscount ?? coupon.maxDiscountAmount ?? 0);
 
+        // On the lines the coupon is for, as placeOrder bills it.
+        let base = cartTotal;
+        const test = await couponScope(coupon);
+        if (test) {
+          base = (args.cartItems || [])
+            .filter((i: any) => test({ productId: String(i.productId), variant: i.variant, title: i.productTitle }))
+            .reduce((sum: number, i: any) => sum + Number(i.price || 0) * Number(i.quantity || 1), 0);
+          if (base <= 0) throw new Error("This coupon doesn't apply to anything in your cart");
+        }
+
         // Calculate discount
         let discountAmount = 0;
         if (coupon.discountType === "percentage") {
-          discountAmount = Math.floor(cartTotal * (coupon.discountValue / 100));
+          discountAmount = Math.floor(base * (coupon.discountValue / 100));
           if (maxDiscount > 0) {
             discountAmount = Math.min(discountAmount, maxDiscount);
           }
         } else {
-          discountAmount = Math.min(cartTotal, coupon.discountValue);
+          discountAmount = Math.min(base, coupon.discountValue);
         }
         
         return {

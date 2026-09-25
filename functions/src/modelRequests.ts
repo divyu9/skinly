@@ -157,7 +157,7 @@ async function sendEmail(
     body: JSON.stringify({
       template_id: t.msg91TemplateId,
       recipients: [{ to: [{ email: to, name }], variables }],
-      from: { email: "noreply@mail.goskinly.com", name: "Skinly" },
+      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
       domain: "mail.goskinly.com",
     }),
   });
