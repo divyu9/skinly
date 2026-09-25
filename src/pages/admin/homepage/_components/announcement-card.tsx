@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
-import { ANNOUNCEMENT_STYLES } from "@/components/announcement-bar.tsx";
+import { ANNOUNCEMENT_STYLES, Countdown } from "@/components/announcement-bar.tsx";
 
 /**
  * The notice bar at the very top of the shop — free shipping, a sale, an
@@ -38,6 +38,7 @@ export function AnnouncementCard() {
   const [link, setLink] = useState("");
   const [style, setStyle] = useState("brand");
   const [endsAt, setEndsAt] = useState("");
+  const [countdown, setCountdown] = useState(false);
   const [saved, setSaved] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -46,15 +47,16 @@ export function AnnouncementCard() {
     const next = {
       enabled: d.announcementEnabled === true, text: d.announcementText || "", link: d.announcementLink || "",
       style: d.announcementStyle || "brand", endsAt: toLocalInput(Number(d.announcementEndsAt) || 0),
+      countdown: d.announcementCountdown === true,
     };
     setSaved(JSON.stringify(next));
     if (!loaded) {
-      setEnabled(next.enabled); setText(next.text); setLink(next.link); setStyle(next.style); setEndsAt(next.endsAt);
+      setEnabled(next.enabled); setText(next.text); setLink(next.link); setStyle(next.style); setEndsAt(next.endsAt); setCountdown(next.countdown);
       setLoaded(true);
     }
   }), [loaded]);
 
-  const current = JSON.stringify({ enabled, text, link, style, endsAt });
+  const current = JSON.stringify({ enabled, text, link, style, endsAt, countdown });
   const dirty = loaded && current !== saved;
   const endsMs = endsAt ? new Date(endsAt).getTime() : 0;
   const expired = !!endsMs && endsMs < Date.now();
@@ -71,6 +73,8 @@ export function AnnouncementCard() {
         announcementLink: l || deleteField(),
         announcementStyle: style,
         announcementEndsAt: endsMs || deleteField(),
+        // A countdown needs an end to count to.
+        announcementCountdown: !!endsMs && countdown,
         updatedAt: Date.now(),
       }, { merge: true });
       toast.success(enabled ? "Notice is live — it shows on the site within seconds" : "Notice turned off");
@@ -95,6 +99,7 @@ export function AnnouncementCard() {
         {/* What customers will see, as they'll see it. */}
         <div className={`flex items-center justify-center gap-2 rounded-md px-4 py-1.5 text-xs ${ANNOUNCEMENT_STYLES[style]} ${enabled && !expired ? "" : "opacity-40"}`}>
           <span className="truncate">{text || "Your notice will appear here"}</span>
+          {countdown && endsMs > Date.now() && <Countdown key={endsMs} endsAt={endsMs} />}
           {link && <span className="font-semibold">→</span>}
         </div>
         {expired && enabled && <p className="text-xs text-amber-700">The end time has passed, so the bar is hidden. Clear or change it to show the notice again.</p>}
@@ -104,7 +109,7 @@ export function AnnouncementCard() {
             <Label htmlFor="notice-text">Notice</Label>
             <Input id="notice-text" value={text} maxLength={120} onChange={(e) => setText(e.target.value)}
               placeholder="e.g. Diwali Sale — flat 20% off all skins, today only!" />
-            <p className="text-xs text-muted-foreground">{text.length}/120 · keep it short; phones show about 45 characters.</p>
+            <p className="text-xs text-muted-foreground">{text.length}/120 · keep it short: phones show about 45 characters, about 28 with the countdown on.</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="notice-link">Opens (optional)</Label>
@@ -128,6 +133,11 @@ export function AnnouncementCard() {
               {endsAt && <Button variant="ghost" size="sm" onClick={() => setEndsAt("")}>Clear</Button>}
             </div>
             <p className="text-xs text-muted-foreground">For a sale: the bar hides itself at this time.</p>
+            <label className={`flex items-center gap-2 pt-1 text-sm ${endsAt ? "" : "opacity-50"}`}>
+              <Switch checked={countdown && !!endsAt} disabled={!endsAt} onCheckedChange={setCountdown} />
+              Show a live countdown (e.g. "Ends in 05:23:11")
+            </label>
+            {!endsAt && <p className="text-xs text-muted-foreground">Set an end time to use the countdown.</p>}
           </div>
         </div>
 
