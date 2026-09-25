@@ -1553,30 +1553,6 @@ export function useQuery(apiRef: any, args?: any) {
           });
           unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
         }
-        else if (path === 'referrals.getReferralStats') {
-          let innerUnsubscribe = () => {};
-          const { getAuth } = await import('firebase/auth');
-          const auth = getAuth();
-          
-          const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
-            if (!user) {
-              setData({ totalEarned: 0, successfulReferrals: 0, referralCode: '' });
-              return;
-            }
-            
-            innerUnsubscribe = onSnapshot(doc(db, 'users', await resolveUserDocId(user)), (snap) => {
-              if (snap.exists()) {
-                const data = snap.data();
-                setData({
-                  totalEarned: data.referralEarnings || 0,
-                  successfulReferrals: data.referralCount || 0,
-                  referralCode: data.referralCode || `REF${user.uid.substring(0, 5).toUpperCase()}`
-                });
-              }
-            });
-          });
-          unsubscribe = () => { unsubscribeAuth(); innerUnsubscribe(); };
-        }
         else if (path === 'admin.bugReports.getBugStats') {
           const q = query(collection(db, 'bugReports'));
           unsubscribe = onSnapshot(q, (snap) => {

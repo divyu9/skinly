@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
+import { useMyReferrals, friendOffer } from "@/hooks/useMyReferrals";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
@@ -51,9 +52,7 @@ function AccountPageInner() {
   const walletBalance = useQuery(api.wallet.getWalletBalance);
   const walletStats = useQuery(api.wallet.getWalletStats);
   const recentTransactions = useQuery(api.wallet.getWalletTransactions, { limit: 5 });
-  const referralStats = useQuery(api.referrals.getReferralStats) as
-    | { referralCode?: string; totalReferrals?: number; totalEarned?: number }
-    | undefined;
+  const referralStats = useMyReferrals();
   const generateLoginOtp = useMutation(api.loginOtp.generateLoginOtp);
   const verifyLoginOtp = useMutation(api.loginOtp.verifyLoginOtp);
   const updateConsent = useMutation(api.whatsappConsent.updateMyConsent);
@@ -68,20 +67,22 @@ function AccountPageInner() {
   const [couponCode, setCouponCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
 
-  const referralCount = Number(referralStats?.totalReferrals) || 0;
-  const referralEarned = Number(referralStats?.totalEarned) || 0;
+  const referralCount = referralStats?.referrals.filter((r) => r.status !== "cancelled").length || 0;
+  const referralEarned = Number(referralStats?.earned) || 0;
+  const referralReward = Number(referralStats?.settings.referrerReward) || 0;
 
   /**
    * The phone's share sheet where there is one, the clipboard everywhere else.
    * Sending someone to a separate page just to copy a link loses most of them.
    */
   const shareReferral = async () => {
-    const code = referralStats?.referralCode;
+    const code = referralStats?.code;
     if (!code) { window.location.href = "/account/referrals"; return; }
     const url = `${window.location.origin}/?ref=${code}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: "Skinly", text: "Get ₹100 off your first Skinly order.", url });
+        const offer = referralStats ? friendOffer(referralStats.settings) : "";
+        await navigator.share({ title: "GoSkinly", text: offer ? `Get ${offer} at GoSkinly.` : "GoSkinly", url });
         return;
       } catch {
         // Sheet dismissed; fall through to copying.
@@ -238,7 +239,8 @@ function AccountPageInner() {
         </CardContent>
       </Card>
 
-      {/* Referral Program */}
+      {/* Referral Program — only while the admin has one running. */}
+      {referralStats?.enabled && (
       <Card className="mb-4 rounded-2xl border-2 border-ink/15 bg-blush/30 sm:mb-6">
         {/* One row on a phone. Stacked with a full-width button it ate 170px
             of a 812px screen to say one sentence; the wallet and the orders
@@ -246,14 +248,14 @@ function AccountPageInner() {
         <CardContent className="flex items-center gap-3 p-4 sm:p-6">
           <UserIcon className="size-5 shrink-0 text-heart" />
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold leading-tight">Refer &amp; Earn ₹100</h3>
+            <h3 className="font-semibold leading-tight">Refer &amp; Earn ₹{referralReward}</h3>
             {/* Progress where there is any, the offer where there is not — a
                 bare "Invite" told someone who had already referred four people
                 nothing about the four. */}
             <p className="text-xs text-muted-foreground">
               {referralCount > 0
                 ? `${referralCount} friend${referralCount === 1 ? "" : "s"} joined · ₹${referralEarned} earned`
-                : "₹100 each, on their first order"}
+                : `₹${referralReward} for each friend's first order`}
             </p>
           </div>
           <Button
@@ -266,6 +268,7 @@ function AccountPageInner() {
           </Button>
         </CardContent>
       </Card>
+      )}
 
       {/* Wallet Balance & Stats */}
       <Card className="mb-4 rounded-2xl border-2 border-ink/15 sm:mb-6">

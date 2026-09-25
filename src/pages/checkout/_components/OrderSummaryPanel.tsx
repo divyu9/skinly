@@ -75,6 +75,9 @@ interface OrderSummaryPanelProps {
   shippingFee: number;
   shippingSettings: ShippingSettings | undefined | null;
   couponDiscount: number;
+  /** A friend's referral discount, and why it is 0 when it is (a coupon, a minimum). */
+  referralDiscount?: number;
+  referralNote?: string | null;
   walletAmount: number;
   walletTotal: number;
   codFee: number;
@@ -128,6 +131,8 @@ export function OrderSummaryPanel({
   shippingFee,
   shippingSettings,
   couponDiscount,
+  referralDiscount = 0,
+  referralNote = null,
   walletAmount,
   walletTotal,
   codFee,
@@ -219,6 +224,18 @@ export function OrderSummaryPanel({
               </span>
               <span className="font-semibold text-brand">-₹{couponDiscount.toFixed(0)}</span>
             </div>
+          )}
+          {referralDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="flex items-center gap-1 text-brand">
+                <TagIcon className="size-3" />
+                Friend's referral
+              </span>
+              <span className="font-semibold text-brand">-₹{referralDiscount.toFixed(0)}</span>
+            </div>
+          )}
+          {referralNote && referralDiscount === 0 && (
+            <p className="text-xs text-muted-foreground">{referralNote}</p>
           )}
           {walletAmount > 0 && (
             <div className="flex justify-between text-sm">

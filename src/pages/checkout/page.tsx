@@ -13,6 +13,9 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyCont
 import { Link } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+import { storedReferralCode, clearStoredReferralCode } from "@/components/referral-tracker.tsx";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/lib/firebase-api";
@@ -245,11 +248,34 @@ function CheckoutPageInner() {
       : "skip"
   );
 
+  /*
+   * A friend's referral (functions/src/referrals.ts): asked of the server as
+   * the cart, the email, the phone or the coupon change, because only it can
+   * say whether this is a first order — and placeOrder decides again.
+   */
+  const [referral, setReferral] = useState<{ code: string; discount: number; reason: string | null } | null>(null);
+  const couponIdForReferral = appliedCoupon?.coupon._id || "";
+  useEffect(() => {
+    const code = storedReferralCode();
+    if (!code && !isAuthenticated) { setReferral(null); return; }
+    let live = true;
+    const t = setTimeout(() => {
+      httpsCallable(functions, "checkReferral")({
+        code, email: formData.email, phone: formData.phone, itemsTotal: subtotal, couponApplied: !!couponIdForReferral,
+      }).then((r) => {
+        const d: any = r.data;
+        if (live) setReferral(d?.ok ? { code: d.code, discount: Number(d.discount) || 0, reason: d.reason || null } : null);
+      }).catch(() => { if (live) setReferral(null); });
+    }, 600);
+    return () => { live = false; clearTimeout(t); };
+  }, [subtotal, formData.email, formData.phone, couponIdForReferral, isAuthenticated]);
+
   const totalCashback = cashbackData?.totalCashback || 0;
   const couponDiscount = appliedCoupon?.discountAmount || 0;
+  const referralDiscount = referral?.discount || 0;
   const walletBalance = walletData?.balance || 0;
   const maxWalletUsage = walletMaxUsage?.maxUsage || 0;
-  const totalAfterCoupon = Math.max(0, total - couponDiscount);
+  const totalAfterCoupon = Math.max(0, total - couponDiscount - referralDiscount);
   const walletAmount = useWallet ? Math.min(maxWalletUsage, totalAfterCoupon) : 0;
   const codFee = formData.paymentMethod === "cod" && codAvailability?.available ? codAvailability.codFee : 0;
   const subtotalAfterDiscounts = totalAfterCoupon - walletAmount;
@@ -408,6 +434,7 @@ function CheckoutPageInner() {
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
         couponId: appliedCoupon?.coupon._id,
         couponDiscount: appliedCoupon?.discountAmount,
+        referralCode: referral?.code,
         walletCreditAmount: appliedCoupon?.walletCreditAmount,
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,
@@ -418,6 +445,8 @@ function CheckoutPageInner() {
       });
 
       const guestNav = () => navigate(`/orders/${result.orderId}`);
+      // A friend's link is for one first order.
+      if (referral) clearStoredReferralCode();
 
       if (result.trackingToken) {
         sessionStorage.setItem("skinly_tracking_token", result.trackingToken);
@@ -506,6 +535,8 @@ function CheckoutPageInner() {
     shippingFee,
     shippingSettings,
     couponDiscount,
+    referralDiscount,
+    referralNote: referral?.reason || null,
     walletAmount,
     walletTotal: total,
     codFee,

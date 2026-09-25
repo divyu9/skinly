@@ -25,6 +25,7 @@ export * from "./abandonedCarts";
 export * from "./collectionSync";
 export * from "./productGadget";
 export * from "./mockupCoverage";
+export * from "./referrals";
 export * from "./whatsappWorker";
 export * from "./poyo";
 export * from "./materials";

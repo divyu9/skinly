@@ -30,7 +30,7 @@ service cloud.firestore {
     function noPrivilegedFields() {
       return !request.resource.data.diff(resource.data)
                 .affectedKeys()
-                .hasAny(['isAdmin', 'walletBalance', 'role', 'permissions']);
+                .hasAny(['isAdmin', 'walletBalance', 'role', 'permissions', 'referralCount', 'referralEarnings', 'referralCode']);
     }
 
     // ── Public catalogue ──────────────────────────────────────────────────────
@@ -98,6 +98,8 @@ service cloud.firestore {
     match /pltSync/{id} { allow read: if isAdmin(); allow write: if false; }
     // Each phone model's mockup design codes, kept by functions (mockupCoverage.ts).
     match /mockupCoverage/{id} { allow read: if isAdmin(); allow write: if false; }
+    // Which account owns each referral code; written only by functions (referrals.ts).
+    match /referralCodes/{code} { allow read: if isAdmin(); allow write: if false; }
 
     match /reviews/{id} {
       allow read: if true;
@@ -125,7 +127,7 @@ service cloud.firestore {
                   || (isSignedIn() && request.auth.token.email != null
                       && resource.data.email == request.auth.token.email);
       allow create: if isOwner(userId)
-                    && !request.resource.data.keys().hasAny(['isAdmin', 'walletBalance', 'role', 'permissions']);
+                    && !request.resource.data.keys().hasAny(['isAdmin', 'walletBalance', 'role', 'permissions', 'referralCount', 'referralEarnings', 'referralCode']);
       allow update: if isAdmin() || (ownsUserDoc(userId) && noPrivilegedFields());
       allow delete: if isAdmin();
     }

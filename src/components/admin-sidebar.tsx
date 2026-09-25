@@ -27,6 +27,7 @@ import {
   Home,
   Bug,
   Coins,
+  Gift,
   TrendingUp,
   FileText,
   Layout,
@@ -130,6 +131,7 @@ export function AdminSidebar() {
         { path: "/backend-skinly/upsells", label: "Upsells", icon: TrendingUp },
         { path: "/backend-skinly/cashback", label: "Cashback", icon: Coins },
         { path: "/backend-skinly/wallet", label: "Wallet", icon: Wallet },
+        { path: "/backend-skinly/referrals", label: "Referrals", icon: Gift },
       ],
     },
     {

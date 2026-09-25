@@ -1,9 +1,8 @@
-import { useQuery } from "@/lib/firebase-hooks";
-import { api } from "@/lib/firebase-api";
+import { useMyReferrals, friendOffer } from "@/hooks/useMyReferrals";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UsersIcon, CopyIcon, CheckCircleIcon, TrophyIcon, ShareIcon, GiftIcon, CoinsIcon } from "lucide-react";
+import { UsersIcon, CopyIcon, CheckCircleIcon, TrophyIcon, ShareIcon, GiftIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AnnouncementBar } from "@/components/announcement-bar";
@@ -13,40 +12,17 @@ import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hook
 import { SignInButton } from "@/components/ui/signin";
 import { Skeleton } from "@/components/ui/skeleton";
 
+/**
+ * A customer's referral link, what it gives a friend and them, and who it
+ * has brought. Everything comes from functions/src/referrals.ts — the
+ * amounts are the admin's, and a reward shows as paid only once it is in
+ * the wallet.
+ */
 function ReferralsPageInner() {
-  const stats = useQuery(api.referrals.getReferralStats);
+  const data = useMyReferrals();
   const [copied, setCopied] = useState(false);
 
-  const referralLink = stats?.referralCode 
-    ? `${window.location.origin}/?ref=${stats.referralCode}` 
-    : "Loading...";
-
-  const handleCopy = () => {
-    if (stats?.referralCode) {
-      navigator.clipboard.writeText(referralLink);
-      setCopied(true);
-      toast.success("Referral link copied to clipboard!");
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleShare = async () => {
-    if (navigator.share && stats?.referralCode) {
-      try {
-        await navigator.share({
-          title: 'Join Skinly & Get Rewarded!',
-          text: 'Use my referral link to sign up and get rewards on your first order!',
-          url: referralLink,
-        });
-      } catch (err) {
-        // Ignore abort errors
-      }
-    } else {
-      handleCopy();
-    }
-  };
-
-  if (stats === undefined) {
+  if (data === undefined) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
         <Skeleton className="h-48 w-full" />
@@ -54,155 +30,98 @@ function ReferralsPageInner() {
       </div>
     );
   }
-
-  if (stats === null) {
+  if (!data || !data.enabled) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <p>Unable to load referral data.</p>
+      <div className="container mx-auto max-w-2xl px-4 py-8 text-center">
+        <GiftIcon className="mx-auto mb-4 size-12 text-muted-foreground" />
+        <h1 className="mb-2 text-2xl font-bold">Referrals are paused</h1>
+        <p className="text-muted-foreground">There's no referral offer running right now. Check back soon.</p>
       </div>
     );
   }
 
+  const link = data.code ? `${window.location.origin}/?ref=${data.code}` : "";
+  const offer = friendOffer(data.settings);
+  const reward = data.settings.referrerReward;
+
+  const copy = async () => {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success("Link copied");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it");
+    }
+  };
+  const share = async () => {
+    const text = `Get ${offer} at GoSkinly with my link:`;
+    if (navigator.share) {
+      try { await navigator.share({ title: "GoSkinly", text, url: link }); return; } catch { /* dismissed */ }
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}`, "_blank", "noopener");
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl space-y-6">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 text-white shadow-xl">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-2 text-center md:text-left">
-            <h1 className="text-3xl font-bold">Refer Friends & Earn</h1>
-            <p className="text-indigo-100 max-w-md">
-              Share your unique link. When your friends place their first order, you both get rewarded!
-            </p>
-            <div className="flex items-center justify-center md:justify-start gap-2 pt-2">
-              <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm flex items-center gap-1">
-                <GiftIcon className="size-4" /> You get ₹100
-              </span>
-              <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm flex items-center gap-1">
-                <UsersIcon className="size-4" /> They get a coupon
-              </span>
-            </div>
-          </div>
-          <div className="bg-white/10 p-6 rounded-xl backdrop-blur-sm border border-white/20 min-w-[280px]">
-            <p className="text-sm text-indigo-100 mb-2">Total Earnings</p>
-            <p className="text-4xl font-bold">₹{stats.totalEarned}</p>
-            <p className="text-xs text-indigo-200 mt-1">
-              From {stats.successfulReferrals} successful referrals
-            </p>
+    <div className="container mx-auto max-w-3xl space-y-6 px-4 py-8">
+      <div className="rounded-2xl border-2 border-ink/15 bg-blush/40 p-6 sm:p-8">
+        <h1 className="text-2xl font-extrabold sm:text-3xl">Give a friend {offer ? offer.split(" their")[0] : "a treat"}, get ₹{reward}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Share your link. Your friend gets {offer || "a discount"}, and ₹{reward} lands in your GoSkinly wallet when their order is delivered.
+        </p>
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <Input readOnly value={link} className="bg-background font-mono text-sm" onFocus={(e) => e.currentTarget.select()} />
+          <div className="flex gap-2">
+            <Button onClick={() => void copy()} variant="outline" className="shrink-0">
+              {copied ? <CheckCircleIcon className="mr-1.5 size-4" /> : <CopyIcon className="mr-1.5 size-4" />}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+            <Button onClick={() => void share()} className="shrink-0 bg-brand font-bold text-brand-foreground hover:bg-brand/90">
+              <ShareIcon className="mr-1.5 size-4" /> Share
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Share Link Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShareIcon className="size-5" />
-            Your Referral Link
-          </CardTitle>
-          <CardDescription>
-            Copy and share this link with your friends
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input 
-              readOnly 
-              value={referralLink} 
-              className="font-mono text-sm bg-muted"
-            />
-            <Button onClick={handleCopy} className="shrink-0 w-24">
-              {copied ? (
-                <>
-                  <CheckCircleIcon className="size-4 mr-2" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <CopyIcon className="size-4 mr-2" />
-                  Copy
-                </>
-              )}
-            </Button>
-          </div>
-          <Button variant="outline" className="w-full" onClick={handleShare}>
-            <ShareIcon className="size-4 mr-2" />
-            Share via WhatsApp / Social
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Clicks</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalReferrals}</div>
-            <p className="text-xs text-muted-foreground mt-1">Friends who signed up</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Successful</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.successfulReferrals}</div>
-            <p className="text-xs text-muted-foreground mt-1">Placed first order</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {stats.totalReferrals > 0 
-                ? ((stats.successfulReferrals / stats.totalReferrals) * 100).toFixed(1) 
-                : "0"}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Signups to Orders</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          ["Friends", data.referrals.filter((r) => r.status !== "cancelled").length],
+          ["Earned", `₹${data.earned}`],
+          ["On the way", `₹${data.pending}`],
+        ].map(([label, value]) => (
+          <Card key={String(label)}>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="text-xl font-bold">{value}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* History */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrophyIcon className="size-5" />
-            Reward History
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2 text-lg"><TrophyIcon className="size-5" /> Your referrals</CardTitle>
+          <CardDescription>A reward is paid when your friend's first order is delivered.</CardDescription>
         </CardHeader>
         <CardContent>
-          {stats.rewardHistory.length > 0 ? (
-            <div className="space-y-4">
-              {stats.rewardHistory.map((reward: any) => (
-                <div key={reward._id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="size-10 rounded-full bg-green-100 flex items-center justify-center">
-                      <CoinsIcon className="size-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Referral Bonus</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(reward.createdAt).toLocaleDateString()}
-                      </p>
-                    </div>
+          {data.referrals.length ? (
+            <ul className="divide-y">
+              {data.referrals.map((r, i) => (
+                <li key={i} className="flex items-center justify-between py-3 text-sm">
+                  <div>
+                    <p className="font-medium">{r.name}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold text-green-600">+₹{reward.amount}</p>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                      Processed
-                    </span>
-                  </div>
-                </div>
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                    r.status === "paid" ? "bg-green-100 text-green-800" : r.status === "pending" ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground"}`}>
+                    {r.status === "paid" ? `+₹${r.reward} paid` : r.status === "pending" ? `₹${r.reward} on delivery` : "Cancelled"}
+                  </span>
+                </li>
               ))}
-            </div>
+            </ul>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              No rewards earned yet. Start sharing!
-            </div>
+            <p className="py-6 text-center text-sm text-muted-foreground">No referrals yet — share your link to get started.</p>
           )}
         </CardContent>
       </Card>

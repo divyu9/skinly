@@ -63,6 +63,7 @@ const AdminWhatsAppMessagesPage = lazyWithReload(() => import("./pages/admin/wha
 const AdminWhatsAppHealthPage = lazyWithReload(() => import("./pages/admin/whatsapp-health.tsx"), "./pages/admin/whatsapp-health.tsx");
 const AdminWhatsAppDebugLogsPage = lazyWithReload(() => import("./pages/admin/whatsapp-debug-logs.tsx"), "./pages/admin/whatsapp-debug-logs.tsx");
 const AdminWalletPage = lazyWithReload(() => import("./pages/admin/wallet/page.tsx"), "./pages/admin/wallet/page.tsx");
+const AdminReferralsPage = lazyWithReload(() => import("./pages/admin/referrals/page.tsx"), "./pages/admin/referrals/page.tsx");
 const AdminCashbackPage = lazyWithReload(() => import("./pages/admin/cashback/page.tsx"), "./pages/admin/cashback/page.tsx");
 const AdminEmailsPage = lazyWithReload(() => import("./pages/admin/emails/page.tsx"), "./pages/admin/emails/page.tsx");
 const AdminBugsPage = lazyWithReload(() => import("./pages/admin/bugs/page.tsx"), "./pages/admin/bugs/page.tsx");
@@ -159,6 +160,7 @@ export default function App() {
             <Route path="/backend-skinly/whatsapp/health" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppHealthPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/whatsapp/debug-logs" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWhatsAppDebugLogsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/wallet" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminWalletPage /></AdminPageWrapper></Suspense>} />
+            <Route path="/backend-skinly/referrals" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminReferralsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/cashback" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminCashbackPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/emails" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminEmailsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/bugs" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminBugsPage /></AdminPageWrapper></Suspense>} />

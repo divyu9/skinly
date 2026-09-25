@@ -58,6 +58,20 @@ export function gstFor(total: number, state: unknown) {
 export const invoiceValue = (o: any) => Number(o?.total ?? o?.amountPayable ?? 0) || 0;
 
 export async function confirmOrder(db: admin.firestore.Firestore, orderId: string, at = Date.now()) {
+  const result = await numberOrder(db, orderId, at);
+  // A confirmed order pays with the wallet money it used — once (userDoc.ts).
+  if (result) {
+    try {
+      const { debitWalletForOrder } = await import("./userDoc");
+      await debitWalletForOrder(db, db.collection("orders").doc(orderId));
+    } catch (e: any) {
+      console.error("confirmOrder: wallet debit failed", { orderId, error: e?.message || e });
+    }
+  }
+  return result;
+}
+
+async function numberOrder(db: admin.firestore.Firestore, orderId: string, at: number) {
   const prefixSnap = await db.collection("settings").doc("INVOICE_PREFIX").get();
   const prefix = String((prefixSnap.data() as any)?.value || DEFAULT_PREFIX).trim() || DEFAULT_PREFIX;
   const orderRef = db.collection("orders").doc(orderId);

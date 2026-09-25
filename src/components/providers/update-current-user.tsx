@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { useAuth } from "@/hooks/use-auth";
+import { storedReferralCode } from "@/components/referral-tracker.tsx";
 
 export function UpdateCurrentUserProvider({
   children,
@@ -21,14 +22,12 @@ export function UpdateCurrentUserProvider({
      * ReferralTracker). It is recorded as who referred them — it used to be
      * written over their own referralCode, so a friend who signed up through
      * a link went on to share the referrer's code instead of theirs, and it
-     * was rewritten at every sign-in. Recorded once, then forgotten.
+     * was rewritten at every sign-in.
      */
-    let storedRefCode: string | null = null;
-    try { storedRefCode = localStorage.getItem("referralCode"); } catch { /* storage blocked */ }
+    // Kept in the browser too, for checkout; the server falls back to this.
+    const storedRefCode = storedReferralCode();
     if (storedRefCode) {
-      void Promise.resolve(updateUser({ referredByCode: storedRefCode }))
-        .then(() => { try { localStorage.removeItem("referralCode"); } catch { /* ignore */ } })
-        .catch(() => { /* try again next sign-in */ });
+      void Promise.resolve(updateUser({ referredByCode: storedRefCode })).catch(() => { /* next sign-in */ });
     }
   }, [isLoaded, isSignedIn, updateUser]);
 

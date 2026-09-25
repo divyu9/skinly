@@ -256,6 +256,16 @@ export async function setOrderStatus(
     } catch (e: any) {
       console.error("setOrderStatus: wallet credit failed", { orderId, error: e?.message || e });
     }
+    try {
+      const { creditReferralOnDelivery } = await import("./referrals");
+      await creditReferralOnDelivery(db, ref, order);
+    } catch (e: any) {
+      console.error("setOrderStatus: referral reward failed", { orderId, error: e?.message || e });
+    }
+  }
+  // A cancelled or returned order earns its referrer nothing.
+  if ((next === "cancelled" || next === "rto") && order?.referral?.status === "pending") {
+    await ref.update({ "referral.status": "cancelled" }).catch(() => undefined);
   }
 
   if (opts.notify !== false) {
@@ -358,7 +368,15 @@ async function creditWalletOnDelivery(
     return;
   }
 
-  const userRef = db.collection("users").doc(String(order.userId));
+  // The account's own document, legacy ones included (userDoc.ts).
+  const { walletUserRef } = await import("./userDoc");
+  const userRef = (order.walletUserDocId ? db.collection("users").doc(String(order.walletUserDocId)) : null)
+    || await walletUserRef(db, order.ownerUid || order.userId, order.email);
+  if (!userRef) {
+    await orderRef.update({ creditOwedNoAccount: amount, updatedAt: Date.now() });
+    console.warn("creditWalletOnDelivery: no account found", { order: order?.orderNumber, amount });
+    return;
+  }
   const txRef = db.collection("walletTransactions").doc();
   const parts = [
     coupon > 0 ? `coupon ₹${coupon}` : "",

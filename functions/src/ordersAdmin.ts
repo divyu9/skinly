@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
+import { walletUserRef } from "./userDoc";
 
 /**
  * Order actions that must not run in the browser.
@@ -111,6 +112,10 @@ export const refundToWallet = onCall(async (data: any, context: any) => {
   const db = admin.firestore();
   const orderRef = db.collection("orders").doc(orderId);
 
+  // The account's own document, legacy ones included (userDoc.ts).
+  const pre = (await orderRef.get()).data() as any;
+  const walletRef = pre ? await walletUserRef(db, pre.ownerUid || pre.userId, pre.email) : null;
+
   const result = await db.runTransaction(async (tx) => {
     const orderSnap = await tx.get(orderRef);
     if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
@@ -127,7 +132,8 @@ export const refundToWallet = onCall(async (data: any, context: any) => {
       throw new HttpsError("invalid-argument", `Refund exceeds the order total of ₹${total}`);
     }
 
-    const userRef = db.collection("users").doc(String(order.userId));
+    if (!walletRef) throw new HttpsError("not-found", "Customer account not found");
+    const userRef = walletRef;
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists) throw new HttpsError("not-found", "Customer account not found");
 
@@ -136,7 +142,8 @@ export const refundToWallet = onCall(async (data: any, context: any) => {
 
     tx.update(userRef, { walletBalance: after });
     tx.set(db.collection("walletTransactions").doc(), {
-      userId: order.userId,
+      userId: userRef.id,
+      ...(order.ownerUid ? { ownerUid: order.ownerUid } : {}),
       transactionType: "credit",
       amount: refundAmount,
       source: "refund",

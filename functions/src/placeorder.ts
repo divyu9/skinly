@@ -7,6 +7,8 @@ import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
+import { evaluateReferral, normCode } from "./referrals";
+import { walletUserRef } from "./userDoc";
 
 /**
  * The part of the cart a coupon applies to, in rupees, or null when the
@@ -75,7 +77,7 @@ export const placeOrder = functions
     const db = admin.firestore();
 
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems,
-            sessionId: reqSessionId, customerPhone, couponId, walletAmount } = data;
+            sessionId: reqSessionId, customerPhone, couponId, walletAmount, referralCode } = data;
     // Note: couponDiscount / prepaidAmount / amount also arrive from the client.
     // They are deliberately ignored — every figure below is re-derived here.
 
@@ -281,6 +283,28 @@ export const placeOrder = functions
       }
     }
 
+    // ── 3c. A friend's referral (referrals.ts) ────────────────────────────────
+    // Worked out here like the coupon: the friend's discount, and the reward
+    // owed to whoever sent them once this order is delivered. A bad or spent
+    // code costs the order nothing — it simply doesn't apply.
+    let referralDiscount = 0;
+    let referral: Record<string, any> | null = null;
+    try {
+      let code = normCode(referralCode);
+      if (!code && uid) code = normCode(((await db.collection("users").doc(uid).get()).data() as any)?.referredByCode);
+      if (code) {
+        const r = await evaluateReferral(db, {
+          code, email, phone: shippingAddress?.phone, uid, itemsTotal, couponApplied: !!couponCode || couponDiscount > 0 || walletCreditCouponAmount > 0,
+        });
+        if (r.ok) {
+          referralDiscount = Math.min(r.discount, Math.max(0, itemsTotal - couponDiscount));
+          referral = { code: r.code, referrerUserDocId: r.referrerUserDocId, referrerAuthUid: r.referrerAuthUid, reward: r.reward, friendDiscount: referralDiscount, status: "pending" };
+        }
+      }
+    } catch (e: any) {
+      console.error("placeOrder: referral check failed", { order: orderId, error: e?.message || e });
+    }
+
     // What this order earns back on delivery, settled now at today's rules.
     const cashback = await cashbackForLines(
       db,
@@ -302,11 +326,15 @@ export const placeOrder = functions
 
     // Wallet is capped by the balance the server can see, never by the request.
     let walletUsed = 0;
+    let walletUserDocId = "";
     if (uid && Number(walletAmount) > 0) {
-      const uSnap = await db.collection("users").doc(uid).get();
-      const balance = Number(uSnap.exists ? (uSnap.data() as any)?.walletBalance || 0 : 0);
+      // The account's own document, legacy ones included (userDoc.ts).
+      const wRef = await walletUserRef(db, uid, context?.auth?.token?.email);
+      const uSnap = wRef ? await wRef.get() : null;
+      walletUserDocId = wRef?.id || "";
+      const balance = Number(uSnap?.exists ? (uSnap.data() as any)?.walletBalance || 0 : 0);
       // The storefront lets the wallet cover shipping too.
-      walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal + shippingFee - couponDiscount));
+      walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal + shippingFee - couponDiscount - referralDiscount));
     }
 
     // COD fee and the prepaid split come from codSettings, same formula the
@@ -316,7 +344,7 @@ export const placeOrder = functions
     if (paymentMethod === "cod") {
       const cs = await db.collection("codSettings").limit(1).get();
       const st = cs.empty ? {} : (cs.docs[0].data() as any);
-      const base = itemsTotal - couponDiscount - walletUsed;
+      const base = itemsTotal - couponDiscount - referralDiscount - walletUsed;
       codFee = st.codFeeType === "fixed"
         ? Number(st.codFeeValue || 0)
         : (base * Number(st.codFeeValue || 0)) / 100;
@@ -327,7 +355,7 @@ export const placeOrder = functions
       }
     }
 
-    const calculatedTotal = Math.max(0, itemsTotal + shippingFee - couponDiscount - walletUsed + codFee);
+    const calculatedTotal = Math.max(0, itemsTotal + shippingFee - couponDiscount - referralDiscount - walletUsed + codFee);
     // What PhonePe must collect right now: the whole thing for prepaid, only
     // the prepaid slice for partial COD.
     const amountPayable = paymentMethod === "cod"
@@ -364,7 +392,10 @@ export const placeOrder = functions
       couponId: couponId || null,
       couponCode,
       couponDiscount,
+      ...(referral ? { referralCode: referral.code, referralDiscount, referral } : {}),
       walletUsed,
+      // Taken off the balance once the order is confirmed (debitWalletForOrder).
+      ...(walletUsed > 0 && walletUserDocId ? { walletUserDocId } : {}),
       // Paid into the wallet when the parcel lands — see creditWalletOnDelivery.
       walletCreditCouponAmount,
       cashbackAmount: cashback.total,
