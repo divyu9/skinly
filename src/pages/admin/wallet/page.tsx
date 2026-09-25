@@ -99,7 +99,7 @@ export default function AdminWallet() {
               <IndianRupee className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹{totalWalletBalance.toFixed(2)}</div>
+              <div className="text-2xl font-bold">₹{Number(totalWalletBalance || 0).toFixed(2)}</div>
               <p className="text-xs text-muted-foreground">Across all users</p>
             </CardContent>
           </Card>
@@ -166,7 +166,7 @@ export default function AdminWallet() {
                       <TableCell className="text-muted-foreground">{user.email}</TableCell>
                       <TableCell className="text-right">
                         <span className={user.walletBalance > 0 ? "text-green-600 font-medium" : ""}>
-                          ₹{user.walletBalance.toFixed(2)}
+                          ₹{Number(user.walletBalance || 0).toFixed(2)}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -477,7 +477,7 @@ function DetailsDialog({
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Wallet Details</DialogTitle>
-          <DialogDescription>{details.user.name} - {details.user.email}</DialogDescription>
+          <DialogDescription>{details.user?.name || "Customer"} - {details.user?.email || ""}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -488,7 +488,7 @@ function DetailsDialog({
                 <CardTitle className="text-sm font-medium">Current Balance</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹{details.user.walletBalance.toFixed(2)}</div>
+                <div className="text-2xl font-bold">₹{Number(details.user?.walletBalance || 0).toFixed(2)}</div>
               </CardContent>
             </Card>
 
@@ -498,7 +498,7 @@ function DetailsDialog({
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  ₹{details.stats.lifetimeEarned.toFixed(2)}
+                  ₹{Number(details.stats.lifetimeEarned || 0).toFixed(2)}
                 </div>
               </CardContent>
             </Card>
@@ -509,7 +509,7 @@ function DetailsDialog({
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-red-600">
-                  ₹{details.stats.lifetimeSpent.toFixed(2)}
+                  ₹{Number(details.stats.lifetimeSpent || 0).toFixed(2)}
                 </div>
               </CardContent>
             </Card>
@@ -552,10 +552,10 @@ function DetailsDialog({
                           txn.transactionType === "credit" ? "text-green-600" : "text-red-600"
                         }`}
                       >
-                        {txn.transactionType === "credit" ? "+" : "-"}₹{txn.amount.toFixed(2)}
+                        {txn.transactionType === "credit" ? "+" : "-"}₹{Number(txn.amount || 0).toFixed(2)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Balance: ₹{txn.balanceAfter.toFixed(2)}
+                        Balance: ₹{Number(txn.balanceAfter || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>

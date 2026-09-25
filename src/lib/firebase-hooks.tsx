@@ -2929,15 +2929,23 @@ export function useQuery(apiRef: any, args?: any) {
               const t = await getDocs(query(collection(db, 'walletTransactions'), where('userId', '==', args.userId)));
               const txns = t.docs
                 .map(d => ({ _id: d.id, ...d.data() } as any))
-                .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0));
+                .map(x => ({ ...x, amount: Math.abs(Number(x.amount) || 0), balanceAfter: Number(x.balanceAfter) || 0 }))
+                .sort((a, b) => (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
+              // A debit is a positive amount marked "debit" (older rows used a negative amount).
+              const isDebit = (x: any, raw: any) => x.transactionType === 'debit' || Number(raw?.amount) < 0;
+              const raw = new Map(t.docs.map(d => [d.id, d.data()]));
+              const credited = txns.filter(x => !isDebit(x, raw.get(x._id))).reduce((n, x) => n + x.amount, 0);
+              const debited = txns.filter(x => isDebit(x, raw.get(x._id))).reduce((n, x) => n + x.amount, 0);
+              const ud: any = u.exists() ? u.data() : null;
               setData({
-                user: u.exists() ? { _id: u.id, ...u.data() } : null,
+                // The page reads these names; the handler used to send others, and every row's button crashed on them.
+                user: ud ? { _id: u.id, ...ud, walletBalance: Number(ud.walletBalance) || 0 } : null,
                 stats: {
-                  totalCredited: txns.filter(x => x.amount > 0).reduce((n, x) => n + x.amount, 0),
-                  totalDebited: txns.filter(x => x.amount < 0).reduce((n, x) => n + Math.abs(x.amount), 0),
+                  lifetimeEarned: credited, lifetimeSpent: debited,
+                  totalCredited: credited, totalDebited: debited,
                   transactionCount: txns.length,
                 },
-                recentTransactions: txns.slice(0, 20),
+                recentTransactions: txns.slice(0, 20).map(x => ({ ...x, transactionType: isDebit(x, raw.get(x._id)) ? 'debit' : 'credit' })),
               });
             })();
           }
