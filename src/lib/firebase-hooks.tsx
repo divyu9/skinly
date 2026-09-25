@@ -342,6 +342,19 @@ const mockupUrlFrom = (m: any): string | null =>
   m?.r2Key ? `${R2_PUBLIC_DOMAIN}/${m.r2Key.split("/").map(encodeURIComponent).join("/")}` : null;
 
 // SKUs differ by suffix between catalogs, e.g. R-01 vs R-01-PH.
+/*
+ * The SKUs a mockup may be filed under. Brand listings carry the design code
+ * with the brand after it (R-44-IPH, R-73-SAM) while mockups are filed under
+ * the design alone (R-44), so asking for the listing's SKU exactly found
+ * nothing: 114 live phone listings showed no model picture despite having
+ * one. The full SKU is asked for too, and preferred when both exist.
+ */
+const mockupSkuCandidates = (sku: string): string[] => {
+  const full = String(sku || "").trim();
+  const base = full.replace(/^([A-Za-z]+-\d+)-[A-Za-z0-9]+$/, "$1");
+  return base && base !== full ? [full, base] : [full];
+};
+
 const skuMatches = (mockupSku: string, target: string): boolean => {
   const a = (mockupSku || "").toUpperCase();
   const b = (target || "").toUpperCase();
@@ -1859,14 +1872,20 @@ export function useQuery(apiRef: any, args?: any) {
                 setData(value);
               };
 
+              const skus = mockupSkuCandidates(args.sku);
+              // The full SKU's row first, then the design's.
+              const firstUsable = (docs: any[]) =>
+                docs.filter(d => mockupUrlFrom(d.data()))
+                  .sort((a, b) => Number(b.data().sku === args.sku) - Number(a.data().sku === args.sku))[0];
               const exact = await getDocs(query(
                 collection(db, 'mockups'),
                 where('brand', '==', args.brand),
                 where('model', '==', args.model),
-                where('sku', '==', args.sku),
-                limit(1)
+                where('sku', 'in', skus),
+                limit(2)
               ));
-              const exactUrl = exact.empty ? null : mockupUrlFrom(exact.docs[0].data());
+              const exactHit = firstUsable(exact.docs);
+              const exactUrl = exactHit ? mockupUrlFrom(exactHit.data()) : null;
               if (exactUrl) {
                 finish({ url: exactUrl, model: args.model, exact: true });
                 return;
@@ -1879,7 +1898,7 @@ export function useQuery(apiRef: any, args?: any) {
               const bySku = await getDocs(query(
                 collection(db, 'mockups'),
                 where('brand', '==', args.brand),
-                where('sku', '==', args.sku),
+                where('sku', 'in', skus),
                 limit(500)
               ));
               const usable = bySku.docs.filter(d => mockupUrlFrom(d.data()));
@@ -1915,12 +1934,13 @@ export function useQuery(apiRef: any, args?: any) {
                 collection(db, 'mockups'),
                 where('brand', '==', HERO_MOCKUP_BRAND),
                 where('model', '==', HERO_MOCKUP_MODEL),
-                where('sku', '==', args.sku),
-                limit(1)
+                where('sku', 'in', skus),
+                limit(2)
               ));
-              finish(hero.empty
-                ? null
-                : { url: mockupUrlFrom(hero.docs[0].data()), model: HERO_MOCKUP_MODEL, exact: false });
+              const heroHit = firstUsable(hero.docs);
+              finish(heroHit
+                ? { url: mockupUrlFrom(heroHit.data()), model: HERO_MOCKUP_MODEL, exact: false }
+                : null);
             })();
             }
           }
@@ -3672,8 +3692,9 @@ export function useQuery(apiRef: any, args?: any) {
             // Only the SKUs asked for. Every mockup row for a model is ~333
             // reads, and a screen shows a couple of dozen designs; SKUs match
             // exactly for 99.6% of rows.
+            // Each listing SKU and its design code (see mockupSkuCandidates).
             const bySku = (brand: string, model: string, skus: string[]) =>
-              Promise.all(chunked([...new Set(skus)], 30).map((c) => getDocs(query(
+              Promise.all(chunked([...new Set(skus.flatMap(mockupSkuCandidates))], 30).map((c) => getDocs(query(
                 collection(db, 'mockups'),
                 where('brand', '==', brand),
                 where('model', '==', model),
