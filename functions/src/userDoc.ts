@@ -11,6 +11,10 @@ import * as admin from "firebase-admin";
  * storefront's rule, on the server: users/{uid}, else the one with the
  * email.
  */
+/** The sign-in's email, only if the provider proved it — the key to a legacy account. */
+export const verifiedEmail = (context: any): string | null =>
+  context?.auth?.token?.email_verified === true ? String(context.auth.token.email || "") : null;
+
 export async function walletUserRef(
   db: admin.firestore.Firestore, uid: string | null | undefined, email?: string | null,
 ): Promise<admin.firestore.DocumentReference | null> {

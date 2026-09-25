@@ -117,7 +117,10 @@ service cloud.firestore {
       return isSignedIn() && (
         request.auth.uid == userId ||
         resource.data.clerkId == request.auth.uid ||
-        (request.auth.token.email != null && resource.data.email == request.auth.token.email)
+        // A legacy account is claimed by email only when that email is proven:
+        // an unverified sign-up under someone else's address must not open it.
+        (request.auth.token.email != null && request.auth.token.email_verified == true
+         && resource.data.email == request.auth.token.email)
       );
     }
 
@@ -127,6 +130,7 @@ service cloud.firestore {
       // rule makes exactly that query legal and nothing wider.
       allow list: if isAdmin()
                   || (isSignedIn() && request.auth.token.email != null
+                      && request.auth.token.email_verified == true
                       && resource.data.email == request.auth.token.email);
       allow create: if isOwner(userId)
                     && !request.resource.data.keys().hasAny(['isAdmin', 'walletBalance', 'role', 'permissions', 'referralCount', 'referralEarnings', 'referralCode']);

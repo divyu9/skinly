@@ -4,7 +4,7 @@ import * as admin from "firebase-admin";
 import { getCaller, requireAdmin, requireAuth } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { isConfirmed } from "./orderConfirm";
-import { walletUserRef } from "./userDoc";
+import { verifiedEmail, walletUserRef } from "./userDoc";
 
 /**
  * Refer a friend: the friend gets money off their first order, and whoever
@@ -223,7 +223,7 @@ export const checkReferral = functionsV1.https.onCall(async (data: any, context:
   let code = normCode(data?.code);
   // A signed-in friend who arrived by link earlier keeps it on their account.
   if (!code && uid) {
-    const u = await walletUserRef(db, uid, context?.auth?.token?.email);
+    const u = await walletUserRef(db, uid, verifiedEmail(context));
     code = normCode(u ? ((await u.get()).data() as any)?.referredByCode : "");
   }
   if (!code) return { ok: false };
@@ -401,7 +401,7 @@ export const myReferrals = functionsV1.https.onCall(async (_data: any, context: 
   const { uid } = requireAuth(context);
   const db = admin.firestore();
   const s = await referralSettings(db);
-  const email = String(context?.auth?.token?.email || "").toLowerCase();
+  const email = String(verifiedEmail(context) || "").toLowerCase();
   let u = await walletUserRef(db, uid, email);
   // A sign-in with no document yet gets one, so it can hold a code and a wallet.
   if (!u) {

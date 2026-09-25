@@ -8,7 +8,7 @@ import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
 import { evaluateReferral, normCode, recordReferral, referrerRewardFor } from "./referrals";
-import { walletUserRef } from "./userDoc";
+import { verifiedEmail, walletUserRef } from "./userDoc";
 
 /**
  * The part of the cart a coupon applies to, in rupees, or null when the
@@ -230,6 +230,19 @@ export const placeOrder = functions
     const flatShippingFee = Number(ship.flatShippingFee ?? 50);
     const shippingFee = itemsTotal >= freeShippingThreshold ? 0 : Math.max(0, flatShippingFee);
 
+    /*
+     * COD only where the checkout offers it. This took any request saying
+     * "cod" — with COD switched off, below its minimum, or for products it
+     * isn't allowed on — and with the prepaid part off, such an order is
+     * confirmed at once with no money taken: a free way to file fake orders.
+     * Same rules as cod.isCodAvailable in the storefront; checked before the
+     * coupon, so a refused COD order doesn't use one up.
+     */
+    if (paymentMethod === "cod") {
+      const cs = await db.collection("codSettings").limit(1).get();
+      await assertCodAllowed(db, cs.empty ? null : cs.docs[0].data(), orderItems, variantIdMap, itemsTotal + shippingFee);
+    }
+
     // ── 3b. Re-derive every discount server-side ──────────────────────────────
     /*
      * Every rule the admin set on a coupon, enforced where it bills.
@@ -383,7 +396,7 @@ export const placeOrder = functions
     let walletUserDocId = "";
     if (uid && Number(walletAmount) > 0) {
       // The account's own document, legacy ones included (userDoc.ts).
-      const wRef = await walletUserRef(db, uid, context?.auth?.token?.email);
+      const wRef = await walletUserRef(db, uid, verifiedEmail(context));
       const uSnap = wRef ? await wRef.get() : null;
       walletUserDocId = wRef?.id || "";
       const balance = Number(uSnap?.exists ? (uSnap.data() as any)?.walletBalance || 0 : 0);
@@ -409,6 +422,7 @@ export const placeOrder = functions
     if (paymentMethod === "cod") {
       const cs = await db.collection("codSettings").limit(1).get();
       const st = cs.empty ? {} : (cs.docs[0].data() as any);
+
       const base = itemsTotal - couponDiscount - referralDiscount - walletUsed;
       codFee = st.codFeeType === "fixed"
         ? Number(st.codFeeValue || 0)
@@ -606,3 +620,44 @@ export const placeOrder = functions
     // ── 6. COD / wallet / zero-total path ─────────────────────────────────────
     return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}` };
   });
+
+/** Throws unless the storefront would offer COD on this cart (see cod.isCodAvailable). */
+async function assertCodAllowed(db: admin.firestore.Firestore, s: any, items: any[], variantIdMap: Map<string, string>, total: number) {
+  const no = (why: string) => { throw new HttpsError("failed-precondition", why); };
+  if (!s || s.enabled !== true) no("Cash on delivery isn't available right now");
+  const productIdsOn = s.productIdsEnabled && (s.productIds?.length ?? 0) > 0;
+  const collectionIdsOn = s.collectionIdsEnabled && (s.collectionIds?.length ?? 0) > 0;
+  const variantIdsOn = s.variantIdsEnabled && (s.variantIds?.length ?? 0) > 0;
+  const itemLevel = productIdsOn || collectionIdsOn || variantIdsOn;
+  const eligible = await Promise.all(items.map(async (item) => {
+    const checks: boolean[] = [];
+    const pid = String(item?.productId || "");
+    if (productIdsOn) checks.push(s.productIds.includes(pid));
+    if (collectionIdsOn) {
+      const p = (await db.collection("products").doc(pid).get()).data() as any;
+      if (!p) checks.push(false);
+      else if (p.collectionId && s.collectionIds.includes(p.collectionId)) checks.push(true);
+      else {
+        const cp = await db.collection("collectionProducts").where("productId", "==", pid).get();
+        checks.push(cp.docs.some((d) => s.collectionIds.includes((d.data() as any).collectionId)));
+      }
+    }
+    if (variantIdsOn) checks.push(s.variantIds.includes(variantIdMap.get(`${pid}::${String(item?.variant)}`) || ""));
+    if (!checks.length) return true;
+    return s.matchMode === "ALL" ? checks.every(Boolean) : checks.some(Boolean);
+  }));
+  const count = eligible.filter(Boolean).length;
+  if (count > 0 && count < items.length && !s.allowMixedCartCod) no("Cash on delivery isn't available for this mix of products");
+  const qty = items.reduce((n, i) => n + (Number(i?.quantity) || 0), 0);
+  const conditions: boolean[] = [];
+  if (s.minOrderAmountEnabled) conditions.push(total >= Number(s.minOrderAmount));
+  if (s.maxOrderAmountEnabled) conditions.push(total <= Number(s.maxOrderAmount));
+  if (s.minProductCountEnabled) conditions.push(qty >= Number(s.minProductCount));
+  if (s.maxProductCountEnabled) conditions.push(qty <= Number(s.maxProductCount));
+  const passed = itemLevel && count === 0 ? false : conditions.every(Boolean);
+  if (!passed) {
+    if (itemLevel && count === 0) no("Cash on delivery isn't available for these products");
+    if (s.minOrderAmountEnabled && total < Number(s.minOrderAmount)) no(`Cash on delivery needs an order of ₹${s.minOrderAmount}`);
+    no("This order isn't eligible for cash on delivery");
+  }
+}
