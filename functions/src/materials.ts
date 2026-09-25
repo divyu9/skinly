@@ -115,7 +115,7 @@ export function resolveMaterialCode(
 export async function reserveMaterialForOrder(
   db: admin.firestore.Firestore,
   orderRef: admin.firestore.DocumentReference,
-  items: Array<{ productId?: string; title?: string; quantity?: number }>
+  items: Array<{ productId?: string; variant?: string; title?: string; quantity?: number }>
 ): Promise<void> {
   const productIds = Array.from(
     new Set(items.map((i) => i?.productId).filter((p): p is string => !!p))
@@ -157,8 +157,14 @@ export async function reserveMaterialForOrder(
 
   for (const item of items) {
     const qty = Math.max(1, Number(item?.quantity) || 1);
-    const variant = variants.get(`${item?.productId}::${String(item?.title ?? "")}`);
-    if (!variant) { unresolved.push(`${item?.productId}::${item?.title}`); continue; }
+    /*
+     * An order line names its variant in `variant` ("Only Top"); this read
+     * `title`, which order lines don't have — so no order ever drew stock
+     * down: none of the 63 orders to 26 Sep 2026 carries materialConsumed.
+     */
+    const name = String(item?.variant ?? item?.title ?? "");
+    const variant = variants.get(`${item?.productId}::${name}`);
+    if (!variant) { unresolved.push(`${item?.productId}::${name}`); continue; }
 
     const design = resolveMaterialCode(variant, stock);
     // Accessories and anything not made from stocked material simply do not
