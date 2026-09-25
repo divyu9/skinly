@@ -12,6 +12,7 @@ import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
+import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
 // PhonePe TypeScript declarations
 declare global {
   interface Window {
@@ -38,7 +39,6 @@ function OrderDetailPageInner() {
     orderId && order?.paymentStatus === "failed" ? { orderId: orderId as Id<"orders"> } : "skip"
   );
   
-  const retryPayment = useMutation(api.orders.retryPayment);
   const initiatePayment = useAction(api.phonepe.initiatePayment);
   const checkPaymentStatus = useAction(api.phonepe.checkPaymentStatus);
   const updatePaymentStatus = useMutation(api.orders.updatePaymentStatus);
@@ -135,41 +135,20 @@ function OrderDetailPageInner() {
     }
   }, [currentMerchantTxnId, checkPaymentStatus, updatePaymentStatus]);
 
-  // Handle retry payment button click
+  // The same order, on PhonePe again. This called orders.retryPayment, which
+  // was never written on this backend, so the button failed for everyone.
   const handleRetryPayment = async () => {
     if (!orderId) return;
-    
     setIsRetrying(true);
-    setRetryCount(0);
-    
     try {
-      // First retry the payment (this validates inventory)
-      const retryResult = await retryPayment({
-        orderId: orderId as Id<"orders">,
-      });
-      
-      // Initiate PhonePe payment
-      const paymentResult = await initiatePayment({
-        orderId: retryResult.orderId,
-        orderNumber: String(retryResult.orderNumber || "").replace(/[^a-zA-Z0-9_-]/g, ""),
-        amount: retryResult.remainingAmount,
-        customerPhone: String(retryResult.shippingPhone || "").replace(/\D/g, "").slice(-10),
-      });
-      
-      if (paymentResult.success && paymentResult.paymentUrl) {
-        setCurrentMerchantTxnId(paymentResult.merchantTransactionId);
-        window.location.href = paymentResult.paymentUrl;
-      } else {
-        throw new Error("Failed to initiate payment");
+      const r = await resumePayment(orderId);
+      if (r.alreadyPaid) {
+        setIsRetrying(false);
+        toast.success("This order is already paid.");
       }
     } catch (error) {
       setIsRetrying(false);
-      if (error && typeof error === 'object' && 'data' in error) {
-        const convexError = error as { data?: { message?: string } };
-        toast.error(convexError.data?.message || "Failed to retry payment");
-      } else {
-        toast.error("Failed to retry payment. Please try again.");
-      }
+      toast.error(paymentErrorMessage(error));
     }
   };
 
@@ -190,6 +169,11 @@ function OrderDetailPageInner() {
       </div>
     );
   }
+
+  // Failed at PhonePe, or left there (the tab closed before it answered):
+  // either way the order is waiting for its money and can be paid.
+  const canPay = order.paymentStatus !== "success" && order.paymentMethod !== "cod" && !order.isDeleted &&
+    (order.paymentStatus === "failed" || order.status === "pending_payment");
 
   return (
     <div className="halftone min-h-screen">
@@ -233,7 +217,7 @@ function OrderDetailPageInner() {
             </div>
           </div>
           
-          {order.paymentStatus === "failed" && (
+          {canPay && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
               <div className="flex items-start gap-3">
                 <AlertTriangleIcon className="size-5 text-amber-600 mt-0.5 shrink-0" />
@@ -581,7 +565,7 @@ function OrderDetailPageInner() {
                 <Separator />
 
                 {/* Retry Payment Section */}
-                {order.paymentStatus === "failed" && (
+                {canPay && (
                   <>
                     {inventoryCheck && !inventoryCheck.available && inventoryCheck.unavailableItems && (
                       <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg">

@@ -5,6 +5,8 @@ import { notifyOrderPlaced } from "./orderNotifications";
 import * as crypto from "crypto";
 import { requireAuth, getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
+import { payLinkValid } from "./payLink";
+import { normalizeOrderStatus } from "./orderStatus";
 
 // PhonePe Config from Firebase environment config or secrets
 const getPhonePeConfig = () => {
@@ -167,7 +169,7 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
   if (!/^[0-9]{10}$/.test(phoneDigits)) {
     throw new HttpsError("invalid-argument", "Invalid phone number");
   }
-  const config = getPhonePeConfig();
+  getPhonePeConfig(); // fails early when PhonePe is not configured
 
   const orderRef = admin.firestore().collection("orders").doc(orderId);
   const orderSnap = await orderRef.get();
@@ -211,6 +213,71 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
     throw new HttpsError("failed-precondition", "Order is already paid");
   }
 
+  return startPhonePePayment(orderSnap, order, orderId, phoneDigits,
+    uid ? uid : (sessionId ? String(sessionId).slice(-24) : "GUEST_USER"), orderNumber);
+});
+
+/**
+ * Pays for an order that already exists — never a new one.
+ *
+ * "Retry Payment" on the failure page sent the customer back to checkout,
+ * which made a second order (one customer made three in a day, #4027–4029),
+ * and the order page's retry called orders.retryPayment, which was never
+ * written on this backend, so it failed for everyone. Both now come here,
+ * and so does the reminder link (payLink.ts).
+ *
+ * Whoever may pay: the signed-in owner, the guest session that placed it, or
+ * the holder of the order's pay-link token. What is charged is read off the
+ * order, as in initiatePayment.
+ */
+export const resumePayment = functions.runWith({ memory: "256MB", timeoutSeconds: 60 }).https.onCall(async (data: any, context: any) => {
+  const { uid } = getCaller(context);
+  const orderId = typeof data?.orderId === "string" ? data.orderId : "";
+  if (!orderId || orderId.length > 128 || orderId.includes("/")) throw new HttpsError("invalid-argument", "Invalid order");
+  await enforceDailyRateLimit({ key: `resumePayment_${orderId}`, limit: 20 });
+
+  const orderSnap = await admin.firestore().collection("orders").doc(orderId).get();
+  if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
+  const order = orderSnap.data() as any;
+
+  const sessionId = typeof data?.sessionId === "string" ? data.sessionId.slice(0, 128) : "";
+  const allowed =
+    payLinkValid(orderId, data?.t) ||
+    (!!uid && (order.userId === uid || order.ownerUid === uid)) ||
+    (!!sessionId && order.userId === sessionId);
+  if (!allowed) throw new HttpsError("permission-denied", "This link is not valid for this order");
+
+  if (order.paymentStatus === "success") return { alreadyPaid: true, orderId };
+  if (order.isDeleted || normalizeOrderStatus(order.status, order.paymentStatus, order) !== "pending_payment") {
+    throw new HttpsError("failed-precondition", "This order can no longer be paid. Please place it again.");
+  }
+  if (Date.now() - (Number(order.createdAt) || 0) > 7 * 86400_000) {
+    throw new HttpsError("failed-precondition", "This order is more than a week old. Please place it again.");
+  }
+  const phoneDigits = String(order.phone || order.shippingAddress?.phone || "").replace(/\D/g, "").slice(-10);
+  if (!/^[0-9]{10}$/.test(phoneDigits)) throw new HttpsError("failed-precondition", "Order has no phone number");
+
+  const result = await startPhonePePayment(orderSnap, order, orderId, phoneDigits,
+    uid || (sessionId ? sessionId.slice(-24) : "PAYLINK"),
+    String(order.orderNumber || "").replace(/[^a-zA-Z0-9_-]/g, ""));
+  return { ...result, orderId };
+});
+
+/**
+ * Asks PhonePe for a payment page for an order that is already written and
+ * checked. Shared by initiatePayment (checkout) and resumePayment (the same
+ * order, paid later: the order page, the failure page, a reminder link).
+ */
+async function startPhonePePayment(
+  orderSnap: admin.firestore.DocumentSnapshot,
+  order: any,
+  orderId: string,
+  phoneDigits: string,
+  merchantUserId: string,
+  orderNumber?: string
+): Promise<{ success: true; paymentUrl: string; merchantTransactionId: string }> {
+  const config = getPhonePeConfig();
+  const payable = Number(order.amountPayable ?? order.total);
   const timestamp = Date.now();
   const last6 = timestamp.toString().slice(-6);
   const orderRefSuffix = orderNumber || orderId.slice(-8);
@@ -228,7 +295,7 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
   const paymentPayload = {
     merchantId: config.merchantId,
     merchantTransactionId: merchantTransactionId,
-    merchantUserId: uid ? uid : (sessionId ? String(sessionId).slice(-24) : "GUEST_USER"),
+    merchantUserId,
     amount: amountInPaise,
     redirectUrl: `${siteUrl}/payment/callback`,
     redirectMode: "REDIRECT",
@@ -305,7 +372,8 @@ export const initiatePayment = functions.runWith({ memory: "256MB", timeoutSecon
     }
     throw new HttpsError("unavailable", error?.message || "PhonePe API error");
   }
-});
+}
+
 
 export const checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSeconds: 60, minInstances: 1 }).https.onCall(async (data: any, context: any) => {
   const { uid } = getCaller(context);
@@ -325,8 +393,11 @@ export const checkPaymentStatus = functions.runWith({ memory: "256MB", timeoutSe
     const orderSnap = await orderRef.get();
     if (!orderSnap.exists) throw new HttpsError("not-found", "Order not found");
     const order = orderSnap.data() as any;
-    if (uid) {
-      if (order.userId !== uid) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
+    if (payLinkValid(orderId, data?.t)) {
+      // Paid through a reminder link, maybe in a browser that never saw the
+      // checkout: the link's token is the proof (payLink.ts).
+    } else if (uid) {
+      if (order.userId !== uid && order.ownerUid !== uid) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
     } else {
       if (!sessionId || typeof sessionId !== "string" || sessionId.length > 128) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");
       if (order.userId !== sessionId) throw new HttpsError("unauthenticated", "UNAUTHENTICATED");

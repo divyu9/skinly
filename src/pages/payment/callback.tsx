@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { CheckCircle2Icon, XCircleIcon, AlertCircleIcon } from "lucide-react";
 import { trackPurchase } from "@/lib/analytics.ts";
+import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
+import { toast } from "sonner";
 
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
@@ -31,9 +33,10 @@ export default function PaymentCallback() {
         txnId: sessionStorage.getItem("skinly_merchant_txn_id"),
         orderId: sessionStorage.getItem("skinly_order_id"),
         sessionId: sessionStorage.getItem("skinly_guest_session_id"),
+        payToken: sessionStorage.getItem("skinly_pay_token"),
       };
     } catch {
-      return { txnId: null, orderId: null, sessionId: null };
+      return { txnId: null, orderId: null, sessionId: null, payToken: null };
     }
   });
 
@@ -97,6 +100,25 @@ export default function PaymentCallback() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const [retrying, setRetrying] = useState(false);
+  const retry = async () => {
+    if (!saved.orderId) {
+      navigate("/checkout");
+      return;
+    }
+    setRetrying(true);
+    try {
+      const r = await resumePayment(saved.orderId, saved.payToken);
+      if (r.alreadyPaid) {
+        setRetrying(false);
+        setStatus("success");
+      }
+    } catch (e) {
+      setRetrying(false);
+      toast.error(paymentErrorMessage(e));
+    }
+  };
+
   const verifyPayment = async (txnId: string) => {
     try {
       console.log("Verifying payment for transaction:", txnId);
@@ -106,6 +128,7 @@ export default function PaymentCallback() {
         merchantTransactionId: txnId,
         ...(saved.orderId ? { orderId: saved.orderId } : {}),
         ...(saved.sessionId ? { sessionId: saved.sessionId } : {}),
+        ...(saved.payToken ? { t: saved.payToken } : {}),
       });
 
       console.log("Payment status result:", result);
@@ -229,11 +252,14 @@ export default function PaymentCallback() {
                   Transaction ID: {merchantTransactionId}
                 </p>
               )}
+              {/* The same order again. Going back to checkout made a new
+                  order on every attempt — one customer made three in a day. */}
               <Button 
-                onClick={() => navigate("/checkout")}
+                onClick={retry}
+                disabled={retrying}
                 className="w-full"
               >
-                Retry Payment
+                {retrying ? "Opening PhonePe…" : "Retry Payment"}
               </Button>
               <Link to="/products" className="block">
                 <Button variant="outline" className="w-full">

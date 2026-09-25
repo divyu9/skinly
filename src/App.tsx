@@ -21,6 +21,7 @@ import TrackOrderPage from "./pages/track/page.tsx";
 import OrderDetailPage from "./pages/orders/detail/page.tsx";
 import DevicesPage from "./pages/devices/page.tsx";
 import PaymentCallback from "./pages/payment/callback.tsx";
+import PayPage from "./pages/pay/page.tsx";
 import AccountPage from "./pages/account/page.tsx";
 import ReferralsPage from "./pages/account/referrals/page.tsx";
 import WalletPage from "./pages/account/wallet/page.tsx";
@@ -131,6 +132,7 @@ export default function App() {
             <Route path="/orders/:orderId" element={<OrderDetailPage />} />
             <Route path="/devices" element={<DevicesPage />} />
             <Route path="/payment/callback" element={<PaymentCallback />} />
+            <Route path="/pay/:orderId" element={<PayPage />} />
             
 
             {/* Admin routes - lazy loaded */}
