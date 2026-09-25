@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useMutation } from "@/lib/firebase-hooks";
+import { useAction, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
@@ -33,7 +33,8 @@ export function ImageManager({ productId, images, onImagesUpdate }: ImageManager
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const generateUploadUrl = useMutation(api.products.generateImageUploadUrl);
+  // The same upload the Media Library uses: to R2, re-encoded, and kept in the library too.
+  const uploadToLibrary = useAction(api.mediaLibrary.uploadAndAddToLibrary);
   const addProductImages = useMutation(api.products.addProductImages);
   const removeProductImage = useMutation(api.products.removeProductImage);
   const reorderProductImages = useMutation(api.products.reorderProductImages);
@@ -54,23 +55,24 @@ export function ImageManager({ productId, images, onImagesUpdate }: ImageManager
           continue;
         }
 
-        // Get upload URL
-        const uploadUrl = await generateUploadUrl();
-
-        // Upload file
-        const response = await fetch(uploadUrl, {
-          method: "POST",
-          headers: { "Content-Type": file.type },
-          body: file,
+        /*
+         * Uploaded through the Media Library's R2 path. This asked for an
+         * upload URL and POSTed the file expecting the old backend's
+         * { storageId } reply, then linked /api/storage/<id> — none of which
+         * exists any more, so no image ever uploaded from here.
+         */
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result).split(",")[1] || "");
+          r.onerror = () => reject(new Error(`Could not read ${file.name}`));
+          r.readAsDataURL(file);
         });
+        const uploaded: any = await uploadToLibrary({
+          fileBase64: base64, filename: file.name, folder: "products", contentType: file.type, mediaType: "image",
+        });
+        const imageUrl = uploaded?.url || uploaded?.publicUrl;
+        if (!imageUrl) throw new Error(`Failed to upload ${file.name}`);
 
-        if (!response.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
-        }
-
-        const { storageId } = await response.json();
-        const imageUrl = `${window.location.origin}/api/storage/${storageId}`;
-        
         newImages.push({
           url: imageUrl,
           alt: file.name.replace(/\.[^/.]+$/, ""),

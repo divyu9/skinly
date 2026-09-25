@@ -5047,7 +5047,13 @@ export function useMutation(apiRef: any) {
 
         for (const row of rows) {
           try {
-            const slug = String(row.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            // A slug must be unique — a product page is found by it. A second
+            // "Blue Marble Skin" took the first one's URL.
+            const base = String(row.title).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            let slug = base;
+            for (let n = 2; !(await getDocs(query(collection(db, 'products'), where('slug', '==', slug), limit(1)))).empty; n++) {
+              slug = `${base}-${n}`;
+            }
             const productRef = await addDoc(collection(db, 'products'), Object.fromEntries(
               Object.entries({
                 title: row.title,
@@ -5923,7 +5929,8 @@ export function useMutation(apiRef: any) {
           const batch = writeBatch(db);
           let inThisBatch = 0;
           for (const u of updates.slice(i, i + 450)) {
-            if (!u?.variantId || !(Number(u.newPrice) >= 0)) { errorCount++; continue; }
+            // Above zero: an unpriced variant can't be ordered (placeOrder refuses it).
+            if (!u?.variantId || !(Number(u.newPrice) > 0)) { errorCount++; continue; }
             batch.update(doc(db, 'variants', u.variantId), { price: Number(u.newPrice), updatedAt: Date.now() });
             inThisBatch++;
           }
@@ -5968,6 +5975,64 @@ export function useMutation(apiRef: any) {
         return { success: true, productId: clone.id, variants: vs.size };
       }
 
+      /*
+       * Adding and removing one product's images. Without these the generic
+       * writer took them by their names: "add" made a new document in
+       * products, and "remove" with a productId deleted the whole product —
+       * so the Remove button on an image deleted the listing it belonged to.
+       */
+      /*
+       * The products page's CSV import. It had no handler: its name holds
+       * "update", so the generic writer wanted one document id, found none
+       * in { updates: [...] }, and every import failed with "ID required".
+       * The variant's name is not taken from the sheet — carts and orders
+       * find a variant by its name, so renaming belongs in the product form.
+       */
+      if (path === 'products.bulkUpdateVariants') {
+        const updates: any[] = Array.isArray(args?.updates) ? args.updates : [];
+        const errors: string[] = [];
+        let successCount = 0;
+        for (let i = 0; i < updates.length; i += 400) {
+          const batch = writeBatch(db);
+          const chunk = updates.slice(i, i + 400);
+          const snaps = await Promise.all(chunk.map((u) => u?.variantId ? getDoc(doc(db, 'variants', String(u.variantId))) : Promise.resolve(null)));
+          chunk.forEach((u, k) => {
+            const label = u?.sku || u?.variantId || `row ${i + k + 2}`;
+            if (!snaps[k]?.exists()) { errors.push(`${label}: no such variant`); return; }
+            if (!(Number(u.price) > 0)) { errors.push(`${label}: price must be more than 0`); return; }
+            const patch: Record<string, any> = { price: Number(u.price), updatedAt: Date.now() };
+            patch.compareAtPrice = Number(u.compareAtPrice) > 0 ? Number(u.compareAtPrice) : deleteField();
+            if (Number.isFinite(Number(u.inventoryQuantity))) patch.inventoryQuantity = Math.max(0, Math.floor(Number(u.inventoryQuantity)));
+            if (Number(u.weight) > 0) patch.weight = Number(u.weight);
+            if (u.weightUnit) patch.weightUnit = String(u.weightUnit);
+            if (u.sku && String(u.sku).trim()) patch.sku = String(u.sku).trim();
+            batch.update(doc(db, 'variants', String(u.variantId)), patch);
+            successCount++;
+          });
+          await batch.commit();
+        }
+        return { successCount, errorCount: errors.length, errors };
+      }
+
+      if (path === 'products.addProductImages' || path === 'products.removeProductImage') {
+        if (!args?.productId) throw new Error('Missing productId');
+        const ref = doc(db, 'products', String(args.productId));
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Product not found');
+        const current: any[] = Array.isArray((snap.data() as any).images) ? (snap.data() as any).images : [];
+        const norm = (i: any) => (typeof i === 'string' ? { url: i } : (i?.alt ? { url: i.url, alt: i.alt } : { url: i?.url }));
+        let next = current.map(norm).filter((i) => i.url);
+        if (path === 'products.addProductImages') {
+          next = [...next, ...(Array.isArray(args.images) ? args.images : []).map(norm).filter((i: any) => i.url)];
+        } else {
+          const at = Number(args.imageIndex);
+          if (!(at >= 0 && at < next.length)) throw new Error('No image at that position');
+          next.splice(at, 1);
+        }
+        await updateDoc(ref, { images: next, updatedAt: Date.now() });
+        return next;
+      }
+
       if (path === 'products.reorderProductImages') {
         if (!args.productId) throw new Error('Missing productId');
         const images = Array.isArray(args.images) ? args.images : [];
@@ -5989,6 +6054,43 @@ export function useMutation(apiRef: any) {
         const fn = httpsCallable(functions, 'syncProductCollections');
         const res: any = await fn({ collectionId: args.collectionId });
         return { success: true, synced: res?.data?.synced ?? res?.data?.updated ?? 0 };
+      }
+
+      /*
+       * Product categories live in productCategoriesConfig. Create, edit and
+       * delete had no handler, so the generic writer aimed them at a
+       * "productCategories" collection the rules don't allow — every one
+       * failed with a permission error and no category could be added,
+       * renamed or removed from Admin › Categories.
+       */
+      if (path === 'productCategories.create' || path === 'productCategories.update' || path === 'productCategories.remove') {
+        const col = collection(db, 'productCategoriesConfig');
+        const clean = (o: any) => Object.fromEntries(Object.entries(o || {}).filter(([k, v]) => v !== undefined && k !== 'id' && k !== '_id'));
+        if (path === 'productCategories.create') {
+          const slug = String(args?.slug || '').trim().toLowerCase();
+          if (!slug || !String(args?.name || '').trim()) throw new Error('Slug and name are required');
+          if (!(await getDocs(query(col, where('slug', '==', slug), limit(1)))).empty) throw new Error(`A category with the slug "${slug}" already exists`);
+          const all = await getDocs(col);
+          const order = Math.max(-1, ...all.docs.map((d) => Number((d.data() as any).order) || 0)) + 1;
+          const ref = await addDoc(col, { ...clean(args), slug, order, isActive: args?.isActive !== false, createdAt: Date.now(), _creationTime: Date.now() });
+          return ref.id;
+        }
+        const id = String(args?.id || args?.categoryId || '');
+        if (!id) throw new Error('Missing category id');
+        const ref = doc(db, 'productCategoriesConfig', id);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) throw new Error('Category not found');
+        if (path === 'productCategories.update') {
+          // The slug is what products are filed under; it never changes here.
+          const { slug: _slug, ...rest } = clean(args);
+          await updateDoc(ref, { ...rest, updatedAt: Date.now() });
+          return id;
+        }
+        const slug = (snap.data() as any).slug;
+        const inUse = await getDocs(query(collection(db, 'products'), where('productCategory', '==', slug), limit(1)));
+        if (!inUse.empty) throw new Error('Products are still filed under this category — move them first');
+        await deleteDoc(ref);
+        return { success: true };
       }
 
       if (path === 'productCategories.reorder') {
@@ -6352,7 +6454,8 @@ export function useMutation(apiRef: any) {
       
       if (actionName.includes('update') || actionName.includes('edit')) {
         if (actionName === 'updateHomepageSettings') {
-          await setDoc(doc(db, targetCollection, 'default'), args, { merge: true });
+          // Firestore refuses undefined; a blank field is left as it is, not a failed save.
+          await setDoc(doc(db, targetCollection, 'default'), stripUndefinedDeep(args), { merge: true });
           return 'default';
         }
         
@@ -6719,7 +6822,8 @@ export function useAction(apiRef: any) {
           return { success: true, deletedCount: args.ids.length };
         }
       } catch (e: any) {
-        return { success: false, error: e.message };
+        // Thrown, not returned: the page said "Media deleted" on a failure.
+        throw new Error(e?.message || 'Could not delete');
       }
     }
 
