@@ -338,6 +338,17 @@ export const placeOrder = functions
       const balance = Number(uSnap?.exists ? (uSnap.data() as any)?.walletBalance || 0 : 0);
       // The storefront lets the wallet cover shipping too.
       walletUsed = Math.max(0, Math.min(Number(walletAmount), balance, itemsTotal + shippingFee - couponDiscount - referralDiscount));
+      /*
+       * The admin's wallet rules (Admin › Wallet › Settings), which only the
+       * checkout page applied: switched off means no wallet, and a
+       * percentage or fixed cap limits it — measured, as the checkout does,
+       * on items plus shipping.
+       */
+      const ws = await db.collection("walletSettings").doc("default").get();
+      const w = (ws.exists ? ws.data() : (await db.collection("walletSettings").limit(1).get()).docs[0]?.data()) as any;
+      if (w?.walletEnabled === false) walletUsed = 0;
+      else if (w?.maxUsageType === "percentage") walletUsed = Math.min(walletUsed, Math.floor((itemsTotal + shippingFee) * (Number(w.maxUsageValue) || 0) / 100));
+      else if (w?.maxUsageType === "fixed") walletUsed = Math.min(walletUsed, Number(w.maxUsageValue) || 0);
     }
 
     // COD fee and the prepaid split come from codSettings, same formula the

@@ -1397,10 +1397,9 @@ export function useQuery(apiRef: any, args?: any) {
               setData({
                 maxUsageType: 'percentage',
                 maxUsageValue: 10,
-                referralRewardAmount: 0,
-                referralMinOrderValue: 0,
                 walletEnabled: true
               });
+              // Referral amounts live in settings/referral (Admin › Referrals).
             }
           });
         }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
@@ -580,19 +581,11 @@ function SettingsDialog({
   currentSettings: {
     maxUsageType: "percentage" | "fixed" | "unlimited";
     maxUsageValue: number;
-    referralRewardAmount: number;
-    referralMinOrderValue: number;
     walletEnabled: boolean;
   };
 }) {
   const [maxUsageType, setMaxUsageType] = useState(currentSettings.maxUsageType);
   const [maxUsageValue, setMaxUsageValue] = useState(currentSettings.maxUsageValue.toString());
-  const [referralRewardAmount, setReferralRewardAmount] = useState(
-    currentSettings.referralRewardAmount.toString()
-  );
-  const [referralMinOrderValue, setReferralMinOrderValue] = useState(
-    currentSettings.referralMinOrderValue.toString()
-  );
   const [walletEnabled, setWalletEnabled] = useState(currentSettings.walletEnabled);
 
   const saveSettings = useMutation(api.wallet.saveWalletSettings);
@@ -602,8 +595,6 @@ function SettingsDialog({
       await saveSettings({
         maxUsageType,
         maxUsageValue: parseFloat(maxUsageValue) || 0,
-        referralRewardAmount: parseFloat(referralRewardAmount) || 0,
-        referralMinOrderValue: parseFloat(referralMinOrderValue) || 0,
         walletEnabled,
       });
       toast.success("Wallet settings saved");
@@ -678,32 +669,11 @@ function SettingsDialog({
             </div>
           )}
 
-          {/* Referral Settings */}
-          <div className="space-y-4 pt-4 border-t">
-            <h3 className="font-semibold">Referral Program (Future)</h3>
-
-            <div className="space-y-2">
-              <Label htmlFor="referral-reward">Referral Reward Amount (₹)</Label>
-              <Input
-                id="referral-reward"
-                type="number"
-                value={referralRewardAmount}
-                onChange={(e) => setReferralRewardAmount(e.target.value)}
-                placeholder="100"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="referral-min">Minimum Order Value for Referral (₹)</Label>
-              <Input
-                id="referral-min"
-                type="number"
-                value={referralMinOrderValue}
-                onChange={(e) => setReferralMinOrderValue(e.target.value)}
-                placeholder="500"
-              />
-            </div>
-          </div>
+          {/* The referral programme used to sit here as two fields nothing read ("Future"). */}
+          <p className="border-t pt-4 text-sm text-muted-foreground">
+            Referral rewards are set on{" "}
+            <Link to="/backend-skinly/referrals" className="font-medium text-primary hover:underline">Marketing › Referrals</Link>.
+          </p>
 
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
