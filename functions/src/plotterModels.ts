@@ -15,7 +15,7 @@ import { requireAdmin } from "./auth";
  * The rows are written by the server only; the rules let admins read them.
  */
 
-const CATEGORIES = new Set(["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "controller", "console", "charger", "mac-mini"]);
+const FALLBACK_CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "controller", "console", "charger", "mac-mini", "accessory"];
 const tidy = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
 
 export const approvePlotterModels = onCall(async (data: any, context: any) => {
@@ -24,6 +24,10 @@ export const approvePlotterModels = onCall(async (data: any, context: any) => {
   if (!items.length) throw new HttpsError("invalid-argument", "Nothing to approve");
 
   const db = admin.firestore();
+  // Whatever gadget types the site has, not a list kept here.
+  const gt = await db.collection("gadgetTypes").get();
+  const CATEGORIES = new Set(gt.docs.map((d) => String((d.data() as any).name || "")).filter(Boolean));
+  if (!CATEGORIES.size) FALLBACK_CATEGORIES.forEach((c) => CATEGORIES.add(c));
   const gadgetIds = new Map<string, string | null>();
   const gadgetIdFor = async (category: string) => {
     if (!gadgetIds.has(category)) {

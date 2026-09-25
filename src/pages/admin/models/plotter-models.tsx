@@ -38,7 +38,22 @@ type Row = {
   approvedAs?: { brandName: string; modelName: string; category: string };
 };
 
-const CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "console", "drone", "gimbals", "controller"];
+/** Used until the site's own gadget types have loaded. */
+const FALLBACK_GADGETS = ["phone", "tablet", "laptop", "camera", "lens", "console", "drone", "gimbals", "controller", "charger", "mac-mini", "accessory"];
+
+/*
+ * The gadget choices are the site's gadget types, read live — a hard-coded
+ * list here had left out console, charger, mac-mini and accessory, so a row
+ * that belonged to one of them could only be approved under the wrong one.
+ */
+function useGadgetTypes() {
+  const [names, setNames] = useState<string[]>(FALLBACK_GADGETS);
+  useEffect(() => onSnapshot(collection(db, "gadgetTypes"), (snap) => {
+    const live = snap.docs.map((d) => d.data() as any).filter((g) => g.isActive !== false && g.name).map((g) => String(g.name));
+    if (live.length) setNames([...new Set(live)].sort());
+  }, () => { /* keep the fallback */ }), []);
+  return names;
+}
 const VENDOR_LABEL = { mobicare: "Mobicare", tia: "TIA" } as const;
 type Vendor = keyof typeof VENDOR_LABEL;
 const vendorsOf = (r: Row): Vendor[] => (Object.keys(r.vendors || {}) as Vendor[]).filter((v) => v in VENDOR_LABEL);
@@ -66,6 +81,7 @@ export function PlotterModels() {
   const [vendor, setVendor] = useState<"all" | Vendor | "both">("all");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
+  const CATEGORIES = useGadgetTypes();
 
   useEffect(() => onSnapshot(collection(db, "plotterModels"), (snap) => {
     setRows(snap.docs.map((d) => ({ _id: d.id, ...(d.data() as any) })));
