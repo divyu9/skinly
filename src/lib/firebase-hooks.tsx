@@ -2823,15 +2823,6 @@ export function useQuery(apiRef: any, args?: any) {
           unsubscribe = onSnapshot(collection(db, 'whatsappTemplates'), (snap) =>
             setData(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
         }
-        else if (path === 'uploadJobs.getAllUploadJobs' || path === 'uploadJobs.getActiveUploadJobs') {
-          unsubscribe = onSnapshot(collection(db, 'uploadJobs'), (snap) => {
-            let jobs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
-            if (path === 'uploadJobs.getActiveUploadJobs') {
-              jobs = jobs.filter(j => j.status === 'pending' || j.status === 'processing');
-            }
-            setData(jobs.sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0)));
-          });
-        }
         else if (path === 'googleDriveImportPublic.getAllImportJobs' || path === 'googleDriveImportPublic.getActiveImportJobs') {
           unsubscribe = onSnapshot(collection(db, 'googleDriveImportJobs'), (snap) => {
             let jobs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
@@ -2876,59 +2867,6 @@ export function useQuery(apiRef: any, args?: any) {
             });
             setData(Array.from(values).sort());
           });
-        }
-        else if (path === 'mockups.getMockupsCount') {
-          (async () => {
-            const c = await getCountFromServer(collection(db, 'mockups'));
-            setData(c.data().count);
-          })();
-        }
-        else if (path === 'mockups.getRecentMockups') {
-          unsubscribe = onSnapshot(collection(db, 'mockups'), (snap) => {
-            setData(snap.docs
-              .map(d => ({ _id: d.id, ...d.data() } as any))
-              .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0))
-              .slice(0, args?.limit || 20));
-          });
-        }
-        else if (path === 'mockups.getMissingMockupsStats' || path === 'mockups.getMissingMockups') {
-          const category = args?.category || "phone";
-          (async () => {
-            const models = (await getDocs(query(collection(db, 'supportedModels'),
-              where('category', '==', category)))).docs
-              .map(d => ({ _id: d.id, ...d.data() } as any))
-              .filter(m => m.isActive);
-
-            const msnap = await getDocs(query(collection(db, 'mockups'), limit(3000)));
-            const byModelId = new Set<string>();
-            const byBrandModel = new Set<string>();
-            msnap.docs.forEach(d => {
-              const m: any = d.data();
-              if (m.supportedModelId) byModelId.add(m.supportedModelId);
-              if (m.brand && m.model) byBrandModel.add(`${m.brand}|${m.model}`);
-            });
-
-            const without = models.filter(m =>
-              !byModelId.has(m._id) && !byBrandModel.has(`${m.brandName}|${m.modelName}`));
-
-            if (path === 'mockups.getMissingMockupsStats') {
-              setData({
-                totalMissingCombinations: without.length,
-                modelsAffected: models.length,
-                brandsAffected: new Set(models.map(m => m.brandName)).size,
-                modelsWithMockups: models.length - without.length,
-                modelsWithoutMockups: without.length,
-                totalSKUs: models.length - without.length,
-              });
-            } else {
-              const pageSize = args?.limit || 100;
-              setData({
-                results: without.slice(0, pageSize),
-                totalAvailable: without.length,
-                hasMore: without.length > pageSize,
-              });
-            }
-          })();
         }
         else if (path === 'cod.getCodSettings') {
           unsubscribe = onSnapshot(collection(db, 'codSettings'), (snap) => {
@@ -5387,57 +5325,6 @@ export function useMutation(apiRef: any) {
         return { success, failed };
       }
 
-      if (path === 'mockupsUpload.storeMockupFile') {
-        // Filenames arrive as Brand_Model_SKU or Model_SKU.
-        const base = String(args?.filename || "").replace(/\.(jpg|jpeg|png|webp)$/i, "");
-        const parts = base.split("_").filter(Boolean);
-        if (parts.length < 2) throw new Error(`Invalid filename: ${args?.filename} — expected Brand_Model_SKU`);
-
-        const sku = parts[parts.length - 1];
-        const brand = parts.length >= 3 ? parts[0] : "";
-        const model = (parts.length >= 3 ? parts.slice(1, -1) : parts.slice(0, -1)).join(" ");
-
-        const existing = await getDocs(query(collection(db, 'mockups'),
-          where('brand', '==', brand), where('model', '==', model), where('sku', '==', sku), limit(1)));
-
-        /*
-         * Which supported model this is. The storefront finds mockups by name,
-         * but the model page's counts and the SEO pages find them by id, and
-         * without it an upload counts for nothing there. Exact name first,
-         * then the brand's models compared the way filenames are written.
-         */
-        let supportedModelId = "";
-        if (brand) {
-          const exact = await getDocs(query(collection(db, 'supportedModels'),
-            where('brandName', '==', brand), where('modelName', '==', model), limit(1)));
-          if (!exact.empty) supportedModelId = exact.docs[0].id;
-          else {
-            // "Oppo_Oppo A57_T-16" is the Oppo "A57": the brand is sometimes
-            // written into the model part of the filename too.
-            const n = (x: string) => normalizeModelName(x).toLowerCase();
-            const wanted = new Set([n(model), n(model).replace(new RegExp(`^${n(brand)}`), "")]);
-            const all = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', brand)));
-            const hit = all.docs.find((d) => wanted.has(n(String(d.data().modelName || ""))));
-            if (hit) supportedModelId = hit.id;
-          }
-        }
-
-        const payload = {
-          brand, model, sku,
-          r2Key: args.r2Key || `mockups/${brand}/${model}/${sku}.webp`,
-          r2Bucket: 'skinly',
-          storageProvider: 'r2',
-          ...(supportedModelId ? { supportedModelId } : {}),
-        };
-
-        if (existing.empty) {
-          await addDoc(collection(db, 'mockups'), { ...payload, _creationTime: Date.now() });
-          return { action: "created", brand, model, sku };
-        }
-        await updateDoc(existing.docs[0].ref, payload);
-        return { action: "updated", brand, model, sku };
-      }
-
       if (path === 'whatsappSeed.checkSeeded') {
         const [t, u] = await Promise.all([
           getDocs(collection(db, 'whatsappTemplates')),
@@ -6477,49 +6364,6 @@ export function useMutation(apiRef: any) {
           syncedCount += Number(res?.data?.updated) || 0;
         }
         return { success: true, syncedCount, designs: codes.length };
-      }
-
-      if (path === 'mockups.bulkImportMockups') {
-        const rows: any[] = Array.isArray(args.mockups) ? args.mockups : [];
-        let imported = 0, updated = 0, skipped = 0;
-        for (const row of rows) {
-          const sku = String(row?.sku || '').trim();
-          const model = String(row?.model || '').trim();
-          if (!sku || !model) { skipped++; continue; }
-          const existing = await getDocs(query(
-            collection(db, 'mockups'),
-            where('sku', '==', sku),
-            where('model', '==', model),
-            limit(1)
-          ));
-          const payload = {
-            brand: String(row?.brand || ''),
-            model, sku,
-            fileId: String(row?.fileId || ''),
-            updatedAt: Date.now(),
-          };
-          if (existing.empty) { await addDoc(collection(db, 'mockups'), { ...payload, createdAt: Date.now() }); imported++; }
-          else { await updateDoc(existing.docs[0].ref, payload); updated++; }
-        }
-        return { success: true, imported, updated, skipped };
-      }
-
-      if (path === 'mockups.clearAllMockups') {
-        const all = await getDocs(collection(db, 'mockups'));
-        for (let i = 0; i < all.docs.length; i += 450) {
-          const batch = writeBatch(db);
-          all.docs.slice(i, i + 450).forEach((d) => batch.delete(d.ref));
-          await batch.commit();
-        }
-        return { success: true, deleted: all.size };
-      }
-
-      if (path === 'uploadJobs.pauseUploadJob' || path === 'uploadJobs.resumeUploadJob' || path === 'uploadJobs.cancelUploadJob') {
-        if (!args.jobId) throw new Error('Missing jobId');
-        const status = path.endsWith('pauseUploadJob') ? 'paused'
-          : path.endsWith('resumeUploadJob') ? 'running' : 'cancelled';
-        await updateDoc(doc(db, 'uploadJobs', args.jobId), { status, updatedAt: Date.now() });
-        return { success: true, status };
       }
 
       if (path === 'googleDriveImportPublic.pauseImportJob' || path === 'googleDriveImportPublic.resumeImportJob' || path === 'googleDriveImportPublic.cancelImportJob') {

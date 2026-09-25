@@ -53,8 +53,6 @@ const AdminReviewsPage = lazyWithReload(() => import("./pages/admin/reviews.tsx"
 const AdminAbandonedCartsPage = lazyWithReload(() => import("./pages/admin/abandoned-carts/page.tsx"), "./pages/admin/abandoned-carts/page.tsx");
 const AdminStockNotificationsPage = lazyWithReload(() => import("./pages/admin/stock-notifications/page.tsx"), "./pages/admin/stock-notifications/page.tsx");
 const AdminOOSPage = lazyWithReload(() => import("./pages/admin/oos/page.tsx"), "./pages/admin/oos/page.tsx");
-const AdminMockupsPage = lazyWithReload(() => import("./pages/admin/mockups.tsx"), "./pages/admin/mockups.tsx");
-const AdminMockupsMissingPage = lazyWithReload(() => import("./pages/admin/mockups-missing.tsx"), "./pages/admin/mockups-missing.tsx");
 const AdminMockupsAdvancedPage = lazyWithReload(() => import("./pages/admin/mockups-advanced.tsx"), "./pages/admin/mockups-advanced.tsx");
 const AdminGoogleDriveImportPage = lazyWithReload(() => import("./pages/admin/google-drive-import.tsx"), "./pages/admin/google-drive-import.tsx");
 const AdminModelsPage = lazyWithReload(() => import("./pages/admin/models/page.tsx"), "./pages/admin/models/page.tsx");
@@ -172,8 +170,9 @@ export default function App() {
             <Route path="/backend-skinly/seo-pages/:pageId" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesEditPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/seo-pages/auto-generate" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOPagesAutoGeneratePage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/settings" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSettingsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/mockups" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/mockups/missing" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsMissingPage /></AdminPageWrapper></Suspense>} />
+            {/* The old Mockups and Missing pages: Advanced Mockups does both, on all the mockups. */}
+            <Route path="/backend-skinly/mockups" element={<Navigate to="/backend-skinly/mockups-advanced" replace />} />
+            <Route path="/backend-skinly/mockups/missing" element={<Navigate to="/backend-skinly/mockups-advanced" replace />} />
             <Route path="/backend-skinly/mockups-advanced" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsAdvancedPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/google-drive-import" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminModelsPage /></AdminPageWrapper></Suspense>} />

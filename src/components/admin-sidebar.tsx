@@ -102,7 +102,6 @@ export function AdminSidebar() {
         { path: "/backend-skinly/collections", label: "Collections", icon: Layers },
         { path: "/backend-skinly/variant-presets", label: "Variant Presets", icon: Layers },
         { path: "/backend-skinly/models", label: "Models", icon: Database },
-        { path: "/backend-skinly/mockups", label: "Mockups", icon: Image },
         { path: "/backend-skinly/mockups-advanced", label: "Advanced Mockups", icon: Image },
         { path: "/backend-skinly/media", label: "Media Library", icon: Image },
         { path: "/backend-skinly/broken-images", label: "Broken Images", icon: ImageOff },
