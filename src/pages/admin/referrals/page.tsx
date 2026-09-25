@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { db, functions } from "@/lib/firebase";
@@ -17,27 +17,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
  * Admin › Referrals: what a friend gets, what the referrer earns, and every
  * order a referral brought. The amounts are read by the server at checkout
  * and at delivery (functions/src/referrals.ts); nothing here is decided in
- * the browser.
+ * the browser. Who referred each order lives in orderReferrals, which only
+ * admins can read.
  */
 
 type Settings = {
   enabled: boolean; friendType: "flat" | "percent"; friendValue: number;
   friendMaxDiscount: number; friendMinOrder: number;
-  referrerType: "flat" | "percent"; referrerReward: number; referrerMaxReward: number;
+  referrerType: "flat" | "percent"; referrerReward: number; referrerMaxReward: number; monthlyCap: number;
 };
-type Order = {
-  _id: string; orderNumber?: string; checkoutRef?: string; customerName?: string; createdAt?: number; status?: string;
-  paymentStatus?: string; paymentMethod?: string; total?: number; referralDiscount?: number;
-  referral?: { code: string; referrerUserDocId: string; reward: number; status: string };
+type Row = {
+  _id: string; code: string; referrerName?: string; referrerEmail?: string; friendName?: string; friendDiscount?: number;
+  reward?: number; status: string; holdReason?: string; createdAt?: number;
+  order?: { orderNumber?: string; checkoutRef?: string; status?: string; paymentStatus?: string; paymentMethod?: string };
 };
 
 const BLANK: Settings = {
   enabled: false, friendType: "flat", friendValue: 0, friendMaxDiscount: 0, friendMinOrder: 0,
-  referrerType: "flat", referrerReward: 0, referrerMaxReward: 0,
+  referrerType: "flat", referrerReward: 0, referrerMaxReward: 0, monthlyCap: 10,
 };
-const confirmed = (o: Order) => o.paymentStatus === "success" || String(o.paymentMethod).toLowerCase() === "cod";
+const confirmed = (o?: Row["order"]) => !!o && (o.paymentStatus === "success" || String(o.paymentMethod).toLowerCase() === "cod");
 const STATUS: Record<string, [string, string]> = {
-  pending: ["Waiting for delivery", "bg-amber-100 text-amber-800"],
+  pending: ["Paid on delivery", "bg-amber-100 text-amber-800"],
+  held: ["Held for your review", "bg-orange-100 text-orange-800"],
+  rejected: ["Refused — no reward", "bg-muted text-muted-foreground"],
   rewarded: ["Reward paid", "bg-green-100 text-green-800"],
   cancelled: ["Cancelled — no reward", "bg-muted text-muted-foreground"],
   no_account: ["Referrer has no account", "bg-red-100 text-red-800"],
@@ -47,8 +50,8 @@ export default function AdminReferralsPage() {
   const [form, setForm] = useState<Settings | null>(null);
   const [saved, setSaved] = useState<Settings | null>(null);
   const [busy, setBusy] = useState(false);
-  const [orders, setOrders] = useState<Order[] | null>(null);
-  const [names, setNames] = useState<Record<string, string>>({});
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [reviewing, setReviewing] = useState("");
 
   useEffect(() => onSnapshot(doc(db, "settings", "referral"), (s) => {
     const v = { ...BLANK, ...(s.data() as Partial<Settings> | undefined) };
@@ -56,24 +59,25 @@ export default function AdminReferralsPage() {
     setForm((f) => f ?? v);
   }), []);
 
-  useEffect(() => onSnapshot(
-    query(collection(db, "orders"), where("referralCode", ">", ""), orderBy("referralCode")),
-    (s) => setOrders(s.docs.map((d) => ({ _id: d.id, ...d.data() } as Order)).filter(confirmed)
-      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))),
-    (e) => { toast.error(e.message); setOrders([]); },
-  ), []);
+  // Every referral, with its order — only confirmed orders count; an unpaid checkout is not a referral yet.
+  useEffect(() => onSnapshot(collection(db, "orderReferrals"), (snap) => {
+    void Promise.all(snap.docs.map(async (d) => {
+      const o = await getDoc(doc(db, "orders", d.id)).catch(() => null);
+      return { _id: d.id, ...(d.data() as any), order: o?.data() } as Row;
+    })).then((list) => setRows(list.filter((r) => confirmed(r.order)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))));
+  }, (e) => { toast.error(e.message); setRows([]); }), []);
 
-  // Who each referrer is, for the list.
-  useEffect(() => {
-    const ids = [...new Set((orders || []).map((o) => o.referral?.referrerUserDocId).filter(Boolean))] as string[];
-    const missing = ids.filter((id) => !(id in names));
-    if (!missing.length) return;
-    void Promise.all(missing.map(async (id) => {
-      const u = await getDoc(doc(db, "users", id)).catch(() => null);
-      const d: any = u?.data() || {};
-      return [id, d.name || d.email || id.slice(0, 8)] as const;
-    })).then((pairs) => setNames((n) => ({ ...n, ...Object.fromEntries(pairs) })));
-  }, [orders, names]);
+  const review = async (orderId: string, approve: boolean) => {
+    setReviewing(orderId);
+    try {
+      const res: any = (await httpsCallable(functions, "reviewReferral")({ orderId, approve })).data;
+      toast.success(res.status === "rewarded" ? "Approved and paid" : approve ? "Approved — paid on delivery" : "Refused");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not update");
+    } finally {
+      setReviewing("");
+    }
+  };
 
   const dirty = !!form && !!saved && JSON.stringify(form) !== JSON.stringify(saved);
   const save = async () => {
@@ -94,14 +98,16 @@ export default function AdminReferralsPage() {
   };
 
   const totals = useMemo(() => {
-    const list = orders || [];
+    const list = rows || [];
+    const sum = (f: (r: Row) => boolean) => list.filter(f).reduce((t, r) => t + (Number(r.reward) || 0), 0);
     return {
       orders: list.length,
-      discounts: list.reduce((t, o) => t + (Number(o.referralDiscount) || 0), 0),
-      paid: list.filter((o) => o.referral?.status === "rewarded").reduce((t, o) => t + (Number(o.referral?.reward) || 0), 0),
-      owed: list.filter((o) => o.referral?.status === "pending").reduce((t, o) => t + (Number(o.referral?.reward) || 0), 0),
+      discounts: list.reduce((t, r) => t + (Number(r.friendDiscount) || 0), 0),
+      paid: sum((r) => r.status === "rewarded"),
+      owed: sum((r) => r.status === "pending"),
+      held: list.filter((r) => r.status === "held").length,
     };
-  }, [orders]);
+  }, [rows]);
 
   const num = (k: keyof Settings) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => f && { ...f, [k]: Math.max(0, Number(e.target.value) || 0) });
@@ -125,7 +131,9 @@ export default function AdminReferralsPage() {
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Customers share a link from their account. A friend who follows it gets a discount on their first order; the
             customer gets wallet credit once that order is delivered. A cancelled or returned order pays nothing, and the
-            friend's discount doesn't combine with a coupon.
+            friend's discount doesn't combine with a coupon. Refused automatically: the customer's own email, phone or
+            browser, and any email, phone or address that has ordered before. Held for your review: a friend delivering to
+            a pincode the customer has ordered to, and customers past the 30-day limit.
           </p>
         </div>
 
@@ -192,6 +200,10 @@ export default function AdminReferralsPage() {
                     </p>
                   </fieldset>
                 </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ref-cap">Rewards one customer can earn in 30 days before the rest wait for your review (0 = no limit)</Label>
+                  <Input id="ref-cap" type="number" min={0} value={form.monthlyCap} onChange={num("monthlyCap")} className="w-32" />
+                </div>
                 <p className="rounded-md bg-muted px-3 py-2 text-sm">
                   Customers will read: <b>your friend gets {offer}, you get {earns} in your wallet</b>.
                   {form.referrerType === "percent" && form.referrerReward > 0 && (
@@ -214,7 +226,7 @@ export default function AdminReferralsPage() {
             ["Referred orders", totals.orders],
             ["Discount given", `₹${totals.discounts}`],
             ["Rewards paid", `₹${totals.paid}`],
-            ["Rewards owed on delivery", `₹${totals.owed}`],
+            ["Owed on delivery", `₹${totals.owed}${totals.held ? ` · ${totals.held} held` : ""}`],
           ].map(([l, v]) => (
             <Card key={String(l)}><CardContent className="pt-5"><p className="text-sm text-muted-foreground">{l}</p><p className="text-2xl font-bold">{v}</p></CardContent></Card>
           ))}
@@ -223,7 +235,7 @@ export default function AdminReferralsPage() {
         <Card>
           <CardHeader><CardTitle className="text-lg">Referred orders</CardTitle></CardHeader>
           <CardContent>
-            {!orders ? <p className="text-sm text-muted-foreground">Loading…</p> : !orders.length ? (
+            {!rows ? <p className="text-sm text-muted-foreground">Loading…</p> : !rows.length ? (
               <p className="py-6 text-center text-sm text-muted-foreground">No referred orders yet.</p>
             ) : (
               <Table>
@@ -238,22 +250,33 @@ export default function AdminReferralsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {orders.map((o) => {
-                    const [label, cls] = STATUS[o.referral?.status || "pending"] || [o.referral?.status || "", ""];
+                  {rows.map((r) => {
+                    const [label, cls] = STATUS[r.status] || [r.status, ""];
                     return (
-                      <TableRow key={o._id}>
+                      <TableRow key={r._id}>
                         <TableCell>
-                          <Link to={`/backend-skinly/orders/${o._id}`} className="font-medium hover:underline">{o.orderNumber || o.checkoutRef}</Link>
-                          <div className="text-xs text-muted-foreground">{o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN") : ""} · {o.status}</div>
+                          <Link to={`/backend-skinly/orders/${r._id}`} className="font-medium hover:underline">{r.order?.orderNumber || r.order?.checkoutRef}</Link>
+                          <div className="text-xs text-muted-foreground">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-IN") : ""} · {r.order?.status}</div>
                         </TableCell>
-                        <TableCell className="text-sm">{o.customerName}</TableCell>
+                        <TableCell className="text-sm">{r.friendName}</TableCell>
                         <TableCell className="text-sm">
-                          {names[o.referral?.referrerUserDocId || ""] || "…"}
-                          <div className="font-mono text-xs text-muted-foreground">{o.referral?.code}</div>
+                          {r.referrerName || r.referrerEmail || "—"}
+                          <div className="font-mono text-xs text-muted-foreground">{r.code}</div>
                         </TableCell>
-                        <TableCell className="text-right text-sm">₹{Number(o.referralDiscount) || 0}</TableCell>
-                        <TableCell className="text-right text-sm">₹{Number(o.referral?.reward) || 0}</TableCell>
-                        <TableCell><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span></TableCell>
+                        <TableCell className="text-right text-sm">₹{Number(r.friendDiscount) || 0}</TableCell>
+                        <TableCell className="text-right text-sm">₹{Number(r.reward) || 0}</TableCell>
+                        <TableCell>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{label}</span>
+                          {r.status === "held" && (
+                            <div className="mt-1.5 space-y-1">
+                              <p className="text-xs text-muted-foreground">{r.holdReason}</p>
+                              <div className="flex gap-1">
+                                <Button size="sm" className="h-7" disabled={reviewing === r._id} onClick={() => void review(r._id, true)}>Approve</Button>
+                                <Button size="sm" variant="outline" className="h-7" disabled={reviewing === r._id} onClick={() => void review(r._id, false)}>Refuse</Button>
+                              </div>
+                            </div>
+                          )}
+                        </TableCell>
                       </TableRow>
                     );
                   })}

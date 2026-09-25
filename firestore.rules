@@ -100,6 +100,8 @@ service cloud.firestore {
     match /mockupCoverage/{id} { allow read: if isAdmin(); allow write: if false; }
     // Which account owns each referral code; written only by functions (referrals.ts).
     match /referralCodes/{code} { allow read: if isAdmin(); allow write: if false; }
+    // Who referred each order and what they are owed: admins only, never the customer (referrals.ts).
+    match /orderReferrals/{orderId} { allow read: if isAdmin(); allow write: if false; }
 
     match /reviews/{id} {
       allow read: if true;

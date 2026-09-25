@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import { useAuth } from "@/hooks/use-auth";
+import { rememberOwnReferralCode } from "@/components/referral-tracker.tsx";
 
 /** The programme as the admin set it (functions/src/referrals.ts). */
 export type ReferralProgramme = {
@@ -55,7 +56,11 @@ export function useMyReferrals(): MyReferrals | null | undefined {
     if (!isSignedIn) { setData(null); return; }
     let live = true;
     httpsCallable(functions, "myReferrals")({})
-      .then((r) => { if (live) setData(r.data as MyReferrals); })
+      .then((r) => {
+        const d = r.data as MyReferrals;
+        if (d?.code) rememberOwnReferralCode(d.code);
+        if (live) setData(d);
+      })
       .catch(() => { if (live) setData(null); });
     return () => { live = false; };
   }, [isLoaded, isSignedIn]);

@@ -521,6 +521,12 @@ function OrderDetailPageInner() {
                       <span className="text-green-600">−₹{Number((order as any).couponDiscount ?? (order as any).discountAmount).toFixed(0)}</span>
                     </div>
                   )}
+                  {Number((order as any).referralDiscount) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Referral discount</span>
+                      <span className="text-green-600">−₹{Number((order as any).referralDiscount).toFixed(0)}</span>
+                    </div>
+                  )}
                   {Number((order as any).walletUsed) > 0 && (
                     <div className="flex justify-between text-sm">
                       <span>Wallet</span>

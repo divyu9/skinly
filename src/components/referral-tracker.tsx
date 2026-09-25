@@ -21,6 +21,18 @@ export function storedReferralCode(): string {
   }
 }
 
+/**
+ * The code of the account that uses this browser, remembered from its own
+ * referral page: the server refuses a referral whose code is this one, so a
+ * customer can't order through their own link on a second number.
+ */
+export function ownReferralCode(): string {
+  try { return localStorage.getItem("myReferralCode") || ""; } catch { return ""; }
+}
+export function rememberOwnReferralCode(code: string) {
+  try { localStorage.setItem("myReferralCode", code); } catch { /* storage blocked */ }
+}
+
 export function clearStoredReferralCode() {
   try {
     localStorage.removeItem("referralCode");

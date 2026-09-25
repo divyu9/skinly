@@ -258,14 +258,19 @@ export async function setOrderStatus(
     }
     try {
       const { creditReferralOnDelivery } = await import("./referrals");
-      await creditReferralOnDelivery(db, ref, order);
+      await creditReferralOnDelivery(db, ref);
     } catch (e: any) {
       console.error("setOrderStatus: referral reward failed", { orderId, error: e?.message || e });
     }
   }
   // A cancelled or returned order earns its referrer nothing.
-  if ((next === "cancelled" || next === "rto") && order?.referral?.status === "pending") {
-    await ref.update({ "referral.status": "cancelled" }).catch(() => undefined);
+  if (next === "cancelled" || next === "rto") {
+    try {
+      const { cancelReferral } = await import("./referrals");
+      await cancelReferral(db, orderId);
+    } catch (e: any) {
+      console.error("setOrderStatus: referral cancel failed", { orderId, error: e?.message || e });
+    }
   }
 
   if (opts.notify !== false) {

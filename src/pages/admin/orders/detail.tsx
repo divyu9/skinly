@@ -16,6 +16,7 @@ import { OrderHeader, type OrderStatus, type PaymentStatus } from "./_components
 import { CustomerInfoCard, type CustomerFormData, type AddressFormData } from "./_components/CustomerInfoCard.tsx";
 import { OrderItemsTable, type ItemFormEntry } from "./_components/OrderItemsTable.tsx";
 import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRefundPanel.tsx";
+import { ReferralPanel } from "./_components/ReferralPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
@@ -654,6 +655,8 @@ function OrderDetailPageInner() {
             onSaveAddress={handleUpdateShippingAddress}
           />
 
+          {(order as any).referred && <ReferralPanel orderId={String(order._id)} />}
+
           <PaymentRefundPanel
             paymentMethod={order.paymentMethod}
             total={order.total}
@@ -662,6 +665,7 @@ function OrderDetailPageInner() {
             codFee={order.codFee}
             couponDiscount={(order as any).couponDiscount ?? (order as any).discountAmount}
             couponCode={(order as any).couponCode}
+            referralDiscount={(order as any).referralDiscount}
             walletUsed={(order as any).walletUsed}
             prepaidAmount={order.prepaidAmount}
             codAmount={order.codAmount}

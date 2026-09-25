@@ -1036,6 +1036,11 @@ function AdminOrdersPageInner() {
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <div className="font-mono text-sm font-semibold">
                           {order.orderNumber || order.checkoutRef || order.failedOrderNumber || "Pending"}
+                          {(order as any).referred && (
+                            <span className="ml-1.5 rounded-full bg-pink-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-pink-800" title="Came through a customer's referral link — see the order">
+                              Referral
+                            </span>
+                          )}
                         </div>
                         {order.invoiceNumber && (
                           <div className="font-mono text-[11px] text-muted-foreground">{order.invoiceNumber}</div>

@@ -19,6 +19,7 @@ interface PaymentRefundPanelProps {
   shippingFee: number;
   codFee?: number;
   couponDiscount?: number;
+  referralDiscount?: number;
   couponCode?: string;
   walletUsed?: number;
   prepaidAmount?: number;
@@ -64,6 +65,7 @@ export function PaymentRefundPanel({
   shippingFee,
   codFee,
   couponDiscount,
+  referralDiscount,
   couponCode,
   walletUsed,
   prepaidAmount,
@@ -128,6 +130,12 @@ export function PaymentRefundPanel({
                 Coupon{couponCode ? <span className="ml-1 font-mono text-xs">({couponCode})</span> : null}
               </span>
               <span className="text-green-600">−₹{couponDiscount.toFixed(0)}</span>
+            </div>
+          )}
+          {referralDiscount !== undefined && referralDiscount > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Referral discount</span>
+              <span className="text-green-600">−₹{referralDiscount.toFixed(0)}</span>
             </div>
           )}
           {walletUsed !== undefined && walletUsed > 0 && (

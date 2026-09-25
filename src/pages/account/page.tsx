@@ -255,7 +255,7 @@ function AccountPageInner() {
                 nothing about the four. */}
             <p className="text-xs text-muted-foreground">
               {referralCount > 0
-                ? `${referralCount} friend${referralCount === 1 ? "" : "s"} joined · ₹${referralEarned} earned`
+                ? `${referralCount} friend${referralCount === 1 ? "" : "s"} · ₹${referralEarned} earned${Number(referralStats?.pending) > 0 ? ` · ₹${referralStats?.pending} on the way` : ""}`
                 : referralRewardText ? `${referralRewardText} on each friend's first order` : "Share your link with friends"}
             </p>
           </div>

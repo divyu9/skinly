@@ -7,7 +7,7 @@ import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
-import { evaluateReferral, normCode, referrerRewardFor } from "./referrals";
+import { evaluateReferral, normCode, recordReferral, referrerRewardFor } from "./referrals";
 import { walletUserRef } from "./userDoc";
 
 /**
@@ -77,7 +77,7 @@ export const placeOrder = functions
     const db = admin.firestore();
 
     const { shippingAddress, customerEmail, guestEmail, paymentMethod, guestItems,
-            sessionId: reqSessionId, customerPhone, couponId, walletAmount, referralCode } = data;
+            sessionId: reqSessionId, customerPhone, couponId, walletAmount, referralCode, ownReferralCode } = data;
     // Note: couponDiscount / prepaidAmount / amount also arrive from the client.
     // They are deliberately ignored — every figure below is re-derived here.
 
@@ -288,19 +288,20 @@ export const placeOrder = functions
     // owed to whoever sent them once this order is delivered. A bad or spent
     // code costs the order nothing — it simply doesn't apply.
     let referralDiscount = 0;
-    let referral: Record<string, any> | null = null;
+    let referral: { r: any; reward: number } | null = null;
     try {
       let code = normCode(referralCode);
       if (!code && uid) code = normCode(((await db.collection("users").doc(uid).get()).data() as any)?.referredByCode);
       if (code) {
         const r = await evaluateReferral(db, {
           code, email, phone: shippingAddress?.phone, uid, itemsTotal, couponApplied: !!couponCode || couponDiscount > 0 || walletCreditCouponAmount > 0,
+          address: shippingAddress, ownCode: ownReferralCode,
         });
         if (r.ok) {
           referralDiscount = Math.min(r.discount, Math.max(0, itemsTotal - couponDiscount));
           // A percentage reward is a share of what the friend spent on items, after discounts.
           const reward = referrerRewardFor(r.settings, itemsTotal - couponDiscount - referralDiscount);
-          referral = { code: r.code, referrerUserDocId: r.referrerUserDocId, referrerAuthUid: r.referrerAuthUid, reward, friendDiscount: referralDiscount, status: "pending" };
+          referral = { r, reward };
         }
       }
     } catch (e: any) {
@@ -394,7 +395,8 @@ export const placeOrder = functions
       couponId: couponId || null,
       couponCode,
       couponDiscount,
-      ...(referral ? { referralCode: referral.code, referralDiscount, referral } : {}),
+      // Who referred it is kept apart, for admins only (orderReferrals).
+      ...(referral ? { referralDiscount, referred: true } : {}),
       walletUsed,
       // Taken off the balance once the order is confirmed (debitWalletForOrder).
       ...(walletUsed > 0 && walletUserDocId ? { walletUserDocId } : {}),
@@ -434,6 +436,13 @@ export const placeOrder = functions
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+
+    if (referral) {
+      await recordReferral(db, orderId, referral.r, {
+        friendDiscount: referralDiscount, reward: referral.reward, customerName: shippingAddress?.fullName || "Guest",
+        email, phone: shippingAddress?.phone || "", shippingAddress,
+      }).catch((e) => console.error("placeOrder: referral record failed", { order: orderId, error: e?.message || e }));
+    }
 
     // ── 4b. Draw down design stock ────────────────────────────────────────────
     // After the order is safely written, and deliberately not blocking on it:

@@ -15,7 +15,7 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-import { storedReferralCode, clearStoredReferralCode } from "@/components/referral-tracker.tsx";
+import { storedReferralCode, clearStoredReferralCode, ownReferralCode } from "@/components/referral-tracker.tsx";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/lib/firebase-api";
@@ -262,13 +262,14 @@ function CheckoutPageInner() {
     const t = setTimeout(() => {
       httpsCallable(functions, "checkReferral")({
         code, email: formData.email, phone: formData.phone, itemsTotal: subtotal, couponApplied: !!couponIdForReferral,
+        address: { pincode: formData.pincode, addressLine1: formData.addressLine1 }, ownCode: ownReferralCode(),
       }).then((r) => {
         const d: any = r.data;
         if (live) setReferral(d?.ok ? { code: d.code, discount: Number(d.discount) || 0, reason: d.reason || null } : null);
       }).catch(() => { if (live) setReferral(null); });
     }, 600);
     return () => { live = false; clearTimeout(t); };
-  }, [subtotal, formData.email, formData.phone, couponIdForReferral, isAuthenticated]);
+  }, [subtotal, formData.email, formData.phone, formData.pincode, formData.addressLine1, couponIdForReferral, isAuthenticated]);
 
   const totalCashback = cashbackData?.totalCashback || 0;
   const couponDiscount = appliedCoupon?.discountAmount || 0;
@@ -435,6 +436,7 @@ function CheckoutPageInner() {
         couponId: appliedCoupon?.coupon._id,
         couponDiscount: appliedCoupon?.discountAmount,
         referralCode: referral?.code,
+        ownReferralCode: ownReferralCode() || undefined,
         walletCreditAmount: appliedCoupon?.walletCreditAmount,
         sessionId: !isAuthenticated ? guestSessionId : undefined,
         guestEmail: !isAuthenticated ? formData.email : undefined,

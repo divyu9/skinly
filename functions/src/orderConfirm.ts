@@ -67,6 +67,13 @@ export async function confirmOrder(db: admin.firestore.Firestore, orderId: strin
     } catch (e: any) {
       console.error("confirmOrder: wallet debit failed", { orderId, error: e?.message || e });
     }
+    // A referred order: tell whoever referred it (referrals.ts). Once.
+    try {
+      const { noteReferredOrderConfirmed } = await import("./referrals");
+      await noteReferredOrderConfirmed(db, orderId);
+    } catch (e: any) {
+      console.error("confirmOrder: referral note failed", { orderId, error: e?.message || e });
+    }
   }
   return result;
 }
