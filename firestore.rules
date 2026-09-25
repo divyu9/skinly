@@ -236,6 +236,11 @@ service cloud.firestore {
     match /whatsappUsecases/{id}        { allow read, write: if isAdmin(); }
     match /whatsappSettings/{id}        { allow read, write: if isAdmin(); }
     match /whatsappDebugLogs/{id}       { allow read, write: if isAdmin(); }
+    // Written by functions only (the mail log; the nightly backup manifests),
+    // read by the admin pages. With no rule they were closed to the admin too,
+    // so the email stats and the backups list could not load.
+    match /emailMessages/{id}           { allow read: if isAdmin(); allow write: if false; }
+    match /backups/{id}                 { allow read: if isAdmin(); allow write: if false; }
     match /emailUsecaseTemplates/{id}   { allow read, write: if isAdmin(); }
     match /mediaLibrary/{id}            { allow read, write: if isAdmin(); }
     match /uploadJobs/{id}              { allow read, write: if isAdmin(); }
