@@ -380,8 +380,10 @@ function ProductsTab({ products, gadgets, finishes, categories, issues, onlyIssu
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{catName(p.productCategory)}</TableCell>
                       <TableCell>
-                        <Select value={g?._id || ""} onValueChange={(v) => save([p._id], gadgetPatch(v), "Gadget")} disabled={busy}>
-                          <SelectTrigger className="h-8"><SelectValue placeholder="—" /></SelectTrigger>
+                        {/* A gadget that disagrees with itself shows blank, so picking
+                            the right one — even the one it seemed to be — saves. */}
+                        <Select value={list.some((i) => i.label.startsWith("Gadget")) ? "" : g?._id || ""} onValueChange={(v) => save([p._id], gadgetPatch(v), "Gadget")} disabled={busy}>
+                          <SelectTrigger className="h-8"><SelectValue placeholder={list.some((i) => i.label.startsWith("Gadget")) ? "Choose…" : "—"} /></SelectTrigger>
                           <SelectContent>{gadgets.map((x) => <SelectItem key={x._id} value={x._id}>{label(x)}</SelectItem>)}</SelectContent>
                         </Select>
                       </TableCell>

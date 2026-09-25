@@ -288,6 +288,8 @@ function EditProductPageInner() {
         weight: parseFloat(formData.weight),
         productType: formData.productType,
         gadgetTypeId: formData.gadgetTypeId ? (formData.gadgetTypeId as Id<"gadgetTypes">) : undefined,
+        // The gadget's name goes with its id: "fits your device" reads the name.
+        gadgetCategory: gadgetTypes?.find((g: any) => g._id === formData.gadgetTypeId)?.name || undefined,
         finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
         productCategory: formData.productCategory || undefined,
         hasMultipleVariants: formData.hasMultipleVariants,

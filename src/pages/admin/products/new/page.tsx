@@ -215,7 +215,7 @@ function NewProductPageInner() {
         status: formData.status,
         images: formData.images.filter((img) => img.url),
         tags: formData.tags.split(",").map((t) => t.trim()).filter((t) => t),
-        gadgetCategory: formData.gadgetCategory,
+        gadgetCategory: gadgetTypes?.find((g: any) => g._id === formData.gadgetTypeId)?.name || formData.gadgetCategory,
         gadgetTypeId: formData.gadgetTypeId ? (formData.gadgetTypeId as Id<"gadgetTypes">) : undefined,
         finishTypeId: formData.finishTypeId ? (formData.finishTypeId as Id<"finishTypes">) : undefined,
         productCategory: formData.productCategory || undefined,
@@ -640,33 +640,6 @@ function NewProductPageInner() {
               </div>
 
               <div>
-                <Label htmlFor="gadgetCategory">Gadget Category</Label>
-                <Select
-                  value={formData.gadgetCategory}
-                  onValueChange={(value: typeof formData.gadgetCategory) =>
-                    setFormData({ ...formData, gadgetCategory: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="phone">Phone</SelectItem>
-                    <SelectItem value="laptop">Laptop</SelectItem>
-                    <SelectItem value="tablet">Tablet</SelectItem>
-                    <SelectItem value="camera">Camera</SelectItem>
-                    <SelectItem value="lens">Lens</SelectItem>
-                    <SelectItem value="drone">Drone</SelectItem>
-                    <SelectItem value="charger">Charger</SelectItem>
-                    <SelectItem value="console">Console</SelectItem>
-                    <SelectItem value="mac-mini">Mac Mini</SelectItem>
-                    <SelectItem value="cover">Cover</SelectItem>
-                    <SelectItem value="accessory">Accessory</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
                 <Label htmlFor="gadgetType">Gadget Type (Optional)</Label>
                 {gadgetTypes === undefined ? (
                   <Skeleton className="h-10 w-full" />
@@ -677,7 +650,13 @@ function NewProductPageInner() {
                 ) : (
                   <Select
                     value={formData.gadgetTypeId || undefined}
-                    onValueChange={(value) => setFormData({ ...formData, gadgetTypeId: value as Id<"gadgetTypes"> })}
+                    // One gadget, both fields: a separate "Gadget Category" dropdown
+                    // let the two disagree (a phone skin filed as accessory).
+                    onValueChange={(value) => setFormData({
+                      ...formData,
+                      gadgetTypeId: value as Id<"gadgetTypes">,
+                      gadgetCategory: (gadgetTypes?.find((g: any) => g._id === value)?.name || formData.gadgetCategory) as typeof formData.gadgetCategory,
+                    })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select gadget type" />
