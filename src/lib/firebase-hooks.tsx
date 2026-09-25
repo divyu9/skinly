@@ -4507,22 +4507,6 @@ export function useMutation(apiRef: any) {
       
 
       
-      if (collectionName === 'coupons' && actionName === 'validateCoupon') {
-        const q = query(collection(db, 'coupons'), where('code', '==', args.code), limit(1));
-        const snap = await getDocs(q);
-        if (snap.empty) return { isValid: false, reason: "Invalid code" };
-        
-        const c = snap.docs[0].data();
-        if (!c.isActive) return { isValid: false, reason: "Coupon inactive" };
-        
-        return { 
-          isValid: true, 
-          coupon: { _id: snap.docs[0].id, ...c }, 
-          discountAmount: c.discountValue || 100,
-          walletCreditAmount: c.cashbackValue || 0
-        };
-      }
-      
       // Public: no auth, the callable checks the contact against the order.
       if (collectionName === 'orders' && actionName === 'trackOrder') {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
@@ -7067,8 +7051,10 @@ export function useConvex() {
         // the cart-value rule); nothing has ever written `minPurchaseAmount`,
         // so every minimum an admin set was silently ignored at apply time —
         // the live 5OFF is set to ₹250 and applied on a ₹1 cart.
-        const minPurchase = Number(
-          coupon.minPurchase ?? coupon.minCartValue ?? coupon.minPurchaseAmount ?? 0
+        // Both minimums the form offers count; the larger wins (placeOrder agrees).
+        const minPurchase = Math.max(
+          Number(coupon.minPurchase ?? coupon.minPurchaseAmount ?? 0) || 0,
+          Number(coupon.minCartValue ?? 0) || 0,
         );
         if (minPurchase > 0 && cartTotal < minPurchase) {
           throw new Error(`Minimum purchase of ₹${minPurchase} required`);
@@ -7114,6 +7100,10 @@ export function useConvex() {
             .reduce((sum: number, i: any) => sum + Number(i.price || 0) * Number(i.quantity || 1), 0);
           if (base <= 0) throw new Error("This coupon doesn't apply to anything in your cart");
         }
+        const minProduct = Number(coupon.minProductValue) || 0;
+        if (minProduct > 0 && base < minProduct) {
+          throw new Error(`The products this coupon is for need to add up to ₹${minProduct}`);
+        }
 
         // Calculate discount
         let discountAmount = 0;
@@ -7126,11 +7116,18 @@ export function useConvex() {
           discountAmount = Math.min(base, coupon.discountValue);
         }
         
+        /*
+         * A wallet-credit coupon takes nothing off now; it pays after delivery.
+         * The form marks it effectType "wallet_credit" and this read only
+         * isWalletCredit — so checkout took the amount off the total while
+         * placeOrder didn't, and the customer was charged more than shown.
+         */
+        const isWalletCredit = coupon.isWalletCredit === true || coupon.effectType === "wallet_credit";
         return {
           coupon: { _id: snap.docs[0].id, ...coupon },
-          discountAmount: discountAmount,
-          isWalletCredit: coupon.isWalletCredit || false,
-          walletCreditAmount: coupon.isWalletCredit ? discountAmount : 0
+          discountAmount: isWalletCredit ? 0 : discountAmount,
+          isWalletCredit,
+          walletCreditAmount: isWalletCredit ? discountAmount : 0
         };
       }
       

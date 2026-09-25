@@ -108,8 +108,8 @@ function AdminCouponsPageInner() {
     discountValue: "",
     minPurchase: "",
     maxDiscount: "",
-    startDate: new Date().toISOString().slice(0, 16),
-    endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+    startDate: toLocalInput(Date.now()),
+    endDate: toLocalInput(Date.now() + 30 * 24 * 60 * 60 * 1000),
     isActive: true,
     usageLimit: "",
     applicableVariantIds: [],
@@ -132,8 +132,8 @@ function AdminCouponsPageInner() {
       discountValue: String(coupon.discountValue),
       minPurchase: coupon.minPurchase ? String(coupon.minPurchase) : "",
       maxDiscount: coupon.maxDiscount ? String(coupon.maxDiscount) : "",
-      startDate: new Date(coupon.startDate).toISOString().slice(0, 16),
-      endDate: new Date(coupon.endDate).toISOString().slice(0, 16),
+      startDate: toLocalInput(coupon.startDate),
+      endDate: toLocalInput(coupon.endDate),
       isActive: coupon.isActive,
       usageLimit: coupon.usageLimit ? String(coupon.usageLimit) : "",
       applicableVariantIds: coupon.applicableVariantIds || [],
@@ -268,8 +268,8 @@ function AdminCouponsPageInner() {
         discountValue: "",
         minPurchase: "",
         maxDiscount: "",
-        startDate: new Date().toISOString().slice(0, 16),
-        endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+        startDate: toLocalInput(Date.now()),
+        endDate: toLocalInput(Date.now() + 30 * 24 * 60 * 60 * 1000),
         isActive: true,
         usageLimit: "",
         applicableVariantIds: [],
@@ -885,6 +885,7 @@ function AdminCouponsPageInner() {
                           setFormData({ ...formData, minProductValue: e.target.value })
                         }
                       />
+                      <p className="mt-1 text-xs text-muted-foreground">The products this coupon is for must add up to at least this.</p>
                     </div>
                   </div>
                 </div>
@@ -1077,6 +1078,14 @@ function AdminCouponsPageInner() {
     </div>
   );
 }
+
+/**
+ * A timestamp as a datetime-local input shows it: in the admin's own time.
+ * toISOString() gave UTC, which the input read as local — so a coupon ending
+ * at midnight showed 18:30, and every save moved its start and end 5½ hours
+ * earlier.
+ */
+const toLocalInput = (ms: number) => new Date(ms - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 export default function AdminCouponsPage() {
   return (

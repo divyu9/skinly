@@ -266,7 +266,8 @@ export const placeOrder = functions
       // `minPurchaseAmount` and `maxDiscountAmount`, names nothing has ever
       // written — so every minimum an admin set was ignored on the line that
       // actually bills, and every percentage cap with it.
-      const minPurchase = Number(c.minPurchase ?? c.minCartValue ?? c.minPurchaseAmount ?? 0);
+      // Both minimums the form offers count; the larger wins.
+      const minPurchase = Math.max(Number(c.minPurchase ?? c.minPurchaseAmount ?? 0) || 0, Number(c.minCartValue ?? 0) || 0);
       const maxDiscount = Number(c.maxDiscount ?? c.maxDiscountAmount ?? 0);
       if (minPurchase > 0 && itemsTotal < minPurchase) {
         throw new HttpsError("failed-precondition", `This coupon needs a cart of at least ₹${minPurchase}`);
@@ -294,6 +295,11 @@ export const placeOrder = functions
       const discountBase = eligible ?? itemsTotal;
       if (eligible !== null && eligible <= 0) {
         throw new HttpsError("failed-precondition", "This coupon doesn't apply to anything in your cart");
+      }
+      // "Min Product Value": the coupon's own products must come to this much.
+      const minProduct = Number(c.minProductValue) || 0;
+      if (minProduct > 0 && discountBase < minProduct) {
+        throw new HttpsError("failed-precondition", `The products this coupon is for need to add up to ₹${minProduct}`);
       }
 
       // Claim one use, or find out there are none left.
