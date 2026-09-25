@@ -5139,12 +5139,6 @@ export function useMutation(apiRef: any) {
         }
       }
       
-      if (collectionName === 'migrateVariantPresetsAutoAssign') {
-        if (actionName === 'autoAssignPresets') {
-          return { success: true, matched: 0, unmatched: 0, skipped: 0, statusBreakdown: { active: 0, draft: 0, archived: 0 }, unmatchedVariants: [] };
-        }
-      }
-
       if (collectionName === 'rapidshyp') {
         return { success: true, message: "Mocked rapidshyp response" };
       }
@@ -6993,10 +6987,6 @@ export function useAction(apiRef: any) {
       return res.data;
     }
     
-    if (collectionName === 'migrateVariantPresetsAutoAssign' && actionName === 'autoAssignPresets') {
-      return { success: true, matched: 0, unmatched: 0, skipped: 0, statusBreakdown: { active: 0, draft: 0, archived: 0 }, unmatchedVariants: [] };
-    }
-
     // Intercept R2 uploads to use presigned URLs directly from the client
     // This avoids sending huge base64 payloads through Firebase Functions
     if ((collectionName === 'r2' && actionName === 'uploadToR2') || 

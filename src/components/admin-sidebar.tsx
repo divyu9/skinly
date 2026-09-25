@@ -101,7 +101,6 @@ export function AdminSidebar() {
         { path: "/backend-skinly/product-classification", label: "Classification", icon: Layers },
         { path: "/backend-skinly/collections", label: "Collections", icon: Layers },
         { path: "/backend-skinly/variant-presets", label: "Variant Presets", icon: Layers },
-        { path: "/backend-skinly/variant-presets-auto-assign", label: "Auto-Assign Presets", icon: Sparkles },
         { path: "/backend-skinly/models", label: "Models", icon: Database },
         { path: "/backend-skinly/mockups", label: "Mockups", icon: Image },
         { path: "/backend-skinly/mockups-advanced", label: "Advanced Mockups", icon: Image },

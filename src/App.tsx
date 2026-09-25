@@ -59,7 +59,6 @@ const AdminMockupsAdvancedPage = lazyWithReload(() => import("./pages/admin/mock
 const AdminGoogleDriveImportPage = lazyWithReload(() => import("./pages/admin/google-drive-import.tsx"), "./pages/admin/google-drive-import.tsx");
 const AdminModelsPage = lazyWithReload(() => import("./pages/admin/models/page.tsx"), "./pages/admin/models/page.tsx");
 const AdminVariantPresetsPage = lazyWithReload(() => import("./pages/admin/variant-presets.tsx"), "./pages/admin/variant-presets.tsx");
-const AdminVariantPresetsAutoAssignPage = lazyWithReload(() => import("./pages/admin/variant-presets-auto-assign.tsx"), "./pages/admin/variant-presets-auto-assign.tsx");
 const AdminCODPage = lazyWithReload(() => import("./pages/admin/cod.tsx"), "./pages/admin/cod.tsx");
 const AdminWhatsAppPage = lazyWithReload(() => import("./pages/admin/whatsapp/page.tsx"), "./pages/admin/whatsapp/page.tsx");
 const AdminWhatsAppMessagesPage = lazyWithReload(() => import("./pages/admin/whatsapp/messages.tsx"), "./pages/admin/whatsapp/messages.tsx");
@@ -181,7 +180,8 @@ export default function App() {
             {/* Phone Collections was a leftover migration page: collections are managed, and filled, from Collections. */}
             <Route path="/backend-skinly/phone-collections" element={<Navigate to="/backend-skinly/collections" replace />} />
             <Route path="/backend-skinly/variant-presets" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/variant-presets-auto-assign" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsAutoAssignPage /></AdminPageWrapper></Suspense>} />
+            {/* Auto-Assign was a stub since the Firebase move; its linking lives on Variant Presets. */}
+            <Route path="/backend-skinly/variant-presets-auto-assign" element={<Navigate to="/backend-skinly/variant-presets" replace />} />
             <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/sitemap" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />

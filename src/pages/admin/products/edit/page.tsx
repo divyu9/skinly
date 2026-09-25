@@ -2,6 +2,7 @@ import { useAction, useQuery, useMutation } from "@/lib/firebase-hooks";
 import { MaterialSection, useMaterialDesigns, inferDesignCode } from "../_components/material-section.tsx";
 import { ListingPictures } from "../_components/listing-pictures.tsx";
 import { api } from "@/lib/firebase-api";
+import { resolveMaterialMultiplier } from "@/lib/material-multiplier";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -33,6 +34,8 @@ interface Variant {
   inventoryQuantity: string;
   consumptionPresetId?: string;
   customMultiplier?: string;
+  /** As saved: kept when neither a preset nor a custom figure says otherwise. */
+  materialMultiplier?: number;
 }
 
 function EditProductPageInner() {
@@ -149,6 +152,7 @@ function EditProductPageInner() {
           rNumber: v.rNumber || "",
           consumptionPresetId: v.consumptionPresetId || "",
           customMultiplier: v.customMultiplier?.toString() || "",
+          materialMultiplier: Number(v.materialMultiplier) || undefined,
         }))
       );
       // Variants all share one design; take the first that names one.
@@ -156,18 +160,9 @@ function EditProductPageInner() {
     }
   }, [product]);
 
-  /**
-   * What the stock maths actually reads.
-   *
-   * A custom figure wins, then the preset's, then one. Writing it here is what
-   * makes the dropdown on this page affect availability — until now it only
-   * stored a preset id that nothing downstream looked at.
-   */
-  const resolveMultiplier = (variant: Variant): number => {
-    if (variant.customMultiplier) return parseFloat(variant.customMultiplier) || 1;
-    const preset = variantPresets?.find((p: any) => p._id === variant.consumptionPresetId);
-    return Number(preset?.multiplier) || 1;
-  };
+  /** What the stock maths actually reads (src/lib/material-multiplier.ts). */
+  const resolveMultiplier = (variant: Variant): number =>
+    resolveMaterialMultiplier(variant, variantPresets as any, variant.materialMultiplier);
 
   const addVariant = () => {
     setVariants([...variants, { sku: "", title: "", price: "", compareAtPrice: "", inventoryQuantity: "0", rNumber: designCode, consumptionPresetId: "", customMultiplier: "" }]);
@@ -193,7 +188,7 @@ function EditProductPageInner() {
 
   const updateVariantLocal = (
     index: number, 
-    field: Exclude<keyof Variant, "_id">, 
+    field: Exclude<keyof Variant, "_id" | "materialMultiplier">, 
     value: string
   ) => {
     const newVariants = [...variants];

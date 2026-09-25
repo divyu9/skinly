@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
+import { resolveMaterialMultiplier } from "@/lib/material-multiplier";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Input } from "@/components/ui/input.tsx";
@@ -240,6 +241,8 @@ function NewProductPageInner() {
           isDefaultVariant: !formData.hasMultipleVariants && i === 0,
           consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
           customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,
+          // The stock maths reads this, not the preset: without it a 2× preset counted as 1×.
+          materialMultiplier: resolveMaterialMultiplier(variant, variantPresets as any),
         });
       }
 
