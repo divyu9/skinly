@@ -237,14 +237,16 @@ function CheckoutPageInner() {
       : "skip"
   );
 
-  const shouldFetchCashback =
-    cartItems?.length &&
-    cartItems.every((i) => i.productId?.startsWith("j") && i.variant?.startsWith("j"));
-
+  /*
+   * What the cart earns back, as placeOrder will settle it. This asked only
+   * when every id began with "j" — the old backend's ids — and a cart line's
+   * variant is its name, not an id, so it never asked at all: the server paid
+   * cashback the checkout never mentioned. The lookup matches variants by name.
+   */
   const cashbackData = useQuery(
     api.cashbackHelpers.calculateCartCashback,
-    shouldFetchCashback
-      ? { items: cartItems!.map((i) => ({ productId: i.productId as Id<"products">, variantId: i.variant as Id<"variants">, finalPrice: i.price, quantity: i.quantity })) }
+    cartItems?.length
+      ? { items: cartItems.map((i: any) => ({ productId: i.productId as Id<"products">, variantTitle: i.variant, finalPrice: i.price, quantity: i.quantity })) }
       : "skip"
   );
 
@@ -544,6 +546,7 @@ function CheckoutPageInner() {
     codFee,
     finalTotal,
     totalCashback,
+    cashbackNeedsAccount: !isAuthenticated,
     gstBreakdown,
     couponCode,
     appliedCoupon,

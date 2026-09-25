@@ -83,6 +83,8 @@ interface OrderSummaryPanelProps {
   codFee: number;
   finalTotal: number;
   totalCashback: number;
+  /** A guest has no wallet for cashback to land in. */
+  cashbackNeedsAccount?: boolean;
   gstBreakdown: GstBreakdown | null;
   couponCode: string;
   appliedCoupon: AppliedCoupon | null;
@@ -138,6 +140,7 @@ export function OrderSummaryPanel({
   codFee,
   finalTotal,
   totalCashback,
+  cashbackNeedsAccount = false,
   gstBreakdown,
   couponCode,
   appliedCoupon,
@@ -279,7 +282,9 @@ export function OrderSummaryPanel({
                   You'll earn ₹{totalCashback.toFixed(0)} cashback
                 </p>
                 <p className="text-xs text-purple-700 dark:text-purple-300 mt-0.5">
-                  Credited to your wallet after delivery
+                  {cashbackNeedsAccount
+                    ? "Credited to your GoSkinly wallet after delivery — sign in before you pay to receive it"
+                    : "Credited to your wallet after delivery"}
                 </p>
               </div>
             </div>

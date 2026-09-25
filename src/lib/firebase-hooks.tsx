@@ -1719,6 +1719,12 @@ export function useQuery(apiRef: any, args?: any) {
               const rules = rsnap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
 
               const itemCashbacks = await Promise.all(items.map(async (item) => {
+                // A cart line names its variant; a variant rule names an id.
+                let variantId = item.variantId;
+                if (!variantId && item.variantTitle && rules.some(r => r.targetType === "variant")) {
+                  const vs = await getDocs(query(collection(db, 'variants'), where('productId', '==', item.productId)));
+                  variantId = vs.docs.find(d => d.data().title === item.variantTitle)?.id;
+                }
                 let collectionIds: string[] = [];
                 if (rules.some(r => r.targetType === "collection")) {
                   const cp = await getDocs(query(collection(db, 'collectionProducts'),
@@ -1727,24 +1733,24 @@ export function useQuery(apiRef: any, args?: any) {
                 }
 
                 const applicable = rules.filter(r =>
-                  (r.targetType === "variant" && r.targetId === item.variantId) ||
+                  (r.targetType === "variant" && !!variantId && r.targetId === variantId) ||
                   (r.targetType === "product" && r.targetId === item.productId) ||
                   (r.targetType === "collection" && collectionIds.includes(r.targetId))
                 ).filter(r =>
-                  (r.minCartValue === undefined || cartTotal >= r.minCartValue) &&
-                  (r.maxCartValue === undefined || cartTotal <= r.maxCartValue)
+                  (r.minCartValue === undefined || r.minCartValue === null || cartTotal >= Number(r.minCartValue)) &&
+                  (r.maxCartValue === undefined || r.maxCartValue === null || cartTotal <= Number(r.maxCartValue))
                 );
 
                 const perUnit = applicable.reduce((best, r) => {
                   const amount = Math.round(r.cashbackType === "fixed"
-                    ? r.cashbackValue
-                    : (item.finalPrice * r.cashbackValue) / 100);
+                    ? Number(r.cashbackValue) || 0
+                    : (item.finalPrice * (Number(r.cashbackValue) || 0)) / 100);
                   return amount > best ? amount : best;
                 }, 0);
 
                 return {
                   productId: item.productId,
-                  variantId: item.variantId,
+                  variantId,
                   cashbackPerUnit: perUnit,
                   totalCashback: perUnit * item.quantity,
                   quantity: item.quantity,
@@ -3264,8 +3270,12 @@ export function useQuery(apiRef: any, args?: any) {
 
               const cp = await getDocs(query(collection(db, 'collectionProducts'), where('productId', '==', args.productId)));
               const collectionIds = cp.docs.map(d => d.data().collectionId);
+              // Only this product's variants: any variant rule anywhere used to put "cashback" on every product.
+              const ownVariants = rules.some(r => r.targetType === "variant")
+                ? new Set((await getDocs(query(collection(db, 'variants'), where('productId', '==', args.productId)))).docs.map(d => d.id))
+                : new Set<string>();
               const other = rules.filter(r =>
-                (r.targetType === "variant") ||
+                (r.targetType === "variant" && ownVariants.has(r.targetId)) ||
                 (r.targetType === "collection" && collectionIds.includes(r.targetId))
               );
               if (other.length === 0) { setData({ hasCashback: false, displayText: null }); return; }
