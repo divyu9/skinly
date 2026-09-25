@@ -16,14 +16,19 @@ export function UpdateCurrentUserProvider({
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    // Check for stored referral code
-    const storedRefCode = localStorage.getItem("referralCode");
-
-    // 🔥 IMPORTANT: Pass referral code if available
+    /*
+     * The code of whoever referred this visitor (?ref=, kept by
+     * ReferralTracker). It is recorded as who referred them — it used to be
+     * written over their own referralCode, so a friend who signed up through
+     * a link went on to share the referrer's code instead of theirs, and it
+     * was rewritten at every sign-in. Recorded once, then forgotten.
+     */
+    let storedRefCode: string | null = null;
+    try { storedRefCode = localStorage.getItem("referralCode"); } catch { /* storage blocked */ }
     if (storedRefCode) {
-      updateUser({
-        referralCode: storedRefCode,
-      });
+      void Promise.resolve(updateUser({ referredByCode: storedRefCode }))
+        .then(() => { try { localStorage.removeItem("referralCode"); } catch { /* ignore */ } })
+        .catch(() => { /* try again next sign-in */ });
     }
   }, [isLoaded, isSignedIn, updateUser]);
 
