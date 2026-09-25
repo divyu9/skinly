@@ -717,8 +717,11 @@ function AdminOrdersPageInner() {
         A count of zero is dimmed rather than hidden, so the row does not
         reshuffle itself as the day goes on.
       */}
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <div className="flex w-max items-center gap-1.5">
+      {/* Wrapped, not scrolled: a scrolling row showed no scrollbar on a Mac
+          and cut the last statuses off at the edge with nothing to say there
+          were more. Every status is always on screen now. */}
+      <div className="pb-1">
+        <div className="flex flex-wrap items-center gap-1.5">
           {ORDER_STATUSES.map((st) => {
             const on = statusFilter === st;
             const n = stats[st] || 0;
@@ -738,7 +741,7 @@ function AdminOrdersPageInner() {
             );
           })}
 
-          <span className="mx-1 h-6 w-px shrink-0 bg-border" />
+          <span className="mx-1 hidden h-6 w-px shrink-0 bg-border sm:block" />
 
           {([
             ["failed", "Payment failed", stats.failed],
