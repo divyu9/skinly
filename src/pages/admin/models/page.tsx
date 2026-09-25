@@ -128,16 +128,18 @@ export default function AdminModelsPage() {
   const [editModel, setEditModel] = useState("");
   const [editGadgetTypeId, setEditGadgetTypeId] = useState<Id<"gadgetTypes"> | "">("");
 
-  // Filter models
+  /*
+   * Word by word, across brand and model together: "lenovo " (a trailing
+   * space) found nothing because no brand contains a space after its name,
+   * and "lenovo thinkpad" never matched either field alone.
+   */
+  const searchWords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
   const filteredModels = models
     ?.filter((m) => {
       if (categoryFilter !== "all" && m.category !== categoryFilter) return false;
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        return (
-          m.brandName.toLowerCase().includes(query) ||
-          m.modelName.toLowerCase().includes(query)
-        );
+      if (searchWords.length) {
+        const hay = `${m.brandName} ${m.modelName}`.toLowerCase();
+        return searchWords.every((w) => hay.includes(w));
       }
       return true;
     })
@@ -316,8 +318,8 @@ export default function AdminModelsPage() {
 
   // Filter brands
   const filteredBrands = brandsWithCounts?.filter((b) => {
-    if (brandSearchQuery) {
-      return b.brand.toLowerCase().includes(brandSearchQuery.toLowerCase());
+    if (brandSearchQuery.trim()) {
+      return b.brand.toLowerCase().includes(brandSearchQuery.trim().toLowerCase());
     }
     return true;
   });
