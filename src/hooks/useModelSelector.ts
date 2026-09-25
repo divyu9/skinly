@@ -3,6 +3,8 @@ import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { brandInScope } from "@/lib/device-fit";
 import { searchModels } from "@/lib/laptop-body";
+import { siblingListingFor, type ListingLike } from "@/lib/listing-siblings";
+import { brandKey, loadCatalogue } from "@/lib/catalogue";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -27,7 +29,9 @@ interface RequestFormState {
 export function useModelSelector(
   deviceCategory: string = "phone",
   // The listing's brands: an "Apple iPad Skin" offers iPads only.
-  brandScope: { modelBrands?: string[]; modelBrandsExclude?: string[] } = {}
+  brandScope: { modelBrands?: string[]; modelBrandsExclude?: string[] } = {},
+  // This listing, so a brand it leaves to its own listing can be sent there.
+  listing: ListingLike = {}
 ) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -69,8 +73,13 @@ export function useModelSelector(
     if (!deviceModelsFromDb) return {};
     
     const grouped: Record<string, string[]> = {};
+    // Only a listing's own-brand list narrows the picker. Brands a catch-all
+    // leaves to their own listing are still offered: picking one goes there
+    // (handleModelSelect), instead of the shopper finding no Samsung on the
+    // Android Phone listing and leaving.
+    const onlyScope = { modelBrands: brandScope.modelBrands };
     deviceModelsFromDb.forEach(model => {
-      if (!brandInScope(brandScope, model.brandName)) return;
+      if (!brandInScope(onlyScope, model.brandName)) return;
       if (!grouped[model.brandName]) {
         grouped[model.brandName] = [];
       }
@@ -136,10 +145,24 @@ export function useModelSelector(
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
   
   // Handle model selection
-  const handleModelSelect = useCallback((model: string, brand: string) => {
+  const handleModelSelect = useCallback(async (model: string, brand: string) => {
     const newSearchParams = new URLSearchParams(searchParams);
     newSearchParams.set('model', model);
     newSearchParams.set('brand', brand);
+
+    // A brand this listing leaves to its own listing: go to that one.
+    const excluded = (brandScope.modelBrandsExclude || []).some((b) => brandKey(b) === brandKey(brand));
+    if (excluded) {
+      const cat = await loadCatalogue().catch(() => null);
+      const slug = cat ? siblingListingFor(listing, brand, cat.products as ListingLike[]) : null;
+      if (slug) {
+        newSearchParams.delete('slug');
+        newSearchParams.delete('id');
+        setSelectorState({ dialogOpen: false, selectedBrand: "", searchQuery: "" });
+        navigate({ pathname: `/products/${slug}`, search: newSearchParams.toString() });
+        return;
+      }
+    }
     
     // Land on the canonical /products/<slug> whenever the slug is known,
     // including from an old /products/detail?slug= link.
@@ -163,7 +186,7 @@ export function useModelSelector(
       selectedBrand: "",
       searchQuery: "",
     });
-  }, [searchParams, navigate, productId, productSlug, params.slug]);
+  }, [searchParams, navigate, productId, productSlug, params.slug, (brandScope.modelBrandsExclude || []).join("|"), listing.slug, listing.title]);
   
   // Submit model request
   const handleSubmitRequest = useCallback(async () => {

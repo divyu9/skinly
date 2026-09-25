@@ -1417,6 +1417,9 @@ async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []
     gadgetTypeId: p.gadgetTypeId,
     finishType: p.finishType,
     ...(Array.isArray(p.modelBrands) && p.modelBrands.length ? { modelBrands: p.modelBrands } : {}),
+    // Which kind of listing (MacBook, Laptop, Android Phone…): the model picker
+    // sends a brand to its own listing of the same design (src/lib/listing-siblings.ts).
+    ...(p.listingKind ? { listingKind: p.listingKind } : {}),
     ...(Array.isArray(p.modelBrandsExclude) && p.modelBrandsExclude.length ? { modelBrandsExclude: p.modelBrandsExclude } : {}),
     finishTypeId: p.finishTypeId,
     // The design this listing prints — R-44 on the iPhone, the laptop and the

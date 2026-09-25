@@ -35,3 +35,4 @@ export * from "./reviews";
 export * from "./pltSync";
 export * from "./plotterModels";
 export * from "./orderConfirm";
+export * from "./brandScope";

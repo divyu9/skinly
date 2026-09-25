@@ -172,6 +172,9 @@ export default function ProductDetailPage() {
   } = useModelSelector(deviceCategory, {
     modelBrands: productData?.modelBrands,
     modelBrandsExclude: productData?.modelBrandsExclude,
+  }, {
+    slug: productData?.slug, title: productData?.title, listingKind: productData?.listingKind,
+    designImageUrl: productData?.designImageUrl, gadgetCategory: productData?.gadgetCategory,
   });
   
   // Cart actions hook
