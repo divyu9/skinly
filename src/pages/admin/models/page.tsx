@@ -116,7 +116,8 @@ export default function AdminModelsPage() {
   const [targetBrandName, setTargetBrandName] = useState("");
   
   // Model requests state
-  const [requestStatusFilter, setRequestStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  // Pending first: that's the work; the rest is history.
+  const [requestStatusFilter, setRequestStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
   const [selectedRequests, setSelectedRequests] = useState<Id<"modelRequests">[]>([]);
   
   // Edit request dialog state
@@ -324,6 +325,15 @@ export default function AdminModelsPage() {
     return true;
   });
   
+  /*
+   * Requests for a model the site already lists: 9 of 65 pending ones on
+   * 27 Sep 2026 — customers waiting on nothing. Approving one just marks it
+   * done and tells the customer; no new model is made.
+   */
+  const modelKey = (b: unknown, m: unknown) => `${String(b || "").toLowerCase().replace(/[^a-z0-9]/g, "")}|${String(m || "").toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+  const liveModelKeys = new Set((models || []).filter((m: any) => m.isActive !== false && !m.mergedInto).map((m: any) => modelKey(m.brandName, m.modelName)));
+  const alreadyListed = (req: any) => liveModelKeys.has(modelKey(req.brandName, req.modelName));
+
   // Filter model requests
   const filteredRequests = allModelRequests?.filter((req) => {
     if (requestStatusFilter !== "all" && req.status !== requestStatusFilter) {
@@ -916,7 +926,14 @@ export default function AdminModelsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="font-medium">{request.brandName}</TableCell>
-                        <TableCell>{request.modelName}</TableCell>
+                        <TableCell>
+                          {request.modelName}
+                          {request.status === "pending" && alreadyListed(request) && (
+                            <Badge variant="outline" className="ml-2 border-green-500 text-[10px] text-green-700" title="The site already lists this model — approve to tell the customer">
+                              Already on site
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             {getCategoryIcon(request.category)}
