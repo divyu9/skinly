@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { SettingsTab } from "./_components/settings-tab.tsx";
+import { AnnouncementCard } from "./_components/announcement-card.tsx";
 import { HeroSlidesTab } from "./_components/hero-slides-tab.tsx";
 import { FeatureBannersTab } from "./_components/feature-banners-tab.tsx";
 import { UgcVideosTab } from "./_components/ugc-videos-tab.tsx";
@@ -39,6 +40,9 @@ export default function HomepageManagement() {
             Manage homepage sections, content, hero slides, featured products, and layout
           </p>
         </div>
+
+        {/* The notice bar first: it changes with every sale. */}
+        <AnnouncementCard />
 
         {/* Tabs Navigation */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

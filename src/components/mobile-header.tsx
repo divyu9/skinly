@@ -23,7 +23,7 @@ import { useDebounce } from "@/hooks/use-debounce.ts";
 import { cn } from "@/lib/utils.ts";
 import { auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } from "firebase/auth";
-import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, announcementLikelyShown, rememberAnnouncementShown, announcementLive } from "@/lib/announcement-dismissed.ts";
 import { BrandLogo } from "./brand-logo.tsx";
 
 interface MobileHeaderProps {
@@ -207,11 +207,11 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
    */
   const settingsKnown = homepageSettings !== undefined;
   const enabled = settingsKnown
-    ? !!homepageSettings?.announcementEnabled
+    ? announcementLive(homepageSettings)
     : announcementLikelyShown();
   useEffect(() => {
-    if (settingsKnown) rememberAnnouncementShown(!!homepageSettings?.announcementEnabled);
-  }, [settingsKnown, homepageSettings?.announcementEnabled]);
+    if (settingsKnown) rememberAnnouncementShown(announcementLive(homepageSettings));
+  }, [settingsKnown, homepageSettings]);
 
   const showAnnouncement = enabled && !barDismissed;
   const announcementHeight = showAnnouncement ? 28 : 0;

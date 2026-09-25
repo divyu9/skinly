@@ -21,9 +21,6 @@ export function SettingsTab() {
   const [showSearchIcon, setShowSearchIcon] = useState(true);
   const [marqueeEnabled, setMarqueeEnabled] = useState(true);
   const [marqueeMaxModels, setMarqueeMaxModels] = useState(20);
-  const [announcementEnabled, setAnnouncementEnabled] = useState(false);
-  const [announcementText, setAnnouncementText] = useState("");
-  const [announcementLink, setAnnouncementLink] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingHeaderLogo, setIsUploadingHeaderLogo] = useState(false);
   const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false);
@@ -40,9 +37,6 @@ export function SettingsTab() {
       setShowSearchIcon(settings.showSearchIcon ?? true);
       setMarqueeEnabled(settings.marqueeEnabled ?? true);
       setMarqueeMaxModels(settings.marqueeMaxModels || 20);
-      setAnnouncementEnabled(settings.announcementEnabled ?? false);
-      setAnnouncementText(settings.announcementText || "");
-      setAnnouncementLink(settings.announcementLink || "");
     }
   }, [settings]);
 
@@ -100,16 +94,15 @@ export function SettingsTab() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Empty fields are left out, not sent as undefined: Firestore refuses
+      // undefined, and the whole save used to fail on one blank logo.
       await updateSettings({
-        logoImageUrl: logoImageUrl || undefined,
-        footerLogoImageUrl: footerLogoImageUrl || undefined,
+        ...(logoImageUrl ? { logoImageUrl } : {}),
+        ...(footerLogoImageUrl ? { footerLogoImageUrl } : {}),
         logoRedirectLink,
         showSearchIcon,
         marqueeEnabled,
         marqueeMaxModels,
-        announcementEnabled,
-        announcementText: announcementText || undefined,
-        announcementLink: announcementLink || undefined,
       });
       toast.success("Settings saved successfully");
     } catch (error) {
@@ -376,54 +369,6 @@ export function SettingsTab() {
                 onChange={(e) => setMarqueeMaxModels(parseInt(e.target.value) || 20)}
               />
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Announcement Bar Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Announcement Bar</CardTitle>
-          <CardDescription>
-            Configure the top announcement banner
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Enable Announcement Bar</Label>
-              <p className="text-xs text-muted-foreground">
-                Show announcement banner at the top
-              </p>
-            </div>
-            <Switch
-              checked={announcementEnabled}
-              onCheckedChange={setAnnouncementEnabled}
-            />
-          </div>
-
-          {announcementEnabled && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="announcement-text">Announcement Text</Label>
-                <Input
-                  id="announcement-text"
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  placeholder="Free shipping on orders above ₹999!"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="announcement-link">Link (Optional)</Label>
-                <Input
-                  id="announcement-link"
-                  value={announcementLink}
-                  onChange={(e) => setAnnouncementLink(e.target.value)}
-                  placeholder="/products"
-                />
-              </div>
-            </>
           )}
         </CardContent>
       </Card>

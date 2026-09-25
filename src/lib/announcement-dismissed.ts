@@ -8,6 +8,17 @@
  * not a permanent preference, and the next visit should show the offer again.
  */
 
+/**
+ * Whether the bar shows at all: switched on, with something to say, and not
+ * past its end time. The bar, the header and the homepage all ask this, so a
+ * sale that ends leaves no 28px gap where the bar was.
+ */
+export function announcementLive(settings: any): boolean {
+  if (!settings?.announcementEnabled || !String(settings.announcementText || "").trim()) return false;
+  const ends = Number(settings.announcementEndsAt) || 0;
+  return !ends || Date.now() <= ends;
+}
+
 export const ANNOUNCEMENT_DISMISSED_EVENT = "skinly:announcement-dismissed";
 
 const KEY = "skinly_announcement_dismissed";

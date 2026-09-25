@@ -88,7 +88,7 @@ import { usePageLoaded } from "@/hooks/use-page-loaded";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { toast } from "sonner";
-import { announcementLikelyShown, rememberAnnouncementShown } from "@/lib/announcement-dismissed.ts";
+import { announcementLikelyShown, rememberAnnouncementShown, announcementLive } from "@/lib/announcement-dismissed.ts";
 
 
 const HOME_ORGANIZATION_LD = ORGANIZATION_LD;
@@ -135,11 +135,11 @@ export default function Index() {
    * every load forever.
    */
   const announcementOn = homepageSettings !== undefined
-    ? !!homepageSettings.announcementEnabled
+    ? announcementLive(homepageSettings)
     : announcementLikelyShown();
   useEffect(() => {
     if (homepageSettings !== undefined) {
-      rememberAnnouncementShown(!!homepageSettings.announcementEnabled);
+      rememberAnnouncementShown(announcementLive(homepageSettings));
     }
   }, [homepageSettings]);
 

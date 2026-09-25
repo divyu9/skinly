@@ -3,7 +3,14 @@ import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
 import { XIcon } from "lucide-react";
 import { useState } from "react";
-import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, dismissAnnouncement } from "@/lib/announcement-dismissed.ts";
+import { ANNOUNCEMENT_DISMISSED_EVENT, isAnnouncementDismissed, dismissAnnouncement, announcementLive } from "@/lib/announcement-dismissed.ts";
+
+/** The bar's colours, chosen per offer in the admin. */
+export const ANNOUNCEMENT_STYLES: Record<string, string> = {
+  brand: "bg-primary text-primary-foreground",
+  sale: "bg-heart text-white",
+  dark: "bg-ink text-background",
+};
 
 export function AnnouncementBar() {
   const homepageSettings = useQuery(api.homepage.getHomepageSettings);
@@ -13,6 +20,8 @@ export function AnnouncementBar() {
   if (homepageSettings === undefined || !homepageSettings?.announcementEnabled || isDismissed) {
     return null;
   }
+  // A sale with an end time takes itself down (Admin › Homepage › Notice bar).
+  if (!announcementLive(homepageSettings)) return null;
 
   const text = homepageSettings.announcementText;
   const link = homepageSettings.announcementLink;
@@ -32,7 +41,7 @@ export function AnnouncementBar() {
   );
 
   return (
-    <div className="w-full bg-primary text-primary-foreground fixed top-0 left-0 right-0 z-50">
+    <div className={`w-full fixed top-0 left-0 right-0 z-50 ${ANNOUNCEMENT_STYLES[homepageSettings.announcementStyle as string] || ANNOUNCEMENT_STYLES.brand}`}>
       <div className="container mx-auto px-4 py-1.5 flex items-center justify-between gap-2">
         {/* Empty space for balance */}
         <div className="w-5" />
