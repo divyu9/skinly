@@ -1,1386 +1,610 @@
-import { useState, useMemo, useEffect, useRef } from "react";
-import { useQuery, useMutation, useAction } from "@/lib/firebase-hooks";
+import { useEffect, useMemo, useState } from "react";
+import { addDoc, collection, deleteDoc, doc, getDocs, limit, onSnapshot, query, updateDoc, where } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import {
+  AlertCircleIcon, CheckCircle2Icon, CopyIcon, ImageIcon, Maximize2Icon, Minimize2Icon, RefreshCwIcon,
+  SearchIcon, Trash2Icon, UploadIcon, XCircleIcon, XIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+import { db, functions } from "@/lib/firebase";
+import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import type { Id } from "@/lib/firebase-api";
+import { convertImageToWebP, blobToBase64 } from "@/lib/image-processing";
+import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Progress } from "@/components/ui/progress.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { ScrollArea } from "@/components/ui/scroll-area.tsx";
-import { AdminLayout } from "@/components/admin-layout.tsx";
-import { toast } from "sonner";
-import { convertImageToWebP, blobToBase64 } from "@/lib/image-processing";
-import { 
-  Upload, 
-  Search, 
-  Image as ImageIcon, 
-  CheckCircle2, 
-  XCircle, 
-  FolderOpen,
-  Trash2,
-  Download,
-  ChevronRight,
-  AlertCircle,
-  RefreshCw,
-  Database,
-  Images,
-  BarChart3,
-  X,
-  Minimize2,
-  Maximize2,
-  Info
-} from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card.tsx";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table.tsx";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert.tsx";
+/**
+ * Admin › Advanced Mockups: each phone model's picture of each design.
+ *
+ * A mockup is one design (R-44) on one phone model, made in the desktop
+ * software and uploaded here a model at a time; the shop shows it when a
+ * customer has picked that phone. "Needed" means the designs live as phone
+ * skins right now, read from the catalogue — not a fixed count, which had
+ * stood at 359 while the real number moved.
+ *
+ * Coverage comes from mockupCoverage (functions/src/mockupCoverage.ts), one
+ * small document per model, rather than downloading all 106k mockups on
+ * every visit as this page used to.
+ */
 
-// --- TYPES ---
+type Model = { _id: string; brandName: string; modelName: string; category?: string; isActive?: boolean; mergedInto?: string };
+type Coverage = { _id: string; skus: string[] };
+type Mockup = { _id: string; sku: string; cloudinaryUrl?: string; r2Url?: string };
+type Design = { code: string; inStock: boolean; listings: number };
+type Row = Model & { have: number; missing: Design[]; extra: number };
 
-interface UploadTask {
-  id: string;
-  modelId: Id<"supportedModels">;
-  brandName: string;
-  modelName: string;
-  files: File[];
-  status: 'pending' | 'uploading' | 'completed' | 'cancelled';
-  progress: {
-    total: number;
-    completed: number;
-    failed: number;
-    skipped: number;
-    current: string;
-  };
-  fileStatuses: Map<string, 'pending' | 'uploading' | 'success' | 'failed' | 'skipped'>;
-  skipExisting: boolean;
-  cancelController?: AbortController;
-  lastError?: string;
-}
+type UploadTask = {
+  id: string; modelId: string; brandName: string; modelName: string; files: File[];
+  status: "uploading" | "completed" | "cancelled";
+  progress: { total: number; completed: number; failed: number; skipped: number; current: string };
+  controller: AbortController; lastError?: string;
+};
 
-// --- COMPONENTS ---
+const PAGE = 50;
+/** Design code of a listing SKU: R-44-IPH is filed under R-44. */
+const designCode = (sku: string) => String(sku || "").trim().toUpperCase().replace(/^([A-Z]+-\d+)-[A-Z0-9]+$/, "$1");
 
-// Upload Progress Panel (Floating)
-function UploadProgressPanel({ 
-  tasks, 
-  onCancel, 
-  onDismiss 
-}: { 
-  tasks: UploadTask[], 
-  onCancel: (id: string) => void,
-  onDismiss: (id: string) => void 
-}) {
-  const [minimized, setMinimized] = useState(false);
-
-  if (tasks.length === 0) return null;
-
-  return (
-    <div className={`fixed bottom-4 right-4 z-50 w-full max-w-md bg-background border shadow-xl rounded-lg overflow-hidden transition-all duration-300 ${minimized ? 'h-12' : 'max-h-[80vh]'}`}>
-      <div className="bg-primary text-primary-foreground p-3 flex items-center justify-between cursor-pointer" onClick={() => setMinimized(!minimized)}>
-        <div className="font-semibold flex items-center gap-2">
-          <Upload className="h-4 w-4" />
-          Upload Manager ({tasks.length})
-        </div>
-        <div className="flex items-center gap-1">
-          {minimized ? <Maximize2 className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-        </div>
-      </div>
-      
-      {!minimized && (
-        <ScrollArea className="h-[400px]">
-          <div className="p-4 space-y-4">
-            {tasks.map(task => {
-              const percentage = task.progress.total > 0 
-                ? ((task.progress.completed + task.progress.failed + task.progress.skipped) / task.progress.total) * 100 
-                : 0;
-
-              return (
-                <div key={task.id} className="border rounded-md p-3 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-medium text-sm">{task.brandName} {task.modelName}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {task.status === 'completed' ? 'Upload Complete' : 
-                         task.status === 'cancelled' ? 'Cancelled' :
-                         task.status === 'pending' ? 'Pending...' :
-                         `Uploading... ${task.progress.current}`}
-                      </div>
-                    </div>
-                    {task.status === 'uploading' || task.status === 'pending' ? (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onCancel(task.id)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDismiss(task.id)}>
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span>{Math.round(percentage)}%</span>
-                      <span>{task.progress.completed + task.progress.failed + task.progress.skipped} / {task.progress.total}</span>
-                    </div>
-                    <Progress value={percentage} className="h-2" />
-                    <div className="flex flex-col gap-1 pt-1">
-                      <div className="flex gap-3 text-xs">
-                        <span className="text-green-600 flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> {task.progress.completed}</span>
-                        <span className="text-blue-600 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {task.progress.skipped}</span>
-                        <span className="text-red-600 flex items-center gap-1"><XCircle className="h-3 w-3" /> {task.progress.failed}</span>
-                      </div>
-                      {task.lastError && (
-                         <div className="text-xs text-destructive flex items-center gap-1 mt-1 bg-destructive/10 p-1 rounded">
-                           <Info className="h-3 w-3" />
-                           <span className="truncate" title={task.lastError}>
-                             Error: {task.lastError}
-                           </span>
-                         </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-      )}
-    </div>
-  );
-}
-
-// Parse SKU from filename
+/**
+ * The design code in a mockup's filename: the last code in it, without
+ * anything after (the -5G, -PRO of a model name used to be glued on, giving
+ * codes like S-15-5G that no design has). Part suffixes _B/_B1 are dropped.
+ */
 function parseSKUFromFilename(filename: string): string | null {
-  // Remove _B, _B1, _B2 anywhere in the filename (case insensitive)
-  // Also handle cases where it might be attached to other words e.g. "Model_B1_SKU"
-  const cleanFilename = filename.replace(/_B\d*(?=_|\.|$| )/gi, "_");
-  
-  // Match patterns like L-01, M-123, S-45, R-123, A-01, T-50 etc.
-  // Also supports optional suffixes like R-123-PH
-  const match = cleanFilename.match(/([LMSBFART])-(\d+)(?:-[A-Z0-9]+)?/i);
-  
-  if (!match) return null;
-
-  // Always return uppercase
-  return match[0].toUpperCase();
+  const clean = filename.replace(/\.[a-z0-9]+$/i, "").replace(/_B\d*(?=_|$| )/gi, "_");
+  const all = [...clean.matchAll(/(?:^|[^A-Za-z0-9])([LMSBFART]-\d+)(?!\d)/gi)];
+  return all.length ? all[all.length - 1][1].toUpperCase() : null;
 }
 
-// View Mockups Dialog
-function ViewMockupsDialog({
-  open,
-  onOpenChange,
-  modelId,
-  brandName,
-  modelName,
-  mockups,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  modelId: Id<"supportedModels">;
-  brandName: string;
-  modelName: string;
-  mockups: any[];
-}) {
-  const deleteMockup = useMutation(api.mockupsAdvanced.deleteMockup);
-  const [deletingId, setDeletingId] = useState<Id<"mockups"> | null>(null);
-
-  const handleDelete = async (id: Id<"mockups">) => {
-    if (!confirm("Are you sure you want to delete this mockup?")) return;
-    setDeletingId(id);
-    try {
-      await deleteMockup({ mockupId: id });
-      toast.success("Mockup deleted");
-    } catch (error) {
-      toast.error("Failed to delete mockup");
-      console.error(error);
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Mockups for {brandName} {modelName}</DialogTitle>
-          <DialogDescription>
-            {mockups.length} mockups uploaded
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto p-1">
-          {mockups.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              No mockups found for this model.
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {mockups.map((mockup) => (
-                <div key={mockup._id} className="relative group border rounded-lg overflow-hidden">
-                  <div className="aspect-[9/16] bg-muted relative">
-                    <img
-                      src={mockup.r2Url || mockup.cloudinaryUrl || "/placeholder.png"}
-                      alt={mockup.sku}
-                      className="object-cover w-full h-full"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => handleDelete(mockup._id)}
-                        disabled={deletingId === mockup._id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-2 bg-background border-t text-center">
-                    <span className="font-mono font-bold text-sm">{mockup.sku}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+function useLive<T>(q: any, key: string) {
+  const [rows, setRows] = useState<T[] | null>(null);
+  useEffect(() => onSnapshot(q, (s: any) => setRows(s.docs.map((d: any) => ({ _id: d.id, ...d.data() }))),
+    (e: any) => { toast.error(e.message); setRows([]); }), [key]);
+  return rows;
 }
 
-// Delete All Mockups Dialog
-function DeleteAllMockupsDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [deleting, setDeleting] = useState(false);
-  const deleteAll = useMutation(api.mockupsAdvanced.deleteAllMockups);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    let totalDeleted = 0;
-    
-    try {
-      // Loop until all deleted
-      while (true) {
-        const result = await deleteAll({});
-        totalDeleted += result.deleted;
-        if (!result.hasMore) break;
+/** Live phone-skin designs, with whether any of their phone listings is in stock. */
+function useLiveDesigns() {
+  const [designs, setDesigns] = useState<Map<string, Design> | null>(null);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const gt = await getDocs(query(collection(db, "gadgetTypes"), where("name", "==", "phone"), limit(1)));
+      const phoneId = gt.docs[0]?.id;
+      const prods = await getDocs(query(collection(db, "products"), where("status", "==", "active")));
+      const ids = prods.docs.filter((d) => d.data().productCategory === "skin" && d.data().gadgetTypeId === phoneId).map((d) => d.id);
+      const variants: any[] = [];
+      for (let i = 0; i < ids.length; i += 30) {
+        const s = await getDocs(query(collection(db, "variants"), where("productId", "in", ids.slice(i, i + 30))));
+        variants.push(...s.docs.map((d) => d.data()));
       }
-      
-      toast.success(`Successfully deleted all ${totalDeleted} mockups.`);
-      onOpenChange(false);
-      setStep(1); // Reset for next time
-    } catch (error) {
-      toast.error("Failed to delete mockups");
-      console.error(error);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(val) => {
-      if (!val) setStep(1); // Reset on close
-      onOpenChange(val);
-    }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete ALL Mockups</DialogTitle>
-          <DialogDescription>
-            {step === 1 
-              ? "This will delete EVERY mockup in the system. Are you sure you want to proceed?"
-              : "Please confirm your choice."
-            }
-          </DialogDescription>
-        </DialogHeader>
-
-        {step === 1 ? (
-          <div className="py-4">
-             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Warning</AlertTitle>
-              <AlertDescription>
-                This action will remove all mockups from the database and delete their images from Cloudinary.
-              </AlertDescription>
-            </Alert>
-          </div>
-        ) : (
-          <div className="py-4 space-y-4">
-            <div className="p-4 border border-destructive/50 bg-destructive/10 rounded-md">
-              <p className="text-destructive font-bold text-center">
-                THIS ACTION IS IRREVERSIBLE!
-              </p>
-              <p className="text-destructive text-sm text-center mt-2">
-                You are about to permanently delete all mockups. This cannot be undone.
-              </p>
-            </div>
-            <p className="text-sm text-muted-foreground text-center">
-              Are you absolutely sure?
-            </p>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={deleting}>
-            Cancel
-          </Button>
-          {step === 1 ? (
-            <Button variant="destructive" onClick={() => setStep(2)}>
-              Next Step
-            </Button>
-          ) : (
-            <Button 
-              variant="destructive" 
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? "Deleting Everything..." : "Yes, Delete Everything"}
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Delete SKU Dialog
-function DeleteSKUDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const [sku, setSku] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const deleteBySKU = useMutation(api.mockupsAdvanced.deleteMockupsBySKU);
-
-  const handleDelete = async () => {
-    if (!sku.trim()) return;
-    
-    if (!confirm(`Are you sure you want to delete SKU "${sku}" from ALL models? This action cannot be undone.`)) return;
-
-    setDeleting(true);
-    try {
-      const result = await deleteBySKU({ sku: sku.trim().toUpperCase() });
-      if (result.deleted > 0) {
-        toast.success(`Deleted ${result.deleted} mockups for SKU ${sku}`);
-        onOpenChange(false);
-        setSku("");
-      } else {
-        toast.info(`No mockups found for SKU ${sku}`);
+      const byProduct = new Map<string, any[]>();
+      for (const v of variants) byProduct.set(v.productId, [...(byProduct.get(v.productId) || []), v]);
+      const out = new Map<string, Design>();
+      for (const id of ids) {
+        const vs = (byProduct.get(id) || []).sort((a, b) => (a._creationTime || 0) - (b._creationTime || 0));
+        // The shop looks a listing's mockup up by its first variant's SKU.
+        const c = vs[0]?.sku ? designCode(vs[0].sku) : "";
+        if (!c) continue;
+        const d = out.get(c) || { code: c, inStock: false, listings: 0 };
+        d.listings++;
+        d.inStock ||= vs.some((v) => Number(v.inventoryQuantity) > 0);
+        out.set(c, d);
       }
-    } catch (error) {
-      toast.error("Failed to delete mockups");
-      console.error(error);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete Mockups by SKU</DialogTitle>
-          <DialogDescription>
-            Enter a SKU (e.g., "L-01") to delete it from ALL models in the system.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">SKU to Delete</label>
-            <Input 
-              placeholder="e.g. L-01" 
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
-            />
-          </div>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Warning</AlertTitle>
-            <AlertDescription>
-              This will permanently delete all mockup images associated with this SKU from Cloudinary and the database.
-            </AlertDescription>
-          </Alert>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button 
-            variant="destructive" 
-            onClick={handleDelete}
-            disabled={!sku.trim() || deleting}
-          >
-            {deleting ? "Deleting..." : "Delete All Matches"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Model card component with lazy-loaded stats
-function ModelCard({ 
-  modelId, 
-  brandName, 
-  modelName, 
-  initialCount,
-  onUploadClick,
-  onViewClick,
-  onDeleteClick
-}: {
-  modelId: Id<"supportedModels">;
-  brandName: string;
-  modelName: string;
-  initialCount?: number;
-  onUploadClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
-  onViewClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[], mockups?: any[]) => void;
-  onDeleteClick: (modelId: Id<"supportedModels">, brandName: string, modelName: string) => void;
-}) {
-  const [showStats, setShowStats] = useState(false);
-  const stats = useQuery(
-    api.mockupsAdvanced.getModelMockupStats,
-    showStats ? { modelId } : "skip"
-  );
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-lg">{brandName} {modelName}</CardTitle>
-            <CardDescription className="mt-1">
-              {initialCount !== undefined && `${initialCount} unique SKUs uploaded`}
-            </CardDescription>
-          </div>
-          <div className="flex gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeleteClick(modelId, brandName, modelName);
-              }}
-              title="Delete all mockups for this model"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowStats(!showStats)}
-            >
-              <ChevronRight className={`h-4 w-4 transition-transform ${showStats ? 'rotate-90' : ''}`} />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      
-      {showStats && (
-        <CardContent className="pt-0">
-          {stats === undefined ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-muted-foreground">Coverage</span>
-                  <span className="font-medium">{stats.coverage}%</span>
-                </div>
-                <Progress value={stats.coverage} />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>{stats.uploadedSKUs} of {stats.totalSKUs} SKUs</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => onUploadClick(modelId, brandName, modelName)}
-                  className="flex-1"
-                >
-                  <Upload className="h-3 w-3 mr-1" />
-                  Upload
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onViewClick(modelId, brandName, modelName, undefined, undefined, stats.mockups)}
-                  className="flex-1"
-                >
-                  <ImageIcon className="h-3 w-3 mr-1" />
-                  View ({stats.mockups.length})
-                </Button>
-              </div>
-
-              {stats.missingSKUs.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => onViewClick(modelId, brandName, modelName, stats.missingSKUsInStock, stats.missingSKUsOutOfStock)}
-                  className="w-full"
-                >
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                  View Missing SKUs ({stats.missingSKUs.length})
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
-  );
-}
-
-// Missing SKUs dialog with inventory tabs
-function MissingSKUsDialog({
-  open,
-  onOpenChange,
-  missingSKUsInStock,
-  missingSKUsOutOfStock,
-  modelName,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  missingSKUsInStock: string[];
-  missingSKUsOutOfStock: string[];
-  modelName: string;
-}) {
-  const [activeTab, setActiveTab] = useState<"instock" | "outofstock">("instock");
-
-  const handleDownloadCSV = (skus: string[], type: string) => {
-    const csv = `SKU\n${skus.join('\n')}`;
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `missing-skus-${type}-${modelName.replace(/\s+/g, '-')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const currentSKUs = activeTab === "instock" ? missingSKUsInStock : missingSKUsOutOfStock;
-  const totalCount = missingSKUsInStock.length + missingSKUsOutOfStock.length;
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[600px]">
-        <DialogHeader>
-          <DialogTitle>Missing SKUs for {modelName}</DialogTitle>
-          <DialogDescription>
-            {totalCount} total SKU{totalCount !== 1 ? 's' : ''} without mockups
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "instock" | "outofstock")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="instock">
-              In Stock
-              {missingSKUsInStock.length > 0 && (
-                <Badge variant="secondary" className="ml-2">{missingSKUsInStock.length}</Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="outofstock">
-              Out of Stock
-              {missingSKUsOutOfStock.length > 0 && (
-                <Badge variant="secondary" className="ml-2">{missingSKUsOutOfStock.length}</Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="instock" className="mt-4">
-            {missingSKUsInStock.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No in-stock SKUs missing mockups
-              </div>
-            ) : (
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="grid grid-cols-4 gap-2">
-                  {missingSKUsInStock.map((sku) => (
-                    <Badge key={sku} variant="outline" className="justify-center">
-                      {sku}
-                    </Badge>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          <TabsContent value="outofstock" className="mt-4">
-            {missingSKUsOutOfStock.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No out-of-stock SKUs missing mockups
-              </div>
-            ) : (
-              <ScrollArea className="h-[300px] pr-4">
-                <div className="grid grid-cols-4 gap-2">
-                  {missingSKUsOutOfStock.map((sku) => (
-                    <Badge key={sku} variant="outline" className="justify-center">
-                      {sku}
-                    </Badge>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={() => handleDownloadCSV(currentSKUs, activeTab)}
-            disabled={currentSKUs.length === 0}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Download {activeTab === "instock" ? "In Stock" : "Out of Stock"} CSV
-          </Button>
-          <Button onClick={() => onOpenChange(false)}>Close</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Upload dialog - Refactored to queue uploads
-function UploadMockupsDialog({
-  open,
-  onOpenChange,
-  modelId,
-  brandName,
-  modelName,
-  onStartUpload
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  modelId: Id<"supportedModels">;
-  brandName: string;
-  modelName: string;
-  onStartUpload: (files: File[], skipExisting: boolean, existingSKUs: Set<string>) => void;
-}) {
-  const [files, setFiles] = useState<File[]>([]);
-  const [skipExisting, setSkipExisting] = useState(true);
-
-  // Fetch current stats to check for existing mockups
-  const stats = useQuery(api.mockupsAdvanced.getModelMockupStats, { modelId });
-  const existingSKUs = useMemo(() => {
-    if (!stats) return new Set<string>();
-    return new Set(stats.mockups.map(m => m.sku.toUpperCase()));
-  }, [stats]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setFiles(prev => [...prev, ...newFiles]);
-    }
-  };
-
-  const handleStart = () => {
-    if (files.length === 0) return;
-    onStartUpload(files, skipExisting, existingSKUs);
-    onOpenChange(false);
-    setFiles([]); // Reset
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Upload Mockups for {brandName} {modelName}</DialogTitle>
-          <DialogDescription>
-            Select mockup images. SKUs will be auto-detected from filenames (e.g., L-01, M-174)
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2 p-4 bg-muted/50 rounded-lg">
-             <div className="flex items-center space-x-2">
-               <input 
-                 type="checkbox" 
-                 id="skipExisting"
-                 className="h-4 w-4 rounded border-gray-300"
-                 checked={skipExisting}
-                 onChange={(e) => setSkipExisting(e.target.checked)}
-               />
-               <label htmlFor="skipExisting" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                 Skip SKUs that already have mockups
-               </label>
-             </div>
-             <div className="text-xs text-muted-foreground ml-auto">
-               {existingSKUs.size} SKUs already uploaded
-             </div>
-          </div>
-
-          <div>
-            <Input
-              type="file"
-              accept="image/*"
-              multiple
-              {...({ webkitdirectory: "", directory: "" } as any)}
-              onChange={handleFileSelect}
-              className="hidden"
-              id="file-upload"
-            />
-            <label htmlFor="file-upload" className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-              <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
-                <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload files</span> or drag and drop</p>
-                <p className="text-xs text-muted-foreground">Select individual images or entire folders</p>
-              </div>
-            </label>
-          </div>
-
-          {files.length > 0 && (
-            <ScrollArea className="h-[200px] border rounded p-4">
-              <div className="space-y-2">
-                {files.map((file, idx) => {
-                  const sku = parseSKUFromFilename(file.name);
-                  return (
-                    <div
-                      key={`${file.name}-${idx}`}
-                      className="flex items-center justify-between p-2 rounded border"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{file.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {sku ? `SKU: ${sku}` : 'No SKU detected'}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleStart} disabled={files.length === 0}>
-            Start Upload ({files.length} Files)
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+      if (live) setDesigns(out);
+    })().catch((e) => { toast.error(e.message); if (live) setDesigns(new Map()); });
+    return () => { live = false; };
+  }, []);
+  return designs;
 }
 
 export default function MockupsAdvancedPage() {
-  const [brandFilter, setBrandFilter] = useState<string>("all");
-  const [modelSearch, setModelSearch] = useState<string>("");
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [missingSKUsDialogOpen, setMissingSKUsDialogOpen] = useState(false);
-  const [viewMockupsDialogOpen, setViewMockupsDialogOpen] = useState(false);
-  const [deleteSKUDialogOpen, setDeleteSKUDialogOpen] = useState(false);
-  const [deleteAllMockupsDialogOpen, setDeleteAllMockupsDialogOpen] = useState(false);
-  const [selectedMockups, setSelectedMockups] = useState<any[]>([]);
-  
-  // Upload Manager State
-  const [uploadTasks, setUploadTasks] = useState<UploadTask[]>([]);
-  
-  const [selectedModel, setSelectedModel] = useState<{
-    id: Id<"supportedModels">;
-    brand: string;
-    name: string;
-    missingSKUsInStock?: string[];
-    missingSKUsOutOfStock?: string[];
-  } | null>(null);
+  const models = useLive<Model>(query(collection(db, "supportedModels"), where("category", "==", "phone")), "phone-models");
+  const coverage = useLive<Coverage>(collection(db, "mockupCoverage"), "coverage");
+  const designs = useLiveDesigns();
 
-  // Queries
-  const brands = useQuery(api.mockupsAdvanced.getUniqueBrands, {});
-  const modelsWithMockups = useQuery(api.mockupsAdvanced.getModelsWithMockups, {
-    brandFilter: brandFilter === "all" ? undefined : brandFilter,
-  });
-  const modelsMissing = useQuery(api.mockupsAdvanced.getModelsMissingMockups, {
-    brandFilter: brandFilter === "all" ? undefined : brandFilter,
-  });
-  const modelsFullCoverage = useQuery(api.mockupsAdvanced.getModelsWithFullCoverage, {
-    brandFilter: brandFilter === "all" ? undefined : brandFilter,
-  });
-  const overviewStats = useQuery(api.mockupsAdvanced.getOverviewStats, {});
+  const [tab, setTab] = useState<"some" | "none" | "done" | "all">("some");
+  const [brand, setBrand] = useState("all");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"missing" | "az">("missing");
+  const [shown, setShown] = useState(PAGE);
+  const [dialog, setDialog] = useState<{ kind: "upload" | "missing" | "view" | "delete"; row: Row } | null>(null);
+  const [toolsOpen, setToolsOpen] = useState<"design" | null>(null);
+  const [tasks, setTasks] = useState<UploadTask[]>([]);
+  const [busy, setBusy] = useState(false);
+  const uploadToR2 = useAction(api.r2.uploadToR2);
 
-  // Mutations & Actions
-  const migrateMockups = useMutation(api.mockupsAdvanced.migrateMockupsToModels);
-  const deleteAllMockups = useMutation(api.mockupsAdvanced.deleteAllMockupsForModel);
-  const uploadToR2 = useAction(api.r2.uploadToR2); // R2 action
-  const storeMockup = useMutation(api.mockupsAdvanced.storeMockupAdvanced);
-  // Need to use getModelMockupStats for checking existing SKUs, but hooks can't be called in loop.
-  // We'll pass the initial set of existing SKUs from the dialog to the task.
-  // Wait, the dialog already fetches stats. We can pass the existing Set from the dialog to onStartUpload?
-  // Or we can fetch it again here? We can't use useQuery conditionally in a loop.
-  // We will assume the Dialog passes the `skipExisting` boolean and we might need to fetch existing SKUs *before* starting?
-  // Actually, for "skip existing", we need to know what exists. 
-  // Solution: The Dialog already knows what exists. We can pass the Set of existing SKUs to the start function.
-  
-  const [migrating, setMigrating] = useState(false);
+  const rows = useMemo<Row[]>(() => {
+    if (!models || !coverage || !designs) return [];
+    const cov = new Map(coverage.map((c) => [c._id, new Set(c.skus || [])]));
+    return models.filter((m) => m.isActive !== false && !m.mergedInto).map((m) => {
+      const has = cov.get(m._id) || new Set<string>();
+      const missing = [...designs.values()].filter((d) => !has.has(d.code));
+      return { ...m, have: designs.size - missing.length, missing, extra: [...has].filter((c) => !designs.has(c)).length };
+    });
+  }, [models, coverage, designs]);
 
-  // --- UPLOAD MANAGER LOGIC ---
+  const brands = useMemo(() => [...new Set(rows.map((r) => r.brandName))].sort(), [rows]);
+  const total = designs?.size || 0;
+  const counts = {
+    done: rows.filter((r) => total && !r.missing.length).length,
+    some: rows.filter((r) => r.have > 0 && r.missing.length).length,
+    none: rows.filter((r) => r.have === 0).length,
+  };
 
-  const handleStartUpload = async (files: File[], skipExisting: boolean, existingSKUs: Set<string>) => {
-    if (!selectedModel) return;
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) =>
+      (tab === "all" || (tab === "done" ? !r.missing.length : tab === "none" ? r.have === 0 : r.have > 0 && r.missing.length > 0))
+      && (brand === "all" || r.brandName === brand)
+      && (!q || `${r.brandName} ${r.modelName}`.toLowerCase().includes(q)))
+      .sort((a, b) => sort === "missing"
+        ? b.missing.filter((d) => d.inStock).length - a.missing.filter((d) => d.inStock).length || a.modelName.localeCompare(b.modelName)
+        : a.brandName.localeCompare(b.brandName) || a.modelName.localeCompare(b.modelName));
+  }, [rows, tab, brand, search, sort]);
 
-    const taskId = crypto.randomUUID();
-    const controller = new AbortController();
+  useEffect(() => setShown(PAGE), [tab, brand, search, sort]);
 
-    const newTask: UploadTask = {
-      id: taskId,
-      modelId: selectedModel.id,
-      brandName: selectedModel.brand,
-      modelName: selectedModel.name,
-      files,
-      status: 'pending',
-      progress: {
-        total: files.length,
-        completed: 0,
-        failed: 0,
-        skipped: 0,
-        current: 'Starting...',
-      },
-      fileStatuses: new Map(files.map(f => [f.name, 'pending'])),
-      skipExisting,
-      cancelController: controller,
+  // ---- Upload manager: five files at a time, retried, each replacing that model's mockup of the design.
+  const patchTask = (id: string, patch: Partial<Omit<UploadTask, "progress">> & { progress?: Partial<UploadTask["progress"]> }) =>
+    setTasks((ts) => ts.map((t) => t.id !== id ? t : { ...t, ...patch, progress: { ...t.progress, ...(patch.progress || {}) } }));
+
+  const startUpload = async (row: Row, files: File[], skipExisting: boolean) => {
+    const have = new Set(coverage?.find((c) => c._id === row._id)?.skus || []);
+    const task: UploadTask = {
+      id: crypto.randomUUID(), modelId: row._id, brandName: row.brandName, modelName: row.modelName, files,
+      status: "uploading", controller: new AbortController(),
+      progress: { total: files.length, completed: 0, failed: 0, skipped: 0, current: "Starting…" },
+    };
+    setTasks((ts) => [...ts, task]);
+    let completed = 0, failed = 0, skipped = 0;
+
+    const one = async (file: File) => {
+      if (task.controller.signal.aborted) return;
+      const sku = parseSKUFromFilename(file.name);
+      if (!sku) { failed++; patchTask(task.id, { progress: { failed }, lastError: `No design code in ${file.name}` }); return; }
+      if (skipExisting && have.has(sku)) { skipped++; patchTask(task.id, { progress: { skipped } }); return; }
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        if (task.controller.signal.aborted) return;
+        try {
+          patchTask(task.id, { progress: { current: `${file.name}${attempt > 1 ? ` (try ${attempt})` : ""}` } });
+          const base64 = await blobToBase64(await convertImageToWebP(file));
+          const r2: any = await uploadToR2({
+            fileBase64: base64.includes(",") ? base64.split(",")[1] : base64,
+            key: `mockups/${row.brandName}/${row.modelName}/${sku}.webp`,
+            contentType: "image/webp",
+          });
+          if (!r2?.success) throw new Error(r2?.error || "Upload failed");
+          const data = {
+            brand: row.brandName, model: row.modelName, sku, supportedModelId: row._id,
+            r2Key: r2.key, r2Bucket: r2.bucket, cloudinaryUrl: r2.url || r2.publicUrl, updatedAt: Date.now(),
+          };
+          // One mockup per model and design: a second upload replaces the first.
+          const existing = await getDocs(query(collection(db, "mockups"),
+            where("supportedModelId", "==", row._id), where("sku", "==", sku), limit(1)));
+          if (existing.empty) await addDoc(collection(db, "mockups"), { ...data, createdAt: Date.now(), _creationTime: Date.now() });
+          else await updateDoc(existing.docs[0].ref, data);
+          completed++;
+          patchTask(task.id, { progress: { completed } });
+          return;
+        } catch (e: any) {
+          if (attempt === 3) { failed++; patchTask(task.id, { progress: { failed }, lastError: `${file.name}: ${e?.message || "failed"}` }); }
+          else await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+        }
+      }
     };
 
-    setUploadTasks(prev => [...prev, newTask]);
-
-    // Start background process
-    processUploadQueue(newTask, skipExisting, existingSKUs);
+    for (let i = 0; i < files.length && !task.controller.signal.aborted; i += 5) {
+      await Promise.all(files.slice(i, i + 5).map(one));
+    }
+    if (!task.controller.signal.aborted) {
+      patchTask(task.id, { status: "completed", progress: { current: "Done" } });
+      toast.success(`${row.brandName} ${row.modelName}: ${completed} uploaded${skipped ? `, ${skipped} skipped` : ""}${failed ? `, ${failed} failed` : ""}`);
+    }
   };
 
-  const processUploadQueue = async (task: UploadTask, skipExisting: boolean, existingSKUs: Set<string>) => {
-    // Update status to uploading
-    updateTaskStatus(task.id, 'uploading');
+  const recount = async () => {
+    setBusy(true);
     try {
-      await executeUpload(task, existingSKUs);
-    } catch (error) {
-      console.error("Upload queue error:", error);
-      updateTaskStatus(task.id, 'uploading', { 
-        current: "Fatal Error: " + (error instanceof Error ? error.message : "Unknown") 
-      }, error instanceof Error ? error.message : "Queue Error");
-    }
-  };
-  
-  // Helper to update task state
-  const updateTaskStatus = (id: string, status: UploadTask['status'], progress?: Partial<UploadTask['progress']>, error?: string) => {
-    setUploadTasks(prev => prev.map(t => {
-      if (t.id !== id) return t;
-      return {
-        ...t,
-        status,
-        progress: progress ? { ...t.progress, ...progress } : t.progress,
-        lastError: error || t.lastError
-      };
-    }));
-  };
-
-  const handleCancelUpload = (id: string) => {
-    const task = uploadTasks.find(t => t.id === id);
-    if (task?.cancelController) {
-      task.cancelController.abort();
-    }
-    updateTaskStatus(id, 'cancelled');
-  };
-
-  const handleDismissUpload = (id: string) => {
-    setUploadTasks(prev => prev.filter(t => t.id !== id));
-  };
-
-  // The actual upload worker with parallelism
-  const executeUpload = async (task: UploadTask, existingSKUs: Set<string>) => {
-    let completed = 0;
-    let failed = 0;
-    let skipped = 0;
-
-    // Concurrency limit - strictly 5 as requested
-    const CONCURRENCY = 5;
-    
-    // Helper to upload a single file with retries and client-side conversion
-    const uploadSingleFile = async (file: File) => {
-       if (task.cancelController?.signal.aborted) return;
-
-       const sku = parseSKUFromFilename(file.name);
-       
-       if (!sku) {
-         failed++;
-         updateTaskStatus(task.id, 'uploading', { failed, current: `Failed: ${file.name}` }, `Invalid SKU in filename: ${file.name}`);
-         return;
-       }
-
-       if (task.skipExisting && existingSKUs && existingSKUs.has(sku)) {
-         skipped++;
-         updateTaskStatus(task.id, 'uploading', { skipped, current: `Skipped: ${file.name}` });
-         return;
-       }
-
-       // Retry logic
-       let attempts = 0;
-       const MAX_RETRIES = 3;
-       
-       while (attempts < MAX_RETRIES) {
-         if (task.cancelController?.signal.aborted) return;
-         
-         try {
-           updateTaskStatus(task.id, 'uploading', { current: `Processing: ${file.name} (Attempt ${attempts + 1})` });
-
-           // 1. Client-side WebP Conversion
-           const webpBlob = await convertImageToWebP(file);
-           const base64 = await blobToBase64(webpBlob);
-
-           // 2. Upload to R2
-           const key = `mockups/${task.brandName}/${task.modelName}/${sku}.webp`;
-           
-           // Extract base64 part
-           const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
-
-           // Use R2
-           const r2Result = await uploadToR2({
-             fileBase64: base64Data,
-             key: key,
-             contentType: 'image/webp'
-           });
-
-           if (!r2Result.success) {
-             throw new Error(r2Result.error || "Unknown R2 error");
-           }
-
-           // 3. Store in DB
-           await storeMockup({
-             brand: task.brandName,
-             model: task.modelName,
-             sku,
-             supportedModelId: task.modelId,
-             r2Key: r2Result.key,
-             r2Bucket: r2Result.bucket,
-             // Map R2 url to cloudinaryUrl directly so it is stored and returned
-             cloudinaryUrl: r2Result.url || r2Result.publicUrl, 
-           });
-
-           completed++;
-           updateTaskStatus(task.id, 'uploading', { completed });
-           return; // Success, exit retry loop
-           
-         } catch (error) {
-           console.error(`Upload error for ${file.name}:`, error);
-           attempts++;
-           
-           const errorMessage = error instanceof Error ? error.message : "Unknown error";
-           
-           if (attempts >= MAX_RETRIES) {
-             failed++;
-             updateTaskStatus(task.id, 'uploading', { 
-               failed, 
-               current: `Error: ${file.name}`
-             }, errorMessage);
-           } else {
-             // Wait before retry
-             await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempts - 1)));
-           }
-         }
-       }
-    };
-
-    // Process files in chunks to manage concurrency
-    for (let i = 0; i < task.files.length; i += CONCURRENCY) {
-      if (task.cancelController?.signal.aborted) break;
-      
-      const chunk = task.files.slice(i, i + CONCURRENCY);
-      
-      // We must catch errors here to ensure the loop continues even if Promise.all fails 
-      // (though uploadSingleFile handles its own errors, Promise.all shouldn't fail)
-      await Promise.all(chunk.map(file => uploadSingleFile(file)));
-      
-      // Cleanup: The 'chunk' array and 'file' references will naturally be garbage collected 
-      // as we move to the next iteration. 
-      // The 'task.files' array still holds references, but browsers handle File objects efficiently (pointers to disk).
-      // The heavy base64 strings are inside uploadSingleFile scope and are GC'd.
-    }
-
-    if (!task.cancelController?.signal.aborted) {
-      updateTaskStatus(task.id, 'completed', { current: 'Done' });
-      toast.success(`Finished uploading for ${task.brandName} ${task.modelName}`);
-    }
-  };
-
-  // --- END UPLOAD MANAGER LOGIC ---
-
-  const handleMigration = async () => {
-    setMigrating(true);
-    try {
-      const result = await migrateMockups({});
-      toast.success(`Migration complete: ${result.updated} mockups linked, ${result.noMatch} without matches`);
-    } catch (error) {
-      toast.error("Migration failed");
-      console.error(error);
+      const r: any = (await httpsCallable(functions, "rebuildMockupCoverage", { timeout: 300_000 })({})).data;
+      toast.success(`Recounted ${r.mockups} mockups across ${r.models} models`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not recount");
     } finally {
-      setMigrating(false);
+      setBusy(false);
     }
   };
 
-  const handleUploadClick = (modelId: Id<"supportedModels">, brand: string, name: string) => {
-    setSelectedModel({ id: modelId, brand, name });
-    setUploadDialogOpen(true);
-  };
-
-  const handleDeleteClick = async (modelId: Id<"supportedModels">, brand: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ALL mockups for ${brand} ${name}? This action cannot be undone.`)) return;
-    
-    try {
-      const result = await deleteAllMockups({ modelId });
-      toast.success(`Deleted ${result.deleted} mockups for ${brand} ${name}`);
-    } catch (error) {
-      toast.error("Failed to delete mockups");
-      console.error(error);
-    }
-  };
-
-  const handleViewClick = (modelId: Id<"supportedModels">, brand: string, name: string, missingSKUsInStock?: string[], missingSKUsOutOfStock?: string[], mockups?: any[]) => {
-    if (missingSKUsInStock || missingSKUsOutOfStock) {
-      setSelectedModel({ id: modelId, brand, name, missingSKUsInStock, missingSKUsOutOfStock });
-      setMissingSKUsDialogOpen(true);
-    } else if (mockups && mockups.length > 0) {
-      setSelectedModel({ id: modelId, brand, name });
-      setSelectedMockups(mockups);
-      setViewMockupsDialogOpen(true);
-    } else {
-      toast.info("No mockups to view");
-    }
-  };
-
-  // Filter models by search term
-  const filterModelsBySearch = <T extends { modelName: string; brandName: string }>(models: T[] | undefined): T[] | undefined => {
-    if (!models || !modelSearch.trim()) return models;
-    const searchLower = modelSearch.toLowerCase().trim();
-    return models.filter(m => 
-      m.modelName.toLowerCase().includes(searchLower) ||
-      m.brandName.toLowerCase().includes(searchLower)
-    );
-  };
-
-  const filteredModelsWithMockups = useMemo(() => filterModelsBySearch(modelsWithMockups), [modelsWithMockups, modelSearch]);
-  const filteredModelsMissing = useMemo(() => filterModelsBySearch(modelsMissing), [modelsMissing, modelSearch]);
-  const filteredModelsFullCoverage = useMemo(() => filterModelsBySearch(modelsFullCoverage), [modelsFullCoverage, modelSearch]);
-
-  const partialCoverageCount = filteredModelsWithMockups?.length ?? 0;
-  const missingCount = filteredModelsMissing?.length ?? 0;
-  const fullCoverageCount = filteredModelsFullCoverage?.length ?? 0;
-
-  // Calculate total models count
-  const totalModels = (modelsWithMockups?.length ?? 0) + (modelsMissing?.length ?? 0) + (modelsFullCoverage?.length ?? 0);
+  const loading = !models || !coverage || !designs;
+  const inStock = designs ? [...designs.values()].filter((d) => d.inStock).length : 0;
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Advanced Mockup Management</h1>
-          <p className="text-muted-foreground mt-2">
-            Upload and manage phone mockups by model with intelligent SKU detection
+          <h1 className="text-3xl font-bold">Phone Mockups</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Each phone model's picture of each design. When a customer picks their phone, the shop shows these; where one
+            is missing they see a generic picture instead. Upload a model's folder from the mockup software — the design
+            code (R-44, M-174…) is read from each file name.
           </p>
         </div>
 
-        {/* Overview Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Database className="h-4 w-4 text-muted-foreground" />
-                Total Models
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalModels}</div>
-              <p className="text-xs text-muted-foreground mt-1">Phone models in database</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Images className="h-4 w-4 text-muted-foreground" />
-                Total Mockups
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overviewStats?.totalMockups ?? 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">Mockups uploaded</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                Unique SKUs
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overviewStats?.uniqueSKUs ?? 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">of {overviewStats?.totalSKUs ?? 0} total SKUs</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                Coverage
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{overviewStats?.coverage ?? 0}%</div>
-              <p className="text-xs text-muted-foreground mt-1">Overall SKU coverage</p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-3 sm:grid-cols-4">
+          {[
+            ["Live phone designs", loading ? "…" : total, loading ? "" : `${inStock} in stock`],
+            ["Models with every design", loading ? "…" : counts.done, ""],
+            ["Models missing some", loading ? "…" : counts.some, ""],
+            ["Models with none", loading ? "…" : counts.none, `of ${rows.length || "…"} phone models`],
+          ].map(([label, value, sub]) => (
+            <Card key={String(label)}>
+              <CardContent className="pt-5">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="text-2xl font-bold">{value}</p>
+                {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
-        {/* Filters and Actions */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1 flex gap-4">
-            <Select value={brandFilter} onValueChange={setBrandFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Brands</SelectItem>
-                {brands?.map((brand) => (
-                  <SelectItem key={brand} value={brand}>
-                    {brand}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search models..."
-                value={modelSearch}
-                onChange={(e) => setModelSearch(e.target.value)}
-                className="pl-9 pr-9"
-              />
-              {modelSearch && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                  onClick={() => setModelSearch("")}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
+        <Card>
+          <CardContent className="space-y-4 pt-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+                <TabsList>
+                  <TabsTrigger value="some">Missing some ({counts.some})</TabsTrigger>
+                  <TabsTrigger value="none">None yet ({counts.none})</TabsTrigger>
+                  <TabsTrigger value="done">Complete ({counts.done})</TabsTrigger>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              <div className="relative">
+                <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search models" className="w-52 pl-8" />
+              </div>
+              <Select value={brand} onValueChange={setBrand}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All brands</SelectItem>
+                  {brands.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+                <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="missing">Most in-stock missing</SelectItem>
+                  <SelectItem value="az">Brand, A–Z</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
 
-          <div className="flex gap-2">
-            <Button variant="destructive" onClick={() => setDeleteAllMockupsDialogOpen(true)}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete ALL
-            </Button>
-            <Button variant="destructive" onClick={() => setDeleteSKUDialogOpen(true)}>
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete by SKU
-            </Button>
-            <Button variant="outline" onClick={handleMigration} disabled={migrating}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${migrating ? 'animate-spin' : ''}`} />
-              {migrating ? 'Migrating...' : 'Sync Existing Mockups'}
-            </Button>
-          </div>
+            {loading ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+            ) : !visible.length ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No models here.</p>
+            ) : (
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Model</TableHead>
+                      <TableHead className="w-56">Designs with a mockup</TableHead>
+                      <TableHead className="w-44">Missing</TableHead>
+                      <TableHead className="w-64 text-right" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visible.slice(0, shown).map((r) => {
+                      const missingIn = r.missing.filter((d) => d.inStock).length;
+                      return (
+                        <TableRow key={r._id}>
+                          <TableCell>
+                            <div className="font-medium">{r.modelName}</div>
+                            <div className="text-xs text-muted-foreground">{r.brandName}</div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Progress value={total ? (r.have / total) * 100 : 0} className="h-2 w-28" />
+                              <span className="text-sm tabular-nums">{r.have}/{total}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {r.missing.length ? (
+                              <button className="text-left text-sm hover:underline" onClick={() => setDialog({ kind: "missing", row: r })}>
+                                <b>{missingIn}</b> in stock{r.missing.length > missingIn ? <span className="text-muted-foreground"> · {r.missing.length - missingIn} out</span> : null}
+                              </button>
+                            ) : <span className="flex items-center gap-1 text-sm text-green-700"><CheckCircle2Icon className="size-4" /> All</span>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button size="sm" onClick={() => setDialog({ kind: "upload", row: r })}><UploadIcon className="mr-1 size-4" /> Upload</Button>
+                              <Button size="sm" variant="outline" disabled={!r.have && !r.extra} onClick={() => setDialog({ kind: "view", row: r })}>
+                                <ImageIcon className="mr-1 size-4" /> View
+                              </Button>
+                              <Button size="icon" variant="ghost" className="size-8" disabled={!r.have && !r.extra}
+                                aria-label={`Delete ${r.modelName}'s mockups`} onClick={() => setDialog({ kind: "delete", row: r })}>
+                                <Trash2Icon className="size-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+                {visible.length > shown && (
+                  <div className="text-center">
+                    <Button variant="outline" onClick={() => setShown((n) => n + PAGE)}>Show more ({visible.length - shown} left)</Button>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-wrap gap-2 text-sm">
+          <Button variant="outline" size="sm" disabled={busy} onClick={recount}>
+            <RefreshCwIcon className="mr-1 size-4" /> Recount from all mockups
+          </Button>
+          <Button variant="outline" size="sm" className="text-destructive" onClick={() => setToolsOpen("design")}>
+            <Trash2Icon className="mr-1 size-4" /> Remove a design from every model
+          </Button>
         </div>
+      </div>
 
-      <Tabs defaultValue="partial" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="partial">
-            Partial Coverage
-            {partialCoverageCount > 0 && (
-              <Badge variant="secondary" className="ml-2">{partialCoverageCount}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="missing">
-            Missing Mockups
-            {missingCount > 0 && (
-              <Badge variant="destructive" className="ml-2">{missingCount}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="complete">
-            Complete Coverage
-            {fullCoverageCount > 0 && (
-              <Badge variant="default" className="ml-2 bg-green-600">{fullCoverageCount}</Badge>
-            )}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="partial" className="space-y-4">
-          {modelsWithMockups === undefined ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="h-32" />
-              ))}
-            </div>
-          ) : !filteredModelsWithMockups || filteredModelsWithMockups.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {modelSearch ? "No models match your search" : "No models with partial mockup coverage"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredModelsWithMockups.map((model) => (
-                <ModelCard
-                  key={model._id}
-                  modelId={model._id}
-                  brandName={model.brandName}
-                  modelName={model.modelName}
-                  initialCount={model.mockupCount}
-                  onUploadClick={handleUploadClick}
-                  onViewClick={handleViewClick}
-                  onDeleteClick={handleDeleteClick}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="missing" className="space-y-4">
-          {modelsMissing === undefined ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="h-32" />
-              ))}
-            </div>
-          ) : !filteredModelsMissing || filteredModelsMissing.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <CheckCircle2 className="h-12 w-12 text-green-600 mb-4" />
-                <p className="text-muted-foreground">
-                  {modelSearch ? "No models match your search" : "All models have at least one mockup!"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredModelsMissing.map((model) => (
-                <ModelCard
-                  key={model._id}
-                  modelId={model._id}
-                  brandName={model.brandName}
-                  modelName={model.modelName}
-                  onUploadClick={handleUploadClick}
-                  onViewClick={handleViewClick}
-                  onDeleteClick={handleDeleteClick}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="complete" className="space-y-4">
-          {modelsFullCoverage === undefined ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="h-32" />
-              ))}
-            </div>
-          ) : !filteredModelsFullCoverage || filteredModelsFullCoverage.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {modelSearch ? "No models match your search" : "No models have complete mockup coverage yet"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredModelsFullCoverage.map((model) => (
-                <ModelCard
-                  key={model._id}
-                  modelId={model._id}
-                  brandName={model.brandName}
-                  modelName={model.modelName}
-                  initialCount={model.mockupCount}
-                  onUploadClick={handleUploadClick}
-                  onViewClick={handleViewClick}
-                  onDeleteClick={handleDeleteClick}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {selectedModel && (
-        <>
-          <UploadMockupsDialog
-            open={uploadDialogOpen}
-            onOpenChange={setUploadDialogOpen}
-            modelId={selectedModel.id}
-            brandName={selectedModel.brand}
-            modelName={selectedModel.name}
-            onStartUpload={(files, skipExisting, existingSKUs) => {
-              handleStartUpload(files, skipExisting, existingSKUs);
-            }}
-          />
-          {(selectedModel.missingSKUsInStock || selectedModel.missingSKUsOutOfStock) && (
-            <MissingSKUsDialog
-              open={missingSKUsDialogOpen}
-              onOpenChange={setMissingSKUsDialogOpen}
-              missingSKUsInStock={selectedModel.missingSKUsInStock || []}
-              missingSKUsOutOfStock={selectedModel.missingSKUsOutOfStock || []}
-              modelName={`${selectedModel.brand} ${selectedModel.name}`}
-            />
-          )}
-          <ViewMockupsDialog
-            open={viewMockupsDialogOpen}
-            onOpenChange={setViewMockupsDialogOpen}
-            modelId={selectedModel.id}
-            brandName={selectedModel.brand}
-            modelName={selectedModel.name}
-            mockups={selectedMockups}
-          />
-        </>
+      {dialog?.kind === "upload" && (
+        <UploadDialog row={dialog.row} have={new Set(coverage?.find((c) => c._id === dialog.row._id)?.skus || [])} designs={designs}
+          onClose={() => setDialog(null)} onStart={(files, skip) => { void startUpload(dialog.row, files, skip); setDialog(null); }} />
       )}
-
-      <DeleteSKUDialog 
-        open={deleteSKUDialogOpen} 
-        onOpenChange={setDeleteSKUDialogOpen} 
-      />
-      <DeleteAllMockupsDialog 
-        open={deleteAllMockupsDialogOpen} 
-        onOpenChange={setDeleteAllMockupsDialogOpen} 
-      />
-      
-      {/* Upload Progress Panel */}
-      <UploadProgressPanel 
-        tasks={uploadTasks} 
-        onCancel={handleCancelUpload}
-        onDismiss={handleDismissUpload}
-      />
-    </div>
+      {dialog?.kind === "missing" && <MissingDialog row={dialog.row} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "view" && <ViewDialog row={dialog.row} designs={designs} onClose={() => setDialog(null)} />}
+      {dialog?.kind === "delete" && <DeleteDialog row={dialog.row} onClose={() => setDialog(null)} />}
+      {toolsOpen === "design" && <DeleteDesignDialog onClose={() => setToolsOpen(null)} />}
+      <UploadPanel tasks={tasks}
+        onCancel={(id) => { tasks.find((t) => t.id === id)?.controller.abort(); patchTask(id, { status: "cancelled" }); }}
+        onDismiss={(id) => setTasks((ts) => ts.filter((t) => t.id !== id))} />
     </AdminLayout>
   );
+}
+
+function UploadDialog({ row, have, designs, onClose, onStart }: {
+  row: Row; have: Set<string>; designs: Map<string, Design> | null;
+  onClose: () => void; onStart: (files: File[], skipExisting: boolean) => void;
+}) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [skipExisting, setSkipExisting] = useState(true);
+  const parsed = files.map((f) => ({ f, sku: parseSKUFromFilename(f.name) }));
+  const noCode = parsed.filter((p) => !p.sku).length;
+  const already = parsed.filter((p) => p.sku && have.has(p.sku)).length;
+  const notLive = parsed.filter((p) => p.sku && designs && !designs.has(p.sku)).length;
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Upload mockups · {row.brandName} {row.modelName}</DialogTitle>
+          <DialogDescription>Choose the model's folder (or files). Each file name must contain its design code, e.g. iPhone 17 Pro_R-44.jpg.</DialogDescription>
+        </DialogHeader>
+        <label className="flex h-28 w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed hover:bg-muted/50">
+          <UploadIcon className="mb-1 size-6 text-muted-foreground" />
+          <span className="text-sm"><b>Choose a folder</b> — {row.have} of this model's designs are already up</span>
+          <input type="file" accept="image/*" multiple className="hidden" {...({ webkitdirectory: "", directory: "" } as any)}
+            onChange={(e) => e.target.files && setFiles([...e.target.files].filter((f) => f.type.startsWith("image/")))} />
+        </label>
+        {files.length > 0 && (
+          <div className="space-y-2 text-sm">
+            <p>
+              <b>{files.length}</b> images · {files.length - noCode} with a design code
+              {already > 0 && <> · {already} already uploaded</>}
+              {notLive > 0 && <> · {notLive} for designs not live now</>}
+            </p>
+            {noCode > 0 && (
+              <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                {noCode} file{noCode === 1 ? " has" : "s have"} no design code in the name and will be skipped: {parsed.filter((p) => !p.sku).slice(0, 3).map((p) => p.f.name).join(", ")}{noCode > 3 ? "…" : ""}
+              </p>
+            )}
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={skipExisting} onChange={(e) => setSkipExisting(e.target.checked)} className="size-4" />
+              Skip designs this model already has {skipExisting ? "" : "(they'll be replaced)"}
+            </label>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button disabled={!files.length || files.length === noCode} onClick={() => onStart(files, skipExisting)}>
+            Upload {files.length - noCode - (skipExisting ? already : 0)} files
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MissingDialog({ row, onClose }: { row: Row; onClose: () => void }) {
+  const inStock = row.missing.filter((d) => d.inStock).map((d) => d.code).sort(byCode);
+  const out = row.missing.filter((d) => !d.inStock).map((d) => d.code).sort(byCode);
+  const copy = (codes: string[]) => { void navigator.clipboard.writeText(codes.join("\n")); toast.success(`Copied ${codes.length} codes`); };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Missing for {row.brandName} {row.modelName}</DialogTitle>
+          <DialogDescription>Live phone designs this model has no mockup of. Make the in-stock ones first — those are what customers can buy today.</DialogDescription>
+        </DialogHeader>
+        {[["In stock", inStock], ["Out of stock", out]].map(([label, codes]) => (codes as string[]).length > 0 && (
+          <div key={label as string} className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">{label} ({(codes as string[]).length})</p>
+              <Button size="sm" variant="ghost" onClick={() => copy(codes as string[])}><CopyIcon className="mr-1 size-4" /> Copy</Button>
+            </div>
+            <div className="flex max-h-48 flex-wrap gap-1 overflow-y-auto">
+              {(codes as string[]).map((c) => <Badge key={c} variant="outline" className="font-mono">{c}</Badge>)}
+            </div>
+          </div>
+        ))}
+        <DialogFooter><Button onClick={onClose}>Close</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ViewDialog({ row, designs, onClose }: { row: Row; designs: Map<string, Design> | null; onClose: () => void }) {
+  const mockups = useLive<Mockup>(query(collection(db, "mockups"), where("supportedModelId", "==", row._id)), `view-${row._id}`);
+  const remove = async (m: Mockup) => {
+    if (!confirm(`Delete the ${m.sku} mockup for ${row.modelName}?`)) return;
+    try { await deleteDoc(doc(db, "mockups", m._id)); toast.success("Deleted"); }
+    catch (e: any) { toast.error(e?.message || "Could not delete"); }
+  };
+  const list = [...(mockups || [])].sort((a, b) => byCode(a.sku, b.sku));
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col">
+        <DialogHeader>
+          <DialogTitle>{row.brandName} {row.modelName}</DialogTitle>
+          <DialogDescription>{mockups ? `${mockups.length} mockups` : "Loading…"} · faded ones are designs not live as phone skins now</DialogDescription>
+        </DialogHeader>
+        <div className="grid flex-1 grid-cols-3 gap-3 overflow-y-auto p-1 sm:grid-cols-5">
+          {list.map((m) => (
+            <div key={m._id} className={`group relative overflow-hidden rounded-lg border ${designs && !designs.has(m.sku.toUpperCase()) ? "opacity-50" : ""}`}>
+              <img src={m.r2Url || m.cloudinaryUrl} alt={m.sku} loading="lazy" className="aspect-[9/16] w-full bg-muted object-cover" />
+              <div className="flex items-center justify-between border-t px-2 py-1">
+                <span className="font-mono text-xs font-bold">{m.sku}</span>
+                <button onClick={() => remove(m)} aria-label={`Delete ${m.sku}`} className="text-muted-foreground hover:text-destructive"><Trash2Icon className="size-3.5" /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteDialog({ row, onClose }: { row: Row; onClose: () => void }) {
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try {
+      const r: any = (await httpsCallable(functions, "deleteMockups", { timeout: 300_000 })({ modelId: row._id })).data;
+      toast.success(`Deleted ${r.deleted} mockups for ${row.modelName}`);
+      onClose();
+    } catch (e: any) { toast.error(e?.message || "Could not delete"); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete every mockup of {row.brandName} {row.modelName}?</DialogTitle>
+          <DialogDescription>Customers who pick this phone will see generic pictures until new ones are uploaded. Type the model name to confirm.</DialogDescription>
+        </DialogHeader>
+        <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={row.modelName} />
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" disabled={busy || typed.trim() !== row.modelName} onClick={go}>{busy ? "Deleting…" : "Delete"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteDesignDialog({ onClose }: { onClose: () => void }) {
+  const [sku, setSku] = useState("");
+  const [count, setCount] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const code = sku.trim().toUpperCase();
+  useEffect(() => {
+    setCount(null);
+    if (!/^[A-Z]+-\d+$/.test(code)) return;
+    const t = setTimeout(() => {
+      getDocs(query(collection(db, "mockups"), where("sku", "==", code), limit(1000))).then((s) => setCount(s.size)).catch(() => setCount(null));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [code]);
+  const go = async () => {
+    if (!confirm(`Delete ${code} from all ${count} models? This cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      const r: any = (await httpsCallable(functions, "deleteMockups", { timeout: 300_000 })({ sku: code })).data;
+      toast.success(`Deleted ${r.deleted} mockups of ${code}`);
+      onClose();
+    } catch (e: any) { toast.error(e?.message || "Could not delete"); } finally { setBusy(false); }
+  };
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Remove a design from every model</DialogTitle>
+          <DialogDescription>For a design that is retired, or whose mockups were made wrong. Every phone model's mockup of it is deleted.</DialogDescription>
+        </DialogHeader>
+        <Input value={sku} onChange={(e) => setSku(e.target.value)} placeholder="Design code, e.g. R-44" />
+        {count !== null && <p className="text-sm">{count ? <><b>{count}</b> mockups of {code} will be deleted.</> : `No mockups of ${code}.`}</p>}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="destructive" disabled={busy || !count} onClick={go}>{busy ? "Deleting…" : "Delete"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function UploadPanel({ tasks, onCancel, onDismiss }: { tasks: UploadTask[]; onCancel: (id: string) => void; onDismiss: (id: string) => void }) {
+  const [min, setMin] = useState(false);
+  if (!tasks.length) return null;
+  return (
+    <div className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-md overflow-hidden rounded-lg border bg-background shadow-xl">
+      <button className="flex w-full items-center justify-between bg-primary p-3 text-sm font-semibold text-primary-foreground" onClick={() => setMin(!min)}>
+        <span className="flex items-center gap-2"><UploadIcon className="size-4" /> Uploads ({tasks.length})</span>
+        {min ? <Maximize2Icon className="size-4" /> : <Minimize2Icon className="size-4" />}
+      </button>
+      {!min && (
+        <div className="max-h-[50vh] space-y-3 overflow-y-auto p-3">
+          {tasks.map((t) => {
+            const done = t.progress.completed + t.progress.failed + t.progress.skipped;
+            return (
+              <div key={t.id} className="space-y-2 rounded-md border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{t.brandName} {t.modelName}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {t.status === "completed" ? "Done" : t.status === "cancelled" ? "Cancelled" : t.progress.current}
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="size-6" aria-label={t.status === "uploading" ? "Cancel" : "Dismiss"}
+                    onClick={() => (t.status === "uploading" ? onCancel(t.id) : onDismiss(t.id))}>
+                    <XIcon className="size-4" />
+                  </Button>
+                </div>
+                <Progress value={t.progress.total ? (done / t.progress.total) * 100 : 0} className="h-2" />
+                <div className="flex gap-3 text-xs">
+                  <span className="flex items-center gap-1 text-green-600"><CheckCircle2Icon className="size-3" /> {t.progress.completed}</span>
+                  <span className="flex items-center gap-1 text-muted-foreground">skipped {t.progress.skipped}</span>
+                  <span className="flex items-center gap-1 text-red-600"><XCircleIcon className="size-3" /> {t.progress.failed}</span>
+                  <span className="ml-auto text-muted-foreground">{done}/{t.progress.total}</span>
+                </div>
+                {t.lastError && (
+                  <p className="flex items-center gap-1 truncate rounded bg-destructive/10 p-1 text-xs text-destructive" title={t.lastError}>
+                    <AlertCircleIcon className="size-3 shrink-0" /> {t.lastError}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** R-2 before R-10: design codes by letter, then number. */
+function byCode(a: string, b: string) {
+  const [pa, na] = [a.replace(/-.*/, ""), parseInt(a.replace(/^[A-Z]+-/i, ""), 10) || 0];
+  const [pb, nb] = [b.replace(/-.*/, ""), parseInt(b.replace(/^[A-Z]+-/i, ""), 10) || 0];
+  return pa.localeCompare(pb) || na - nb;
 }

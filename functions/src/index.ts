@@ -24,6 +24,7 @@ export * from "./loginOtp";
 export * from "./abandonedCarts";
 export * from "./collectionSync";
 export * from "./productGadget";
+export * from "./mockupCoverage";
 export * from "./whatsappWorker";
 export * from "./poyo";
 export * from "./materials";

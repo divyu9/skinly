@@ -321,8 +321,6 @@ import { calculateGST } from "./gst";
 import { laptopBodyKeys, squash } from "./laptop-body";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
-const TOTAL_PHONE_SKIN_SKUS = 359;
-
 // Mockups for 28 models (every iPhone before the 17, plus Nothing Phone 3/3A and
 // CMF Phone 1) were lost with the Cloudinary account, so those rows carry a dead
 // cloudinaryUrl and no r2Key. Those models fall back to the hero model's mockup
@@ -361,10 +359,6 @@ const skuMatches = (mockupSku: string, target: string): boolean => {
   if (!a || !b) return false;
   return a === b || a.startsWith(b + "-") || b.startsWith(a + "-");
 };
-
-// The mockups collection holds ~100k docs, so unique-SKU counting reads a
-// bounded sample rather than the whole collection (mirrors the Convex original).
-const MOCKUP_SAMPLE_LIMIT = 15000;
 
 // User documents were imported from the previous backend under its own ids, so
 // users/{authUid} does not exist for anyone who predates the move — their
@@ -3721,206 +3715,6 @@ export function useQuery(apiRef: any, args?: any) {
             })().catch((err) => console.error('[firebase-hooks] mockup lookup failed:', err));
           }
         }
-        else if (path === 'mockupsAdvanced.getUniqueBrands') {
-          const q = query(collection(db, 'supportedModels'));
-          unsubscribe = onSnapshot(q, (snap) => {
-            const brands = new Set<string>();
-            snap.docs.forEach(d => {
-              const brandName = d.data().brandName;
-              if (brandName) brands.add(brandName.trim());
-            });
-            setData(Array.from(brands).sort((a, b) => a.localeCompare(b)));
-          });
-        }
-        else if (path === 'mockupsAdvanced.getModelsWithMockups') {
-          let q = query(collection(db, 'supportedModels'));
-          if (args?.brandFilter && args.brandFilter !== "all") {
-            q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brandFilter));
-          }
-          unsubscribe = onSnapshot(q, async (snap) => {
-            const models = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            // Fetch all mockups to group them efficiently
-            const mockupsSnap = await getDocs(collection(db, 'mockups'));
-            
-            // Map models by their names (case-insensitive) for fallback matching
-            const mockupsCountByModelId = new Map<string, number>();
-            const mockupsCountByBrandModel = new Map<string, number>();
-            
-            mockupsSnap.docs.forEach(d => {
-              const data = d.data();
-              const modelId = data.supportedModelId;
-              const brand = data.brand?.toLowerCase().trim() || "";
-              const modelName = data.model?.toLowerCase().trim() || "";
-              const key = `${brand}_${modelName}`;
-              
-              if (modelId) {
-                mockupsCountByModelId.set(modelId, (mockupsCountByModelId.get(modelId) || 0) + 1);
-              } else if (brand && modelName) {
-                mockupsCountByBrandModel.set(key, (mockupsCountByBrandModel.get(key) || 0) + 1);
-              }
-            });
-            
-            const modelsWithMockups = models.filter(m => {
-              const brand = m.brandName?.toLowerCase().trim() || "";
-              const modelName = m.modelName?.toLowerCase().trim() || "";
-              const key = `${brand}_${modelName}`;
-              return mockupsCountByModelId.has(m._id) || mockupsCountByBrandModel.has(key);
-            }).map(m => {
-              const brand = m.brandName?.toLowerCase().trim() || "";
-              const modelName = m.modelName?.toLowerCase().trim() || "";
-              const key = `${brand}_${modelName}`;
-              const count = (mockupsCountByModelId.get(m._id) || 0) + (mockupsCountByBrandModel.get(key) || 0);
-              return {
-                ...m,
-                mockupCount: count
-              };
-            });
-            setData(modelsWithMockups);
-          });
-        }
-        else if (path === 'mockupsAdvanced.getModelsMissingMockups') {
-          let q = query(collection(db, 'supportedModels'));
-          if (args?.brandFilter && args.brandFilter !== "all") {
-            q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brandFilter));
-          }
-          unsubscribe = onSnapshot(q, async (snap) => {
-            const models = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            // Fetch all mockups to group them efficiently
-            const mockupsSnap = await getDocs(collection(db, 'mockups'));
-            
-            const modelsWithMockups = new Set<string>();
-            const modelsWithMockupsByBrandModel = new Set<string>();
-            
-            mockupsSnap.docs.forEach(d => {
-              const data = d.data();
-              const modelId = data.supportedModelId;
-              const brand = data.brand?.toLowerCase().trim() || "";
-              const modelName = data.model?.toLowerCase().trim() || "";
-              const key = `${brand}_${modelName}`;
-              
-              if (modelId) {
-                modelsWithMockups.add(modelId);
-              } else if (brand && modelName) {
-                modelsWithMockupsByBrandModel.add(key);
-              }
-            });
-            
-            const missingModels = models.filter(m => {
-              const brand = m.brandName?.toLowerCase().trim() || "";
-              const modelName = m.modelName?.toLowerCase().trim() || "";
-              const key = `${brand}_${modelName}`;
-              return !modelsWithMockups.has(m._id) && !modelsWithMockupsByBrandModel.has(key);
-            });
-            setData(missingModels);
-          });
-        }
-        else if (path === 'mockupsAdvanced.getModelsWithFullCoverage') {
-          let q = query(collection(db, 'supportedModels'));
-          if (args?.brandFilter && args.brandFilter !== "all") {
-            q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brandFilter));
-          }
-          unsubscribe = onSnapshot(q, async (snap) => {
-            const models = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
-            const mockupsSnap = await getDocs(collection(db, 'mockups'));
-
-            const skusByModelId = new Map<string, Set<string>>();
-            const skusByBrandModel = new Map<string, Set<string>>();
-            mockupsSnap.docs.forEach(d => {
-              const m: any = d.data();
-              const sku = (m.sku || "").toUpperCase();
-              if (!sku) return;
-              if (m.supportedModelId) {
-                if (!skusByModelId.has(m.supportedModelId)) skusByModelId.set(m.supportedModelId, new Set());
-                skusByModelId.get(m.supportedModelId)!.add(sku);
-              } else {
-                const key = `${(m.brand || "").toLowerCase().trim()}_${(m.model || "").toLowerCase().trim()}`;
-                if (!skusByBrandModel.has(key)) skusByBrandModel.set(key, new Set());
-                skusByBrandModel.get(key)!.add(sku);
-              }
-            });
-
-            const full = models.flatMap(model => {
-              const key = `${(model.brandName || "").toLowerCase().trim()}_${(model.modelName || "").toLowerCase().trim()}`;
-              const skus = skusByModelId.get(model._id) ?? skusByBrandModel.get(key);
-              if (!skus || skus.size < TOTAL_PHONE_SKIN_SKUS) return [];
-              return [{
-                _id: model._id,
-                brandName: model.brandName,
-                modelName: model.modelName,
-                category: model.category,
-                mockupCount: skus.size,
-                totalSKUs: TOTAL_PHONE_SKIN_SKUS,
-              }];
-            });
-
-            full.sort((a, b) =>
-              a.brandName.localeCompare(b.brandName) || a.modelName.localeCompare(b.modelName)
-            );
-            setData(full);
-          });
-        }
-        else if (path === 'mockupsAdvanced.getOverviewStats') {
-          (async () => {
-            const countSnap = await getCountFromServer(collection(db, 'mockups'));
-            const totalMockups = countSnap.data().count;
-
-            const sampleSnap = await getDocs(query(collection(db, 'mockups'), limit(MOCKUP_SAMPLE_LIMIT)));
-            const uniqueSKUs = new Set(
-              sampleSnap.docs.map(d => (d.data().sku || "").toUpperCase()).filter(Boolean)
-            ).size;
-
-            setData({
-              totalMockups,
-              uniqueSKUs,
-              totalSKUs: TOTAL_PHONE_SKIN_SKUS,
-              coverage: Math.min(Math.round((uniqueSKUs / TOTAL_PHONE_SKIN_SKUS) * 100), 100),
-            });
-          })();
-        }
-        else if (path === 'mockupsAdvanced.getModelMockupStats') {
-          if (!args?.modelId) {
-            setData(null);
-            return;
-          }
-          
-          // First, get the model details to fallback to brand/model name matching
-          const modelDoc = await getDoc(doc(db, 'supportedModels', args.modelId));
-          const modelData = modelDoc.exists() ? modelDoc.data() : null;
-          
-          // Try to find mockups by modelId
-          let q = query(collection(db, 'mockups'), where('supportedModelId', '==', args.modelId));
-          
-          unsubscribe = onSnapshot(q, async (snap) => {
-            let mockups = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-            
-            // Fallback: If no mockups found by ID but we have model data, search by brand/model name
-            if (mockups.length === 0 && modelData) {
-               const allMockupsSnap = await getDocs(collection(db, 'mockups'));
-               const brandNameLower = modelData.brandName?.toLowerCase().trim() || "";
-               const modelNameLower = modelData.modelName?.toLowerCase().trim() || "";
-               
-               if (brandNameLower && modelNameLower) {
-                 mockups = allMockupsSnap.docs
-                   .map(d => ({ _id: d.id, ...d.data() }))
-                   .filter((m: any) => 
-                     !m.supportedModelId && 
-                     m.brand?.toLowerCase().trim() === brandNameLower && 
-                     m.model?.toLowerCase().trim() === modelNameLower
-                   );
-               }
-            }
-            
-            setData({
-              totalSKUs: TOTAL_PHONE_SKIN_SKUS,
-              uploadedSKUs: mockups.length,
-              missingSKUs: [],
-              missingSKUsInStock: [],
-              missingSKUsOutOfStock: [],
-              coverage: Math.min(Math.round((mockups.length / TOTAL_PHONE_SKIN_SKUS) * 100), 100),
-              mockups: mockups
-            });
-          });
-        }
         else if (path === 'variantConsumptionPresets.listByGadgetType') {
           if (!args?.gadgetTypeId) {
             setData([]);
@@ -5046,38 +4840,6 @@ export function useMutation(apiRef: any) {
         }
       }
       
-      if (collectionName === 'mockupsAdvanced') {
-        if (actionName === 'migrateMockupsToModels') {
-          return { updated: 0, noMatch: 0, total: 0 };
-        }
-        if (actionName === 'deleteAllMockupsForModel') {
-          const q = query(collection(db, 'mockups'), where('supportedModelId', '==', args.modelId));
-          const snap = await getDocs(q);
-          const batch = writeBatch(db);
-          snap.docs.forEach(d => batch.delete(d.ref));
-          await batch.commit();
-          return { deleted: snap.size };
-        }
-        if (actionName === 'storeMockupAdvanced') {
-          const docRef = await addDoc(collection(db, 'mockups'), args);
-          return docRef.id;
-        }
-        if (actionName === 'deleteMockup') {
-          await deleteDoc(doc(db, 'mockups', args.mockupId));
-          return { success: true };
-        }
-        if (actionName === 'deleteAllMockups') {
-          return { deleted: 0, hasMore: false };
-        }
-        if (actionName === 'deleteMockupsBySKU') {
-          const q = query(collection(db, 'mockups'), where('sku', '==', args.sku));
-          const snap = await getDocs(q);
-          const batch = writeBatch(db);
-          snap.docs.forEach(d => batch.delete(d.ref));
-          await batch.commit();
-          return { deleted: snap.size };
-        }
-      }
 
       if (collectionName === 'variantConsumptionPresets') {
         if (actionName === 'create') {
