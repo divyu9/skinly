@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { CheckIcon, XIcon, Undo2Icon, SearchIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -70,6 +70,39 @@ export function usePlotterPendingCount() {
     (s) => setN(s.docs.filter((d) => d.data().status === "pending").length),
     () => setN(0)), []);
   return n;
+}
+
+/*
+ * When each cutting program's list last reached the site. The Windows PC
+ * sends them every evening (tools/plt-sync/plt-sync.ps1); a list more than two
+ * days old means the PC was off, the script stopped, or the vendor software
+ * was not opened to fetch its new models.
+ */
+function LastSync() {
+  const [s, setS] = useState<Record<string, any>>({});
+  useEffect(() => {
+    const offs = (["mobicare", "tia"] as const).map((v) =>
+      onSnapshot(doc(db, "pltSync", `latest_${v}`), (d) => setS((cur) => ({ ...cur, [v]: d.exists() ? d.data() : null })), () => {}));
+    return () => offs.forEach((o) => o());
+  }, []);
+  return (
+    <div className="flex flex-wrap gap-2 text-xs">
+      {(["mobicare", "tia"] as const).map((v) => {
+        const x = s[v];
+        const stale = !x || Date.now() - (x.receivedAt || 0) > 2 * 86400_000;
+        return (
+          <span key={v} className={`rounded-lg border px-2.5 py-1 ${stale ? "border-amber-400 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200" : "border-border text-muted-foreground"}`}>
+            <b className="text-foreground">{VENDOR_LABEL[v]}:</b>{" "}
+            {x === undefined ? "…" : !x ? "no list from the PC yet"
+              : <>last list {new Date(x.receivedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+                  {" · "}{Number(x.fileCount).toLocaleString("en-IN")} lines
+                  {x.result?.error ? <> · <span className="text-red-600">failed: {x.result.error}</span></> : <> · {x.result?.added ?? 0} new</>}
+                  {stale ? " · over 2 days old" : ""}</>}
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 export function PlotterModels() {
@@ -146,6 +179,7 @@ export function PlotterModels() {
     <Card>
       <CardHeader className="space-y-3">
         <CardTitle>New models from the plotter software</CardTitle>
+        <LastSync />
         <p className="text-sm text-muted-foreground">
           Models the cutting software (Mobicare, TIA) has and the website doesn't. Names are as the software writes them, with the
           part files (-A, -B, -B1, Sides, Top…) folded into one. Fix the brand, name or category in the row if needed,

@@ -94,6 +94,8 @@ service cloud.firestore {
     // Models found in the plotter software, waiting for approval
     // (functions/src/plotterModels.ts writes them; admins read them).
     match /plotterModels/{id} { allow read: if isAdmin(); allow write: if false; }
+    // The plotter PC's daily uploads: when each vendor's list last arrived (pltSync.ts).
+    match /pltSync/{id} { allow read: if isAdmin(); allow write: if false; }
 
     match /reviews/{id} {
       allow read: if true;
