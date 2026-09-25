@@ -10,6 +10,8 @@ export interface GuestCartItem {
   phoneModel?: string;
   phoneBrand?: string;
   coverage?: "only_back" | "full_body_wrap";
+  /** Added from a checkout upsell: placeOrder prices it by that rule's offer. */
+  upsellRuleId?: string;
 }
 
 const GUEST_CART_KEY = "skinly_guest_cart";

@@ -1333,7 +1333,8 @@ export function useQuery(apiRef: any, args?: any) {
                         variantId: String(entry.variantId),
                         variantTitle: String(v.title || 'Default'),
                         price: Number(v.price) || 0,
-                        discountedPrice: Number(entry.discountedPrice) || Number(v.price) || 0,
+                        // An offer above today's price is no offer (the glass was repriced from ₹449 to ₹299).
+                        discountedPrice: Math.min(Number(entry.discountedPrice) || Number(v.price) || 0, Number(v.price) || 0),
                       };
                     })
                     .filter(Boolean) as any[];
@@ -4465,7 +4466,8 @@ export function useMutation(apiRef: any) {
           
           const cartData: any = {
             ...args,
-            price: realPrice,
+            // An upsell line keeps its offer price, never above the real one; placeOrder checks the rule.
+            price: args.upsellRuleId ? Math.min(Number(realPrice) || 0, Number(args.price) || Number(realPrice) || 0) : realPrice,
             addedAt: Date.now()
           };
           

@@ -147,15 +147,60 @@ export const placeOrder = functions
       }
     }
 
+    /*
+     * A line added from a checkout upsell (checkoutUpsells) is charged the
+     * rule's offer price — the checkout showed it — but only when the rule is
+     * live, lists that variant, and still holds for the rest of the cart; and
+     * never above the variant's own price. placeOrder used to charge the full
+     * price whatever the checkout had said, so a ₹199 membrane showed as ₹199
+     * and PhonePe asked for ₹249.
+     */
+    const upsellPrice = new Map<number, number>();
+    const upsellLines = orderItems.map((it, i) => (it?.upsellRuleId ? i : -1)).filter((i) => i >= 0);
+    if (upsellLines.length) {
+      try {
+        const key = (it: any) => `${String(it?.productId)}::${String(it?.variant)}`;
+        const rest = orderItems.filter((it) => !it?.upsellRuleId);
+        const restValue = rest.reduce((s, it) => s + (priceMap.get(key(it)) || 0) * Math.max(1, Math.floor(Number(it?.quantity || 1))), 0);
+        const restProducts = await Promise.all([...new Set(rest.map((it) => String(it?.productId || "")).filter(Boolean))]
+          .map((id) => db.collection("products").doc(id).get()));
+        const cats = new Set(restProducts.filter((d) => d.exists).map((d) => String((d.data() as any).gadgetCategory || "").toLowerCase()).filter(Boolean));
+        const rules = new Map<string, any>();
+        for (const i of upsellLines) {
+          const it = orderItems[i];
+          const rid = String(it.upsellRuleId);
+          if (!rules.has(rid)) rules.set(rid, (await db.collection("checkoutUpsells").doc(rid).get()).data() || null);
+          const rule = rules.get(rid);
+          if (!rule || rule.isActive !== true) continue;
+          const checks: boolean[] = [];
+          if (rule.cartValueMin != null) {
+            const min = Number(rule.cartValueMin) || 0;
+            checks.push(rule.cartValueOperator === "<=" ? restValue <= min : restValue >= min);
+          }
+          const want: string[] = Array.isArray(rule.containsGadgetCategories) ? rule.containsGadgetCategories : [];
+          if (want.length) checks.push(want.some((c) => cats.has(String(c).toLowerCase())));
+          const passes = !checks.length || (rule.matchLogic === "any" ? checks.some(Boolean) : checks.every(Boolean));
+          const vid = variantIdMap.get(key(it));
+          const entry = (rule.upsellProducts || []).find((e: any) => String(e?.variantId) === vid);
+          const full = priceMap.get(key(it));
+          if (passes && entry && typeof full === "number" && Number(entry.discountedPrice) > 0) {
+            upsellPrice.set(i, Math.min(full, Number(entry.discountedPrice)));
+          }
+        }
+      } catch (e: any) {
+        console.error("placeOrder: upsell pricing failed", { order: orderId, error: e?.message || e });
+      }
+    }
+
     // Price comes from the variant document, always. The old fallback to
     // `item.price` meant a cart line naming a variant that does not exist was
     // billed at whatever the caller claimed — send variant "zzz" with price 1
     // and a ₹5,000 order became ₹1.
-    const itemsTotal = orderItems.reduce((sum, item) => {
+    const itemsTotal = orderItems.reduce((sum, item, idx) => {
       const qty = Math.max(1, Math.floor(Number(item?.quantity || 1)));
-      const dbPrice = item?.productId && item?.variant
+      const dbPrice = upsellPrice.get(idx) ?? (item?.productId && item?.variant
         ? priceMap.get(`${String(item.productId)}::${String(item.variant)}`)
-        : undefined;
+        : undefined);
       if (typeof dbPrice !== "number") {
         throw new HttpsError(
           "failed-precondition",
@@ -434,12 +479,14 @@ export const placeOrder = functions
        * for carrying the same SKU twice. An order is a record of what was
        * sold; it should not depend on the catalogue still agreeing.
        */
-      items: orderItems.map((item) => {
+      items: orderItems.map((item, idx) => {
         const key = `${String(item?.productId)}::${String(item?.variant)}`;
         const sku = skuMap.get(key);
         const variantId = variantIdMap.get(key);
         return {
           ...item,
+          // What was actually charged per unit (the upsell offer, where one applied).
+          price: upsellPrice.get(idx) ?? priceMap.get(key) ?? item?.price,
           ...(sku ? { sku } : {}),
           ...(variantId ? { variantId } : {}),
         };

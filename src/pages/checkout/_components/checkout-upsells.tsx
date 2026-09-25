@@ -79,6 +79,8 @@ export function CheckoutUpsells() {
         variant: variantToAdd.variantTitle,
         price: variantToAdd.discountedPrice || variantToAdd.originalPrice,
         quantity: 1,
+        // placeOrder charges the offer price only for a line it can trace to the rule.
+        upsellRuleId: variantToAdd.ruleId,
       };
 
       if (user) {
@@ -98,6 +100,7 @@ export function CheckoutUpsells() {
           variant: variantToAdd.variantTitle,
           price: variantToAdd.discountedPrice || variantToAdd.originalPrice,
           quantity: 1,
+          upsellRuleId: variantToAdd.ruleId,
         });
         toast.success("Added to cart!");
       } else {
