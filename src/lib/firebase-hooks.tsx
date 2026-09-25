@@ -2142,16 +2142,6 @@ export function useQuery(apiRef: any, args?: any) {
             setData(data);
           });
         }
-        else if (path === 'supportedModels.getModelCountByGadgetType') {
-          if (!args?.gadgetTypeId) {
-            setData(0);
-          } else {
-            unsubscribe = onSnapshot(
-              query(collection(db, 'supportedModels'), where('gadgetTypeId', '==', args.gadgetTypeId)),
-              (snap) => setData(snap.size)
-            );
-          }
-        }
         else if (path === 'supportedModels.getLatest') {
           const q = query(collection(db, 'supportedModels'), limit(args?.count || 20));
           unsubscribe = onSnapshot(q, (snap) => {
@@ -3276,50 +3266,6 @@ export function useQuery(apiRef: any, args?: any) {
             setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
           });
         }
-        else if (path === 'productClassification.getClassificationStats') {
-          // Finish types are edited on this same page, so a change there has to
-          // refresh the cards too — watch both sides, not just products.
-          const recompute = async () => {
-            const snap = await getDocs(query(collection(db, 'products'), where('status', '==', 'active')));
-            {
-              const products = snap.docs.map(d => d.data() as any);
-              const classified = products.filter(p => p.gadgetCategory && p.finishTypeId).length;
-
-              const byGadget: Record<string, number> = {};
-              products.forEach(p => {
-                if (p.gadgetCategory) byGadget[p.gadgetCategory] = (byGadget[p.gadgetCategory] || 0) + 1;
-              });
-
-              const fsnap = await getDocs(collection(db, 'finishTypes'));
-              const byFinish: Record<string, number> = {};
-              fsnap.docs.forEach(f => {
-                const count = products.filter(p => p.finishTypeId === f.id).length;
-                if (count > 0) byFinish[f.data().displayName || f.data().name] = count;
-              });
-
-              setData({
-                total: products.length,
-                classified,
-                unclassified: products.length - classified,
-                partiallyClassified: products.filter(p =>
-                  (p.gadgetCategory && !p.finishTypeId) || (!p.gadgetCategory && p.finishTypeId)).length,
-                byGadget,
-                byFinish,
-                totalFinishTypes: fsnap.size,
-              });
-            }
-          };
-
-          const unsubProducts = onSnapshot(collection(db, 'products'), () => { void recompute(); });
-          const unsubFinishes = onSnapshot(collection(db, 'finishTypes'), () => { void recompute(); });
-          unsubscribe = () => { unsubProducts(); unsubFinishes(); };
-        }
-        else if (path === 'productClassification.previewAutoClassification') {
-          setData({ results: [] });
-        }
-        else if (path === 'migrateProductCategory.previewProductCategoryMigration') {
-          setData({ stats: { total: 0, willChange: 0 }, preview: [] });
-        }
         else if (path === 'modelRequests.findSimilarModels') {
           const search = (args?.modelName || "").toLowerCase().trim();
           if (search.length < 2) {
@@ -3495,46 +3441,6 @@ export function useQuery(apiRef: any, args?: any) {
               if (active) setData({ config, products: withVariants });
             })();
           }
-        }
-        else if (path === 'productCategories.getProductsByCategory') {
-          // Returns {products,total,hasMore}. Without a handler this fell through
-          // to the generic fallback, which answers with a plain array — the page
-          // guards on the result being present, then reads .products.length off it.
-          const pageSize = args?.limit || 50;
-          const offset = args?.offset || 0;
-          unsubscribe = onSnapshot(collection(db, 'products'), (snap) => {
-            let docs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
-            if (args?.category === "uncategorized") {
-              docs = docs.filter(p => !p.productCategory);
-            } else if (args?.category) {
-              docs = docs.filter(p => p.productCategory === args.category);
-            }
-            setData({
-              products: docs.slice(offset, offset + pageSize),
-              total: docs.length,
-              hasMore: offset + pageSize < docs.length,
-            });
-          });
-        }
-        else if (path === 'productCategories.getUncategorizedProducts') {
-          unsubscribe = onSnapshot(collection(db, 'products'), (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any)).filter(p => !p.productCategory));
-          });
-        }
-        else if (path === 'productClassification.getUnclassifiedProducts' || path === 'productClassification.getProductsByClassification') {
-          setData([]);
-        }
-        else if (path === 'productCategories.getCategoryStats') {
-          // Flat map: the page indexes it by category slug and reads .uncategorized.
-          unsubscribe = onSnapshot(collection(db, 'products'), (snap) => {
-            const stats: Record<string, number> = { total: snap.size, uncategorized: 0 };
-            snap.docs.forEach(d => {
-              const slug = d.data().productCategory;
-              if (!slug) stats.uncategorized++;
-              else stats[slug] = (stats[slug] || 0) + 1;
-            });
-            setData(stats);
-          });
         }
         else if (path === 'supportedModels.getModelInfo') {
           const q = query(collection(db, 'supportedModels'), where('brandName', '==', args.brand), where('modelName', '==', args.model), limit(1));
@@ -5381,41 +5287,6 @@ export function useMutation(apiRef: any) {
         return { success: true, updated: incoming.length };
       }
 
-      // These namespaces have no collection of their own — they edit products in
-      // bulk, so the generic writer would aim at a collection that
-      // does not exist (and they carry no single document id anyway).
-      if (collectionName === 'productClassification' || collectionName === 'productCategories') {
-        const applyToProducts = async (ids: string[], patch: Record<string, any>) => {
-          const clean = Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined));
-          if (Object.keys(clean).length === 0) return { updated: 0 };
-          for (let i = 0; i < ids.length; i += 400) {
-            const batch = writeBatch(db);
-            ids.slice(i, i + 400).forEach(id => batch.update(doc(db, 'products', id), clean));
-            await batch.commit();
-          }
-          return { updated: ids.length };
-        };
-
-        if (actionName === 'bulkUpdateClassification') {
-          return applyToProducts(args.productIds || [], {
-            gadgetCategory: args.gadgetCategory,
-            finishTypeId: args.finishTypeId,
-          });
-        }
-        if (actionName === 'updateSingleProductClassification') {
-          return applyToProducts([args.productId], {
-            gadgetCategory: args.gadgetCategory,
-            finishTypeId: args.finishTypeId,
-          });
-        }
-        if (actionName === 'bulkUpdateProductCategories') {
-          return applyToProducts(args.productIds || [], { productCategory: args.category });
-        }
-        if (actionName === 'updateProductCategory') {
-          return applyToProducts([args.productId], { productCategory: args.category });
-        }
-      }
-
       // Variants live under api.products.* but are their own collection; without
       // this the generic writer would create variants as product documents.
       if (collectionName === 'products' && actionName.toLowerCase().includes('variant')) {
@@ -6713,22 +6584,10 @@ export function useMutation(apiRef: any) {
       // ---------------------------------------------------------------------
       // Catalogue maintenance.
       //
-      // These were written off as spent migrations, but the data says
-      // otherwise: every gadget and finish count had drifted from the truth
-      // (phone stored 438 against 480 actual), 223 products carry no
-      // gadgetCategory and 201 no finishTypeId. They are recurring repairs, so
-      // each one is idempotent and safe to press twice.
+      // Idempotent repairs, safe to press twice. The product gadget/finish
+      // repairs that lived here moved to Admin › Classification, which shows
+      // what is wrong before fixing it and writes both gadget fields together.
       // ---------------------------------------------------------------------
-
-      /** Everything these repairs need, read once. */
-      const loadCatalogue = async () => {
-        const [products, gadgetTypes, finishTypes] = await Promise.all([
-          getDocs(collection(db, 'products')),
-          getDocs(collection(db, 'gadgetTypes')),
-          getDocs(collection(db, 'finishTypes')),
-        ]);
-        return { products, gadgetTypes, finishTypes };
-      };
 
       const commitAll = async (writes: Array<{ ref: any; data: any }>) => {
         for (let i = 0; i < writes.length; i += 450) {
@@ -6737,102 +6596,6 @@ export function useMutation(apiRef: any) {
           await batch.commit();
         }
       };
-
-      if (path === 'gadgetTypes.recalculateProductCounts' || path === 'finishTypes.recalculateAllCounts') {
-        const isGadget = path.startsWith('gadgetTypes');
-        const { products, gadgetTypes, finishTypes } = await loadCatalogue();
-        const types = isGadget ? gadgetTypes : finishTypes;
-        const field = isGadget ? 'gadgetTypeId' : 'finishTypeId';
-
-        const counts = new Map<string, number>();
-        products.docs.forEach((d) => {
-          const id = (d.data() as any)[field];
-          if (id) counts.set(id, (counts.get(id) || 0) + 1);
-        });
-
-        const writes = types.docs
-          .filter((d) => Number((d.data() as any).productCount || 0) !== (counts.get(d.id) || 0))
-          .map((d) => ({ ref: d.ref, data: { productCount: counts.get(d.id) || 0 } }));
-        await commitAll(writes);
-        return {
-          success: true,
-          updated: writes.length,
-          message: writes.length
-            ? `Recounted ${writes.length} of ${types.size} ${isGadget ? 'gadget' : 'finish'} types`
-            : 'All counts already correct',
-        };
-      }
-
-      if (path === 'gadgetTypes.migrateProductGadgetTypes' || path === 'productClassification.applyAutoClassification') {
-        const { products, gadgetTypes, finishTypes } = await loadCatalogue();
-        const gadgetByName = new Map<string, string>();
-        gadgetTypes.docs.forEach((d) => gadgetByName.set(String((d.data() as any).name || '').toLowerCase(), d.id));
-        const gadgetNameById = new Map<string, string>();
-        gadgetTypes.docs.forEach((d) => gadgetNameById.set(d.id, String((d.data() as any).name || '')));
-        const finishByName = new Map<string, string>();
-        finishTypes.docs.forEach((d) => finishByName.set(String((d.data() as any).name || '').toLowerCase(), d.id));
-
-        // Title wording is the last resort, and only where the field is blank —
-        // nothing already set is ever overwritten.
-        const guessGadget = (title: string): string | null => {
-          const t = title.toLowerCase();
-          for (const [needle, name] of [
-            ['laptop', 'laptop'], ['macbook', 'laptop'], ['mac mini', 'mac-mini'], ['ipad', 'tablet'],
-            ['tablet', 'tablet'], ['lens', 'lens'], ['camera', 'camera'], ['drone', 'drone'],
-            ['controller', 'controller'], ['play station', 'console'], ['playstation', 'console'],
-            ['ps5', 'console'], ['xbox', 'console'], ['charger', 'charger'], ['gimbal', 'gimbals'],
-            ['phone', 'phone'],
-          ] as Array<[string, string]>) {
-            if (t.includes(needle)) return gadgetByName.get(name) || null;
-          }
-          return null;
-        };
-        const guessFinish = (title: string, finishType?: string): string | null => {
-          const t = `${finishType || ''} ${title}`.toLowerCase();
-          if (/tranz|transparent|membrane/.test(t)) return finishByName.get('transparent') || null;
-          if (/3d|emboss|textur/.test(t)) return finishByName.get('embossed') || null;
-          if (/matte/.test(t)) return finishByName.get('matte') || null;
-          return null;
-        };
-
-        const writes: Array<{ ref: any; data: any }> = [];
-        products.docs.forEach((d) => {
-          const p: any = d.data();
-          const patch: any = {};
-          const gadgetTypeId = p.gadgetTypeId || (p.gadgetCategory ? gadgetByName.get(String(p.gadgetCategory).toLowerCase()) : null) || guessGadget(String(p.title || ''));
-          if (!p.gadgetTypeId && gadgetTypeId) patch.gadgetTypeId = gadgetTypeId;
-          // gadgetCategory is the denormalised name; derive it from the id.
-          const name = gadgetNameById.get(gadgetTypeId || p.gadgetTypeId);
-          if (!p.gadgetCategory && name) patch.gadgetCategory = name;
-          if (!p.finishTypeId) {
-            const f = guessFinish(String(p.title || ''), p.finishType);
-            if (f) patch.finishTypeId = f;
-          }
-          if (Object.keys(patch).length) writes.push({ ref: d.ref, data: patch });
-        });
-        await commitAll(writes);
-        return {
-          success: true,
-          classified: writes.length,
-          updated: writes.length,
-          message: writes.length
-            ? `Filled missing fields on ${writes.length} product${writes.length === 1 ? '' : 's'}`
-            : 'Every product is already classified',
-        };
-      }
-
-      if (path === 'migrateProductCategory.migrateProductsToProductCategory') {
-        const products = await getDocs(collection(db, 'products'));
-        const writes = products.docs
-          .filter((d) => !(d.data() as any).productCategory)
-          .map((d) => ({ ref: d.ref, data: { productCategory: 'skin' } }));
-        await commitAll(writes);
-        return {
-          success: true,
-          updated: writes.length,
-          message: writes.length ? `Set a product category on ${writes.length} product(s)` : 'Every product already has a category',
-        };
-      }
 
       if (path === 'migrateModelsToGadgetTypes.migrateModelsToGadgetTypes') {
         const [models, gadgetTypes] = await Promise.all([
