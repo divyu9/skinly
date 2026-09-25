@@ -24,7 +24,9 @@ import { walletUserRef } from "./userDoc";
  * - The friend's discount doesn't stack with a coupon; the referral still
  *   counts, so the referrer is still paid for bringing them.
  * - The reward is paid on delivery, so a cancelled or returned order pays
- *   nothing.
+ *   nothing. It is a fixed sum, or a share of what the friend spent on
+ *   items (after discounts, without shipping) so a bigger cart earns more —
+ *   settled when the order is placed, as the friend's discount is.
  */
 
 export type ReferralSettings = {
@@ -33,7 +35,11 @@ export type ReferralSettings = {
   friendValue: number;
   friendMaxDiscount: number;
   friendMinOrder: number;
+  referrerType: "flat" | "percent";
+  /** Rupees, or a percentage of the friend's items when referrerType is percent. */
   referrerReward: number;
+  /** The most a percentage reward pays; 0 for no cap. */
+  referrerMaxReward: number;
 };
 
 export async function referralSettings(db: admin.firestore.Firestore): Promise<ReferralSettings> {
@@ -45,8 +51,19 @@ export async function referralSettings(db: admin.firestore.Firestore): Promise<R
     friendValue: Math.max(0, Number(d.friendValue) || 0),
     friendMaxDiscount: Math.max(0, Number(d.friendMaxDiscount) || 0),
     friendMinOrder: Math.max(0, Number(d.friendMinOrder) || 0),
+    referrerType: d.referrerType === "percent" ? "percent" : "flat",
     referrerReward: Math.max(0, Number(d.referrerReward) || 0),
+    referrerMaxReward: Math.max(0, Number(d.referrerMaxReward) || 0),
   };
+}
+
+/** What the referrer earns on a friend's order whose items came to `spent` (after discounts). */
+export function referrerRewardFor(s: ReferralSettings, spent: number): number {
+  if (!(s.referrerReward > 0)) return 0;
+  if (s.referrerType !== "percent") return s.referrerReward;
+  let r = Math.floor(Math.max(0, spent) * s.referrerReward / 100);
+  if (s.referrerMaxReward > 0) r = Math.min(r, s.referrerMaxReward);
+  return r;
 }
 
 export const normCode = (c: unknown) => String(c || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
@@ -86,7 +103,7 @@ export async function ensureCode(db: admin.firestore.Firestore, userRef: admin.f
 }
 
 type Evaluation =
-  | { ok: true; code: string; referrerUserDocId: string; referrerAuthUid: string; discount: number; reward: number; reason?: string }
+  | { ok: true; code: string; referrerUserDocId: string; referrerAuthUid: string; discount: number; reward: number; settings: ReferralSettings; reason?: string }
   | { ok: false; reason: string };
 
 /**
@@ -126,7 +143,9 @@ export async function evaluateReferral(db: admin.firestore.Firestore, args: {
 
   const discount = args.couponApplied ? 0 : friendDiscount(s, args.itemsTotal);
   return {
-    ok: true, code, referrerUserDocId: userDocId, referrerAuthUid: authUid || "", discount, reward: s.referrerReward,
+    // The reward on this cart as it stands; placeOrder settles it after any coupon.
+    ok: true, code, referrerUserDocId: userDocId, referrerAuthUid: authUid || "", discount,
+    reward: referrerRewardFor(s, args.itemsTotal - discount), settings: s,
     ...(args.couponApplied ? { reason: "The referral discount doesn't combine with a coupon" }
       : s.friendMinOrder > 0 && args.itemsTotal < s.friendMinOrder ? { reason: `The referral discount needs a cart of ₹${s.friendMinOrder}` } : {}),
   };
@@ -185,7 +204,8 @@ export const myReferrals = functionsV1.https.onCall(async (_data: any, context: 
 
 const publicSettings = (s: ReferralSettings) => ({
   friendType: s.friendType, friendValue: s.friendValue, friendMaxDiscount: s.friendMaxDiscount,
-  friendMinOrder: s.friendMinOrder, referrerReward: s.referrerReward,
+  friendMinOrder: s.friendMinOrder, referrerType: s.referrerType, referrerReward: s.referrerReward,
+  referrerMaxReward: s.referrerMaxReward,
 });
 
 /** Pays the referrer when the friend's order is delivered. Once only. */
@@ -236,9 +256,12 @@ export const saveReferralSettings = functionsV1.https.onCall(async (data: any, c
     friendValue: Math.max(0, Number(data?.friendValue) || 0),
     friendMaxDiscount: Math.max(0, Number(data?.friendMaxDiscount) || 0),
     friendMinOrder: Math.max(0, Number(data?.friendMinOrder) || 0),
+    referrerType: data?.referrerType === "percent" ? "percent" : "flat",
     referrerReward: Math.max(0, Number(data?.referrerReward) || 0),
+    referrerMaxReward: Math.max(0, Number(data?.referrerMaxReward) || 0),
   };
   if (s.friendType === "percent" && s.friendValue > 90) throw new HttpsError("invalid-argument", "A percentage over 90 is surely a typo");
+  if (s.referrerType === "percent" && s.referrerReward > 50) throw new HttpsError("invalid-argument", "A referrer share over 50% is surely a typo");
   await admin.firestore().collection("settings").doc("referral").set({ ...s, updatedAt: Date.now() }, { merge: true });
   return s;
 });

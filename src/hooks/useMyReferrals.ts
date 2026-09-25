@@ -9,7 +9,9 @@ export type ReferralProgramme = {
   friendValue: number;
   friendMaxDiscount: number;
   friendMinOrder: number;
+  referrerType: "flat" | "percent";
   referrerReward: number;
+  referrerMaxReward: number;
 };
 
 export type MyReferrals = {
@@ -28,6 +30,20 @@ export function friendOffer(s: ReferralProgramme): string {
     ? `${s.friendValue}% off${s.friendMaxDiscount > 0 ? ` (up to ₹${s.friendMaxDiscount})` : ""}`
     : `₹${s.friendValue} off`;
   return `${off} their first order${s.friendMinOrder > 0 ? ` over ₹${s.friendMinOrder}` : ""}`;
+}
+
+/** What the referrer earns, in words: "₹100" or "10% of their order (up to ₹200)". */
+export function referrerOffer(s: ReferralProgramme): string {
+  if (!(s.referrerReward > 0)) return "";
+  return s.referrerType === "percent"
+    ? `${s.referrerReward}% of their order${s.referrerMaxReward > 0 ? ` (up to ₹${s.referrerMaxReward})` : ""}`
+    : `₹${s.referrerReward}`;
+}
+
+/** The headline for the referrer: "₹100" or "10%". */
+export function referrerHeadline(s: ReferralProgramme): string {
+  if (!(s.referrerReward > 0)) return "";
+  return s.referrerType === "percent" ? `${s.referrerReward}%` : `₹${s.referrerReward}`;
 }
 
 /** The signed-in customer's referral code, programme and referrals; undefined while loading. */

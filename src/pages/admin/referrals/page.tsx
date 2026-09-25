@@ -22,7 +22,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 type Settings = {
   enabled: boolean; friendType: "flat" | "percent"; friendValue: number;
-  friendMaxDiscount: number; friendMinOrder: number; referrerReward: number;
+  friendMaxDiscount: number; friendMinOrder: number;
+  referrerType: "flat" | "percent"; referrerReward: number; referrerMaxReward: number;
 };
 type Order = {
   _id: string; orderNumber?: string; checkoutRef?: string; customerName?: string; createdAt?: number; status?: string;
@@ -30,7 +31,10 @@ type Order = {
   referral?: { code: string; referrerUserDocId: string; reward: number; status: string };
 };
 
-const BLANK: Settings = { enabled: false, friendType: "flat", friendValue: 0, friendMaxDiscount: 0, friendMinOrder: 0, referrerReward: 0 };
+const BLANK: Settings = {
+  enabled: false, friendType: "flat", friendValue: 0, friendMaxDiscount: 0, friendMinOrder: 0,
+  referrerType: "flat", referrerReward: 0, referrerMaxReward: 0,
+};
 const confirmed = (o: Order) => o.paymentStatus === "success" || String(o.paymentMethod).toLowerCase() === "cod";
 const STATUS: Record<string, [string, string]> = {
   pending: ["Waiting for delivery", "bg-amber-100 text-amber-800"],
@@ -102,6 +106,12 @@ export default function AdminReferralsPage() {
   const num = (k: keyof Settings) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => f && { ...f, [k]: Math.max(0, Number(e.target.value) || 0) });
 
+  // Both offers in words, as customers will read them.
+  const earns = form && form.referrerReward > 0
+    ? (form.referrerType === "percent"
+      ? `${form.referrerReward}% of their order${form.referrerMaxReward > 0 ? ` (up to ₹${form.referrerMaxReward})` : ""}`
+      : `₹${form.referrerReward}`)
+    : "nothing";
   // The friend's offer in words, as customers will read it.
   const offer = form && form.friendValue > 0
     ? `${form.friendType === "percent" ? `${form.friendValue}% off${form.friendMaxDiscount > 0 ? ` (up to ₹${form.friendMaxDiscount})` : ""}` : `₹${form.friendValue} off`} their first order${form.friendMinOrder > 0 ? ` over ₹${form.friendMinOrder}` : ""}`
@@ -158,15 +168,37 @@ export default function AdminReferralsPage() {
                   </fieldset>
                   <fieldset className="space-y-3 rounded-lg border p-4">
                     <legend className="px-1 text-sm font-semibold">The customer who shared earns</legend>
-                    <div className="space-y-1">
-                      <Label htmlFor="ref-reward">Wallet credit per friend (₹)</Label>
-                      <Input id="ref-reward" type="number" min={0} value={form.referrerReward || ""} onChange={num("referrerReward")} placeholder="100" className="w-32" />
+                    <div className="flex gap-2">
+                      <Select value={form.referrerType} onValueChange={(v) => setForm({ ...form, referrerType: v as Settings["referrerType"] })}>
+                        <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="flat">₹ per friend</SelectItem>
+                          <SelectItem value="percent">% of friend's order</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" min={0} value={form.referrerReward || ""} onChange={num("referrerReward")} placeholder={form.referrerType === "percent" ? "10" : "100"} className="w-28" aria-label="Referrer's reward" />
                     </div>
-                    <p className="text-xs text-muted-foreground">Paid into their GoSkinly wallet when the friend's order is delivered, to spend on their next order.</p>
+                    {form.referrerType === "percent" && (
+                      <div className="space-y-1">
+                        <Label htmlFor="ref-max-reward">Most one friend can earn them (₹, 0 = no cap)</Label>
+                        <Input id="ref-max-reward" type="number" min={0} value={form.referrerMaxReward || ""} onChange={num("referrerMaxReward")} className="w-32" />
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {form.referrerType === "percent"
+                        ? "A share of what the friend spends on items, after discounts and without shipping — a bigger cart earns more. "
+                        : ""}
+                      Paid into their GoSkinly wallet when the friend's order is delivered, to spend on their next order.
+                    </p>
                   </fieldset>
                 </div>
                 <p className="rounded-md bg-muted px-3 py-2 text-sm">
-                  Customers will read: <b>your friend gets {offer}, you get ₹{form.referrerReward} in your wallet</b>.
+                  Customers will read: <b>your friend gets {offer}, you get {earns} in your wallet</b>.
+                  {form.referrerType === "percent" && form.referrerReward > 0 && (
+                    <span className="mt-1 block text-xs text-muted-foreground">
+                      e.g. a friend's ₹1,000 cart earns ₹{Math.min(Math.floor(1000 * form.referrerReward / 100), form.referrerMaxReward || Infinity)}, a ₹3,000 cart ₹{Math.min(Math.floor(3000 * form.referrerReward / 100), form.referrerMaxReward || Infinity)}.
+                    </span>
+                  )}
                 </p>
                 <div className="flex gap-2">
                   <Button onClick={save} disabled={busy || !dirty}>{busy ? "Saving…" : "Save"}</Button>

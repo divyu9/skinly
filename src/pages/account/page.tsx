@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import { useMyReferrals, friendOffer } from "@/hooks/useMyReferrals";
+import { useMyReferrals, friendOffer, referrerOffer, referrerHeadline } from "@/hooks/useMyReferrals";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
@@ -69,7 +69,8 @@ function AccountPageInner() {
 
   const referralCount = referralStats?.referrals.filter((r) => r.status !== "cancelled").length || 0;
   const referralEarned = Number(referralStats?.earned) || 0;
-  const referralReward = Number(referralStats?.settings.referrerReward) || 0;
+  const referralHeadline = referralStats ? referrerHeadline(referralStats.settings) : "";
+  const referralRewardText = referralStats ? referrerOffer(referralStats.settings) : "";
 
   /**
    * The phone's share sheet where there is one, the clipboard everywhere else.
@@ -248,14 +249,14 @@ function AccountPageInner() {
         <CardContent className="flex items-center gap-3 p-4 sm:p-6">
           <UserIcon className="size-5 shrink-0 text-heart" />
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold leading-tight">Refer &amp; Earn ₹{referralReward}</h3>
+            <h3 className="font-semibold leading-tight">Refer &amp; Earn{referralHeadline ? ` ${referralHeadline}` : ""}</h3>
             {/* Progress where there is any, the offer where there is not — a
                 bare "Invite" told someone who had already referred four people
                 nothing about the four. */}
             <p className="text-xs text-muted-foreground">
               {referralCount > 0
                 ? `${referralCount} friend${referralCount === 1 ? "" : "s"} joined · ₹${referralEarned} earned`
-                : `₹${referralReward} for each friend's first order`}
+                : referralRewardText ? `${referralRewardText} on each friend's first order` : "Share your link with friends"}
             </p>
           </div>
           <Button

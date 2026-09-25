@@ -1,4 +1,4 @@
-import { useMyReferrals, friendOffer } from "@/hooks/useMyReferrals";
+import { useMyReferrals, friendOffer, referrerOffer, referrerHeadline } from "@/hooks/useMyReferrals";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,8 @@ function ReferralsPageInner() {
 
   const link = data.code ? `${window.location.origin}/?ref=${data.code}` : "";
   const offer = friendOffer(data.settings);
-  const reward = data.settings.referrerReward;
+  const reward = referrerOffer(data.settings);
+  const headline = referrerHeadline(data.settings);
 
   const copy = async () => {
     if (!link) return;
@@ -66,9 +67,9 @@ function ReferralsPageInner() {
   return (
     <div className="container mx-auto max-w-3xl space-y-6 px-4 py-8">
       <div className="rounded-2xl border-2 border-ink/15 bg-blush/40 p-6 sm:p-8">
-        <h1 className="text-2xl font-extrabold sm:text-3xl">Give a friend {offer ? offer.split(" their")[0] : "a treat"}, get ₹{reward}</h1>
+        <h1 className="text-2xl font-extrabold sm:text-3xl">Give a friend {offer ? offer.split(" their")[0] : "a treat"}{headline ? `, get ${headline}` : ""}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Share your link. Your friend gets {offer || "a discount"}, and ₹{reward} lands in your GoSkinly wallet when their order is delivered.
+          Share your link. Your friend gets {offer || "a discount"}{reward ? <>, and you get {reward} in your GoSkinly wallet when their order is delivered</> : null}.
         </p>
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <Input readOnly value={link} className="bg-background font-mono text-sm" onFocus={(e) => e.currentTarget.select()} />

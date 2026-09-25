@@ -7,7 +7,7 @@ import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
-import { evaluateReferral, normCode } from "./referrals";
+import { evaluateReferral, normCode, referrerRewardFor } from "./referrals";
 import { walletUserRef } from "./userDoc";
 
 /**
@@ -298,7 +298,9 @@ export const placeOrder = functions
         });
         if (r.ok) {
           referralDiscount = Math.min(r.discount, Math.max(0, itemsTotal - couponDiscount));
-          referral = { code: r.code, referrerUserDocId: r.referrerUserDocId, referrerAuthUid: r.referrerAuthUid, reward: r.reward, friendDiscount: referralDiscount, status: "pending" };
+          // A percentage reward is a share of what the friend spent on items, after discounts.
+          const reward = referrerRewardFor(r.settings, itemsTotal - couponDiscount - referralDiscount);
+          referral = { code: r.code, referrerUserDocId: r.referrerUserDocId, referrerAuthUid: r.referrerAuthUid, reward, friendDiscount: referralDiscount, status: "pending" };
         }
       }
     } catch (e: any) {
