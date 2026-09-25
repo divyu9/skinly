@@ -32,3 +32,4 @@ export * from "./modelRequests";
 export * from "./ownership";
 export * from "./payLink";
 export * from "./reviews";
+export * from "./pltSync";
