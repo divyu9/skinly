@@ -1176,7 +1176,25 @@ export function useQuery(apiRef: any, args?: any) {
             q = query(collection(db, 'coupons'), where('isActive', '==', true));
           }
           unsubscribe = onSnapshot(q, (snap) => {
-            let data = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+            let data = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+            /*
+             * Checkout's "available coupons" list — only the store's own
+             * promotions. It listed every active coupon, the personal ones
+             * too (abandoned-cart codes, isPublic: false), newest first, so
+             * each code emailed to one customer headed everyone's checkout
+             * and was spent by a stranger before its owner came back.
+             */
+            if (path === 'coupons.getActiveCoupons') {
+              const now = Date.now();
+              data = data.filter((c: any) =>
+                c.isPublic !== false &&
+                c.source !== 'abandoned_cart' &&
+                !(Array.isArray(c.allowedCustomerEmails) && c.allowedCustomerEmails.length) &&
+                (!c.startDate || Number(c.startDate) <= now) &&
+                (!c.endDate || Number(c.endDate) >= now) &&
+                (!c.expiresAt || Number(c.expiresAt) > now) &&
+                (!c.usageLimit || (Number(c.usageCount) || 0) < Number(c.usageLimit)));
+            }
             data = data.sort((a: any, b: any) => {
               const aTime = a.createdAt || a._creationTime || 0;
               const bTime = b.createdAt || b._creationTime || 0;
@@ -7745,6 +7763,14 @@ export function useConvex() {
         const usageLimit = Number(coupon.usageLimit) || 0;
         if (usageLimit > 0 && (Number(coupon.usageCount) || 0) >= usageLimit) {
           throw new Error("This coupon has been fully used");
+        }
+        // A personal code: said now, not at payment (placeOrder decides).
+        const allowed: string[] = Array.isArray(coupon.allowedCustomerEmails)
+          ? coupon.allowedCustomerEmails.map((e: any) => String(e).trim().toLowerCase()) : [];
+        if (allowed.length && !allowed.includes(String(args.userEmail || '').trim().toLowerCase())) {
+          throw new Error(args.userEmail
+            ? "This coupon was sent to a different email address"
+            : "Enter the email this coupon was sent to, then apply it");
         }
 
         // Same story for the cap: the form writes `maxDiscount`.

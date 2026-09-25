@@ -107,6 +107,16 @@ const createRecoveryCoupon = async (cart: any, s: Settings): Promise<string | nu
       endDate: Date.now() + s.couponValidityDays * 24 * 60 * 60 * 1000,
       source: "abandoned_cart",
       abandonedCartId: cart._id,
+      /*
+       * The code is for the person it was emailed to. It was not tied to
+       * them, and checkout listed every active coupon, so each new one sat
+       * at the top of everybody's checkout: all five issued on 24 Sep were
+       * used within a day, by five other people. placeOrder refuses an
+       * order from any other email.
+       */
+      ...(String(cart.userEmail || "").includes("@")
+        ? { allowedCustomerEmails: [String(cart.userEmail).trim().toLowerCase()] }
+        : {}),
       createdAt: Date.now(),
     });
     return code;
