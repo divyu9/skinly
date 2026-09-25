@@ -49,7 +49,7 @@ const DROP: Record<string, string[]> = {
   oneplus: ["one plus", "oneplus"], motorola: ["motorola", "moto"], huawei: ["huawei"], nokia: ["nokia", "hmd"],
   google: ["google"], nothing: ["nothing"], microsoft: ["microsoft"], dji: ["dji"], aiplus: ["ai plus", "ai"],
   feiyu: ["feiyu tech", "feiyutech", "feiyu"], canon: ["canon", "eos"], nikon: ["nikon"], sony: ["sony"],
-  fujifilm: ["fujifilm", "fuji"], console: ["sony", "playstation", "microsoft", "nintendo", "valve", "asus", "aus"],
+  fujifilm: ["fujifilm", "fuji"], console: ["sony", "playstation", "microsoft", "nintendo", "valve", "asus", "aus", "lenovo", "msi", "fat", "edition", "console"],
 };
 export function groupOf(brand: string): string {
   const b = brand.toLowerCase().replace(/lens/g, "").replace(/\s+/g, " ").trim();
@@ -80,7 +80,7 @@ export function key(text: string, group: string): string {
   t = dropWords(t, group);
   t = t.replace(/\(?\b[45]g\b\)?/g, " ");
   t = t.replace(/\b(lens|for|the|inch|in|gimbal|gmibal|drone|dron|stabilizer|handheld|smartphone|3.?axis|dual)\b/g, " ");
-  t = t.replace(/\balpha\s*(?=\d)/g, "a");
+  t = t.replace(/\balpha\s*(?=\d)/g, "a").replace(/\bdisc\b/g, "disk");
   return t.replace(/[^a-z0-9]/g, "");
 }
 const STOP = new Set(["lens", "for", "the", "inch", "in", "with", "and"]);
@@ -126,15 +126,31 @@ const PHONE_SKIP = new Set(["smoke cover", "soft transparent cover", "hd cover",
   "charger", "macbook", "idea"]);
 const TABLET = /\b(ipad|tab|pad|matepad|tablet|kindle)\b/i;
 const WEARABLE = /watch|\bbuds?\b|\bband\b|airpods/i;
-const CONSOLE_BRAND = (name: string) =>
-  /\bps\d|playstation|psp/i.test(name) ? "PlayStation" : /xbox/i.test(name) ? "Xbox" : /steam deck/i.test(name) ? "Valve"
-  : /rog ally|asus/i.test(name) ? "Asus" : /aya ?neo/i.test(name) ? "AYANEO" : "Nintendo";
+/*
+ * A console's brand from its name. It fell back to "Nintendo" for anything
+ * it didn't know, so TIA's Lenovo Legion Go S arrived as Nintendo; an unknown
+ * handheld now keeps the brand the vendor filed it under.
+ */
+const CONSOLE_BRAND = (name: string, vendorBrand = "") => {
+  const n = name.toLowerCase();
+  if (/\bps\d|playstation|psp|dualsense|dualshock/.test(n)) return "PlayStation";
+  if (/xbox/.test(n)) return "Xbox";
+  if (/steam deck|valve/.test(n)) return "Valve";
+  if (/legion/.test(n)) return "Lenovo";
+  if (/rog ally|\basus\b|\baus\b/.test(n)) return "Asus";
+  if (/msi claw|\bclaw\b/.test(n)) return "MSI";
+  if (/aya ?neo/.test(n)) return "AYANEO";
+  if (/onex/.test(n)) return "OneXPlayer";
+  if (/nintendo|switch|\b[23]ds|\bwii|\bw2\b/.test(n)) return "Nintendo";
+  const b = vendorBrand.trim();
+  return b ? b.charAt(0).toUpperCase() + b.slice(1).toLowerCase() : "Other";
+};
 
 function mobicareClass(cat: string, brand: string, model: string): { gadget: Gadget; brand: string; model: string } | null {
   const bl = brand.toLowerCase().trim();
   if (cat === "Mobile Skins" || cat === "Case Friendly Skins") {
     if (bl === "drone") return { gadget: "dji", brand: model.split(" ")[0] || "DJI", model };
-    if (bl === "gaming consoles" || bl === "nintendo") return { gadget: "console", brand: CONSOLE_BRAND(`${brand} ${model}`), model };
+    if (bl === "gaming consoles" || bl === "nintendo") return { gadget: "console", brand: CONSOLE_BRAND(`${brand} ${model}`, bl === "nintendo" ? "Nintendo" : ""), model };
     if (PHONE_SKIP.has(bl)) return null;
     if (bl === "other") {
       model = model.replace(/^ai\s*(?:\+|plus)\s+/i, "AI+ ");
@@ -219,7 +235,7 @@ export function parseTia(lines: string[]): VendorModel[] {
     else if (cat === "5") gadget = "console";
     else if (cat === "15") gadget = ({ "CAMERA LENS": "lens", "CAMERA BODY": "camera", GIMBAL: "dji" } as Record<string, Gadget>)[brand.toUpperCase()] || null;
     if (!gadget || !name || GENERIC.test(name) || name.toUpperCase() === brand.toUpperCase()) continue;
-    let maker = gadget === "console" ? CONSOLE_BRAND(`${brand} ${name}`) : cat === "15" ? name.split(" ")[0] : brand;
+    let maker = gadget === "console" ? CONSOLE_BRAND(`${brand} ${name}`, brand) : cat === "15" ? name.split(" ")[0] : brand;
     // Filed under one brand, named after another: "REALME C75X" under XIAOMI.
     const firstWord = (name.split(" ")[0] || "").toLowerCase();
     if (gadget !== "console" && GROUP[firstWord] && GROUP[firstWord] !== groupOf(maker)) maker = name.split(" ")[0];
