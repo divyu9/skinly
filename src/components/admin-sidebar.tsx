@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils.ts";
 import {
   Package,
   Layers,
-  Smartphone,
   FileCode,
   ShoppingCart,
   Users,
@@ -101,7 +100,6 @@ export function AdminSidebar() {
         { path: "/backend-skinly/product-sections", label: "Page Sections", icon: Layout },
         { path: "/backend-skinly/product-classification", label: "Classification", icon: Layers },
         { path: "/backend-skinly/collections", label: "Collections", icon: Layers },
-        { path: "/backend-skinly/phone-collections", label: "Phone Collections", icon: Smartphone },
         { path: "/backend-skinly/variant-presets", label: "Variant Presets", icon: Layers },
         { path: "/backend-skinly/variant-presets-auto-assign", label: "Auto-Assign Presets", icon: Sparkles },
         { path: "/backend-skinly/models", label: "Models", icon: Database },

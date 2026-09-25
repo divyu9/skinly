@@ -58,7 +58,6 @@ const AdminMockupsMissingPage = lazyWithReload(() => import("./pages/admin/mocku
 const AdminMockupsAdvancedPage = lazyWithReload(() => import("./pages/admin/mockups-advanced.tsx"), "./pages/admin/mockups-advanced.tsx");
 const AdminGoogleDriveImportPage = lazyWithReload(() => import("./pages/admin/google-drive-import.tsx"), "./pages/admin/google-drive-import.tsx");
 const AdminModelsPage = lazyWithReload(() => import("./pages/admin/models/page.tsx"), "./pages/admin/models/page.tsx");
-const AdminPhoneCollectionsPage = lazyWithReload(() => import("./pages/admin/phone-collections.tsx"), "./pages/admin/phone-collections.tsx");
 const AdminVariantPresetsPage = lazyWithReload(() => import("./pages/admin/variant-presets.tsx"), "./pages/admin/variant-presets.tsx");
 const AdminVariantPresetsAutoAssignPage = lazyWithReload(() => import("./pages/admin/variant-presets-auto-assign.tsx"), "./pages/admin/variant-presets-auto-assign.tsx");
 const AdminCODPage = lazyWithReload(() => import("./pages/admin/cod.tsx"), "./pages/admin/cod.tsx");
@@ -179,7 +178,8 @@ export default function App() {
             <Route path="/backend-skinly/mockups-advanced" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminMockupsAdvancedPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/google-drive-import" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminGoogleDriveImportPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/models" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminModelsPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/phone-collections" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminPhoneCollectionsPage /></AdminPageWrapper></Suspense>} />
+            {/* Phone Collections was a leftover migration page: collections are managed, and filled, from Collections. */}
+            <Route path="/backend-skinly/phone-collections" element={<Navigate to="/backend-skinly/collections" replace />} />
             <Route path="/backend-skinly/variant-presets" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/variant-presets-auto-assign" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminVariantPresetsAutoAssignPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />

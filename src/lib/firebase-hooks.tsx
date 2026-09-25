@@ -4082,12 +4082,6 @@ export function useQuery(apiRef: any, args?: any) {
             }));
           });
         }
-        else if (path === 'phoneCollectionsQueries.getPhoneCollectionsWithCounts') {
-          const q = query(collection(db, 'phoneCollections'));
-          unsubscribe = onSnapshot(q, (snap) => {
-            setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
-          });
-        }
         else if (path === 'whatsapp.getApprovedTemplates') {
           const q = query(collection(db, 'whatsappTemplates'));
           unsubscribe = onSnapshot(q, (snap) => {
@@ -5236,12 +5230,6 @@ export function useMutation(apiRef: any) {
         if (actionName === 'toggleActive') {
           await updateDoc(doc(db, 'variantConsumptionPresets', args.presetId), { isActive: args.isActive });
           return args.presetId;
-        }
-      }
-      
-      if (collectionName === 'phoneCollections') {
-        if (actionName === 'runPhoneCollectionsMigration') {
-          return { collectionsCreated: 0, productsAssigned: 0, errors: [] };
         }
       }
       
@@ -7240,10 +7228,6 @@ export function useAction(apiRef: any) {
       const callable = httpsCallable(functions, 'checkPaymentStatus');
       const res: any = await callable(args);
       return res.data;
-    }
-    
-    if (collectionName === 'phoneCollections' && actionName === 'runPhoneCollectionsMigration') {
-      return { collectionsCreated: 0, productsAssigned: 0, errors: [] };
     }
     
     if (collectionName === 'migrateVariantPresetsAutoAssign' && actionName === 'autoAssignPresets') {
