@@ -31,11 +31,23 @@ type Row = {
   parts?: string[];
   folders?: string[];
   newestFileAt?: number;
+  firstFileAt?: number;
+  /** Which cutting software has it, the name it uses there, and when that vendor added it. */
+  vendors?: Partial<Record<"mobicare" | "tia", { name: string; firstFileAt?: number | null }>>;
   status: "pending" | "approved" | "rejected";
   approvedAs?: { brandName: string; modelName: string; category: string };
 };
 
 const CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "controller"];
+const VENDOR_LABEL = { mobicare: "Mobicare", tia: "TIA" } as const;
+type Vendor = keyof typeof VENDOR_LABEL;
+const vendorsOf = (r: Row): Vendor[] => (Object.keys(r.vendors || {}) as Vendor[]).filter((v) => v in VENDOR_LABEL);
+/** The earliest date any vendor had this model. */
+const since = (r: Row) => {
+  const ds = vendorsOf(r).map((v) => r.vendors?.[v]?.firstFileAt || 0).filter(Boolean) as number[];
+  return ds.length ? Math.min(...ds) : (r.firstFileAt || r.newestFileAt || 0);
+};
+const fmt = (t?: number | null) => t ? new Date(t).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 export function usePlotterPendingCount() {
   const [n, setN] = useState(0);
@@ -51,6 +63,7 @@ export function PlotterModels() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<Row["status"]>("pending");
   const [category, setCategory] = useState("all");
+  const [vendor, setVendor] = useState<"all" | Vendor | "both">("all");
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -63,9 +76,10 @@ export function PlotterModels() {
     return (rows || [])
       .filter((r) => r.status === status)
       .filter((r) => category === "all" || r.category === category)
+      .filter((r) => vendor === "all" || (vendor === "both" ? vendorsOf(r).length > 1 : vendorsOf(r).includes(vendor)))
       .filter((r) => !q || `${r.brand} ${r.model}`.toLowerCase().includes(q))
-      .sort((a, b) => (b.newestFileAt || 0) - (a.newestFileAt || 0) || a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
-  }, [rows, status, category, search]);
+      .sort((a, b) => since(b) - since(a) || a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
+  }, [rows, status, category, vendor, search]);
 
   const counts = useMemo(() => {
     const c = { pending: 0, approved: 0, rejected: 0 } as Record<string, number>;
@@ -117,7 +131,7 @@ export function PlotterModels() {
       <CardHeader className="space-y-3">
         <CardTitle>New models from the plotter software</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Models the cutting software has and the website doesn't. Names are as the software writes them, with the
+          Models the cutting software (Mobicare, TIA) has and the website doesn't. Names are as the software writes them, with the
           part files (-A, -B, -B1, Sides, Top…) folded into one. Fix the brand, name or category in the row if needed,
           then approve — it appears in the model picker straight away.
         </p>
@@ -135,6 +149,15 @@ export function PlotterModels() {
             <SelectContent>
               <SelectItem value="all">All gadgets</SelectItem>
               {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={vendor} onValueChange={(v) => setVendor(v as typeof vendor)}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Both vendors</SelectItem>
+              <SelectItem value="mobicare">Mobicare has it</SelectItem>
+              <SelectItem value="tia">TIA has it</SelectItem>
+              <SelectItem value="both">Both have it</SelectItem>
             </SelectContent>
           </Select>
           <div className="relative">
@@ -170,8 +193,9 @@ export function PlotterModels() {
                 <TableHead className="w-40">Brand</TableHead>
                 <TableHead>Model</TableHead>
                 <TableHead className="w-36">Gadget</TableHead>
+                <TableHead className="w-40">Vendor</TableHead>
                 <TableHead className="w-24">Part files</TableHead>
-                <TableHead className="w-28">In software since</TableHead>
+                <TableHead className="w-28">First seen</TableHead>
                 <TableHead className="w-44 text-right" />
               </TableRow>
             </TableHeader>
@@ -200,6 +224,27 @@ export function PlotterModels() {
                     ) : (r.approvedAs?.category || r.category)}
                   </TableCell>
                   <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      {vendorsOf(r).map((v) => {
+                        const d = r.vendors?.[v]?.firstFileAt;
+                        const first = vendorsOf(r).length > 1 && d && d === since(r);
+                        return (
+                          <Tooltip key={v}>
+                            <TooltipTrigger asChild>
+                              <Badge variant={first ? "default" : "outline"} className="cursor-default">
+                                {VENDOR_LABEL[v]}{first ? " · first" : ""}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{r.vendors?.[v]?.name}</p>
+                              <p className="opacity-80">Added {fmt(d)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </TableCell>
+                  <TableCell>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Badge variant="secondary" className="cursor-default">{r.parts?.length || 0}</Badge>
@@ -210,9 +255,7 @@ export function PlotterModels() {
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {r.newestFileAt ? new Date(r.newestFileAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{fmt(since(r))}</TableCell>
                   <TableCell className="text-right">
                     {status === "pending" ? (
                       <div className="flex justify-end gap-1">
