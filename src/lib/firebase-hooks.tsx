@@ -2854,7 +2854,8 @@ export function useQuery(apiRef: any, args?: any) {
               .filter(o => o.gstAmount === undefined || o.gstAmount === null)));
         }
         else if (path === 'whatsappDebugLogs.getErrorTypes' || path === 'whatsappDebugLogs.getUsecasesWithLogs') {
-          const field = path.endsWith('getErrorTypes') ? 'errorType' : 'usecaseId';
+          // Logs carry usecaseKey (there is no usecaseId), so the use-case filter came up empty.
+          const field = path.endsWith('getErrorTypes') ? 'errorType' : 'usecaseKey';
           unsubscribe = onSnapshot(collection(db, 'whatsappDebugLogs'), (snap) => {
             const values = new Set<string>();
             snap.docs.forEach(d => {
@@ -3515,84 +3516,6 @@ export function useQuery(apiRef: any, args?: any) {
             }
           });
         }
-        else if (path === 'sitemap.getSitemapUrls') {
-          const fetchSitemap = async () => {
-            try {
-              const baseUrl = "https://goskinly.com";
-              const urls: any[] = [];
-              const staticPages = [
-                { path: "/", priority: 1.0, changefreq: "daily" },
-                { path: "/products", priority: 0.9, changefreq: "daily" },
-                { path: "/devices", priority: 0.9, changefreq: "weekly" },
-                { path: "/policies/privacy", priority: 0.3, changefreq: "monthly" },
-                { path: "/policies/terms", priority: 0.3, changefreq: "monthly" },
-                { path: "/policies/shipping", priority: 0.4, changefreq: "monthly" },
-                { path: "/policies/returns", priority: 0.4, changefreq: "monthly" },
-              ];
-
-              const now = new Date().toISOString();
-              staticPages.forEach((page) => {
-                urls.push({
-                  url: `${baseUrl}${page.path}`,
-                  lastmod: now,
-                  changefreq: page.changefreq,
-                  priority: page.priority,
-                });
-              });
-
-              // Products
-              const pq = query(collection(db, 'products'), where('status', '==', 'active'));
-              const pSnap = await getDocs(pq);
-              pSnap.docs.forEach((doc) => {
-                const data = doc.data();
-                if (data.slug) {
-                  urls.push({
-                    url: `${baseUrl}/products/${data.slug}`,
-                    lastmod: data.updatedAt ? new Date(data.updatedAt).toISOString() : new Date(data.createdAt || data._creationTime || Date.now()).toISOString(),
-                    changefreq: "weekly",
-                    priority: 0.8,
-                  });
-                }
-              });
-
-              // Collections
-              const cq = query(collection(db, 'collections'));
-              const cSnap = await getDocs(cq);
-              cSnap.docs.forEach((doc) => {
-                const data = doc.data();
-                if (data.slug) {
-                  urls.push({
-                    url: `${baseUrl}/shop?collection=${data.slug}`,
-                    lastmod: data.updatedAt ? new Date(data.updatedAt).toISOString() : new Date(data.createdAt || data._creationTime || Date.now()).toISOString(),
-                    changefreq: "daily",
-                    priority: 0.7,
-                  });
-                }
-              });
-
-              // SEO Pages
-              const sq = query(collection(db, 'seoPages'), where('isPublished', '==', true));
-              const sSnap = await getDocs(sq);
-              sSnap.docs.forEach((doc) => {
-                const data = doc.data();
-                if (data.slug) {
-                  urls.push({
-                    url: `${baseUrl}/${data.slug}`,
-                    lastmod: data.updatedAt ? new Date(data.updatedAt).toISOString() : new Date(data.createdAt || data._creationTime || Date.now()).toISOString(),
-                    changefreq: "weekly",
-                    priority: 0.85,
-                  });
-                }
-              });
-
-              setData(urls);
-            } catch (err) {
-              console.error("Error fetching sitemap:", err);
-              setData([]);
-            }
-          };
-          fetchSitemap();
-        }
         else if (path === 'admin.customers.getAll') {
           /*
            * A customer, in a shop whose orders are mostly guests'.
@@ -3930,7 +3853,21 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'emailManagement.getStats') {
-          setData({ total: 0, sent: 0, failed: 0, pending: 0, successRate: 0 });
+          // Counted on the server: emailMessages holds thousands of rows. This returned zeros.
+          (async () => {
+            const col = collection(db, 'emailMessages');
+            const [t, sent, failed, pending] = await Promise.all([
+              getCountFromServer(col),
+              getCountFromServer(query(col, where('status', '==', 'sent'))),
+              getCountFromServer(query(col, where('status', '==', 'failed'))),
+              getCountFromServer(query(col, where('status', '==', 'pending'))),
+            ]);
+            const total = t.data().count;
+            setData({
+              total, sent: sent.data().count, failed: failed.data().count, pending: pending.data().count,
+              successRate: total ? Math.round((sent.data().count / total) * 100) : 0,
+            });
+          })().catch(() => setData({ total: 0, sent: 0, failed: 0, pending: 0, successRate: 0 }));
         }
         else if (path === 'users.isCurrentUserAdmin') {
           let innerUnsubscribe = () => {};
@@ -5988,6 +5925,58 @@ export function useMutation(apiRef: any) {
        * The variant's name is not taken from the sheet — carts and orders
        * find a variant by its name, so renaming belongs in the product form.
        */
+      /*
+       * Settings pages whose saves had no handler of their own. Each fell to
+       * the generic writer, which wants one document id: the email page's
+       * updateUsecase landed in the generic 'updateUsecase' branch — the one
+       * for WhatsApp — so switching an email off switched off the WhatsApp
+       * use-case of the same name (model_added, model_requested) and never
+       * touched the email; WhatsApp's enable/disable-all, the variable
+       * mapper, and the SEO hero-image push all failed with "ID required".
+       */
+      if (path === 'emailManagement.updateUsecase') {
+        const key = String(args?.usecaseKey || '');
+        if (!key) throw new Error('Missing usecaseKey');
+        const snap = await getDocs(query(collection(db, 'emailUsecaseTemplates'), where('usecaseKey', '==', key), limit(1)));
+        if (snap.empty) throw new Error(`No email use-case "${key}"`);
+        const patch: Record<string, any> = { updatedAt: Date.now() };
+        if (args.enabled !== undefined) patch.enabled = args.enabled === true;
+        if ('msg91TemplateId' in args) patch.msg91TemplateId = args.msg91TemplateId ? String(args.msg91TemplateId).trim() : deleteField();
+        if ('templateName' in args) patch.templateName = args.templateName ? String(args.templateName).trim() : deleteField();
+        await updateDoc(snap.docs[0].ref, patch);
+        return { success: true };
+      }
+      if (path === 'whatsapp.bulkUpdateUsecases') {
+        const keys: string[] = Array.isArray(args?.keys) ? args.keys.map(String) : [];
+        let updated = 0;
+        for (let i = 0; i < keys.length; i += 30) {
+          const snap = await getDocs(query(collection(db, 'whatsappUsecases'), where('usecaseKey', 'in', keys.slice(i, i + 30))));
+          const batch = writeBatch(db);
+          snap.docs.forEach((d) => batch.update(d.ref, { enabled: args.enabled === true, updatedAt: Date.now() }));
+          if (snap.size) await batch.commit();
+          updated += snap.size;
+        }
+        return { success: true, updated, message: `${args.enabled ? 'Enabled' : 'Disabled'} ${updated} use-case${updated === 1 ? '' : 's'}` };
+      }
+      if (path === 'whatsapp.updateVariableMapping') {
+        const key = String(args?.usecaseKey || '');
+        const snap = await getDocs(query(collection(db, 'whatsappUsecases'), where('usecaseKey', '==', key), limit(1)));
+        if (snap.empty) throw new Error(`No WhatsApp use-case "${key}"`);
+        await updateDoc(snap.docs[0].ref, { variableMapping: stripUndefinedDeep(args.variableMapping || {}), updatedAt: Date.now() });
+        return { success: true };
+      }
+      if (path === 'seoPages.updateHeroImagesByPageType') {
+        const url = String(args?.heroImageUrl || '').trim();
+        if (!args?.pageType || !url) throw new Error('A page type and an image are needed');
+        const snap = await getDocs(query(collection(db, 'seoPages'), where('pageType', '==', String(args.pageType))));
+        for (let i = 0; i < snap.docs.length; i += 400) {
+          const batch = writeBatch(db);
+          snap.docs.slice(i, i + 400).forEach((d) => batch.update(d.ref, { heroImageUrl: url, updatedAt: Date.now() }));
+          await batch.commit();
+        }
+        return { success: true, updatedCount: snap.size };
+      }
+
       if (path === 'products.bulkUpdateVariants') {
         const updates: any[] = Array.isArray(args?.updates) ? args.updates : [];
         const errors: string[] = [];
@@ -7021,6 +7010,28 @@ export function usePaginatedQuery(apiRef: any, args: any, options: { initialNumI
     const fetchInitial = async () => {
       readLabel = `paginated:${path}`;
       setStatus("LoadingFirstPage");
+      /*
+       * WhatsApp debug logs are not products: the path below filtered every
+       * collection by status == "active", a field logs don't have, so the
+       * debug page always showed none of its 215 logs.
+       */
+      if (path === 'whatsappDebugLogs.getDebugLogs') {
+        try {
+          const snap = await getDocs(query(collection(db, 'whatsappDebugLogs'), orderBy('createdAt', 'desc'), limit(500)));
+          if (cancelled) return;
+          let logs = snap.docs.map(d => ({ _id: d.id, ...d.data() } as any));
+          if (args?.usecaseKey) logs = logs.filter(l => l.usecaseKey === args.usecaseKey);
+          if (args?.success !== undefined) logs = logs.filter(l => (l.success === true) === args.success);
+          if (args?.errorType) logs = logs.filter(l => l.errorType === args.errorType);
+          setAllMatches(logs);
+          setResults(logs.slice(0, options.initialNumItems));
+          setStatus(logs.length > options.initialNumItems ? "CanLoadMore" : "Exhausted");
+        } catch (e) {
+          console.error('[firebase-hooks] debug logs failed:', e);
+          if (!cancelled) { setResults([]); setStatus("Exhausted"); }
+        }
+        return;
+      }
       try {
         // Products come from the build's catalogue when there is one (the
         // whole collection was 959 reads per visit); otherwise all active

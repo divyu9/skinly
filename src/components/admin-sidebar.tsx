@@ -31,7 +31,6 @@ import {
   TrendingUp,
   FileText,
   Layout,
-  Map,
   Sparkles,
   Tags, WandSparkles,
 } from "lucide-react";
@@ -144,7 +143,6 @@ export function AdminSidebar() {
         { path: "/backend-skinly/seo-pages", label: "SEO Pages", icon: FileText },
         { path: "/backend-skinly/seo-automation", label: "SEO Automation", icon: Sparkles },
         { path: "/backend-skinly/seo-generator", label: "SEO Generator", icon: Sparkles },
-        { path: "/backend-skinly/sitemap", label: "Sitemap", icon: Map },
       ],
     },
     {

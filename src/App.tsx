@@ -74,7 +74,6 @@ const AdminSEOPagesNewPage = lazyWithReload(() => import("./pages/admin/seo-page
 const AdminSEOPagesEditPage = lazyWithReload(() => import("./pages/admin/seo-pages/edit.tsx"), "./pages/admin/seo-pages/edit.tsx");
 const AdminSEOPagesAutoGeneratePage = lazyWithReload(() => import("./pages/admin/seo-pages/auto-generate.tsx"), "./pages/admin/seo-pages/auto-generate.tsx");
 const AdminSettingsPage = lazyWithReload(() => import("./pages/admin/settings/page.tsx"), "./pages/admin/settings/page.tsx");
-const AdminSitemapGeneratorPage = lazyWithReload(() => import("./pages/admin/sitemap-generator.tsx"), "./pages/admin/sitemap-generator.tsx");
 const AdminSeoAutomationPage = lazyWithReload(() => import("./pages/admin/seo-automation/page.tsx"), "./pages/admin/seo-automation/page.tsx");
 const AdminSEOGeneratorPage = lazyWithReload(() => import("./pages/admin/seo-generator/page.tsx"), "./pages/admin/seo-generator/page.tsx");
 const AdminShippingPage = lazyWithReload(() => import("./pages/admin/shipping.tsx"), "./pages/admin/shipping.tsx");
@@ -184,7 +183,8 @@ export default function App() {
             {/* Auto-Assign was a stub since the Firebase move; its linking lives on Variant Presets. */}
             <Route path="/backend-skinly/variant-presets-auto-assign" element={<Navigate to="/backend-skinly/variant-presets" replace />} />
             <Route path="/backend-skinly/tax-export" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><TaxExportPage /></AdminPageWrapper></Suspense>} />
-            <Route path="/backend-skinly/sitemap" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSitemapGeneratorPage /></AdminPageWrapper></Suspense>} />
+            {/* The sitemap is written by the build (scripts/prerender.mjs); this page only made a copy to paste nowhere. */}
+            <Route path="/backend-skinly/sitemap" element={<Navigate to="/backend-skinly/seo-automation" replace />} />
             <Route path="/backend-skinly/seo-generator" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminSEOGeneratorPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/product-classification" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductClassificationPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/product-categories" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductCategoriesPage /></AdminPageWrapper></Suspense>} />
