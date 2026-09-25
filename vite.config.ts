@@ -29,8 +29,6 @@ export default defineConfig(({ mode }) => {
       output: {
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-convex': ['convex'],
-          'vendor-clerk': ['@clerk/clerk-react'],
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select',
                         '@radix-ui/react-dropdown-menu'],
           'vendor-charts': ['recharts'],
