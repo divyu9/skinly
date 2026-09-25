@@ -144,21 +144,39 @@ export function PlotterModels() {
   const approve = async (ids: string[]) => {
     if (!ids.length) return;
     setBusy(true);
+    // In batches: one call for a whole bulk selection ran past the function's
+    // time limit and failed as INTERNAL part-way through.
+    const BATCH = 20;
+    const byId = new Map((rows || []).map((r) => [r._id, r]));
+    const items = ids.map((id) => {
+      const r = byId.get(id)!;
+      return { id, brandName: val(r, "brand"), modelName: val(r, "model"), category: val(r, "category") };
+    });
+    const total = { added: 0, alreadyListed: 0, errors: [] as string[] };
+    const progress = items.length > BATCH ? toast.loading(`Approving 0 of ${items.length}…`) : undefined;
     try {
-      const byId = new Map((rows || []).map((r) => [r._id, r]));
-      const items = ids.map((id) => {
-        const r = byId.get(id)!;
-        return { id, brandName: val(r, "brand"), modelName: val(r, "model"), category: val(r, "category") };
-      });
-      const res: any = (await httpsCallable(functions, "approvePlotterModels")({ items })).data;
-      toast.success(`${res.added} added to the website${res.alreadyListed ? `, ${res.alreadyListed} were already listed` : ""}`);
-      if (res.errors?.length) toast.error(res.errors.slice(0, 3).join("\n"));
-      setSelected(new Set());
-    } catch (e: any) {
-      toast.error(e?.message || "Could not approve");
+      for (let i = 0; i < items.length; i += BATCH) {
+        const chunk = items.slice(i, i + BATCH);
+        try {
+          const res: any = (await httpsCallable(functions, "approvePlotterModels", { timeout: 300_000 })({ items: chunk })).data;
+          total.added += res.added || 0;
+          total.alreadyListed += res.alreadyListed || 0;
+          total.errors.push(...(res.errors || []));
+        } catch (e: any) {
+          // The rows of a failed batch stay pending (or free themselves in two minutes): carry on with the rest.
+          total.errors.push(`${chunk.length} rows: ${e?.message || "failed"}`);
+        }
+        if (progress) toast.loading(`Approving ${Math.min(i + BATCH, items.length)} of ${items.length}…`, { id: progress });
+      }
     } finally {
+      if (progress) toast.dismiss(progress);
       setBusy(false);
     }
+    if (total.added || total.alreadyListed) {
+      toast.success(`${total.added} added to the website${total.alreadyListed ? `, ${total.alreadyListed} were already listed` : ""}`);
+    }
+    if (total.errors.length) toast.error(`${total.errors.length} not approved — try them again:\n${total.errors.slice(0, 3).join("\n")}`);
+    setSelected(new Set());
   };
 
   const reject = async (ids: string[], undo = false) => {

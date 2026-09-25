@@ -1,3 +1,4 @@
+import * as functionsV1 from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
@@ -17,8 +18,16 @@ import { requireAdmin } from "./auth";
 
 const FALLBACK_CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "controller", "console", "charger", "mac-mini", "accessory"];
 const tidy = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
+/* A row left "approving" this long belongs to a call that died (a timeout): take it again. */
+const STALE_CLAIM_MS = 2 * 60_000;
 
-export const approvePlotterModels = onCall(async (data: any, context: any) => {
+/*
+ * Five minutes, not the default one. Each row is a transaction, a brand
+ * lookup and two writes; a bulk approval of 60+ rows ran past 60 seconds and
+ * the admin saw INTERNAL, with the row in hand left stuck at "approving".
+ * The page also sends rows in small batches now, so no call comes near this.
+ */
+export const approvePlotterModels = functionsV1.runWith({ timeoutSeconds: 300, memory: "512MB" }).https.onCall(async (data: any, context: any) => {
   const { uid } = await requireAdmin(context);
   const items: any[] = Array.isArray(data?.items) ? data.items.slice(0, 200) : [];
   if (!items.length) throw new HttpsError("invalid-argument", "Nothing to approve");
@@ -37,6 +46,16 @@ export const approvePlotterModels = onCall(async (data: any, context: any) => {
     return gadgetIds.get(category) || null;
   };
 
+  // One lookup per brand per call, kept up to date with what this call adds.
+  const brandModels = new Map<string, { id: string; ref: admin.firestore.DocumentReference; data: any }[]>();
+  const modelsOf = async (brandName: string) => {
+    if (!brandModels.has(brandName)) {
+      const snap = await db.collection("supportedModels").where("brandName", "==", brandName).get();
+      brandModels.set(brandName, snap.docs.map((d) => ({ id: d.id, ref: d.ref, data: d.data() })));
+    }
+    return brandModels.get(brandName)!;
+  };
+
   const out = { added: 0, alreadyListed: 0, errors: [] as string[] };
   for (const it of items) {
     const id = String(it?.id || "");
@@ -52,8 +71,9 @@ export const approvePlotterModels = onCall(async (data: any, context: any) => {
         const snap = await tx.get(ref);
         if (!snap.exists) throw new Error("not found");
         const r = snap.data() as any;
-        if (r.status === "approved" || r.status === "approving") return null;
-        tx.update(ref, { status: "approving" });
+        if (r.status === "approved") return null;
+        if (r.status === "approving" && Date.now() - Number(r.approvingAt || 0) < STALE_CLAIM_MS) return null;
+        tx.update(ref, { status: "approving", approvingAt: Date.now() });
         return r;
       });
       if (!row) { out.alreadyListed++; continue; }
@@ -65,32 +85,36 @@ export const approvePlotterModels = onCall(async (data: any, context: any) => {
         if (!CATEGORIES.has(category)) throw new Error(`unknown category "${category}"`);
 
         // Already on the site under this brand, spaced or cased differently?
-        const sameBrand = await db.collection("supportedModels").where("brandName", "==", brandName).get();
-        const existing = sameBrand.docs.find((d) =>
-          tidy(d.data().modelName).toLowerCase() === modelName.toLowerCase() && !d.data().mergedInto);
+        // (A row taken back from a dead call may have got this far: it finds its own model here.)
+        const sameBrand = await modelsOf(brandName);
+        const existing = sameBrand.find((d) =>
+          tidy(d.data.modelName).toLowerCase() === modelName.toLowerCase() && !d.data.mergedInto);
 
         let supportedModelId: string;
         if (existing) {
-          if (existing.data().isActive === false) await existing.ref.update({ isActive: true });
+          if (existing.data.isActive === false) { await existing.ref.update({ isActive: true }); existing.data.isActive = true; }
           supportedModelId = existing.id;
           out.alreadyListed++;
         } else {
           const gadgetTypeId = await gadgetIdFor(category);
           const now = Date.now();
-          const created = await db.collection("supportedModels").add({
+          const doc = {
             brandName, modelName, category, isActive: true, source: "plotter",
             createdAt: now, _creationTime: now,
             ...(gadgetTypeId ? { gadgetTypeId } : {}),
-          });
+          };
+          const created = await db.collection("supportedModels").add(doc);
+          sameBrand.push({ id: created.id, ref: created, data: doc });
           supportedModelId = created.id;
           out.added++;
         }
         await ref.update({
           status: "approved", approvedAt: Date.now(), approvedBy: uid, supportedModelId,
+          approvingAt: admin.firestore.FieldValue.delete(),
           approvedAs: { brandName, modelName, category },
         });
       } catch (e) {
-        await ref.update({ status: "pending" });   // let it be tried again
+        await ref.update({ status: "pending", approvingAt: admin.firestore.FieldValue.delete() });   // let it be tried again
         throw e;
       }
     } catch (e: any) {
