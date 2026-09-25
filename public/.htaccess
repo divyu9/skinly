@@ -11,6 +11,16 @@ DirectoryIndex index.html
 ErrorDocument 404 /404.html
 
 <IfModule mod_headers.c>
+  # Security headers on every response. HSTS keeps browsers on https (not
+  # subdomains: mail.goskinly.com and the like are not ours to vouch for);
+  # SAMEORIGIN stops another site framing the checkout to trick clicks;
+  # nosniff stops a browser treating an upload as a script; the referrer
+  # policy keeps order and pay-link URLs out of other sites' logs.
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
   <FilesMatch "\.html$">
     # Every page is written by the build and changes only on a deploy, yet
     # "no-cache" sent every request — every visitor's, and every one of

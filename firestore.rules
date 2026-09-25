@@ -156,7 +156,12 @@ service cloud.firestore {
     // stay open. Rows owned by a signed-in customer are locked to them, which
     // stops anyone planting priced items in someone else's cart.
     match /cart/{cartId} {
-      allow create: if true;
+      // A guest row, or a row for the signed-in customer themselves: an open
+      // create let anyone plant items in another customer's cart by naming
+      // their userId.
+      allow create: if !('userId' in request.resource.data)
+                    || request.resource.data.userId == null
+                    || (isSignedIn() && request.resource.data.userId == request.auth.uid);
       allow read, update, delete: if isAdmin()
                                   || !('userId' in resource.data)
                                   || resource.data.userId == null
