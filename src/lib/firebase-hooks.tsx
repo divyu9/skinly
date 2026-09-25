@@ -205,6 +205,35 @@ async function catalogueModels(): Promise<any[] | null> {
  * callers use their original Firestore reads.
  */
 /*
+ * The orders a tax export covers: confirmed ones only (paid, or COD), dated
+ * by their invoice, with their GST. Unpaid checkouts used to be counted, the
+ * date filter read _creationTime (which orders placed since the move to
+ * Firebase don't have, so "this month" came back empty), and no order carried
+ * GST, so the report said ₹0. Orders confirmed before invoices were issued
+ * (functions/src/orderConfirm.ts) get their GST worked out here.
+ */
+function exportRows(orders: any[], args: any): any[] {
+  const { startDate, endDate, status } = args || {};
+  const statusFilter = status && status !== 'all' ? status : null;
+  const confirmed = (o: any) => !!o?.invoiceNumber
+    || (!o?.isDeleted && (o?.paymentStatus === 'success' || String(o?.paymentMethod || '').toLowerCase() === 'cod'));
+  const when = (o: any) => Number(o?.invoiceDate || o?.confirmedAt || o?.createdAt || o?._creationTime || 0);
+  return orders
+    .filter(confirmed)
+    .filter((o) => !(startDate && endDate) || (when(o) >= startDate && when(o) <= endDate))
+    .filter((o) => !statusFilter || o?.status === statusFilter)
+    .map((o) => {
+      if (o.taxableAmount != null && o.totalGstAmount != null) return o;
+      const g = calculateGST(Number(o.total ?? o.amountPayable ?? 0) || 0, String(o.shippingAddress?.state || ''));
+      return { ...o, taxableAmount: g.taxableAmount, gstRate: 18, totalGstAmount: g.totalGstAmount,
+        cgstRate: g.cgstRate ? 9 : 0, sgstRate: g.sgstRate ? 9 : 0, igstRate: g.igstRate ? 18 : 0,
+        cgstAmount: g.cgstAmount || 0, sgstAmount: g.sgstAmount || 0, igstAmount: g.igstAmount || 0 };
+    })
+    .sort((a, b) => (String(a.invoiceFy || '').localeCompare(String(b.invoiceFy || '')))
+      || (Number(a.invoiceSeq || 0) - Number(b.invoiceSeq || 0)) || (when(a) - when(b)));
+}
+
+/*
  * What a coupon is for, as a test on a product line — the same rule placeOrder
  * bills by (functions/src/placeorder.ts, couponEligibleTotal). Null when the
  * coupon is for everything. MAG300 is "₹300 off Magneto X" and was offered on
@@ -288,6 +317,8 @@ import { collectionKey } from "./collection-key";
 import { loadCatalogue, loadModelCatalogue } from "./catalogue";
 import { listingOf, presetFor } from "./ai-mockup-shots";
 import { searchRows } from "./search-match";
+import { calculateGST } from "./gst";
+import { laptopBodyKeys, squash } from "./laptop-body";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 const TOTAL_PHONE_SKIN_SKUS = 359;
@@ -1008,6 +1039,8 @@ export function useQuery(apiRef: any, args?: any) {
               has(d.orderNumber) ||
               String(d.orderNumber || '').toLowerCase().replace(/^#/, '').includes(bare) ||
               has(d.failedOrderNumber) ||
+              has(d.checkoutRef) ||
+              has(d.invoiceNumber) ||
               has(d.orderId) ||
               has(d.customerName) ||
               has(d.shippingAddress?.fullName) ||
@@ -3294,15 +3327,24 @@ export function useQuery(apiRef: any, args?: any) {
           } else {
             const brandSearch = args?.brandName?.toLowerCase().trim();
             const keywords = search.split(/\s+/).filter((k: string) => k.length > 1);
-            const similar = (rows: any[]) => rows
-              .filter(m => {
-                if (args?.category && m.category !== args.category) return false;
-                if (brandSearch && (m.brandName || "").toLowerCase() !== brandSearch) return false;
+            // Spacing-blind, and for laptops also by body: a request for
+            // "15s-fq5111TU" suggests the 15S FQ models already listed, which
+            // take the same skin (src/lib/laptop-body.ts).
+            const squashed = squash(search);
+            const wantBody = args?.category === "laptop" && brandSearch ? new Set(laptopBodyKeys(brandSearch, search)) : new Set<string>();
+            const similar = (rows: any[]) => {
+              const inScope = rows.filter(m => (!args?.category || m.category === args.category)
+                && (!brandSearch || (m.brandName || "").toLowerCase() === brandSearch));
+              const byName = inScope.filter(m => {
                 const name = (m.modelName || "").toLowerCase();
-                return keywords.every((k: string) => name.includes(k));
-              })
-              .slice(0, 5)
-              .map(m => ({ _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category }));
+                return keywords.every((k: string) => name.includes(k)) || (squashed.length >= 3 && squash(name).includes(squashed));
+              });
+              const byBody = wantBody.size
+                ? inScope.filter(m => !byName.includes(m) && laptopBodyKeys(brandSearch, m.modelName || "").some((k) => wantBody.has(k)))
+                : [];
+              return [...byName, ...byBody].slice(0, 5)
+                .map(m => ({ _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category }));
+            };
             const modelRows = await catalogueModels();
             if (modelRows) {
               if (active) setData(similar(modelRows));
@@ -3311,18 +3353,7 @@ export function useQuery(apiRef: any, args?: any) {
             unsubscribe = onSnapshot(
               query(collection(db, 'supportedModels'), where('isActive', '==', true)),
               (snap) => {
-                const matches = snap.docs
-                  .map(d => ({ _id: d.id, ...d.data() } as any))
-                  .filter(m => {
-                    if (args?.category && m.category !== args.category) return false;
-                    if (brandSearch && (m.brandName || "").toLowerCase() !== brandSearch) return false;
-                    const name = (m.modelName || "").toLowerCase();
-                    return keywords.every((k: string) => name.includes(k));
-                  })
-                  .slice(0, 5);
-                setData(matches.map(m => ({
-                  _id: m._id, brandName: m.brandName, modelName: m.modelName, category: m.category,
-                })));
+                setData(similar(snap.docs.map(d => ({ _id: d.id, ...d.data() } as any))));
               }
             );
           }
@@ -4334,124 +4365,59 @@ export function useQuery(apiRef: any, args?: any) {
           });
         }
         else if (path === 'exports.getOrdersForExport') {
-          const { startDate, endDate, orderIds, status } = args || {};
-          const statusFilter = status && status !== 'all' ? status : null;
-
-          const applyFilters = (orders: any[]) => {
-            let filtered = orders;
-            if (startDate && endDate) {
-              filtered = filtered.filter((o: any) => {
-                const t = o?._creationTime || 0;
-                return t >= startDate && t <= endDate;
-              });
-            }
-            if (statusFilter) {
-              filtered = filtered.filter((o: any) => o?.status === statusFilter);
-            }
-            filtered.sort((a: any, b: any) => (b._creationTime || 0) - (a._creationTime || 0));
-            return filtered;
-          };
-
+          const { orderIds } = args || {};
           if (Array.isArray(orderIds) && orderIds.length > 0) {
             const chunks: string[][] = [];
             for (let i = 0; i < orderIds.length; i += 10) chunks.push(orderIds.slice(i, i + 10));
-
             const unsubs: Array<() => void> = [];
             const ordersById = new Map<string, any>();
-
             chunks.forEach((chunk) => {
               const q = query(collection(db, 'orders'), where(documentId(), 'in', chunk));
-              const u = onSnapshot(q, (snap) => {
+              unsubs.push(onSnapshot(q, (snap) => {
                 snap.docs.forEach((d) => ordersById.set(d.id, { _id: d.id, ...d.data() }));
-                setData(applyFilters(Array.from(ordersById.values())));
-              });
-              unsubs.push(u);
+                setData(exportRows(Array.from(ordersById.values()), args));
+              }));
             });
-
             unsubscribe = () => unsubs.forEach((u) => u());
           } else {
-            let q = query(collection(db, 'orders'));
-            if (startDate && endDate) {
-              q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
-            }
-
-            unsubscribe = onSnapshot(q, (snap) => {
-              const orders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-              setData(applyFilters(orders));
+            unsubscribe = onSnapshot(collection(db, 'orders'), (snap) => {
+              setData(exportRows(snap.docs.map(d => ({ _id: d.id, ...d.data() })), args));
             });
           }
         }
         else if (path === 'exports.getExportStats') {
-          const { startDate, endDate, orderIds, status } = args || {};
-          const statusFilter = status && status !== 'all' ? status : null;
-
+          const { orderIds } = args || {};
           const computeStats = (orders: any[]) => {
-            let filtered = orders;
-            if (startDate && endDate) {
-              filtered = filtered.filter((o: any) => {
-                const t = o?._creationTime || 0;
-                return t >= startDate && t <= endDate;
-              });
+            const rows = exportRows(orders, args);
+            const s = { totalOrders: rows.length, totalRevenue: 0, totalTaxableAmount: 0, totalGst: 0, totalCgst: 0, totalSgst: 0, totalIgst: 0 };
+            for (const o of rows) {
+              if (o?.status === 'cancelled') continue;   // a cancelled invoice is reversed by a credit note
+              s.totalRevenue += Number(o.total ?? o.amountPayable ?? 0) || 0;
+              s.totalTaxableAmount += o.taxableAmount || 0;
+              s.totalGst += o.totalGstAmount || 0;
+              s.totalCgst += o.cgstAmount || 0;
+              s.totalSgst += o.sgstAmount || 0;
+              s.totalIgst += o.igstAmount || 0;
             }
-            if (statusFilter) {
-              filtered = filtered.filter((o: any) => o?.status === statusFilter);
-            }
-
-            let totalRevenue = 0;
-            let totalTaxableAmount = 0;
-            let totalGst = 0;
-            let totalCgst = 0;
-            let totalSgst = 0;
-            let totalIgst = 0;
-
-            filtered.forEach((order: any) => {
-              if (order?.status !== 'cancelled' && order?.status !== 'failed') {
-                totalRevenue += order?.total || 0;
-                totalTaxableAmount += order?.taxableAmount || 0;
-                totalGst += order?.totalGstAmount || 0;
-                totalCgst += order?.cgstAmount || 0;
-                totalSgst += order?.sgstAmount || 0;
-                totalIgst += order?.igstAmount || 0;
-              }
-            });
-
-            return {
-              totalOrders: filtered.length,
-              totalRevenue,
-              totalTaxableAmount,
-              totalGst,
-              totalCgst,
-              totalSgst,
-              totalIgst
-            };
+            const r2 = (n: number) => Math.round(n * 100) / 100;
+            return { ...s, totalTaxableAmount: r2(s.totalTaxableAmount), totalGst: r2(s.totalGst), totalCgst: r2(s.totalCgst), totalSgst: r2(s.totalSgst), totalIgst: r2(s.totalIgst) };
           };
-
           if (Array.isArray(orderIds) && orderIds.length > 0) {
             const chunks: string[][] = [];
             for (let i = 0; i < orderIds.length; i += 10) chunks.push(orderIds.slice(i, i + 10));
-
             const unsubs: Array<() => void> = [];
             const ordersById = new Map<string, any>();
-
             chunks.forEach((chunk) => {
               const q = query(collection(db, 'orders'), where(documentId(), 'in', chunk));
-              const u = onSnapshot(q, (snap) => {
+              unsubs.push(onSnapshot(q, (snap) => {
                 snap.docs.forEach((d) => ordersById.set(d.id, { _id: d.id, ...d.data() }));
                 setData(computeStats(Array.from(ordersById.values())));
-              });
-              unsubs.push(u);
+              }));
             });
-
             unsubscribe = () => unsubs.forEach((u) => u());
           } else {
-            let q = query(collection(db, 'orders'));
-            if (startDate && endDate) {
-              q = query(q, where('_creationTime', '>=', startDate), where('_creationTime', '<=', endDate));
-            }
-
-            unsubscribe = onSnapshot(q, (snap) => {
-              const orders = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
-              setData(computeStats(orders));
+            unsubscribe = onSnapshot(collection(db, 'orders'), (snap) => {
+              setData(computeStats(snap.docs.map(d => ({ _id: d.id, ...d.data() }))));
             });
           }
         }
@@ -5209,7 +5175,11 @@ export function useMutation(apiRef: any) {
         if (actualActionName === 'createManualOrder') {
           const docRef = await addDoc(collection(db, 'orders'), {
             ...args.orderData,
-            orderNumber: `MAN-${Math.floor(Math.random() * 100000)}`,
+            // The order number and GST invoice come from the same sequence as
+            // every other order, once it is confirmed (paid or COD) — see
+            // functions/src/orderConfirm.ts. This random MAN-##### used to be
+            // the number itself, outside the sequence.
+            checkoutRef: `MAN-${Date.now().toString(36).toUpperCase()}`,
             createdAt: Date.now(),
             updatedAt: Date.now()
           });

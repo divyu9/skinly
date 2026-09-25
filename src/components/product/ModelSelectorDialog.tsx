@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { brandKey, loadCatalogue, type BrandLogo } from "@/lib/catalogue";
+import { STICKER_HINT } from "@/lib/laptop-body";
 
 /** The same logos the admin sets on the homepage's Explore by Brand section. */
 let brandLogosPromise: Promise<Record<string, BrandLogo>> | null = null;
@@ -22,6 +23,9 @@ interface ModelSelectorDialogProps {
   searchQuery: string;
   modelsByBrand: Record<string, string[]>;
   filteredModels: string[];
+  /** Models listed only because they share a body with the laptop searched for. */
+  sameBodyModels?: Set<string>;
+  deviceCategory?: string;
   onBrandSelect: (brand: string) => void;
   onSearchChange: (query: string) => void;
   onModelSelect: (model: string, brand: string) => void;
@@ -42,6 +46,8 @@ export function ModelSelectorDialog({
   searchQuery,
   modelsByBrand,
   filteredModels,
+  sameBodyModels,
+  deviceCategory,
   onBrandSelect,
   onSearchChange,
   onModelSelect,
@@ -117,11 +123,25 @@ export function ModelSelectorDialog({
             </DialogHeader>
             
             <Input
-              placeholder={`Search ${selectedBrand} models...`}
+              placeholder={deviceCategory === "laptop" ? `Search or type the model number on your ${selectedBrand} sticker` : `Search ${selectedBrand} models...`}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="mb-2"
             />
+            {/* Laptop makers give one body many numbers (one per processor or
+                RAM). The number on the sticker finds the models with the same
+                body, which is all a skin needs. */}
+            {deviceCategory === "laptop" && (
+              <p className="-mt-1 mb-2 text-xs text-muted-foreground">
+                {STICKER_HINT[selectedBrand.toLowerCase()] || "Type the model number from the sticker under your laptop."}{" "}
+                Same body = same skin, whatever the processor or RAM.
+              </p>
+            )}
+            {!!sameBodyModels?.size && (
+              <p className="mb-2 rounded-lg bg-brand/10 px-3 py-2 text-xs">
+                <b>{searchQuery.trim()}</b> has the same body as the models marked ✓ below — pick any of them, the skin fits yours.
+              </p>
+            )}
             
             <div className="flex-1 overflow-y-auto pr-2 space-y-2">
               {filteredModels.length > 0 ? (
@@ -132,7 +152,10 @@ export function ModelSelectorDialog({
                     className="w-full justify-start text-left h-auto py-3"
                     onClick={() => onModelSelect(model, selectedBrand)}
                   >
-                    {model}
+                    <span className="flex-1">{model}</span>
+                    {sameBodyModels?.has(model) && (
+                      <span className="ml-2 shrink-0 rounded-full bg-brand/15 px-2 py-0.5 text-[11px] font-semibold text-brand-deep">✓ Same body, fits</span>
+                    )}
                   </Button>
                 ))
               ) : (

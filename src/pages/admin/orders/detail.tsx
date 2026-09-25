@@ -522,7 +522,8 @@ function OrderDetailPageInner() {
 
       {/* Header: order number + status dropdowns */}
       <OrderHeader
-        orderNumber={order.orderNumber}
+        orderNumber={order.orderNumber || order.checkoutRef || "Unpaid checkout"}
+        invoiceNumber={order.invoiceNumber}
         creationTime={creationTime}
         status={order.status}
         paymentStatus={order.paymentStatus}

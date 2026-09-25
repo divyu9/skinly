@@ -2,6 +2,7 @@ import * as functions from "firebase-functions/v1";
 import { reserveMaterialForOrder } from "./materials";
 import { cashbackForLines } from "./cashback";
 import { notifyOrderPlaced } from "./orderNotifications";
+import { confirmOrder } from "./orderConfirm";
 import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
@@ -40,18 +41,6 @@ export async function couponEligibleTotal(
     .reduce((sum, l) => sum + l.amount, 0);
 }
 
-/** Atomic counter increment — runs in background while cart is being fetched */
-const reserveOrderNumber = async (db: admin.firestore.Firestore): Promise<string> => {
-  const counterRef = db.collection("settings").doc("order_counter");
-  let orderNumber = "";
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(counterRef);
-    const current = snap.exists ? (snap.data()?.value ?? 4001) : 4001;
-    tx.set(counterRef, { value: current + 1 }, { merge: true });
-    orderNumber = `#${current}`;
-  });
-  return orderNumber;
-};
 
 const getPhonePeConfig = () => {
   const merchantId = process.env.PHONEPE_MERCHANT_ID || "";
@@ -90,11 +79,9 @@ export const placeOrder = functions
     // Note: couponDiscount / prepaidAmount / amount also arrive from the client.
     // They are deliberately ignored — every figure below is re-derived here.
 
-    // ── 1. Kick off order number reservation immediately (runs in background) ──
-    // Cart fetch + variant query take ~500ms. The counter transaction takes ~800-1200ms.
-    // By starting both at the same time we overlap most of the wait.
-    const orderNumberPromise = reserveOrderNumber(db);
-
+    // No order number yet: one is given when the order is confirmed — paid, or
+    // placed as COD (orderConfirm.ts) — so abandoned checkouts don't leave
+    // gaps in the sequence. Until then the checkout is known by checkoutRef.
     // Pre-generate doc ref so we have orderId before any writes
     const docRef = db.collection("orders").doc();
     const orderId = docRef.id;
@@ -348,12 +335,11 @@ export const placeOrder = functions
       : calculatedTotal;
 
     // ── 4. Write order ────────────────────────────────────────────────────────
-    // Collect the order number now — by this point cart+variants took ~500ms,
-    // so the counter transaction (started at step 1) is usually already done.
-    const orderNumber = await orderNumberPromise;
+    const checkoutRef = `CHK-${orderId.slice(0, 8).toUpperCase()}`;
+    let orderNumber = "";
 
     await docRef.set({
-      orderNumber,
+      checkoutRef,
       userId: uid || reqSessionId || "guest",
       // The sign-in that may list this order (see ownership.ts).
       ...(uid ? { ownerUid: uid } : {}),
@@ -428,6 +414,12 @@ export const placeOrder = functions
     // from applyPaymentResult — "we've got your order" before payment is worse
     // than silence. Non-blocking for the same reason as the stock draw-down.
     if (paymentMethod !== "phonepe") {
+      // Confirmed now: number and invoice first, so the message carries them.
+      try {
+        orderNumber = (await confirmOrder(db, docRef.id))?.orderNumber || "";
+      } catch (e: any) {
+        console.error("confirmOrder failed", { order: docRef.id, error: e?.message || e });
+      }
       notifyOrderPlaced(db, docRef.id).catch((e) =>
         console.error("notifyOrderPlaced failed", { order: docRef.id, error: e?.message || e })
       );
@@ -440,7 +432,7 @@ export const placeOrder = functions
       if (!/^[0-9]{10}$/.test(phoneDigits)) throw new HttpsError("invalid-argument", "Invalid phone number");
 
       const config = getPhonePeConfig();
-      const merchantTransactionId = `${orderNumber.replace("#", "")}-${Date.now().toString().slice(-6)}`;
+      const merchantTransactionId = `${checkoutRef}-${Date.now().toString().slice(-6)}`;
       const amountInPaise = Math.max(Math.round(amountPayable * 100), 100);
       const siteUrl = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
       // The function, not the SPA route — see the note in phonepe.ts.

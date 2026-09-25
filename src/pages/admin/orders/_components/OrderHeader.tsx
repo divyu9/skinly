@@ -9,6 +9,8 @@ export type PaymentStatus = "pending" | "success" | "failed";
 
 interface OrderHeaderProps {
   orderNumber: string;
+  /** The GST invoice, issued when the order was confirmed. */
+  invoiceNumber?: string;
   creationTime: any;
   status: string;
   paymentStatus?: string;
@@ -45,6 +47,7 @@ function toMillis(value: any): number {
 
 export function OrderHeader({
   orderNumber,
+  invoiceNumber,
   creationTime,
   status,
   paymentStatus,
@@ -60,6 +63,7 @@ export function OrderHeader({
     <div className="flex items-start justify-between gap-4">
       <div>
         <h1 className="text-3xl font-bold">{orderNumber}</h1>
+        {invoiceNumber && <p className="font-mono text-sm text-muted-foreground">Invoice {invoiceNumber}</p>}
         <p className="text-muted-foreground">{formatDate(toMillis(creationTime))}</p>
       </div>
       <div className="flex flex-wrap gap-2">

@@ -7,6 +7,7 @@ import { requireAuth, getCaller } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { payLinkValid } from "./payLink";
 import { normalizeOrderStatus } from "./orderStatus";
+import { confirmOrder } from "./orderConfirm";
 
 // PhonePe Config from Firebase environment config or secrets
 const getPhonePeConfig = () => {
@@ -136,6 +137,14 @@ const applyPaymentResult = async (
     notify: false,
   });
 
+  // The order's number and GST invoice are issued now that it is paid
+  // (orderConfirm.ts), before the message that quotes them.
+  try {
+    await confirmOrder(admin.firestore(), doc.id);
+  } catch (e: any) {
+    console.error("confirmOrder failed", { order: doc.id, error: e?.message || e });
+  }
+
   // The money is in, so now the customer hears about it. Not before: an
   // online order that never gets paid should produce no confirmation at all.
   // Non-blocking, and guarded by its own once-only flag, because the status
@@ -259,7 +268,7 @@ export const resumePayment = functions.runWith({ memory: "256MB", timeoutSeconds
 
   const result = await startPhonePePayment(orderSnap, order, orderId, phoneDigits,
     uid || (sessionId ? sessionId.slice(-24) : "PAYLINK"),
-    String(order.orderNumber || "").replace(/[^a-zA-Z0-9_-]/g, ""));
+    String(order.orderNumber || order.checkoutRef || "").replace(/[^a-zA-Z0-9_-]/g, ""));
   return { ...result, orderId };
 });
 
@@ -280,7 +289,7 @@ async function startPhonePePayment(
   const payable = Number(order.amountPayable ?? order.total);
   const timestamp = Date.now();
   const last6 = timestamp.toString().slice(-6);
-  const orderRefSuffix = orderNumber || orderId.slice(-8);
+  const orderRefSuffix = orderNumber || order.checkoutRef || orderId.slice(-8);
   const merchantTransactionId = `${orderRefSuffix}-${last6}`;
 
   const amountInPaise = Math.max(Math.round(payable * 100), 100);

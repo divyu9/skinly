@@ -42,21 +42,10 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
   }
 
   // 2. Generate Order Number (Transactionally to avoid duplicates)
-  const counterRef = db.collection('settings').doc('order_counter');
-  let orderNumber = '';
-
-  await db.runTransaction(async (transaction) => {
-    const counterDoc = await transaction.get(counterRef);
-    let currentVal = 4001; // Default starting number
-    if (counterDoc.exists) {
-      const docData = counterDoc.data();
-      currentVal = (docData && docData.value) ? docData.value : 4001;
-      transaction.update(counterRef, { value: currentVal + 1 });
-    } else {
-      transaction.set(counterRef, { key: 'order_counter', value: 4002 });
-    }
-    orderNumber = `#${currentVal}`;
-  });
+  // No number until the order is confirmed (orderConfirm.ts): taking one here
+  // for a checkout that is never paid left a gap in the sequence.
+  const orderNumber = '';
+  const checkoutRef = `CHK-${Date.now().toString(36).toUpperCase()}`;
 
   // 3. Assemble the Order Payload securely by calculating total from database
   const productIds = Array.from(
@@ -106,7 +95,7 @@ export const createOrder = functions.runWith({ memory: "256MB", timeoutSeconds: 
 
   // Use calculated total instead of client-provided remainingAmount
   const newOrder = {
-    orderNumber: orderNumber,
+    checkoutRef,
     userId: uid || reqSessionId || 'guest',
     ...(uid ? { ownerUid: uid } : {}),
     customerName: shippingAddress?.fullName || 'Guest',

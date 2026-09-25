@@ -116,6 +116,8 @@ function TaxExportPageInner() {
     try {
       // Create CSV content with GST details
       const headers = [
+        "Invoice Number",
+        "Invoice Date",
         "Order Number",
         "Order Date",
         "Customer Name",
@@ -148,48 +150,55 @@ function TaxExportPageInner() {
 
       const rows = orders.map((order) => {
         // Format items
-        const itemDetails = order.items
+        const itemDetails = (order.items || [])
           .map(
-            (item) =>
-              `${item.productTitle}${item.phoneModel ? ` (${item.phoneModel})` : ""} - Qty: ${item.quantity} × ₹${item.price.toFixed(2)}`
+            (item: any) =>
+              `${item.productTitle}${item.phoneModel ? ` (${item.phoneModel})` : ""} - Qty: ${item.quantity} × ₹${(Number(item.price) || 0).toFixed(2)}`
           )
           .join("; ");
 
         // Format address
         const address = [
-          order.shippingAddress.addressLine1,
-          order.shippingAddress.addressLine2,
+          order.shippingAddress?.addressLine1,
+          order.shippingAddress?.addressLine2,
         ]
           .filter(Boolean)
           .join(", ");
 
+        const money = (v: unknown) => (Number(v) || 0).toFixed(2);
+        // Rates are stored as percentages (18), older rows as fractions (0.18).
+        const pct = (v: unknown) => { const n = Number(v) || 0; return n ? (n <= 1 ? n * 100 : n).toFixed(0) : ""; };
+        const date = (t: unknown) => (Number(t) ? new Date(Number(t)).toLocaleString("en-IN") : "");
+        const orderedAt = order.createdAt || order._creationTime;
         return [
-          order.orderNumber || order.failedOrderNumber || "Pending",
-          new Date(order._creationTime).toLocaleString("en-IN"),
-          order.shippingAddress.fullName,
-          order.shippingAddress.phone,
-          "", // Email not stored in current schema
+          order.invoiceNumber || "",
+          date(order.invoiceDate || order.confirmedAt || orderedAt),
+          order.orderNumber || order.failedOrderNumber || "",
+          date(orderedAt),
+          order.shippingAddress?.fullName || order.customerName || "",
+          order.shippingAddress?.phone || order.phone || "",
+          order.email || order.customerEmail || "",
           address,
-          order.shippingAddress.city,
-          order.shippingAddress.state,
-          order.shippingAddress.pincode,
+          order.shippingAddress?.city || "",
+          order.shippingAddress?.state || "",
+          order.shippingAddress?.pincode || "",
           order.status,
           order.paymentStatus || "N/A",
-          order.paymentMethod,
-          order.items.length.toString(),
+          order.paymentMethod || "",
+          String((order.items || []).length),
           itemDetails,
-          order.subtotal.toFixed(2),
-          order.shippingFee.toFixed(2),
-          order.total.toFixed(2),
-          (order.taxableAmount || 0).toFixed(2),
-          order.gstRate ? (order.gstRate * 100).toFixed(0) : "0",
-          order.cgstRate ? (order.cgstRate * 100).toFixed(0) : "",
-          order.cgstAmount ? order.cgstAmount.toFixed(2) : "",
-          order.sgstRate ? (order.sgstRate * 100).toFixed(0) : "",
-          order.sgstAmount ? order.sgstAmount.toFixed(2) : "",
-          order.igstRate ? (order.igstRate * 100).toFixed(0) : "",
-          order.igstAmount ? order.igstAmount.toFixed(2) : "",
-          (order.totalGstAmount || 0).toFixed(2),
+          money(order.subtotal ?? order.itemsTotal),
+          money(order.shippingFee),
+          money(order.total ?? order.amountPayable),
+          money(order.taxableAmount),
+          pct(order.gstRate) || "18",
+          pct(order.cgstRate),
+          order.cgstAmount ? money(order.cgstAmount) : "",
+          pct(order.sgstRate),
+          order.sgstAmount ? money(order.sgstAmount) : "",
+          pct(order.igstRate),
+          order.igstAmount ? money(order.igstAmount) : "",
+          money(order.totalGstAmount),
           order.awbNumber || "",
           order.trackingUrl || "",
         ];

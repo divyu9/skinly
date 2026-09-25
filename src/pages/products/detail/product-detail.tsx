@@ -161,6 +161,7 @@ export default function ProductDetailPage() {
     handleModelSelect,
     modelsByBrand,
     filteredModels,
+    sameBodyModels,
     requestState,
     openRequestForm,
     resetRequestForm,
@@ -667,6 +668,8 @@ export default function ProductDetailPage() {
         searchQuery={selectorState.searchQuery}
         modelsByBrand={modelsByBrand}
         filteredModels={filteredModels}
+        sameBodyModels={sameBodyModels}
+        deviceCategory={deviceCategory}
         onBrandSelect={selectBrand}
         onSearchChange={setSearchQuery}
         onModelSelect={handleModelSelect}

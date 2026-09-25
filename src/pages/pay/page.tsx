@@ -9,6 +9,7 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
+import { orderLabel } from "@/lib/order-label.ts";
 
 /**
  * /pay/:orderId?t=… — finish paying for an order, from the reminder.
@@ -67,7 +68,7 @@ export default function PayPage() {
             </Message>
           ) : isPaid ? (
             <Message icon="ok" title="This order is paid">
-              Thank you! Order {order.orderNumber} is confirmed and we're getting it ready.
+              Thank you! Order {orderLabel(order)} is confirmed and we're getting it ready.
               <Link to={`/orders/${orderId}`} className="mt-4 block">
                 <Button className="w-full">View order</Button>
               </Link>
@@ -82,7 +83,7 @@ export default function PayPage() {
           ) : (
             <>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Order {order.orderNumber}
+                {order.orderNumber ? `Order ${order.orderNumber}` : `Checkout ${order.checkoutRef || orderLabel(order)}`}
               </p>
               <h1 className="mt-1 text-2xl font-bold">Your payment didn't go through</h1>
               <p className="mt-1 text-sm text-muted-foreground">

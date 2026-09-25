@@ -160,7 +160,7 @@ export async function sendPaymentNudges(db: admin.firestore.Firestore, now = Dat
     const firstName = String(o.shippingAddress?.fullName || o.customerName || "").trim().split(/\s+/)[0] || "there";
     const queued = await queueWhatsApp(db, USECASE, p, {
       customer_name: firstName,
-      order_number: String(o.orderNumber || "").replace(/^#/, ""),
+      order_number: String(o.orderNumber || o.checkoutRef || "").replace(/^#/, ""),
       order_amount: `₹${Math.round(Number(o.amountPayable ?? o.total))}`,
       order_total: `₹${Math.round(Number(o.amountPayable ?? o.total))}`,
       product_name: String(items[0]?.productTitle || "your order").slice(0, 60),

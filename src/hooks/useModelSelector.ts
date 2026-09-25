@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { brandInScope } from "@/lib/device-fit";
+import { searchModels } from "@/lib/laptop-body";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -111,22 +112,14 @@ export function useModelSelector(
     if (hit) setSelectorState(prev => ({ ...prev, selectedBrand: hit }));
   }, [selectorState.dialogOpen, selectorState.selectedBrand, allBrands, urlBrand]);
 
-  // Filter models based on search
-  const filteredModels = useMemo(() => {
+  // Filter models based on search. Spacing and hyphens don't matter ("15s fq"
+  // finds "15S FQ1107TU"), and a laptop's sticker number also finds the
+  // models that share its body (src/lib/laptop-body.ts).
+  const { filteredModels, sameBodyModels } = useMemo(() => {
     const models = modelsByBrand[selectorState.selectedBrand] || [];
-    
-    if (!selectorState.searchQuery.trim()) return models;
-    
-    const searchTerms = selectorState.searchQuery
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(term => term.length > 0);
-    
-    return models.filter(model => {
-      const modelLower = model.toLowerCase();
-      return searchTerms.every(term => modelLower.includes(term));
-    });
-  }, [selectorState.selectedBrand, selectorState.searchQuery, modelsByBrand]);
+    const r = searchModels(selectorState.selectedBrand, models, selectorState.searchQuery, deviceCategory);
+    return { filteredModels: r.models, sameBodyModels: r.sameBody };
+  }, [selectorState.selectedBrand, selectorState.searchQuery, modelsByBrand, deviceCategory]);
   
   // Similar models for request form
   const similarModels = useQuery(
@@ -285,6 +278,7 @@ export function useModelSelector(
     modelsByBrand,
     allBrands,
     filteredModels,
+    sameBodyModels,
     
     // Request form
     requestState,

@@ -18,9 +18,15 @@ export function orderLabel(order: {
   _id?: string;
   orderNumber?: string | null;
   failedOrderNumber?: string | null;
+  checkoutRef?: string | null;
 }): string {
   const number = String(order?.orderNumber || "").trim();
   if (number) return number.startsWith("#") ? number : `#${number}`;
+
+  // An unpaid checkout has no order number yet — numbers are issued on
+  // confirmation so the sequence has no gaps (functions/src/orderConfirm.ts).
+  const ref = String(order?.checkoutRef || "").trim();
+  if (ref) return ref;
 
   const failed = String(order?.failedOrderNumber || "").trim();
   if (failed) return failed;
