@@ -37,8 +37,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.t
 import { toast } from "sonner";
 import { ExportModels, ImportModels } from "./models-import-export.tsx";
 import { ResyncBrandScopeButton } from "./resync-brand-scope.tsx";
+import { PlotterModels, usePlotterPendingCount } from "./plotter-models.tsx";
 import {
   PlusIcon,
+  DatabaseIcon,
   UploadIcon,
   DownloadIcon,
   PencilIcon,
@@ -95,6 +97,7 @@ export default function AdminModelsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [modelsDialog, setModelsDialog] = useState<"import" | "export" | null>(null);
+  const plotterPending = usePlotterPendingCount();
   const [editingModel, setEditingModel] = useState<{ id: Id<"supportedModels">; data: ModelFormData } | null>(null);
   const [formData, setFormData] = useState<ModelFormData>({
     brandName: "",
@@ -441,6 +444,11 @@ export default function AdminModelsPage() {
                   {allModelRequests.filter(r => r.status === "pending").length}
                 </Badge>
               ) : null}
+            </TabsTrigger>
+            <TabsTrigger value="plotter">
+              <DatabaseIcon className="size-4 mr-2" />
+              From plotter
+              {plotterPending ? <Badge variant="secondary" className="ml-2">{plotterPending}</Badge> : null}
             </TabsTrigger>
           </TabsList>
 
@@ -988,6 +996,11 @@ export default function AdminModelsPage() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* FROM PLOTTER TAB */}
+          <TabsContent value="plotter" className="space-y-6">
+            <PlotterModels />
           </TabsContent>
         </Tabs>
 
