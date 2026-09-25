@@ -649,11 +649,7 @@ export default function ProductDetailPage() {
           <TrendingProductsSection productId={productData._id} />
 
           {/* Reviews Section */}
-          <ReviewSection
-            reviews={reviews}
-            reviewStats={reviewStats}
-            onPostReview={openReviewDialog}
-          />
+          <ReviewSection reviews={reviews} />
         </div>
       </section>
       
@@ -678,20 +674,6 @@ export default function ProductDetailPage() {
         }}
       />
 
-      {/* Review Dialog */}
-      <ReviewDialog
-        open={reviewFormState.dialogOpen}
-        onOpenChange={(open) => !open && closeReviewDialog()}
-        formState={reviewFormState}
-        onUpdateForm={updateReviewForm}
-        onAddImages={addImages}
-        onRemoveImage={removeImage}
-        onAddVideos={addVideos}
-        onRemoveVideo={removeVideo}
-        onSubmit={handleSubmitReview}
-        onClose={closeReviewDialog}
-      />
-      
       {/* Request Model Dialog */}
       <RequestModelDialog
         open={requestState.dialogOpen}

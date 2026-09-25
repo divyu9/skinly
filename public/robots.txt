@@ -9,6 +9,7 @@ Disallow: /cart/
 Disallow: /checkout/
 Disallow: /payment/
 Disallow: /pay/
+Disallow: /review/
 Disallow: /mock-payment/
 
 Sitemap: https://goskinly.com/sitemap.xml

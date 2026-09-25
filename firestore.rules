@@ -87,11 +87,13 @@ service cloud.firestore {
     // client cannot turn a readable code into a cheaper order.
     match /coupons/{id}                  { allow read: if true; allow write: if isAdmin(); }
 
-    // Reviews are public to read; a signed-in customer may add one.
+    // Reviews are public to read. They are written by submitOrderReview
+    // (functions/src/reviews.ts), which checks the order was delivered and
+    // the product was in it. `create: if isSignedIn()` let any Google account
+    // post any review of anything.
     match /reviews/{id} {
       allow read: if true;
-      allow create: if isSignedIn();
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
     // ── User profiles ─────────────────────────────────────────────────────────

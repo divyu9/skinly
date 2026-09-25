@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Badge } from "@/components/ui/badge.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, RefreshCwIcon, AlertTriangleIcon } from "lucide-react";
+import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, RefreshCwIcon, AlertTriangleIcon, StarIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator.tsx";
 import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
@@ -217,6 +217,19 @@ function OrderDetailPageInner() {
             </div>
           </div>
           
+          {order.status === "delivered" && !order.isDeleted && (
+            <Link to={`/review/${orderId}`} className="flex items-center gap-3 rounded-2xl border-2 border-ink/15 bg-sunny/25 p-4">
+              <StarIcon className="size-6 shrink-0 fill-yellow-400 text-yellow-400" />
+              <div className="flex-1">
+                <p className="font-semibold">How's your skin looking?</p>
+                <p className="text-sm text-muted-foreground">Rate it and add a photo — it helps the next person choose.</p>
+              </div>
+              <span className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
+                {order.reviewedAt ? "Edit review" : "Rate"}
+              </span>
+            </Link>
+          )}
+
           {canPay && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
               <div className="flex items-start gap-3">

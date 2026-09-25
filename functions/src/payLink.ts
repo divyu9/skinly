@@ -24,10 +24,22 @@ import { enforceDailyRateLimit } from "./rate-limit";
 
 const SITE = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
 
-export function payLinkToken(orderId: string): string {
+/** A link token for one purpose on one order ("pay", "review"). */
+export function linkToken(purpose: string, orderId: string): string {
   const secret = process.env.PAY_LINK_SECRET || "";
   if (!secret) throw new Error("PAY_LINK_SECRET not configured");
-  return crypto.createHmac("sha256", secret).update(`pay:${orderId}`).digest("base64url").slice(0, 16);
+  return crypto.createHmac("sha256", secret).update(`${purpose}:${orderId}`).digest("base64url").slice(0, 16);
+}
+
+export function linkTokenValid(purpose: string, orderId: string, token: unknown): boolean {
+  if (typeof token !== "string" || token.length !== 16) return false;
+  const want = Buffer.from(linkToken(purpose, orderId));
+  const got = Buffer.from(token);
+  return want.length === got.length && crypto.timingSafeEqual(want, got);
+}
+
+export function payLinkToken(orderId: string): string {
+  return linkToken("pay", orderId);
 }
 
 export function payLinkValid(orderId: string, token: unknown): boolean {
