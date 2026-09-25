@@ -6090,35 +6090,23 @@ export function useMutation(apiRef: any) {
         return { success: true, reordered: ids.length };
       }
 
-      if (path === 'supportedModels.renameBrand') {
-        const oldName = String(args.oldName || '');
-        const newName = String(args.newName || '').trim();
-        if (!oldName || !newName) throw new Error('Both the old and new brand name are required');
-        const hits = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', oldName)));
-        for (let i = 0; i < hits.docs.length; i += 450) {
-          const batch = writeBatch(db);
-          hits.docs.slice(i, i + 450).forEach((d) => batch.update(d.ref, { brandName: newName }));
-          await batch.commit();
-        }
-        return hits.size;
+      /*
+       * A brand's name is also on its mockups and in listing scopes, so the
+       * rename runs on the server and moves all three (functions/src/brands.ts).
+       * Renaming only the models here left the phones without mockups.
+       */
+      if (path === 'supportedModels.renameBrand' || path === 'supportedModels.mergeBrands') {
+        const from = path.endsWith('renameBrand') ? [String(args.oldName || '')] : (Array.isArray(args.sourceNames) ? args.sourceNames : []);
+        const to = String(path.endsWith('renameBrand') ? args.newName : args.targetName || '').trim();
+        if (!from.filter(Boolean).length || !to) throw new Error('Pick the brand(s) and the new name');
+        const res: any = (await httpsCallable(functions, 'renameBrands', { timeout: 540_000 })({ from, to })).data;
+        return res.models;
       }
-
-      if (path === 'supportedModels.mergeBrands') {
-        const sources: string[] = Array.isArray(args.sourceNames) ? args.sourceNames : [];
-        const target = String(args.targetName || '').trim();
-        if (!sources.length || !target) throw new Error('Pick the brands to merge and a target name');
-        let moved = 0;
-        for (const name of sources) {
-          if (name === target) continue;
-          const hits = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', name)));
-          for (let i = 0; i < hits.docs.length; i += 450) {
-            const batch = writeBatch(db);
-            hits.docs.slice(i, i + 450).forEach((d) => batch.update(d.ref, { brandName: target }));
-            await batch.commit();
-          }
-          moved += hits.size;
-        }
-        return moved;
+      // A brand is only its models' name: with none left there is nothing to delete.
+      if (path === 'supportedModels.deleteBrand') {
+        const left = await getDocs(query(collection(db, 'supportedModels'), where('brandName', '==', String(args?.name || '')), limit(1)));
+        if (!left.empty) throw new Error('Models still use this brand — move or delete them first');
+        return { success: true };
       }
 
       if (path === 'modelRequests.approveModelRequests') {
