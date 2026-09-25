@@ -38,42 +38,57 @@ export const approvePlotterModels = onCall(async (data: any, context: any) => {
     const id = String(it?.id || "");
     try {
       const ref = db.collection("plotterModels").doc(id);
-      const snap = await ref.get();
-      if (!id || !snap.exists) throw new Error("not found");
-      const row = snap.data() as any;
-      if (row.status === "approved") { out.alreadyListed++; continue; }
-
-      const brandName = tidy(it.brandName ?? row.brand);
-      const modelName = tidy(it.modelName ?? row.model);
-      const category = tidy(it.category ?? row.category).toLowerCase();
-      if (!brandName || !modelName) throw new Error("brand and model are needed");
-      if (!CATEGORIES.has(category)) throw new Error(`unknown category "${category}"`);
-
-      // Already on the site under this brand, spaced or cased differently?
-      const sameBrand = await db.collection("supportedModels").where("brandName", "==", brandName).get();
-      const existing = sameBrand.docs.find((d) =>
-        tidy(d.data().modelName).toLowerCase() === modelName.toLowerCase() && !d.data().mergedInto);
-
-      let supportedModelId: string;
-      if (existing) {
-        if (existing.data().isActive === false) await existing.ref.update({ isActive: true });
-        supportedModelId = existing.id;
-        out.alreadyListed++;
-      } else {
-        const gadgetTypeId = await gadgetIdFor(category);
-        const now = Date.now();
-        const created = await db.collection("supportedModels").add({
-          brandName, modelName, category, isActive: true, source: "plotter",
-          createdAt: now, _creationTime: now,
-          ...(gadgetTypeId ? { gadgetTypeId } : {}),
-        });
-        supportedModelId = created.id;
-        out.added++;
-      }
-      await ref.update({
-        status: "approved", approvedAt: Date.now(), approvedBy: uid, supportedModelId,
-        approvedAs: { brandName, modelName, category },
+      if (!id) throw new Error("not found");
+      /*
+       * Claimed first, in a transaction. Two approvals of one row landing in
+       * the same second (a double click, a second tab) both saw "pending" and
+       * each created the model: seven were listed twice on 25 Sep.
+       */
+      const row = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) throw new Error("not found");
+        const r = snap.data() as any;
+        if (r.status === "approved" || r.status === "approving") return null;
+        tx.update(ref, { status: "approving" });
+        return r;
       });
+      if (!row) { out.alreadyListed++; continue; }
+      try {
+        const brandName = tidy(it.brandName ?? row.brand);
+        const modelName = tidy(it.modelName ?? row.model);
+        const category = tidy(it.category ?? row.category).toLowerCase();
+        if (!brandName || !modelName) throw new Error("brand and model are needed");
+        if (!CATEGORIES.has(category)) throw new Error(`unknown category "${category}"`);
+
+        // Already on the site under this brand, spaced or cased differently?
+        const sameBrand = await db.collection("supportedModels").where("brandName", "==", brandName).get();
+        const existing = sameBrand.docs.find((d) =>
+          tidy(d.data().modelName).toLowerCase() === modelName.toLowerCase() && !d.data().mergedInto);
+
+        let supportedModelId: string;
+        if (existing) {
+          if (existing.data().isActive === false) await existing.ref.update({ isActive: true });
+          supportedModelId = existing.id;
+          out.alreadyListed++;
+        } else {
+          const gadgetTypeId = await gadgetIdFor(category);
+          const now = Date.now();
+          const created = await db.collection("supportedModels").add({
+            brandName, modelName, category, isActive: true, source: "plotter",
+            createdAt: now, _creationTime: now,
+            ...(gadgetTypeId ? { gadgetTypeId } : {}),
+          });
+          supportedModelId = created.id;
+          out.added++;
+        }
+        await ref.update({
+          status: "approved", approvedAt: Date.now(), approvedBy: uid, supportedModelId,
+          approvedAs: { brandName, modelName, category },
+        });
+      } catch (e) {
+        await ref.update({ status: "pending" });   // let it be tried again
+        throw e;
+      }
     } catch (e: any) {
       out.errors.push(`${id}: ${e?.message || "failed"}`);
     }

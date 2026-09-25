@@ -38,7 +38,7 @@ type Row = {
   approvedAs?: { brandName: string; modelName: string; category: string };
 };
 
-const CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "controller"];
+const CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "console", "drone", "gimbals", "controller"];
 const VENDOR_LABEL = { mobicare: "Mobicare", tia: "TIA" } as const;
 type Vendor = keyof typeof VENDOR_LABEL;
 const vendorsOf = (r: Row): Vendor[] => (Object.keys(r.vendors || {}) as Vendor[]).filter((v) => v in VENDOR_LABEL);
