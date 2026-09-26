@@ -4009,14 +4009,16 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'reviews.getProductReviews') {
           if (!args?.productId) { setData([]); return; }
-          const q = query(collection(db, 'reviews'), where('productId', '==', args.productId));
+          // Approved only: reviews are moderated (functions/src/reviewRewards.ts),
+          // and the rules let the public read nothing else.
+          const q = query(collection(db, 'reviews'), where('productId', '==', args.productId), where('status', '==', 'approved'));
           unsubscribe = onSnapshot(q, (snap) => {
             setData(snap.docs.map(d => ({ _id: d.id, ...d.data() })));
-          });
+          }, () => setData([]));
         }
         else if (path === 'reviews.getReviewStats') {
           if (!args?.productId) { setData({ count: 0, verifiedCount: 0, averageRating: 0 }); return; }
-          const q = query(collection(db, 'reviews'), where('productId', '==', args.productId));
+          const q = query(collection(db, 'reviews'), where('productId', '==', args.productId), where('status', '==', 'approved'));
           unsubscribe = onSnapshot(q, (snap) => {
             const all = snap.docs.map(d => d.data());
             const verified = all.filter(r => r.verified);

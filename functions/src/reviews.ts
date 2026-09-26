@@ -61,8 +61,13 @@ export const submitOrderReview = functions
     if (!snap.exists) throw new HttpsError("not-found", "Order not found");
     const order = snap.data() as any;
 
-    const allowed = linkTokenValid("review", orderId, data?.t) ||
-      (!!uid && (order.userId === uid || order.ownerUid === uid));
+    // The review link (?t=), the customer's own order link (?k=), or the
+    // signed-in owner — by account, or by the verified email the order used.
+    const tok = context?.auth?.token || {};
+    const byEmail = !!uid && tok.email_verified === true && !!tok.email &&
+      String(tok.email).toLowerCase() === String(order.email || "").toLowerCase();
+    const allowed = linkTokenValid("review", orderId, data?.t) || linkTokenValid("view", orderId, data?.k) ||
+      (!!uid && (order.userId === uid || order.ownerUid === uid)) || byEmail;
     if (!allowed) throw new HttpsError("permission-denied", "This review link is not valid for this order");
     if (order.isDeleted || String(order.status || "") !== "delivered") {
       throw new HttpsError("failed-precondition", "You can review this order once it has been delivered.");
@@ -104,8 +109,11 @@ export const submitOrderReview = functions
 
       const now = Date.now();
       const created = Number(before.data()?.createdAt) || now;
+      // For the homepage review cards' link to the product.
+      const productSlug = String((await db.collection("products").doc(productId).get()).data()?.slug || "");
       await ref.set({
         productId,
+        productSlug,
         productTitle: String(item.productTitle || ""),
         orderId,
         rating,
@@ -116,6 +124,9 @@ export const submitOrderReview = functions
         verified: true,
         device: [item.phoneBrand, item.phoneModel].filter(Boolean).join(" "),
         source: uid && !linkTokenValid("review", orderId, data?.t) ? "order-page" : "review-link",
+        // Moderated (reviewRewards.ts): public, and paid for, once an admin
+        // approves it. An edit goes back to the queue.
+        status: "pending",
         createdAt: created,
         _creationTime: created,
         updatedAt: now,
@@ -125,5 +136,5 @@ export const submitOrderReview = functions
 
     await orderRef.update({ reviewedAt: Date.now() });
     console.log("submitOrderReview", { order: order.orderNumber, products: written.length });
-    return { success: true, reviewed: written };
+    return { success: true, reviewed: written, pending: true };
   });

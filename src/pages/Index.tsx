@@ -23,6 +23,7 @@ const WhySkinly = lazy(() => import("@/components/why-skinly").then(m => ({ defa
 const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m => ({ default: m.FeatureBanner })));
 const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
 const RealCuts = lazy(() => import("@/components/real-cuts").then(m => ({ default: m.RealCuts })));
+const CustomerReviews = lazy(() => import("@/components/customer-reviews").then(m => ({ default: m.CustomerReviews })));
 
 // Loading fallback for lazy components
 /**
@@ -245,6 +246,14 @@ export default function Index() {
         return (
           <LazySection key={key} reserve="min-h-[742px] md:min-h-[706px]">
             <UgcVideos />
+          </LazySection>
+        );
+
+      case "customer_reviews":
+        // Nothing reserved: until a review is approved the section renders nothing.
+        return (
+          <LazySection key={key} reserve="">
+            <CustomerReviews />
           </LazySection>
         );
 

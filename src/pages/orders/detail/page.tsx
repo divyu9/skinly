@@ -13,6 +13,7 @@ import { BrandLogo } from "@/components/brand-logo.tsx";
 import { PackedForYou } from "@/components/packed-for-you.tsx";
 import { OrderItemImage } from "@/components/order-item-image.tsx";
 import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
+import { ReviewRewardCta } from "@/components/review-reward-cta.tsx";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -275,6 +276,8 @@ function OrderDetailPageInner() {
                 </Link>
               </div>
             )}
+
+            {orderId && <ReviewRewardCta order={order} orderId={orderId} />}
 
             <PackedForYou orderNumber={order.orderNumber || (order as any).checkoutRef} />
 

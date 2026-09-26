@@ -1900,7 +1900,8 @@ async function main() {
   }
 
   const reviewsByProduct = new Map();
-  for (const r of data.reviews || []) {
+  // Approved reviews only; a pending or rejected one is not on the page either.
+  for (const r of (data.reviews || []).filter((r) => !r.status || r.status === "approved")) {
     if (!r?.productId) continue;
     reviewsByProduct.set(r.productId, [...(reviewsByProduct.get(r.productId) || []), r]);
   }

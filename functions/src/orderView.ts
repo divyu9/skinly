@@ -27,6 +27,7 @@ const PUBLIC_FIELDS = [
   "walletUsed", "walletAmountUsed", "total", "amountPayable", "gstAmount", "cgst", "sgst", "igst",
   "cgstRate", "sgstRate", "igstRate", "createdAt", "_creationTime", "updatedAt", "isDeleted",
   "expectedDeliveryAt", "deliveredAt", "shippedAt", "cancelledAt", "courierName", "upsellItems",
+  "reviewedAt", "reviewRewardPaid", "reviewRewardOwed",
 ];
 const ITEM_FIELDS = ["productId", "productTitle", "productImage", "variant", "variantId", "sku", "quantity", "price",
   "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell"];
@@ -52,9 +53,16 @@ export const viewOrder = onCall(async (data: any, context: any) => {
   const order = snap.data() as any;
 
   let viaLink = false;
-  try { viaLink = linkTokenValid("view", orderId, data?.k) || payLinkValid(orderId, data?.t); } catch { viaLink = false; }
+  try {
+    viaLink = linkTokenValid("view", orderId, data?.k) || payLinkValid(orderId, data?.t) || linkTokenValid("review", orderId, data?.t);
+  } catch { viaLink = false; }
   const full = viaLink || ownsOrder(context, order) || (await isAdminCaller(context));
-  if (full) return { _id: snap.id, ...order, access: "full" };
+  if (full) {
+    // This order's own reviews, pending ones included, so the review page can
+    // show what was sent (the public can read only approved reviews).
+    const mine = await admin.firestore().collection("reviews").where("orderId", "==", orderId).get();
+    return { _id: snap.id, ...order, access: "full", myReviews: mine.docs.map((d) => ({ _id: d.id, ...d.data() })) };
+  }
 
   const limited: Record<string, unknown> = { _id: snap.id, access: "limited" };
   for (const f of PUBLIC_FIELDS) if (order[f] !== undefined) limited[f] = order[f];

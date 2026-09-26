@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils.ts";
 
 const SECTION_INFO: Record<string, { label: string; description: string }> = {
   real_photos: {
+  customer_reviews: { label: "Customer Reviews", description: "Approved reviews from verified buyers (Admin › Reviews); hidden until one is approved" },
     label: "Real Cuts",
     description: "Packing-table photos of real orders, each naming the phone it was cut for (add them from an order's items)"
   },

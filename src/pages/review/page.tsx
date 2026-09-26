@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { httpsCallable } from "firebase/functions";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { CameraIcon, CheckCircle2Icon, StarIcon, XIcon } from "lucide-react";
+import { CameraIcon, CheckCircle2Icon, ImageIcon, StarIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
-import { db, functions } from "@/lib/firebase";
+import { functions } from "@/lib/firebase";
+import { orderGoodsValue, rewardAmount, useReviewRewardRules } from "@/lib/review-rewards";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
@@ -53,6 +53,9 @@ export default function ReviewPage() {
   const { orderId = "" } = useParams<{ orderId: string }>();
   const [params] = useSearchParams();
   const token = params.get("t");
+  // The customer's own order link carries ?k=; it opens this page too.
+  const viewKey = params.get("k");
+  const rules = useReviewRewardRules();
   const order: any = useQuery(api.orders.getOrderPublic, orderId ? { orderId } : "skip");
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -66,20 +69,18 @@ export default function ReviewPage() {
     return [...seen.values()];
   }, [order]);
 
-  // Reviews already left for this order come back filled in, to edit.
+  // Reviews already left for this order come back filled in, to edit. They
+  // arrive with the order (viewOrder), pending ones included — the public can
+  // read only approved reviews.
   useEffect(() => {
-    if (!orderId) return;
-    getDocs(query(collection(db, "reviews"), where("orderId", "==", orderId)))
-      .then((snap) => {
-        const next: Record<string, Draft> = {};
-        snap.docs.forEach((d) => {
-          const r: any = d.data();
-          next[r.productId] = { rating: r.rating, comment: r.comment || "", photos: [], kept: r.imageUrls || [], saved: true };
-        });
-        setDrafts((cur) => ({ ...next, ...cur }));
-      })
-      .catch(() => { /* nothing to prefill */ });
-  }, [orderId]);
+    const mine: any[] = Array.isArray(order?.myReviews) ? order.myReviews : [];
+    if (!mine.length) return;
+    const next: Record<string, Draft> = {};
+    for (const r of mine) {
+      next[r.productId] = { rating: r.rating, comment: r.comment || "", photos: [], kept: r.imageUrls || [], saved: true };
+    }
+    setDrafts((cur) => ({ ...next, ...cur }));
+  }, [order]);
 
   const draft = (id: string): Draft => drafts[id] || { rating: 0, comment: "", photos: [], kept: [], saved: false };
   const update = (id: string, patch: Partial<Draft>) =>
@@ -109,15 +110,16 @@ export default function ReviewPage() {
       await httpsCallable(functions, "submitOrderReview")({
         orderId,
         ...(token ? { t: token } : {}),
+        ...(viewKey ? { k: viewKey } : {}),
         reviews: [{ productId: id, rating: d.rating, comment: d.comment, photos: d.photos, keepImageUrls: d.kept }],
       });
       setDrafts((cur) => ({ ...cur, [id]: { ...d, saved: true } }));
-      toast.success("Thank you! Your review is live.");
+      toast.success("Thank you! We'll publish it after a quick check — your cashback follows.");
     } catch (e: any) {
       const code = e?.code || "";
       toast.error(
         code === "functions/permission-denied"
-          ? (token ? "This review link isn't valid. Please use the link we sent you."
+          ? (token || viewKey ? "This link isn't valid. Please use the link we sent you."
             : "Please sign in with the account you ordered from, or use the review link we sent on WhatsApp.")
           : code === "functions/failed-precondition" || code === "functions/invalid-argument" ? e.message
           : "Couldn't send your review. Please try again.",
@@ -152,6 +154,16 @@ export default function ReviewPage() {
             <p className="mt-1 text-center text-sm text-muted-foreground">
               A photo of the skin on your device helps the next person choose.
             </p>
+            {rules?.enabled && rewardAmount(rules, orderGoodsValue(order), true) > 0 && (
+              <div className="mt-4 rounded-2xl border-2 border-ink bg-sunny/40 p-3 text-center text-sm">
+                <p className="font-bold">
+                  Get up to ₹{rewardAmount(rules, orderGoodsValue(order), true)} back in your wallet
+                </p>
+                <p className="text-xs">
+                  {rules.photoPct}% of your order with a photo · {rules.textPct}% for a written review · max ₹{rules.maxAmount}, once it's approved
+                </p>
+              </div>
+            )}
 
             <div className="mt-6 space-y-4">
               {products.map((item) => {
@@ -203,18 +215,27 @@ export default function ReviewPage() {
                         <Thumb key={i} src={u} onRemove={() => update(id, { photos: d.photos.filter((_, j) => j !== i) })} />
                       ))}
                       {photoCount < MAX_PHOTOS && (
-                        <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-ink/20 text-xs text-muted-foreground">
-                          <CameraIcon className="size-5" />
-                          Add photo
-                          <input type="file" accept="image/*" multiple className="hidden"
-                            onChange={(e) => { void addPhotos(id, e.target.files); e.target.value = ""; }} />
-                        </label>
+                        <>
+                          {/* Two doors, because a phone's single picker hides one of them. */}
+                          <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-ink/25 text-xs font-medium text-muted-foreground">
+                            <CameraIcon className="size-5" />
+                            Camera
+                            <input type="file" accept="image/*" capture="environment" className="hidden"
+                              onChange={(e) => { void addPhotos(id, e.target.files); e.target.value = ""; }} />
+                          </label>
+                          <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-ink/25 text-xs font-medium text-muted-foreground">
+                            <ImageIcon className="size-5" />
+                            Gallery
+                            <input type="file" accept="image/*" multiple className="hidden"
+                              onChange={(e) => { void addPhotos(id, e.target.files); e.target.value = ""; }} />
+                          </label>
+                        </>
                       )}
                     </div>
 
                     {d.saved ? (
                       <p className="mt-4 flex items-center justify-center gap-1.5 text-sm font-semibold text-brand-deep">
-                        <CheckCircle2Icon className="size-4" /> Review posted — thank you!
+                        <CheckCircle2Icon className="size-4" /> Review sent — thank you!
                       </p>
                     ) : (
                       <Button className="sticker mt-4 h-11 w-full" onClick={() => submit(item)} disabled={busy === id}>
@@ -227,7 +248,7 @@ export default function ReviewPage() {
               })}
             </div>
             <p className="mt-6 text-center text-xs text-muted-foreground">
-              Your first name and last initial are shown with your review, marked as a verified purchase.
+              Reviews appear after a quick check. Your first name and last initial are shown with your review, marked as a verified purchase.
             </p>
           </>
         )}

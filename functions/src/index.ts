@@ -42,3 +42,4 @@ export * from "./orderConfirm";
 export * from "./brandScope";
 export * from "./delhivery";
 export * from "./orderView";
+export * from "./reviewRewards";
