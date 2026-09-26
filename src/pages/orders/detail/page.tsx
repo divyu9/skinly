@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 import { PackedForYou } from "@/components/packed-for-you.tsx";
+import { OrderItemImage } from "@/components/order-item-image.tsx";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -277,8 +278,9 @@ function OrderDetailPageInner() {
                     <div className="flex gap-4">
                       {item.productImage && (
                         <div className="size-20 bg-muted rounded-lg overflow-hidden shrink-0">
-                          <img
+                          <OrderItemImage
                             src={item.productImage}
+                            productId={item.productId}
                             alt={item.productTitle}
                             className="w-full h-full object-cover"
                           />
