@@ -11,7 +11,7 @@ import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { BrandLogo } from "@/components/brand-logo.tsx";
-import { ProductThumb } from "@/components/product-thumb.tsx";
+import { OrderItemImage } from "@/components/order-item-image.tsx";
 
 /**
  * /review/:orderId?t=… — rate what you bought.
@@ -175,7 +175,7 @@ export default function ReviewPage() {
                   <Card key={id}>
                     <div className="flex items-center gap-3">
                       <div className="size-14 shrink-0 overflow-hidden rounded-xl border border-border bg-muted">
-                        <ProductThumb src={item.productImage} alt={item.productTitle || ""} />
+                        <OrderItemImage src={item.productImage} productId={item.productId} alt={item.productTitle || ""} className="h-full w-full object-cover" />
                       </div>
                       <div className="min-w-0">
                         <p className="line-clamp-2 text-sm font-semibold">{item.productTitle}</p>
