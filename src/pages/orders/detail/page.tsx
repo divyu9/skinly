@@ -36,6 +36,26 @@ declare global {
  * Where a hand-entered shipment can be followed: the link the admin typed, or,
  * for a courier we know, its tracking page built from the number.
  */
+/** What the customer chose to cover: the line's own coverage ("full_body_wrap"), in their words. */
+function coverageLabel(item: any): string | null {
+  const c = String(item?.coverage || "").toLowerCase();
+  if (c === "full_body_wrap") return "Full Body Wrap";
+  if (c === "only_back") return "Only Back";
+  return null;
+}
+
+/*
+ * The variant, when it is a real choice (a laptop's "Only Top", a tablet's
+ * "Back + Front Bezel + Charger"). "Default" and a phone's "Back Skin" are our
+ * catalogue's names, not something the customer picked — coverage says that.
+ */
+function customerVariant(item: any): string | null {
+  const v = String(item?.variant || "").trim();
+  if (!v || /^default( title)?$/i.test(v)) return null;
+  if (/^back skin$/i.test(v) && coverageLabel(item)) return null;
+  return v;
+}
+
 /** The courier's tracking page: the stored link, else one built from the AWB. */
 function courierTrackUrl(order: any): string | null {
   if (/^https?:\/\//i.test(String(order?.trackingUrl || ""))) return String(order.trackingUrl);
@@ -331,9 +351,14 @@ function OrderDetailPageInner() {
                             For: {item.phoneModel}
                           </p>
                         )}
-                        {item.variant && !/^default( title)?$/i.test(String(item.variant)) && (
+                        {coverageLabel(item) && (
+                          <p className="text-sm text-muted-foreground mb-1">
+                            Coverage: <span className="font-medium text-foreground">{coverageLabel(item)}</span>
+                          </p>
+                        )}
+                        {customerVariant(item) && (
                           <p className="text-sm text-muted-foreground mb-2">
-                            Variant: {item.variant}
+                            Variant: {customerVariant(item)}
                           </p>
                         )}
                         <div className="flex items-center gap-4 text-sm">

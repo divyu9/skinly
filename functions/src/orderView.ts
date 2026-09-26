@@ -30,7 +30,7 @@ const PUBLIC_FIELDS = [
   "reviewedAt", "reviewRewardPaid", "reviewRewardOwed",
 ];
 const ITEM_FIELDS = ["productId", "productTitle", "productImage", "variant", "variantId", "sku", "quantity", "price",
-  "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell"];
+  "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell", "coverage"];
 
 async function isAdminCaller(context: any): Promise<boolean> {
   try { await requireAdmin(context); return true; } catch { return false; }
