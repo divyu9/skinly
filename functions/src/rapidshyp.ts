@@ -211,10 +211,23 @@ export async function buildOrderPayload(orderId: string) {
     totalHeight += num(p.height) ?? 2;
   }
   const count = physical.length;
-  const avgLength = Math.ceil(totalLength / count);
-  const avgBreadth = Math.ceil(totalBreadth / count);
-  const avgHeight = Math.ceil(totalHeight / count);
-  const packageWeightInGrams = Math.max(1, Math.round(totalWeight));
+  const computed = {
+    weightGrams: Math.max(1, Math.round(totalWeight)),
+    lengthCm: Math.ceil(totalLength / count),
+    breadthCm: Math.ceil(totalBreadth / count),
+    heightCm: Math.ceil(totalHeight / count),
+  };
+  /*
+   * The admin's own measure of the box wins (order page › Package), for an
+   * order whose parcel is not what its items add up to; RapidShyp and
+   * Delhivery both read the result.
+   */
+  const o = (order as any).packageOverride || {};
+  const pos = (v: unknown) => (num(v) !== null && num(v)! > 0 ? num(v)! : null);
+  const packageWeightInGrams = Math.round(pos(o.weightGrams) ?? computed.weightGrams);
+  const avgLength = Math.ceil(pos(o.lengthCm) ?? computed.lengthCm);
+  const avgBreadth = Math.ceil(pos(o.breadthCm) ?? computed.breadthCm);
+  const avgHeight = Math.ceil(pos(o.heightCm) ?? computed.heightCm);
 
   const money = orderMoney(order, items);
   if (!(money.total > 0)) {
@@ -287,8 +300,22 @@ export async function buildOrderPayload(orderId: string) {
     },
   };
 
-  return { orderRef, order, orderDoc, payload, pickup: names.pickup };
+  return { orderRef, order, orderDoc, payload, pickup: names.pickup, computedPackage: computed };
 }
+
+/** The parcel's weight and size as worked out from its items, and the admin's override if any. */
+export const getOrderPackage = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const orderId = String(data?.orderId || "");
+  if (!orderId) throw new HttpsError("invalid-argument", "Missing orderId");
+  const { order, payload, computedPackage } = await buildOrderPayload(orderId);
+  const p = (payload.packageDetails as any) || {};
+  return {
+    computed: computedPackage,
+    override: (order as any).packageOverride || null,
+    effective: { weightGrams: p.packageWeight, lengthCm: p.packageLength, breadthCm: p.packageBreadth, heightCm: p.packageHeight },
+  };
+});
 
 export const createShipment = onCall(async (data: any, context: any) => {
   const { uid } = await requireAdmin(context);

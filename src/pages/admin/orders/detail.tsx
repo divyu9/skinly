@@ -19,6 +19,7 @@ import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRe
 import { ReferralPanel } from "./_components/ReferralPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
+import { PackageCard } from "./_components/PackageCard.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
 import { WhatsAppPanel, type EmailType } from "./_components/WhatsAppPanel.tsx";
@@ -564,7 +565,13 @@ function OrderDetailPageInner() {
           />
 
           {orderId && (
+            <PackageCard orderId={orderId} override={(order as any).packageOverride} locked={!!order.awbNumber} />
+          )}
+
+          {orderId && (
             <DelhiveryShipPanel
+              // A new package measure asks Delhivery for a fresh rate.
+              key={JSON.stringify((order as any).packageOverride || {})}
               orderId={orderId}
               awbNumber={order.awbNumber}
               shippingProvider={(order as any).shippingProvider}
