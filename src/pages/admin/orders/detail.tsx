@@ -513,13 +513,19 @@ function OrderDetailPageInner() {
   return (
     <div className="admin-brandy space-y-6">
       {/* Back */}
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Link to="/backend-skinly/orders">
           <Button variant="outline" size="sm">
             <ArrowLeftIcon className="size-4 mr-2" />
             Back to Orders
           </Button>
         </Link>
+        {/* The customer's own order page — the same document id, opened as they see it. */}
+        {orderId && (
+          <a href={`/orders/${orderId}`} target="_blank" rel="noopener noreferrer">
+            <Button variant="outline" size="sm">View as customer ↗</Button>
+          </a>
+        )}
       </div>
 
       {/* Header: order number + status dropdowns */}
