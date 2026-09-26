@@ -31,6 +31,23 @@ declare global {
   }
 }
 
+/**
+ * Where a hand-entered shipment can be followed: the link the admin typed, or,
+ * for a courier we know, its tracking page built from the number.
+ */
+function manualTrackUrl(order: any): string | null {
+  const typed = String(order?.manualTrackingUrl || "").trim();
+  if (/^https?:\/\//i.test(typed)) return typed;
+  const n = encodeURIComponent(String(order?.manualTrackingNumber || "").trim());
+  if (!n) return null;
+  const c = String(order?.manualCourierCompany || "").toLowerCase();
+  if (c.includes("delhivery")) return `https://www.delhivery.com/track-v2/package/${n}`;
+  if (c.includes("blue") && c.includes("dart")) return `https://www.bluedart.com/web/guest/trackdartresult?trackFor=0&trackNo=${n}`;
+  if (c.includes("dtdc")) return `https://www.dtdc.in/trace.asp?strCnno=${n}`;
+  if (c.includes("india post") || c.includes("speed post")) return `https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx`;
+  return null;
+}
+
 function OrderDetailPageInner() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
@@ -407,6 +424,14 @@ function OrderDetailPageInner() {
                             </p>
                             <p className="text-sm font-semibold">{order.manualCourierCompany}</p>
                           </div>
+                        )}
+                        {manualTrackUrl(order) && (
+                          <a href={manualTrackUrl(order)!} target="_blank" rel="noopener noreferrer" className="block">
+                            <Button className="w-full" size="sm">
+                              <TruckIcon className="size-4 mr-2" />
+                              Track Your Shipment
+                            </Button>
+                          </a>
                         )}
                       </div>
                     )}
