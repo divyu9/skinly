@@ -97,6 +97,10 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
       const categoryName = 
         model.category === "phone" ? "Phones" :
         model.category === "camera" ? "Cameras" :
+        model.category === "action-camera" ? "Action Cameras" :
+        model.category === "laptop" ? "Laptops" :
+        model.category === "gimbals" ? "Gimbals" :
+        model.category === "controller" ? "Controllers" :
         model.category === "lens" ? "Lenses" :
         model.category === "tablet" ? "Tablets" :
         model.category === "mac-mini" ? "Mac Mini" :
@@ -107,6 +111,10 @@ export function MobileHeader({ onMenuClick, onRequestModelClick }: MobileHeaderP
       const icon = 
         model.category === "phone" ? "📱" :
         model.category === "camera" ? "📷" :
+        model.category === "action-camera" ? "🎥" :
+        model.category === "laptop" ? "💻" :
+        model.category === "gimbals" ? "🎬" :
+        model.category === "controller" ? "🕹️" :
         model.category === "lens" ? "🔍" :
         model.category === "tablet" ? "📱" :
         model.category === "mac-mini" ? "💻" :
