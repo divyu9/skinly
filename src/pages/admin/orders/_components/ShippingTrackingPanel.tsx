@@ -177,7 +177,7 @@ export function ShippingTrackingPanel({
                   ) : (
                     <>
                       <SendIcon className="size-4 mr-2" />
-                      Create Shipment
+                      Create Shipment (RapidShyp)
                     </>
                   )}
                 </Button>
@@ -284,7 +284,7 @@ export function ShippingTrackingPanel({
                     <div className="space-y-4">
                       <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
                         <p className="text-sm text-amber-900">
-                          <strong>Warning:</strong> This will cancel the shipment with RapidShyp and reset the order status to Processing. All shipping information (AWB, tracking URL, label) will be removed.
+                          <strong>Warning:</strong> This will cancel the shipment with the courier (RapidShyp or Delhivery) and reset the order status to Processing. All shipping information (AWB, tracking URL, label) will be removed.
                         </p>
                       </div>
                     </div>

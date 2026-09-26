@@ -20,6 +20,10 @@ export default function AdminShippingPage() {
   const [includesTax, setIncludesTax] = useState<boolean>(false);
   const [pickupName, setPickupName] = useState<string>("");
   const [storeName, setStoreName] = useState<string>("");
+  const [dlvPickup, setDlvPickup] = useState<string>("");
+  const [dlvOriginPin, setDlvOriginPin] = useState<string>("");
+  const [sellerGstin, setSellerGstin] = useState<string>("");
+  const [dlvMode, setDlvMode] = useState<string>("Surface");
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   
@@ -30,6 +34,10 @@ export default function AdminShippingPage() {
     setIncludesTax(shippingSettings.shippingIncludesTax);
     setPickupName((shippingSettings as any).rapidshypPickupName || "");
     setStoreName((shippingSettings as any).rapidshypStoreName || "");
+    setDlvPickup((shippingSettings as any).delhiveryPickupName || (shippingSettings as any).rapidshypPickupName || "");
+    setDlvOriginPin((shippingSettings as any).delhiveryOriginPin || "");
+    setSellerGstin((shippingSettings as any).sellerGstin || "");
+    setDlvMode((shippingSettings as any).delhiveryMode || "Surface");
     setIsInitialized(true);
   }
   
@@ -55,6 +63,10 @@ export default function AdminShippingPage() {
         shippingIncludesTax: includesTax,
         rapidshypPickupName: pickupName.trim(),
         rapidshypStoreName: storeName.trim(),
+        delhiveryPickupName: dlvPickup.trim(),
+        delhiveryOriginPin: dlvOriginPin.replace(/\D/g, "").slice(0, 6),
+        sellerGstin: sellerGstin.trim().toUpperCase(),
+        delhiveryMode: dlvMode === "Express" ? "Express" : "Surface",
       });
       toast.success("Shipping settings updated successfully!");
     } catch (error) {
@@ -206,6 +218,43 @@ export default function AdminShippingPage() {
                   <p className="text-sm text-muted-foreground">
                     Leave as DEFAULT unless RapidShyp shows more than one channel
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Delhivery Direct (functions/src/delhivery.ts). The API token is
+                not here: it lives in functions/.env, never in the database. */}
+            <div className="space-y-4 pt-4 border-t">
+              <div>
+                <p className="text-sm font-medium">Delhivery Direct</p>
+                <p className="text-sm text-muted-foreground">
+                  For the "Ship via Delhivery Direct" button on an order. The warehouse name must match the
+                  Delhivery panel exactly (it is case-sensitive).
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="dlvPickup">Warehouse / pickup location name</Label>
+                  <Input id="dlvPickup" value={dlvPickup} onChange={(e) => setDlvPickup(e.target.value)} placeholder="e.g. bibhab" />
+                  <p className="text-sm text-muted-foreground">Delhivery panel → Settings → Pickup locations</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dlvOriginPin">Warehouse pincode</Label>
+                  <Input id="dlvOriginPin" inputMode="numeric" value={dlvOriginPin} onChange={(e) => setDlvOriginPin(e.target.value)} placeholder="6 digits" />
+                  <p className="text-sm text-muted-foreground">Used for Delhivery's rate estimate on each order</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sellerGstin">Seller GSTIN</Label>
+                  <Input id="sellerGstin" value={sellerGstin} onChange={(e) => setSellerGstin(e.target.value)} placeholder="15 characters" />
+                  <p className="text-sm text-muted-foreground">Delhivery asks for it on every shipment</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="dlvMode">Mode</Label>
+                  <select id="dlvMode" value={dlvMode} onChange={(e) => setDlvMode(e.target.value)}
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm">
+                    <option value="Surface">Surface (cheaper)</option>
+                    <option value="Express">Express (air)</option>
+                  </select>
                 </div>
               </div>
             </div>

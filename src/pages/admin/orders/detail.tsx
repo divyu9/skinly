@@ -18,6 +18,7 @@ import { OrderItemsTable, type ItemFormEntry } from "./_components/OrderItemsTab
 import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRefundPanel.tsx";
 import { ReferralPanel } from "./_components/ReferralPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
+import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
 import { WhatsAppPanel, type EmailType } from "./_components/WhatsAppPanel.tsx";
@@ -545,6 +546,15 @@ function OrderDetailPageInner() {
             onItemsFormChange={setItemsForm}
             onSaveItems={handleUpdateOrderItems}
           />
+
+          {orderId && (
+            <DelhiveryShipPanel
+              orderId={orderId}
+              awbNumber={order.awbNumber}
+              shippingProvider={(order as any).shippingProvider}
+              orderStatus={order.status}
+            />
+          )}
 
           <ShippingTrackingPanel
             awbNumber={order.awbNumber}
