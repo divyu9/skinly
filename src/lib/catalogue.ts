@@ -40,6 +40,8 @@ export interface CatalogueProduct {
   modelBrandsExclude?: string[];
   finishType?: string;
   finishTypeId?: string;
+  /** The design code shared by every listing of one artwork: "R-44". */
+  design?: string;
   tags: string[];
   images: Array<{ url: string; alt?: string }>;
   _creationTime: number;
