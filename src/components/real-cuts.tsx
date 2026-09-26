@@ -82,7 +82,7 @@ export function RealCuts() {
           {photos.length > 3 && <ScrollNavButtons containerId="real-cuts-scroll" />}
         </div>
 
-        <div id="real-cuts-scroll" className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+        <div id="real-cuts-scroll" data-drag-scroll className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
           {photos.map((p) => {
             const t = target(p);
             return (

@@ -1,5 +1,6 @@
 import { Suspense, useEffect } from "react";
 import { usePageLoaded } from "./hooks/use-page-loaded";
+import { useGlobalDragScroll } from "./hooks/use-drag-scroll";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { DefaultProviders } from "./components/providers/default.tsx";
@@ -110,6 +111,12 @@ function PageSkeleton() {
  * quiet, so the shopper's tap on the cart opens it without a download — and
  * without those chunks competing with the page's own pictures on arrival.
  */
+/** Press-and-drag for every sideways row marked data-drag-scroll (hooks/use-drag-scroll.ts). */
+function DragScrollRows() {
+  useGlobalDragScroll();
+  return null;
+}
+
 function PrefetchCheckoutChunks() {
   const loaded = usePageLoaded();
   useEffect(() => {
@@ -132,6 +139,7 @@ export default function App() {
         <BrowserRouter>
           <ReferralTracker />
           <PrefetchCheckoutChunks />
+          <DragScrollRows />
           <StorefrontErrorBoundary>
           <Routes>
             {/* Critical paths - eagerly loaded */}

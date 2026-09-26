@@ -66,7 +66,7 @@ export function ExploreByGadget({ sectionId, config }: ExploreByGadgetProps) {
         {/* Horizontal Scroll Container */}
         <div
           id="explore-gadget-scroll"
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
+          data-drag-scroll className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}

@@ -52,7 +52,7 @@ export function PackedForYou({ orderNumber }: { orderNumber?: string | null }) {
         </div>
         {many && <ScrollNavButtons containerId={stripId} />}
       </div>
-      <div id={stripId} className="no-scrollbar flex touch-pan-x snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-4">
+      <div id={stripId} data-drag-scroll className="no-scrollbar flex touch-pan-x snap-x snap-mandatory gap-3 overflow-x-auto scroll-smooth px-4 pb-4">
         {photos.map((p, i) => (
           <button key={p._id} type="button" onClick={() => setOpen(i)}
             className="w-40 shrink-0 snap-start overflow-hidden rounded-xl border bg-card text-left sm:w-48">

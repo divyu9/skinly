@@ -48,7 +48,7 @@ export function CustomerReviews() {
         </div>
         {reviews.length > 3 && <ScrollNavButtons containerId="customer-reviews-scroll" />}
       </div>
-      <div id="customer-reviews-scroll" className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+      <div id="customer-reviews-scroll" data-drag-scroll className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
         {reviews.map((r) => {
           const photo = r.imageUrls?.[0];
           const body = (

@@ -57,7 +57,7 @@ export function MostTrendy({ config: raw }: MostTrendyProps) {
         {/* Horizontal Scroll Container */}
         <div 
           id="most-trendy-scroll"
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
+          data-drag-scroll className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}

@@ -99,7 +99,7 @@ export function ExploreByBrand({ sectionId, config }: ExploreByBrandProps) {
         {/* Horizontal Scroll Container */}
         <div
           id="explore-brand-scroll"
-          className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
+          data-drag-scroll className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}

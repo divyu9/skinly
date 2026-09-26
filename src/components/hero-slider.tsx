@@ -107,7 +107,7 @@ export function HeroSlider() {
       {/* Horizontal Scrolling Cards */}
       <div 
         ref={scrollContainerRef}
-        className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+        data-drag-scroll className="flex gap-3 overflow-x-auto snap-x snap-mandatory scrollbar-hide"
         style={{
           WebkitOverflowScrolling: 'touch',
           paddingLeft: '16px',

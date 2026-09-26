@@ -75,7 +75,7 @@ export function TopPicks({
         <div className="relative -mx-4 px-4">
           {products === undefined ? (
             // Loading state
-            <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+            <div data-drag-scroll className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="flex-shrink-0 w-[280px]">
                   <Skeleton className="aspect-square rounded-2xl mb-3" />
@@ -91,7 +91,7 @@ export function TopPicks({
             </div>
           ) : (
             // Products
-            <div id="top-picks-scroll" className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
+            <div id="top-picks-scroll" data-drag-scroll className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory">
               {products.map((product) => {
                 const firstVariant = product.variants?.[0];
                 const isOutOfStock = firstVariant?.inventoryQuantity === 0 || firstVariant?.inventory_quantity === 0;

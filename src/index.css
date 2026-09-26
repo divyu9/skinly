@@ -506,3 +506,10 @@ img[data-img-broken] {
 :where(.bg-brand, .bg-primary):focus-visible {
   outline-color: var(--background);
 }
+
+/* Sideways rows a mouse can drag (hooks/use-drag-scroll.ts useGlobalDragScroll). */
+@media (pointer: fine) {
+  [data-drag-scroll] { cursor: grab; }
+  [data-drag-scroll][data-dragging] { cursor: grabbing; user-select: none; }
+  [data-drag-scroll][data-dragging] * { pointer-events: none; }
+}

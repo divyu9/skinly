@@ -74,7 +74,7 @@ export function UgcVideos() {
 
         {/* Videos Grid - Horizontal Scroll */}
         <div className="relative">
-          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+          <div data-drag-scroll className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
             {videos.map((video) => (
               <div
                 key={video._id}

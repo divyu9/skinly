@@ -93,3 +93,65 @@ export function useDragScroll<T extends HTMLElement>() {
     },
   };
 }
+
+/**
+ * The same press-and-drag for every row marked `data-drag-scroll`, installed
+ * once for the whole site (App.tsx) rather than wired into each component:
+ * the homepage rows — hero, brands, top picks, real cuts, trendy, videos,
+ * reviews — are plain overflow-x rows, and only needed a mouse to move them.
+ * Touch is left to the browser, which already swipes them.
+ */
+export function useGlobalDragScroll() {
+  useEffect(() => {
+    let row: HTMLElement | null = null;
+    let startX = 0, startLeft = 0, moved = false;
+
+    const down = (e: PointerEvent) => {
+      // Every press starts clean: a drag whose release landed off the row
+      // never gets its click, and must not swallow the next real one.
+      moved = false;
+      if (e.pointerType !== "mouse" || e.button !== 0) return;
+      const el = (e.target as HTMLElement | null)?.closest?.("[data-drag-scroll]") as HTMLElement | null;
+      if (!el || el.scrollWidth <= el.clientWidth) return;
+      row = el; startX = e.clientX; startLeft = el.scrollLeft; moved = false;
+    };
+    const move = (e: PointerEvent) => {
+      if (!row) return;
+      const dx = e.clientX - startX;
+      if (!moved && Math.abs(dx) > 5) { moved = true; row.style.scrollSnapType = "none"; row.style.scrollBehavior = "auto"; row.dataset.dragging = "1"; }
+      if (moved) row.scrollLeft = startLeft - dx;
+    };
+    const up = () => {
+      if (!row) return;
+      row.style.scrollSnapType = ""; row.style.scrollBehavior = ""; delete row.dataset.dragging;
+      row = null;
+      // The click (if any) is dispatched right after this pointerup; clear
+      // the flag once it has been, so it never outlives this drag.
+      setTimeout(() => { moved = false; }, 0);
+    };
+    // A drag that moved ends in a click on whatever was under the mouse — a
+    // link, in every one of these rows. That click is not meant.
+    const click = (e: MouseEvent) => {
+      if (!moved) return;
+      moved = false;
+      e.preventDefault(); e.stopPropagation();
+    };
+    const nativeDrag = (e: DragEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("[data-drag-scroll]")) e.preventDefault();
+    };
+    window.addEventListener("pointerdown", down);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    window.addEventListener("click", click, true);
+    window.addEventListener("dragstart", nativeDrag);
+    return () => {
+      window.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      window.removeEventListener("click", click, true);
+      window.removeEventListener("dragstart", nativeDrag);
+    };
+  }, []);
+}
