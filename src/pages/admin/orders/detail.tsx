@@ -44,7 +44,6 @@ function OrderDetailPageInner() {
   const updateShippingInfo = useMutation(api.admin.orders.updateShippingInfo);
   const sendOrderEmail = useMutation(api.admin.orders.sendOrderStatusEmail);
   const sendOrderWhatsApp = useMutation(api.admin.orders.sendOrderStatusWhatsApp);
-  const updateCustomerInfo = useMutation(api.admin.orders.updateCustomerInfo);
   const updateShippingAddress = useMutation(api.admin.orders.updateOrderShippingAddress);
   const updateOrderItems = useMutation(api.admin.orders.updateOrderItems);
   const createShipment = useAction(api.rapidshyp.createShipment);
@@ -198,20 +197,31 @@ function OrderDetailPageInner() {
     }
   };
 
+  /*
+   * Saved on the server (updateOrderCustomer): name and phone onto the
+   * shipping address, and a changed email re-files the order so the customer
+   * finds it by signing in with the new address (functions/src/orderEmail.ts).
+   */
   const handleUpdateCustomerInfo = async () => {
     if (!orderId || !order) return;
+    const before = String(order.email || order.customerEmail || order.guestEmail || "").trim().toLowerCase();
+    const email = String(customerForm.email || "").trim().toLowerCase();
+    const emailChanged = !!email && email !== before;
+    const resend = emailChanged && confirm(`Send the order confirmation to ${email} as well?`);
     try {
-      await updateCustomerInfo({
-        orderId: orderId as Id<"orders">,
-        fullName: customerForm.fullName,
-        phone: customerForm.phone,
-        customerEmail: order.userId ? customerForm.email : undefined,
-        guestEmail: !order.userId ? customerForm.email : undefined,
-      });
-      toast.success("Customer information updated");
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const res: any = (await httpsCallable(getFunctions(), "updateOrderCustomer")({
+        orderId, fullName: customerForm.fullName, phone: customerForm.phone, email, resend,
+      })).data;
+      const e = res?.email;
+      toast.success(
+        !emailChanged ? "Customer information updated"
+          : `Email changed to ${email}. ${e?.linkedToAccount ? "Linked to their account — it's in their orders now." : "They'll see the order once they sign in with this email."}${e?.resent ? " Confirmation sent." : ""}`,
+        { duration: 8000 },
+      );
       setShowEditCustomerDialog(false);
-    } catch {
-      toast.error("Failed to update customer information");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update customer information");
     }
   };
 

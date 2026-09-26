@@ -147,7 +147,9 @@ export const claimGuestOrders = functions.https.onCall(async (_data: any, contex
   for (const snap of snaps) {
     for (const d of snap.docs) {
       const o = d.data() as any;
-      if (!String(o.userId || "").startsWith("guest-")) continue;
+      // A guest order ("guest", "guest-<session>", or one an admin re-filed
+      // after correcting its email) and never one an account already owns.
+      if (o.ownerUid || !String(o.userId || "guest").startsWith("guest")) continue;
       await d.ref.update({ userId: uid, ownerUid: uid, claimedFromGuestId: o.userId, claimedAt: Date.now() });
       claimed++;
     }

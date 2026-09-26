@@ -217,7 +217,9 @@ export function CustomerInfoCard({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Customer Information</DialogTitle>
-            <DialogDescription>Update customer name, phone, and email</DialogDescription>
+            <DialogDescription>
+              Update name, phone and email. A new email moves the order with it: the customer sees it in their orders when they sign in with that email.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
