@@ -29,6 +29,7 @@ import { useState, useMemo } from "react";
 import type { Id } from "@/lib/firebase-api";
 import { PDFDocument } from "pdf-lib";
 import { ManualOrderDialog } from "./manual-order-dialog.tsx";
+import { buildPackList, packListText as packListTextOf } from "@/lib/pack-list";
 import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
 import { ADMIN_STATUS_LABELS, STATUS_BADGE, STATUS_DOT } from "@/lib/order-label.ts";
 
@@ -541,7 +542,7 @@ function AdminOrdersPageInner() {
     }
   };
 
-  const generatePackList = () => {
+  const generatePackList = async () => {
     if (!displayOrders || selectedOrders.size === 0) {
       toast.error("Please select orders to generate pack list");
       return;
@@ -551,56 +552,16 @@ function AdminOrdersPageInner() {
       selectedOrders.has(o._id)
     );
 
-    // Create a consolidated SKU list with quantities
-    const skuMap: Record<string, { sku: string; quantity: number; orders: string[] }> = {};
-
-    selectedOrdersList.forEach((order) => {
-      order.items.forEach((item) => {
-        const sku = item.variant; // Using variant as SKU
-        const orderRef = order.orderNumber || order.failedOrderNumber || order._id;
-        if (skuMap[sku]) {
-          skuMap[sku].quantity += item.quantity;
-          skuMap[sku].orders.push(orderRef);
-        } else {
-          skuMap[sku] = {
-            sku,
-            quantity: item.quantity,
-            orders: [orderRef],
-          };
-        }
-      });
-    });
-
-    // Generate text content
-    let packListText = `PACK LIST - Generated ${new Date().toLocaleString("en-IN")}\n`;
-    packListText += `Total Orders: ${selectedOrders.size}\n`;
-    packListText += `Total Unique SKUs: ${Object.keys(skuMap).length}\n`;
-    packListText += `\n${"=".repeat(80)}\n\n`;
-
-    packListText += `SKU\t\tQuantity\tOrder Numbers\n`;
-    packListText += `${"-".repeat(80)}\n`;
-
-    Object.values(skuMap).forEach((item) => {
-      packListText += `${item.sku}\t\t${item.quantity}\t\t${item.orders.join(", ")}\n`;
-    });
-
-    packListText += `\n${"=".repeat(80)}\n\n`;
-    packListText += `DETAILED ORDER ITEMS:\n\n`;
-
-    selectedOrdersList.forEach((order) => {
-      packListText += `Order: ${order.orderNumber}\n`;
-      packListText += `Customer: ${order.shippingAddress.fullName}\n`;
-      packListText += `Phone: ${order.shippingAddress.phone}\n`;
-      packListText += `City: ${order.shippingAddress.city}, ${order.shippingAddress.state}\n`;
-      packListText += `Items:\n`;
-      order.items.forEach((item) => {
-        packListText += `  - SKU: ${item.variant} | ${item.productTitle} | Qty: ${item.quantity}`;
-        if (item.phoneModel) packListText += ` | Model: ${item.phoneModel}`;
-        if (item.coverage) packListText += ` | Coverage: ${item.coverage}`;
-        packListText += `\n`;
-      });
-      packListText += `\n`;
-    });
+    // Design codes and pieces, for fetching the sheets from the godown in one
+    // trip (src/lib/pack-list.ts). Variant names are not SKUs.
+    let packListText: string;
+    try {
+      const list = await buildPackList(selectedOrdersList as any);
+      packListText = packListTextOf(selectedOrdersList.length, list);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not build the pack list");
+      return;
+    }
 
     // Download as text file
     const blob = new Blob([packListText], { type: "text/plain;charset=utf-8" });
