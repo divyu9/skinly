@@ -15,8 +15,22 @@ import { designCodeOf } from "@/lib/real-photos";
  * variant that spends two sheets (a laptop's keyboard view) counts two.
  */
 
-type Line = { productId?: string; productTitle?: string; variant?: string; sku?: string; quantity?: number; productImage?: string };
-export type PackRow = { code: string; pieces: number; orders: Set<string>; skin: boolean; title: string };
+type Line = {
+  productId?: string; productTitle?: string; variant?: string; sku?: string; quantity?: number; productImage?: string;
+  phoneBrand?: string; phoneModel?: string; coverage?: string;
+};
+/** One cut to make: the device, and what it covers. */
+export type Cut = { device: string; coverage: string; qty: number };
+export type PackRow = { code: string; pieces: number; orders: Set<string>; skin: boolean; title: string; cuts: Map<string, Cut> };
+
+/** "Full Body Wrap" / "Only Back", or a real variant (a laptop's "Top + Keyboard Area"). */
+function coverageOf(it: Line): string {
+  const c = String(it.coverage || "").toLowerCase();
+  if (c === "full_body_wrap") return "Full Body Wrap";
+  if (c === "only_back") return "Only Back";
+  const v = String(it.variant || "").trim();
+  return v && !/^(default( title)?|back skin)$/i.test(v) ? v : "";
+}
 
 const SKIN_CODE = /^[A-Z]{1,3}-\d+$/;
 const fromImage = (url: unknown) => String(url || "").match(/_([A-Za-z]+-\d+(?:-[A-Za-z0-9]+)?)\.(?:jpe?g|png|webp)$/)?.[1] || "";
@@ -54,9 +68,16 @@ export async function buildPackList(orders: Array<{ orderNumber?: string; _id: s
     if (!code) { unresolved.push({ title: String(it.productTitle || "Item"), qty, order }); continue; }
     const skin = SKIN_CODE.test(code);
     const key = skin ? code : `${code}::${it.productTitle}`;
-    const row = rows.get(key) || { code, pieces: 0, orders: new Set<string>(), skin, title: String(it.productTitle || "") };
+    const row = rows.get(key) || { code, pieces: 0, orders: new Set<string>(), skin, title: String(it.productTitle || ""), cuts: new Map<string, Cut>() };
     row.pieces += qty * (v?.multiplier || 1);
     row.orders.add(order);
+    // What to cut from this design: each device and its coverage, alike ones counted together.
+    const device = [it.phoneBrand, it.phoneModel].filter(Boolean).join(" ").trim() || "Model not given";
+    const coverage = coverageOf(it);
+    const cutKey = `${device}::${coverage}`;
+    const cut = row.cuts.get(cutKey) || { device, coverage, qty: 0 };
+    cut.qty += qty;
+    row.cuts.set(cutKey, cut);
     rows.set(key, row);
   }
 
@@ -78,7 +99,14 @@ export function packListText(orderCount: number, list: Awaited<ReturnType<typeof
   out.push("");
   out.push(`${pad("SKU", 12)}PCS`);
   out.push("-".repeat(18));
-  for (const r of list.skins) out.push(`${pad(r.code, 12)}${String(r.pieces).padStart(3)}`);
+  for (const r of list.skins) {
+    out.push(`${pad(r.code, 12)}${String(r.pieces).padStart(3)}`);
+    // One line per cut under its design: the device, and the coverage chosen.
+    for (const c of [...r.cuts.values()].sort((a, b) => a.device.localeCompare(b.device))) {
+      out.push(`   - ${c.device}${c.coverage ? ` · ${c.coverage}` : ""}${c.qty > 1 ? `  × ${c.qty}` : ""}`);
+    }
+    out.push("");
+  }
   if (list.others.length) {
     out.push("");
     out.push("OTHER ITEMS");
