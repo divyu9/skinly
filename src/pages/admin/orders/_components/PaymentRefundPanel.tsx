@@ -58,6 +58,13 @@ function formatDate(timestamp: number) {
   });
 }
 
+/** A GST rate as a percentage, whether stored as 18 or as 0.18. */
+const pct = (r: number | undefined, fallback: number) => {
+  const n = Number(r);
+  if (!(n > 0)) return fallback;
+  return n > 1 ? n : Math.round(n * 1000) / 10;
+};
+
 export function PaymentRefundPanel({
   paymentMethod,
   total,
@@ -151,21 +158,25 @@ export function PaymentRefundPanel({
                   GST Breakdown (Included)
                 </p>
                 <div className="space-y-1">
-                  {cgstAmount !== undefined && sgstAmount !== undefined ? (
+                  {/* Intra-state only when CGST/SGST were actually charged: confirmed
+                      orders carry all three, with 0 for the ones that don't apply,
+                      so "present" chose CGST 0% and hid the IGST. Rates are stored
+                      as 9 / 18 now (older rows as 0.09). */}
+                  {Number(cgstAmount) > 0 || Number(sgstAmount) > 0 ? (
                     <>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">CGST ({(cgstRate! * 100)}%)</span>
-                        <span>₹{cgstAmount.toFixed(2)}</span>
+                        <span className="text-muted-foreground">CGST ({pct(cgstRate, 9)}%)</span>
+                        <span>₹{Number(cgstAmount).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">SGST ({(sgstRate! * 100)}%)</span>
-                        <span>₹{sgstAmount.toFixed(2)}</span>
+                        <span className="text-muted-foreground">SGST ({pct(sgstRate, 9)}%)</span>
+                        <span>₹{Number(sgstAmount).toFixed(2)}</span>
                       </div>
                     </>
-                  ) : igstAmount !== undefined ? (
+                  ) : Number(igstAmount) > 0 ? (
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">IGST ({(igstRate! * 100)}%)</span>
-                      <span>₹{igstAmount.toFixed(2)}</span>
+                      <span className="text-muted-foreground">IGST ({pct(igstRate, 18)}%)</span>
+                      <span>₹{Number(igstAmount).toFixed(2)}</span>
                     </div>
                   ) : null}
                   <div className="flex justify-between text-sm font-medium">

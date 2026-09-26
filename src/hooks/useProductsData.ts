@@ -33,6 +33,9 @@ export interface Product {
   finishType?: string;
   variants: ProductVariant[];
   mockupUrl?: string; // Added for batch mockup support
+  /** The phone the mockup shows, and whether it is the chosen one, its nearest sibling, or the hero. */
+  mockupModel?: string;
+  mockupMatch?: "exact" | "sibling" | "hero";
 }
 
 interface UseProductsDataParams {
@@ -440,9 +443,11 @@ export function useProductsData({
         }
       }
 
+      const key = mockupUrl && sku ? (mockupMap[sku] ? sku : Object.keys(mockupMap).find((k) => k.toUpperCase() === sku.toUpperCase())) : undefined;
       return {
         ...product,
         mockupUrl,
+        ...(key ? { mockupModel: (mockupResult as any).mockupModels?.[key], mockupMatch: (mockupResult as any).mockupMatch?.[key] } : {}),
       };
     });
   }, [sortedProducts, mockupResult, urlParams.brand, urlParams.model]);

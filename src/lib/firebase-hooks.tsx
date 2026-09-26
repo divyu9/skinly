@@ -1899,7 +1899,9 @@ export function useQuery(apiRef: any, args?: any) {
                 const candidate = normalizeModelName(d.data().model || "").toLowerCase();
                 let i = 0;
                 while (i < wanted.length && i < candidate.length && wanted[i] === candidate[i]) i++;
-                if (i >= 6 && (!best || i > best.score)) best = { doc: d, score: i };
+                // Ties to the alphabetically first model, as the listing does, so both show the same phone.
+                const name = String(d.data().model || '');
+                if (i >= 6 && (!best || i > best.score || (i === best.score && name < String(best.doc.data().model || '')))) best = { doc: d, score: i };
               }
               if (best) {
                 finish({ url: mockupUrlFrom(best.doc.data()), model: best.doc.data().model, exact: false });
@@ -3612,23 +3614,55 @@ export function useQuery(apiRef: any, args?: any) {
                 where('sku', 'in', c),
               )))).then((snaps) => snaps.flatMap((sn) => sn.docs));
             (async () => {
+              /*
+               * Which phone each picture shows, and how close it is. Where the
+               * chosen model had no mockup this went straight to the hero phone
+               * — a Galaxy A51 shopper saw iPhone 17 Pro Max photos under a
+               * "Galaxy A51" badge, while the product page showed the nearest
+               * Samsung (the A54) and said so. Now: the model, then its nearest
+               * sibling in the same brand (the product page's rule), then the hero.
+               */
               const result: Record<string, string> = {};
-              const collectRows = (docs: any[]) => {
+              const models: Record<string, string> = {};
+              const match: Record<string, 'exact' | 'sibling' | 'hero'> = {};
+              const collectRows = (docs: any[], kind: 'exact' | 'sibling' | 'hero') => {
                 docs.forEach(d => {
                   const m: any = d.data();
                   const url = mockupUrlFrom(m);
                   if (!url) return;
                   for (const target of requestedSkus) {
-                    if (!result[target] && skuMatches(m.sku, target)) result[target] = url;
+                    if (!result[target] && skuMatches(m.sku, target)) {
+                      result[target] = url; models[target] = m.model; match[target] = kind;
+                    }
                   }
                 });
               };
-              collectRows(await bySku(args.brand, args.model, requestedSkus));
-              const missing = requestedSkus.filter(sku => !result[sku]);
-              if (missing.length > 0 && !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
-                collectRows(await bySku(HERO_MOCKUP_BRAND, HERO_MOCKUP_MODEL, missing));
+              collectRows(await bySku(args.brand, args.model, requestedSkus), 'exact');
+              let missing = requestedSkus.filter(sku => !result[sku]);
+              if (missing.length > 0) {
+                // The nearest sibling, found from a few designs' rows in this brand
+                // (one alone may be a new design no model has a photo of yet).
+                const probeSkus = [...new Set(missing.slice(0, 10).flatMap(mockupSkuCandidates))].slice(0, 30);
+                const probe = await getDocs(query(collection(db, 'mockups'),
+                  where('brand', '==', args.brand), where('sku', 'in', probeSkus), limit(1500)));
+                const wanted = normalizeModelName(args.model).toLowerCase();
+                let best: { model: string; score: number } | null = null;
+                for (const name of new Set(probe.docs.map(d => String(d.data().model || '')))) {
+                  const c = normalizeModelName(name).toLowerCase();
+                  let i = 0;
+                  while (i < wanted.length && i < c.length && wanted[i] === c[i]) i++;
+                  // Ties go to the alphabetically first name — the product page breaks them the same way.
+                  if (i >= 6 && name !== args.model && (!best || i > best.score || (i === best.score && name < best.model))) best = { model: name, score: i };
+                }
+                if (best) {
+                  collectRows(await bySku(args.brand, best.model, missing), 'sibling');
+                  missing = requestedSkus.filter(sku => !result[sku]);
+                }
               }
-              if (active) setData({ mockups: result, cursor: "", isDone: true });
+              if (missing.length > 0 && !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
+                collectRows(await bySku(HERO_MOCKUP_BRAND, HERO_MOCKUP_MODEL, missing), 'hero');
+              }
+              if (active) setData({ mockups: result, mockupModels: models, mockupMatch: match, cursor: "", isDone: true });
             })().catch((err) => console.error('[firebase-hooks] mockup lookup failed:', err));
           }
         }

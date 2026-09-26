@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageOffIcon } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { productImageUrl } from "@/lib/image-cdn";
@@ -23,6 +23,8 @@ export function ProductThumb({
   dimmed?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
+  // A new picture gets its own chance: a failed one used to stick for good.
+  useEffect(() => setFailed(false), [src]);
 
   if (!src || failed) {
     return (

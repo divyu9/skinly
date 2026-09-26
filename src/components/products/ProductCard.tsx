@@ -63,6 +63,14 @@ export const ProductCard = memo(function ProductCard({
   // Otherwise, use main image
   const displayImageUrl = product.mockupUrl || mainImage?.url;
   const hasMockup = !!product.mockupUrl;
+  /*
+   * The badge names the phone in the picture. It used to name the chosen
+   * model whatever the picture was — "Galaxy A51" over an iPhone 17 Pro Max.
+   * The hero fallback gets no badge: it only shows the design.
+   */
+  const badgeModel = product.mockupMatch === "sibling" ? product.mockupModel
+    : product.mockupMatch === "hero" ? null
+    : modelFilter;
   
   const variants = product.variants || [];
   const minPrice = variants.length > 0 ? Math.min(...variants.map(v => v.price || 0)) : 0;
@@ -109,10 +117,10 @@ export const ProductCard = memo(function ProductCard({
           isOutOfStock && autoSortOOS ? 'opacity-30' : ''
         }`}>
           {/* Mockup Badge - Show when mockup is displayed */}
-          {hasMockup && (
+          {hasMockup && badgeModel && (
             <div className="absolute top-2 left-2 z-10 px-1.5 py-0.5 sm:px-2 sm:py-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-[7px] sm:text-[10px] font-bold rounded-full shadow-md flex items-center gap-0.5">
               <Sparkles className="size-2.5 sm:size-3" />
-              <span>{modelFilter?.split(' ').slice(0, 2).join(' ')}</span>
+              <span>{badgeModel?.split(' ').slice(0, 2).join(' ')}</span>
             </div>
           )}
           

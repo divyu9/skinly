@@ -556,7 +556,8 @@ function OrderDetailPageInner() {
                         <span>Taxable Amount</span>
                         <span>₹{(order.taxableAmount ?? 0).toFixed(2)}</span>
                       </div>
-                      {order.cgstAmount !== undefined && order.sgstAmount !== undefined ? (
+                      {/* CGST/SGST only when charged; an out-of-state order carries them as 0 beside its IGST. */}
+                      {Number(order.cgstAmount) > 0 || Number(order.sgstAmount) > 0 ? (
                         <>
                           <div className="flex justify-between text-xs">
                             <span>CGST (9%)</span>
@@ -567,7 +568,7 @@ function OrderDetailPageInner() {
                             <span>₹{(order.sgstAmount ?? 0).toFixed(2)}</span>
                           </div>
                         </>
-                      ) : order.igstAmount !== undefined ? (
+                      ) : Number(order.igstAmount) > 0 ? (
                         <div className="flex justify-between text-xs">
                           <span>IGST (18%)</span>
                           <span>₹{(order.igstAmount ?? 0).toFixed(2)}</span>
