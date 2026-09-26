@@ -22,6 +22,7 @@ const BugReportModal = lazy(() => import("@/components/bug-report-modal.tsx").th
 const WhySkinly = lazy(() => import("@/components/why-skinly").then(m => ({ default: m.WhySkinly })));
 const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m => ({ default: m.FeatureBanner })));
 const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
+const RealCuts = lazy(() => import("@/components/real-cuts").then(m => ({ default: m.RealCuts })));
 
 // Loading fallback for lazy components
 /**
@@ -241,6 +242,15 @@ export default function Index() {
           <LazySection key={key} reserve="min-h-[742px] md:min-h-[706px]">
             <UgcVideos />
           </LazySection>
+        );
+
+      case "real_photos":
+        // No reserved height: until the first packing photo is taken there is
+        // nothing to show, and a reserve would leave a blank band on the page.
+        return (
+          <Suspense key={key} fallback={null}>
+            <RealCuts />
+          </Suspense>
         );
 
       default:

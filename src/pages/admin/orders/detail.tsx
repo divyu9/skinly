@@ -537,6 +537,7 @@ function OrderDetailPageInner() {
         <div className="lg:col-span-2 space-y-6">
           <OrderItemsTable
             items={order.items as any}
+            orderNumber={order.orderNumber || (order as any).checkoutRef}
             showEditItemsDialog={showEditItemsDialog}
             itemsForm={itemsForm}
             onOpenEditItems={() => { setItemsForm([...(order.items ?? [])]); setShowEditItemsDialog(true); }}

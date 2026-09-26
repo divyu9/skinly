@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { RealPhotoButton } from "./RealPhotoButton.tsx";
 
 export interface OrderItem {
   productId: string;
@@ -53,6 +54,8 @@ interface OrderItemsTableProps {
    * screen you could not open.
    */
   items?: OrderItem[] | null;
+  /** Files each line's real photos (RealPhotoButton). */
+  orderNumber?: string;
   // Edit items dialog
   showEditItemsDialog: boolean;
   itemsForm: ItemFormEntry[];
@@ -64,6 +67,7 @@ interface OrderItemsTableProps {
 
 export function OrderItemsTable({
   items: itemsProp,
+  orderNumber,
   showEditItemsDialog,
   itemsForm,
   onOpenEditItems,
@@ -211,6 +215,10 @@ export function OrderItemsTable({
                     ₹{(Number(item.price) || 0).toFixed(0)} × {Number(item.quantity) || 0} = ₹
                     {((Number(item.quantity) || 0) * (Number(item.price) || 0)).toFixed(0)}
                   </p>
+                  {/* A photo of this line's skin, for the shop (one per product in the order). */}
+                  {!live[item.productId]?.gone && (
+                    <RealPhotoButton item={item} orderNumber={orderNumber} slug={live[item.productId]?.slug} />
+                  )}
                 </div>
               </div>
             ))}

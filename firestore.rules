@@ -59,6 +59,8 @@ service cloud.firestore {
     match /ugcVideos/{id}                { allow read: if true; allow write: if isAdmin(); }
     match /seoPages/{id}                 { allow read: if true; allow write: if isAdmin(); }
     match /seoPageTemplates/{id}         { allow read: if true; allow write: if isAdmin(); }
+    // Photos of real skins taken while packing (src/lib/real-photos.ts): design and phone only, no customer.
+    match /realPhotos/{id}               { allow read: if true; allow write: if isAdmin(); }
     // Read is public because the storefront needs the shipping fee, the Meta
     // pixel id and a few counters before anyone signs in. That makes this the
     // worst place in the database for a secret — and two OpenAI keys and a

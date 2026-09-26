@@ -7,6 +7,7 @@ import { useSearchParams, useParams } from "react-router-dom";
 import type { Id } from "@/lib/firebase-api";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView } from "@/lib/analytics.ts";
+import { cutFor, designCodeOf, useDesignRealPhotos, type RealPhoto } from "@/lib/real-photos";
 
 export interface ProductState {
   selectedImage: string;
@@ -24,6 +25,17 @@ export interface MockupState {
   shownModel?: string | null;
   /** False when the picture is a stand-in for a model we have no shot of. */
   exact?: boolean;
+}
+
+/** Real photos woven into the gallery: the shopper's phone first, the rest after the mockup. */
+function withRealPhotos(base: any[], photos: RealPhoto[], phoneModel: string | null | undefined, title?: string) {
+  if (!photos.length) return base;
+  const own = phoneModel ? photos.filter((p) => p.model.toLowerCase() === phoneModel.toLowerCase()) : [];
+  const others = photos.filter((p) => !own.includes(p)).slice(0, 8);
+  const img = (p: RealPhoto) => ({ url: p.imageUrl, alt: `${title || "Skin"} — real photo, ${cutFor(p).toLowerCase()}`, realCutFor: cutFor(p) });
+  if (!base.length) return [...own, ...others].map(img);
+  // With a phone chosen the lead image is its mockup; without one, the product's own lead image.
+  return [...own.map(img), base[0], ...others.map(img), ...base.slice(1)];
 }
 
 export function useProductDetail() {
@@ -212,9 +224,19 @@ export function useProductDetail() {
   // Default logo image URL (used as placeholder when no product images uploaded)
   const DEFAULT_LOGO_IMAGE = "/logo.webp";
 
+  /*
+   * Real photos of this design on this gadget, from orders packed (any
+   * listing of the design, any phone). The shopper's own phone first, before
+   * the mockup; the rest after the mockup, newest first.
+   */
+  const realPhotos = useDesignRealPhotos(
+    productData?.variants?.[0]?.sku ? designCodeOf(productData.variants[0].sku) : null,
+    productData?.gadgetCategory || null,
+  );
+
   // Display images with mockup priority
   // Logic: If mockup exists, show mockup first. If only logo image exists, show it after mockup.
-  const displayImages = useMemo(() => {
+  const baseImages = useMemo(() => {
     if (!productData || !productData.images) return [];
 
     // Helper to check if an image is the default logo
@@ -262,6 +284,11 @@ export function useProductDetail() {
 
     return images.length > 0 ? images : productData.images;
   }, [productData, phoneModel, mockupState.url]);
+
+  const displayImages = useMemo(
+    () => withRealPhotos(baseImages, realPhotos, phoneModel, productData?.title),
+    [baseImages, realPhotos, phoneModel, productData?.title],
+  );
   
   // Auto-select first image when displayImages changes
   useEffect(() => {

@@ -15,6 +15,10 @@ import {
 import { cn } from "@/lib/utils.ts";
 
 const SECTION_INFO: Record<string, { label: string; description: string }> = {
+  real_photos: {
+    label: "Real Cuts",
+    description: "Packing-table photos of real orders, each naming the phone it was cut for (add them from an order's items)"
+  },
   hero_slides: {
     label: "Hero Slider",
     description: "Full-width image carousel with CTAs"

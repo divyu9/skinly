@@ -4,7 +4,8 @@ import { brandInScope, productFitsDevice } from "@/lib/device-fit";
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
-import { PackageIcon, BellIcon, Sparkles } from "lucide-react";
+import { PackageIcon, BellIcon, Sparkles, CameraIcon } from "lucide-react";
+import { useRealPhotoCount } from "@/lib/real-photos";
 import type { Product } from "@/hooks/useProductsData";
 
 interface ProductCardProps {
@@ -73,6 +74,8 @@ export const ProductCard = memo(function ProductCard({
     : modelFilter;
   
   const variants = product.variants || [];
+  // Photos of this design cut for real orders (src/lib/real-photos.ts).
+  const realPhotoCount = useRealPhotoCount(variants[0]?.sku, product.gadgetCategory);
   const minPrice = variants.length > 0 ? Math.min(...variants.map(v => v.price || 0)) : 0;
   const maxPrice = variants.length > 0 ? Math.max(...variants.map(v => v.price || 0)) : 0;
   
@@ -124,6 +127,13 @@ export const ProductCard = memo(function ProductCard({
             </div>
           )}
           
+          {realPhotoCount > 0 && (
+            <div className="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-1 rounded-full bg-ink/85 px-1.5 py-0.5 text-[8px] font-semibold text-white shadow-sm sm:bottom-2 sm:left-2 sm:px-2 sm:text-[11px]">
+              <CameraIcon className="size-2.5 sm:size-3" />
+              {realPhotoCount} real photo{realPhotoCount > 1 ? "s" : ""}
+            </div>
+          )}
+
           {/* A brand listing says which brand it is for, with the admin's logo. */}
           {product.modelBrands?.[0] && <BrandBadge brand={product.modelBrands[0]} />}
 

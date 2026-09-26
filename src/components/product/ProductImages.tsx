@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState } from "react";
-import { PackageIcon, SmartphoneIcon } from "lucide-react";
+import { CameraIcon, PackageIcon, SmartphoneIcon } from "lucide-react";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { productImageUrl, productMainImg } from "@/lib/image-cdn";
 
@@ -7,6 +7,8 @@ interface ProductImage {
   url: string;
   alt?: string;
   phoneModel?: string;
+  /** A packing-table photo of a real order: "Cut for iPhone 13" (src/lib/real-photos.ts). */
+  realCutFor?: string;
 }
 
 interface ProductImagesProps {
@@ -80,6 +82,7 @@ export function ProductImages({
   const swipeHandlers = useSwipeNavigation(handleSwipeLeft, handleSwipeRight);
   
   const isMockupImage = mockupUrl && selectedImage === mockupUrl;
+  const selectedReal = images.find((img) => img.url === selectedImage)?.realCutFor;
   
   return (
     <div className="space-y-3 md:sticky md:top-24 md:self-start">
@@ -141,6 +144,20 @@ export function ProductImages({
         )}
       </div>
       
+      {/* A real photo says so, and which phone that skin was cut for. */}
+      {selectedReal && (
+        <div className={`flex items-start gap-2.5 rounded-xl border-2 px-3 py-2.5 ${
+          phoneModel && selectedReal.toLowerCase().endsWith(phoneModel.toLowerCase()) ? "border-brand/40 bg-brand/10" : "border-ink/15 bg-muted/40"}`}>
+          <span className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-ink text-background">
+            <CameraIcon className="size-3.5" strokeWidth={2.4} />
+          </span>
+          <p className="text-[12px] leading-snug">
+            <span className="font-bold text-foreground">Real photo · {selectedReal}</span>
+            <span className="text-muted-foreground"> — from an order we packed</span>
+          </p>
+        </div>
+      )}
+
       {/* Which phone is pictured — under the image, not over it.
           This was a filled pill sitting bottom-centre on mobile, directly on
           the part of the shot a skin buyer most wants to look at: the port

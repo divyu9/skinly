@@ -12,6 +12,8 @@ import { TopPicksTab } from "./_components/top-picks-tab.tsx";
 import { ExploreByBrandTab } from "./_components/explore-by-brand-tab.tsx";
 import { ExploreByGadgetTab } from "./_components/explore-by-gadget-tab.tsx";
 import { LayoutManagerTab } from "./_components/layout-manager-tab.tsx";
+import { RealPhotosTab } from "./_components/real-photos-tab.tsx";
+import { CameraIcon } from "lucide-react";
 import { 
   SettingsIcon, 
   ImageIcon, 
@@ -88,6 +90,10 @@ export default function HomepageManagement() {
                 <LayoutGridIcon className="h-4 w-4" />
                 <span className="hidden sm:inline">Categories</span>
               </TabsTrigger>
+              <TabsTrigger value="realphotos" className="gap-2">
+                <CameraIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Real photos</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -134,6 +140,11 @@ export default function HomepageManagement() {
           {/* UGC Videos Tab */}
           <TabsContent value="videos" className="space-y-6">
             <UgcVideosTab />
+          </TabsContent>
+
+          {/* Real photos Tab */}
+          <TabsContent value="realphotos" className="space-y-6">
+            <RealPhotosTab />
           </TabsContent>
 
           {/* Categories Tab */}
