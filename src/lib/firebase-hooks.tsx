@@ -124,8 +124,21 @@ export function sortVariants<T extends { materialMultiplier?: any; price?: any; 
  * ?k= on the order link, ?t= on the pay link — is passed along, so a guest's
  * own link still opens their whole order.
  */
-async function viewOrderFor(orderId: string): Promise<any | null> {
+async function viewOrderFor(orderId: string, opts: { withReviews?: boolean } = {}): Promise<any | null> {
   const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  // The owner or an admin may read the document itself, at once; the function
+  // (a cold start of several seconds) is for everyone else. The review page
+  // asks for the order's own reviews, which only the function returns.
+  if (!opts.withReviews) {
+    try {
+      // A reload restores the sign-in a moment after the page starts.
+      await (firebaseAuth as any).authStateReady?.();
+      if (firebaseAuth.currentUser) {
+        const snap = await getDoc(doc(db, 'orders', orderId));
+        if (snap.exists()) return normalizeOrder({ _id: snap.id, ...snap.data(), access: 'full' });
+      }
+    } catch { /* not theirs: ask the function */ }
+  }
   const { getFunctions, httpsCallable } = await import('firebase/functions');
   const res: any = await httpsCallable(getFunctions(), 'viewOrder')({
     orderId, ...(qs.get('k') ? { k: qs.get('k') } : {}), ...(qs.get('t') ? { t: qs.get('t') } : {}),
@@ -937,7 +950,7 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'orders.getOrderPublic') {
           if (!args?.orderId) { setData(null); return; }
-          viewOrderFor(String(args.orderId))
+          viewOrderFor(String(args.orderId), { withReviews: !!args.withReviews })
             .then((o) => { if (active) setData(o); })
             .catch((e) => { console.error('viewOrder failed', e); if (active) setData(null); });
           unsubscribe = () => {};

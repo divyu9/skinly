@@ -56,7 +56,7 @@ export default function ReviewPage() {
   // The customer's own order link carries ?k=; it opens this page too.
   const viewKey = params.get("k");
   const rules = useReviewRewardRules();
-  const order: any = useQuery(api.orders.getOrderPublic, orderId ? { orderId } : "skip");
+  const order: any = useQuery(api.orders.getOrderPublic, orderId ? { orderId, withReviews: true } : "skip");
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [busy, setBusy] = useState<string | null>(null);
 
