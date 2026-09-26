@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { setOrderStatus } from "./orderStatus";
+import { cancelDelhiveryWaybill, delhiveryLabelLink } from "./delhiveryApi";
 
 /**
  * RapidShyp shipment creation.
@@ -72,7 +73,7 @@ const num = (v: any): number | null => {
  * courier needs real figures, so they are derived the same way the admin UI
  * derives them rather than defaulted to zero.
  */
-function orderMoney(order: any, items: any[]) {
+export function orderMoney(order: any, items: any[]) {
   const lineTotal = items.reduce(
     (sum, it) => sum + (num(it?.price) ?? 0) * (num(it?.quantity) ?? 1),
     0
@@ -169,7 +170,7 @@ async function resolveLines(db: admin.firestore.Firestore, items: any[]) {
   });
 }
 
-async function buildOrderPayload(orderId: string) {
+export async function buildOrderPayload(orderId: string) {
   const db = admin.firestore();
   const orderRef = db.collection("orders").doc(orderId);
   const orderDoc = await orderRef.get();
@@ -483,17 +484,22 @@ export const cancelShipment = onCall(async (data: any, context: any) => {
   const order = orderDoc.data()!;
   if (!order.awbNumber) throw new HttpsError("failed-precondition", "Order has no shipment to cancel");
 
-  const config = getRapidShypConfig();
-  const base = config.apiUrl.replace(/\/rapidshyp\/apis\/v1\/wrapper\/?$/, "");
-  const response = await fetch(`${base}/v1/external/orders/cancel/${order.awbNumber}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "rapidshyp-token": config.apiKey },
-  });
+  // A parcel booked directly with Delhivery is cancelled there (delhivery.ts).
+  if (order.shippingProvider === "delhivery") {
+    await cancelDelhiveryWaybill(String(order.awbNumber));
+  } else {
+    const config = getRapidShypConfig();
+    const base = config.apiUrl.replace(/\/rapidshyp\/apis\/v1\/wrapper\/?$/, "");
+    const response = await fetch(`${base}/v1/external/orders/cancel/${order.awbNumber}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "rapidshyp-token": config.apiKey },
+    });
 
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("RapidShyp cancelShipment failed", { status: response.status, body });
-    throw new HttpsError("unavailable", describeError(response.status, body));
+    if (!response.ok) {
+      const body = await response.text();
+      console.error("RapidShyp cancelShipment failed", { status: response.status, body });
+      throw new HttpsError("unavailable", describeError(response.status, body));
+    }
   }
 
   await orderRef.update({
@@ -549,9 +555,13 @@ export const bulkFetchLabels = onCall(async (data: any, context: any) => {
     const order: any = snap.exists ? snap.data() : null;
     const label = String(order?.orderNumber || order?.failedOrderNumber || "Pending");
     if (!order) { errors.push({ orderId: snap.id, orderNumber: label, error: "Order not found" }); continue; }
-    if (!order.labelUrl) { errors.push({ orderId: snap.id, orderNumber: label, error: "No label URL found" }); continue; }
+    // Delhivery's label links expire, so a Delhivery parcel's is asked for afresh.
+    const labelUrl = order.shippingProvider === "delhivery" && order.awbNumber
+      ? await delhiveryLabelLink(String(order.awbNumber)).catch(() => null) || order.labelUrl
+      : order.labelUrl;
+    if (!labelUrl) { errors.push({ orderId: snap.id, orderNumber: label, error: "No label URL found" }); continue; }
     try {
-      const res = await fetch(String(order.labelUrl), { redirect: "follow" });
+      const res = await fetch(String(labelUrl), { redirect: "follow" });
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
       const buf = Buffer.from(await res.arrayBuffer());
       if (!buf.byteLength) throw new Error("Empty PDF file");
