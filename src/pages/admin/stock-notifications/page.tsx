@@ -48,8 +48,57 @@ type ProductStat = {
 
 const formatWhen = (ms: number) =>
   ms
-    ? new Date(ms).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })
+    ? new Date(ms).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })
     : "—";
+
+/** How long someone has been waiting: "today", "3 days", "2 months". */
+const ageOf = (ms: number) => {
+  if (!ms) return "";
+  const days = Math.floor((Date.now() - ms) / 86_400_000);
+  if (days < 1) return "today";
+  if (days < 60) return `${days} day${days > 1 ? "s" : ""}`;
+  return `${Math.floor(days / 30)} months`;
+};
+const ageTone = (ms: number) => {
+  const days = (Date.now() - ms) / 86_400_000;
+  return !ms ? "" : days > 60 ? "bg-rose-500/15 text-rose-700" : days > 30 ? "bg-amber-500/15 text-amber-700" : "bg-emerald-500/10 text-emerald-700";
+};
+
+/** Every waiting request in one table, oldest first — who has waited longest. */
+function AllRequestsTable({ stats }: { stats: ProductStat[] }) {
+  const rows = stats.flatMap((p) => p.variants.flatMap((v) => v.requests.map((r) => ({ p, v, r }))))
+    .sort((a, b) => (a.r.createdAt || Infinity) - (b.r.createdAt || Infinity));
+  return (
+    <Card>
+      <CardContent className="overflow-x-auto p-0">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2 font-medium">Waiting</th>
+              <th className="px-4 py-2 font-medium">Asked on</th>
+              <th className="px-4 py-2 font-medium">WhatsApp number</th>
+              <th className="px-4 py-2 font-medium">Product</th>
+              <th className="px-4 py-2 font-medium">Variant · SKU</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ p, v, r }) => (
+              <tr key={r._id} className="border-t">
+                <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ageTone(r.createdAt)}`}>{ageOf(r.createdAt) || "—"}</span></td>
+                <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted-foreground">{formatWhen(r.createdAt)}</td>
+                <td className="whitespace-nowrap px-4 py-2 font-mono tabular-nums">
+                  <a href={`https://wa.me/91${r.phoneNumber}`} target="_blank" rel="noreferrer" className="hover:underline">+91 {r.phoneNumber}</a>
+                </td>
+                <td className="px-4 py-2">{p.productTitle}</td>
+                <td className="px-4 py-2 text-muted-foreground">{v.variantTitle}{v.sku ? <> · <span className="font-mono">{v.sku}</span></> : null}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+    </Card>
+  );
+}
 
 function AdminStockNotificationsPageInner() {
   const stats = useQuery(api.stockNotifications.getNotificationStats, {}) as ProductStat[] | undefined;
@@ -58,6 +107,7 @@ function AdminStockNotificationsPageInner() {
   const [sendingFor, setSendingFor] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<{ variantId: string; variantTitle: string; count: number } | null>(null);
   const [healthKey, setHealthKey] = useState(0);
+  const [view, setView] = useState<"all" | "product">("all");
 
   const confirmSendNotifications = async () => {
     if (!selectedVariant) return;
@@ -137,7 +187,12 @@ function AdminStockNotificationsPageInner() {
         </Empty>
       ) : (
         <div className="space-y-4">
-          {stats.map((product) => (
+          <div className="flex gap-2">
+            <Button size="sm" variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All requests (oldest first)</Button>
+            <Button size="sm" variant={view === "product" ? "default" : "outline"} onClick={() => setView("product")}>By product</Button>
+          </div>
+          {view === "all" && <AllRequestsTable stats={stats} />}
+          {view === "product" && stats.map((product) => (
             <Card key={product.productId || product.productTitle}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
@@ -215,7 +270,10 @@ function AdminStockNotificationsPageInner() {
                                   +91 {r.phoneNumber}
                                 </a>
                               </td>
-                              <td className="px-4 py-2 tabular-nums text-muted-foreground">{formatWhen(r.createdAt)}</td>
+                              <td className="whitespace-nowrap px-4 py-2 tabular-nums text-muted-foreground">
+                                {formatWhen(r.createdAt)}
+                                {r.createdAt ? <span className={`ml-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ageTone(r.createdAt)}`}>{ageOf(r.createdAt)}</span> : null}
+                              </td>
                               <td className="px-4 py-2 text-muted-foreground">
                                 {r.userEmail || (r.userId ? "signed in" : "guest")}
                               </td>

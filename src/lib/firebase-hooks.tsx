@@ -2256,7 +2256,9 @@ export function useQuery(apiRef: any, args?: any) {
                   v.requests.push({
                     _id: n._id,
                     phoneNumber: n.phoneNumber,
-                    createdAt: n.createdAt || 0,
+                    // Requests from before createdAt was written carry the time as
+                    // subscribedAt or _creationTime; without them the page showed "—".
+                    createdAt: Number(n.createdAt || n.subscribedAt || n._creationTime) || 0,
                     userId: n.userId || '',
                     userEmail: n.userEmail || '',
                     requestsFromThisNumber: perPhone.get(n.phoneNumber) || 1,
