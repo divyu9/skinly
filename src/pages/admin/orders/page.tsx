@@ -47,6 +47,7 @@ function AdminOrdersPageInner() {
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState(params.get("q") || "");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
+  const [bookingRs, setBookingRs] = useState<{ done: number; total: number } | null>(null);
 
   // Date filter state
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -542,6 +543,37 @@ function AdminOrdersPageInner() {
     }
   };
 
+  /*
+   * The order-page button "Order only, no shipment", for many at once: each
+   * selected order is booked in RapidShyp with no courier or AWB, to process
+   * in their panel. One at a time (the function books and writes back per
+   * order); orders already shipped or already in RapidShyp are skipped, and
+   * the server refuses them anyway.
+   */
+  const bulkCreateRapidshypOrders = async () => {
+    if (!displayOrders || selectedOrders.size === 0) return;
+    const chosen = displayOrders.filter((o: any) => selectedOrders.has(o._id));
+    const todo = chosen.filter((o: any) => !o.awbNumber && !o.rapidshypOrderId && !o.isDeleted);
+    const skipped = chosen.length - todo.length;
+    if (!todo.length) { toast.info("All selected orders are already shipped or already in RapidShyp"); return; }
+    if (!confirm(`Create ${todo.length} order${todo.length > 1 ? "s" : ""} in RapidShyp (no shipment)?${skipped ? ` ${skipped} already shipped or in RapidShyp will be skipped.` : ""}`)) return;
+
+    const { getFunctions, httpsCallable } = await import("firebase/functions");
+    const call = httpsCallable(getFunctions(), "createRapidshypOrder");
+    let ok = 0;
+    const failed: string[] = [];
+    setBookingRs({ done: 0, total: todo.length });
+    for (const [i, o] of todo.entries() as IterableIterator<[number, any]>) {
+      try { await call({ orderId: o._id }); ok++; }
+      catch (e: any) { failed.push(`${(o as any).orderNumber || o._id}: ${e?.message || "failed"}`); }
+      setBookingRs({ done: i + 1, total: todo.length });
+    }
+    setBookingRs(null);
+    const summary = `${ok} created in RapidShyp${skipped ? `, ${skipped} skipped` : ""}${failed.length ? `, ${failed.length} failed` : ""}`;
+    if (failed.length) toast.error(summary, { description: failed.slice(0, 5).join(" · "), duration: 15000 });
+    else toast.success(summary);
+  };
+
   const generatePackList = async () => {
     if (!displayOrders || selectedOrders.size === 0) {
       toast.error("Please select orders to generate pack list");
@@ -926,6 +958,17 @@ function AdminOrdersPageInner() {
             >
               <ListChecksIcon className="size-4 mr-2" />
               Generate Pack List ({selectedOrders.size})
+            </Button>
+
+            {/* RapidShyp: book the selected orders there, no courier or AWB yet. */}
+            <Button
+              onClick={() => void bulkCreateRapidshypOrders()}
+              disabled={selectedOrders.size === 0 || !!bookingRs}
+              variant="outline"
+              title="Books each selected order in RapidShyp without a courier or AWB, to process there"
+            >
+              {bookingRs ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <PackageIcon className="size-4 mr-2" />}
+              {bookingRs ? `Creating ${bookingRs.done}/${bookingRs.total}…` : `Create RapidShyp orders (${selectedOrders.size})`}
             </Button>
           </div>
         </div>
