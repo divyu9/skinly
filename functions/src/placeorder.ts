@@ -1,5 +1,4 @@
 import * as functions from "firebase-functions/v1";
-import { reserveMaterialForOrder } from "./materials";
 import { cashbackForLines } from "./cashback";
 import { notifyOrderPlaced } from "./orderNotifications";
 import { confirmOrder } from "./orderConfirm";
@@ -522,12 +521,12 @@ export const placeOrder = functions
       }).catch((e) => console.error("placeOrder: referral record failed", { order: orderId, error: e?.message || e }));
     }
 
-    // ── 4b. Draw down design stock ────────────────────────────────────────────
-    // After the order is safely written, and deliberately not blocking on it:
-    // an order must never be lost because the stock ledger had a bad row.
-    reserveMaterialForOrder(db, docRef, orderItems).catch((e) =>
-      console.error("reserveMaterial failed", { order: docRef.id, error: e?.message || e })
-    );
+    // ── 4b. Design stock ──────────────────────────────────────────────────────
+    // Drawn down by the onOrderCreatedStock trigger (materials.ts), not here.
+    // Left running after this call replied, Cloud Functions throttled it:
+    // #4046's sheets came off two minutes late and its listing kept the old
+    // count until a manual recount. A trigger runs to the end, and checkout
+    // doesn't wait for it.
 
     // ── 4c. Tell the customer ─────────────────────────────────────────────────
     // COD only. An online order is notified once PhonePe confirms the money,
@@ -540,7 +539,8 @@ export const placeOrder = functions
       } catch (e: any) {
         console.error("confirmOrder failed", { order: docRef.id, error: e?.message || e });
       }
-      notifyOrderPlaced(db, docRef.id).catch((e) =>
+      // Awaited for the same reason: work left after the reply may not run.
+      await notifyOrderPlaced(db, docRef.id).catch((e) =>
         console.error("notifyOrderPlaced failed", { order: docRef.id, error: e?.message || e })
       );
     }

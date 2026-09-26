@@ -36,6 +36,8 @@ interface Variant {
   customMultiplier?: string;
   /** As saved: kept when neither a preset nor a custom figure says otherwise. */
   materialMultiplier?: number;
+  /** The stock figure as loaded, to tell an edit from a stale copy. */
+  loadedInventory?: string;
 }
 
 function EditProductPageInner() {
@@ -149,6 +151,7 @@ function EditProductPageInner() {
           price: v.price.toString(),
           compareAtPrice: v.compareAtPrice?.toString() || "",
           inventoryQuantity: v.inventoryQuantity.toString(),
+          loadedInventory: v.inventoryQuantity.toString(),
           rNumber: v.rNumber || "",
           consumptionPresetId: v.consumptionPresetId || "",
           customMultiplier: v.customMultiplier?.toString() || "",
@@ -188,7 +191,7 @@ function EditProductPageInner() {
 
   const updateVariantLocal = (
     index: number, 
-    field: Exclude<keyof Variant, "_id" | "materialMultiplier">, 
+    field: Exclude<keyof Variant, "_id" | "materialMultiplier" | "loadedInventory">, 
     value: string
   ) => {
     const newVariants = [...variants];
@@ -303,7 +306,12 @@ function EditProductPageInner() {
             title: variant.title,
             price: parseFloat(variant.price),
             compareAtPrice: compareAtPriceNum,
-            inventoryQuantity: parseInt(variant.inventoryQuantity),
+            /*
+             * Only when changed here. Stock is recounted from the sheets on
+             * every order; a form opened before one still holds the old
+             * figure, and saving it put that back (M-213 showed 4 over 3).
+             */
+            inventoryQuantity: variant.inventoryQuantity !== variant.loadedInventory ? parseInt(variant.inventoryQuantity) : undefined,
             isDefaultVariant: !formData.hasMultipleVariants && i === 0,
             consumptionPresetId: variant.consumptionPresetId ? (variant.consumptionPresetId as Id<"variantConsumptionPresets">) : undefined,
             customMultiplier: variant.customMultiplier ? parseFloat(variant.customMultiplier) : undefined,

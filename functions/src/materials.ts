@@ -1,3 +1,4 @@
+import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import { requireAdmin } from "./auth";
@@ -117,6 +118,9 @@ export async function reserveMaterialForOrder(
   orderRef: admin.firestore.DocumentReference,
   items: Array<{ productId?: string; variant?: string; title?: string; quantity?: number }>
 ): Promise<void> {
+  // Once per order: the trigger and any re-run must not take it twice.
+  if (((await orderRef.get()).data() as any)?.materialConsumed) return;
+
   const productIds = Array.from(
     new Set(items.map((i) => i?.productId).filter((p): p is string => !!p))
   );
@@ -584,3 +588,21 @@ export async function releaseMaterialForOrder(
   console.log("releaseMaterial", { order: orderRef.id, returned });
   return returned;
 }
+
+/**
+ * Every new order draws down the stock of the designs it was cut from, and
+ * the listings made from them are recounted — run to completion by Firestore
+ * rather than left behind by placeOrder's reply.
+ */
+export const onOrderCreatedStock = functionsV1
+  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .firestore.document("orders/{orderId}")
+  .onCreate(async (snap) => {
+    const order = snap.data() as any;
+    try {
+      await reserveMaterialForOrder(admin.firestore(), snap.ref, Array.isArray(order?.items) ? order.items : []);
+    } catch (e: any) {
+      console.error("onOrderCreatedStock failed", { order: snap.id, error: e?.message || e });
+    }
+    return null;
+  });

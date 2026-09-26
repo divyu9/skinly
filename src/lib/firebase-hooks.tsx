@@ -2707,8 +2707,10 @@ export function useQuery(apiRef: any, args?: any) {
                 const rn = String(variant.rNumber || '').trim().toUpperCase();
                 if (rn && rollsMap[rn]) return { kind: 'roll' as const, code: rn, doc: rollsMap[rn] };
                 if (rn && cutoutsMap[rn]) return { kind: 'cutout' as const, code: rn, doc: cutoutsMap[rn] };
+                // From the whole SKU down: a plain "M-213" is itself the code,
+                // and starting one segment short showed it as N/A.
                 const parts = String(variant.sku || '').split('-');
-                for (let k = parts.length - 1; k >= 1; k--) {
+                for (let k = parts.length; k >= 1; k--) {
                   const code = parts.slice(0, k).join('-').toUpperCase();
                   if (rollsMap[code]) return { kind: 'roll' as const, code, doc: rollsMap[code] };
                   if (cutoutsMap[code]) return { kind: 'cutout' as const, code, doc: cutoutsMap[code] };
