@@ -14,6 +14,7 @@ import { PackedForYou } from "@/components/packed-for-you.tsx";
 import { OrderItemImage } from "@/components/order-item-image.tsx";
 import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
 import { ReviewRewardCta } from "@/components/review-reward-cta.tsx";
+import { OrderProgress } from "@/components/order-progress.tsx";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -35,6 +36,16 @@ declare global {
  * Where a hand-entered shipment can be followed: the link the admin typed, or,
  * for a courier we know, its tracking page built from the number.
  */
+/** The courier's tracking page: the stored link, else one built from the AWB. */
+function courierTrackUrl(order: any): string | null {
+  if (/^https?:\/\//i.test(String(order?.trackingUrl || ""))) return String(order.trackingUrl);
+  const awb = encodeURIComponent(String(order?.awbNumber || "").trim());
+  if (!awb) return null;
+  return order?.shippingProvider === "delhivery"
+    ? `https://www.delhivery.com/track-v2/package/${awb}`
+    : `https://app.rapidshyp.com/t/${awb}`;
+}
+
 function manualTrackUrl(order: any): string | null {
   const typed = String(order?.manualTrackingUrl || "").trim();
   if (/^https?:\/\//i.test(typed)) return typed;
@@ -238,6 +249,8 @@ function OrderDetailPageInner() {
             </div>
           </div>
           
+          <OrderProgress status={order.status} />
+
           {/* The one review prompt: what a review earns, for a delivered order. */}
           {orderId && <ReviewRewardCta order={order} orderId={orderId} />}
 
@@ -269,7 +282,7 @@ function OrderDetailPageInner() {
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 min-w-0 space-y-6">
             {/* A link opened by someone who is not the customer (or a guest's
                 link without its key): what was bought, never who or where. */}
             {(order as any).access === "limited" && (
@@ -318,7 +331,7 @@ function OrderDetailPageInner() {
                             For: {item.phoneModel}
                           </p>
                         )}
-                        {item.variant !== "Default Title" && (
+                        {item.variant && !/^default( title)?$/i.test(String(item.variant)) && (
                           <p className="text-sm text-muted-foreground mb-2">
                             Variant: {item.variant}
                           </p>
@@ -387,9 +400,9 @@ function OrderDetailPageInner() {
                           expectedDeliveryAt={(order as any).expectedDeliveryAt}
                           delivered={order.status === "delivered"}
                         />
-                        {order.trackingUrl && (
+                        {courierTrackUrl(order) && (
                           <a
-                            href={order.trackingUrl}
+                            href={courierTrackUrl(order)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="block"
@@ -469,6 +482,19 @@ function OrderDetailPageInner() {
             </Card>
             )}
 
+            {/* A way to ask, with the order number already written. */}
+            <a
+              href={`https://wa.me/919761011121?text=${encodeURIComponent(`Hi, I need help with my order ${order.orderNumber || ""}`.trim())}`}
+              target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-between gap-3 rounded-2xl border-2 border-ink/10 bg-card p-4 hover:border-brand"
+            >
+              <div>
+                <p className="text-sm font-semibold">Need help with this order?</p>
+                <p className="text-xs text-muted-foreground">Chat with us on WhatsApp — we usually reply within a few hours.</p>
+              </div>
+              <span className="shrink-0 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp</span>
+            </a>
+
             {/* Payment Method */}
             <Card>
               <CardHeader>
@@ -489,7 +515,16 @@ function OrderDetailPageInner() {
                         <span className="text-sm">Cash on Delivery</span>
                       </>
                     ) : (
-                      <span className="text-sm">{order.paymentMethod}</span>
+                      <>
+                        <Badge variant="secondary" className={order.paymentStatus === "success"
+                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+                          : "bg-amber-500/10 text-amber-700 border-amber-500/20"}>
+                          {order.paymentStatus === "success" ? "Paid" : "Payment pending"}
+                        </Badge>
+                        <span className="text-sm">
+                          Online{/phonepe/i.test(String(order.paymentMethod || "")) ? " (PhonePe)" : ""}
+                        </span>
+                      </>
                     )}
                   </div>
                 </div>
