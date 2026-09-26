@@ -23,6 +23,17 @@ type Line = {
 export type Cut = { device: string; coverage: string; qty: number };
 export type PackRow = { code: string; pieces: number; orders: Set<string>; skin: boolean; title: string; cuts: Map<string, Cut> };
 
+/**
+ * The design's name, from the listing title: everything before the finish
+ * ("Neon Highway Matte Finish Phone Skin" → "Neon Highway", "Santa Barbara 3D
+ * Textured Phone Skin" → "Santa Barbara"). Listings keep no separate name.
+ */
+export function designNameOf(title: unknown): string {
+  const t = String(title || "").trim();
+  const cut = t.replace(/\s+(matte|glossy|gloss|3d|embossed|textured|sparkl\w*|glitter|transparent|tranzy|leather|premium|carbon)\b.*$/i, "").trim();
+  return (cut && cut !== t ? cut : t.replace(/\s+(phone|laptop|macbook|mobile|back)?\s*skins?$/i, "")).replace(/[\s\-–|,:]+$/, "").trim();
+}
+
 /** "Full Body Wrap" / "Only Back", or a real variant (a laptop's "Top + Keyboard Area"). */
 function coverageOf(it: Line): string {
   const c = String(it.coverage || "").toLowerCase();
@@ -93,14 +104,16 @@ export async function buildPackList(orders: Array<{ orderNumber?: string; _id: s
 export function packListText(orderCount: number, list: Awaited<ReturnType<typeof buildPackList>>): string {
   const pieces = list.skins.reduce((s, r) => s + r.pieces, 0);
   const pad = (s: string, n: number) => (s.length >= n ? s : s + " ".repeat(n - s.length));
+  const nameWidth = Math.min(34, Math.max(6, ...list.skins.map((r) => designNameOf(r.title).length))) + 2;
   const out: string[] = [];
   out.push(`PACK LIST — ${new Date().toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`);
   out.push(`${orderCount} orders · ${list.skins.length} designs · ${pieces} pieces`);
   out.push("");
-  out.push(`${pad("SKU", 12)}PCS`);
-  out.push("-".repeat(18));
+  out.push(`${pad("SKU", 10)}${pad("DESIGN", nameWidth)}PCS`);
+  out.push("-".repeat(10 + nameWidth + 3));
   for (const r of list.skins) {
-    out.push(`${pad(r.code, 12)}${String(r.pieces).padStart(3)}`);
+    // The name beside the code, so whoever pulls the sheet can check both.
+    out.push(`${pad(r.code, 10)}${pad(designNameOf(r.title).slice(0, 34), nameWidth)}${String(r.pieces).padStart(3)}`);
     // One line per cut under its design: the device, and the coverage chosen.
     for (const c of [...r.cuts.values()].sort((a, b) => a.device.localeCompare(b.device))) {
       out.push(`   - ${c.device}${c.coverage ? ` · ${c.coverage}` : ""}${c.qty > 1 ? `  × ${c.qty}` : ""}`);
