@@ -221,18 +221,8 @@ function OrderDetailPageInner() {
             </div>
           </div>
           
-          {order.status === "delivered" && !order.isDeleted && (
-            <Link to={`/review/${orderId}`} className="flex items-center gap-3 rounded-2xl border-2 border-ink/15 bg-sunny/25 p-4">
-              <StarIcon className="size-6 shrink-0 fill-yellow-400 text-yellow-400" />
-              <div className="flex-1">
-                <p className="font-semibold">How's your skin looking?</p>
-                <p className="text-sm text-muted-foreground">Rate it and add a photo — it helps the next person choose.</p>
-              </div>
-              <span className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">
-                {order.reviewedAt ? "Edit review" : "Rate"}
-              </span>
-            </Link>
-          )}
+          {/* The one review prompt: what a review earns, for a delivered order. */}
+          {orderId && <ReviewRewardCta order={order} orderId={orderId} />}
 
           {canPay && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
@@ -276,8 +266,6 @@ function OrderDetailPageInner() {
                 </Link>
               </div>
             )}
-
-            {orderId && <ReviewRewardCta order={order} orderId={orderId} />}
 
             <PackedForYou orderNumber={order.orderNumber || (order as any).checkoutRef} />
 
