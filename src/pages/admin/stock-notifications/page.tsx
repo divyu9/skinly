@@ -64,10 +64,12 @@ const ageTone = (ms: number) => {
   return !ms ? "" : days > 60 ? "bg-rose-500/15 text-rose-700" : days > 30 ? "bg-amber-500/15 text-amber-700" : "bg-emerald-500/10 text-emerald-700";
 };
 
-/** Every waiting request in one table, oldest first — who has waited longest. */
-function AllRequestsTable({ stats }: { stats: ProductStat[] }) {
+/** Every waiting request in one table, latest first unless asked otherwise. */
+function AllRequestsTable({ stats, order }: { stats: ProductStat[]; order: "latest" | "oldest" }) {
   const rows = stats.flatMap((p) => p.variants.flatMap((v) => v.requests.map((r) => ({ p, v, r }))))
-    .sort((a, b) => (a.r.createdAt || Infinity) - (b.r.createdAt || Infinity));
+    .sort((a, b) => order === "latest"
+      ? (b.r.createdAt || 0) - (a.r.createdAt || 0)
+      : (a.r.createdAt || Infinity) - (b.r.createdAt || Infinity));
   return (
     <Card>
       <CardContent className="overflow-x-auto p-0">
@@ -108,6 +110,7 @@ function AdminStockNotificationsPageInner() {
   const [selectedVariant, setSelectedVariant] = useState<{ variantId: string; variantTitle: string; count: number } | null>(null);
   const [healthKey, setHealthKey] = useState(0);
   const [view, setView] = useState<"all" | "product">("all");
+  const [order, setOrder] = useState<"latest" | "oldest">("latest");
 
   const confirmSendNotifications = async () => {
     if (!selectedVariant) return;
@@ -187,11 +190,19 @@ function AdminStockNotificationsPageInner() {
         </Empty>
       ) : (
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Button size="sm" variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All requests (oldest first)</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant={view === "all" ? "default" : "outline"} onClick={() => setView("all")}>All requests</Button>
             <Button size="sm" variant={view === "product" ? "default" : "outline"} onClick={() => setView("product")}>By product</Button>
+            <span className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+              Sort
+              <select value={order} onChange={(e) => setOrder(e.target.value as "latest" | "oldest")}
+                className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground">
+                <option value="latest">Latest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </span>
           </div>
-          {view === "all" && <AllRequestsTable stats={stats} />}
+          {view === "all" && <AllRequestsTable stats={stats} order={order} />}
           {view === "product" && stats.map((product) => (
             <Card key={product.productId || product.productTitle}>
               <CardHeader>
@@ -258,7 +269,7 @@ function AdminStockNotificationsPageInner() {
                           </tr>
                         </thead>
                         <tbody>
-                          {variant.requests.map((r) => (
+                          {[...variant.requests].sort((x, y) => order === "latest" ? (y.createdAt || 0) - (x.createdAt || 0) : (x.createdAt || Infinity) - (y.createdAt || Infinity)).map((r) => (
                             <tr key={r._id} className="border-t">
                               <td className="px-4 py-2 font-mono tabular-nums">
                                 <a
