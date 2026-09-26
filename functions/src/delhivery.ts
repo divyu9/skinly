@@ -25,7 +25,7 @@ const IST_OFFSET = 5.5 * 3600 * 1000;
 const istDate = (t: number) => new Date(t + IST_OFFSET).toISOString().slice(0, 10);
 
 /** Whether Delhivery delivers to a pincode, and takes COD there. */
-async function serviceability(pin: string) {
+export async function serviceability(pin: string) {
   const r = await dlv(`/c/api/pin-codes/json/?filter_codes=${encodeURIComponent(pin)}`);
   const pc = r.data?.delivery_codes?.[0]?.postal_code;
   if (!pc) return { serviceable: false, cod: false, prepaid: false, note: r.status === 401 ? "Delhivery rejected the API token" : "Delhivery does not deliver to this pincode" };
@@ -39,7 +39,7 @@ async function serviceability(pin: string) {
 }
 
 /** Delhivery's own estimate of the charge (its Invoice API; approximate by its own account). */
-async function estimate(originPin: string, pin: string, grams: number, cod: boolean, codValue: number, mode: string) {
+export async function estimate(originPin: string, pin: string, grams: number, cod: boolean, codValue: number, mode: string) {
   if (!originPin) return null;
   const q = new URLSearchParams({
     md: mode === "Express" ? "E" : "S", ss: "Delivered", o_pin: originPin, d_pin: pin,

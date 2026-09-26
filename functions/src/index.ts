@@ -44,3 +44,4 @@ export * from "./delhivery";
 export * from "./orderView";
 export * from "./reviewRewards";
 export * from "./orderEmail";
+export * from "./shippingCompare";

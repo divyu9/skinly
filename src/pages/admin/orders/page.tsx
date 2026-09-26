@@ -899,10 +899,10 @@ function AdminOrdersPageInner() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Delhivery Direct: see each order's rate, then book the chosen ones. */}
+            {/* Compare & ship: each order priced with Delhivery Direct and RapidShyp's couriers, then booked on the chosen route. */}
             <Button variant="outline" disabled={selectedOrders.size === 0} onClick={() => setShowDelhiveryBulk(true)}>
               <TruckIcon className="size-4 mr-2" />
-              Delhivery Direct ({selectedOrders.size})
+              Compare & ship ({selectedOrders.size})
             </Button>
             
             {/* Bulk Fetch Labels - Shipped tab only */}
