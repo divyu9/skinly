@@ -30,6 +30,8 @@ import type { Id } from "@/lib/firebase-api";
 import { PDFDocument } from "pdf-lib";
 import { ManualOrderDialog } from "./manual-order-dialog.tsx";
 import { buildPackList, packListText as packListTextOf } from "@/lib/pack-list";
+import { DelhiveryBulkDialog } from "./_components/DelhiveryBulkDialog.tsx";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu.tsx";
 import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
 import { ADMIN_STATUS_LABELS, STATUS_BADGE, STATUS_DOT } from "@/lib/order-label.ts";
 
@@ -48,6 +50,7 @@ function AdminOrdersPageInner() {
   const [searchTerm, setSearchTerm] = useState(params.get("q") || "");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
   const [bookingRs, setBookingRs] = useState<{ done: number; total: number } | null>(null);
+  const [showDelhiveryBulk, setShowDelhiveryBulk] = useState(false);
 
   // Date filter state
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
@@ -878,21 +881,29 @@ function AdminOrdersPageInner() {
               : "Select orders for bulk operations"}
           </div>
           <div className="flex gap-2">
-            {/* Bulk Ship - Processing tab only */}
-            {statusFilter === "processing" && (
-              <Button
-                onClick={() => setShowBulkShipDialog(true)}
-                disabled={isProcessingBulk || getValidShipOrders().length === 0}
-                variant="default"
-              >
-                {isProcessingBulk ? (
-                  <LoaderIcon className="size-4 mr-2 animate-spin" />
-                ) : (
-                  <PackageCheckIcon className="size-4 mr-2" />
-                )}
-                Bulk Ship via RapidShyp ({getValidShipOrders().length})
-              </Button>
-            )}
+            {/* RapidShyp, both ways in one menu: ship now, or book the order only. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="default" disabled={selectedOrders.size === 0 || isProcessingBulk || !!bookingRs}>
+                  {isProcessingBulk || bookingRs ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <PackageCheckIcon className="size-4 mr-2" />}
+                  {bookingRs ? `RapidShyp ${bookingRs.done}/${bookingRs.total}…` : `RapidShyp (${selectedOrders.size}) ▾`}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem disabled={statusFilter !== "processing" || getValidShipOrders().length === 0} onSelect={() => setShowBulkShipDialog(true)}>
+                  Ship now — courier and AWB ({statusFilter === "processing" ? getValidShipOrders().length : "Processing tab"})
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void bulkCreateRapidshypOrders()}>
+                  Create orders only, no shipment ({selectedOrders.size})
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Delhivery Direct: see each order's rate, then book the chosen ones. */}
+            <Button variant="outline" disabled={selectedOrders.size === 0} onClick={() => setShowDelhiveryBulk(true)}>
+              <TruckIcon className="size-4 mr-2" />
+              Delhivery Direct ({selectedOrders.size})
+            </Button>
             
             {/* Bulk Fetch Labels - Shipped tab only */}
             {statusFilter === "shipped" && (
@@ -960,16 +971,7 @@ function AdminOrdersPageInner() {
               Generate Pack List ({selectedOrders.size})
             </Button>
 
-            {/* RapidShyp: book the selected orders there, no courier or AWB yet. */}
-            <Button
-              onClick={() => void bulkCreateRapidshypOrders()}
-              disabled={selectedOrders.size === 0 || !!bookingRs}
-              variant="outline"
-              title="Books each selected order in RapidShyp without a courier or AWB, to process there"
-            >
-              {bookingRs ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <PackageIcon className="size-4 mr-2" />}
-              {bookingRs ? `Creating ${bookingRs.done}/${bookingRs.total}…` : `Create RapidShyp orders (${selectedOrders.size})`}
-            </Button>
+
           </div>
         </div>
       )}
@@ -1243,6 +1245,11 @@ function AdminOrdersPageInner() {
       )}
 
       {/* Manual Order Dialog */}
+      <DelhiveryBulkDialog
+        open={showDelhiveryBulk}
+        onOpenChange={setShowDelhiveryBulk}
+        orders={(displayOrders || []).filter((o: any) => selectedOrders.has(o._id))}
+      />
       <ManualOrderDialog
         open={showManualOrderDialog}
         onOpenChange={setShowManualOrderDialog}
