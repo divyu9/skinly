@@ -56,6 +56,9 @@ function customerVariant(item: any): string | null {
   return v;
 }
 
+/** Whether the courier's scans are on the order (webhook / Delhivery sync), so the history shows. */
+const hasScans = (order: any) => Array.isArray(order?.trackScans) && order.trackScans.some((x: any) => x?.at && x?.scan);
+
 /** The courier's tracking page: the stored link, else one built from the AWB. */
 function courierTrackUrl(order: any): string | null {
   if (/^https?:\/\//i.test(String(order?.trackingUrl || ""))) return String(order.trackingUrl);
@@ -425,7 +428,14 @@ function OrderDetailPageInner() {
                           expectedDeliveryAt={(order as any).expectedDeliveryAt}
                           delivered={order.status === "delivered"}
                         />
-                        {courierTrackUrl(order) && (
+                        {/* With the courier's scans on this page the journey is already here,
+                            so the courier's own site is a quiet link, not the main button. */}
+                        {courierTrackUrl(order) && (hasScans(order) ? (
+                          <a href={courierTrackUrl(order)!} target="_blank" rel="noopener noreferrer"
+                            className="inline-block text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">
+                            View on the courier's site →
+                          </a>
+                        ) : (
                           <a
                             href={courierTrackUrl(order)!}
                             target="_blank"
@@ -437,7 +447,7 @@ function OrderDetailPageInner() {
                               Track Your Shipment
                             </Button>
                           </a>
-                        )}
+                        ))}
                       </div>
                     )}
 
