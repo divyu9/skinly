@@ -52,7 +52,7 @@ export function TrendingProductsSection({ productId }: TrendingProductsSectionPr
         <div className="relative -mx-4 px-4">
           <div
             id="trending-products-scroll"
-            className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory"
+            data-drag-scroll className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory"
           >
             {products.map((product, index) => {
             const firstVariant = product.variants && product.variants[0];
@@ -144,7 +144,7 @@ function TrendingProductsSkeleton() {
           <Skeleton className="size-10 rounded-full" />
           <Skeleton className="h-8 w-48" />
         </div>
-        <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+        <div data-drag-scroll className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex-shrink-0 w-[200px] md:w-[240px]">
               <Skeleton className="aspect-square rounded-xl mb-3" />

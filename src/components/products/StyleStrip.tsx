@@ -38,7 +38,7 @@ export function StyleStrip({ gadget }: { gadget?: string | null }) {
   return (
     <section className="mb-4 -mx-3 sm:mx-0">
       <h2 className="mb-2 px-3 text-sm font-semibold sm:px-0">Browse by style</h2>
-      <div className="flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
+      <div data-drag-scroll className="flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:px-0 [&::-webkit-scrollbar]:hidden">
         {shown.slice(0, 18).map((t) => (
           <Link
             key={t.slug}

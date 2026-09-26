@@ -96,7 +96,7 @@ function ReviewCard({ review }: { review: Review }) {
           (review.videoUrls && review.videoUrls.length > 0)) && (
           <div className="space-y-3 mt-4">
             {review.imageUrls && review.imageUrls.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto">
+              <div data-drag-scroll className="flex gap-2 overflow-x-auto">
                 {review.imageUrls.map((url, idx) => (
                   <img
                     key={idx}
@@ -109,7 +109,7 @@ function ReviewCard({ review }: { review: Review }) {
               </div>
             )}
             {review.videoUrls && review.videoUrls.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto">
+              <div data-drag-scroll className="flex gap-2 overflow-x-auto">
                 {review.videoUrls.map((url, idx) => (
                   <video
                     key={idx}

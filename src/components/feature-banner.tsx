@@ -151,7 +151,7 @@ export function FeatureBanner() {
         {/* Scrolling Banners */}
         <div
           ref={scrollContainerRef}
-          className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+          data-drag-scroll className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}
