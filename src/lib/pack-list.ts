@@ -20,7 +20,7 @@ type Line = {
   phoneBrand?: string; phoneModel?: string; coverage?: string;
 };
 /** One cut to make: the device, and what it covers. */
-export type Cut = { device: string; coverage: string; qty: number };
+export type Cut = { device: string; coverage: string; qty: number; orders: string[] };
 export type PackRow = { code: string; pieces: number; orders: Set<string>; skin: boolean; title: string; cuts: Map<string, Cut> };
 
 /**
@@ -86,8 +86,9 @@ export async function buildPackList(orders: Array<{ orderNumber?: string; _id: s
     const device = [it.phoneBrand, it.phoneModel].filter(Boolean).join(" ").trim() || "Model not given";
     const coverage = coverageOf(it);
     const cutKey = `${device}::${coverage}`;
-    const cut = row.cuts.get(cutKey) || { device, coverage, qty: 0 };
+    const cut = row.cuts.get(cutKey) || { device, coverage, qty: 0, orders: [] };
     cut.qty += qty;
+    if (!cut.orders.includes(order)) cut.orders.push(order);
     row.cuts.set(cutKey, cut);
     rows.set(key, row);
   }
@@ -116,7 +117,7 @@ export function packListText(orderCount: number, list: Awaited<ReturnType<typeof
     out.push(`${pad(r.code, 10)}${pad(designNameOf(r.title).slice(0, 34), nameWidth)}${String(r.pieces).padStart(3)}`);
     // One line per cut under its design: the device, and the coverage chosen.
     for (const c of [...r.cuts.values()].sort((a, b) => a.device.localeCompare(b.device))) {
-      out.push(`   - ${c.device}${c.coverage ? ` · ${c.coverage}` : ""}${c.qty > 1 ? `  × ${c.qty}` : ""}`);
+      out.push(`   - ${c.device}${c.coverage ? ` · ${c.coverage}` : ""}${c.qty > 1 ? `  × ${c.qty}` : ""}  (${c.orders.join(", ")})`);
     }
     out.push("");
   }
