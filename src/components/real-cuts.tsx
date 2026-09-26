@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { CameraIcon } from "lucide-react";
 import { responsiveImg } from "@/lib/image-cdn";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
-import { cutFor, useLatestRealPhotos, type RealPhoto } from "@/lib/real-photos";
+import { cutFor, designCodeOf, useLatestRealPhotos, type RealPhoto } from "@/lib/real-photos";
 import { readActiveDevice, type ActiveDevice } from "@/lib/active-device";
 import { brandInScope } from "@/lib/device-fit";
 import { loadCatalogue, loadModelCatalogue, type CatalogueProduct } from "@/lib/catalogue";
@@ -45,7 +45,8 @@ export function RealCuts() {
     // A saved device without a category is, in practice, a phone.
     if ((device.category || "phone") !== (p.gadget || "phone")) return null;
     const fits = catalogue.filter((c) =>
-      c.design === p.designCode && c.productCategory === "skin" &&
+      // M-213 listings carry no design field; their SKU is the design code.
+      (c.design || designCodeOf(c.variants?.[0]?.sku)) === p.designCode && c.productCategory === "skin" &&
       (c.gadgetCategory || "phone") === (p.gadget || "phone") && brandInScope(c, device.brand));
     return fits.find((c) => c._id === p.productId) || fits[0] || null;
   };
