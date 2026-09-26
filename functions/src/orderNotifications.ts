@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import { describeItems } from "./ordersAdmin";
 
@@ -22,7 +23,15 @@ const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
 /** Where "View Your Order" should point. */
 function orderLinkFor(orderId: string): string {
   const site = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
-  return `${site}/orders/${orderId}`;
+  /*
+   * Signed, so the customer's own link opens their full order (name, address,
+   * tracking) even when they checked out as a guest; the same URL without the
+   * key shows only what was bought (orderView.ts). The key is payLink's
+   * linkToken("view", id), written out here because payLink imports this file.
+   */
+  const secret = process.env.PAY_LINK_SECRET || "";
+  const k = secret ? crypto.createHmac("sha256", secret).update(`view:${orderId}`).digest("base64url").slice(0, 16) : "";
+  return `${site}/orders/${orderId}${k ? `?k=${k}` : ""}`;
 }
 
 /**

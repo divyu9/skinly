@@ -12,6 +12,7 @@ import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 import { PackedForYou } from "@/components/packed-for-you.tsx";
 import { OrderItemImage } from "@/components/order-item-image.tsx";
+import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -261,6 +262,20 @@ function OrderDetailPageInner() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            {/* A link opened by someone who is not the customer (or a guest's
+                link without its key): what was bought, never who or where. */}
+            {(order as any).access === "limited" && (
+              <div className="rounded-xl border-2 border-sunny bg-sunny/20 p-4 text-sm">
+                <p className="font-semibold">Address and tracking are hidden</p>
+                <p className="mt-1 text-muted-foreground">
+                  To see them, sign in with the email or phone you ordered with, or open this order from the link in your order email or WhatsApp.
+                </p>
+                <Link to="/account" className="mt-2 inline-block">
+                  <Button size="sm">Sign in</Button>
+                </Link>
+              </div>
+            )}
+
             <PackedForYou orderNumber={order.orderNumber || (order as any).checkoutRef} />
 
             {/* Order Items */}
@@ -358,6 +373,12 @@ function OrderDetailPageInner() {
                             <p className="text-sm">{order.shippingStatus}</p>
                           </div>
                         )}
+                        <OrderTrackingHistory
+                          placedAt={Number((order as any).createdAt || (order as any)._creationTime) || undefined}
+                          scans={(order as any).trackScans}
+                          expectedDeliveryAt={(order as any).expectedDeliveryAt}
+                          delivered={order.status === "delivered"}
+                        />
                         {order.trackingUrl && (
                           <a
                             href={order.trackingUrl}
@@ -403,7 +424,8 @@ function OrderDetailPageInner() {
               </Card>
             )}
 
-            {/* Shipping Address */}
+            {/* Shipping Address — only in the full view (orderView.ts). */}
+            {order.shippingAddress && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -429,6 +451,7 @@ function OrderDetailPageInner() {
                 </div>
               </CardContent>
             </Card>
+            )}
 
             {/* Payment Method */}
             <Card>

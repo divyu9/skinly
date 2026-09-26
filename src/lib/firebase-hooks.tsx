@@ -116,6 +116,23 @@ export function sortVariants<T extends { materialMultiplier?: any; price?: any; 
   );
 }
 
+/*
+ * A storefront read of one order, through the viewOrder function
+ * (functions/src/orderView.ts): the rules keep order documents to their owner
+ * and admins, and viewOrder decides between the full order and a limited one
+ * (no name, phone, address or tracking). The key a link we sent carries —
+ * ?k= on the order link, ?t= on the pay link — is passed along, so a guest's
+ * own link still opens their whole order.
+ */
+async function viewOrderFor(orderId: string): Promise<any | null> {
+  const qs = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const { getFunctions, httpsCallable } = await import('firebase/functions');
+  const res: any = await httpsCallable(getFunctions(), 'viewOrder')({
+    orderId, ...(qs.get('k') ? { k: qs.get('k') } : {}), ...(qs.get('t') ? { t: qs.get('t') } : {}),
+  });
+  return res?.data ? normalizeOrder(res.data) : null;
+}
+
 async function refreshProducts(list: any[], label: string): Promise<any[]> {
   if (!list.length) return [];
   const ids = [...new Set(list.map((p) => p._id))];
@@ -918,7 +935,14 @@ export function useQuery(apiRef: any, args?: any) {
             innerUnsubscribe();
           };
         }
-        else if (path === 'orders.getOrderPublic' || path === 'admin.orders.getOrderDetails') {
+        else if (path === 'orders.getOrderPublic') {
+          if (!args?.orderId) { setData(null); return; }
+          viewOrderFor(String(args.orderId))
+            .then((o) => { if (active) setData(o); })
+            .catch((e) => { console.error('viewOrder failed', e); if (active) setData(null); });
+          unsubscribe = () => {};
+        }
+        else if (path === 'admin.orders.getOrderDetails') {
           if (!args?.orderId) {
             setData(null);
             return;
@@ -1202,12 +1226,12 @@ export function useQuery(apiRef: any, args?: any) {
             setData(null);
           } else {
             (async () => {
-              const osnap = await getDoc(doc(db, 'orders', args.orderId));
-              if (!osnap.exists()) {
+              const viewed = await viewOrderFor(String(args.orderId)).catch(() => null);
+              if (!viewed) {
                 setData({ available: false, unavailableItems: [] });
                 return;
               }
-              const items: any[] = osnap.data().items || [];
+              const items: any[] = viewed.items || [];
               const unavailableItems: any[] = [];
               for (const item of items) {
                 const vsnap = await getDocs(query(
@@ -7298,8 +7322,7 @@ export function useConvex() {
       // always concluded the order did not exist.
       if (path === 'orders.getOrderPublic') {
         if (!args?.orderId) return null;
-        const snap = await getDoc(doc(db, 'orders', String(args.orderId)));
-        return snap.exists() ? normalizeOrder({ _id: snap.id, ...snap.data() }) : null;
+        return viewOrderFor(String(args.orderId)).catch(() => null);
       }
       if (path === 'orders.getOrderByMerchantTransaction') {
         if (!args?.merchantTransactionId) return null;
