@@ -1404,7 +1404,7 @@ async function writeMerchantFeed(active, variantsByProduct) {
   return items.length;
 }
 
-async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []) {
+async function writeCatalogue(active, variantsByProduct, logos = {}, themes = [], homeTags = []) {
   const tagsOf = (t) =>
     (Array.isArray(t) ? t : typeof t === "string" ? t.split(",") : []).map((x) => String(x).trim()).filter(Boolean);
   const products = active.map((p) => ({
@@ -1443,6 +1443,27 @@ async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []
       inventoryQuantity: Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0),
     })),
   }));
+  /*
+   * /data/home.json: just the products the homepage's tag rows can show (Top
+   * Picks, Most Trendy), in catalogue order, with the same fields. Those rows
+   * used to wait for the whole catalogue — 340 KB, 2.8 s on a throttled
+   * phone — to pick a dozen cards; this file is a few KB. Written before the
+   * tags below are turned into indexes, and with the same builtAt, so the
+   * storefront's "changed since the build" check means the same for both.
+   */
+  const builtAt = Date.now();
+  const wanted = new Set(homeTags);
+  const perTag = new Map();
+  const homeProducts = products.filter((p) => {
+    // The first N of a row are always within the first N of each of their
+    // tags, so a cap above any row's size (maxProducts + 4 spare) loses nothing.
+    const hit = p.tags.filter((t) => wanted.has(t) && (perTag.get(t) || 0) < 60);
+    hit.forEach((t) => perTag.set(t, (perTag.get(t) || 0) + 1));
+    return hit.length > 0;
+  });
+  await fs.mkdir(path.join(DIST, "data"), { recursive: true });
+  await fs.writeFile(path.join(DIST, "data", "home.json"), JSON.stringify({ builtAt, tags: [...wanted], products: homeProducts }));
+
   // Tags repeat across hundreds of products; store each once and refer to it
   // by index. src/lib/catalogue.ts expands them again on load.
   const tagIndex = new Map();
@@ -1464,7 +1485,7 @@ async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []
    * styles".
    */
   const themeRows = themes.map((t) => ({ slug: t.slug, name: t.name, total: t.total, gadget: t.gadget || null }));
-  const body = JSON.stringify({ builtAt: Date.now(), tagList, products, brandLogos: logos, themes: themeRows });
+  const body = JSON.stringify({ builtAt, tagList, products, brandLogos: logos, themes: themeRows });
   await fs.writeFile(path.join(DIST, "data", "catalogue.json"), body);
   return body.length;
 }
@@ -1899,7 +1920,18 @@ async function main() {
   const magneto = magnetoPage(active, variantsByProduct);
   await writePage(magneto.route, render(template, magneto));
 
-  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes);
+  // The tags the homepage's rows are built from: Top Picks' tabs and each
+  // Most Trendy section's own. A section's config is saved either as an
+  // object or as a JSON string (read the same way in firebase-hooks.tsx).
+  const configOf = (c) => { if (c && typeof c === "object") return c; try { return JSON.parse(c) || {}; } catch { return {}; } };
+  const homeTags = new Set(["bestseller", "new", "trending"]);
+  for (const sec of data.sections || []) {
+    if (sec.isActive === false) continue;
+    const cfg = configOf(sec.config);
+    if (sec.sectionType === "most_trendy") (Array.isArray(cfg.tags) ? cfg.tags : []).forEach((t) => homeTags.add(String(t).trim()));
+    if (sec.sectionType === "top_picks") (Array.isArray(cfg.tabs) ? cfg.tabs : []).forEach((t) => t?.tag && homeTags.add(String(t.tag).trim()));
+  }
+  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes, [...homeTags]);
   const feedItems = await writeMerchantFeed(active, variantsByProduct);
   console.log(`[prerender] merchant feed: ${feedItems} items`);
   log(`catalogue: ${active.length} products, ${Math.round(catalogueBytes / 1024)} KB`);

@@ -28,8 +28,11 @@ export function RealCuts() {
   useEffect(() => {
     const d = readActiveDevice();
     // A guess from the user agent is not "your phone"; only a device they picked is.
-    setDevice(d && d.isConfirmed !== false ? d : null);
-    loadCatalogue().then((c) => setCatalogue(c?.products ?? null));
+    const mine = d && d.isConfirmed !== false ? d : null;
+    setDevice(mine);
+    // The whole catalogue is only needed to find the design's listing for
+    // the shopper's own phone; without one, the cards link to the photo's.
+    if (mine) loadCatalogue().then((c) => setCatalogue(c?.products ?? null));
     loadModelCatalogue().then((c) => {
       const n: Record<string, number> = {};
       c?.models.forEach((m) => { if (m.category) n[m.category] = (n[m.category] || 0) + 1; });

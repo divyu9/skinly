@@ -189,7 +189,11 @@ export default function Index() {
       case "top_picks":
         return (
           <LazySection key={key} reserve="min-h-[784px] md:min-h-[772px]">
-            <TopPicks />
+            {/* The admin's title and tabs (Admin › Homepage › Layout), else the defaults. */}
+            <TopPicks
+              {...(typeof section.config?.title === "string" && section.config.title ? { title: section.config.title } : {})}
+              {...(Array.isArray(section.config?.tabs) && section.config.tabs.some((t: any) => t?.tag) ? { tabs: section.config.tabs.filter((t: any) => t?.tag && t?.label) } : {})}
+            />
           </LazySection>
         );
 
@@ -245,12 +249,11 @@ export default function Index() {
         );
 
       case "real_photos":
-        // No reserved height: until the first packing photo is taken there is
-        // nothing to show, and a reserve would leave a blank band on the page.
+        // Heights measured off the loaded section at 400px and 873px wide.
         return (
-          <Suspense key={key} fallback={null}>
+          <LazySection key={key} reserve="min-h-[580px] md:min-h-[642px]">
             <RealCuts />
-          </Suspense>
+          </LazySection>
         );
 
       default:

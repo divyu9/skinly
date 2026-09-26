@@ -314,8 +314,7 @@ async function catalogueProducts(): Promise<any[] | null> {
   return [...active, ...cat.products.filter((p) => !touched.has(p._id))];
 }
 import { collectionKey } from "./collection-key";
-import { loadCatalogue, loadModelCatalogue } from "./catalogue";
-import { listingOf, presetFor } from "./ai-mockup-shots";
+import { loadCatalogue, loadHomeProducts, loadModelCatalogue } from "./catalogue";
 import { searchRows } from "./search-match";
 import { calculateGST } from "./gst";
 import { laptopBodyKeys, squash } from "./laptop-body";
@@ -735,7 +734,28 @@ export function useQuery(apiRef: any, args?: any) {
         else if (path === 'homepage.getProductsByTags' || path === 'products.getProductsByTag') {
           const limitNum = args?.maxProducts || args?.limit || 10;
           const tagsArg = args?.tags || (args?.tag ? [args.tag] : []);
-          
+          const pickTagged = (list: any[]) => tagsArg.length
+            ? list.filter((d: any) => tagsArg.some((t: string) => (d.tags || []).includes(t)))
+            : list;
+
+          /*
+           * The homepage's rows come from the build's small home.json when
+           * it covers every tag asked for: its cards show at once, then the
+           * live read below corrects price and stock (and adds anything tagged
+           * since the build). Waiting on the whole catalogue first took ~3 s
+           * on a phone before a single card appeared.
+           */
+          const home = tagsArg.length ? await loadHomeProducts() : null;
+          if (home && tagsArg.every((t: string) => home.tags.includes(t))) {
+            const quick = pickTagged(home.products);
+            if (active && quick.length) setData(quick.slice(0, limitNum));
+            const { touched, active: changed } = await productsSinceBuild(home.builtAt);
+            const tagged = pickTagged([...changed, ...home.products.filter((p) => !touched.has(p._id))]);
+            const shown = await refreshProducts(tagged.slice(0, limitNum + 4), path);
+            if (active) setData(shown.slice(0, limitNum));
+            return;
+          }
+
           const fromCatalogue = await catalogueProducts();
           if (fromCatalogue) {
             const tagged = tagsArg.length
@@ -5415,6 +5435,8 @@ export function useMutation(apiRef: any) {
         // the single-variant rule, and "Only Top" pulled the generic laptop
         // shot onto the MacBook listing.
         const listing = String(args.listing || '').trim().toLowerCase();
+        // The mockup presets are admin-only data (75 KB), loaded when used.
+        const { presetFor } = await import("./ai-mockup-shots");
         const listingIsPreset = allowed.some((l: string) => !!presetFor(l));
 
         let linked = 0, alreadyThere = 0, wrongGadget = 0, wrongListing = 0;
@@ -5497,6 +5519,7 @@ export function useMutation(apiRef: any) {
          * nothing went back to draft. Which is exactly what happened to Oppo,
          * OnePlus, Realme, Samsung and Vivo Charger.
          */
+        const { listingOf, presetFor } = await import("./ai-mockup-shots");
         const kindByUrl = new Map<string, { kinds: string[]; explicit: boolean; shared: boolean }>();
         jobSnap.docs.forEach((d) => {
           const j: any = d.data();

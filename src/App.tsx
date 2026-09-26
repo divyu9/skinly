@@ -1,4 +1,5 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
+import { usePageLoaded } from "./hooks/use-page-loaded";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { DefaultProviders } from "./components/providers/default.tsx";
@@ -14,19 +15,27 @@ import { MobileBottomNav } from "./components/mobile-bottom-nav.tsx";
 import Index from "./pages/Index.tsx";
 import ProductsPage from "./pages/products/page.tsx";
 import ProductDetailPage from "./pages/products/detail/product-detail.tsx";
-import CheckoutPage from "./pages/checkout/page.tsx";
-import CartPage from "./pages/cart/page.tsx";
-import OrdersPage from "./pages/orders/page.tsx";
-import TrackOrderPage from "./pages/track/page.tsx";
-import OrderDetailPage from "./pages/orders/detail/page.tsx";
-import DevicesPage from "./pages/devices/page.tsx";
-import PaymentCallback from "./pages/payment/callback.tsx";
-import PayPage from "./pages/pay/page.tsx";
-import ReviewPage from "./pages/review/page.tsx";
-import AccountPage from "./pages/account/page.tsx";
-import ReferralsPage from "./pages/account/referrals/page.tsx";
-import WalletPage from "./pages/account/wallet/page.tsx";
 import NotFound from "./pages/NotFound.tsx";
+
+/*
+ * Account, cart, checkout and order pages - lazy loaded. They were in the
+ * first download of every visit (with a date picker and date-fns), which a
+ * shopper opening the homepage on a phone paid for before seeing anything.
+ * Cart and checkout are fetched once the page is idle (below), so the tap
+ * that opens them does not wait.
+ */
+const CheckoutPage = lazyWithReload(() => import("./pages/checkout/page.tsx"), "./pages/checkout/page.tsx");
+const CartPage = lazyWithReload(() => import("./pages/cart/page.tsx"), "./pages/cart/page.tsx");
+const OrdersPage = lazyWithReload(() => import("./pages/orders/page.tsx"), "./pages/orders/page.tsx");
+const TrackOrderPage = lazyWithReload(() => import("./pages/track/page.tsx"), "./pages/track/page.tsx");
+const OrderDetailPage = lazyWithReload(() => import("./pages/orders/detail/page.tsx"), "./pages/orders/detail/page.tsx");
+const DevicesPage = lazyWithReload(() => import("./pages/devices/page.tsx"), "./pages/devices/page.tsx");
+const PaymentCallback = lazyWithReload(() => import("./pages/payment/callback.tsx"), "./pages/payment/callback.tsx");
+const PayPage = lazyWithReload(() => import("./pages/pay/page.tsx"), "./pages/pay/page.tsx");
+const ReviewPage = lazyWithReload(() => import("./pages/review/page.tsx"), "./pages/review/page.tsx");
+const AccountPage = lazyWithReload(() => import("./pages/account/page.tsx"), "./pages/account/page.tsx");
+const ReferralsPage = lazyWithReload(() => import("./pages/account/referrals/page.tsx"), "./pages/account/referrals/page.tsx");
+const WalletPage = lazyWithReload(() => import("./pages/account/wallet/page.tsx"), "./pages/account/wallet/page.tsx");
 
 // Policy pages - lazy loaded
 const ReturnsPolicy = lazyWithReload(() => import("./pages/policies/returns.tsx"), "./pages/policies/returns.tsx");
@@ -96,6 +105,25 @@ function PageSkeleton() {
   );
 }
 
+/**
+ * Fetches the cart and checkout chunks once the page has loaded and gone
+ * quiet, so the shopper's tap on the cart opens it without a download — and
+ * without those chunks competing with the page's own pictures on arrival.
+ */
+function PrefetchCheckoutChunks() {
+  const loaded = usePageLoaded();
+  useEffect(() => {
+    if (!loaded) return;
+    const idle = (window as any).requestIdleCallback || ((f: () => void) => setTimeout(f, 1));
+    const t = setTimeout(() => idle(() => {
+      void import("./pages/cart/page.tsx").catch(() => {});
+      void import("./pages/checkout/page.tsx").catch(() => {});
+    }), 4000);
+    return () => clearTimeout(t);
+  }, [loaded]);
+  return null;
+}
+
 export default function App() {
   return (
     <HelmetProvider>
@@ -103,13 +131,14 @@ export default function App() {
         <FacebookPixelInitializer />
         <BrowserRouter>
           <ReferralTracker />
+          <PrefetchCheckoutChunks />
           <StorefrontErrorBoundary>
           <Routes>
             {/* Critical paths - eagerly loaded */}
             <Route path="/" element={<Index />} />
-            <Route path="/account" element={<AccountPage />} />
-            <Route path="/account/referrals" element={<ReferralsPage />} />
-            <Route path="/account/wallet" element={<WalletPage />} />
+            <Route path="/account" element={<Suspense fallback={<PageSkeleton />}><AccountPage /></Suspense>} />
+            <Route path="/account/referrals" element={<Suspense fallback={<PageSkeleton />}><ReferralsPage /></Suspense>} />
+            <Route path="/account/wallet" element={<Suspense fallback={<PageSkeleton />}><WalletPage /></Suspense>} />
             <Route path="/magneto-x" element={<Suspense fallback={<PageSkeleton />}><MagnetoXPage /></Suspense>} />
             <Route path="/products" element={<ProductsPage />} />
             {/* Category listings with a path of their own (src/lib/category-paths.mjs). */}
@@ -120,17 +149,17 @@ export default function App() {
             <Route path="/accessories" element={<ProductsPage />} />
             <Route path="/products/detail" element={<ProductDetailPage />} />
             <Route path="/products/:slug" element={<ProductDetailPage />} />
-            <Route path="/cart" element={<CartPage />} />
-            <Route path="/checkout" element={<CheckoutPage />} />
-            <Route path="/orders" element={<OrdersPage />} />
+            <Route path="/cart" element={<Suspense fallback={<PageSkeleton />}><CartPage /></Suspense>} />
+            <Route path="/checkout" element={<Suspense fallback={<PageSkeleton />}><CheckoutPage /></Suspense>} />
+            <Route path="/orders" element={<Suspense fallback={<PageSkeleton />}><OrdersPage /></Suspense>} />
             {/* Guest-friendly: no login, the order number plus the contact it was placed with. */}
-            <Route path="/track" element={<TrackOrderPage />} />
+            <Route path="/track" element={<Suspense fallback={<PageSkeleton />}><TrackOrderPage /></Suspense>} />
             <Route path="/track-order" element={<Navigate to="/track" replace />} />
-            <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-            <Route path="/devices" element={<DevicesPage />} />
-            <Route path="/payment/callback" element={<PaymentCallback />} />
-            <Route path="/pay/:orderId" element={<PayPage />} />
-            <Route path="/review/:orderId" element={<ReviewPage />} />
+            <Route path="/orders/:orderId" element={<Suspense fallback={<PageSkeleton />}><OrderDetailPage /></Suspense>} />
+            <Route path="/devices" element={<Suspense fallback={<PageSkeleton />}><DevicesPage /></Suspense>} />
+            <Route path="/payment/callback" element={<Suspense fallback={<PageSkeleton />}><PaymentCallback /></Suspense>} />
+            <Route path="/pay/:orderId" element={<Suspense fallback={<PageSkeleton />}><PayPage /></Suspense>} />
+            <Route path="/review/:orderId" element={<Suspense fallback={<PageSkeleton />}><ReviewPage /></Suspense>} />
             
 
             {/* Admin routes - lazy loaded */}
