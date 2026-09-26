@@ -220,7 +220,7 @@ const GADGET_NOUNS: Record<string, string> = {
   lens: "Lens", camera: "Camera", gimbal: "Gimbal", gimbals: "Gimbal", controller: "Controller",
   console: "Console", drone: "Drone",
 };
-const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|camera|lens|gimbal|drone|controller|console|ps5|xbox|switch|mac mini/i;
+const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|camera|lens|gimbal|drone|controller|console|ps5|xbox|switch|mac mini|gopro|osmo|insta360/i;
 
 export function deviceNameFor(listingName: string, gadgetLabel: string): string {
   const name = String(listingName || "").trim();

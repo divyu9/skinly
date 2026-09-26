@@ -39,7 +39,7 @@ type Row = {
 };
 
 /** Used until the site's own gadget types have loaded. */
-const FALLBACK_GADGETS = ["phone", "tablet", "laptop", "camera", "lens", "console", "drone", "gimbals", "controller", "charger", "mac-mini", "accessory"];
+const FALLBACK_GADGETS = ["phone", "tablet", "laptop", "camera", "lens", "console", "drone", "gimbals", "action-camera", "controller", "charger", "mac-mini", "accessory"];
 
 /*
  * The gadget choices are the site's gadget types, read live — a hard-coded

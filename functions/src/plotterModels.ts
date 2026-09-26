@@ -16,7 +16,7 @@ import { requireAdmin } from "./auth";
  * The rows are written by the server only; the rules let admins read them.
  */
 
-const FALLBACK_CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "controller", "console", "charger", "mac-mini", "accessory"];
+const FALLBACK_CATEGORIES = ["phone", "tablet", "laptop", "camera", "lens", "drone", "gimbals", "action-camera", "controller", "console", "charger", "mac-mini", "accessory"];
 const tidy = (s: unknown) => String(s ?? "").replace(/\s+/g, " ").trim();
 /* A row left "approving" this long belongs to a call that died (a timeout): take it again. */
 const STALE_CLAIM_MS = 2 * 60_000;

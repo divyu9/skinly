@@ -39,7 +39,7 @@ type CategoryRow = { _id: string; name?: string; slug?: string };
 const PAGE = 100;
 const RANK: Record<string, number> = {
   phone: 1, laptop: 2, "mac-mini": 3, camera: 4, tablet: 5, console: 6, lens: 7,
-  drone: 8, controller: 9, charger: 10, gimbals: 11, accessory: 12,
+  drone: 8, controller: 9, charger: 10, gimbals: 11, 'action-camera': 4.5, accessory: 12,
 };
 const label = (t?: TypeRow) => t?.displayName || t?.name || "";
 

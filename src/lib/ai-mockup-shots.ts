@@ -1499,6 +1499,18 @@ const GIMBAL_BRANDS: BrandListing[] = [
   { listing: "Gimbal", code: "GMB", device: "A black handheld camera gimbal with no brand marking" },
 ];
 
+/*
+ * Action cameras: one listing per brand, and no catch-all while every action
+ * camera the plotter can cut is one of these three (a brand added later
+ * needs a listing of its own here, or a catch-all excluding these). Insta360
+ * is a brand shoppers search by name, so it is not folded into "others".
+ */
+const ACTION_BRANDS: BrandListing[] = [
+  { listing: "GoPro", code: "GPR", brands: ["GoPro"], device: "A GoPro HERO10 Black action camera" },
+  { listing: "DJI Osmo", code: "DJO", brands: ["DJI"], device: "A DJI Osmo Action 5 Pro action camera" },
+  { listing: "Insta360", code: "INS", brands: ["Insta360"], device: "An Insta360 X3 360-degree camera, a slim upright bar with a round lens on each face" },
+];
+
 const allBrandsOf = (list: BrandListing[]) => list.flatMap((b) => b.brands || []);
 const scopeOf = (b: BrandListing, list: BrandListing[]) =>
   b.brands ? { modelBrands: b.brands } : { modelBrandsExclude: allBrandsOf(list) };
@@ -1516,6 +1528,7 @@ const PRESET_BUILDERS: Array<[BrandListing[], (b: BrandListing) => PresetVariant
   ]],
   [LENS_BRANDS, (b) => [{ tail: b.code, title: "Lens Skin", price: 299, price3d: 349, materialMultiplier: 1 }]],
   [GIMBAL_BRANDS, (b) => [{ tail: b.code, title: "Gimbal Skin", price: 399, materialMultiplier: 1 }]],
+  [ACTION_BRANDS, (b) => [{ tail: b.code, title: "Full Body Skin", price: 399, price3d: 499, materialMultiplier: 1 }]],
 ];
 for (const [list, build] of PRESET_BUILDERS) {
   for (const b of list) {
@@ -1716,6 +1729,23 @@ const gimbalShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
     + "hands anywhere in the frame. " + REAL + "{{staging}} ",
 });
 
+const actionShot = (b: BrandListing): Omit<MockupShot, "_id"> => ({
+  label: `${b.listing} — front three-quarter`,
+  gadget: "action-camera",
+  suffix: `action-${slug(b.listing)}`,
+  listing: b.listing,
+  skuCodes: [b.code],
+  matchSingleVariant: true,
+  order: 0,
+  isActive: true,
+  prompt:
+    `${b.device} standing on a light oak desk, photographed close up from a front three-quarter angle at `
+    + "lens height so the camera fills most of the frame and its front, one side and the top read clearly. "
+    + "A vinyl skin covers the flat faces of the body. {{fidelity}} The lens and its glass, the screens, the "
+    + "buttons, the microphone holes and the mounting fingers or quick-release base stay uncovered, the vinyl "
+    + "stopping cleanly at their edges. No people and no hands anywhere in the frame. " + REAL + "{{staging}} ",
+});
+
 /**
  * The catch-all Android listing's second picture: the brands it covers, laid
  * out together in one design, so a shopper on a Realme or a Vivo can see their
@@ -1759,6 +1789,7 @@ STARTER_SHOTS.push(
   ...CAMERA_BRANDS.filter((b) => b.device).flatMap(cameraShots),
   ...LENS_BRANDS.filter((b) => b.device).map(lensShot),
   ...GIMBAL_BRANDS.filter((b) => b.device).map(gimbalShot),
+  ...ACTION_BRANDS.filter((b) => b.device).map(actionShot),
 );
 
 /* ------------------------------------------------------------------ phases */
@@ -1785,6 +1816,7 @@ export const PHASE_1_LISTINGS = new Set([
   "sony camera", "canon camera", "nikon camera",
   "sony lens", "canon lens", "nikon lens", "sigma lens", "tamron lens", "fujifilm lens", "camera lens",
   "dji gimbal", "zhiyun gimbal", "gimbal",
+  "gopro", "dji osmo", "insta360",
   "apple charger", "samsung charger", "oneplus charger", "realme charger", "oppo charger",
   "vivo charger", "xiaomi charger", "charger",
   "mac mini", "tablet",
@@ -1811,7 +1843,7 @@ export const isPhase1 = (listing: string) => PHASE_1_LISTINGS.has(String(listing
  */
 export const TEMPLATE_GADGETS = new Set([
   "phone", "laptop", "tablet", "mac-mini",
-  "console", "controller", "drone", "camera", "lens", "gimbals", "charger",
+  "console", "controller", "drone", "camera", "lens", "gimbals", "charger", "action-camera",
 ]);
 
 /**
@@ -1839,6 +1871,8 @@ export const DEFAULT_SURFACE_CM: Record<string, [number, number]> = {
   lens: [27.0, 12.0],
   gimbals: [20.0, 10.0],
   charger: [6.0, 6.0],
+  // A GoPro's front face; an Osmo Action's is about the same.
+  "action-camera": [7.1, 5.1],
 };
 
 export { slug as listingSlug };
@@ -1847,7 +1881,7 @@ export { slug as listingSlug };
  * The device as a shopper names it — "OnePlus" alone does not say phone.
  * Kept in step with deviceNameFor in functions/src/listings.ts.
  */
-const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|camera|lens|gimbal|drone|controller|console|ps5|xbox|switch|mac mini/i;
+const SAYS_DEVICE = /phone|laptop|macbook|\btab\b|tablet|ipad|\bpad\b|charger|camera|lens|gimbal|drone|controller|console|ps5|xbox|switch|mac mini|gopro|osmo|insta360/i;
 const GADGET_NOUNS: Record<string, string> = {
   phone: "Phone", tablet: "Tablet", laptop: "Laptop", charger: "Charger", lens: "Lens", camera: "Camera",
   gimbals: "Gimbal", controller: "Controller", console: "Console", drone: "Drone",

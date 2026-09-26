@@ -191,7 +191,7 @@ export interface Brief {
 const GADGET_WORD: Record<string, string> = {
   phone: "phone", laptop: "laptop", tablet: "tablet", camera: "camera", lens: "lens",
   controller: "controller", console: "console", drone: "drone", charger: "charger",
-  gimbals: "gimbal", gimbal: "gimbal", "mac-mini": "Mac mini",
+  gimbals: "gimbal", gimbal: "gimbal", "mac-mini": "Mac mini", "action-camera": "action camera",
 };
 
 const pickDistinct = (xs: string[], n: number) => [...new Set(xs.filter(Boolean))].slice(0, n);

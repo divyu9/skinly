@@ -92,6 +92,7 @@ const GADGET_NAMES: Record<string, string> = {
   phone: "Phone", laptop: "Laptop", tablet: "Tablet", camera: "Camera",
   lens: "Lens", controller: "Controller", console: "Console", drone: "Drone",
   charger: "Charger", gimbals: "Gimbal", gimbal: "Gimbal", "mac-mini": "Mac mini",
+  "action-camera": "Action Camera",
 };
 
 /**

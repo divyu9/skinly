@@ -34,6 +34,8 @@ export function gadgetOf(p: any): string {
   if (/lens/.test(kind)) return "lens";
   if (/charger/.test(kind)) return "charger";
   if (/gimbal/.test(kind)) return "gimbals";
+  // Before "camera": the GoPro, DJI Osmo and Insta360 listings are action cameras.
+  if (/gopro|osmo|insta360|action cam/.test(kind)) return "action-camera";
   if (/ipad|galaxy tab|\bpad\b|tab\b/.test(kind)) return "tablet";
   if (/macbook|laptop/.test(kind)) return "laptop";
   if (/camera/.test(kind)) return "camera";

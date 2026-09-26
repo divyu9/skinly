@@ -273,7 +273,7 @@ async function couponScope(c: any): Promise<null | ((line: { productId: string; 
  * charger, is the one thing on the page most likely to go in the same order.
  * One per device, most-owned devices first, so it is never six lens skins.
  */
-const SETUP_GADGET_ORDER = ['phone', 'laptop', 'tablet', 'charger', 'controller', 'console', 'mac-mini', 'camera', 'drone', 'gimbals', 'lens'];
+const SETUP_GADGET_ORDER = ['phone', 'laptop', 'tablet', 'charger', 'controller', 'console', 'mac-mini', 'camera', 'action-camera', 'drone', 'gimbals', 'lens'];
 function designOf(p: any): string {
   const up = /\/design-raw\/([A-Z]+-\d+)-/.exec(String(p?.designImageUrl || ''))?.[1];
   if (up) return up;
@@ -3451,7 +3451,7 @@ export function useQuery(apiRef: any, args?: any) {
             // in Firestore id order — which is why the picker opened on
             // Controller. Fall back to the order customers actually shop in.
             const RANK: Record<string, number> = {
-              phone: 1, laptop: 2, 'mac-mini': 3, camera: 4, tablet: 5,
+              phone: 1, laptop: 2, 'mac-mini': 3, camera: 4, 'action-camera': 4.5, tablet: 5,
               console: 6, lens: 7, drone: 8, controller: 9, charger: 10,
               gimbals: 11, accessory: 12,
             };
@@ -6360,7 +6360,7 @@ export function useMutation(apiRef: any) {
           ? { col: 'gadgetTypes', key: 'name', rows: [
               ['phone','Phone'],['laptop','Laptop'],['tablet','Tablet'],['camera','Camera'],['lens','Lens'],
               ['console','Console'],['controller','Controller'],['drone','Drone'],['charger','Charger'],
-              ['mac-mini','Mac Mini'],['gimbals','Gimbals'],['accessory','Accessory'],
+              ['mac-mini','Mac Mini'],['gimbals','Gimbals'],['action-camera','Action Camera'],['accessory','Accessory'],
             ] }
           : path === 'finishTypes.seedInitialFinishTypes'
           ? { col: 'finishTypes', key: 'name', rows: [
@@ -6912,7 +6912,7 @@ export function useAction(apiRef: any) {
       const GADGET_WORD: Record<string, string> = {
         phone: 'phone', laptop: 'laptop', tablet: 'tablet', camera: 'camera', lens: 'lens',
         drone: 'drone', charger: 'charger', console: 'console', controller: 'controller',
-        gimbals: 'gimbal', 'mac-mini': 'Mac mini',
+        gimbals: 'gimbal', 'mac-mini': 'Mac mini', 'action-camera': 'action camera',
       };
       const FINISH_WORD: Record<string, string> = {
         matte: 'Matte', embossed: '3D textured', transparent: 'Transparent', 'premium-leather': 'Leather',

@@ -38,7 +38,7 @@ type Form = { presetId?: string; gadgetTypeId: string; name: string; multiplier:
 
 const RANK: Record<string, number> = {
   phone: 1, laptop: 2, "mac-mini": 3, camera: 4, tablet: 5, console: 6, lens: 7,
-  drone: 8, controller: 9, charger: 10, gimbals: 11, accessory: 12,
+  drone: 8, controller: 9, charger: 10, gimbals: 11, 'action-camera': 4.5, accessory: 12,
 };
 const norm = (s?: string) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const mult = (v: Variant) => Number(v.materialMultiplier) || 1;

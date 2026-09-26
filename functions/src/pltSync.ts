@@ -118,7 +118,7 @@ export async function processUpload(
   const otherByName = new Map<string, { model: string; firstAt: number }>();
   for (const [g, b, model, firstAt] of await loadIndex(db, other)) {
     const full = ModelIndex.fullName(b, model);
-    otherIdx.add(siteCategory(g as any, model), b, full);
+    otherIdx.add(siteCategory(g as any, model, b), b, full);
     otherByName.set(full, { model: `${b} ${model}`, firstAt });
   }
 
@@ -150,11 +150,11 @@ export async function processUpload(
     const brand = brandFor(m);
     const model = /^(iqoo|poco|honor|cmf)$/i.test(brand) ? m.model.replace(new RegExp(`^${brand}\\s+`, "i"), "").trim() || m.model : m.model;
     if (!opts.dryRun) await ref.set({
-      brand, model, category: siteCategory(m.gadget, m.model),
+      brand, model, category: siteCategory(m.gadget, m.model, m.brand),
       parts: m.parts.slice(0, 60), folders: m.folders, firstFileAt: m.firstAt || null, newestFileAt: m.firstAt || null,
       status: "pending", source: `sync-${vendor}`, createdAt: Date.now(), vendors,
     });
-    rowsIdx.add(siteCategory(m.gadget, m.model), brand, ModelIndex.fullName(brand, model));
+    rowsIdx.add(siteCategory(m.gadget, m.model, m.brand), brand, ModelIndex.fullName(brand, model));
     out.added++;
     if (out.names.length < 30) out.names.push(`${brand} | ${model}`);
   }

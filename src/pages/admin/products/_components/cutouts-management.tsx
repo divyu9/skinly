@@ -18,7 +18,7 @@ import { LaptopSkuFix } from "./laptop-sku-fix.tsx";
 import { PrecutImport } from "./precut-import.tsx";
 
 /** Gadgets a design's sheets or pieces can be cut for. */
-const GADGET_CHOICES = ["phone", "laptop", "tablet", "console", "controller", "camera", "lens", "charger", "drone", "mac-mini", "gimbals"];
+const GADGET_CHOICES = ["phone", "laptop", "tablet", "console", "controller", "camera", "lens", "charger", "drone", "mac-mini", "gimbals", "action-camera"];
 
 /**
  * Stock for designs that come as printed sheets rather than off a roll.

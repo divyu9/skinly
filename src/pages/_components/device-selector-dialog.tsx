@@ -23,7 +23,8 @@ import {
   JoystickIcon,
   VideoIcon,
   HeadphonesIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ApertureIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
@@ -66,6 +67,7 @@ const gadgetIcons: Record<string, LucideIcon> = {
   // same icon.
   "controller": JoystickIcon,
   "gimbals": VideoIcon,
+  "action-camera": ApertureIcon,
   "accessory": HeadphonesIcon,
 };
 

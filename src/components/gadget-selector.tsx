@@ -10,6 +10,7 @@ import {
   JoystickIcon,
   VideoIcon,
   MonitorIcon,
+  ApertureIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -20,7 +21,7 @@ import type { LucideIcon } from "lucide-react";
  */
 export type DeviceType =
   | "laptop" | "phone" | "mac-mini" | "drone" | "camera" | "lens"
-  | "charger" | "tablet" | "console" | "controller" | "gimbals";
+  | "charger" | "tablet" | "console" | "controller" | "gimbals" | "action-camera";
 
 const CARDS: Array<{ type: DeviceType; label: string; icon: LucideIcon }> = [
   { type: "laptop", label: "Laptop", icon: LaptopIcon },
@@ -28,6 +29,7 @@ const CARDS: Array<{ type: DeviceType; label: string; icon: LucideIcon }> = [
   { type: "mac-mini", label: "Mac Mini", icon: MonitorIcon },
   { type: "tablet", label: "iPad/Tablet", icon: TabletSmartphoneIcon },
   { type: "camera", label: "Camera", icon: CameraIcon },
+  { type: "action-camera", label: "Action Cams", icon: ApertureIcon },
   { type: "lens", label: "Lenses", icon: CircleDotIcon },
   { type: "gimbals", label: "Gimbals", icon: VideoIcon },
   { type: "drone", label: "Drones", icon: PlaneIcon },

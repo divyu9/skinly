@@ -262,8 +262,8 @@ export function parseTia(lines: string[]): VendorModel[] {
 
 // ── matching against a list (the site, the admin list, the other vendor) ────
 const SITE_SCOPE: Record<Gadget, string[]> = {
-  phone: ["phone", "tablet"], tablet: ["tablet", "phone"], laptop: ["laptop"], camera: ["camera"], lens: ["lens"],
-  dji: ["drone", "gimbals", "controller"], console: ["console", "controller"],
+  phone: ["phone", "tablet"], tablet: ["tablet", "phone"], laptop: ["laptop"], camera: ["camera", "action-camera"], lens: ["lens"],
+  dji: ["drone", "gimbals", "controller", "action-camera"], console: ["console", "controller"],
 };
 type Entry = { k: string; tk: Set<string>; name: string };
 export class ModelIndex {
@@ -336,7 +336,10 @@ export class ModelIndex {
 }
 
 /** The site category a vendor gadget goes under. */
-export function siteCategory(g: Gadget, model: string): string {
+export function siteCategory(g: Gadget, model: string, brand = ""): string {
+  // DJI's Osmo Action, Osmo Pocket and Osmo 360 are action cameras; Osmo Mobile is a phone gimbal.
+  if (g === "dji" && /osmo\s*(action|pocket|360)/i.test(model)) return "action-camera";
   if (g === "dji") return /ronin|\brs ?\d|osmo|gimbal|stabili|weebill|crane|smooth/i.test(model) ? "gimbals" : /controller|\brc\b/i.test(model) ? "controller" : "drone";
+  if (g === "camera" && /gopro|insta\s*360|akaso|sjcam/i.test(brand)) return "action-camera";
   return g;
 }
