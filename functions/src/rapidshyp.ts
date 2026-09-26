@@ -170,6 +170,64 @@ async function resolveLines(db: admin.firestore.Firestore, items: any[]) {
   });
 }
 
+/**
+ * The parcel's weight and size: added up from the items (a product's weight,
+ * 100 g when unset; its size averaged, 10×10×2 cm when unset), unless the
+ * admin measured the box (order page or orders list › Package, saved as
+ * packageOverride) — which wins, field by field. What RapidShyp and Delhivery
+ * are sent.
+ */
+export function packageOf(order: any, physical: any[], products: Map<string, any>) {
+  let totalWeight = 0, totalLength = 0, totalBreadth = 0, totalHeight = 0;
+  for (const item of physical) {
+    const p = products.get(String(item?.productId)) || {};
+    totalWeight += (num(p.weight) ?? 100) * (num(item?.quantity) ?? 1);
+    totalLength += num(p.length) ?? 10;
+    totalBreadth += num(p.breadth) ?? 10;
+    totalHeight += num(p.height) ?? 2;
+  }
+  const count = Math.max(1, physical.length);
+  const computed = {
+    weightGrams: Math.max(1, Math.round(totalWeight)),
+    lengthCm: Math.ceil(totalLength / count),
+    breadthCm: Math.ceil(totalBreadth / count),
+    heightCm: Math.ceil(totalHeight / count),
+  };
+  const o = order?.packageOverride || {};
+  const pos = (v: unknown) => (num(v) !== null && num(v)! > 0 ? num(v)! : null);
+  const effective = {
+    weightGrams: Math.round(pos(o.weightGrams) ?? computed.weightGrams),
+    lengthCm: Math.ceil(pos(o.lengthCm) ?? computed.lengthCm),
+    breadthCm: Math.ceil(pos(o.breadthCm) ?? computed.breadthCm),
+    heightCm: Math.ceil(pos(o.heightCm) ?? computed.heightCm),
+  };
+  const overridden = ["weightGrams", "lengthCm", "breadthCm", "heightCm"].some((k) => pos(o[k]) !== null);
+  return { computed, effective, overridden };
+}
+
+/** Package figures for a page of orders at once (Admin › Orders list), with one read per product. */
+export const getOrderPackages = onCall(async (data: any, context: any) => {
+  await requireAdmin(context);
+  const ids: string[] = (Array.isArray(data?.orderIds) ? data.orderIds : []).map(String).filter(Boolean).slice(0, 200);
+  if (!ids.length) return {};
+  const db = admin.firestore();
+  const orders = await db.getAll(...ids.map((id) => db.collection("orders").doc(id)));
+  const pids = [...new Set(orders.flatMap((o) => ((o.data() as any)?.items || []).map((i: any) => String(i?.productId || "")).filter(Boolean)))];
+  const products = new Map<string, any>();
+  for (let i = 0; i < pids.length; i += 100) {
+    const docs = await db.getAll(...pids.slice(i, i + 100).map((id) => db.collection("products").doc(id)));
+    docs.forEach((d) => { if (d.exists) products.set(d.id, d.data()); });
+  }
+  const out: Record<string, unknown> = {};
+  for (const o of orders) {
+    if (!o.exists) continue;
+    const order = o.data() as any;
+    const physical = (order.items || []).filter((i: any) => products.get(String(i?.productId))?.productType !== "digital");
+    out[o.id] = packageOf(order, physical, products);
+  }
+  return out;
+});
+
 export async function buildOrderPayload(orderId: string) {
   const db = admin.firestore();
   const orderRef = db.collection("orders").doc(orderId);
@@ -202,32 +260,11 @@ export async function buildOrderPayload(orderId: string) {
     throw new HttpsError("failed-precondition", "Order contains only digital products, no shipment required");
   }
 
-  let totalWeight = 0, totalLength = 0, totalBreadth = 0, totalHeight = 0;
-  for (const item of physical) {
-    const p = products.get(String(item?.productId)) || {};
-    totalWeight += (num(p.weight) ?? 100) * (num(item?.quantity) ?? 1);
-    totalLength += num(p.length) ?? 10;
-    totalBreadth += num(p.breadth) ?? 10;
-    totalHeight += num(p.height) ?? 2;
-  }
-  const count = physical.length;
-  const computed = {
-    weightGrams: Math.max(1, Math.round(totalWeight)),
-    lengthCm: Math.ceil(totalLength / count),
-    breadthCm: Math.ceil(totalBreadth / count),
-    heightCm: Math.ceil(totalHeight / count),
-  };
-  /*
-   * The admin's own measure of the box wins (order page › Package), for an
-   * order whose parcel is not what its items add up to; RapidShyp and
-   * Delhivery both read the result.
-   */
-  const o = (order as any).packageOverride || {};
-  const pos = (v: unknown) => (num(v) !== null && num(v)! > 0 ? num(v)! : null);
-  const packageWeightInGrams = Math.round(pos(o.weightGrams) ?? computed.weightGrams);
-  const avgLength = Math.ceil(pos(o.lengthCm) ?? computed.lengthCm);
-  const avgBreadth = Math.ceil(pos(o.breadthCm) ?? computed.breadthCm);
-  const avgHeight = Math.ceil(pos(o.heightCm) ?? computed.heightCm);
+  const { computed, effective } = packageOf(order, physical, products);
+  const packageWeightInGrams = effective.weightGrams;
+  const avgLength = effective.lengthCm;
+  const avgBreadth = effective.breadthCm;
+  const avgHeight = effective.heightCm;
 
   const money = orderMoney(order, items);
   if (!(money.total > 0)) {

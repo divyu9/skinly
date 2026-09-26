@@ -25,12 +25,13 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover.tsx";
 import { Calendar } from "@/components/ui/calendar.tsx";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type { Id } from "@/lib/firebase-api";
 import { PDFDocument } from "pdf-lib";
 import { ManualOrderDialog } from "./manual-order-dialog.tsx";
 import { buildPackList, packListText as packListTextOf } from "@/lib/pack-list";
 import { DelhiveryBulkDialog } from "./_components/DelhiveryBulkDialog.tsx";
+import { PackageCell, type PackageInfo } from "./_components/PackageCell.tsx";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu.tsx";
 import { ORDER_STATUSES } from "@/lib/normalize-order.ts";
 import { ADMIN_STATUS_LABELS, STATUS_BADGE, STATUS_DOT } from "@/lib/order-label.ts";
@@ -125,6 +126,20 @@ function AdminOrdersPageInner() {
     return filtered;
   }, [baseOrders, dateFilter, customStartDate, customEndDate]);
 
+  // Package figures for the rows on screen, fetched in one call per page (getOrderPackages).
+  const [packages, setPackages] = useState<Record<string, PackageInfo>>({});
+  const [packageOverrides, setPackageOverrides] = useState<Record<string, any>>({});
+  const packageIds = (displayOrders || []).map((o: any) => o._id).join(",");
+  useEffect(() => {
+    const ids = packageIds ? packageIds.split(",").filter((id: string) => !packages[id]) : [];
+    if (!ids.length) return;
+    let live = true;
+    import("firebase/functions").then(({ getFunctions, httpsCallable }) =>
+      httpsCallable(getFunctions(), "getOrderPackages")({ orderIds: ids.slice(0, 200) }))
+      .then((r: any) => { if (live) setPackages((p) => ({ ...p, ...(r.data || {}) })); })
+      .catch(() => { /* the column stays empty */ });
+    return () => { live = false; };
+  }, [packageIds]); // eslint-disable-line react-hooks/exhaustive-deps
   const computedStats = useMemo<Record<string, number>>(() => {
     // Zeroes rather than null: the render below dereferences every field, and
     // it is only safe today because of an early return three hundred lines
@@ -1010,6 +1025,7 @@ function AdminOrdersPageInner() {
                   <th>Customer</th>
                   <th>Ships to</th>
                   <th className="!text-right">Value</th>
+                  <th>Package</th>
                   <th>Status</th>
                   <th>Tracking</th>
                   <th>Payment</th>
@@ -1081,6 +1097,25 @@ function AdminOrdersPageInner() {
                             COD{order.codAmount > 0 ? ` ₹${order.codAmount.toFixed(0)}` : ""}
                           </div>
                         )}
+                      </td>
+
+                      <td className="px-3 py-2.5 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <PackageCell
+                          orderId={order._id}
+                          info={packages[order._id]}
+                          override={packageOverrides[order._id] !== undefined ? packageOverrides[order._id] : (order as any).packageOverride}
+                          locked={!!order.awbNumber}
+                          onSaved={(ov) => {
+                            setPackageOverrides((m) => ({ ...m, [order._id]: ov }));
+                            setPackages((m) => {
+                              const cur = m[order._id];
+                              if (!cur) return m;
+                              const eff = { ...cur.computed, ...(ov || {}) } as any;
+                              for (const k of ["weightGrams", "lengthCm", "breadthCm", "heightCm"]) eff[k] = k === "weightGrams" ? Math.round(eff[k]) : Math.ceil(eff[k]);
+                              return { ...m, [order._id]: { ...cur, effective: eff, overridden: !!ov } };
+                            });
+                          }}
+                        />
                       </td>
 
                       <td className="px-3 py-2.5 whitespace-nowrap">
