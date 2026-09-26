@@ -121,3 +121,26 @@ export function useRealPhotoCount(sku: unknown, gadget: string | null | undefine
   }, [code, gadget]);
   return n;
 }
+
+/**
+ * The photos taken of one order while it was packed, for its customer's own
+ * order page ("Packed for you"). Hidden ones too: hiding keeps a photo off
+ * the shop, not away from the person whose parcel it is.
+ */
+export function useOrderRealPhotos(orderNumber: string | null | undefined): RealPhoto[] {
+  const [photos, setPhotos] = useState<RealPhoto[]>([]);
+  useEffect(() => {
+    if (!orderNumber) { setPhotos([]); return; }
+    let live = true;
+    getDocs(query(collection(db, "realPhotos"), where("orderNumber", "==", String(orderNumber)), limit(20)))
+      .then((s) => {
+        const rows = s.docs.map((d) => ({ _id: d.id, ...d.data() } as RealPhoto))
+          .filter((p) => p.imageUrl)
+          .sort((a, b) => a.createdAt - b.createdAt);
+        if (live) setPhotos(rows);
+      })
+      .catch(() => { if (live) setPhotos([]); });
+    return () => { live = false; };
+  }, [orderNumber]);
+  return photos;
+}

@@ -10,6 +10,7 @@ import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { useState, useCallback } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
+import { PackedForYou } from "@/components/packed-for-you.tsx";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -259,6 +260,8 @@ function OrderDetailPageInner() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
+            <PackedForYou orderNumber={order.orderNumber || (order as any).checkoutRef} />
+
             {/* Order Items */}
             <Card>
               <CardHeader>
