@@ -950,10 +950,25 @@ export function useQuery(apiRef: any, args?: any) {
         }
         else if (path === 'orders.getOrderPublic') {
           if (!args?.orderId) { setData(null); return; }
-          viewOrderFor(String(args.orderId), { withReviews: !!args.withReviews })
-            .then((o) => { if (active) setData(o); })
+          /*
+           * A customer back from PhonePe usually lands before PhonePe's
+           * confirmation reaches us, while the order still reads
+           * pending_payment. It used to be read once, so the page never saw it
+           * paid — and the purchase was never reported (lib/analytics.ts). Until
+           * it settles, it is read again every 4 s, for about a minute.
+           */
+          let tries = 0;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const load = () => viewOrderFor(String(args.orderId), { withReviews: !!args.withReviews })
+            .then((o) => {
+              if (!active) return;
+              setData(o);
+              const waiting = o && o.status === 'pending_payment' && o.paymentStatus !== 'failed';
+              if (waiting && ++tries < 15) timer = setTimeout(load, 4000);
+            })
             .catch((e) => { console.error('viewOrder failed', e); if (active) setData(null); });
-          unsubscribe = () => {};
+          void load();
+          unsubscribe = () => { if (timer) clearTimeout(timer); };
         }
         else if (path === 'admin.orders.getOrderDetails') {
           if (!args?.orderId) {

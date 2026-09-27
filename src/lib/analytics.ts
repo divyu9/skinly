@@ -122,7 +122,9 @@ export function trackPurchase(
     quantity: number;
   }>
 ) {
-  // Google Analytics
+  // Google Analytics — the deferred script is fetched now, so a buyer who
+  // closes the page within seconds does not take the queued purchase with them.
+  try { (window as any).__skinlyLoadGA?.(); } catch { /* no loader */ }
   if (window.gtag) {
     window.gtag("event", "purchase", {
       transaction_id: orderId,
