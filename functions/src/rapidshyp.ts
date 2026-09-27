@@ -302,6 +302,9 @@ export async function buildOrderPayload(orderId: string) {
   };
 
   const lines = await resolveLines(db, items);
+  // The package weight shared across every unit in it (grams, as RapidShyp takes item weights).
+  const totalUnits = Math.max(1, lines.reduce((n, l) => n + (Number(l.units) || 1), 0));
+  const unitWeightGrams = Math.max(1, Math.round((packageWeightInGrams / totalUnits) * 10) / 10);
   const orderedAt = num(order.createdAt) || num(order._creationTime) || Date.now();
   const names = await pickupNames(db);
 
@@ -323,6 +326,16 @@ export async function buildOrderPayload(orderId: string) {
         unitPrice: price,
         tax: Number((price * (0.18 / 1.18)).toFixed(2)),
         hsn: "39269099",
+        /*
+         * Each line carries its share of the package, so the lines add up to
+         * packageDetails. Left out, RapidShyp weighed the parcel from its own
+         * catalogue of our SKUs (10×5×0.2 cm, ~300 g a skin) and ignored the
+         * package: #4063, seven skins set at 300 g, went in as 2.15 kg.
+         */
+        productWeight: unitWeightGrams,
+        productLength: avgLength,
+        productBreadth: avgBreadth,
+        productHeight: avgHeight,
       };
     }),
     paymentMethod,
