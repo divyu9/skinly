@@ -1894,7 +1894,7 @@ export function useQuery(apiRef: any, args?: any) {
           if (!args?.brand || !args?.model || !args?.sku) {
             setData(null);
           } else {
-            const cacheKey = `${args.brand}|${args.model}|${args.sku}`;
+            const cacheKey = `${args.brand}|${args.model}|${args.sku}|${args.gadget || ''}`;
             const cached = mockupLookupCache.get(cacheKey);
             if (cached !== undefined) {
               setData(cached);
@@ -1965,6 +1965,8 @@ export function useQuery(apiRef: any, args?: any) {
                 return;
               }
 
+              // The hero is a phone: a Mac mini, laptop or camera listing shows its own picture instead.
+              if (args.gadget && args.gadget !== 'phone') { finish(null); return; }
               const hero = await getDocs(query(
                 collection(db, 'mockups'),
                 where('brand', '==', HERO_MOCKUP_BRAND),
@@ -3720,7 +3722,9 @@ export function useQuery(apiRef: any, args?: any) {
                   missing = requestedSkus.filter(sku => !result[sku]);
                 }
               }
-              if (missing.length > 0 && !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
+              // The hero is a phone, so it stands in for phones only.
+              const phoneOnly = !args.gadget || args.gadget === 'phone';
+              if (phoneOnly && missing.length > 0 && !(args.brand === HERO_MOCKUP_BRAND && args.model === HERO_MOCKUP_MODEL)) {
                 collectRows(await bySku(HERO_MOCKUP_BRAND, HERO_MOCKUP_MODEL, missing), 'hero');
               }
               if (active) setData({ mockups: result, mockupModels: models, mockupMatch: match, cursor: "", isDone: true });

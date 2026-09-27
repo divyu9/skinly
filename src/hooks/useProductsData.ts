@@ -399,7 +399,9 @@ export function useProductsData({
       ? {
           brand: urlParams.brand,
           model: urlParams.model,
-          skus: viewportSkus
+          skus: viewportSkus,
+          // Not a phone: no nearest-phone or hero-phone stand-in (a Mac mini got iPhone photos).
+          ...(filters.gadgetFilter ? { gadget: filters.gadgetFilter } : {}),
         }
       : "skip"
   );
@@ -444,6 +446,15 @@ export function useProductsData({
       }
 
       const key = mockupUrl && sku ? (mockupMap[sku] ? sku : Object.keys(mockupMap).find((k) => k.toUpperCase() === sku.toUpperCase())) : undefined;
+      /*
+       * A stand-in picture (another model's, or the hero iPhone's) only ever
+       * suits a phone listing. On a Mac mini, laptop or camera listing it put
+       * a phone on the card; that listing shows its own picture instead.
+       */
+      const matchKind = key ? (mockupResult as any).mockupMatch?.[key] : undefined;
+      if (matchKind && matchKind !== "exact" && product.gadgetCategory && product.gadgetCategory !== "phone") {
+        return product;
+      }
       return {
         ...product,
         mockupUrl,

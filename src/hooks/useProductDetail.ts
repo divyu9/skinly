@@ -146,6 +146,8 @@ export function useProductDetail() {
           brand: phoneBrand || extractBrand(phoneModel) || "",
           model: phoneModel,
           sku: extractSKU(productData.title, productData.variants && productData.variants[0]?.sku) || "",
+          // A Mac mini or laptop listing never borrows the hero phone's picture.
+          ...(productData.gadgetCategory ? { gadget: productData.gadgetCategory } : {}),
         }
       : "skip"
   );
