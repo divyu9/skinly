@@ -47,3 +47,4 @@ export * from "./orderEmail";
 export * from "./shippingCompare";
 export * from "./rapidshypSync";
 export * from "./dashboard";
+export * from "./homeRankings";

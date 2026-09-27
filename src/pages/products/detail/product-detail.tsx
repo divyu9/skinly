@@ -179,6 +179,9 @@ export default function ProductDetailPage() {
     designImageUrl: productData?.designImageUrl, gadgetCategory: productData?.gadgetCategory,
   });
   
+  // Tranzy (transparent) phone skins come for the back only: no Full Body Wrap.
+  const isTranzy = /tranzy/i.test(String(productData?.title || "")) || String(productData?.finishType || "").toLowerCase() === "transparent";
+
   // Add-ons ticked in "Complete your setup", added with the skin.
   const [setupExtras, setSetupExtras] = useState<SetupCartItem[]>([]);
   const [setupReset, setSetupReset] = useState(0);
@@ -195,7 +198,7 @@ export default function ProductDetailPage() {
     displayImage: displayImages[0]?.url || "",
     phoneModel,
     phoneBrand,
-    coverage: isPhoneSkin ? productState.selectedCoverage : undefined,
+    coverage: isPhoneSkin ? (isTranzy ? "only_back" : productState.selectedCoverage) : undefined,
     requiresDeviceSelection: isSkinProduct && needsDeviceSelector,
     extras: setupExtras,
     onAdded: () => setSetupReset((n) => n + 1),
@@ -556,12 +559,16 @@ export default function ProductDetailPage() {
                   />
                   
                   {/* Coverage Selection */}
-                  {phoneModel && isPhoneSkin && (
+                  {phoneModel && isPhoneSkin && (isTranzy ? (
+                    <p className="rounded-xl border-2 border-ink/10 bg-card px-3 py-2 text-xs text-muted-foreground">
+                      <b className="text-foreground">Coverage: Only Back.</b> Tranzy skins are clear, so they are cut for the back panel.
+                    </p>
+                  ) : (
                     <CoverageSelector
                       selectedCoverage={productState.selectedCoverage}
                       onCoverageChange={handleCoverageChange}
                     />
-                  )}
+                  ))}
                 </div>
               )}
               
@@ -669,7 +676,7 @@ export default function ProductDetailPage() {
           <SameDesignOtherGadgets productId={productData._id} brand={phoneBrand} />
 
           {/* Suggested Products Section: other designs for this device, one listing each. */}
-          <SuggestedProductsSection productId={productData._id} />
+          <SuggestedProductsSection productId={productData._id} brand={phoneBrand} />
 
           {/* Trending Products Section */}
           <TrendingProductsSection productId={productData._id} />

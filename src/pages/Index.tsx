@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { Fragment, useState, useEffect, useRef, lazy, Suspense } from "react";
 import { HOME_META, ORGANIZATION_LD } from "@/lib/category-paths.mjs";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
@@ -12,8 +12,9 @@ import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog
 const MobileNav = lazy(() => import("@/components/mobile-nav.tsx").then(m => ({ default: m.MobileNav })));
 const ModelsMarquee = lazy(() => import("@/components/models-marquee.tsx").then(m => ({ default: m.ModelsMarquee })));
 const ExploreModels = lazy(() => import("@/components/explore-models.tsx").then(m => ({ default: m.ExploreModels })));
-const TopPicks = lazy(() => import("@/components/top-picks.tsx").then(m => ({ default: m.TopPicks })));
-const MostTrendy = lazy(() => import("@/components/most-trendy.tsx").then(m => ({ default: m.MostTrendy })));
+const TopPicksRows = lazy(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.TopPicksRows })));
+const VibeRows = lazy(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.VibeRows })));
+const MatchingSets = lazy(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.MatchingSets })));
 const ExploreByBrand = lazy(() => import("@/components/explore-by-brand.tsx").then(m => ({ default: m.ExploreByBrand })));
 const ExploreByGadget = lazy(() => import("@/components/explore-by-gadget.tsx").then(m => ({ default: m.ExploreByGadget })));
 const SiteFooter = lazy(() => import("@/components/site-footer.tsx").then(m => ({ default: m.SiteFooter })));
@@ -189,23 +190,26 @@ export default function Index() {
 
       case "top_picks":
         return (
-          <LazySection key={key} reserve="min-h-[784px] md:min-h-[772px]">
-            {/* The admin's title and tabs (Admin › Homepage › Layout), else the defaults. */}
-            <TopPicks
+          <LazySection key={key} reserve="min-h-[520px] md:min-h-[600px]">
+            {/* Rows picked at build time from sales and the whole catalogue (home.json). */}
+            <TopPicksRows
               {...(typeof section.config?.title === "string" && section.config.title ? { title: section.config.title } : {})}
-              {...(Array.isArray(section.config?.tabs) && section.config.tabs.some((t: any) => t?.tag) ? { tabs: section.config.tabs.filter((t: any) => t?.tag && t?.label) } : {})}
             />
           </LazySection>
         );
 
       case "most_trendy":
         return (
-          <LazySection key={key} reserve="min-h-[608px] md:min-h-[612px]">
-            <MostTrendy
-              sectionId={section._id}
-              config={section.config as never}
-            />
-          </LazySection>
+          <Fragment key={key}>
+            <LazySection reserve="min-h-[560px] md:min-h-[640px]">
+              <VibeRows
+                {...(typeof (section.config as any)?.title === "string" && !/^most trendy$/i.test((section.config as any).title) ? { title: (section.config as any).title } : {})}
+              />
+            </LazySection>
+            <LazySection reserve="min-h-[560px] md:min-h-[600px]">
+              <MatchingSets />
+            </LazySection>
+          </Fragment>
         );
 
       case "explore_by_brand":

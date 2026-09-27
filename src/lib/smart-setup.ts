@@ -15,6 +15,21 @@
  */
 import type { CatalogueModel, CatalogueProduct } from "@/lib/catalogue";
 import { brandInScope } from "@/lib/device-fit";
+import { designNameOf } from "@/lib/pack-list";
+
+/**
+ * A listing's design code: the catalogue's own field, else a bare-code SKU —
+ * the older listings ("L-59") carry no suffix, which the build's reader of
+ * "R-44-IPH" missed, so they looked like they had no design at all.
+ */
+export function designOfListing(p: Pick<CatalogueProduct, "variants"> & { design?: string }): string {
+  if (p.design) return p.design;
+  for (const v of p.variants || []) {
+    const m = /^([A-Z]+-\d+)(?:-[A-Z][A-Z0-9]*)?$/.exec(String(v.sku || "").trim().toUpperCase());
+    if (m) return m[1];
+  }
+  return "";
+}
 
 export type SetupKind = "chargerSkin" | "case" | "glass" | "cameraRing" | "membrane" | "magneto";
 export type OfferRule = { enabled: boolean; type: "percent" | "flat"; value: number };
@@ -211,18 +226,36 @@ export function buildSetupPicks(
   const byKind = (k: SetupKind) => catalogue.filter((p) => p.status !== "draft" && kindOf(p) === k);
   const category = device.category || "phone";
 
-  // Same design, for the charger that came with their device.
-  if (on("chargerSkin") && product.design && category !== "charger" && ["phone", "tablet", "laptop"].includes(category)) {
+  // Same design, for the charger that came with their device — or, when this
+  // design has no charger version (most older listings), the charger skins
+  // made for their brand, closest finish first, to choose from.
+  const design = designOfListing(product as any);
+  if (on("chargerSkin") && category !== "charger" && ["phone", "tablet", "laptop"].includes(category)) {
     const chargerBrand = CHARGER_BRANDS[bkey(device.brand)]?.[0] || device.brand;
-    const sameDesign = byKind("chargerSkin").filter((p) => p.design === product.design && (p.variants || []).some(inStock));
-    const listing = sameDesign.find((p) => (p.modelBrands || []).length && brandInScope(p, chargerBrand)) || sameDesign.find((p) => !(p.modelBrands || []).length);
     const chargers = chargerOptions(models, device.brand, { category, model: device.model });
+    const stocked = byKind("chargerSkin").filter((p) => (p.variants || []).some(inStock));
+    const forBrand = (p: CatalogueProduct) => (p.modelBrands || []).length > 0 && brandInScope(p, chargerBrand);
+    const sameDesign = design ? stocked.filter((p) => designOfListing(p) === design) : [];
+    const listing = sameDesign.find(forBrand) || sameDesign.find((p) => !(p.modelBrands || []).length);
     if (listing && chargers.options.length) {
       picks.push({
         kind: "chargerSkin", heading: "Matching charger skin", fit: "Same design as your skin",
         options: optionsFor(listing, (listing.variants || []).filter(inStock).slice(0, 1), () => "Charger skin"),
         chargers,
       });
+    } else if (chargers.options.length) {
+      const finish = String((product as any).finishType || "").toLowerCase();
+      const pool = stocked.filter(forBrand)
+        .sort((a, b) => Number(String(b.finishType || "").toLowerCase() === finish) - Number(String(a.finishType || "").toLowerCase() === finish)
+          || (b._creationTime || 0) - (a._creationTime || 0))
+        .slice(0, 4);
+      if (pool.length) {
+        picks.push({
+          kind: "chargerSkin", heading: "Charger skin", fit: `Made for your ${chargerBrand} charger`,
+          options: pool.map((p) => optionsFor(p, (p.variants || []).filter(inStock).slice(0, 1), () => designNameOf(p.title).replace(/\s+(apple|samsung|oneplus|xiaomi|realme|oppo|vivo)$/i, ""))[0]),
+          chargers,
+        });
+      }
     }
   }
 

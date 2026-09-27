@@ -20,7 +20,7 @@ import { loadCatalogue, loadModelCatalogue, type CatalogueProduct } from "@/lib/
  * never to the phone in the photo.
  */
 export function RealCuts() {
-  const photos = useLatestRealPhotos(20);
+  const photos = useLatestRealPhotos(12);
   const [catalogue, setCatalogue] = useState<CatalogueProduct[] | null>(null);
   const [modelCounts, setModelCounts] = useState<Record<string, number>>({});
   const [device, setDevice] = useState<ActiveDevice | null>(null);
@@ -79,7 +79,7 @@ export function RealCuts() {
               Every design is cut to order for your exact phone — here's how they turn out. Tap one to get it for yours.
             </p>
           </div>
-          {photos.length > 3 && <ScrollNavButtons containerId="real-cuts-scroll" />}
+          {photos.length > 2 && <ScrollNavButtons containerId="real-cuts-scroll" />}
         </div>
 
         <div id="real-cuts-scroll" data-drag-scroll className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
@@ -111,6 +111,20 @@ export function RealCuts() {
               </Link>
             );
           })}
+          {/* The rest live on their own page: the row shows the latest dozen. */}
+          <Link to="/real-photos" className="group flex w-[220px] flex-shrink-0 snap-start md:w-[260px]">
+            <div className="flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-ink bg-sunny p-6 text-center shadow-[3px_3px_0_0_var(--ink)] transition-transform group-hover:-translate-y-0.5">
+              <CameraIcon className="size-8" />
+              <p className="text-lg font-extrabold leading-tight text-ink">See every real photo</p>
+              <p className="text-xs font-semibold text-ink/70">Filter by your brand or phone</p>
+              <span className="rounded-full border-2 border-ink bg-card px-4 py-1.5 text-sm font-bold text-ink">View all →</span>
+            </div>
+          </Link>
+        </div>
+        <div className="flex justify-center">
+          <Link to="/real-photos" className="sticker-sm sticker-press inline-flex items-center gap-1.5 rounded-full bg-card px-5 py-2 text-sm font-bold">
+            <CameraIcon className="size-4" /> See all real photos
+          </Link>
         </div>
       </div>
     </section>

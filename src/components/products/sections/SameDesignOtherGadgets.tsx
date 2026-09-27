@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { loadCatalogue, type CatalogueProduct } from "@/lib/catalogue";
 import { brandInScope } from "@/lib/device-fit";
 import { designNameOf } from "@/lib/pack-list";
+import { designOfListing } from "@/lib/smart-setup";
 import { ProductThumb } from "@/components/product-thumb.tsx";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 
@@ -24,29 +25,51 @@ const LABEL: Record<string, string> = {
 };
 
 export function SameDesignOtherGadgets({ productId, brand }: { productId: string; brand?: string | null }) {
-  const [rows, setRows] = useState<{ name: string; items: CatalogueProduct[] } | null>(null);
+  const [rows, setRows] = useState<{ title: string; sub: string; items: CatalogueProduct[] } | null>(null);
 
   useEffect(() => {
     let live = true;
     loadCatalogue().then((c) => {
       if (!live || !c) return;
       const self = c.products.find((p) => p._id === productId);
-      if (!self?.design || self.productCategory !== "skin") { setRows(null); return; }
-      const family = c.products.filter((p) =>
-        p.design === self.design && p._id !== productId && p.productCategory === "skin" && p.status !== "draft" &&
-        p.gadgetCategory && p.gadgetCategory !== self.gadgetCategory && p.images?.[0]?.url &&
-        (p.variants || []).some((v) => Number(v.price) > 0));
+      if (!self || self.productCategory !== "skin") { setRows(null); return; }
+      const design = designOfListing(self);
+      const usable = (p: CatalogueProduct) =>
+        p._id !== productId && p.productCategory === "skin" && p.status !== "draft" && !!p.gadgetCategory &&
+        p.gadgetCategory !== self.gadgetCategory && !!p.images?.[0]?.url && (p.variants || []).some((v) => Number(v.price) > 0);
+      const fitsBrand = (p: CatalogueProduct) => !!brand && !!(p.modelBrands || []).length && brandInScope(p, brand);
+      const rank = (g?: string) => { const i = ORDER.indexOf(String(g)); return i < 0 ? 99 : i; };
+
+      // The same design on every other gadget it is made in.
+      const family = design ? c.products.filter((p) => usable(p) && designOfListing(p) === design) : [];
       const perGadget = new Map<string, CatalogueProduct>();
       for (const p of family) {
         const g = String(p.gadgetCategory);
         const cur = perGadget.get(g);
-        const fits = brand ? brandInScope(p, brand) && !!(p.modelBrands || []).length : false;
-        const curFits = cur && brand ? brandInScope(cur, brand) && !!(cur.modelBrands || []).length : false;
-        if (!cur || (fits && !curFits)) perGadget.set(g, p);
+        if (!cur || (fitsBrand(p) && !fitsBrand(cur))) perGadget.set(g, p);
       }
-      const rank = (g?: string) => { const i = ORDER.indexOf(String(g)); return i < 0 ? 99 : i; };
-      const items = [...perGadget.values()].sort((a, b) => rank(a.gadgetCategory) - rank(b.gadgetCategory));
-      setRows(items.length ? { name: designNameOf(self.title), items } : null);
+      if (perGadget.size) {
+        const items = [...perGadget.values()].sort((a, b) => rank(a.gadgetCategory) - rank(b.gadgetCategory));
+        setRows({ title: `${designNameOf(self.title)} for your other gadgets`, sub: "Same design, cut for your laptop, charger and more — a matching set.", items });
+        return;
+      }
+
+      // Most older designs are made for one gadget only. Then: the closest
+      // listing for each other gadget — most shared tags, same finish — so
+      // the row still leads to the rest of the shop, not to more phone skins.
+      const tags = new Set(self.tags || []);
+      const score = (p: CatalogueProduct) =>
+        (p.tags || []).filter((t) => tags.has(t)).length * 2 + (p.finishType && p.finishType === self.finishType ? 1 : 0) + (fitsBrand(p) ? 1 : 0);
+      const best = new Map<string, { p: CatalogueProduct; s: number }>();
+      for (const p of c.products) {
+        if (!usable(p) || (brand && (p.modelBrands || []).length && !brandInScope(p, brand))) continue;
+        const g = String(p.gadgetCategory);
+        const sc = score(p);
+        const cur = best.get(g);
+        if (!cur || sc > cur.s || (sc === cur.s && (p._creationTime || 0) > (cur.p._creationTime || 0))) best.set(g, { p, s: sc });
+      }
+      const items = [...best.values()].map((x) => x.p).sort((a, b) => rank(a.gadgetCategory) - rank(b.gadgetCategory)).slice(0, 10);
+      setRows(items.length ? { title: "Skins for your other gadgets", sub: "Laptop, charger, controller and more — picked to go with this one.", items } : null);
     });
     return () => { live = false; };
   }, [productId, brand]);
@@ -57,8 +80,8 @@ export function SameDesignOtherGadgets({ productId, brand }: { productId: string
     <section className="py-8 md:py-10">
       <div className="mb-5 flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold md:text-3xl">{rows.name} for your other gadgets</h2>
-          <p className="mt-1 text-muted-foreground">Same design, cut for your laptop, charger and more — a matching set.</p>
+          <h2 className="text-2xl font-bold md:text-3xl">{rows.title}</h2>
+          <p className="mt-1 text-muted-foreground">{rows.sub}</p>
         </div>
         {rows.items.length > 3 && <ScrollNavButtons containerId="same-design-scroll" />}
       </div>

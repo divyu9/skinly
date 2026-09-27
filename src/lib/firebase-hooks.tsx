@@ -308,12 +308,12 @@ function designOf(p: any): string {
   if (up) return up;
   if (p?.design) return String(p.design);
   for (const v of p?.variants || []) {
-    const m = /^([A-Z]+-\d+)-[A-Z]/.exec(String(v?.sku || ''));
+    const m = /^([A-Z]+-\d+)(?:-[A-Z][A-Z0-9]*)?$/.exec(String(v?.sku || '').trim().toUpperCase());
     if (m) return m[1];
   }
   return '';
 }
-function setupPicks(product: any, productId: string, candidates: any[]): any[] {
+function setupPicks(product: any, productId: string, candidates: any[], brand?: string): any[] {
   /*
    * Other designs for the same device, one listing per design.
    *
@@ -323,8 +323,11 @@ function setupPicks(product: any, productId: string, candidates: any[]): any[] {
    * iPhone page shows the iPhone listing) where there is one. The same design
    * on the buyer's other gadgets has its own row (SameDesignOtherGadgets).
    */
-  const withPhoto = candidates.filter((p) => p.productCategory === product.productCategory && p.images?.[0]?.url);
+  // With the shopper's brand known, only listings that fit it (an iPhone
+  // shopper was shown OnePlus listings on the older, brand-less pages).
+  const withPhoto = candidates.filter((p) => p.productCategory === product.productCategory && p.images?.[0]?.url && (!brand || brandInScope(p, brand)));
   const design = designOf(product);
+  const fitsBrand = (p: any) => !!brand && (p.modelBrands || []).length > 0 && brandInScope(p, brand);
   const sameDevice = withPhoto
     .filter((p) => p.gadgetCategory === product.gadgetCategory && p._id !== productId && (!design || designOf(p) !== design))
     .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0));
@@ -332,7 +335,10 @@ function setupPicks(product: any, productId: string, candidates: any[]): any[] {
   for (const p of sameDevice) {
     const key = designOf(p) || p._id;
     const cur = byDesign.get(key);
-    if (!cur || (p.listingKind && p.listingKind === product.listingKind && cur.listingKind !== product.listingKind)) byDesign.set(key, p);
+    const better = cur && (
+      (fitsBrand(p) && !fitsBrand(cur)) ||
+      (fitsBrand(p) === fitsBrand(cur) && !!p.listingKind && p.listingKind === product.listingKind && cur.listingKind !== product.listingKind));
+    if (!cur || better) byDesign.set(key, p);
   }
   return [...byDesign.values()];
 }
@@ -348,6 +354,7 @@ import { loadCatalogue, loadHomeProducts, loadModelCatalogue } from "./catalogue
 import { searchRows } from "./search-match";
 import { calculateGST } from "./gst";
 import { laptopBodyKeys, squash } from "./laptop-body";
+import { brandInScope } from "./device-fit";
 const R2_PUBLIC_DOMAIN = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev";
 
 // Mockups for 28 models (every iPhone before the 17, plus Nothing Phone 3/3A and
@@ -3460,11 +3467,24 @@ export function useQuery(apiRef: any, args?: any) {
                 const wanted = new Set(config.manualProductIds);
                 picked = candidates.filter(p => wanted.has(p._id));
               } else if (config.sourceType === 'same-category' && product.productCategory) {
-                picked = setupPicks(product, args.productId, candidates);
+                picked = setupPicks(product, args.productId, candidates, args.brand || undefined);
               } else if (config.sourceType === 'tag-based' && config.filterTags?.length) {
                 picked = candidates.filter(p => p.tags?.some((t: string) => config.filterTags.includes(t)));
               }
-              picked = picked.slice(0, config.maxProducts || 8);
+              if (config.sourceType === 'same-category' && product.productCategory) {
+                // Up to the row's size of each finish, so the section's Matte /
+                // 3D Textured / Tranzy tabs each have a full row to show.
+                const per = config.maxProducts || 8;
+                const seen = new Map<string, number>();
+                picked = picked.filter((p) => {
+                  const f = String(p.finishType || '').toLowerCase();
+                  const n = seen.get(f) || 0;
+                  seen.set(f, n + 1);
+                  return n < per;
+                }).slice(0, per * 3);
+              } else {
+                picked = picked.slice(0, config.maxProducts || 8);
+              }
 
               // The cards read product.variants for price and stock — live.
               const withVariants = await refreshProducts(picked, path);

@@ -716,6 +716,19 @@ function staticPages(hub, home = null) {
               `<li><a href="${SITE}${esc(g.href)}">${esc(gadgetLabel(g.gadget) || g.gadget)} skins</a> <span>(${g.count} designs)</span></li>`))
           : ""),
     },
+    {
+      // Every photo taken at the packing table (src/pages/real-photos/page.tsx).
+      route: "/real-photos",
+      title: "Real Photos of Our Skins, Cut for Real Orders | GoSkinly",
+      description:
+        "Photos of GoSkinly skins taken while packing real orders — every design printed and cut for the customer's exact phone, laptop or gadget.",
+      canonical: `${SITE}/real-photos`,
+      priority: "0.6",
+      body:
+        `<h1>Real photos, real orders</h1>` +
+        `<p>Every skin here was printed and cut for a customer's exact device and photographed at our packing table before it shipped.</p>` +
+        `<p><a href="${SITE}/products">Shop all skins</a></p>`,
+    },
     policy("privacy", "Privacy Policy | GoSkinly",
       "Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy."),
     policy("terms", "Terms of Service | GoSkinly",
@@ -1316,6 +1329,13 @@ function designCode(p, variants = []) {
     const m = /^([A-Z]+-\d+)-[A-Z]/.exec(String(v.sku || ""));
     if (m) return m[1];
   }
+  // Older skin listings carry the bare code as their SKU ("L-59").
+  if (p.productCategory === "skin") {
+    for (const v of variants) {
+      const m = /^([A-Z]+-\d+)$/.exec(String(v.sku || "").trim().toUpperCase());
+      if (m) return m[1];
+    }
+  }
   return "";
 }
 
@@ -1404,7 +1424,137 @@ async function writeMerchantFeed(active, variantsByProduct) {
   return items.length;
 }
 
-async function writeCatalogue(active, variantsByProduct, logos = {}, themes = [], homeTags = []) {
+// ─── homepage rows ────────────────────────────────────────────────────────────
+
+/*
+ * The homepage's product rows, built here from the whole catalogue.
+ *
+ * They were hand-kept tags: "bestseller" on eight products (mostly cases and
+ * glass), "New Arrivals" wired to the laptop tag, and Most Trendy showing 28
+ * Mac mini skins in a row. Every row now follows three rules so a shopper
+ * sees the breadth of the shop: one listing per design, no more than two of
+ * one gadget running, and in stock with a picture.
+ *
+ * - bestsellers: settings/homeRankings (confirmed orders, 60 days; written by
+ *   functions/src/homeRankings.ts), topped up from the "bestseller" tag.
+ * - newDrops: the newest designs.
+ * - vibes: a handful of style pages (Anime, Gaming, Cars…), each its own row.
+ * - sets: designs made for three or more gadgets — the matching-set row.
+ */
+const VIBES = [
+  ["anime-skins", "Anime"], ["gaming-skins", "Gaming"], ["superhero-skins", "Superheroes"], ["car-skins", "Cars"],
+  ["god-religious-skins", "Spiritual"], ["quotes-typography-skins", "Quotes"], ["space-cosmic-skins", "Space"],
+  ["camouflage-skins", "Camo"], ["marble-texture-skins", "Marble"], ["minimal-skins", "Minimal"],
+  ["abstract-skins", "Abstract"], ["transparent-skins", "Tranzy"],
+];
+const SET_GADGETS = ["phone", "laptop", "charger", "tablet", "controller", "console", "mac-mini"];
+
+function homeRows(active, variantsByProduct, seoInfo, themes, rankings) {
+  const stock = (v) => Number(v.inventoryQuantity ?? v.inventory_quantity ?? 0);
+  const sellable = (p) =>
+    (variantsByProduct.get(p._id) || []).some((v) => Number(v.price) > 0 && stock(v) > 0) &&
+    (p.images || []).some((i) => liveImage(typeof i === "string" ? i : i?.url));
+  const pool = active.filter(sellable);
+  const byId = new Map(pool.map((p) => [p._id, p]));
+  const dkey = (p) => designCode(p, variantsByProduct.get(p._id)) || p._id;
+  const isAccessory = (p) => p.productCategory !== "skin";
+  // For a design with a listing per brand, the one that fits every phone.
+  const generic = (p) => !(p.modelBrands || []).length;
+
+  function onePerDesign(list) {
+    const out = new Map();
+    for (const p of list) {
+      const k = dkey(p);
+      const cur = out.get(k);
+      if (!cur) out.set(k, p);
+      else if (generic(p) && !generic(cur) && cur.productCategory === p.productCategory && cur.gadgetCategory === p.gadgetCategory) out.set(k, p);
+    }
+    return [...out.values()];
+  }
+  /*
+   * Variety within a row: phones up to half of it (most shoppers are here for
+   * one), any other gadget at most two, accessories at most a quarter — then
+   * laid out so no two of the same non-phone gadget sit side by side.
+   */
+  function mix(list, n) {
+    const cap = (p) => (isAccessory(p) ? "accessory" : p.gadgetCategory || "other");
+    const limit = (k) => (k === "phone" ? Math.ceil(n / 2) : k === "accessory" ? Math.ceil(n / 4) : 2);
+    const count = new Map();
+    const chosen = [];
+    for (const p of list) {
+      if (chosen.length >= n) break;
+      const k = cap(p);
+      if ((count.get(k) || 0) >= limit(k)) continue;
+      count.set(k, (count.get(k) || 0) + 1);
+      chosen.push(p);
+    }
+    // Short of n (a style made mostly for phones), top up past the caps — but
+    // never past the accessory share.
+    for (const p of list) {
+      if (chosen.length >= n) break;
+      if (chosen.includes(p) || (cap(p) === "accessory" && (count.get("accessory") || 0) >= limit("accessory"))) continue;
+      chosen.push(p);
+    }
+    // Arrange: alternate phones with everything else, keeping each group's order.
+    const phones = chosen.filter((p) => cap(p) === "phone");
+    const others = chosen.filter((p) => cap(p) !== "phone");
+    const out = [];
+    while (phones.length || others.length) {
+      if (phones.length) out.push(phones.shift());
+      if (others.length) {
+        const last = out[out.length - 1];
+        let i = others.findIndex((p) => !last || cap(p) !== cap(last));
+        if (i < 0) i = 0;
+        out.push(others.splice(i, 1)[0]);
+      }
+    }
+    return out;
+  }
+
+  const ranked = (rankings?.bestsellers || []).map((r) => byId.get(r.productId)).filter(Boolean);
+  const tagged = pool.filter((p) => (Array.isArray(p.tags) ? p.tags : String(p.tags || "").split(",")).map((t) => String(t).trim()).includes("bestseller"));
+  const newest = pool.filter((p) => p.productCategory === "skin").sort((a, b) => Number(b._creationTime || b.createdAt || 0) - Number(a._creationTime || a.createdAt || 0));
+  const bestsellers = mix(onePerDesign([...ranked, ...tagged, ...newest.slice(0, 40)]), 16);
+  const newDrops = mix(onePerDesign(newest.filter((p) => !bestsellers.slice(0, 6).includes(p))), 16);
+
+  const themeSlugs = new Set(themes.map((t) => t.slug));
+  const vibes = [];
+  for (const [slug, name] of VIBES) {
+    const info = seoInfo.get(slug);
+    if (!info || (!themeSlugs.has(slug) && !info.total)) continue;
+    const items = mix(onePerDesign((info.products || []).map((x) => byId.get(x._id)).filter(Boolean)), 10);
+    // A vibe row has to lead with the gadgets people carry: a style page whose
+    // sample is all gimbal and lens skins makes a poor first impression.
+    const everyday = items.filter((p) => ["phone", "laptop", "tablet"].includes(p.gadgetCategory)).length;
+    if (items.length >= 6 && everyday >= 4) vibes.push({ slug, name, ids: items.map((p) => p._id) });
+  }
+
+  // Designs made for three or more of the everyday gadgets, best-selling first.
+  const sold = new Map((rankings?.bestsellers || []).map((r) => [r.productId, r.qty]));
+  const families = new Map();
+  for (const p of pool) {
+    if (p.productCategory !== "skin" || !SET_GADGETS.includes(p.gadgetCategory)) continue;
+    const k = designCode(p, variantsByProduct.get(p._id));
+    if (!k) continue;
+    const f = families.get(k) || { design: k, byGadget: new Map(), sold: 0 };
+    const cur = f.byGadget.get(p.gadgetCategory);
+    if (!cur || (generic(p) && !generic(cur))) f.byGadget.set(p.gadgetCategory, p);
+    f.sold += sold.get(p._id) || 0;
+    families.set(k, f);
+  }
+  const sets = [...families.values()]
+    .filter((f) => f.byGadget.size >= 3 && f.byGadget.has("phone"))
+    .sort((a, b) => b.sold - a.sold || b.byGadget.size - a.byGadget.size)
+    .slice(0, 8)
+    .map((f) => ({
+      design: f.design,
+      ids: SET_GADGETS.map((g) => f.byGadget.get(g)?._id).filter(Boolean).slice(0, 4),
+    }));
+
+  return { bestsellers: bestsellers.map((p) => p._id), newDrops: newDrops.map((p) => p._id), vibes, sets };
+}
+
+async function writeCatalogue(active, variantsByProduct, logos = {}, themes = [], homeTags = [], rows = null) {
   const tagsOf = (t) =>
     (Array.isArray(t) ? t : typeof t === "string" ? t.split(",") : []).map((x) => String(x).trim()).filter(Boolean);
   const products = active.map((p) => ({
@@ -1454,15 +1604,25 @@ async function writeCatalogue(active, variantsByProduct, logos = {}, themes = []
   const builtAt = Date.now();
   const wanted = new Set(homeTags);
   const perTag = new Map();
+  // Everything the homepage rows name, whether or not it carries a row's tag.
+  const rowIds = new Set(rows ? [...rows.bestsellers, ...rows.newDrops, ...rows.vibes.flatMap((v) => v.ids), ...rows.sets.flatMap((x) => x.ids)] : []);
   const homeProducts = products.filter((p) => {
     // The first N of a row are always within the first N of each of their
     // tags, so a cap above any row's size (maxProducts + 4 spare) loses nothing.
     const hit = p.tags.filter((t) => wanted.has(t) && (perTag.get(t) || 0) < 60);
     hit.forEach((t) => perTag.set(t, (perTag.get(t) || 0) + 1));
-    return hit.length > 0;
+    // With the built rows, the tag rows are gone: home.json holds only what the rows show.
+    return rows ? rowIds.has(p._id) : hit.length > 0;
+  }).map((p) => {
+    if (!rows) return p;
+    // Only in the new rows: a card needs one price, not a case's thirty models.
+    const inStock = p.variants.filter((v) => v.price > 0 && v.inventoryQuantity > 0);
+    const cheapest = (inStock.length ? inStock : p.variants).slice().sort((a, b) => a.price - b.price)[0];
+    return { ...p, tags: [], variants: cheapest ? [cheapest] : [] };
   });
   await fs.mkdir(path.join(DIST, "data"), { recursive: true });
-  await fs.writeFile(path.join(DIST, "data", "home.json"), JSON.stringify({ builtAt, tags: [...wanted], products: homeProducts }));
+  // No tags when the rows are built, so a tag query falls through to the catalogue.
+  await fs.writeFile(path.join(DIST, "data", "home.json"), JSON.stringify({ builtAt, tags: rows ? [] : [...wanted], products: homeProducts, ...(rows ? { rows } : {}) }));
 
   // Tags repeat across hundreds of products; store each once and refer to it
   // by index. src/lib/catalogue.ts expands them again on load.
@@ -1743,9 +1903,7 @@ async function main() {
       readCollection(project, "variants"),
       readCollection(project, "seoPages"),
       readCollection(project, "productCategoriesConfig").catch(() => []),
-      readCollection(project, "settings")
-        .then((rows) => rows.find((r) => r._id === "shipping") || null)
-        .catch(() => null),
+      readCollection(project, "settings").catch(() => []),
       readCollection(project, "supportedModels"),
       readCollection(project, "collections"),
       readCollection(project, "collectionProducts"),
@@ -1758,7 +1916,14 @@ async function main() {
     // Ratings for the Product markup. A separate read because a site with no
     // reviews yet must still build.
     const reviews = await readCollection(project, "reviews").catch(() => []);
-    data = { products, variants, seoPages, categories, shipping, models, collections, memberships, sections, sectionCards, reviews, heroSlides };
+    // `shipping` above is every settings document; the pages want the shipping one,
+    // and the homepage rows want the bestseller ranking (settings/homeRankings).
+    const settingsRows = Array.isArray(shipping) ? shipping : [];
+    data = {
+      products, variants, seoPages, categories, models, collections, memberships, sections, sectionCards, reviews, heroSlides,
+      shipping: settingsRows.find((r) => r._id === "shipping") || null,
+      homeRankings: settingsRows.find((r) => r._id === "homeRankings") || null,
+    };
   } catch (err) {
     log(`Firestore unreachable (${err?.message || err}); writing static pages only`);
   }
@@ -1932,7 +2097,9 @@ async function main() {
     if (sec.sectionType === "most_trendy") (Array.isArray(cfg.tags) ? cfg.tags : []).forEach((t) => homeTags.add(String(t).trim()));
     if (sec.sectionType === "top_picks") (Array.isArray(cfg.tabs) ? cfg.tabs : []).forEach((t) => t?.tag && homeTags.add(String(t.tag).trim()));
   }
-  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes, [...homeTags]);
+  const rows = homeRows(active, variantsByProduct, seoInfo, themes, data.homeRankings);
+  log(`home rows: ${rows.bestsellers.length} bestsellers, ${rows.newDrops.length} new, ${rows.vibes.length} vibes, ${rows.sets.length} matching sets`);
+  const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes, [...homeTags], rows);
   const feedItems = await writeMerchantFeed(active, variantsByProduct);
   console.log(`[prerender] merchant feed: ${feedItems} items`);
   log(`catalogue: ${active.length} products, ${Math.round(catalogueBytes / 1024)} KB`);

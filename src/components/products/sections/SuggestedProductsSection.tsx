@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Link } from "react-router-dom";
@@ -10,10 +11,13 @@ import type { Id } from "@/lib/firebase-api";
 
 interface SuggestedProductsSectionProps {
   productId: Id<"products">;
+  /** The shopper's device brand, when chosen: only listings that fit it are shown. */
+  brand?: string | null;
 }
 
-export function SuggestedProductsSection({ productId }: SuggestedProductsSectionProps) {
-  const data = useQuery(api.productSections.getSuggestedProducts, { productId });
+export function SuggestedProductsSection({ productId, brand }: SuggestedProductsSectionProps) {
+  const data = useQuery(api.productSections.getSuggestedProducts, { productId, ...(brand ? { brand } : {}) } as any);
+  const [finish, setFinish] = useState("all");
 
   // Don't render anything if no config or no products
   if (data === undefined) {
@@ -24,7 +28,21 @@ export function SuggestedProductsSection({ productId }: SuggestedProductsSection
     return null;
   }
 
-  const { config, products } = data;
+  const { config } = data;
+  const all: any[] = data.products;
+  /*
+   * Tabs by finish when the row mixes them: Matte (₹199) and 3D Textured
+   * (₹299) are the first choice a phone-skin shopper makes, and one row of
+   * both made them hunt. A tab shows only with three or more designs in it.
+   */
+  const finishOf = (p: any) => {
+    const f = String(p.finishType || "").toLowerCase();
+    return f === "matte" ? "matte" : f === "embossed" || f === "3d" ? "3d" : f === "transparent" ? "tranzy" : "";
+  };
+  const FINISH_TABS: Array<[string, string]> = [["matte", "Matte"], ["3d", "3D Textured"], ["tranzy", "Tranzy"]];
+  const finishTabs = FINISH_TABS.filter(([k]) => all.filter((p) => finishOf(p) === k).length >= 3);
+  const showTabs = finishTabs.length >= 2;
+  const products = showTabs && finish !== "all" ? all.filter((p) => finishOf(p) === finish) : all;
 
   return (
     <section className="py-8 md:py-12">
@@ -42,13 +60,27 @@ export function SuggestedProductsSection({ productId }: SuggestedProductsSection
           )}
         </div>
 
+        {showTabs && (
+          <div data-drag-scroll className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+            {[["all", "All"] as [string, string], ...finishTabs].map(([k, label]) => (
+              <button key={k} type="button" onClick={() => setFinish(k)}
+                className={cn(
+                  "shrink-0 rounded-full border-2 px-4 py-1.5 text-sm font-bold transition-colors",
+                  finish === k ? "border-ink bg-brand text-brand-foreground shadow-[2px_2px_0_0_var(--ink)]" : "border-ink/15 bg-card hover:border-ink/40",
+                )}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Products Horizontal Scroll */}
         <div className="relative -mx-4 px-4">
           <div
             id="suggested-products-scroll"
             data-drag-scroll className="flex gap-4 overflow-x-auto pb-4 no-scrollbar snap-x snap-mandatory"
           >
-            {products.map((product) => {
+            {products.map((product: any) => {
             const firstVariant = product.variants && product.variants[0];
             const isOutOfStock = firstVariant?.inventoryQuantity === 0 || firstVariant?.inventory_quantity === 0;
             const price = firstVariant?.price || 0;

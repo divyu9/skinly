@@ -525,6 +525,8 @@ export const placeOrder = functions
           price: upsellPrice.get(idx) ?? priceMap.get(key) ?? item?.price,
           ...(sku ? { sku } : {}),
           ...(variantId ? { variantId } : {}),
+          // Tranzy (transparent) skins are made for the back only.
+          ...(item?.coverage && (/tranzy/i.test(String(item?.productTitle || "")) || /^T-\d+$/i.test(String(sku || ""))) ? { coverage: "only_back" } : {}),
         };
       }),
       createdAt: Date.now(),

@@ -100,7 +100,7 @@ export function loadCatalogue(): Promise<Catalogue | null> {
   return pending;
 }
 
-let pendingHome: Promise<{ builtAt: number; tags: string[]; products: CatalogueProduct[] } | null> | null = null;
+let pendingHome: Promise<{ builtAt: number; tags: string[]; products: CatalogueProduct[]; rows: HomeRows | null } | null> | null = null;
 
 /**
  * The few products the homepage's tag rows can show, from /data/home.json
@@ -108,6 +108,13 @@ let pendingHome: Promise<{ builtAt: number; tags: string[]; products: CatalogueP
  * held Top Picks back ~3 seconds on a phone. Same fields and builtAt as the
  * catalogue; tags are plain strings. null when the file is missing.
  */
+export type HomeRows = {
+  bestsellers: string[];
+  newDrops: string[];
+  vibes: Array<{ slug: string; name: string; ids: string[] }>;
+  sets: Array<{ design: string; ids: string[] }>;
+};
+
 export function loadHomeProducts() {
   if (pendingHome) return pendingHome;
   pendingHome = fetch("/data/home.json", { headers: { accept: "application/json" } })
@@ -115,7 +122,13 @@ export function loadHomeProducts() {
       if (!res.ok || !(res.headers.get("content-type") || "").includes("json")) return null;
       const body = await res.json();
       if (!body || !Array.isArray(body.products) || typeof body.builtAt !== "number") return null;
-      return { builtAt: body.builtAt as number, tags: Array.isArray(body.tags) ? body.tags as string[] : [], products: body.products as CatalogueProduct[] };
+      return {
+        builtAt: body.builtAt as number,
+        tags: Array.isArray(body.tags) ? body.tags as string[] : [],
+        products: body.products as CatalogueProduct[],
+        // The homepage rows the build picked (scripts/prerender.mjs homeRows), when present.
+        rows: (body.rows || null) as HomeRows | null,
+      };
     })
     .catch(() => null);
   return pendingHome;
