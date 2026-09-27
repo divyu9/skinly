@@ -66,9 +66,15 @@ export function useGuestCart() {
   }, []);
 
   const addToGuestCart = (item: Omit<GuestCartItem, "quantity"> & { quantity?: number }) => {
-    const prev = guestCart;
+    // Read the stored cart, not this render's copy: a skin and its Smart Setup
+    // add-ons are added in one go, and each add used to overwrite the last.
+    let prev: GuestCartItem[] = guestCart;
+    try { prev = JSON.parse(localStorage.getItem(GUEST_CART_KEY) || "[]"); } catch { /* keep this render's copy */ }
+    // The same design for two phones is two lines, not one line with the
+    // second phone's model lost.
     const existingIndex = prev.findIndex(
-      (i) => i.productId === item.productId && i.variant === item.variant
+      (i) => i.productId === item.productId && i.variant === item.variant &&
+        (i.phoneModel || "") === (item.phoneModel || "") && (i.coverage || "") === (item.coverage || "")
     );
 
     let newCart;

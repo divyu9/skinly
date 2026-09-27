@@ -50,6 +50,7 @@ import { ProductUgcFloat } from "./_components/product-ugc-float.tsx";
 import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
 import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
+import { SmartSetup, type SetupCartItem } from "./_components/smart-setup.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
 
@@ -177,6 +178,10 @@ export default function ProductDetailPage() {
     designImageUrl: productData?.designImageUrl, gadgetCategory: productData?.gadgetCategory,
   });
   
+  // Add-ons ticked in "Complete your setup", added with the skin.
+  const [setupExtras, setSetupExtras] = useState<SetupCartItem[]>([]);
+  const [setupReset, setSetupReset] = useState(0);
+
   // Cart actions hook
   const {
     isAdding,
@@ -191,6 +196,8 @@ export default function ProductDetailPage() {
     phoneBrand,
     coverage: isPhoneSkin ? productState.selectedCoverage : undefined,
     requiresDeviceSelection: isSkinProduct && needsDeviceSelector,
+    extras: setupExtras,
+    onAdded: () => setSetupReset((n) => n + 1),
   });
   
   // Reviews hook
@@ -449,7 +456,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Product Info */}
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
               {/* Title, price, proof */}
               <div>
                 <div className="mb-2 flex items-start justify-between gap-3">
@@ -570,6 +577,15 @@ export default function ProductDetailPage() {
               {/* A dead grey primary button was the last thing a visitor saw
                   before leaving. When no model is picked the CTA is live and
                   says what to do; it only becomes Buy Now once we can sell. */}
+              {isInStock && isSkinProduct && phoneModel && phoneBrand && (
+                <SmartSetup
+                  productId={productData._id}
+                  device={{ brand: phoneBrand, model: phoneModel, category: deviceCategory }}
+                  onChange={setSetupExtras}
+                  resetKey={setupReset}
+                />
+              )}
+
               {isInStock ? (
                 isButtonDisabled ? (
                   <div className="space-y-2">
@@ -595,7 +611,7 @@ export default function ProductDetailPage() {
                       className="sticker sticker-press h-14 flex-1 rounded-2xl border-ink text-base font-bold"
                     >
                       <ShoppingCartIcon className="mr-2 size-5" />
-                      {isAdding ? "Adding..." : "Add to Cart"}
+                      {isAdding ? "Adding..." : setupExtras.length ? `Add ${setupExtras.length + 1} to Cart` : "Add to Cart"}
                     </Button>
                     <Button
                       size="lg"

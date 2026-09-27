@@ -24,6 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import type { Id } from "@/lib/firebase-api";
+import { SmartSetupSettings } from "./smart-setup-settings.tsx";
 
 function CheckoutUpsellsPageInner() {
   const rules = useQuery(api.checkoutUpsells.listAllRules, {});
@@ -182,9 +183,9 @@ function CheckoutUpsellsPageInner() {
       <AdminPageWrapper>
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Checkout Upsells</h1>
+            <h1 className="text-3xl font-bold">Upsells</h1>
             <p className="text-muted-foreground mt-1">
-              Configure product upsells displayed on the checkout page
+              Add-ons on product pages (smart setup) and on the cart and checkout (rules)
             </p>
           </div>
           <Button onClick={handleNewRule}>
@@ -193,6 +194,9 @@ function CheckoutUpsellsPageInner() {
           </Button>
         </div>
 
+        <SmartSetupSettings />
+
+        <h2 className="mb-3 text-lg font-bold">Checkout rules</h2>
         {rules === undefined ? (
           <Card>
             <CardContent className="p-12 text-center text-muted-foreground">

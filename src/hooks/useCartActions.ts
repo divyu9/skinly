@@ -39,6 +39,10 @@ interface UseCartActionsParams {
   phoneBrand?: string | null;
   coverage?: "only_back" | "full_body_wrap";
   requiresDeviceSelection: boolean;
+  /** Add-ons ticked in Smart Setup, added after the item itself (each priced by placeOrder). */
+  extras?: Array<CartItemParams & { upsellRuleId: string }>;
+  /** Called once the item and its add-ons are in the cart. */
+  onAdded?: () => void;
 }
 
 export function useCartActions({
@@ -49,6 +53,8 @@ export function useCartActions({
   phoneBrand,
   coverage,
   requiresDeviceSelection,
+  extras = [],
+  onAdded,
 }: UseCartActionsParams) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -95,6 +101,21 @@ export function useCartActions({
       1
     );
   }, [user, addToCartMutation, addToGuestCart]);
+
+  /** The ticked add-ons. One failing never takes the skin out of the cart with it. */
+  const addExtras = useCallback(async () => {
+    let n = 0;
+    for (const extra of extras) {
+      try {
+        await addToCart(extra);
+        n++;
+      } catch {
+        try { addToGuestCart(extra); n++; } catch { /* skipped: the skin is what matters */ }
+      }
+    }
+    if (extras.length) onAdded?.();
+    return n;
+  }, [extras, addToCart, addToGuestCart, onAdded]);
   
   const handleAddToCart = useCallback(async () => {
     if (!product || !product.variants || product.variants.length === 0) return;
@@ -121,7 +142,8 @@ export function useCartActions({
     
     try {
       await addToCart(cartItem);
-      toast.success("Added to cart!");
+      const n = await addExtras();
+      toast.success(n ? `Added ${n + 1} items to cart!` : "Added to cart!");
     } catch (error: any) {
       console.error("Add to cart error:", error);
       if (error?.message === "UNAUTHENTICATED" || (error instanceof ConvexError && (error.data as { code?: string })?.code === "UNAUTHENTICATED")) {
@@ -132,14 +154,15 @@ export function useCartActions({
           cartItem.price,
           1
         );
-        toast.success("Added to cart!");
+        const n = await addExtras();
+        toast.success(n ? `Added ${n + 1} items to cart!` : "Added to cart!");
       } else {
         toast.error("Failed to add to cart");
       }
     } finally {
       setIsAdding(false);
     }
-  }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart]);
+  }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart, addExtras]);
   
   const handleBuyNow = useCallback(async () => {
     if (!product || !product.variants || product.variants.length === 0) return;
@@ -166,6 +189,7 @@ export function useCartActions({
     
     try {
       await addToCart(cartItem);
+      await addExtras();
       navigate("/checkout");
     } catch (error: any) {
       console.error("Buy now error:", error);
@@ -177,6 +201,7 @@ export function useCartActions({
           cartItem.price,
           1
         );
+        await addExtras();
         navigate("/checkout");
       } else {
         toast.error("Failed to add to cart");
@@ -184,7 +209,7 @@ export function useCartActions({
     } finally {
       setIsBuyingNow(false);
     }
-  }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart, navigate]);
+  }, [product, requiresDeviceSelection, phoneModel, selectedVariant, createCartItem, addToCart, addToGuestCart, addExtras, navigate]);
   
   return {
     isAdding,

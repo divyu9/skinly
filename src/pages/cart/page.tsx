@@ -260,7 +260,7 @@ function AuthenticatedCartContent() {
 
       <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
         {/* Cart Items */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="min-w-0 lg:col-span-2 space-y-3">
           {cartItems.map((item) => {
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);
             const isOutOfStock = stockInfo?.isOutOfStock || false;
@@ -617,7 +617,7 @@ function GuestCartContent() {
 
       <div className="grid gap-4 lg:gap-8 lg:grid-cols-3">
         {/* Cart Items */}
-        <div className="lg:col-span-2 space-y-3">
+        <div className="min-w-0 lg:col-span-2 space-y-3">
           {guestCart.map((item, idx) => {
             const key = `${item.productId}-${item.variant}-${idx}`;
             const stockInfo = stockStatusMap.get(`${item.productId}-${item.variant}`);

@@ -1,4 +1,5 @@
 import * as functions from "firebase-functions/v1";
+import { loadSmartRules, smartLinePrice } from "./smartUpsell";
 import { cashbackForLines } from "./cashback";
 import { notifyOrderPlaced } from "./orderNotifications";
 import { confirmOrder } from "./orderConfirm";
@@ -165,9 +166,21 @@ export const placeOrder = functions
           .map((id) => db.collection("products").doc(id).get()));
         const cats = new Set(restProducts.filter((d) => d.exists).map((d) => String((d.data() as any).gadgetCategory || "").toLowerCase()).filter(Boolean));
         const rules = new Map<string, any>();
+        // Product-page Smart Setup lines ("smart:<kind>"): priced by settings/smartUpsell.
+        let smartRules: Awaited<ReturnType<typeof loadSmartRules>> | null = null;
         for (const i of upsellLines) {
           const it = orderItems[i];
           const rid = String(it.upsellRuleId);
+          if (rid.startsWith("smart:")) {
+            smartRules = smartRules || await loadSmartRules(db);
+            const pdoc = await db.collection("products").doc(String(it.productId || "")).get();
+            const full = priceMap.get(key(it));
+            if (pdoc.exists && typeof full === "number") {
+              const offer = smartLinePrice(rid, pdoc.data(), full, restProducts.filter((d) => d.exists).map((d) => d.data()), smartRules);
+              if (offer !== undefined) upsellPrice.set(i, offer);
+            }
+            continue;
+          }
           if (!rules.has(rid)) rules.set(rid, (await db.collection("checkoutUpsells").doc(rid).get()).data() || null);
           const rule = rules.get(rid);
           if (!rule || rule.isActive !== true) continue;
