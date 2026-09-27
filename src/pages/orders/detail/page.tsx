@@ -8,13 +8,14 @@ import { PackageIcon, TruckIcon, MapPinIcon, CreditCardIcon, ChevronLeftIcon, Re
 import { Separator } from "@/components/ui/separator.tsx";
 import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { BrandLogo } from "@/components/brand-logo.tsx";
 import { PackedForYou } from "@/components/packed-for-you.tsx";
 import { OrderItemImage } from "@/components/order-item-image.tsx";
 import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
 import { ReviewRewardCta } from "@/components/review-reward-cta.tsx";
 import { OrderProgress } from "@/components/order-progress.tsx";
+import { trackPurchaseOnce } from "@/lib/analytics.ts";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -206,6 +207,9 @@ function OrderDetailPageInner() {
       toast.error(paymentErrorMessage(error));
     }
   };
+
+  // The sale, reported to GA4 and the Meta Pixel once the order is confirmed (lib/analytics.ts).
+  useEffect(() => { if (order) trackPurchaseOnce(order); }, [order]);
 
   if (order === undefined) {
     return (

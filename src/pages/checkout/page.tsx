@@ -29,6 +29,7 @@ import { CouponField } from "./_components/CouponField.tsx";
 import { ActiveCouponsSection } from "./_components/ActiveCouponsSection.tsx";
 
 import { BrandLogo } from "@/components/brand-logo.tsx";
+import { markOrderPlacedHere } from "@/lib/analytics.ts";
 
 // PhonePe TypeScript declarations
 declare global {
@@ -448,6 +449,8 @@ function CheckoutPageInner() {
         amount: isPhonePePayment ? (formData.paymentMethod === "cod" ? prepaidAmount : finalTotal) : undefined,
       });
 
+      // This browser placed it: the order page reports the purchase to GA4 / Meta once it is confirmed.
+      markOrderPlacedHere(result.orderId);
       const guestNav = () => navigate(`/orders/${result.orderId}`);
       // A friend's link is for one first order.
       if (referral) clearStoredReferralCode();

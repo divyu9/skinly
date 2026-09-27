@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { CheckCircle2Icon, LockIcon, XCircleIcon } from "lucide-react";
@@ -10,6 +10,7 @@ import { BrandLogo } from "@/components/brand-logo.tsx";
 import { ProductThumb } from "@/components/product-thumb.tsx";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
 import { orderLabel } from "@/lib/order-label.ts";
+import { markOrderPlacedHere } from "@/lib/analytics.ts";
 
 /**
  * /pay/:orderId?t=… — finish paying for an order, from the reminder.
@@ -24,6 +25,8 @@ export default function PayPage() {
   const [params] = useSearchParams();
   const token = params.get("t");
   const order: any = useQuery(api.orders.getOrderPublic, orderId ? { orderId } : "skip");
+  // The customer's own pay link: paying here is this browser placing the order (lib/analytics.ts).
+  useEffect(() => { if (orderId) markOrderPlacedHere(orderId); }, [orderId]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paid, setPaid] = useState(false);

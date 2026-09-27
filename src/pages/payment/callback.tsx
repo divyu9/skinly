@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { Button } from "@/components/ui/button.tsx";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { CheckCircle2Icon, XCircleIcon, AlertCircleIcon } from "lucide-react";
-import { trackPurchase } from "@/lib/analytics.ts";
+import { trackPurchaseOnce } from "@/lib/analytics.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
 import { toast } from "sonner";
 
@@ -57,16 +57,8 @@ export default function PaymentCallback() {
   useEffect(() => {
     if (order && status === "success" && !hasTracked) {
       // Track the purchase
-      trackPurchase(
-        order._id,
-        order.total,
-        order.items.map(item => ({
-          id: item.productId,
-          name: `${item.productTitle} - ${item.variant}`,
-          price: item.price,
-          quantity: item.quantity
-        }))
-      );
+      // Once per order, shared with the order page (lib/analytics.ts), so a sale is never counted twice.
+      trackPurchaseOnce(order);
       setHasTracked(true);
       
       // Auto-redirect to order page after a brief delay
