@@ -27,7 +27,16 @@ function useHome() {
   const [home, setHome] = useState<Home | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    (homeOnce ||= loadHomeProducts().then((h) => (h?.rows ? { rows: h.rows, byId: new Map(h.products.map((p) => [p._id, p])) } : null)))
+    (homeOnce ||= loadHomeProducts().then(async (h) => {
+      // Cloudflare may hand out the previous build's home.json for up to an
+      // hour after a deploy; one from before the rows existed has none, so ask
+      // past the cache once rather than show nothing.
+      if (h && !h.rows) {
+        const fresh = await fetch(`/data/home.json?fresh=${Date.now()}`).then((r) => r.json()).catch(() => null);
+        if (fresh?.rows && Array.isArray(fresh.products)) h = { ...h, rows: fresh.rows, products: fresh.products };
+      }
+      return h?.rows ? { rows: h.rows, byId: new Map(h.products.map((p) => [p._id, p])) } : null;
+    }))
       .then((h) => live && setHome(h));
     return () => { live = false; };
   }, []);
