@@ -55,6 +55,7 @@ const AdminCollectionsPage = lazyWithReload(() => import("./pages/admin/collecti
 const NewProductPage = lazyWithReload(() => import("./pages/admin/products/new/page.tsx"), "./pages/admin/products/new/page.tsx");
 const EditProductPage = lazyWithReload(() => import("./pages/admin/products/edit/page.tsx"), "./pages/admin/products/edit/page.tsx");
 const BulkProductCreatorPage = lazyWithReload(() => import("./pages/admin/products/bulk/page.tsx"), "./pages/admin/products/bulk/page.tsx");
+const AdminDashboardPage = lazyWithReload(() => import("./pages/admin/dashboard/page.tsx"), "./pages/admin/dashboard/page.tsx");
 const AdminOrdersPage = lazyWithReload(() => import("./pages/admin/orders/page.tsx"), "./pages/admin/orders/page.tsx");
 const AdminCustomersPage = lazyWithReload(() => import("./pages/admin/customers/page.tsx"), "./pages/admin/customers/page.tsx");
 const AdminOrderDetailPage = lazyWithReload(() => import("./pages/admin/orders/detail.tsx"), "./pages/admin/orders/detail.tsx");
@@ -172,7 +173,7 @@ export default function App() {
 
             {/* Admin routes - lazy loaded */}
             {/* Without this the bare path falls through to the /:slug SEO page and 404s */}
-            <Route path="/backend-skinly" element={<Navigate to="/backend-skinly/products" replace />} />
+            <Route path="/backend-skinly" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminDashboardPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><AdminProductsPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products/new" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><NewProductPage /></AdminPageWrapper></Suspense>} />
             <Route path="/backend-skinly/products/bulk" element={<Suspense fallback={<PageSkeleton />}><AdminPageWrapper><BulkProductCreatorPage /></AdminPageWrapper></Suspense>} />

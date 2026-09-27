@@ -32,7 +32,7 @@ import {
   FileText,
   Layout,
   Sparkles,
-  Tags, WandSparkles,
+  Tags, WandSparkles, LayoutDashboard,
 } from "lucide-react";
 import { useSidebar } from "./admin-sidebar-context.tsx";
 import { useState, useEffect } from "react";
@@ -53,7 +53,11 @@ interface NavCategory {
 
 export function AdminSidebar() {
   const location = useLocation();
-  const { collapsed, setCollapsed } = useSidebar();
+  const { collapsed: collapsedSetting, setCollapsed, mobileOpen, setMobileOpen } = useSidebar();
+  // The drawer on a phone always opens full width; the icon rail is a desktop thing.
+  const collapsed = collapsedSetting && !mobileOpen;
+  // Following a link closes the drawer, or it would sit over the page it opened.
+  useEffect(() => { setMobileOpen(false); }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load expanded state from localStorage
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => {
@@ -174,8 +178,9 @@ export function AdminSidebar() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-card border-r flex flex-col transition-all duration-300 z-40",
-        collapsed ? "w-16" : "w-64"
+        "fixed left-0 top-0 h-screen bg-card border-r flex flex-col transition-all duration-300 z-50",
+        collapsed ? "w-16" : "w-64",
+        mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0"
       )}
     >
       {/* Logo & Toggle */}
@@ -186,11 +191,29 @@ export function AdminSidebar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={() => (mobileOpen ? setMobileOpen(false) : setCollapsed(!collapsedSetting))}
           className={cn("shrink-0", collapsed && "mx-auto")}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
+      </div>
+
+      {/* Home sits above the groups: it is where the day starts, not a page among forty. */}
+      <div className="px-2 pt-2">
+        <Link
+          to="/backend-skinly"
+          title="Dashboard"
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+            collapsed && "justify-center",
+            location.pathname === "/backend-skinly" || location.pathname === "/backend-skinly/"
+              ? "bg-primary text-primary-foreground"
+              : "text-foreground hover:bg-accent hover:text-accent-foreground"
+          )}
+        >
+          <LayoutDashboard className={cn("shrink-0", collapsed ? "h-5 w-5" : "h-4 w-4")} />
+          {!collapsed && <span>Dashboard</span>}
+        </Link>
       </div>
 
       {/* Navigation */}

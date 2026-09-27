@@ -16,12 +16,12 @@ import { queueWhatsApp } from "./orderNotifications";
  * out, so the number is on record even when WhatsApp is not configured.
  */
 
-const SETTINGS = {
+export const SETTINGS = {
   rollMetres: "LOW_STOCK_ROLL_METRES",
   cutoutSheets: "LOW_STOCK_CUTOUT_SHEETS",
 };
 
-async function threshold(db: admin.firestore.Firestore, key: string, fallback: number): Promise<number> {
+export async function threshold(db: admin.firestore.Firestore, key: string, fallback: number): Promise<number> {
   const snap = await db.collection("settings").doc(key).get();
   const n = Number(snap.exists ? (snap.data() as any)?.value : NaN);
   return Number.isFinite(n) && n >= 0 ? n : fallback;

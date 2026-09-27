@@ -438,7 +438,7 @@ export default function AdminModelsPage() {
 
   return (
     <AdminLayout>
-        <Tabs defaultValue="models" className="w-full">
+        <Tabs defaultValue={new URLSearchParams(window.location.search).get("tab") || "models"} className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="models">
               <SmartphoneIcon className="size-4 mr-2" />

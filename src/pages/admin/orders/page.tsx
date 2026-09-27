@@ -46,7 +46,7 @@ function AdminOrdersPageInner() {
    * filtered to them. The tab widens to All at the same time, or a customer
    * whose orders are all delivered would open on an empty Processing list.
    */
-  const [statusFilter, setStatusFilter] = useState<string>(params.get("q") ? "all" : "processing");
+  const [statusFilter, setStatusFilter] = useState<string>(params.get("status") || (params.get("q") ? "all" : "processing"));
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState(params.get("q") || "");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());

@@ -513,3 +513,10 @@ img[data-img-broken] {
   [data-drag-scroll][data-dragging] { cursor: grabbing; user-select: none; }
   [data-drag-scroll][data-dragging] * { pointer-events: none; }
 }
+
+/* The admin home's greeting: one wave on arrival, then still. */
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  20%, 60% { transform: rotate(14deg); }
+  40%, 80% { transform: rotate(-8deg); }
+}

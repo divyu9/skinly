@@ -66,7 +66,7 @@ export function MobileBottomNav() {
 
   // The bar would sit on top of the payment sheet, and a checkout is the one
   // place a stray tap is expensive.
-  const hidden = /^\/(checkout|payment)/.test(pathname);
+  const hidden = /^\/(checkout|payment|backend-skinly)/.test(pathname); // admin has its own menu
 
   // The page needs clearance only where the bar is actually drawn. As a blanket
   // rule on body it left 56px of dead space at the bottom of checkout, which is
