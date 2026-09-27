@@ -6,8 +6,10 @@ import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button.tsx";
 
 /**
- * Newer / older order, from an order's page: the next order placed after this
- * one and the one before it, by createdAt, skipping deleted orders. The
+ * Newer / older order, from an order's page: the next confirmed order placed
+ * after this one and the one before it, by createdAt. Unpaid checkouts and
+ * failed payments (no order number yet, or awaiting payment) and deleted
+ * orders are skipped. The
  * keyboard's ← and → do the same when nothing is being typed.
  */
 type Near = { id: string; label: string } | null;
@@ -15,12 +17,15 @@ type Near = { id: string; label: string } | null;
 async function neighbour(createdAt: number, dir: "newer" | "older"): Promise<Near> {
   const q = query(collection(db, "orders"),
     where("createdAt", dir === "newer" ? ">" : "<", createdAt),
-    orderBy("createdAt", dir === "newer" ? "asc" : "desc"), limit(8));
+    orderBy("createdAt", dir === "newer" ? "asc" : "desc"), limit(30));
   const s = await getDocs(q);
-  const d = s.docs.find((x) => !(x.data() as any).isDeleted);
+  const d = s.docs.find((x) => {
+    const o = x.data() as any;
+    return !!o.orderNumber && !o.isDeleted && o.status !== "pending_payment" && o.paymentStatus !== "failed";
+  });
   if (!d) return null;
   const o = d.data() as any;
-  return { id: d.id, label: String(o.orderNumber || o.checkoutRef || "Unpaid") };
+  return { id: d.id, label: String(o.orderNumber) };
 }
 
 export function OrderNavigator({ createdAt }: { createdAt?: number }) {
