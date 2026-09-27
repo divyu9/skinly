@@ -118,8 +118,16 @@ export async function reserveMaterialForOrder(
   orderRef: admin.firestore.DocumentReference,
   items: Array<{ productId?: string; variant?: string; title?: string; quantity?: number }>
 ): Promise<void> {
-  // Once per order: the trigger and any re-run must not take it twice.
-  if (((await orderRef.get()).data() as any)?.materialConsumed) return;
+  // Once per order: the trigger and any re-run must not take it twice. The
+  // claim is a transaction because a payment confirmation writes the order
+  // several times in quick succession, and each write wakes the trigger.
+  const claimed = await db.runTransaction(async (tx) => {
+    const o = (await tx.get(orderRef)).data() as any;
+    if (!o || o.materialConsumed || o.materialClaimedAt) return false;
+    tx.update(orderRef, { materialClaimedAt: Date.now() });
+    return true;
+  });
+  if (!claimed) return;
 
   const productIds = Array.from(
     new Set(items.map((i) => i?.productId).filter((p): p is string => !!p))
@@ -590,19 +598,35 @@ export async function releaseMaterialForOrder(
 }
 
 /**
- * Every new order draws down the stock of the designs it was cut from, and
- * the listings made from them are recounted — run to completion by Firestore
- * rather than left behind by placeOrder's reply.
+ * Whether an order is real: it has its order number, is not awaiting or
+ * failed payment, and was not deleted. An online checkout is written before
+ * the customer pays — as CHK-…, pending_payment — and most are never paid.
  */
-export const onOrderCreatedStock = functionsV1
+export function isConfirmedOrder(o: any): boolean {
+  return !!o?.orderNumber && !o?.isDeleted && o?.status !== "pending_payment" && o?.paymentStatus !== "failed";
+}
+
+/**
+ * An order draws down the stock of the designs it was cut from once it is
+ * confirmed — at once for COD, when the payment lands for an online order —
+ * and the listings made from them are recounted. It used to happen on
+ * creation, so every abandoned online checkout (28 in its first day) took
+ * sheets it never paid for. reserveMaterialForOrder is idempotent
+ * (materialConsumed), so a later write to a confirmed order takes nothing more.
+ */
+export const onOrderConfirmedStock = functionsV1
   .runWith({ timeoutSeconds: 120, memory: "512MB" })
   .firestore.document("orders/{orderId}")
-  .onCreate(async (snap) => {
-    const order = snap.data() as any;
+  .onWrite(async (change) => {
+    if (!change.after.exists) return null;
+    const after = change.after.data() as any;
+    const before = change.before.exists ? (change.before.data() as any) : null;
+    if (!isConfirmedOrder(after) || after.materialConsumed || after.materialReleasedAt) return null;
+    if (before && isConfirmedOrder(before) && before.materialConsumed) return null;
     try {
-      await reserveMaterialForOrder(admin.firestore(), snap.ref, Array.isArray(order?.items) ? order.items : []);
+      await reserveMaterialForOrder(admin.firestore(), change.after.ref, Array.isArray(after?.items) ? after.items : []);
     } catch (e: any) {
-      console.error("onOrderCreatedStock failed", { order: snap.id, error: e?.message || e });
+      console.error("onOrderConfirmedStock failed", { order: change.after.id, error: e?.message || e });
     }
     return null;
   });
