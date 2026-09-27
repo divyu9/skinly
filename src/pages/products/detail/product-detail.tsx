@@ -51,6 +51,7 @@ import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
 import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { SmartSetup, type SetupCartItem } from "./_components/smart-setup.tsx";
+import { SameDesignOtherGadgets } from "@/components/products/sections/SameDesignOtherGadgets.tsx";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
 
@@ -664,7 +665,10 @@ export default function ProductDetailPage() {
           {/* Apple-like Landing Sections */}
           <ProductLandingSections productId={productData._id} />
 
-          {/* Suggested Products Section */}
+          {/* The same design on the buyer's other gadgets. */}
+          <SameDesignOtherGadgets productId={productData._id} brand={phoneBrand} />
+
+          {/* Suggested Products Section: other designs for this device, one listing each. */}
           <SuggestedProductsSection productId={productData._id} />
 
           {/* Trending Products Section */}

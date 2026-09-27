@@ -303,7 +303,6 @@ async function couponScope(c: any): Promise<null | ((line: { productId: string; 
  * charger, is the one thing on the page most likely to go in the same order.
  * One per device, most-owned devices first, so it is never six lens skins.
  */
-const SETUP_GADGET_ORDER = ['phone', 'laptop', 'tablet', 'charger', 'controller', 'console', 'mac-mini', 'camera', 'action-camera', 'drone', 'gimbals', 'lens'];
 function designOf(p: any): string {
   const up = /\/design-raw\/([A-Z]+-\d+)-/.exec(String(p?.designImageUrl || ''))?.[1];
   if (up) return up;
@@ -315,26 +314,27 @@ function designOf(p: any): string {
   return '';
 }
 function setupPicks(product: any, productId: string, candidates: any[]): any[] {
+  /*
+   * Other designs for the same device, one listing per design.
+   *
+   * A design is listed once per brand (Apple iPhone, Samsung Galaxy, OnePlus,
+   * Android…), so the row showed "Adult Drama" four times running. Each design
+   * now appears once, as the listing of the same kind as this page's (an
+   * iPhone page shows the iPhone listing) where there is one. The same design
+   * on the buyer's other gadgets has its own row (SameDesignOtherGadgets).
+   */
   const withPhoto = candidates.filter((p) => p.productCategory === product.productCategory && p.images?.[0]?.url);
-  const rank = (g: string) => { const i = SETUP_GADGET_ORDER.indexOf(g); return i < 0 ? 99 : i; };
   const design = designOf(product);
-  const out: any[] = [];
-  const seenGadget = new Set<string>([String(product.gadgetCategory || '')]);
-  if (design) {
-    const family = withPhoto
-      .filter((p) => designOf(p) === design && p.gadgetCategory !== product.gadgetCategory)
-      .sort((a, b) => rank(a.gadgetCategory) - rank(b.gadgetCategory));
-    for (const p of family) {
-      if (seenGadget.has(p.gadgetCategory)) continue;
-      seenGadget.add(p.gadgetCategory);
-      out.push(p);
-    }
-  }
-  const picked = new Set(out.map((p) => p._id).concat(productId));
   const sameDevice = withPhoto
-    .filter((p) => p.gadgetCategory === product.gadgetCategory && !picked.has(p._id) && designOf(p) !== design)
+    .filter((p) => p.gadgetCategory === product.gadgetCategory && p._id !== productId && (!design || designOf(p) !== design))
     .sort((a, b) => (b._creationTime || 0) - (a._creationTime || 0));
-  return [...out, ...sameDevice];
+  const byDesign = new Map<string, any>();
+  for (const p of sameDevice) {
+    const key = designOf(p) || p._id;
+    const cur = byDesign.get(key);
+    if (!cur || (p.listingKind && p.listingKind === product.listingKind && cur.listingKind !== product.listingKind)) byDesign.set(key, p);
+  }
+  return [...byDesign.values()];
 }
 
 async function catalogueProducts(): Promise<any[] | null> {
@@ -3450,6 +3450,10 @@ export function useQuery(apiRef: any, args?: any) {
                 : (await getDocs(query(collection(db, 'products'), where('status', '==', 'active'))))
                     .docs.map(d => ({ _id: d.id, ...d.data() } as any));
               const candidates = all.filter((p: any) => p._id !== args.productId);
+              // The product document has no design field; the catalogue row does.
+              const self = all.find((p: any) => p._id === args.productId);
+              if (self?.design && !product.design) product.design = self.design;
+              if (self?.listingKind && !product.listingKind) product.listingKind = self.listingKind;
 
               let picked: any[] = [];
               if (config.sourceType === 'manual' && config.manualProductIds?.length) {

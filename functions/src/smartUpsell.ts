@@ -42,32 +42,51 @@ export function smartOfferPrice(full: number, rule: Rule | undefined): number {
   return Math.max(1, Math.min(full, Math.round(full - off)));
 }
 
-export async function loadSmartRules(db: admin.firestore.Firestore): Promise<{ enabled: boolean; offers: Record<Kind, Rule> }> {
+type Gift = { enabled: boolean; threshold: number; kind: Kind };
+export type SmartRules = { enabled: boolean; offers: Record<Kind, Rule>; freeGift: Gift };
+
+export async function loadSmartRules(db: admin.firestore.Firestore): Promise<SmartRules> {
   const raw = (await db.collection("settings").doc("smartUpsell").get()).data() as any;
   const offers = { ...DEFAULTS };
   for (const k of Object.keys(DEFAULTS) as Kind[]) {
     const o = raw?.offers?.[k];
     if (o) offers[k] = { enabled: o.enabled !== false, type: o.type === "flat" ? "flat" : "percent", value: Math.max(0, Number(o.value) || 0) };
   }
-  return { enabled: raw?.enabled !== false, offers };
+  const g = raw?.freeGift;
+  const freeGift: Gift = {
+    enabled: g?.enabled === true,
+    threshold: Math.max(0, Number(g?.threshold) || 0),
+    kind: g?.kind && g.kind in DEFAULTS ? g.kind : "chargerSkin",
+  };
+  return { enabled: raw?.enabled !== false, offers, freeGift };
 }
 
 /**
- * The offer price of one smart line, or undefined to charge in full.
- * `restProducts` are the documents of the cart's ordinary (non-upsell) lines.
+ * The price of one smart line, or undefined to charge in full.
+ * `restProducts` are the documents of the cart's ordinary (non-upsell) lines
+ * and `restValue` what they cost. The first single gift-kind line is free once
+ * `restValue` reaches the gift threshold; `state` carries that across lines.
  */
 export function smartLinePrice(
   claimed: string,
   product: any,
   full: number,
+  quantity: number,
   restProducts: any[],
-  rules: { enabled: boolean; offers: Record<Kind, Rule> },
+  restValue: number,
+  rules: SmartRules,
+  state: { giftGiven: boolean },
 ): number | undefined {
   if (!rules.enabled) return undefined;
   const kind = smartKindOf(product);
   if (!kind || `smart:${kind}` !== claimed) return undefined;
   const anchors = restProducts.filter((p) => String(p?.productCategory || "").toLowerCase() === "skin" && (kind !== "chargerSkin" || p?.gadgetCategory !== "charger"));
   if (!anchors.length) return undefined;
+  const g = rules.freeGift;
+  if (g.enabled && g.kind === kind && !state.giftGiven && quantity === 1 && restValue >= g.threshold) {
+    state.giftGiven = true;
+    return 0;
+  }
   const price = smartOfferPrice(full, rules.offers[kind]);
   return price < full ? price : undefined;
 }

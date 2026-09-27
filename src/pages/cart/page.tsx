@@ -13,6 +13,7 @@ import type { Id } from "@/lib/firebase-api";
 import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { CheckoutUpsells } from "../checkout/_components/checkout-upsells.tsx";
+import { CartSmartSetup, useSmartRepricing } from "@/components/cart-smart-setup.tsx";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useEffect, useState } from "react";
@@ -84,6 +85,7 @@ export default function CartPage() {
 function AuthenticatedCartContent() {
   const navigate = useNavigate();
   const cartItems = useQuery(api.cart.getCart);
+  useSmartRepricing(cartItems as any, false);
   const shippingSettings = useQuery(api.shipping.getShippingSettings) as
     | { freeShippingThreshold?: number; flatShippingFee?: number }
     | null
@@ -397,7 +399,7 @@ function AuthenticatedCartContent() {
               none are configured, and the wrapper was still spending its margin
               — 48px of blank between the cart and its total. */}
           <div className="mt-4 empty:hidden">
-            <CheckoutUpsells />
+            <CartSmartSetup lines={cartItems as any} fallback={<CheckoutUpsells />} />
           </div>
         </div>
 
@@ -511,6 +513,7 @@ function GuestCartContent() {
     removeFromGuestCart,
     clearGuestCart,
   } = useGuestCart();
+  useSmartRepricing(guestCart as any, true);
 
   // Check stock status for guest cart items (Must be called unconditionally)
   const cartItemsForStockCheck = (guestCart || []).map(item => ({
@@ -745,6 +748,10 @@ function GuestCartContent() {
             >
               Clear cart
             </button>
+          </div>
+
+          <div className="mt-4 empty:hidden">
+            <CartSmartSetup lines={guestCart as any} />
           </div>
         </div>
 

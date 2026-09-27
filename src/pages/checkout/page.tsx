@@ -20,6 +20,7 @@ import { useGuestCart } from "@/hooks/use-guest-cart.ts";
 import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/lib/firebase-api";
 import { CheckoutUpsells } from "./_components/checkout-upsells.tsx";
+import { CartSmartSetup, useSmartRepricing } from "@/components/cart-smart-setup.tsx";
 import { AddressForm, type FormData } from "./_components/AddressForm.tsx";
 import { PaymentMethodSelector } from "./_components/PaymentMethodSelector.tsx";
 import { CodOtpSection } from "./_components/CodOtpSection.tsx";
@@ -202,6 +203,8 @@ function CheckoutPageInner() {
   });
 
   const cartItems = isAuthenticated ? dbCartItems : guestCart;
+  // Smart Setup lines carry exactly what placeOrder will charge.
+  useSmartRepricing(cartItems as any, !isAuthenticated);
 
   const cartItemsForStockCheck = cartItems?.map((item) => ({
     productId: item.productId, variant: item.variant, quantity: item.quantity,
@@ -587,7 +590,7 @@ function CheckoutPageInner() {
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
+          <div className="min-w-0 lg:col-span-2">
             {hasOutOfStockItems && (
               <Card className="mb-6 border-destructive/50 bg-destructive/10">
                 <CardContent className="p-4">
@@ -701,7 +704,7 @@ function CheckoutPageInner() {
               {/* One upsell, immediately above the button. It was rendered
                   twice — once before the address form, where it interrupts,
                   and once under Place Order, where nobody scrolls. */}
-              <CheckoutUpsells />
+              <CartSmartSetup lines={cartItems as any} compact fallback={<CheckoutUpsells />} />
 
               <Button type="submit" size="lg" className="sticker sticker-press w-full rounded-xl bg-brand text-base font-bold text-brand-foreground hover:bg-brand/90" disabled={isSubmitting || isRedirectingToPayment || hasOutOfStockItems}>
                 {isRedirectingToPayment ? (

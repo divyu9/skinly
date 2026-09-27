@@ -18,7 +18,9 @@ import { brandInScope } from "@/lib/device-fit";
 
 export type SetupKind = "chargerSkin" | "case" | "glass" | "cameraRing" | "membrane" | "magneto";
 export type OfferRule = { enabled: boolean; type: "percent" | "flat"; value: number };
-export type SmartUpsellSettings = { enabled: boolean; offers: Record<SetupKind, OfferRule> };
+/** Spend this much on everything else and one add-on of `kind` is free. */
+export type FreeGift = { enabled: boolean; threshold: number; kind: SetupKind };
+export type SmartUpsellSettings = { enabled: boolean; offers: Record<SetupKind, OfferRule>; freeGift: FreeGift };
 
 export const SETUP_KINDS: Array<{ kind: SetupKind; label: string; hint: string }> = [
   { kind: "chargerSkin", label: "Matching charger skin", hint: "Same design, for their brand's charger" },
@@ -39,6 +41,8 @@ export const DEFAULT_SMART_UPSELL: SmartUpsellSettings = {
     membrane: { enabled: true, type: "percent", value: 10 },
     magneto: { enabled: true, type: "flat", value: 200 },
   },
+  // Off until the admin picks a threshold: it gives stock away.
+  freeGift: { enabled: false, threshold: 599, kind: "chargerSkin" },
 };
 
 /** Stored settings over the defaults, so a kind added later is never undefined. */
@@ -48,7 +52,11 @@ export function withDefaults(raw: any): SmartUpsellSettings {
     const o = raw?.offers?.[kind];
     if (o) offers[kind] = { enabled: o.enabled !== false, type: o.type === "flat" ? "flat" : "percent", value: Math.max(0, Number(o.value) || 0) };
   }
-  return { enabled: raw?.enabled !== false, offers };
+  const g = raw?.freeGift;
+  const freeGift: FreeGift = g
+    ? { enabled: g.enabled === true, threshold: Math.max(0, Number(g.threshold) || 0), kind: SETUP_KINDS.some((k) => k.kind === g.kind) ? g.kind : "chargerSkin" }
+    : DEFAULT_SMART_UPSELL.freeGift;
+  return { enabled: raw?.enabled !== false, offers, freeGift };
 }
 
 /** The offer price: never above the real price, never below ₹1. */
@@ -246,4 +254,58 @@ export function buildSetupPicks(
   }
 
   return picks.filter((p) => p.options.length && p.kind !== undefined && product._id !== p.options[0].productId);
+}
+
+
+// ─── Cart pricing ────────────────────────────────────────────────────────────
+
+export type CartLine = {
+  _id?: string; productId: string; variant: string; price: number; quantity: number;
+  upsellRuleId?: string; phoneBrand?: string; phoneModel?: string;
+};
+
+/**
+ * What each Smart Setup line in a cart costs, by the rules placeOrder applies
+ * (functions/src/smartUpsell.ts): the offer price while the cart holds a skin
+ * (for a charger skin, a skin for another device), the full price otherwise,
+ * and ₹0 for the first single gift-kind line once everything else in the cart
+ * reaches the free-gift threshold. Keyed by line index.
+ */
+export function smartCartPrices(lines: CartLine[], byId: Map<string, CatalogueProduct>, settings: SmartUpsellSettings): Map<number, number> {
+  const out = new Map<number, number>();
+  const fullOf = (l: CartLine) => {
+    const v = byId.get(l.productId)?.variants?.find((x) => x.title === l.variant);
+    return Number(v?.price) || 0;
+  };
+  const rest = lines.filter((l) => !l.upsellRuleId);
+  const restValue = rest.reduce((s, l) => s + fullOf(l) * (Number(l.quantity) || 1), 0);
+  const restProducts = rest.map((l) => byId.get(l.productId)).filter(Boolean) as CatalogueProduct[];
+  let giftGiven = false;
+  lines.forEach((l, i) => {
+    if (!String(l.upsellRuleId || "").startsWith("smart:")) return;
+    const p = byId.get(l.productId);
+    const full = fullOf(l);
+    if (!p || !full) return;
+    const kind = kindOf(p);
+    const anchored = restProducts.some((r) => r.productCategory === "skin" && (kind !== "chargerSkin" || r.gadgetCategory !== "charger"));
+    let price = full;
+    if (settings.enabled && kind && l.upsellRuleId === `smart:${kind}` && anchored) {
+      const g = settings.freeGift;
+      if (g.enabled && g.kind === kind && !giftGiven && (Number(l.quantity) || 1) === 1 && restValue >= g.threshold) {
+        price = 0;
+        giftGiven = true;
+      } else {
+        price = offerPrice(full, settings.offers[kind]);
+      }
+    }
+    out.set(i, price);
+  });
+  return out;
+}
+
+/** Flagships worth pitching Magneto X to as a creator's kit: recent Pro iPhones, Galaxy S Ultra and the folds. */
+export function isFlagship(brand: string, model: string): boolean {
+  const m = `${brand} ${model}`;
+  const ip = /iphone\s*(\d+)\s*pro/i.exec(m);
+  return (!!ip && Number(ip[1]) >= 15) || /s2[3-9]\s*ultra|fold|flip|pixel\s*\d+\s*pro/i.test(m);
 }

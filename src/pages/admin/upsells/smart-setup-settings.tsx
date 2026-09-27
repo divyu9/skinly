@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
-import { LoaderIcon, SparklesIcon } from "lucide-react";
+import { GiftIcon, LoaderIcon, SparklesIcon } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
@@ -104,6 +104,31 @@ export function SmartSetupSettings() {
             })}
           </tbody>
         </table>
+        {/* Free gift: the cart shows a bar towards it. */}
+        <div className="flex flex-wrap items-center gap-3 border-t bg-blush/20 px-5 py-4">
+          <GiftIcon className="size-5" />
+          <div className="min-w-[200px] flex-1">
+            <p className="font-semibold">Free gift in the cart</p>
+            <p className="text-xs text-muted-foreground">
+              Cart shows "Add ₹X more and get a FREE …". One free piece per order, only with a skin in the cart.
+            </p>
+          </div>
+          <Switch checked={s.freeGift.enabled} onCheckedChange={(v) => edit({ ...s, freeGift: { ...s.freeGift, enabled: v } })} />
+          <label className="flex items-center gap-1.5 text-sm">
+            Free
+            <select value={s.freeGift.kind} onChange={(e) => edit({ ...s, freeGift: { ...s.freeGift, kind: e.target.value as SetupKind } })}
+              className="h-8 rounded-md border border-input bg-background px-2 text-sm">
+              {SETUP_KINDS.map((k) => <option key={k.kind} value={k.kind}>{k.label}</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-sm">
+            when the rest reaches ₹
+            <input type="number" min={0} value={s.freeGift.threshold}
+              onChange={(e) => edit({ ...s, freeGift: { ...s.freeGift, threshold: Math.max(0, Number(e.target.value) || 0) } })}
+              className="h-8 w-24 rounded-md border border-input bg-background px-2 text-sm tabular-nums" />
+          </label>
+        </div>
+
         <p className="border-t px-5 py-3 text-xs text-muted-foreground">
           The offer price applies only when the cart also has a skin; on its own an add-on is charged in full. A value of 0 shows it at full price.
         </p>

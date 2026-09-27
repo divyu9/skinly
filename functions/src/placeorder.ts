@@ -168,6 +168,7 @@ export const placeOrder = functions
         const rules = new Map<string, any>();
         // Product-page Smart Setup lines ("smart:<kind>"): priced by settings/smartUpsell.
         let smartRules: Awaited<ReturnType<typeof loadSmartRules>> | null = null;
+        const giftState = { giftGiven: false };
         for (const i of upsellLines) {
           const it = orderItems[i];
           const rid = String(it.upsellRuleId);
@@ -176,7 +177,8 @@ export const placeOrder = functions
             const pdoc = await db.collection("products").doc(String(it.productId || "")).get();
             const full = priceMap.get(key(it));
             if (pdoc.exists && typeof full === "number") {
-              const offer = smartLinePrice(rid, pdoc.data(), full, restProducts.filter((d) => d.exists).map((d) => d.data()), smartRules);
+              const qty = Math.max(1, Math.floor(Number(it?.quantity || 1)));
+              const offer = smartLinePrice(rid, pdoc.data(), full, qty, restProducts.filter((d) => d.exists).map((d) => d.data()), restValue, smartRules, giftState);
               if (offer !== undefined) upsellPrice.set(i, offer);
             }
             continue;
@@ -222,7 +224,9 @@ export const placeOrder = functions
       // An unpriced variant is not for sale. New Hexa Ring carried twenty rows
       // at price 0; the storefront hides them, but this is the line that bills,
       // and it would have charged ₹0 for any of them.
-      if (!(dbPrice > 0)) {
+      const listPrice = item?.productId && item?.variant ? priceMap.get(`${String(item.productId)}::${String(item.variant)}`) : undefined;
+      // A Smart Setup free gift is charged ₹0; whether it is for sale at all is its own price.
+      if (!(dbPrice > 0) && !(upsellPrice.get(idx) === 0 && Number(listPrice) > 0)) {
         throw new HttpsError(
           "failed-precondition",
           `"${item?.variant}" is not available to order`
