@@ -54,7 +54,7 @@ export function DelhiveryBulkDialog({ open, onOpenChange, orders }: { open: bool
   useEffect(() => {
     if (!open) return;
     cancelled.current = false;
-    const initial: Row[] = orders.filter((o) => !o.awbNumber && !o.isDeleted).map((o) => ({
+    const initial: Row[] = orders.filter((o) => !o.awbNumber && !o.isDeleted && !!o.orderNumber && o.status !== "pending_payment" && o.paymentStatus !== "failed").map((o) => ({
       id: o._id, orderNumber: String(o.orderNumber || o._id), route: "skip",
       pin: String(o.shippingAddress?.pincode || ""), city: String(o.shippingAddress?.city || ""),
     }));

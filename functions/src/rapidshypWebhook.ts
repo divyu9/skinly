@@ -116,7 +116,7 @@ function eventTime(shipment: any, record: any): number {
 }
 
 /** One shipment out of the payload, applied to the order it belongs to. */
-async function applyShipment(
+export async function applyShipment(
   db: admin.firestore.Firestore,
   record: any,
   shipment: any

@@ -571,10 +571,12 @@ function AdminOrdersPageInner() {
   const bulkCreateRapidshypOrders = async () => {
     if (!displayOrders || selectedOrders.size === 0) return;
     const chosen = displayOrders.filter((o: any) => selectedOrders.has(o._id));
-    const todo = chosen.filter((o: any) => !o.awbNumber && !o.rapidshypOrderId && !o.isDeleted);
+    // Confirmed orders only: an unpaid checkout (CHK-…, pending or failed payment) is never shipped.
+    const confirmed = (o: any) => !!o.orderNumber && !o.isDeleted && o.status !== "pending_payment" && o.paymentStatus !== "failed";
+    const todo = chosen.filter((o: any) => !o.awbNumber && !o.rapidshypOrderId && confirmed(o));
     const skipped = chosen.length - todo.length;
-    if (!todo.length) { toast.info("All selected orders are already shipped or already in RapidShyp"); return; }
-    if (!confirm(`Create ${todo.length} order${todo.length > 1 ? "s" : ""} in RapidShyp (no shipment)?${skipped ? ` ${skipped} already shipped or in RapidShyp will be skipped.` : ""}`)) return;
+    if (!todo.length) { toast.info("All selected orders are already shipped, already in RapidShyp, or unpaid"); return; }
+    if (!confirm(`Create ${todo.length} order${todo.length > 1 ? "s" : ""} in RapidShyp (no shipment)?${skipped ? ` ${skipped} skipped: already shipped, already in RapidShyp, or unpaid.` : ""}`)) return;
 
     const { getFunctions, httpsCallable } = await import("firebase/functions");
     const call = httpsCallable(getFunctions(), "createRapidshypOrder");
@@ -590,6 +592,25 @@ function AdminOrdersPageInner() {
     const summary = `${ok} created in RapidShyp${skipped ? `, ${skipped} skipped` : ""}${failed.length ? `, ${failed.length} failed` : ""}`;
     if (failed.length) toast.error(summary, { description: failed.slice(0, 5).join(" · "), duration: 15000 });
     else toast.success(summary);
+  };
+
+  /*
+   * RapidShyp does not always send its webhook (functions/src/rapidshypSync.ts):
+   * this asks it for the selected orders — or every open RapidShyp order —
+   * and applies what it says: AWB, courier, status. Runs by itself every 30
+   * minutes too.
+   */
+  const syncFromRapidshyp = async () => {
+    const ids = [...selectedOrders];
+    const t = toast.loading(ids.length ? `Asking RapidShyp about ${ids.length} order(s)…` : "Asking RapidShyp about every open order…");
+    try {
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const r: any = (await httpsCallable(getFunctions(), "syncRapidshypOrders")({ orderIds: ids })).data;
+      toast.success(`${r.checked} checked · ${r.moved?.length || 0} moved${r.noShipment ? ` · ${r.noShipment} not shipped in RapidShyp yet` : ""}${r.errors ? ` · ${r.errors} failed` : ""}`,
+        { id: t, description: (r.moved || []).slice(0, 8).join(", "), duration: 10000 });
+    } catch (e: any) {
+      toast.error(e?.message || "Could not sync with RapidShyp", { id: t });
+    }
   };
 
   const generatePackList = async () => {
@@ -899,7 +920,7 @@ function AdminOrdersPageInner() {
             {/* RapidShyp, both ways in one menu: ship now, or book the order only. */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="default" disabled={selectedOrders.size === 0 || isProcessingBulk || !!bookingRs}>
+                <Button variant="default" disabled={isProcessingBulk || !!bookingRs}>
                   {isProcessingBulk || bookingRs ? <LoaderIcon className="size-4 mr-2 animate-spin" /> : <PackageCheckIcon className="size-4 mr-2" />}
                   {bookingRs ? `RapidShyp ${bookingRs.done}/${bookingRs.total}…` : `RapidShyp (${selectedOrders.size}) ▾`}
                 </Button>
@@ -908,8 +929,11 @@ function AdminOrdersPageInner() {
                 <DropdownMenuItem disabled={statusFilter !== "processing" || getValidShipOrders().length === 0} onSelect={() => setShowBulkShipDialog(true)}>
                   Ship now — courier and AWB ({statusFilter === "processing" ? getValidShipOrders().length : "Processing tab"})
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void bulkCreateRapidshypOrders()}>
+                <DropdownMenuItem disabled={selectedOrders.size === 0} onSelect={() => void bulkCreateRapidshypOrders()}>
                   Create orders only, no shipment ({selectedOrders.size})
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void syncFromRapidshyp()}>
+                  Sync status from RapidShyp ({selectedOrders.size || "all open"})
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

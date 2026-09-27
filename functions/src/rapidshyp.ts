@@ -4,6 +4,7 @@ import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { setOrderStatus } from "./orderStatus";
 import { cancelDelhiveryWaybill, delhiveryLabelLink } from "./delhiveryApi";
+import { isConfirmedOrder } from "./materials";
 
 /**
  * RapidShyp shipment creation.
@@ -383,6 +384,10 @@ export const createShipment = onCall(async (data: any, context: any) => {
   if (order.awbNumber) {
     throw new HttpsError("already-exists", `Shipment already created (AWB ${order.awbNumber})`);
   }
+  // An unpaid checkout (CHK-…, pending or failed payment) is not an order to ship.
+  if (!isConfirmedOrder(order)) {
+    throw new HttpsError("failed-precondition", "This order is not confirmed (unpaid or payment failed) — it cannot be shipped");
+  }
 
   console.log("RapidShyp createShipment", {
     order: order.orderNumber || orderDoc.id,
@@ -486,6 +491,10 @@ export const createRapidshypOrder = onCall(async (data: any, context: any) => {
   }
   if (order.rapidshypOrderId) {
     throw new HttpsError("already-exists", `Already in RapidShyp as order ${order.rapidshypOrderId} — process it there`);
+  }
+  // An unpaid checkout (CHK-…, pending or failed payment) is not an order to ship.
+  if (!isConfirmedOrder(order)) {
+    throw new HttpsError("failed-precondition", "This order is not confirmed (unpaid or payment failed) — it cannot be shipped");
   }
 
   console.log("RapidShyp createOrder", { order: payload.orderId, url: config.orderUrl, payload });

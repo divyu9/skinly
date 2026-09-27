@@ -5,6 +5,7 @@ import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { setOrderStatus, type OrderStatus } from "./orderStatus";
 import { buildOrderPayload, orderMoney } from "./rapidshyp";
+import { isConfirmedOrder } from "./materials";
 import {
   dlv, delhiverySettings, dlvClean, dlvTime, delhiveryLabelLink, DELHIVERY_TRACK_URL,
 } from "./delhiveryApi";
@@ -116,6 +117,7 @@ export const createDelhiveryShipment = onCall(async (data: any, context: any) =>
   const db = admin.firestore();
   const { orderRef, order, orderDoc, payload } = await buildOrderPayload(orderId);
   if (order.awbNumber) throw new HttpsError("already-exists", `Shipment already created (AWB ${order.awbNumber})`);
+  if (!isConfirmedOrder(order)) throw new HttpsError("failed-precondition", "This order is not confirmed (unpaid or payment failed) — it cannot be shipped");
   const cfg = await delhiverySettings(db);
   if (!cfg.pickup) throw new HttpsError("failed-precondition", "Set the Delhivery pickup location name in Admin → Shipping first.");
 
