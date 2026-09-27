@@ -20,6 +20,7 @@ import { ReferralPanel } from "./_components/ReferralPanel.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
 import { PackageCard } from "./_components/PackageCard.tsx";
+import { OrderNavigator } from "./_components/OrderNavigator.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
 import { WhatsAppPanel, type EmailType } from "./_components/WhatsAppPanel.tsx";
@@ -531,6 +532,9 @@ function OrderDetailPageInner() {
             Back to Orders
           </Button>
         </Link>
+        {/* Step to the order placed just after or before this one. */}
+        <OrderNavigator createdAt={Number((order as any).createdAt) || undefined} />
+
         {/* The customer's own order page — the same document id, opened as they see it. */}
         {orderId && (
           <a href={`/orders/${orderId}`} target="_blank" rel="noopener noreferrer">
