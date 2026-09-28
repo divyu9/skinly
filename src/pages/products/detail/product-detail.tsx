@@ -642,7 +642,7 @@ export default function ProductDetailPage() {
                 />
               ) : null}
 
-              {/* A buyer's words under the buttons — demo only, behind ?quoteDemo=1. */}
+              {/* A real buyer's words under the buttons, once the design has an approved review. */}
               <ReviewQuote reviews={reviews} />
 
               {/* Under the buy button, on every screen.
