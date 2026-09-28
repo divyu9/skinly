@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/lib/firebase-api";
 import { CheckoutUpsells } from "./_components/checkout-upsells.tsx";
 import { CartSmartSetup, useSmartRepricing } from "@/components/cart-smart-setup.tsx";
+import { trackBeginCheckout } from "@/lib/analytics.ts";
 import { AddressForm, type FormData } from "./_components/AddressForm.tsx";
 import { PaymentMethodSelector } from "./_components/PaymentMethodSelector.tsx";
 import { CodOtpSection } from "./_components/CodOtpSection.tsx";
@@ -205,6 +206,10 @@ function CheckoutPageInner() {
   const cartItems = isAuthenticated ? dbCartItems : guestCart;
   // Smart Setup lines carry exactly what placeOrder will charge.
   useSmartRepricing(cartItems as any, !isAuthenticated);
+  // The funnel's "began checkout" step, once the cart is known.
+  useEffect(() => {
+    if (cartItems?.length) trackBeginCheckout(cartItems as any);
+  }, [cartItems?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cartItemsForStockCheck = cartItems?.map((item) => ({
     productId: item.productId, variant: item.variant, quantity: item.quantity,

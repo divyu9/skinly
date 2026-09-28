@@ -110,6 +110,29 @@ export function trackAddToCart(
 }
 
 /**
+ * The checkout page was opened with something in the cart — the funnel step
+ * between "added to cart" and "paid" (dashboard funnel, functions/src/funnel.ts).
+ * Once per tab session, so a reload or a return from PhonePe is not a second start.
+ */
+export function trackBeginCheckout(items: Array<{ productId: string; productTitle?: string; price: number; quantity: number }>) {
+  try {
+    if (!items.length || sessionStorage.getItem("skinly_begin_checkout")) return;
+    sessionStorage.setItem("skinly_begin_checkout", "1");
+  } catch { /* storage blocked: send anyway */ }
+  const value = items.reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
+  if (window.gtag) {
+    window.gtag("event", "begin_checkout", {
+      currency: "INR",
+      value,
+      items: items.map((i) => ({ item_id: i.productId, item_name: i.productTitle || "", price: i.price, quantity: i.quantity })),
+    });
+  }
+  if (window.fbq) {
+    window.fbq("track", "InitiateCheckout", { value, currency: "INR", num_items: items.length, content_ids: items.map((i) => i.productId), content_type: "product" });
+  }
+}
+
+/**
  * Track purchase/conversion
  */
 export function trackPurchase(
@@ -165,6 +188,8 @@ export function trackPurchase(
 /** Called by the checkout the moment an order is written, so trackPurchaseOnce knows this browser placed it. */
 export function markOrderPlacedHere(orderId: unknown) {
   try { if (orderId) localStorage.setItem(`skinly_placed_${String(orderId)}`, String(Date.now())); } catch { /* storage blocked */ }
+  // The next checkout in this tab is a new one.
+  try { sessionStorage.removeItem("skinly_begin_checkout"); } catch { /* storage blocked */ }
 }
 
 export function trackPurchaseOnce(order: any) {

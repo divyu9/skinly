@@ -163,6 +163,15 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     bySource: [...bySource.entries()].map(([source, v]) => ({ source, ...v })).sort((a, b) => b.sales - a.sales),
   };
 
+  // ── Funnel (GA4, refreshed nightly by funnel.ts) ────────────────────────
+  // GA only began recording purchases on 27 Sep; the paid step is the shop's
+  // own count of confirmed orders over the same 30 days.
+  const f = (await db.collection("analytics").doc("funnel30").get()).data() as any;
+  const funnel = f ? {
+    ...f,
+    steps: (f.steps || []).map((st: any) => (st.event === "purchase" ? { ...st, users: last30.filter((o) => !o.addOnTo).length, fromOrders: true } : st)),
+  } : null;
+
   // ── Tasks ───────────────────────────────────────────────────────────────
   const open = openSnap.docs.map((d) => ({ _id: d.id, ...(d.data() as any) })).filter((o) => !o.isDeleted);
   const by = (st: string) => open.filter((o) => statusOf(o) === st);
@@ -256,7 +265,7 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
       aovPrev30: prev30.length ? tally(prev30).sales / prev30.length : 0,
       codShare, repeat30: repeat,
     },
-    daily, hours, upsells,
+    daily, hours, upsells, funnel,
     topProducts: [...top.values()].sort((a, b) => b.qty - a.qty || b.sales - a.sales).slice(0, 6),
     topModels: [...byModel.entries()].map(([model, qty]) => ({ model, qty })).sort((a, b) => b.qty - a.qty).slice(0, 6),
     tasks: {

@@ -32,6 +32,12 @@ type Dashboard = {
     last30: Period; prev30: Period; aov30: number; aovPrev30: number; codShare: number; repeat30: number;
   };
   daily: Array<{ day: string; orders: number; sales: number }>;
+  funnel?: {
+    steps: Array<{ event: string; label: string; users: number; fromOrders?: boolean }>;
+    devices: Array<{ device: string; steps: number[] }>;
+    pages: Array<{ page: string; sessions: number; purchases: number }>;
+    updatedAt: number;
+  } | null;
   upsells?: {
     attachRate: number; orders: number; baseOrders: number; sales: number; aovWith: number; aovWithout: number;
     byKind: Array<{ kind: string; pieces: number; sales: number }>;
@@ -502,6 +508,9 @@ function DashboardInner() {
         </Panel>
       </div>
 
+      {/* ── Funnel ───────────────────────────────────────────────────────── */}
+      <FunnelPanel funnel={data.funnel || null} onRefreshed={() => void reload()} />
+
       {/* ── Upsells ──────────────────────────────────────────────────────── */}
       {data.upsells && <UpsellPanel u={data.upsells} />}
 
@@ -575,6 +584,99 @@ function DashboardInner() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+/**
+ * Visitors to paid, last 30 days: users per step from GA4 (functions/src/funnel.ts,
+ * nightly), the paid step from the shop's own confirmed orders. Each bar shows
+ * how many of the step before made it; the worst drop is called out.
+ */
+function FunnelPanel({ funnel, onRefreshed }: { funnel: Dashboard["funnel"]; onRefreshed: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const refresh = async () => {
+    setBusy(true);
+    try {
+      await httpsCallable(getFunctions(), "refreshFunnel")({});
+      onRefreshed();
+    } catch (e: any) {
+      alert(e?.message || "Could not refresh from GA4");
+    } finally { setBusy(false); }
+  };
+  const action = (
+    <button onClick={() => void refresh()} className="flex items-center gap-1 text-xs font-semibold text-brand-deep hover:underline" disabled={busy}>
+      <RefreshCwIcon className={cn("size-3.5", busy && "animate-spin")} /> {funnel ? `Updated ${new Date(funnel.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : "Load from GA4"}
+    </button>
+  );
+  if (!funnel?.steps?.length) {
+    return <Panel title="Shopping funnel · 30 days" icon={<FlameIcon className="size-4 text-brand" />} action={action}><p className="text-sm text-muted-foreground">Not loaded yet — it refreshes from Google Analytics every night.</p></Panel>;
+  }
+  const steps = funnel.steps;
+  const top = Math.max(1, steps[0].users);
+  const rate = (i: number) => (i === 0 || !steps[i - 1].users ? null : steps[i].users / steps[i - 1].users);
+  // The worst step-to-step drop among steps that have data on both sides.
+  let worst = -1;
+  steps.forEach((_, i) => { const r = rate(i); if (r !== null && steps[i].users > 0 && (worst < 0 || r < (rate(worst) ?? 1))) worst = i; });
+  const DEV: Record<string, string> = { mobile: "Mobile", desktop: "Desktop", tablet: "Tablet" };
+  return (
+    <Panel title="Shopping funnel · 30 days" icon={<FlameIcon className="size-4 text-brand" />} action={action}>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-2.5 lg:col-span-2">
+          {steps.map((st, i) => {
+            const r = rate(i);
+            const empty = st.event === "begin_checkout" && st.users === 0;
+            return (
+              <div key={st.event}>
+                <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
+                  <span className="font-semibold">{st.label}{st.fromOrders && <span className="ml-1 text-[10px] font-normal text-muted-foreground">(from orders)</span>}</span>
+                  <span className="tabular-nums">
+                    <b>{empty ? "—" : st.users.toLocaleString("en-IN")}</b>
+                    {r !== null && !empty && (
+                      <span className={cn("ml-2 rounded-full px-1.5 py-0.5 text-[11px] font-bold", i === worst ? "bg-heart/15 text-heart" : "bg-muted text-muted-foreground")}>
+                        {(r * 100).toFixed(r < 0.1 ? 1 : 0)}% of previous
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="h-6 overflow-hidden rounded-md bg-muted">
+                  <div className={cn("h-full rounded-md", i === worst ? "bg-heart/70" : "bg-brand")} style={{ width: `${Math.max(empty ? 0 : 1.5, (st.users / top) * 100)}%` }} />
+                </div>
+                {empty && <p className="mt-1 text-[11px] text-muted-foreground">Recording since 29 Sep — fills in over the next days.</p>}
+              </div>
+            );
+          })}
+          {worst > 0 && (
+            <p className="rounded-lg border-2 border-heart/20 bg-heart/5 px-3 py-2 text-xs">
+              Biggest drop: <b>{steps[worst - 1].label} → {steps[worst].label}</b> — only {((rate(worst) || 0) * 100).toFixed(0)}% move on. Fix this step first.
+            </p>
+          )}
+        </div>
+        <div className="space-y-4">
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">By device · visit → cart</p>
+            <div className="space-y-1.5">
+              {funnel.devices.map((d) => (
+                <div key={d.device} className="flex items-center justify-between rounded-lg bg-muted px-3 py-1.5 text-xs">
+                  <span className="font-semibold">{DEV[d.device] || d.device}</span>
+                  <span className="tabular-nums">{d.steps[0].toLocaleString("en-IN")} → {d.steps[2]} <b className="ml-1">{d.steps[0] ? ((d.steps[2] / d.steps[0]) * 100).toFixed(1) : 0}%</b></span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Where visitors land</p>
+            <div className="space-y-1">
+              {funnel.pages.slice(0, 6).map((pg) => (
+                <div key={pg.page} className="flex items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 truncate" title={pg.page}>{pg.page === "/" ? "Homepage" : pg.page.replace(/^\/products\//, "")}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">{pg.sessions.toLocaleString("en-IN")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 
