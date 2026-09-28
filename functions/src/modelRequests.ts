@@ -112,12 +112,74 @@ async function customerName(db: admin.firestore.Firestore, r: any): Promise<stri
   return "there";
 }
 
+/**
+ * Three designs to show in the "model added" email: best-sellers first
+ * (settings/homeRankings), then the newest, among skins for this gadget that
+ * fit this brand, each with a picture, a price and a link that opens the
+ * listing with the device already chosen.
+ */
+/**
+ * The picture on our own domain. Not resized: the CDN's resizer answers 429
+ * to format=jpeg and redirects format=auto back to the original, so the
+ * original it is (webp — Gmail and phone mail apps show it).
+ */
+function emailImage(url: string): string {
+  const R2 = "https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev/";
+  return url.startsWith(R2) ? `https://cdn.goskinly.com/${url.slice(R2.length)}` : url;
+}
+
+export async function picksFor(db: admin.firestore.Firestore, brand: string, model: string, category: string) {
+  const key = (b: unknown) => String(b || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const fits = (p: any) => {
+    const only = (p.modelBrands || []).map(key).filter(Boolean);
+    if (only.length) return only.includes(key(brand));
+    return !(p.modelBrandsExclude || []).map(key).includes(key(brand));
+  };
+  const usable = (p: any) => p && p.status === "active" && p.productCategory === "skin" &&
+    String(p.gadgetCategory || "phone") === (category || "phone") && fits(p) && (p.images?.[0]?.url || typeof p.images?.[0] === "string");
+  const ranked = ((await db.collection("settings").doc("homeRankings").get()).data()?.bestsellers || []).map((r: any) => String(r.productId));
+  const docs = ranked.length ? await db.getAll(...ranked.slice(0, 60).map((id: string) => db.collection("products").doc(id))) : [];
+  let pool = docs.filter((d) => d.exists).map((d) => ({ _id: d.id, ...(d.data() as any) })).filter(usable);
+  if (pool.length < 3) {
+    const recent = await db.collection("products").where("gadgetCategory", "==", category || "phone").limit(150).get();
+    pool = [...pool, ...recent.docs.map((d) => ({ _id: d.id, ...(d.data() as any) })).filter(usable)
+      .sort((a, b) => Number(b._creationTime || b.createdAt || 0) - Number(a._creationTime || a.createdAt || 0))];
+  }
+  // A listing made for their brand pictures their kind of phone; the catch-all
+  // listings lead with an iPhone. Brand listings first, order kept otherwise.
+  const own = (p: any) => (p.modelBrands || []).map(key).includes(key(brand));
+  pool = [...pool.filter(own), ...pool.filter((p) => !own(p))];
+  const seen = new Set<string>();
+  const out: Array<{ title: string; img: string; price: string; url: string }> = [];
+  for (const p of pool) {
+    const design = String(p.title || "").replace(/\s+(matte|3d|embossed|textured|glossy|tranzy)\b.*$/i, "").replace(/,.*$/, "").trim();
+    if (!design || seen.has(design.toLowerCase())) continue;
+    seen.add(design.toLowerCase());
+    const vs = await db.collection("variants").where("productId", "==", p._id).get();
+    const prices = vs.docs.map((d) => Number((d.data() as any).price)).filter((n) => n > 0);
+    const q = new URLSearchParams({ brand, model, utm_source: "model_added", utm_medium: "email" });
+    out.push({
+      title: design,
+      img: emailImage(String(p.images[0]?.url || p.images[0])),
+      price: prices.length ? `₹${Math.min(...prices)}` : "",
+      url: `${SITE}/products/${p.slug}?${q}`,
+    });
+    if (out.length >= 3) break;
+  }
+  // The template has three slots and no conditions: never leave one empty.
+  while (out.length && out.length < 3) out.push(out[out.length % out.length]);
+  return out;
+}
+
 async function notify(db: admin.firestore.Firestore, id: string, r: any, usecaseKey: "model_requested" | "model_added") {
   const brand = String(r.brandName || "").trim();
   const model = String(r.modelName || "").trim();
   const number = String(r.requestNumber || "");
   const name = await customerName(db, r);
-  const shopLink = `${SITE}/products?brand=${encodeURIComponent(brand)}&utm_source=${usecaseKey === "model_added" ? "model_added" : "model_request"}&utm_medium=notification`;
+  const category = String(r.category || "phone");
+  // The listing narrowed to their device, which also remembers it as theirs.
+  const shopLink = `${SITE}/products?${new URLSearchParams({ brand, model, utm_source: usecaseKey === "model_added" ? "model_added" : "model_request", utm_medium: "email" })}`;
+  const picks = usecaseKey === "model_added" ? await picksFor(db, brand, model, category).catch(() => []) : [];
 
   const results = await Promise.allSettled([
     // Each WhatsApp template reads exactly the names in its variableMapping;
@@ -129,16 +191,22 @@ async function notify(db: admin.firestore.Firestore, id: string, r: any, usecase
       request_number: number,
     }, id),
     r.userEmail ? sendEmail(db, usecaseKey, String(r.userEmail), name, id, r.userId, {
+      // Every spelling a template has used: the MSG91 ones read brand, model,
+      // requestId and customerName; older ones the snake_case names.
       customer_name: name, brand_name: brand, model_name: model, request_number: number,
       customerName: name, brandName: brand, modelName: model, requestNumber: number,
-      shopLink,
+      brand, model, requestId: number, device: `${brand} ${model}`.trim(),
+      shopLink, requestsLink: `${SITE}/real-photos?utm_source=model_request&utm_medium=email`,
+      ...Object.fromEntries(picks.flatMap((p, i) => [
+        [`pick${i + 1}_title`, p.title], [`pick${i + 1}_img`, p.img], [`pick${i + 1}_price`, p.price], [`pick${i + 1}_url`, p.url],
+      ])),
     }) : Promise.resolve(false),
   ]);
   const [wa, mail] = results.map((x) => (x.status === "fulfilled" ? x.value : false));
   if (results.some((x) => x.status === "rejected")) {
     console.error(`${usecaseKey} notify error`, id, results.map((x) => x.status === "rejected" ? String((x as any).reason?.message || x.reason) : "ok"));
   }
-  console.log(`${usecaseKey} notified`, { id, number, wa, mail });
+  console.log(`${usecaseKey} notified`, { id, number, wa, mail, picks: picks.length });
 }
 
 /** One MSG91 usecase email, logged like the order mails. */

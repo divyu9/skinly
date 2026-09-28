@@ -184,6 +184,16 @@ const reminderVariables = (cart: any, couponCode: string | null, s: Settings) =>
     vars[`item${n}Qty`] = String(Number(it?.quantity) || 1);
   });
   vars.moreItems = items.length > 3 ? `+ ${items.length - 3} more in your cart` : "";
+  /*
+   * For the condition-free template (MSG91 prints {{#if}} as text): whole
+   * sentences that are simply empty when they do not apply, and the first
+   * item's picture for the one product row.
+   */
+  vars.couponLine = couponCode
+    ? `Use code ${couponCode} at checkout for ${off} — valid ${Number(s.couponValidityDays) || 7} days, one use.`
+    : "";
+  vars.productImage = mailImage(items[0]?.productImage) || "https://mailer-prod-api-assets.s3.ap-southeast-2.amazonaws.com/templates/1765447653-outbound-23404-Skinly_Logo.png";
+  vars.productLine = items.length > 1 ? `${items.length} items · ₹${rupees(cart.cartTotal)}` : `₹${rupees(cart.cartTotal)}`;
   return vars;
 };
 
