@@ -28,6 +28,8 @@ const PUBLIC_FIELDS = [
   "cgstRate", "sgstRate", "igstRate", "createdAt", "_creationTime", "updatedAt", "isDeleted",
   "expectedDeliveryAt", "deliveredAt", "shippedAt", "cancelledAt", "courierName", "upsellItems",
   "reviewedAt", "reviewRewardPaid", "reviewRewardOwed",
+  // An add-on says which order's parcel it rides in.
+  "addOnTo", "parentOrderNumber",
 ];
 const ITEM_FIELDS = ["productId", "productTitle", "productImage", "variant", "variantId", "sku", "quantity", "price",
   "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell", "coverage"];

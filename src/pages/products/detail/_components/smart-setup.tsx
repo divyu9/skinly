@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils.ts";
 
 export type SetupCartItem = {
   productId: string; productTitle: string; productImage: string; variant: string; price: number; quantity: number;
-  upsellRuleId: string; phoneBrand?: string; phoneModel?: string;
+  upsellRuleId: string; upsellSource?: string; phoneBrand?: string; phoneModel?: string;
 };
 
 let settingsOnce: Promise<SmartUpsellSettings> | null = null;
@@ -73,6 +73,7 @@ export function SmartSetup({ productId, device, onChange, resetKey }: {
         productId: o.productId, productTitle: o.title, productImage: o.image, variant: o.variant, quantity: 1,
         price: offerPrice(o.price, data.settings.offers[p.kind]),
         upsellRuleId: `smart:${p.kind}`,
+        upsellSource: "product",
         ...(charger ? { phoneBrand: charger.brand, phoneModel: charger.model } : {}),
       });
     }

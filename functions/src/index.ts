@@ -48,3 +48,4 @@ export * from "./shippingCompare";
 export * from "./rapidshypSync";
 export * from "./dashboard";
 export * from "./homeRankings";
+export * from "./addOns";

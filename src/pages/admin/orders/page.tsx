@@ -573,7 +573,8 @@ function AdminOrdersPageInner() {
     const chosen = displayOrders.filter((o: any) => selectedOrders.has(o._id));
     // Confirmed orders only: an unpaid checkout (CHK-…, pending or failed payment) is never shipped.
     const confirmed = (o: any) => !!o.orderNumber && !o.isDeleted && o.status !== "pending_payment" && o.paymentStatus !== "failed";
-    const todo = chosen.filter((o: any) => !o.awbNumber && !o.rapidshypOrderId && confirmed(o));
+    // An add-on goes in its parent's parcel and is never booked on its own.
+    const todo = chosen.filter((o: any) => !o.awbNumber && !o.rapidshypOrderId && confirmed(o) && !o.addOnTo);
     const skipped = chosen.length - todo.length;
     if (!todo.length) { toast.info("All selected orders are already shipped, already in RapidShyp, or unpaid"); return; }
     if (!confirm(`Create ${todo.length} order${todo.length > 1 ? "s" : ""} in RapidShyp (no shipment)?${skipped ? ` ${skipped} skipped: already shipped, already in RapidShyp, or unpaid.` : ""}`)) return;
@@ -1082,6 +1083,16 @@ function AdminOrdersPageInner() {
                       <td className="px-3 py-2.5 whitespace-nowrap">
                         <div className="font-mono text-sm font-semibold">
                           {order.orderNumber || order.checkoutRef || order.failedOrderNumber || "Pending"}
+                          {(order as any).addOnTo && (
+                            <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-amber-900" title="Bought after the order: pack it in that order's parcel, do not ship it separately">
+                              Add-on to {(order as any).parentOrderNumber || "order"}
+                            </span>
+                          )}
+                          {((order as any).addOnOrderIds?.length || 0) > 0 && (
+                            <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-amber-900" title="The customer added items after ordering: pack them in this parcel">
+                              + add-on
+                            </span>
+                          )}
                           {(order as any).referred && (
                             <span className="ml-1.5 rounded-full bg-pink-100 px-1.5 py-0.5 font-sans text-[10px] font-semibold text-pink-800" title="Came through a customer's referral link — see the order">
                               Referral

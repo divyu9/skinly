@@ -12,6 +12,8 @@ export interface GuestCartItem {
   coverage?: "only_back" | "full_body_wrap";
   /** Added from a checkout upsell: placeOrder prices it by that rule's offer. */
   upsellRuleId?: string;
+  /** Where the add-on was offered: product, cart, checkout (dashboard figures). */
+  upsellSource?: string;
 }
 
 const GUEST_CART_KEY = "skinly_guest_cart";

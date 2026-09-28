@@ -117,6 +117,9 @@ export const createDelhiveryShipment = onCall(async (data: any, context: any) =>
   const db = admin.firestore();
   const { orderRef, order, orderDoc, payload } = await buildOrderPayload(orderId);
   if (order.awbNumber) throw new HttpsError("already-exists", `Shipment already created (AWB ${order.awbNumber})`);
+  if (order?.addOnTo) {
+    throw new HttpsError("failed-precondition", `This is an add-on to order ${order.parentOrderNumber || order.addOnTo}: it goes in that parcel and takes its tracking, so it is not shipped on its own.`);
+  }
   if (!isConfirmedOrder(order)) throw new HttpsError("failed-precondition", "This order is not confirmed (unpaid or payment failed) — it cannot be shipped");
   const cfg = await delhiverySettings(db);
   if (!cfg.pickup) throw new HttpsError("failed-precondition", "Set the Delhivery pickup location name in Admin → Shipping first.");

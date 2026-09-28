@@ -14,6 +14,7 @@ import { PackedForYou } from "@/components/packed-for-you.tsx";
 import { OrderItemImage } from "@/components/order-item-image.tsx";
 import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
 import { ReviewRewardCta } from "@/components/review-reward-cta.tsx";
+import { AddToParcel, AddOnOfBanner } from "@/components/add-to-parcel.tsx";
 import { OrderProgress } from "@/components/order-progress.tsx";
 import { trackPurchaseOnce } from "@/lib/analytics.ts";
 
@@ -280,6 +281,10 @@ function OrderDetailPageInner() {
 
           {/* The one review prompt: what a review earns, for a delivered order. */}
           {orderId && <ReviewRewardCta order={order} orderId={orderId} />}
+
+          {/* Before it is packed: add-ons that fit, in the same parcel. */}
+          {orderId && <AddToParcel order={order} orderId={orderId} />}
+          <AddOnOfBanner order={order} />
 
           {canPay && (
             <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">

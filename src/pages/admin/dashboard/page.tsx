@@ -32,6 +32,11 @@ type Dashboard = {
     last30: Period; prev30: Period; aov30: number; aovPrev30: number; codShare: number; repeat30: number;
   };
   daily: Array<{ day: string; orders: number; sales: number }>;
+  upsells?: {
+    attachRate: number; orders: number; baseOrders: number; sales: number; aovWith: number; aovWithout: number;
+    byKind: Array<{ kind: string; pieces: number; sales: number }>;
+    bySource: Array<{ source: string; pieces: number; sales: number }>;
+  };
   hours: number[];
   topProducts: Array<{ productId: string; title: string; image: string; qty: number; sales: number }>;
   topModels: Array<{ model: string; qty: number }>;
@@ -497,6 +502,9 @@ function DashboardInner() {
         </Panel>
       </div>
 
+      {/* ── Upsells ──────────────────────────────────────────────────────── */}
+      {data.upsells && <UpsellPanel u={data.upsells} />}
+
       {/* ── Demand ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Panel title="Customers are waiting for" icon={<BellRingIcon className="size-4 text-indigo-600" />} action={<PanelLink to="/backend-skinly/stock-notifications">Stock alerts</PanelLink>}>
@@ -567,6 +575,68 @@ function DashboardInner() {
         </Panel>
       </div>
     </div>
+  );
+}
+
+const KIND_LABEL: Record<string, string> = {
+  chargerSkin: "Charger skin", case: "MagSafe case", glass: "Tempered glass", cameraRing: "Lens rings",
+  membrane: "Screen membrane", magneto: "Magneto X", checkoutRule: "Checkout rule",
+};
+const SOURCE_LABEL: Record<string, string> = { product: "Product page", cart: "Cart", checkout: "Checkout", parcel: "Add to parcel" };
+
+/** What the add-on offers sold in 30 days: how many orders took one, what, and where. */
+function UpsellPanel({ u }: { u: NonNullable<Dashboard["upsells"]> }) {
+  const maxKind = Math.max(1, ...u.byKind.map((k) => k.sales));
+  const lift = u.aovWithout > 0 ? ((u.aovWith - u.aovWithout) / u.aovWithout) * 100 : null;
+  return (
+    <Panel title="Upsell performance · 30 days" icon={<SparklesIcon className="size-4 text-brand" />} action={<PanelLink to="/backend-skinly/upsells">Offers</PanelLink>}>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+          <div className="rounded-xl bg-muted px-4 py-3">
+            <p className="text-xs text-muted-foreground">Orders with an add-on</p>
+            <p className="text-2xl font-extrabold tabular-nums">{Math.round(u.attachRate * 100)}%</p>
+            <p className="text-[11px] text-muted-foreground">{u.orders} of {u.baseOrders} orders</p>
+          </div>
+          <div className="rounded-xl bg-muted px-4 py-3">
+            <p className="text-xs text-muted-foreground">Add-on sales</p>
+            <p className="text-2xl font-extrabold tabular-nums">{inr(u.sales)}</p>
+            <p className="text-[11px] text-muted-foreground">
+              Avg order {inr(u.aovWith)} with vs {inr(u.aovWithout)} without{lift !== null && lift > 0 ? ` (+${Math.round(lift)}%)` : ""}
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">What sold</p>
+          {u.byKind.length ? (
+            <div className="space-y-2">
+              {u.byKind.map((k) => (
+                <div key={k.kind} className="flex items-center gap-2 text-xs">
+                  <span className="w-28 truncate font-medium">{KIND_LABEL[k.kind] || k.kind}</span>
+                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <span className="block h-full rounded-full bg-brand" style={{ width: `${(k.sales / maxKind) * 100}%` }} />
+                  </span>
+                  <span className="w-16 text-right font-bold tabular-nums">{inr(k.sales)}</span>
+                  <span className="w-8 text-right text-muted-foreground tabular-nums">{k.pieces}×</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">No add-ons sold yet — they show here as they come in.</p>}
+        </div>
+        <div>
+          <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Where it was offered</p>
+          {u.bySource.length ? (
+            <div className="space-y-2">
+              {u.bySource.map((x) => (
+                <div key={x.source} className="flex items-center justify-between rounded-lg border-2 border-ink/10 px-3 py-2 text-sm">
+                  <span className="font-semibold">{SOURCE_LABEL[x.source] || x.source}</span>
+                  <span className="tabular-nums"><b>{inr(x.sales)}</b> <span className="text-xs text-muted-foreground">· {x.pieces} pcs</span></span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">Product page, cart, checkout and add-to-parcel appear here.</p>}
+        </div>
+      </div>
+    </Panel>
   );
 }
 

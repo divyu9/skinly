@@ -127,6 +127,8 @@ export function CartSmartSetup({ lines, compact = false, fallback }: { lines: Ca
       productId: o.productId, productTitle: o.title, productImage: o.image, variant: o.variant, quantity: 1,
       price: free ? 0 : offerPrice(o.price, settings.offers[p.kind]),
       upsellRuleId: `smart:${p.kind}`,
+      // Where it was offered, for the dashboard's upsell figures.
+      upsellSource: compact ? "checkout" : "cart",
       ...(charger ? { phoneBrand: charger.brand, phoneModel: charger.model } : {}),
     };
     setAdding(p.kind);

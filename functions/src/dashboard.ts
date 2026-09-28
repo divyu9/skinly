@@ -126,10 +126,48 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     }
   }
 
+  // ── Upsells (30 days) ───────────────────────────────────────────────────
+  // What the add-on offers sell: each upsell line by kind and by where it was
+  // offered, add-on orders as "parcel", and how many orders took any.
+  const kindName = (rid: string) => (rid.startsWith("smart:") ? rid.slice(6) : "checkoutRule");
+  const byKind = new Map<string, { pieces: number; sales: number }>();
+  const bySource = new Map<string, { pieces: number; sales: number }>();
+  let upsellSales = 0, withUpsell = 0, aovWith = 0, aovWithout = 0, nWith = 0, nWithout = 0;
+  const parents = new Set(last30.filter((o) => o.addOnTo).map((o) => String(o.addOnTo)));
+  for (const o of last30) {
+    let took = false;
+    for (const it of o.items || []) {
+      const rid = String(it.upsellRuleId || "");
+      if (!rid) continue;
+      took = true;
+      const qty = Number(it.quantity) || 1;
+      const amt = (Number(it.price) || 0) * qty;
+      upsellSales += amt;
+      const k = byKind.get(kindName(rid)) || { pieces: 0, sales: 0 };
+      k.pieces += qty; k.sales += amt; byKind.set(kindName(rid), k);
+      const srcKey = String(it.upsellSource || (o.addOnTo ? "parcel" : rid.startsWith("smart:") ? "product" : "checkout"));
+      const src = bySource.get(srcKey) || { pieces: 0, sales: 0 };
+      src.pieces += qty; src.sales += amt; bySource.set(srcKey, src);
+    }
+    if (o.addOnTo) continue;
+    if (took || parents.has(o._id)) { withUpsell++; aovWith += money(o); nWith++; } else { aovWithout += money(o); nWithout++; }
+  }
+  const baseOrders = last30.filter((o) => !o.addOnTo).length;
+  const upsells = {
+    attachRate: baseOrders ? withUpsell / baseOrders : 0,
+    orders: withUpsell, baseOrders,
+    sales: upsellSales,
+    aovWith: nWith ? aovWith / nWith : 0,
+    aovWithout: nWithout ? aovWithout / nWithout : 0,
+    byKind: [...byKind.entries()].map(([kind, v]) => ({ kind, ...v })).sort((a, b) => b.sales - a.sales),
+    bySource: [...bySource.entries()].map(([source, v]) => ({ source, ...v })).sort((a, b) => b.sales - a.sales),
+  };
+
   // ── Tasks ───────────────────────────────────────────────────────────────
   const open = openSnap.docs.map((d) => ({ _id: d.id, ...(d.data() as any) })).filter((o) => !o.isDeleted);
   const by = (st: string) => open.filter((o) => statusOf(o) === st);
-  const toPack = by("processing").filter((o) => !o.awbNumber);
+  // An add-on is packed inside its parent's parcel, not as a parcel of its own.
+  const toPack = by("processing").filter((o) => !o.awbNumber && !o.addOnTo);
   const readyToShip = by("ready_to_ship");
   const pickupLate = readyToShip.filter((o) => now - since(o) > 2 * DAY);
   const moving = [...by("shipped"), ...by("out_for_delivery")];
@@ -218,7 +256,7 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
       aovPrev30: prev30.length ? tally(prev30).sales / prev30.length : 0,
       codShare, repeat30: repeat,
     },
-    daily, hours,
+    daily, hours, upsells,
     topProducts: [...top.values()].sort((a, b) => b.qty - a.qty || b.sales - a.sales).slice(0, 6),
     topModels: [...byModel.entries()].map(([model, qty]) => ({ model, qty })).sort((a, b) => b.qty - a.qty).slice(0, 6),
     tasks: {

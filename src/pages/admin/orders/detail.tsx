@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Authenticated, Unauthenticated, AuthLoading } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Id } from "@/lib/firebase-api";
 
 import { OrderHeader, type OrderStatus, type PaymentStatus } from "./_components/OrderHeader.tsx";
@@ -554,6 +554,8 @@ function OrderDetailPageInner() {
         onPaymentStatusChange={handlePaymentStatusChange}
       />
 
+      <AddOnAdminBanner order={order} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column */}
         <div className="lg:col-span-2 space-y-6">
@@ -743,6 +745,48 @@ function OrderDetailPageInner() {
         onSendWhatsAppChange={setSendWhatsApp}
         onSendEmail={handleSendEmail}
       />
+    </div>
+  );
+}
+
+/**
+ * An add-on and its parent travel together: the add-on is packed into the
+ * parent's parcel and takes its tracking (functions/src/addOns.ts).
+ */
+function AddOnAdminBanner({ order }: { order: any }) {
+  const [kids, setKids] = useState<any[]>([]);
+  const ids: string[] = Array.isArray(order?.addOnOrderIds) ? order.addOnOrderIds : [];
+  useEffect(() => {
+    if (!ids.length) { setKids([]); return; }
+    let live = true;
+    import("firebase/firestore").then(async ({ doc, getDoc }) => {
+      const { db } = await import("@/lib/firebase");
+      const rows = await Promise.all(ids.map((id) => getDoc(doc(db, "orders", id)).then((d) => ({ _id: d.id, ...(d.data() as any) }))));
+      if (live) setKids(rows.filter((k) => k.orderNumber && k.paymentStatus !== "failed" && k.status !== "pending_payment"));
+    });
+    return () => { live = false; };
+  }, [ids.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (order?.addOnTo) {
+    return (
+      <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
+        <b>Add-on to {order.parentOrderNumber || "another order"}.</b> Pack these items in that parcel — do not ship this order on its own.
+        It takes that order's tracking automatically.{" "}
+        <Link className="font-semibold underline" to={`/backend-skinly/orders/${order.addOnTo}`}>Open {order.parentOrderNumber || "the order"} →</Link>
+      </div>
+    );
+  }
+  if (!kids.length) return null;
+  return (
+    <div className="rounded-xl border-2 border-amber-400 bg-amber-50 p-4 text-sm text-amber-950">
+      <b>The customer added items after ordering — pack them in this parcel:</b>
+      <ul className="mt-1.5 list-disc pl-5">
+        {kids.map((k) => (
+          <li key={k._id}>
+            <Link className="font-semibold underline" to={`/backend-skinly/orders/${k._id}`}>{k.orderNumber}</Link>:{" "}
+            {(k.items || []).map((it: any) => `${it.productTitle}${it.phoneModel ? ` (${it.phoneModel})` : ""}${it.variant && !/charger skin|default/i.test(it.variant) ? ` · ${it.variant}` : ""}`).join(", ")}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

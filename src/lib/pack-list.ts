@@ -48,7 +48,9 @@ const fromImage = (url: unknown) => String(url || "").match(/_([A-Za-z]+-\d+(?:-
 const fromDesignUpload = (url: unknown) => String(url || "").match(/\/design-raw\/([A-Z]+-\d+)-/)?.[1] || "";
 
 export async function buildPackList(orders: Array<{ orderNumber?: string; _id: string; items?: Line[] }>) {
-  const lines = orders.flatMap((o) => (o.items || []).map((it) => ({ it, order: String(o.orderNumber || o._id) })));
+  // An add-on is labelled with the parcel it goes in: "#4091→#4077".
+  const label = (o: any) => String(o.orderNumber || o._id) + (o.addOnTo && o.parentOrderNumber ? `→${o.parentOrderNumber}` : "");
+  const lines = orders.flatMap((o) => (o.items || []).map((it) => ({ it, order: label(o) })));
   const pids = [...new Set(lines.map((l) => String(l.it.productId || "")).filter(Boolean))];
 
   // Variants and products of everything in the list, 30 at a time.
