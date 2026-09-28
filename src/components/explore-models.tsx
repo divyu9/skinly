@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useDropdownHeight } from "@/hooks/use-dropdown-height.ts";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
@@ -11,9 +11,13 @@ import { Link } from "react-router-dom";
 
 interface ExploreModelsProps {
   onRequestModelClick: () => void;
+  /** The homepage's closing search reuses this with its own words and extras. */
+  title?: string;
+  subtitle?: string;
+  footer?: ReactNode;
 }
 
-export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
+export function ExploreModels({ onRequestModelClick, title = "Find Your Device", subtitle = "Search for your device model to see available products", footer }: ExploreModelsProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const { maxHeight: dropdownHeight } = useDropdownHeight(searchBoxRef);
@@ -126,10 +130,10 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
         {/* Title */}
         <div className="text-center space-y-2">
           <h2 className="text-2xl font-bold sm:text-3xl md:text-4xl">
-            Find Your Device
+            {title}
           </h2>
           <p className="text-sm text-muted-foreground sm:text-base">
-            Search for your device model to see available products
+            {subtitle}
           </p>
         </div>
 
@@ -368,6 +372,7 @@ export function ExploreModels({ onRequestModelClick }: ExploreModelsProps) {
             </CardContent>
           </Card>
         )}
+        {footer}
         </div>
       </div>
     </section>

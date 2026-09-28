@@ -2156,6 +2156,21 @@ async function main() {
     if (sec.sectionType === "top_picks") (Array.isArray(cfg.tabs) ? cfg.tabs : []).forEach((t) => t?.tag && homeTags.add(String(t.tag).trim()));
   }
   const rows = homeRows(active, variantsByProduct, seoInfo, themes, data.homeRankings);
+  /*
+   * The numbers behind the homepage's "Why Skinly" tiles, counted here so
+   * they are always true and cost the page nothing: models we cut for,
+   * designs, packing-table photos, and approved reviews.
+   */
+  const realPhotos = await readCollection(project, "realPhotos").catch(() => []);
+  const approved = (data.reviews || []).filter((r) => r.status === "approved" && Number(r.rating) >= 1);
+  rows.stats = {
+    models: (data.models || []).filter((m) => m.isActive !== false).length,
+    designs: new Set(active.filter((p) => p.productCategory === "skin").map((p) => designCode(p, variantsByProduct.get(p._id)) || p._id)).size,
+    realPhotos: realPhotos.filter((r) => !r.hidden && r.imageUrl).length,
+    reviews: approved.length,
+    rating: approved.length ? Math.round((approved.reduce((sum, r) => sum + Number(r.rating), 0) / approved.length) * 10) / 10 : 0,
+  };
+  log(`home stats: ${JSON.stringify(rows.stats)}`);
   log(`home rows: ${rows.bestsellers.length} bestsellers, ${rows.newDrops.length} new, ${rows.vibes.length} vibes, ${rows.sets.length} matching sets`);
   const catalogueBytes = await writeCatalogue(active, variantsByProduct, brandLogos(data.sections || [], data.sectionCards || []), themes, [...homeTags], rows);
   const feedItems = await writeMerchantFeed(active, variantsByProduct);

@@ -113,6 +113,8 @@ export type HomeRows = {
   newDrops: string[];
   vibes: Array<{ slug: string; name: string; ids: string[] }>;
   sets: Array<{ design: string; ids: string[] }>;
+  /** Counted at build time for the "Why Skinly" tiles. */
+  stats?: { models: number; designs: number; realPhotos: number; reviews: number; rating: number };
 };
 
 export function loadHomeProducts() {

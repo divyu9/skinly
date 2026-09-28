@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils.ts";
  */
 
 type Home = { rows: HomeRows; byId: Map<string, CatalogueProduct> };
+/** The build's homepage data (rows and stats), shared with the other homepage sections. */
+export function useHomeData() { return useHome(); }
 let homeOnce: Promise<Home | null> | null = null;
 function useHome() {
   const [home, setHome] = useState<Home | null | undefined>(undefined);

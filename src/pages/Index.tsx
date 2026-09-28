@@ -20,8 +20,8 @@ const ExploreByGadget = lazy(() => import("@/components/explore-by-gadget.tsx").
 const SiteFooter = lazy(() => import("@/components/site-footer.tsx").then(m => ({ default: m.SiteFooter })));
 import { RequestModelDialog } from "@/components/request-model-dialog.tsx";
 const BugReportModal = lazy(() => import("@/components/bug-report-modal.tsx").then(m => ({ default: m.BugReportModal })));
-const WhySkinly = lazy(() => import("@/components/why-skinly").then(m => ({ default: m.WhySkinly })));
-const FeatureBanner = lazy(() => import("@/components/feature-banner").then(m => ({ default: m.FeatureBanner })));
+const WhySkinlyProof = lazy(() => import("@/components/home/why-skinly-proof.tsx").then(m => ({ default: m.WhySkinlyProof })));
+const ClosingSearch = lazy(() => import("@/components/home/closing-search.tsx").then(m => ({ default: m.ClosingSearch })));
 const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
 const RealCuts = lazy(() => import("@/components/real-cuts").then(m => ({ default: m.RealCuts })));
 const CustomerReviews = lazy(() => import("@/components/customer-reviews").then(m => ({ default: m.CustomerReviews })));
@@ -233,22 +233,25 @@ export default function Index() {
         );
 
       case "why_skinly":
+        // Four claims with their numbers and the page that proves each.
         return (
-          <LazySection key={key} reserve="min-h-[387px] md:min-h-[413px]">
-            <WhySkinly />
+          <LazySection key={key} reserve="min-h-[560px] md:min-h-[400px]">
+            <WhySkinlyProof />
           </LazySection>
         );
 
       case "feature_banner":
+        // The slot of the old rotating banners: a closing device search for
+        // everyone who got this far without opening a product.
         return (
-          <LazySection key={key} reserve="min-h-[320px] md:min-h-[520px]">
-            <FeatureBanner />
+          <LazySection key={key} reserve="min-h-[380px] md:min-h-[400px]">
+            <ClosingSearch onRequestModelClick={() => setIsRequestModelOpen(true)} />
           </LazySection>
         );
 
       case "ugc_videos":
         return (
-          <LazySection key={key} reserve="min-h-[742px] md:min-h-[706px]">
+          <LazySection key={key} reserve="min-h-[520px] md:min-h-[600px]">
             <UgcVideos />
           </LazySection>
         );
