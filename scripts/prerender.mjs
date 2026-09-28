@@ -730,6 +730,48 @@ function staticPages(hub, home = null) {
         `<p><a href="${SITE}/products">Shop all skins</a></p>`,
     },
     {
+      // The install guide (src/pages/how-to-apply/page.tsx), with the steps
+      // and the YouTube walkthrough as structured data.
+      route: "/how-to-apply",
+      title: "How to Apply Your Skinly Skin — Step-by-Step Guide & Video | GoSkinly",
+      description: "Apply your Skinly skin bubble-free in five steps: clean, line up the camera, press from the centre out, wrap the edges, final press. Watch the video guide.",
+      canonical: `${SITE}/how-to-apply`,
+      priority: "0.6",
+      jsonLd: [
+        {
+          "@context": "https://schema.org",
+          "@type": "HowTo",
+          name: "How to apply a Skinly skin",
+          totalTime: "PT5M",
+          step: [
+            ["Clean and dry the device", "Take off the case and any old skin, wipe away dust and fingerprints, and let the device dry completely."],
+            ["Line up the camera first", "Peel the backing from one side and place the camera cut-out over the camera as the anchor."],
+            ["Press from the centre out", "Smooth the skin outwards from the middle so trapped air escapes to the edges. Lift and re-place if it is off; do not stretch it."],
+            ["Wrap the edges and sides", "Fold the sides around the edges and press them down; a few seconds of warm air on low softens the vinyl on curves."],
+            ["Final press, then let it settle", "Press firmly over the whole skin, especially edges and cut-outs. The hold strengthens over the next few hours."],
+          ].map(([name, text], i) => ({ "@type": "HowToStep", position: i + 1, name, text })),
+          video: { "@id": `${SITE}/how-to-apply#video` },
+        },
+        {
+          "@context": "https://schema.org",
+          "@type": "VideoObject",
+          "@id": `${SITE}/how-to-apply#video`,
+          name: "How to Apply Skinly Phone Skins",
+          description: "A step-by-step walkthrough of applying a Skinly skin to a phone.",
+          thumbnailUrl: "https://i.ytimg.com/vi/kP2ywckzWXA/maxresdefault.jpg",
+          uploadDate: "2024-11-10T22:37:32-08:00",
+          duration: "PT5M27S",
+          embedUrl: "https://www.youtube.com/embed/kP2ywckzWXA",
+          contentUrl: "https://www.youtube.com/watch?v=kP2ywckzWXA",
+        },
+      ],
+      body:
+        `<h1>How to apply your Skinly skin</h1>` +
+        `<p>Five steps, about five minutes, no bubbles.</p>` +
+        `<ol><li>Clean and dry the device.</li><li>Line up the camera first.</li><li>Press from the centre out.</li><li>Wrap the edges and sides.</li><li>Final press, then let it settle.</li></ol>` +
+        `<p><a href="https://www.youtube.com/watch?v=kP2ywckzWXA">Watch the video guide</a> · <a href="${SITE}/products">Shop skins</a></p>`,
+    },
+    {
       // Every approved review (src/pages/reviews/page.tsx).
       route: "/reviews",
       title: "Customer Reviews | GoSkinly",

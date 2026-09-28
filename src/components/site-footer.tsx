@@ -123,6 +123,16 @@ export function SiteFooter() {
                       Best Sellers
                     </Link>
                   </li>
+                  <li>
+                    <Link to="/real-photos" className="text-muted-foreground hover:text-primary transition-colors">
+                      Real Photos
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/reviews" className="text-muted-foreground hover:text-primary transition-colors">
+                      Customer Reviews
+                    </Link>
+                  </li>
                 </ul>
               </div>
 
@@ -134,6 +144,11 @@ export function SiteFooter() {
                     {/* /orders needs a login; most orders here are guests'. */}
                     <Link to="/track" className="text-muted-foreground hover:text-primary transition-colors">
                       Track Order
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/how-to-apply" className="text-muted-foreground hover:text-primary transition-colors">
+                      How to Apply Skins
                     </Link>
                   </li>
                   <li>
