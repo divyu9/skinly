@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import {
-  AlertTriangleIcon, CameraIcon, CheckCircle2Icon, HandIcon, MessageCircleIcon, PlayIcon, SparklesIcon,
-  SprayCanIcon, TimerIcon, WindIcon, XCircleIcon,
+  AlertTriangleIcon, AlignVerticalJustifyEndIcon, CameraIcon, CheckCircle2Icon, FlameIcon, HandIcon, MessageCircleIcon,
+  MoveHorizontalIcon, PackageOpenIcon, PlayIcon, SparklesIcon, SprayCanIcon, WindIcon, XCircleIcon,
 } from "lucide-react";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -19,49 +19,78 @@ import { SiteFooter } from "@/components/site-footer.tsx";
 
 export const HOW_TO_VIDEO_ID = "kP2ywckzWXA";
 
+/** What is in the install kit that comes with every skin. */
+const KIT = [
+  { icon: SprayCanIcon, name: "Wet & dry wipes", use: "to clean the device" },
+  { icon: SparklesIcon, name: "Dust absorber", use: "to lift tiny dust specks" },
+  { icon: HandIcon, name: "Squeegee", use: "to press the skin flat" },
+  { icon: WindIcon, name: "Microfiber cloth", use: "for the final wipe" },
+];
+
+// The steps as the video shows them (youtube.com/watch?v=kP2ywckzWXA).
 const STEPS = [
   {
     icon: SprayCanIcon,
-    title: "Clean and dry the device",
-    text: "Take off the case and any old skin. Wipe away dust, oil and fingerprints, and let it dry completely — the adhesive needs a clean, dry surface.",
+    title: "Clean with the wet and dry wipes",
+    text: "Take off the case and any old skin. Wipe the back of the phone with the wet wipe first, then the dry wipe, until it is clean and completely dry.",
   },
   {
-    icon: CameraIcon,
-    title: "Line up the camera first",
-    text: "Peel the backing from one side only. Place the camera cut-out over the camera — it is the anchor that keeps everything else aligned.",
+    icon: SparklesIcon,
+    title: "Lift the dust with the dust absorber",
+    text: "Dab the dust absorber over the whole back to pick up the tiny dust specks you can't see. These are the most common cause of bubbles, so don't skip this.",
+  },
+  {
+    icon: AlignVerticalJustifyEndIcon,
+    title: "Start at the bottom: ports and speakers",
+    text: "Peel the skin and begin from the bottom edge. Take your time to line up the bottom ports and speaker cut-outs 100% — get this right and the whole skin falls into place.",
   },
   {
     icon: HandIcon,
-    title: "Press from the centre out",
-    text: "Smooth the skin outwards from the middle with your thumb. The air-release adhesive lets trapped air escape to the edges. Off by a little? Lift gently and re-place — don't stretch it.",
+    title: "Press it flat with the squeegee",
+    text: "Work upwards from the bottom with the squeegee from the kit, pressing the skin onto the back of the phone so it sits flat and aligned.",
   },
   {
-    icon: WindIcon,
-    title: "Wrap the edges and sides",
-    text: "For full-body wraps, fold the sides around the edges and press them down. A few seconds of warm air from a hair dryer on low makes the vinyl softer on curved corners.",
+    icon: CameraIcon,
+    title: "Fine-tune around the camera",
+    text: "When you reach the top, make small adjustments around the camera cut-out until it sits exactly over the lenses, then press it down.",
   },
   {
-    icon: TimerIcon,
-    title: "Final press, then let it settle",
-    text: "Press firmly over the whole skin once more, especially the edges and around the cut-outs. The hold gets stronger over the next few hours.",
+    icon: MoveHorizontalIcon,
+    title: "Fold and press the sides",
+    text: "Press the sides down along the edges of the phone, smoothing each one with your thumb or the squeegee.",
+  },
+  {
+    icon: FlameIcon,
+    title: "Full body wrap: set the 4 corners with a little heat",
+    text: "The corner flaps on a full body wrap can stand up on curved edges. Hold a lighter (a matchstick or a hair dryer works too) 1–2 cm from each corner flap for about 2 seconds — just enough warmth for it to stick instantly — then press it down.",
+    warn: "Keep the flame moving and never let it touch the skin; 2 seconds is enough — more can damage the vinyl. Adults only, away from children.",
+  },
+  {
+    icon: CheckCircle2Icon,
+    title: "Final wipe with the microfiber cloth",
+    text: "Give the whole skin a firm press and a wipe with the microfiber cloth. The hold gets stronger over the next few hours.",
   },
 ];
 
 const DONTS = [
-  "Don't apply on a wet or freshly sprayed device",
+  "Don't apply on a wet or dusty device",
   "Don't touch the sticky side more than you need to",
   "Don't pull or stretch the vinyl to make it fit",
-  "Don't rush the camera and port cut-outs — line them up first",
+  "Don't start from the camera — start from the bottom ports",
 ];
 
 const FAQ = [
   {
     q: "I see a small bubble — what do I do?",
-    a: "Push it towards the nearest edge with your thumb; the channels in the adhesive let the air out. For a stubborn one, lift that area gently and press it down again from the centre outwards.",
+    a: "Push it towards the nearest edge with the squeegee or your thumb. If there is a speck of dust under it, lift that area gently, dab it with the dust absorber and press it down again.",
   },
   {
     q: "It went on slightly crooked.",
-    a: "Peel it back slowly from the nearest corner before pressing hard, re-align the camera cut-out and smooth it down again.",
+    a: "Peel it back slowly before pressing hard, line up the bottom ports and speakers again, and work upwards with the squeegee.",
+  },
+  {
+    q: "The corners won't stay down.",
+    a: "That is normal on curved edges of a full body wrap — a couple of seconds of heat on each corner flap (step 7) sets them firmly.",
   },
   {
     q: "How do I remove it later?",
@@ -87,7 +116,7 @@ function VideoEmbed() {
           <span className="absolute left-1/2 top-1/2 grid size-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-ink bg-brand text-brand-foreground shadow-[3px_3px_0_0_var(--ink)] transition-transform group-hover:scale-105">
             <PlayIcon className="ml-1 size-9 fill-current" />
           </span>
-          <span className="absolute bottom-3 left-3 rounded-full bg-background/90 px-3 py-1 text-xs font-bold">▶ Watch the 5-minute guide</span>
+          <span className="absolute bottom-3 left-3 rounded-full bg-background/90 px-3 py-1 text-xs font-bold">▶ Watch the video guide</span>
         </button>
       )}
     </div>
@@ -100,7 +129,7 @@ export default function HowToApplyPage() {
     <div className="halftone min-h-screen">
       <Helmet>
         <title>How to Apply Your Skinly Skin — Step-by-Step Guide & Video | GoSkinly</title>
-        <meta name="description" content="Apply your Skinly skin bubble-free in five steps: clean, line up the camera, press from the centre out, wrap the edges, final press. Watch the video guide." />
+        <meta name="description" content="Apply your Skinly skin bubble-free with the install kit: clean with the wipes, lift dust, start from the bottom ports, press with the squeegee, set the corners. Watch the video guide." />
         <link rel="canonical" href="https://goskinly.com/how-to-apply" />
       </Helmet>
       <AnnouncementBar />
@@ -115,12 +144,25 @@ export default function HowToApplyPage() {
           </span>
           <h1 className="mt-4 text-3xl font-extrabold tracking-tight md:text-5xl">How to apply your Skinly skin</h1>
           <p className="mx-auto mt-3 max-w-2xl text-muted-foreground md:text-lg">
-            Five steps, about five minutes, no bubbles. Watch the video or follow the steps below — the install kit in your box is all you need.
+            A few minutes, no bubbles. Watch the video or follow the steps below — the install kit in your box has everything you need.
           </p>
         </div>
 
         {/* Video */}
         <div className="mt-8"><VideoEmbed /></div>
+
+        {/* The kit */}
+        <h2 className="mt-12 flex items-center gap-2 text-2xl font-extrabold md:text-3xl"><PackageOpenIcon className="size-6 text-brand-deep" /> In your install kit</h2>
+        <div className="mt-1.5 h-1 w-12 rounded-full bg-brand" />
+        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+          {KIT.map((k) => (
+            <div key={k.name} className="rounded-2xl border-2 border-ink bg-card p-4 text-center">
+              <span className="mx-auto grid size-11 place-items-center rounded-full border-2 border-ink bg-sunny"><k.icon className="size-5 text-ink" /></span>
+              <p className="mt-2 text-sm font-extrabold">{k.name}</p>
+              <p className="text-xs text-muted-foreground">{k.use}</p>
+            </div>
+          ))}
+        </div>
 
         {/* Steps */}
         <h2 className="mt-12 text-2xl font-extrabold md:text-3xl">Step by step</h2>
@@ -137,6 +179,11 @@ export default function HowToApplyPage() {
                   <s.icon className="size-5 shrink-0 text-brand-deep" /> {s.title}
                 </h3>
                 <p className="mt-1.5 text-[15px] leading-relaxed text-foreground/80">{s.text}</p>
+                {"warn" in s && s.warn && (
+                  <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-heart/10 px-3 py-2 text-[13px] font-semibold text-heart">
+                    <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" /> {s.warn}
+                  </p>
+                )}
               </div>
             </li>
           ))}
@@ -149,7 +196,7 @@ export default function HowToApplyPage() {
             <ul className="mt-3 space-y-2 text-[15px] text-foreground/80">
               <li>• Apply in good light, on a flat table</li>
               <li>• Keep your hands clean and dry</li>
-              <li>• Take your time with the camera and port cut-outs</li>
+              <li>• Take your time lining up the bottom ports and speakers</li>
               <li>• Put the case back on after a few hours</li>
             </ul>
           </div>

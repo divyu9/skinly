@@ -734,7 +734,7 @@ function staticPages(hub, home = null) {
       // and the YouTube walkthrough as structured data.
       route: "/how-to-apply",
       title: "How to Apply Your Skinly Skin — Step-by-Step Guide & Video | GoSkinly",
-      description: "Apply your Skinly skin bubble-free in five steps: clean, line up the camera, press from the centre out, wrap the edges, final press. Watch the video guide.",
+      description: "Apply your Skinly skin bubble-free with the install kit: clean with the wipes, lift dust, start from the bottom ports, press with the squeegee, set the corners. Watch the video guide.",
       canonical: `${SITE}/how-to-apply`,
       priority: "0.6",
       jsonLd: [
@@ -742,13 +742,17 @@ function staticPages(hub, home = null) {
           "@context": "https://schema.org",
           "@type": "HowTo",
           name: "How to apply a Skinly skin",
-          totalTime: "PT5M",
+          totalTime: "PT10M",
+          tool: ["Wet and dry wipes", "Dust absorber", "Squeegee", "Microfiber cloth"].map((name) => ({ "@type": "HowToTool", name })),
           step: [
-            ["Clean and dry the device", "Take off the case and any old skin, wipe away dust and fingerprints, and let the device dry completely."],
-            ["Line up the camera first", "Peel the backing from one side and place the camera cut-out over the camera as the anchor."],
-            ["Press from the centre out", "Smooth the skin outwards from the middle so trapped air escapes to the edges. Lift and re-place if it is off; do not stretch it."],
-            ["Wrap the edges and sides", "Fold the sides around the edges and press them down; a few seconds of warm air on low softens the vinyl on curves."],
-            ["Final press, then let it settle", "Press firmly over the whole skin, especially edges and cut-outs. The hold strengthens over the next few hours."],
+            ["Clean with the wet and dry wipes", "Take off the case, wipe the back of the phone with the wet wipe and then the dry wipe until it is clean and dry."],
+            ["Lift the dust with the dust absorber", "Dab the dust absorber over the back to pick up tiny dust specks, the most common cause of bubbles."],
+            ["Start at the bottom: ports and speakers", "Begin from the bottom edge and line up the bottom ports and speaker cut-outs exactly."],
+            ["Press it flat with the squeegee", "Work upwards with the squeegee, pressing the skin flat onto the back of the phone."],
+            ["Fine-tune around the camera", "Make small adjustments around the camera cut-out until it sits exactly over the lenses."],
+            ["Fold and press the sides", "Press the sides down along the edges of the phone."],
+            ["Set the corners with a little heat", "On a full body wrap, hold a lighter, matchstick or hair dryer 1-2 cm from each corner flap for about 2 seconds so it sticks, then press it down."],
+            ["Final wipe with the microfiber cloth", "Press the whole skin firmly and wipe it with the microfiber cloth."],
           ].map(([name, text], i) => ({ "@type": "HowToStep", position: i + 1, name, text })),
           video: { "@id": `${SITE}/how-to-apply#video` },
         },
@@ -767,8 +771,8 @@ function staticPages(hub, home = null) {
       ],
       body:
         `<h1>How to apply your Skinly skin</h1>` +
-        `<p>Five steps, about five minutes, no bubbles.</p>` +
-        `<ol><li>Clean and dry the device.</li><li>Line up the camera first.</li><li>Press from the centre out.</li><li>Wrap the edges and sides.</li><li>Final press, then let it settle.</li></ol>` +
+        `<p>A few minutes, no bubbles, with the install kit in your box: wet and dry wipes, a dust absorber, a squeegee and a microfiber cloth.</p>` +
+        `<ol><li>Clean with the wet and dry wipes.</li><li>Lift the dust with the dust absorber.</li><li>Start at the bottom: line up the ports and speakers.</li><li>Press it flat with the squeegee.</li><li>Fine-tune around the camera.</li><li>Fold and press the sides.</li><li>Full body wrap: set the corners with a little heat.</li><li>Final wipe with the microfiber cloth.</li></ol>` +
         `<p><a href="https://www.youtube.com/watch?v=kP2ywckzWXA">Watch the video guide</a> · <a href="${SITE}/products">Shop skins</a></p>`,
     },
     {
