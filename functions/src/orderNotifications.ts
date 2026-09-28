@@ -109,6 +109,21 @@ export async function sendUsecaseEmail(
   const name = order.shippingAddress?.fullName || order.customerName || "Customer";
   const total = Number(order.total ?? order.amountPayable) || 0;
 
+  // Delivered: the review link, and what a review pays (settings/reviewRewards,
+  // on the goods — not shipping — as the order page shows it).
+  let reviewLink = "", reviewRewardLine = "";
+  if (usecaseKey === "order_delivered") {
+    const { reviewLinkUrl } = await import("./reviews");
+    reviewLink = reviewLinkUrl(orderId, "email");
+    const r = (await db.collection("settings").doc("reviewRewards").get()).data() as any;
+    const goods = Math.max(0, (Number(order.itemsTotal) || items.reduce((s: number, i: any) => s + (Number(i?.price) || 0) * (Number(i?.quantity) || 1), 0)) - (Number(order.couponDiscount) || 0));
+    if (r?.enabled !== false) {
+      const photoPct = Number(r?.photoPct ?? 10), textPct = Number(r?.textPct ?? 5), max = Number(r?.maxAmount ?? 50);
+      const best = Math.min(max, Math.round((goods * photoPct) / 100));
+      if (best > 0) reviewRewardLine = `Get up to ₹${best} back in your Skinly wallet — ${photoPct}% with a photo, ${textPct}% for a written review.`;
+    }
+  }
+
   const res = await fetch(MSG91_EMAIL_ENDPOINT, {
     method: "POST",
     headers: { authkey, "Content-Type": "application/json" },
@@ -123,6 +138,19 @@ export async function sendUsecaseEmail(
           amount: `₹${total.toFixed(2)}`,
           productImage: usableImage(items),
           orderLink: orderLinkFor(orderId),
+          /*
+           * For the condition-free templates (MSG91 prints {{#if}} as text):
+           * a picture that is never empty, and whole sentences.
+           */
+          firstName: String(name).trim().split(/\s+/)[0] || "there",
+          productPhoto: usableImage(items) || "https://mailer-prod-api-assets.s3.ap-southeast-2.amazonaws.com/templates/1765380300-outbound-23404-Skinly_Logo.png",
+          itemLine: `${items.reduce((s: number, i: any) => s + (Number(i?.quantity) || 1), 0)} item${items.reduce((s: number, i: any) => s + (Number(i?.quantity) || 1), 0) === 1 ? "" : "s"}`,
+          paymentLine: String(order.paymentMethod || "").toLowerCase() === "cod"
+            ? `Cash on delivery — ₹${Math.max(0, total - (Number(order.prepaidAmount) || 0)).toFixed(0)} to pay at the door`
+            : "Paid online",
+          shipTo: [order.shippingAddress?.city, order.shippingAddress?.state].filter(Boolean).join(", "),
+          reviewLink: reviewLink || orderLinkFor(orderId),
+          reviewRewardLine,
         },
       }],
       from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
