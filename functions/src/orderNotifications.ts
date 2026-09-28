@@ -151,6 +151,19 @@ export async function sendUsecaseEmail(
           shipTo: [order.shippingAddress?.city, order.shippingAddress?.state].filter(Boolean).join(", "),
           reviewLink: reviewLink || orderLinkFor(orderId),
           reviewRewardLine,
+          // Dispatched: the parcel's AWB, courier and the courier's own tracking page
+          // (the order page's courierTrackUrl, same rules), and the expected date.
+          awbNumber: String(order.awbNumber || "—"),
+          courierName: String(order.courierName || (order.shippingProvider === "delhivery" ? "Delhivery" : order.awbNumber ? "RapidShyp" : "Our courier partner")),
+          trackingUrl: /^https?:\/\//i.test(String(order.trackingUrl || "")) ? String(order.trackingUrl)
+            : order.awbNumber
+              ? (order.shippingProvider === "delhivery"
+                ? `https://www.delhivery.com/track-v2/package/${encodeURIComponent(String(order.awbNumber).trim())}`
+                : `https://app.rapidshyp.com/t/${encodeURIComponent(String(order.awbNumber).trim())}`)
+              : orderLinkFor(orderId),
+          deliveryLine: Number(order.expectedDeliveryAt) > Date.now()
+            ? `Expected by ${new Date(Number(order.expectedDeliveryAt) + 5.5 * 3600000).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" })}`
+            : "We'll send you updates on WhatsApp as it moves",
         },
       }],
       from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
