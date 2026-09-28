@@ -46,6 +46,7 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
     model: "",
     category: "",
     phone: "",
+    email: "",
   });
   
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
@@ -55,14 +56,18 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
   }, []);
   
   const resetForm = useCallback(() => {
-    setFormState({ brand: "", model: "", category: "", phone: "" });
+    setFormState({ brand: "", model: "", category: "", phone: "", email: "" });
   }, []);
   
   const handleSubmit = useCallback(async () => {
-    const { brand, model, category, phone } = formState;
+    const { brand, model, category, phone, email } = formState;
     
-    if (!brand.trim() || !model.trim() || !category || !phone.trim()) {
+    if (!brand.trim() || !model.trim() || !category || !phone.trim() || !email.trim()) {
       toast.error("Please fill in all fields");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      toast.error("Please enter a valid email address");
       return;
     }
     
@@ -73,7 +78,9 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
         category: category,
         // Digits and a leading + only: the rules refuse anything else.
         whatsappPhone: phone.replace(/[^\d+]/g, ""),
-      });
+        // The same messages go to both, in case one channel does not reach.
+        userEmail: email.trim().toLowerCase(),
+      } as any);
       toast.success("Model request submitted! We'll notify you when it's added.");
       onOpenChange(false);
       resetForm();
@@ -86,7 +93,8 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
   const isValid = formState.brand.trim() && 
     formState.model.trim() && 
     formState.category && 
-    formState.phone.trim();
+    formState.phone.trim() &&
+    formState.email.trim();
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -147,6 +155,20 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
               value={formState.phone}
               onChange={(e) => updateField("phone", e.target.value)}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="email">Email *</Label>
+            <Input
+              id="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={formState.email}
+              onChange={(e) => updateField("email", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">We'll tell you on WhatsApp and email when it's added.</p>
           </div>
           
           <div className="flex gap-3">

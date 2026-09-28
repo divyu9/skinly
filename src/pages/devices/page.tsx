@@ -72,6 +72,7 @@ export default function DevicesPage() {
   const [requestModel, setRequestModel] = useState("");
   const [requestCategory, setRequestCategory] = useState<string>("");
   const [requestWhatsApp, setRequestWhatsApp] = useState("");
+  const [requestEmail, setRequestEmail] = useState("");
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [confirmedNotMatch, setConfirmedNotMatch] = useState(false); // Confirmation checkbox
   
@@ -321,6 +322,11 @@ export default function DevicesPage() {
       toast.error("Please enter a valid 10-digit phone number");
       return;
     }
+    // Email too: both messages go to both, in case one channel does not reach.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(requestEmail.trim())) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
     
     // If similar models exist and user hasn't confirmed, show warning
     if (similarModels && similarModels.length > 0 && !confirmedNotMatch) {
@@ -336,9 +342,10 @@ export default function DevicesPage() {
         modelName: requestModel.trim(),
         category: requestCategory as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
         whatsappPhone: "+91" + cleanedPhone,
-      });
+        userEmail: requestEmail.trim().toLowerCase(),
+      } as any);
       
-      toast.success("Request submitted! We'll notify you on WhatsApp when it's added.");
+      toast.success("Request submitted! We'll tell you on WhatsApp and email when it's added.");
       
       // Reset form
       setRequestDialogOpen(false);
@@ -348,6 +355,7 @@ export default function DevicesPage() {
       setRequestModel("");
       setRequestCategory("");
       setRequestWhatsApp("");
+      setRequestEmail("");
       setConfirmedNotMatch(false);
     } catch (error) {
       toast.error("Failed to submit request. Please try again.");
@@ -852,8 +860,21 @@ export default function DevicesPage() {
                   maxLength={10}
                 />
               </div>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label>Email *</Label>
+              <Input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                value={requestEmail}
+                onChange={(e) => setRequestEmail(e.target.value)}
+              />
               <p className="text-xs text-muted-foreground">
-                We'll notify you on WhatsApp when your device is added
+                We'll tell you on WhatsApp and email when your device is added
               </p>
             </div>
 

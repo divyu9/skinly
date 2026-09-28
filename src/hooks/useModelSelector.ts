@@ -22,6 +22,7 @@ interface RequestFormState {
   model: string;
   category: string;
   whatsApp: string;
+  email: string;
   confirmedNotMatch: boolean;
   isSubmitting: boolean;
 }
@@ -56,6 +57,7 @@ export function useModelSelector(
     model: "",
     category: "phone",
     whatsApp: "",
+    email: "",
     confirmedNotMatch: false,
     isSubmitting: false,
   });
@@ -214,6 +216,13 @@ export function useModelSelector(
       toast.error("Please enter a valid 10-digit phone number");
       return;
     }
+    // Email too: the "request received" and "model added" messages go to
+    // both, so one failing channel does not leave the customer in the dark.
+    const email = requestState.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
     
     if (similarModels && similarModels.length > 0 && !requestState.confirmedNotMatch) {
       toast.error("Please confirm that your model doesn't match any of the similar models listed");
@@ -228,9 +237,10 @@ export function useModelSelector(
         modelName: requestState.model.trim(),
         category: requestState.category as "phone" | "tablet" | "laptop" | "console" | "charger" | "drone" | "camera" | "lens" | "mac-mini",
         whatsappPhone: "+91" + cleanedPhone,
-      });
+        userEmail: email,
+      } as any);
       
-      toast.success("Request submitted! We'll notify you on WhatsApp when it's added.");
+      toast.success("Request submitted! We'll tell you on WhatsApp and email when it's added.");
       resetRequestForm();
     } catch (error) {
       toast.error("Failed to submit request. Please try again.");
@@ -278,6 +288,7 @@ export function useModelSelector(
       model: "",
       category: "phone",
       whatsApp: "",
+    email: "",
       confirmedNotMatch: false,
       isSubmitting: false,
     });

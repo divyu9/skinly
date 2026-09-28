@@ -34,6 +34,7 @@ interface RequestModelDialogProps {
     model: string;
     category: string;
     whatsApp: string;
+    email: string;
     confirmedNotMatch: boolean;
     isSubmitting: boolean;
   };
@@ -206,8 +207,21 @@ export function RequestModelDialog({
                 maxLength={10}
               />
             </div>
+          </div>
+
+          {/* Email — the same two messages go here too, in case WhatsApp does not reach. */}
+          <div className="space-y-2">
+            <Label>Email *</Label>
+            <Input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={formState.email}
+              onChange={(e) => onUpdateForm({ email: e.target.value })}
+            />
             <p className="text-xs text-muted-foreground">
-              We'll notify you on WhatsApp when your device is added
+              We'll tell you on WhatsApp and email when your device is added
             </p>
           </div>
 

@@ -40,6 +40,7 @@ export function RequestModelDialog({
   const [model, setModel] = useState("");
   const [category, setCategory] = useState(initialCategory);
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   // Opened from the picker, the brand and category are already known — asking
@@ -53,8 +54,12 @@ export function RequestModelDialog({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!brand || !model || !category || !phone) {
+    if (!brand || !model || !category || !phone || !email) {
       toast.error("Please fill in all fields");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      toast.error("Please enter a valid email address");
       return;
     }
     setSubmitting(true);
@@ -65,10 +70,12 @@ export function RequestModelDialog({
         category,
         // Digits and a leading + only: the rules refuse anything else.
         whatsappPhone: phone.replace(/[^\d+]/g, ""),
-      });
+        // The same messages go to both, in case one channel does not reach.
+        userEmail: email.trim().toLowerCase(),
+      } as any);
       toast.success("Request submitted! We'll notify you when it's available.");
       onOpenChange(false);
-      setBrand(""); setModel(""); setCategory(""); setPhone("");
+      setBrand(""); setModel(""); setCategory(""); setPhone(""); setEmail("");
     } catch (error) {
       toast.error("Failed to submit request. Please try again.");
       console.error(error);
@@ -132,8 +139,22 @@ export function RequestModelDialog({
               onChange={(e) => setPhone(e.target.value)}
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="request-email">Email *</Label>
+            <Input
+              id="request-email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
             <p className="text-xs text-muted-foreground">
-              We'll message you when your model is available
+              We'll tell you on WhatsApp and email when your model is available
             </p>
           </div>
 
