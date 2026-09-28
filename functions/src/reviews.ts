@@ -36,6 +36,18 @@ function displayName(full: unknown): string {
   return parts.length > 1 ? `${first} ${parts[parts.length - 1].charAt(0).toUpperCase()}.` : first;
 }
 
+/** "new delhi" → "New Delhi": the city from the address, shown on the review. */
+export function cityName(raw: unknown): string {
+  return String(raw || "").trim().toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 40);
+}
+
+/** The design a review is of: R-44 from "R-44-IPH" or "L-59", else from the design upload. */
+export function reviewDesignCode(sku: unknown, designImageUrl: unknown): string {
+  const m = /^([A-Z]+-\d+)(?:-[A-Z][A-Z0-9]*)?$/.exec(String(sku || "").trim().toUpperCase());
+  if (m) return m[1];
+  return /\/design-raw\/([A-Z]+-\d+)-/.exec(String(designImageUrl || ""))?.[1] || "";
+}
+
 const MAX_PHOTOS = 3;
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
 
@@ -109,8 +121,12 @@ export const submitOrderReview = functions
 
       const now = Date.now();
       const created = Number(before.data()?.createdAt) || now;
-      // For the homepage review cards' link to the product.
-      const productSlug = String((await db.collection("products").doc(productId).get()).data()?.slug || "");
+      // For the homepage review cards' link to the product, and so the review
+      // shows on every listing of its design for the same gadget (the Apple,
+      // Samsung and Android listings of one design are separate pages).
+      const product = (await db.collection("products").doc(productId).get()).data() || {};
+      const productSlug = String(product.slug || "");
+      const designCode = reviewDesignCode(item.sku, product.designImageUrl);
       await ref.set({
         productId,
         productSlug,
@@ -121,6 +137,9 @@ export const submitOrderReview = functions
         comment,
         imageUrls,
         userName: displayName(order.shippingAddress?.fullName || order.customerName),
+        city: cityName(order.shippingAddress?.city),
+        ...(designCode ? { designCode } : {}),
+        gadget: String(product.gadgetCategory || "phone"),
         verified: true,
         device: [item.phoneBrand, item.phoneModel].filter(Boolean).join(" "),
         source: uid && !linkTokenValid("review", orderId, data?.t) ? "order-page" : "review-link",

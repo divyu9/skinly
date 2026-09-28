@@ -17,6 +17,8 @@ import { reviewLinkUrl } from "./reviews";
  */
 
 const ASK_AFTER_DAYS = 3;
+/** The one reminder goes this long after the ask, if no review came. */
+const REMIND_AFTER_DAYS = 5;
 /** One ask per number in this long, however many orders it has. */
 const ONE_PER_PHONE_DAYS = 90;
 const PER_RUN = 30;
@@ -93,7 +95,36 @@ export async function sendReviewRequests(
     out.queued++;
   }
 
-  if (out.queued) console.log("sendReviewRequests", out);
+  /*
+   * One reminder, five days after the ask, to whoever has not reviewed yet —
+   * and never a third message. Most people mean to and forget; a second
+   * nudge roughly doubles what one message brings in.
+   */
+  let reminded = 0;
+  for (const d of snap.docs) {
+    if (opts.dryRun || out.queued + reminded >= PER_RUN) break;
+    const o = d.data() as any;
+    const asked = Number(o.reviewAskedAt) || 0;
+    if (o.isDeleted === true || !asked || o.reviewedAt || o.reviewRemindedAt || asked > now - REMIND_AFTER_DAYS * 86400000) continue;
+    const phone = String(o.shippingAddress?.phone || o.phone || "").replace(/\D/g, "").slice(-10);
+    if (!/^[6-9]\d{9}$/.test(phone)) continue;
+    const items = Array.isArray(o.items) ? o.items : [];
+    const link = reviewLinkUrl(d.id, "whatsapp_reminder");
+    const ok = await queueWhatsApp(db, USECASE, phone, {
+      customer_name: String(o.shippingAddress?.fullName || o.customerName || "there").trim().split(/\s+/)[0],
+      order_number: String(o.orderNumber || d.id).replace(/^#/, ""),
+      product_name: String(items[0]?.productTitle || "your skin").slice(0, 60),
+      review_link: link,
+      product_url: link,
+      shop_url: "https://goskinly.com",
+      company_name: "GoSkinly",
+    }, d.id).catch(() => false);
+    if (!ok) continue;
+    await d.ref.update({ reviewRemindedAt: Date.now() });
+    reminded++;
+  }
+
+  if (out.queued || reminded) console.log("sendReviewRequests", { ...out, reminded });
   return out;
 }
 

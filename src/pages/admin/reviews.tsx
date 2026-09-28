@@ -27,9 +27,16 @@ type Review = {
   _id: string; productId: string; productTitle?: string; productSlug?: string; orderId?: string; rating: number;
   title?: string; comment?: string; imageUrls?: string[]; userName?: string; device?: string; verified?: boolean;
   status?: "pending" | "approved" | "rejected"; createdAt?: number; _creationTime?: number;
+  city?: string; followedUpAt?: number;
 };
 
-const TABS = ["pending", "approved", "rejected", "all"] as const;
+/*
+ * "Follow up": 1–3 star reviews nobody has answered yet. Not approved (they
+ * stay off the site) but not ignored either — a call and a reprint turn most
+ * of them into a customer who comes back.
+ */
+const TABS = ["pending", "followup", "approved", "rejected", "all"] as const;
+const needsFollowUp = (r: Review) => Number(r.rating) <= 3 && !r.followedUpAt;
 type Tab = (typeof TABS)[number];
 const statusOf = (r: Review) => r.status || "approved";
 
@@ -94,11 +101,25 @@ export default function AdminReviews() {
     (e) => { toast.error(e.message); setReviews([]); }), []);
 
   const counts = useMemo(() => {
-    const c: Record<Tab, number> = { pending: 0, approved: 0, rejected: 0, all: 0 };
-    for (const r of reviews || []) { c[statusOf(r) as Tab]++; c.all++; }
+    const c: Record<Tab, number> = { pending: 0, followup: 0, approved: 0, rejected: 0, all: 0 };
+    for (const r of reviews || []) { c[statusOf(r) as Tab]++; c.all++; if (needsFollowUp(r)) c.followup++; }
     return c;
   }, [reviews]);
-  const shown = (reviews || []).filter((r) => tab === "all" || statusOf(r) === tab);
+  const shown = (reviews || []).filter((r) => tab === "all" || (tab === "followup" ? needsFollowUp(r) : statusOf(r) === tab));
+
+  /** Opens WhatsApp to the customer, the order number and product already in the message. */
+  const whatsapp = async (r: Review) => {
+    const o: any = r.orderId ? (await getDoc(doc(db, "orders", r.orderId))).data() : null;
+    const phone = String(o?.shippingAddress?.phone || o?.phone || "").replace(/\D/g, "").slice(-10);
+    if (!phone) { toast.error("No phone number on this order"); return; }
+    const name = String(o?.shippingAddress?.fullName || r.userName || "").split(/\s+/)[0];
+    const msg = `Hi ${name}, this is GoSkinly. Sorry the ${r.productTitle || "skin"} from order ${o?.orderNumber || ""} wasn't right. Tell us what happened and we'll fix it for you.`;
+    window.open(`https://wa.me/91${phone}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+  };
+  const markFollowedUp = async (r: Review) => {
+    try { await setDoc(doc(db, "reviews", r._id), { followedUpAt: Date.now() }, { merge: true }); toast.success("Marked as followed up"); }
+    catch (e: any) { toast.error(e?.message || "Could not update"); }
+  };
 
   const moderate = async (r: Review, action: "approve" | "reject") => {
     setBusy(r._id);
@@ -136,7 +157,7 @@ export default function AdminReviews() {
         <div className="flex flex-wrap gap-2">
           {TABS.map((t) => (
             <Button key={t} size="sm" variant={tab === t ? "default" : "outline"} onClick={() => setTab(t)} className="capitalize">
-              {t} <Badge variant="secondary" className="ml-2">{counts[t]}</Badge>
+              {t === "followup" ? "Follow up (1–3★)" : t} <Badge variant={t === "followup" && counts[t] ? "destructive" : "secondary"} className="ml-2">{counts[t]}</Badge>
             </Button>
           ))}
         </div>
@@ -146,7 +167,7 @@ export default function AdminReviews() {
         ) : shown.length === 0 ? (
           <Card><CardContent className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
             <MessageSquareIcon className="size-8" />
-            {tab === "pending" ? "Nothing waiting for approval" : "No reviews here"}
+            {tab === "pending" ? "Nothing waiting for approval" : tab === "followup" ? "No unhappy customers waiting on a reply" : "No reviews here"}
           </CardContent></Card>
         ) : (
           <div className="space-y-4">
@@ -165,11 +186,19 @@ export default function AdminReviews() {
                         </div>
                         <p className="text-xs text-muted-foreground">
                           {new Date(r.createdAt || r._creationTime || 0).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                          {r.device ? ` · ${r.device}` : ""}
+                          {r.device ? ` · ${r.device}` : ""}{r.city ? ` · ${r.city}` : ""}
                           {r.orderId && <> · <Link className="underline" to={`/backend-skinly/orders/${r.orderId}`}>order</Link></>}
                         </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        {needsFollowUp(r) && (
+                          <>
+                            <Button size="sm" variant="outline" className="border-green-600 text-green-700" onClick={() => void whatsapp(r)}>
+                              <MessageSquareIcon className="mr-1 size-4" /> WhatsApp customer
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => void markFollowedUp(r)}>Followed up</Button>
+                          </>
+                        )}
                         {st !== "approved" && (
                           <Button size="sm" onClick={() => void moderate(r, "approve")} disabled={busy === r._id}>
                             <CheckIcon className="mr-1 size-4" /> Approve

@@ -1,16 +1,20 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
-import { StarIcon } from "lucide-react";
+import { BadgeCheckIcon, StarIcon, XIcon } from "lucide-react";
+import { sizedImage } from "@/lib/image-cdn";
+import { timeAgo } from "@/lib/public-reviews";
 
 interface Review {
   _id: string;
   _creationTime?: number;
   createdAt?: number;
   device?: string;
-  userName: string;
-  verified: boolean;
+  userName?: string;
+  city?: string;
+  verified?: boolean;
   rating: number;
-  title: string;
-  comment: string;
+  title?: string;
+  comment?: string;
   imageUrls?: string[];
   videoUrls?: string[];
 }
@@ -67,63 +71,54 @@ function RatingBar({ rating, count, total }: { rating: number; count: number; to
 }
 
 function ReviewCard({ review }: { review: Review }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const when = timeAgo(Number(review.createdAt || review._creationTime || 0));
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold">{review.userName}</span>
-              {review.verified && (
-                <span className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded">
-                  Verified Purchase
-                </span>
-              )}
-            </div>
-            <StarRating rating={review.rating} />
+    <div className="rounded-2xl border-2 border-ink/10 bg-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="font-bold">{review.userName || "Verified buyer"}</span>
+            {review.city && <span className="text-sm text-muted-foreground">· {review.city}</span>}
           </div>
-          <span className="text-sm text-muted-foreground">
-            {new Date(review.createdAt || review._creationTime || 0).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-          </span>
+          {review.verified !== false && (
+            <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              <BadgeCheckIcon className="size-3.5" /> Verified Buyer
+            </span>
+          )}
         </div>
-        
-        {review.device && <p className="text-xs text-muted-foreground mb-2">On {review.device}</p>}
-        {review.title && <h4 className="font-semibold mb-2">{review.title}</h4>}
-        <p className="text-sm text-muted-foreground mb-3">{review.comment}</p>
-        
-        {/* Review Media */}
-        {((review.imageUrls && review.imageUrls.length > 0) ||
-          (review.videoUrls && review.videoUrls.length > 0)) && (
-          <div className="space-y-3 mt-4">
-            {review.imageUrls && review.imageUrls.length > 0 && (
-              <div data-drag-scroll className="flex gap-2 overflow-x-auto">
-                {review.imageUrls.map((url, idx) => (
-                  <img
-                    key={idx}
-                    src={url}
-                    alt={`Review image ${idx + 1}`}
-                    className="h-32 w-32 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => window.open(url, '_blank')}
-                  />
-                ))}
-              </div>
-            )}
-            {review.videoUrls && review.videoUrls.length > 0 && (
-              <div data-drag-scroll className="flex gap-2 overflow-x-auto">
-                {review.videoUrls.map((url, idx) => (
-                  <video
-                    key={idx}
-                    src={url}
-                    controls
-                    className="h-40 rounded-lg"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        {when && <span className="shrink-0 text-xs text-muted-foreground">{when}</span>}
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <StarRating rating={review.rating} />
+        {review.device && <span className="text-xs text-muted-foreground">on {review.device}</span>}
+      </div>
+      {review.title && <h4 className="mt-2 font-semibold">{review.title}</h4>}
+      {review.comment && <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">{review.comment}</p>}
+
+      {review.imageUrls && review.imageUrls.length > 0 && (
+        <div data-drag-scroll className="mt-3 flex gap-2 overflow-x-auto">
+          {review.imageUrls.map((url, idx) => (
+            <button key={idx} type="button" onClick={() => setOpen(url)} className="shrink-0 overflow-hidden rounded-xl border border-ink/10">
+              <img src={sizedImage(url, 240)} alt={`Customer photo ${idx + 1}`} loading="lazy" className="size-24 object-cover transition-transform hover:scale-105 md:size-28" />
+            </button>
+          ))}
+        </div>
+      )}
+      {review.videoUrls && review.videoUrls.length > 0 && (
+        <div data-drag-scroll className="mt-3 flex gap-2 overflow-x-auto">
+          {review.videoUrls.map((url, idx) => <video key={idx} src={url} controls className="h-40 rounded-lg" />)}
+        </div>
+      )}
+
+      {open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => setOpen(null)} role="dialog" aria-modal="true">
+          <button aria-label="Close" className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white"><XIcon className="size-5" /></button>
+          <img src={sizedImage(open, 1000)} alt="Customer photo" className="max-h-[85vh] max-w-full rounded-2xl object-contain" />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -156,8 +151,9 @@ export function ReviewSection({ reviews }: ReviewSectionProps) {
     (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
 
   return (
-    <div className="border-t border-border pt-12">
-      <h2 className="text-2xl font-bold mb-6">Customer Reviews</h2>
+    <div id="reviews" className="scroll-mt-24 border-t border-border pt-12">
+      <h2 className="text-2xl font-bold mb-1">Customer Reviews</h2>
+      <p className="mb-6 text-sm text-muted-foreground">From buyers of this design, on every phone it is cut for.</p>
 
       <div className="space-y-6">
         <Card>

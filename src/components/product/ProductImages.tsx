@@ -9,6 +9,8 @@ interface ProductImage {
   phoneModel?: string;
   /** A packing-table photo of a real order: "Cut for iPhone 13" (src/lib/real-photos.ts). */
   realCutFor?: string;
+  /** A photo from an approved review: "Priya S., Pune" (src/lib/public-reviews.ts). */
+  customerBy?: string;
 }
 
 interface ProductImagesProps {
@@ -83,6 +85,7 @@ export function ProductImages({
   
   const isMockupImage = mockupUrl && selectedImage === mockupUrl;
   const selectedReal = images.find((img) => img.url === selectedImage)?.realCutFor;
+  const selectedCustomer = images.find((img) => img.url === selectedImage)?.customerBy;
   
   return (
     <div className="space-y-3 md:sticky md:top-24 md:self-start">
@@ -154,6 +157,19 @@ export function ProductImages({
           <p className="text-[12px] leading-snug">
             <span className="font-bold text-foreground">Real photo · {selectedReal}</span>
             <span className="text-muted-foreground"> — from an order we packed</span>
+          </p>
+        </div>
+      )}
+
+      {/* A buyer's own photo, from their approved review. */}
+      {selectedCustomer && (
+        <div className="flex items-start gap-2.5 rounded-xl border-2 border-sunny bg-sunny/25 px-3 py-2.5">
+          <span className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-sunny text-ink ring-2 ring-ink">
+            <CameraIcon className="size-3.5" strokeWidth={2.4} />
+          </span>
+          <p className="text-[12px] leading-snug">
+            <span className="font-bold text-foreground">Customer photo · {selectedCustomer}</span>
+            <span className="text-muted-foreground"> — from a verified review</span>
           </p>
         </div>
       )}

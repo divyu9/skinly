@@ -30,6 +30,7 @@ const CartPage = lazyWithReload(() => import("./pages/cart/page.tsx"), "./pages/
 const OrdersPage = lazyWithReload(() => import("./pages/orders/page.tsx"), "./pages/orders/page.tsx");
 const TrackOrderPage = lazyWithReload(() => import("./pages/track/page.tsx"), "./pages/track/page.tsx");
 const OrderDetailPage = lazyWithReload(() => import("./pages/orders/detail/page.tsx"), "./pages/orders/detail/page.tsx");
+const ReviewsPage = lazyWithReload(() => import("./pages/reviews/page.tsx"), "./pages/reviews/page.tsx");
 const RealPhotosPage = lazyWithReload(() => import("./pages/real-photos/page.tsx"), "./pages/real-photos/page.tsx");
 const DevicesPage = lazyWithReload(() => import("./pages/devices/page.tsx"), "./pages/devices/page.tsx");
 const PaymentCallback = lazyWithReload(() => import("./pages/payment/callback.tsx"), "./pages/payment/callback.tsx");
@@ -168,6 +169,7 @@ export default function App() {
             <Route path="/orders/:orderId" element={<Suspense fallback={<PageSkeleton />}><OrderDetailPage /></Suspense>} />
             <Route path="/devices" element={<Suspense fallback={<PageSkeleton />}><DevicesPage /></Suspense>} />
             <Route path="/real-photos" element={<Suspense fallback={<PageSkeleton />}><RealPhotosPage /></Suspense>} />
+            <Route path="/reviews" element={<Suspense fallback={<PageSkeleton />}><ReviewsPage /></Suspense>} />
             <Route path="/payment/callback" element={<Suspense fallback={<PageSkeleton />}><PaymentCallback /></Suspense>} />
             <Route path="/pay/:orderId" element={<Suspense fallback={<PageSkeleton />}><PayPage /></Suspense>} />
             <Route path="/review/:orderId" element={<Suspense fallback={<PageSkeleton />}><ReviewPage /></Suspense>} />

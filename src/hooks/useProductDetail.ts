@@ -8,6 +8,8 @@ import type { Id } from "@/lib/firebase-api";
 import { findMockupImageUrl, extractSKU, extractBrand } from "@/lib/mockups.ts";
 import { trackProductView } from "@/lib/analytics.ts";
 import { cutFor, designCodeOf, useDesignRealPhotos, type RealPhoto } from "@/lib/real-photos";
+import { useDesignReviews } from "@/lib/public-reviews";
+import { designOfListing } from "@/lib/smart-setup";
 
 export interface ProductState {
   selectedImage: string;
@@ -287,10 +289,22 @@ export function useProductDetail() {
     return images.length > 0 ? images : productData.images;
   }, [productData, phoneModel, mockupState.url]);
 
-  const displayImages = useMemo(
-    () => withRealPhotos(baseImages, realPhotos, phoneModel, productData?.title),
-    [baseImages, realPhotos, phoneModel, productData?.title],
+  // Buyers' own photos from approved reviews of this design, after everything else.
+  const reviews = useDesignReviews(
+    productData?._id || null,
+    productData ? designOfListing(productData) : null,
+    productData?.gadgetCategory || null,
   );
+  const displayImages = useMemo(() => {
+    const withReal = withRealPhotos(baseImages, realPhotos, phoneModel, productData?.title);
+    const seen = new Set(withReal.map((i: any) => i.url));
+    const customer = (reviews || []).filter((r) => r.rating >= 4).flatMap((r) =>
+      (r.imageUrls || []).map((url) => ({
+        url, alt: `${productData?.title || "Skin"} — customer photo`,
+        customerBy: [r.userName, r.city].filter(Boolean).join(", ") || "Verified buyer",
+      }))).filter((i) => !seen.has(i.url)).slice(0, 8);
+    return [...withReal, ...customer];
+  }, [baseImages, realPhotos, phoneModel, productData?.title, reviews]);
   
   // Auto-select first image when displayImages changes
   useEffect(() => {

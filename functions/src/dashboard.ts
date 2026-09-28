@@ -54,6 +54,9 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     db.collection("abandonedCarts").where("createdAt", ">=", now - 2 * DAY).get(),
     db.collection("variants").where("inventoryQuantity", "<=", 0).count().get(),
   ]);
+  // 1–3 star reviews nobody has answered yet (Admin › Reviews › Follow up).
+  const lowSnap = await db.collection("reviews").where("rating", "<=", 3).get();
+  const followUps = lowSnap.docs.filter((d) => !(d.data() as any).followedUpAt).length;
 
   const recent = recentSnap.docs.map((d) => ({ _id: d.id, ...(d.data() as any) })).filter((o) => !o.isDeleted);
   const sales = recent.filter(isSale);
@@ -226,6 +229,7 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
       unpaid: unpaid.length, unpaidValue: unpaid.reduce((s, o) => s + money(o), 0),
       carts: carts.length, cartsValue: carts.reduce((s, c) => s + (Number(c.cartTotal) || 0), 0),
       reviews: reviewSnap.data().count,
+      followUps,
       modelRequests: requests.length,
       stockAlerts: alertsWaiting.length,
       bugs: bugsOpen,

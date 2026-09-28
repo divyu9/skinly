@@ -729,6 +729,18 @@ function staticPages(hub, home = null) {
         `<p>Every skin here was printed and cut for a customer's exact device and photographed at our packing table before it shipped.</p>` +
         `<p><a href="${SITE}/products">Shop all skins</a></p>`,
     },
+    {
+      // Every approved review (src/pages/reviews/page.tsx).
+      route: "/reviews",
+      title: "Customer Reviews | GoSkinly",
+      description: "Reviews and photos from verified GoSkinly buyers — every review is tied to a delivered order.",
+      canonical: `${SITE}/reviews`,
+      priority: "0.6",
+      body:
+        `<h1>Customer reviews</h1>` +
+        `<p>Every review here comes from a delivered GoSkinly order.</p>` +
+        `<p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/real-photos">Real photos</a></p>`,
+    },
     policy("privacy", "Privacy Policy | GoSkinly",
       "Read GoSkinly's privacy policy. We are committed to protecting your personal information and data privacy."),
     policy("terms", "Terms of Service | GoSkinly",

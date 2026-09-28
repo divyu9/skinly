@@ -1,6 +1,7 @@
-import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
+import { useDesignReviews, reviewStats as computeStats } from "@/lib/public-reviews";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/use-auth.ts";
 import { ConvexError } from "convex/values";
@@ -16,7 +17,11 @@ interface ReviewFormState {
   isUploading: boolean;
 }
 
-export function useProductReviews(productId: Id<"products"> | null) {
+/**
+ * Reviews on a product page: approved ones for this listing and every listing
+ * of its design on the same gadget (src/lib/public-reviews.ts).
+ */
+export function useProductReviews(productId: Id<"products"> | null, designCode?: string | null, gadget?: string | null) {
   const { user } = useAuth();
   
   // Load reviews state - only load when product exists
@@ -33,16 +38,11 @@ export function useProductReviews(productId: Id<"products"> | null) {
     isUploading: false,
   });
   
-  // Queries
-  const reviews = useQuery(
-    api.reviews.getProductReviews,
-    loadReviews && productId ? { productId } : "skip"
-  );
-  
-  const reviewStats = useQuery(
-    api.reviews.getReviewStats,
-    loadReviews && productId ? { productId } : "skip"
-  );
+  const reviews = useDesignReviews(loadReviews ? productId : null, designCode, gadget);
+  const reviewStats = useMemo(() => {
+    const st = computeStats(reviews || []);
+    return { averageRating: st.averageRating, totalReviews: st.total };
+  }, [reviews]);
   
   // Mutations
   const addReview = useMutation(api.reviews.addReview);

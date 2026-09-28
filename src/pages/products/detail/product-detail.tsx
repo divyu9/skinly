@@ -51,7 +51,9 @@ import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
 import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { SmartSetup, type SetupCartItem } from "./_components/smart-setup.tsx";
+import { ReviewQuote } from "./_components/review-quote.tsx";
 import { SameDesignOtherGadgets } from "@/components/products/sections/SameDesignOtherGadgets.tsx";
+import { designOfListing } from "@/lib/smart-setup";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
 import { StockNotification } from "./_components/stock-notification.tsx";
 
@@ -217,7 +219,7 @@ export default function ProductDetailPage() {
     addVideos,
     removeVideo,
     handleSubmitReview,
-  } = useProductReviews(productData?._id || null);
+  } = useProductReviews(productData?._id || null, productData ? designOfListing(productData as any) : null, deviceCategory);
   
   // Handler for image selection
   const handleImageSelect = useCallback((url: string) => {
@@ -375,7 +377,7 @@ export default function ProductDetailPage() {
         productPrice={productPrice}
         variants={productData?.variants}
         breadcrumb={breadcrumbForSeo}
-        reviews={reviews}
+        reviews={reviews?.map((r) => ({ ...r, verified: r.verified !== false, userName: r.userName || "Verified buyer", title: r.title || "", comment: r.comment || "" }))}
       />
       
       {/* Layout */}
@@ -491,7 +493,8 @@ export default function ProductDetailPage() {
 
                   {/* Only shown when reviews actually exist — no placeholder stars. */}
                   {reviewStats && reviewStats.totalReviews > 0 && (
-                    <div className="flex items-center gap-1.5">
+                    <a href="#reviews" className="flex items-center gap-1.5 hover:underline"
+                      onClick={(e) => { e.preventDefault(); document.getElementById("reviews")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
                       <div className="flex items-center">
                         {[...Array(5)].map((_, i) => (
                           <StarIcon
@@ -505,9 +508,9 @@ export default function ProductDetailPage() {
                         ))}
                       </div>
                       <span className="text-sm text-muted-foreground">
-                        {reviewStats.averageRating} ({reviewStats.totalReviews})
+                        {reviewStats.averageRating} · {reviewStats.totalReviews} {reviewStats.totalReviews === 1 ? "review" : "reviews"}
                       </span>
-                    </div>
+                    </a>
                   )}
                 </div>
 
@@ -638,6 +641,9 @@ export default function ProductDetailPage() {
                   variantTitle={productData.variants[productState.selectedVariant]?.title}
                 />
               ) : null}
+
+              {/* A buyer's words under the buttons — demo only, behind ?quoteDemo=1. */}
+              <ReviewQuote reviews={reviews} />
 
               {/* Under the buy button, on every screen.
                   It used to sit at the bottom of the gallery card, which is

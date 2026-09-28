@@ -38,7 +38,7 @@ type Dashboard = {
   tasks: {
     toPack: number; oldestToPackHours: number; readyToShip: number; pickupLate: number; inTransit: number; slow: number;
     undelivered: number; rto30: number; unpaid: number; unpaidValue: number; carts: number; cartsValue: number;
-    reviews: number; modelRequests: number; stockAlerts: number; bugs: number;
+    reviews: number; followUps?: number; modelRequests: number; stockAlerts: number; bugs: number;
   };
   stock: {
     low: Array<{ code: string; name: string; left: number; unit: string; sold30: number; daysLeft: number | null }>;
@@ -381,6 +381,8 @@ function DashboardInner() {
             <div className="mx-2.5 my-1.5 border-t border-dashed border-ink/15" />
             <TaskRow to="/backend-skinly/reviews" icon={<StarIcon className="size-4" />} tone="bg-sunny/40 text-ink"
               label="Reviews approve karne" hint="Approve pe cashback jaata hai" count={t.reviews} />
+            <TaskRow to="/backend-skinly/reviews" icon={<AlertTriangleIcon className="size-4" />} tone="bg-heart/15 text-heart"
+              label="Naraaz customers (1–3★)" hint="Call karke problem solve karo" count={t.followUps || 0} urgent />
             <TaskRow to="/backend-skinly/models?tab=requests" icon={<SmartphoneIcon className="size-4" />} tone="bg-brand/15 text-brand-deep"
               label="Model requests" hint="Naye phones ki maang" count={t.modelRequests} />
             <TaskRow to="/backend-skinly/stock-notifications" icon={<BellRingIcon className="size-4" />} tone="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300"
