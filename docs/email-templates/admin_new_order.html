@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>New order {{orderNumber}} — {{amountText}}</title>
+</head>
+<body style="margin:0;padding:0;background:#fffaf4;font-family:Arial,Helvetica,sans-serif;color:#16161a;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fffaf4">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;background:#ffffff;border:2px solid #16161a;border-radius:16px;">
+
+  <!-- Celebration header -->
+  <tr><td align="center" bgcolor="#28a58b" style="background:#28a58b;padding:26px 20px 22px;border-radius:14px 14px 0 0;border-bottom:2px solid #16161a;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 10px;">
+      <tr>
+        <td style="padding:0 5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:#ffd166;border:2px solid #16161a;"></span></td>
+        <td style="padding:0 5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#f7b9cd;border:2px solid #16161a;"></span></td>
+        <td style="padding:0 5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:#ffffff;border:2px solid #16161a;"></span></td>
+        <td style="padding:0 5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#ef3e46;border:2px solid #16161a;"></span></td>
+        <td style="padding:0 5px;"><span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:#ffd166;border:2px solid #16161a;"></span></td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:34px;line-height:1.1;font-weight:bold;color:#16161a;">&#127881; New order!</p>
+    <p style="margin:8px 0 0;font-size:14px;font-weight:bold;color:#16161a;">{{todayLine}}</p>
+  </td></tr>
+
+  <!-- Amount -->
+  <tr><td align="center" style="padding:24px 28px 0;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;background:#ffd166;border:2px solid #16161a;border-radius:16px;">
+      <tr><td align="center" style="padding:16px 34px;">
+        <p style="margin:0;font-size:44px;font-weight:bold;line-height:1;color:#16161a;">{{amountText}}</p>
+        <p style="margin:6px 0 0;font-size:13px;font-weight:bold;color:#16161a;">Order {{orderNumber}} &middot; {{itemCount}}</p>
+      </td></tr>
+    </table>
+    <p style="margin:12px 0 0;font-size:14px;font-weight:bold;color:#1b7462;">{{paymentLine}}</p>
+  </td></tr>
+
+  <!-- Who and what -->
+  <tr><td style="padding:22px 28px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:2px solid #16161a;border-radius:12px;">
+      <tr>
+        <td width="120" valign="top" style="padding:14px;">
+          <img src="{{productPhoto}}" width="104" alt="" style="display:block;width:104px;height:104px;object-fit:cover;border-radius:8px;border:1px solid #e5e0d8;">
+        </td>
+        <td valign="top" style="padding:14px 14px 14px 0;font-size:14px;line-height:1.55;color:#3d3d44;">
+          <p style="margin:0 0 6px;font-size:15px;font-weight:bold;color:#16161a;">{{customerName}}</p>
+          <p style="margin:0 0 8px;">&#128205; {{city}}</p>
+          <p style="margin:0;color:#16161a;">{{itemsText}}</p>
+          <p style="margin:8px 0 0;font-size:13px;color:#1b7462;font-weight:bold;">{{upsellLine}}</p>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- CTAs -->
+  <tr><td align="center" style="padding:24px 28px 0;">
+    <a href="{{adminLink}}" style="display:inline-block;background:#28a58b;color:#16161a;border:2px solid #16161a;border-radius:12px;padding:14px 28px;font-size:16px;font-weight:bold;text-decoration:none;">Open order &rarr;</a>
+    <p style="margin:12px 0 0;font-size:13px;"><a href="{{dashboardLink}}" style="color:#1b7462;font-weight:bold;">See today on the dashboard</a></p>
+  </td></tr>
+
+  <!-- Cheer -->
+  <tr><td align="center" style="padding:24px 28px 26px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f7b9cd;border:2px solid #16161a;border-radius:12px;">
+      <tr><td align="center" style="padding:14px 16px;font-size:14px;line-height:1.5;color:#16161a;">
+        Someone just picked a Skinly for their device. Keep it going! &#128640;
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <tr><td align="center" style="padding:14px;border-top:1px dashed #d9d4cc;font-size:12px;color:#8a8a93;">GoSkinly order alerts &middot; turn off in Admin &rsaquo; Emails</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -245,10 +245,13 @@ export async function notifyOrderPlaced(
     })(),
 
     sendUsecaseEmail(db, order, orderId, "order_confirmed"),
+
+    // "New order!" to the shop's own inbox (settings/adminAlerts).
+    import("./adminOrderEmail").then((m) => m.sendAdminOrderEmail(db, order, orderId)),
   ]);
 
-  const [customerWa, adminWa, mail] = results.map((r) =>
+  const [customerWa, adminWa, mail, adminMail] = results.map((r) =>
     r.status === "fulfilled" ? r.value : false
   );
-  console.log("notifyOrderPlaced", { orderId, orderNumber, customerWa, adminWa, mail });
+  console.log("notifyOrderPlaced", { orderId, orderNumber, customerWa, adminWa, mail, adminMail });
 }

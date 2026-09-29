@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
+import { AdminAlertsCard } from "./admin-alerts-card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Card,
@@ -145,7 +146,7 @@ export default function AdminEmailsPage() {
 
   // Group usecases by category
   const orderUsecases = usecases.filter((u) =>
-    ["order_confirmed", "order_dispatched", "order_delivered", "order_cancelled", "payment_failed"].includes(u.usecaseKey)
+    ["order_confirmed", "order_dispatched", "order_delivered", "order_cancelled", "payment_failed", "admin_new_order"].includes(u.usecaseKey)
   );
   const engagementUsecases = usecases.filter((u) =>
     ["abandoned_cart", "back_in_stock", "wallet_credited"].includes(u.usecaseKey)
@@ -170,6 +171,8 @@ export default function AdminEmailsPage() {
             Reseed Use-cases
           </Button>
         </div>
+
+        <AdminAlertsCard />
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
