@@ -20,6 +20,8 @@ import { enforceDailyRateLimit } from "./rate-limit";
 // "message":{"sms":"Invalid Template"}} — keyed by "sms", because that is what
 // it thought we were sending. WhatsApp wants this host and `wid`.
 const AUTHKEY_URL = "https://console.authkey.io/restapi/request.php";
+// Its JSON sibling, the only one that takes a template header (an image).
+const AUTHKEY_JSON_URL = "https://console.authkey.io/restapi/requestjson.php";
 const MAX_PER_RUN = 40;
 const MAX_ATTEMPTS = 3;
 
@@ -155,28 +157,46 @@ const sendOne = async (queueRow: any): Promise<boolean> => {
     if (v !== undefined) numbered[String(i + 1)] = String(v);
   });
 
-  const params = new URLSearchParams({
-    authkey,
-    mobile: phone,
-    country_code: "91",
-    wid,
-    ...numbered,
-  });
+  /*
+   * A template approved with an image header must be sent one, or Meta
+   * refuses it outright. The GET endpoint can't carry a header, so those go
+   * through Authkey's JSON endpoint (same wid, same numbered values); the
+   * picture is `header_image` on the message, else the store's default card.
+   */
+  const tplData = tpl.empty ? {} : (tpl.docs[0].data() as any);
+  const headerImage = tplData.headerType === "image"
+    ? String((msg.variables || {}).header_image || "https://goskinly.com/og-default.jpg")
+    : "";
 
   const fetch = require("node-fetch");
-  const res = await fetch(`${AUTHKEY_URL}?${params.toString()}`, { method: "GET" });
+  const res = headerImage
+    ? await fetch(AUTHKEY_JSON_URL, {
+        method: "POST",
+        headers: { Authorization: `Basic ${authkey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          country_code: "91",
+          mobile: phone,
+          wid,
+          type: "media",
+          bodyValues: numbered,
+          headerValues: { headerFileName: "GoSkinly.jpg", headerData: headerImage },
+        }),
+      })
+    : await fetch(`${AUTHKEY_URL}?${new URLSearchParams({ authkey, mobile: phone, country_code: "91", wid, ...numbered }).toString()}`, { method: "GET" });
   const body = await res.text();
 
   const verdict = readAuthkeyResult(res.status, body);
   if (!verdict.sent) {
     console.error("authkey send failed:", { status: res.status, body: body.slice(0, 300) });
     await queueRef.update({ status: "pending", failureReason: verdict.reason });
-    await msgSnap.ref.update({ status: "failed", failureReason: verdict.reason });
+    await msgSnap.ref.update({ status: "failed", failureReason: verdict.reason, providerResponse: body.slice(0, 500) });
     return false;
   }
 
   await queueRef.update({ status: "sent", sentAt: Date.now(), failureReason: admin.firestore.FieldValue.delete() });
-  await msgSnap.ref.update({ status: "sent", sentAt: Date.now() });
+  // What Authkey said, kept: "sent" here only means Authkey accepted it, and
+  // the LogID is what their delivery report is searched by.
+  await msgSnap.ref.update({ status: "sent", sentAt: Date.now(), providerResponse: body.slice(0, 500), providerTemplateId: wid, sentParams: numbered, ...(headerImage ? { headerImage } : {}) });
   return true;
 };
 

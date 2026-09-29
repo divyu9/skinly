@@ -224,6 +224,9 @@ export async function notifyOrderPlaced(
   const orderNumber = String(order.orderNumber || "Pending");
   const total = Number(order.total ?? order.amountPayable) || 0;
   const productNames = items.map((i: any) => i?.productTitle).filter(Boolean).join(", ");
+  // The picture both order templates carry in their header (a collage past one product).
+  const { whatsappHeaderImage } = await import("./waImage");
+  const headerImage = await whatsappHeaderImage(`order-${orderId}`, items).catch(() => "https://goskinly.com/og-default.jpg");
 
   const results = await Promise.allSettled([
     // Names come from each usecase's own variableMapping, not from guesswork:
@@ -234,6 +237,7 @@ export async function notifyOrderPlaced(
       order_number: orderNumber,
       order_total: total.toFixed(2),
       product_name: productNames,
+      header_image: headerImage,
     }, orderId),
 
     (async () => {
@@ -249,6 +253,7 @@ export async function notifyOrderPlaced(
         customer_name: name,
         number_of_products: String(items.length),
         payment_mode: mode,
+        header_image: headerImage,
       }, orderId);
     })(),
 
