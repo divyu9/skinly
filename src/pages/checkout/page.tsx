@@ -3,7 +3,7 @@ import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { PackageIcon, AlertCircleIcon,
   ChevronDownIcon,
@@ -370,6 +370,25 @@ function CheckoutPageInner() {
       setIsApplyingCoupon(false);
     }
   };
+
+  /*
+   * The abandoned-cart WhatsApp's coupon (/c/:code queues it): filled in and
+   * tried once the cart is here. If it can't apply yet — it is tied to the
+   * customer's email — it stays in the box for them to apply.
+   */
+  const pendingCouponTried = useRef(false);
+  useEffect(() => {
+    if (pendingCouponTried.current || !cartItems?.length || appliedCoupon) return;
+    let pending = "";
+    try { pending = localStorage.getItem("skinly_pending_coupon") || ""; } catch { /* no storage */ }
+    if (!pending) return;
+    pendingCouponTried.current = true;
+    try { localStorage.removeItem("skinly_pending_coupon"); } catch { /* no storage */ }
+    setCouponCode(pending.toUpperCase());
+    void handleApplyCoupon(pending);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems?.length, appliedCoupon]);
+
 
   const handleRemoveCoupon = () => { setAppliedCoupon(null); setCouponCode(""); setCouponMessage(null); };
 

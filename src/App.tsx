@@ -36,6 +36,7 @@ const RealPhotosPage = lazyWithReload(() => import("./pages/real-photos/page.tsx
 const DevicesPage = lazyWithReload(() => import("./pages/devices/page.tsx"), "./pages/devices/page.tsx");
 const PaymentCallback = lazyWithReload(() => import("./pages/payment/callback.tsx"), "./pages/payment/callback.tsx");
 const PayPage = lazyWithReload(() => import("./pages/pay/page.tsx"), "./pages/pay/page.tsx");
+const CartRestorePage = lazyWithReload(() => import("./pages/cart-restore/page.tsx"), "./pages/cart-restore/page.tsx");
 const ReviewPage = lazyWithReload(() => import("./pages/review/page.tsx"), "./pages/review/page.tsx");
 const AccountPage = lazyWithReload(() => import("./pages/account/page.tsx"), "./pages/account/page.tsx");
 const ReferralsPage = lazyWithReload(() => import("./pages/account/referrals/page.tsx"), "./pages/account/referrals/page.tsx");
@@ -162,6 +163,8 @@ export default function App() {
             <Route path="/products/detail" element={<ProductDetailPage />} />
             <Route path="/products/:slug" element={<ProductDetailPage />} />
             <Route path="/cart" element={<Suspense fallback={<PageSkeleton />}><CartPage /></Suspense>} />
+            {/* The abandoned-cart WhatsApp's button: puts that cart back, then checkout. */}
+            <Route path="/c/:code" element={<Suspense fallback={<PageSkeleton />}><CartRestorePage /></Suspense>} />
             <Route path="/checkout" element={<Suspense fallback={<PageSkeleton />}><CheckoutPage /></Suspense>} />
             <Route path="/orders" element={<Suspense fallback={<PageSkeleton />}><OrdersPage /></Suspense>} />
             {/* Guest-friendly: no login, the order number plus the contact it was placed with. */}

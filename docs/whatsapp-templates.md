@@ -208,18 +208,22 @@ Samples: Aurora Arches Matte iPhone 15 Skin · https://goskinly.com/products/aur
 
 ## 12. `skinly_abandoned_cart` — Marketing
 **Header: Image** — a collage of the products in the cart (up to 4). Upload any Skinly product photo as the sample.  
-Variables: `customer_name, product_name, cart_link, coupon_line`
+Variables: `customer_name, product_name, coupon_line` · Button 1 variable: `cart_code`
 
 ```
 Hi {{1}}, you left {{2}} in your GoSkinly cart 🛒
 
-It's saved for you. Pick up where you left off: {{3}}
+It's saved and ready — tap below to check out in one step.
 
-{{4}}
+{{3}}
 
 Team GoSkinly
 ```
-Samples: Priya · Aurora Arches Matte iPhone 15 Skin · https://goskinly.com/cart · Use code BACK10 at checkout for 10% off.
+Samples: Priya · Aurora Arches Matte iPhone 15 Skin · Use code BACK10 at checkout for 10% off.
+
+Buttons (Call To Action):
+- **Complete My Order** — Visit website, **Dynamic**, URL `https://goskinly.com/c/` (Authkey appends `{{1}}` itself — don't type it), sample `Xy12Ab34Cd56`. The code is the cart's restore key: /c/<code> refills that exact cart with the coupon applied, even in WhatsApp's in-app browser.
+- **Need Help?** — Visit website, Static, `https://goskinly.com/support`.
 
 ## 13. `skinly_otp` — Authentication
 Variable: `otp`

@@ -203,8 +203,13 @@ const sendReminderWhatsApp = async (cart: any, couponCode: string | null, s: Set
   if (!/^[6-9]\d{9}$/.test(phone)) return false;
   const v = reminderVariables(cart, couponCode, s);
   const { queueWhatsApp } = await import("./orderNotifications");
+  const { whatsappHeaderImage } = await import("./waImage");
+  const headerImage = await whatsappHeaderImage(`cart-${cart._id}`, cart.items || []).catch(() => "https://goskinly.com/og-default.jpg");
   return queueWhatsApp(admin.firestore(), "abandoned_cart", phone, {
     customer_name: v.customerName,
+    // The "Complete My Order" button's /c/<code>, and the header picture.
+    cart_code: cartRestoreCode(String(cart._id || "")),
+    header_image: headerImage,
     product_name: v.productName.slice(0, 80),
     cart_total: `₹${v.amount}`,
     cart_link: v.cartLink.replace("utm_source=email", "utm_source=whatsapp"),
@@ -292,6 +297,10 @@ const contactKey = (email?: unknown, phone?: unknown) => {
   const p = String(phone || "").replace(/\D/g, "").slice(-10);
   return p.length === 10 ? `p:${p}` : "";
 };
+/** Which phone and coverage a line was for, so /c/<code> can put back the same line. */
+const deviceOf = (i: any) => Object.fromEntries(
+  (["phoneBrand", "phoneModel", "coverage"] as const).filter((k) => i?.[k]).map((k) => [k, String(i[k])])
+);
 const rowId = (key: string) =>
   `c_${require("crypto").createHash("sha1").update(key).digest("hex").slice(0, 24)}`;
 
@@ -343,7 +352,7 @@ export async function detectAbandonedCarts(): Promise<{ found: number; created: 
       userId: o.userId && !String(o.userId).startsWith("guest") ? String(o.userId) : null,
       items: (o.items || []).map((i: any) => ({
         productId: i.productId, productTitle: i.productTitle, productImage: i.productImage,
-        variant: i.variant, price: i.price, quantity: i.quantity,
+        variant: i.variant, price: i.price, quantity: i.quantity, ...deviceOf(i),
       })),
       cartTotal: Number(o.total ?? o.amountPayable) || 0,
       abandonedAt: at,
@@ -373,7 +382,7 @@ export async function detectAbandonedCarts(): Promise<{ found: number; created: 
       userName: String(user.name || user.fullName || user.displayName || ""),
       items: rows.map((r) => ({
         productId: r.productId, productTitle: r.productTitle, productImage: r.productImage,
-        variant: r.variant, price: r.price, quantity: r.quantity,
+        variant: r.variant, price: r.price, quantity: r.quantity, ...deviceOf(r),
       })),
       cartTotal: rows.reduce((n, r) => n + (Number(r.price) || 0) * (Number(r.quantity) || 1), 0),
       abandonedAt: at,
@@ -478,6 +487,7 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
     }
 
     const coupon = await createRecoveryCoupon(cart, s);
+    if (coupon) await db.collection("abandonedCarts").doc(cart._id).update({ lastCouponCode: coupon }).catch(() => undefined);
     if (cart.userEmail && await sendReminderEmail(cart, coupon, s)) sent++;
     // WhatsApp too, on the first reminder only: read far more than email,
     // and one nudge is the most a chat should get.
@@ -574,3 +584,51 @@ export const markAbandonedCartRecovered = onCall(async (data: any, context: any)
   });
   return { success: true };
 });
+
+/*
+ * /c/<code>: the reminder's one-tap way back.
+ *
+ * A plain /cart link opened from WhatsApp lands in its in-app browser, which
+ * has neither the customer's sign-in nor their saved guest cart, so it showed
+ * an empty cart. The code names the abandoned cart instead — its id plus a
+ * signature, because the id is only a hash of a phone number or an email and
+ * anyone could compute one — and the page puts that cart back.
+ */
+const cartSig = (id: string) =>
+  require("crypto").createHmac("sha256", process.env.PAY_LINK_SECRET || "skinly-cart").update(`cart:${id}`).digest("base64url").slice(0, 10);
+
+export function cartRestoreCode(cartId: string): string {
+  const hex = cartId.replace(/^c_/, "");
+  return /^[0-9a-f]{24}$/.test(hex) ? `${hex}${cartSig(cartId)}` : "";
+}
+
+export const restoreAbandonedCart = onCall(async (data: any) => {
+  const code = String(data?.code || "");
+  const hex = code.slice(0, 24), id = `c_${hex}`;
+  if (!/^[0-9a-f]{24}$/.test(hex) || code.slice(24) !== cartSig(id)) return { found: false };
+  await enforceDailyRateLimit({ key: `restoreCart_${hex}`, limit: 30 });
+  const db = admin.firestore();
+  const snap = await db.collection("abandonedCarts").doc(id).get();
+  if (!snap.exists) return { found: false };
+  const cart = snap.data() as any;
+
+  // An unpaid checkout already holds the address and the price: finishing the
+  // payment is the one step left, so that is where the button goes.
+  if (cart.source === "checkout" && cart.orderId) {
+    const o = (await db.collection("orders").doc(String(cart.orderId)).get()).data() as any;
+    if (o && o.paymentStatus !== "success" && !o.isDeleted && o.status !== "cancelled") {
+      const { payLinkUrl } = await import("./payLink");
+      return { found: true, payLink: payLinkUrl(String(cart.orderId), "whatsapp_cart") };
+    }
+  }
+  const items = (Array.isArray(cart.items) ? cart.items : [])
+    .filter((i: any) => i?.productId && i?.variant)
+    .slice(0, 20)
+    .map((i: any) => ({
+      productId: String(i.productId), productTitle: String(i.productTitle || ""), productImage: String(i.productImage || ""),
+      variant: String(i.variant), price: Number(i.price) || 0, quantity: Math.min(10, Math.max(1, Number(i.quantity) || 1)),
+      ...deviceOf(i),
+    }));
+  return { found: true, items, couponCode: cart.lastCouponCode || "" };
+});
+
