@@ -302,6 +302,8 @@ export function useProductDetail() {
       (r.imageUrls || []).map((url) => ({
         url, alt: `${productData?.title || "Skin"} — customer photo`,
         customerBy: [r.userName, r.city].filter(Boolean).join(", ") || "Verified buyer",
+        // Which phone it is on: a buyer with the same model trusts this photo most.
+        customerDevice: String((r as any).device || "").trim(),
       }))).filter((i) => !seen.has(i.url)).slice(0, 8);
     return [...withReal, ...customer];
   }, [baseImages, realPhotos, phoneModel, productData?.title, reviews]);

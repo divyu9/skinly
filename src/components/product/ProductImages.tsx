@@ -11,6 +11,7 @@ interface ProductImage {
   realCutFor?: string;
   /** A photo from an approved review: "Priya S., Pune" (src/lib/public-reviews.ts). */
   customerBy?: string;
+  customerDevice?: string;
 }
 
 interface ProductImagesProps {
@@ -86,6 +87,7 @@ export function ProductImages({
   const isMockupImage = mockupUrl && selectedImage === mockupUrl;
   const selectedReal = images.find((img) => img.url === selectedImage)?.realCutFor;
   const selectedCustomer = images.find((img) => img.url === selectedImage)?.customerBy;
+  const selectedDevice = images.find((img) => img.url === selectedImage)?.customerDevice;
   
   return (
     <div className="space-y-3 md:sticky md:top-24 md:self-start">
@@ -169,6 +171,7 @@ export function ProductImages({
           </span>
           <p className="text-[12px] leading-snug">
             <span className="font-bold text-foreground">Customer photo · {selectedCustomer}</span>
+            {selectedDevice && <span className="text-foreground"> · on their <b>{selectedDevice}</b></span>}
             <span className="text-muted-foreground"> — from a verified review</span>
           </p>
         </div>

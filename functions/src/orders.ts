@@ -144,6 +144,7 @@ export const claimGuestOrders = functions.https.onCall(async (_data: any, contex
   const variants = [...new Set([email, email.toLowerCase()])];
   const snaps = await Promise.all(variants.map((e) => db.collection("orders").where("email", "==", e).limit(100).get()));
   let claimed = 0;
+  const owing: string[] = [];
   for (const snap of snaps) {
     for (const d of snap.docs) {
       const o = d.data() as any;
@@ -152,6 +153,33 @@ export const claimGuestOrders = functions.https.onCall(async (_data: any, contex
       if (o.ownerUid || !String(o.userId || "guest").startsWith("guest")) continue;
       await d.ref.update({ userId: uid, ownerUid: uid, claimedFromGuestId: o.userId, claimedAt: Date.now() });
       claimed++;
+      if ((Number(o.creditOwedNoAccount) > 0 && !o.walletCreditCredited) || Number(o.reviewRewardOwed) > 0) owing.push(d.id);
+    }
+  }
+
+  /*
+   * What those orders earned while they had no account to pay into —
+   * delivery cashback / wallet-credit coupons, review rewards — is paid now.
+   * It was recorded as owed and then never settled: the order moved into the
+   * account and the money stayed behind.
+   */
+  let paid = 0;
+  if (owing.length) {
+    const { walletUserRef } = await import("./userDoc");
+    if (!(await walletUserRef(db, uid, email))) {
+      await db.collection("users").doc(uid).set({ email: email.toLowerCase(), walletBalance: 0, createdAt: Date.now() }, { merge: true });
+    }
+    const { creditWalletOnDelivery } = await import("./orderStatus");
+    const { payReviewReward } = await import("./reviewRewards");
+    for (const id of owing) {
+      try {
+        const ref = db.collection("orders").doc(id);
+        const o = (await ref.get()).data() as any;
+        if (Number(o?.creditOwedNoAccount) > 0 && !o?.walletCreditCredited) { await creditWalletOnDelivery(db, ref, o); paid++; }
+        if (Number(o?.reviewRewardOwed) > 0) { await payReviewReward(db, id, "claim"); paid++; }
+      } catch (e: any) {
+        console.error("claimGuestOrders: paying owed credit failed", { id, error: e?.message || e });
+      }
     }
   }
 
@@ -174,6 +202,6 @@ export const claimGuestOrders = functions.https.onCall(async (_data: any, contex
       }
     }
   }
-  if (claimed || linked) console.log("claimGuestOrders", { uid, claimed, linked });
-  return { claimed, linked };
+  if (claimed || linked || paid) console.log("claimGuestOrders", { uid, claimed, linked, paid });
+  return { claimed, linked, paid };
 });

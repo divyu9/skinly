@@ -162,6 +162,11 @@ export default function ReviewPage() {
                 <p className="text-xs">
                   {rules.photoPct}% of your order with a photo · {rules.textPct}% for a written review · max ₹{rules.maxAmount}, once it's approved
                 </p>
+                {products.length > 1 && (
+                  <p className="mt-1 text-xs font-semibold">
+                    Split across your {products.length} products — review each one to get the full amount.
+                  </p>
+                )}
               </div>
             )}
 

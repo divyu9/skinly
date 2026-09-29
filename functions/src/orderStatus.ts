@@ -373,7 +373,7 @@ export async function notifyOrderStatus(
  * owed the customer money. It belongs to the status, not to the route that
  * reported it.
  */
-async function creditWalletOnDelivery(
+export async function creditWalletOnDelivery(
   db: admin.firestore.Firestore,
   orderRef: admin.firestore.DocumentReference,
   order: any
@@ -383,23 +383,17 @@ async function creditWalletOnDelivery(
   const amount = Math.round((coupon + cashback) * 100) / 100;
   if (!(amount > 0) || order?.walletCreditCredited) return;
 
-  if (!order?.userId || String(order.userId).startsWith("guest")) {
-    /*
-     * A guest has no wallet to pay into. Said out loud and marked on the
-     * order rather than dropped, because the customer was promised this at
-     * checkout and somebody has to be able to see who is owed what.
-     */
-    await orderRef.update({ creditOwedNoAccount: amount, updatedAt: Date.now() });
-    console.warn("creditWalletOnDelivery: no account to credit", {
-      order: order?.orderNumber, amount,
-    });
-    return;
-  }
-
-  // The account's own document, legacy ones included (userDoc.ts).
+  /*
+   * The account's own document, legacy ones included (userDoc.ts). A guest
+   * order is looked up by its email too: most customers check out as guests,
+   * and one who already has an account under that email — or makes one later
+   * and signs in (claimGuestOrders pays it then) — was owed this and got
+   * nothing, because a guest id was taken to mean "no wallet".
+   */
+  const guest = !order?.userId || String(order.userId).startsWith("guest");
   const { walletUserRef } = await import("./userDoc");
   const userRef = (order.walletUserDocId ? db.collection("users").doc(String(order.walletUserDocId)) : null)
-    || await walletUserRef(db, order.ownerUid || order.userId, order.email);
+    || await walletUserRef(db, order.ownerUid || (guest ? "" : order.userId), order.email);
   if (!userRef) {
     await orderRef.update({ creditOwedNoAccount: amount, updatedAt: Date.now() });
     console.warn("creditWalletOnDelivery: no account found", { order: order?.orderNumber, amount });
@@ -422,7 +416,7 @@ async function creditWalletOnDelivery(
     const after = Math.round((before + amount) * 100) / 100;
     tx.update(userRef, { walletBalance: after });
     tx.set(txRef, {
-      userId: order.userId,
+      userId: order.ownerUid || (guest ? userRef.id : order.userId),
       transactionType: "credit",
       amount,
       source: coupon > 0 && cashback > 0 ? "delivery_credit" : coupon > 0 ? "coupon_credit" : "cashback",
@@ -437,6 +431,7 @@ async function creditWalletOnDelivery(
       walletCreditCredited: true,
       walletCreditPaid: amount,
       walletCreditPaidAt: Date.now(),
+      creditOwedNoAccount: admin.firestore.FieldValue.delete(),
     });
   });
 

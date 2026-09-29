@@ -13,11 +13,13 @@ import { requireAdmin } from "./auth";
  *   with a photo      photoPct  of the order value (default 10%)
  *   never more than   maxAmount per order          (default ₹50)
  *
- * Per order, not per review: reviewing three products of one order earns the
- * order's reward once, at the photo rate if any approved review of it has a
- * photo. It is paid as a top-up — a text review approved first and a photo
- * review later pays the difference — recorded in orderReviewRewards/{orderId}
- * so nothing is ever paid twice.
+ * Split across the order's products: each product's share of the order value
+ * is paid when that product's review is approved, at the photo rate if that
+ * review has a photo. Two skins, two reviews → the full % of the order; one
+ * review → only that skin's share. (It used to pay the whole order's reward
+ * on the first approved review.) The order total never exceeds maxAmount. It
+ * is paid as a top-up — recorded in orderReviewRewards/{orderId} — so a later
+ * approval or a photo added later pays only the difference, never twice.
  */
 
 export interface ReviewRewardRules { enabled: boolean; textPct: number; photoPct: number; maxAmount: number }
@@ -42,8 +44,36 @@ export function rewardFor(rules: ReviewRewardRules, value: number, withPhoto: bo
   return Math.min(rules.maxAmount, Math.round((value * pct) / 100));
 }
 
+/**
+ * What the approved reviews of an order earn: each reviewed product's share of
+ * the order's goods value (its lines, coupon spread evenly), at that review's
+ * rate, the sum capped at maxAmount. Items are the order's distinct products,
+ * the same unit a review is written for.
+ */
+export function splitReward(rules: ReviewRewardRules, order: any, approved: any[]): number {
+  if (!rules.enabled || !approved.length) return 0;
+  const items: any[] = Array.isArray(order?.items) ? order.items : [];
+  const byProduct = new Map<string, number>();
+  for (const it of items) {
+    const id = String(it?.productId || "");
+    if (id) byProduct.set(id, (byProduct.get(id) || 0) + (Number(it?.price) || 0) * (Number(it?.quantity) || 1));
+  }
+  const lines = [...byProduct.values()].reduce((a, b) => a + b, 0);
+  const value = orderValue(order);
+  const factor = lines > 0 ? value / lines : 0;
+  let total = 0;
+  for (const r of approved) {
+    const share = byProduct.size
+      ? (byProduct.get(String(r.productId || "")) || 0) * factor
+      : value; // an order without product lines: the review stands for the whole order
+    const pct = (r.imageUrls || []).length > 0 ? rules.photoPct : rules.textPct;
+    total += (share * pct) / 100;
+  }
+  return Math.min(rules.maxAmount, Math.round(total));
+}
+
 /** Pays whatever the order's approved reviews now earn beyond what was paid. */
-async function payReviewReward(db: admin.firestore.Firestore, orderId: string, actor: string) {
+export async function payReviewReward(db: admin.firestore.Firestore, orderId: string, actor: string) {
   const orderRef = db.collection("orders").doc(orderId);
   const order = (await orderRef.get()).data() as any;
   if (!order) return { paid: 0, note: "order not found" };
@@ -52,7 +82,7 @@ async function payReviewReward(db: admin.firestore.Firestore, orderId: string, a
   if (approved.empty) return { paid: 0, note: "no approved review" };
   const withPhoto = approved.docs.some((d) => ((d.data() as any).imageUrls || []).length > 0);
   const rules = await reviewRewardRules(db);
-  const target = rewardFor(rules, orderValue(order), withPhoto);
+  const target = splitReward(rules, order, approved.docs.map((d) => d.data() as any));
 
   const rewardRef = db.collection("orderReviewRewards").doc(orderId);
   const already = Number(((await rewardRef.get()).data() as any)?.paid) || 0;
