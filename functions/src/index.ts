@@ -50,3 +50,4 @@ export * from "./dashboard";
 export * from "./homeRankings";
 export * from "./addOns";
 export * from "./funnel";
+export * from "./walletEmail";

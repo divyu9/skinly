@@ -148,10 +148,10 @@ export default function AdminEmailsPage() {
     ["order_confirmed", "order_dispatched", "order_delivered", "order_cancelled", "payment_failed"].includes(u.usecaseKey)
   );
   const engagementUsecases = usecases.filter((u) =>
-    ["abandoned_cart", "back_in_stock"].includes(u.usecaseKey)
+    ["abandoned_cart", "back_in_stock", "wallet_credited"].includes(u.usecaseKey)
   );
   const supportUsecases = usecases.filter((u) =>
-    ["model_requested", "model_added"].includes(u.usecaseKey)
+    ["model_requested", "model_added", "wallet_refund"].includes(u.usecaseKey)
   );
 
   return (
