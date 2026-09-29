@@ -1395,7 +1395,7 @@ async function legacyRedirects(active, variantsByProduct) {
     if (c) byCode.set(c, [...(byCode.get(c) || []), p]);
   }
   // The design's own words: no brand, device, finish or filler.
-  const STOP = /^(skin|skins|phone|phones|finish|all|models?|the|for|and|latest|new|matte|embossed|textured|transparent|tranzy|series|clean|apple|iphone|samsung|galaxy|oneplus|xiaomi|redmi|oppo|realme|vivo|poco|motorola|google|pixel|android|zvxtus|mfnoteflip|charger|cover|case|back|mobile|[a-z]?\d+[a-z]?)$/;
+  const STOP = /^(skin|skins|phone|phones|finish|all|models?|the|for|and|latest|new|matte|embossed|textured|transparent|tranzy|series|clean|apple|iphone|samsung|galaxy|oneplus|xiaomi|redmi|oppo|realme|vivo|poco|motorola|google|pixel|android|zvxtus|mfnoteflip|charger|cover|case|back|mobile|asus|cmf|nothing|honor|huawei|infinix|iqoo|lava|tecno|by|tab|tablet|ipad|laptop|macbook|camera|lens|controller|[a-z]?\d+[a-z]?)$/;
   const words = (s) => new Set(String(s).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.test(w)));
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const rules = [];
@@ -1415,23 +1415,33 @@ async function legacyRedirects(active, variantsByProduct) {
     const gadget = LEGACY_GADGETS.find(([re]) => re.test(slug))?.[1] || "phone";
     const cm = /-([a-z])-?(\d{1,4})$/.exec(slug);
     const pool = (cm && byCode.get(`${cm[1].toUpperCase()}-${cm[2]}`)) || [];
-    // The design's code decides; the name only when the code is not sold any more.
-    let target = pool.find((p) => hint && hint[1].test(String(p.listingKind || "")))
-      || pool.find((p) => p.gadgetCategory === gadget)
-      || pool[0];
-    if (!target) {
-      // No code (an old one-off listing): the live listing sharing most of its words, if clearly the same.
-      const w = words(slug);
-      let best = null, score = 0;
+    /*
+     * Name first, code second. The old store's design codes do not match
+     * today's: its "Batman Arkham City … L-59" is today's M-01, and today's
+     * L-59 is another design (of 221 old URLs carrying both a name and a
+     * code, 52 disagreed). So a URL that names its design goes to the live
+     * listing of that name; the code decides only for URLs with no name
+     * ("…-3d-embossed-l-184") or when its listing shares the name; a name
+     * and a code that disagree go to the brand or gadget page, not a guess.
+     */
+    const w = words(slug);
+    let target = null;
+    if (w.size >= 2) {
+      let score = 0;
       for (const p of active) {
         if (p.gadgetCategory !== gadget) continue; // same kind of device only
         const pw = words(p.slug);
         const common = [...w].filter((x) => pw.has(x)).length;
-        const s = common / Math.max(w.size, pw.size, 1);
-        if (s > score) { score = s; best = p; }
+        const sc = common / Math.max(w.size, pw.size, 1);
+        if (sc > score) { score = sc; target = p; }
       }
-      // At least two design words, and most of both names: "cyberpunk cat" yes, "cat" alone no.
-      if (w.size >= 2 && score >= 0.66) target = best;
+      if (score < 0.66) target = null;
+    }
+    if (!target && pool.length) {
+      const pick = pool.find((p) => hint && hint[1].test(String(p.listingKind || "")))
+        || pool.find((p) => p.gadgetCategory === gadget) || pool[0];
+      const shares = [...w].some((x) => words(pick.slug).has(x));
+      if (w.size < 2 || shares) target = pick;
     }
     const page = LEGACY_GADGETS.find(([re]) => re.test(slug))?.[2];
     const to = target ? `/products/${target.slug}`
