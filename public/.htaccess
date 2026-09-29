@@ -111,6 +111,10 @@ RewriteRule ^ https://goskinly.com/ [R=301,L]
 # ─── Trailing slashes ───────────────────────────────────────────────────────
 RewriteRule ^(.+)/$ https://goskinly.com/$1 [R=301,L]
 
+# ─── Support chat ───────────────────────────────────────────────────────────
+# Meta refuses wa.me links in WhatsApp templates, so the templates link here.
+RewriteRule ^support$ https://wa.me/919761011121?text=Hi\%20GoSkinly\%2C\%20I\%20need\%20help\%20with\%20my\%20order [R=302,L,NE]
+
 # ─── Shopify-era and older URLs still in Google ─────────────────────────────
 RewriteRule ^collections/[^/]+/products/([^/]+)$ https://goskinly.com/products/$1 [R=301,L,NC]
 RewriteRule ^collections/(phoneskins|phone-skins|mobile-skins|leather-mobile-skins)$ https://goskinly.com/phone-skins [R=301,L,NC]
