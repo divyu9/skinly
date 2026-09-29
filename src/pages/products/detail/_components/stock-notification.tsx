@@ -17,6 +17,8 @@ interface StockNotificationProps {
 
 export function StockNotification({ variantId, variantTitle }: StockNotificationProps) {
   const [phoneNumber, setPhoneNumber] = useState("");
+  // Optional: the restock email goes here as well as the WhatsApp.
+  const [email, setEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   
@@ -38,12 +40,18 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
       return;
     }
     
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) {
+      toast.error("Please enter a valid email, or leave it empty");
+      return;
+    }
+
     setIsSubscribing(true);
     
     try {
       const result = await subscribeToNotification({
         variantId,
         phoneNumber: phoneNumber.replace(/\D/g, ""),
+        email: email.trim().toLowerCase(),
       });
       
       if (result.alreadySubscribed) {
@@ -54,6 +62,7 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
       
       setIsSubscribed(true);
       setPhoneNumber("");
+      setEmail("");
     } catch (error) {
       if (error instanceof ConvexError) {
         const { message } = error.data as { code: string; message: string };
@@ -106,6 +115,17 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               maxLength={10}
+              disabled={isSubscribing}
+            />
+          </div>
+          <div>
+            <Label htmlFor="notify-email">Email <span className="font-normal text-muted-foreground">(optional)</span></Label>
+            <Input
+              id="notify-email"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               disabled={isSubscribing}
             />
           </div>

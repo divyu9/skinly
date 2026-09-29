@@ -32,8 +32,14 @@ export async function notifyRestocked(
 
   const uc = await db.collection("whatsappUsecases")
     .where("usecaseKey", "==", "back_in_stock").limit(1).get();
-  if (uc.empty || uc.docs[0].data().enabled !== true) return 0;
-  const usecase = uc.docs[0].data() as any;
+  const waOn = !uc.empty && uc.docs[0].data().enabled === true;
+  const usecase = (uc.empty ? {} : uc.docs[0].data()) as any;
+  // The email (MSG91 `back_in_stock`, docs/email-templates/back_in_stock.html)
+  // goes to whoever left an address, alongside or instead of the WhatsApp.
+  const et = await db.collection("emailUsecaseTemplates").where("usecaseKey", "==", "back_in_stock").limit(1).get();
+  const emailTemplateId = !et.empty && et.docs[0].data().enabled === true && process.env.MSG91_AUTH_TOKEN
+    ? String(et.docs[0].data().msg91TemplateId || "") : "";
+  if (!waOn && !emailTemplateId) return 0;
 
   let queued = 0;
   for (const variantId of ids) {
@@ -61,13 +67,16 @@ export async function notifyRestocked(
      */
     const batch = db.batch();
     const seen = new Set<string>();
+    const emails = new Set<string>();
     for (const d of waiting.docs) {
       const n = d.data() as any;
       if (seen.size >= RESTOCK_CAP) break;
       if (seen.has(String(n.phoneNumber))) continue;
       seen.add(String(n.phoneNumber));
+      const email = String(n.userEmail || "").trim().toLowerCase();
+      if (emailTemplateId && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) emails.add(email);
       const msgRef = db.collection("whatsappMessages").doc();
-      batch.set(msgRef, {
+      if (waOn) batch.set(msgRef, {
         usecaseKey: "back_in_stock",
         templateName: usecase.templateName,
         providerTemplateId: usecase.providerTemplateId,
@@ -91,7 +100,7 @@ export async function notifyRestocked(
         createdAt: Date.now(),
         queuedBy: "auto-restock",
       });
-      batch.set(db.collection("whatsappQueue").doc(), {
+      if (waOn) batch.set(db.collection("whatsappQueue").doc(), {
         messageId: msgRef.id,
         status: "pending",
         attempts: 0,
@@ -106,14 +115,60 @@ export async function notifyRestocked(
         ...n,
         status: "notified",
         notifiedAt: Date.now(),
-        messageId: msgRef.id,
+        messageId: waOn ? msgRef.id : null,
+        emailed: emails.has(email),
       });
       batch.delete(d.ref);
       queued++;
     }
     await batch.commit();
+    if (emails.size) {
+      await sendRestockEmail(db, emailTemplateId, [...emails], {
+        productName: String(product.title || waiting.docs[0].data().productTitle || "Your Skinly pick"),
+        variant: String(variant.title || waiting.docs[0].data().variantTitle || ""),
+        image: String(product.images?.[0]?.url || (typeof product.images?.[0] === "string" ? product.images[0] : "") || product.designImageUrl || ""),
+        price: variant.price ? `₹${variant.price}` : "",
+        url: `https://goskinly.com/products/${product.slug || waiting.docs[0].data().productSlug || ""}?utm_source=email&utm_medium=back_in_stock`,
+      }).catch((e) => console.error("restock email failed", { variantId, error: e?.message || e }));
+    }
   }
 
   if (queued) console.log("notifyRestocked", { variants: ids.length, queued });
   return queued;
 }
+
+/** One MSG91 send for everyone who left an email on this variant. */
+async function sendRestockEmail(
+  db: admin.firestore.Firestore,
+  templateId: string,
+  to: string[],
+  p: { productName: string; variant: string; image: string; price: string; url: string }
+): Promise<void> {
+  const img = /^https:\/\//.test(p.image) && !p.image.includes("res.cloudinary.com") ? p.image.replace(/ /g, "%20")
+    : "https://mailer-prod-api-assets.s3.ap-southeast-2.amazonaws.com/templates/1765447805-outbound-23404-Skinly_Logo.png";
+  const variant = /^default( title)?$/i.test(p.variant) ? "" : p.variant;
+  const variables = {
+    firstName: "there",
+    productName: p.productName,
+    variantLine: variant ? `For ${variant}` : "Cut fresh for your device",
+    productPhoto: img,
+    productPrice: p.price || "Shop now",
+    productUrl: p.url,
+  };
+  const res = await fetch("https://control.msg91.com/api/v5/email/send", {
+    method: "POST",
+    headers: { authkey: process.env.MSG91_AUTH_TOKEN || "", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      template_id: templateId,
+      recipients: to.map((email) => ({ to: [{ email, name: "there" }], variables })),
+      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+      domain: "mail.goskinly.com",
+    }),
+  });
+  const text = await res.text();
+  await db.collection("emailMessages").add({
+    createdAt: Date.now(), recipientEmail: to.join(", "), usecaseKey: "back_in_stock", msg91TemplateId: templateId,
+    variables, status: res.ok ? "sent" : "failed", ...(res.ok ? {} : { errorMessage: text.slice(0, 500) }),
+  });
+}
+

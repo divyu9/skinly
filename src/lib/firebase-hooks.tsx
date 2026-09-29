@@ -5752,7 +5752,7 @@ export function useMutation(apiRef: any) {
             sku: String(variant.sku || ''),
             phoneNumber: phone,
             userId: user?.uid || '',
-            userEmail: user?.email || '',
+            userEmail: String(args.email || user?.email || '').trim().toLowerCase().slice(0, 120),
             status: 'waiting',
             createdAt: Date.now(),
           });
