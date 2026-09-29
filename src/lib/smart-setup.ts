@@ -87,7 +87,8 @@ export function kindOf(p: Pick<CatalogueProduct, "productCategory" | "gadgetCate
   const title = String(p.title || "");
   if (cat === "skin" && p.gadgetCategory === "charger") return "chargerSkin";
   if (cat === "case-cover") return "case";
-  if (cat === "glass") return "glass";
+  // A refill is glass only: useless without the AutoApply tool, so never the add-on.
+  if (cat === "glass") return /refill/i.test(title) ? null : "glass";
   if (cat === "camera-ring") return "cameraRing";
   if (cat === "magneto-x" && /enclosure/i.test(title)) return "magneto";
   if (/membrane/i.test(title)) return "membrane";

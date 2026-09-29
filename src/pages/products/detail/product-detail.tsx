@@ -52,6 +52,7 @@ import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { SmartSetup, type SetupCartItem } from "./_components/smart-setup.tsx";
 import { ReviewQuote } from "./_components/review-quote.tsx";
+import { RefillLine } from "./_components/refill-line.tsx";
 import { SameDesignOtherGadgets } from "@/components/products/sections/SameDesignOtherGadgets.tsx";
 import { designOfListing } from "@/lib/smart-setup";
 import { FormattedDescription } from "./_components/formatted-description.tsx";
@@ -519,6 +520,8 @@ export default function ProductDetailPage() {
                     the Buy button. */}
                 <CashbackLine info={cashbackInfo} price={nowPrice} />
               </div>
+
+              <RefillLine title={productData.title} category={(productData as any).productCategory} />
 
               {/* USPs */}
               <ProductUSPs show={isSkinProduct} />
