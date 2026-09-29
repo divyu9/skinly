@@ -1356,7 +1356,83 @@ async function staleAssetRules() {
   return rules.join("\n");
 }
 
-async function writeHtaccess(strict, retired = []) {
+/**
+ * 301s for URLs from the old store that Google still holds (seo/legacy-urls.txt,
+ * from Search Console exports): 933 of them sat in "Duplicate without
+ * user-selected canonical" and now answer 404.
+ *
+ * The old shop had one listing per brand per design — "oppo-phone-skins-all-
+ * models-denim-jeans-pocket-3d-embossed-finish-l-134" — ending in the design
+ * code. Each goes to today's listing of that design (the brand's own listing
+ * when there is one, else the phone listing), else to the brand's SEO page,
+ * else the shop. Old ?collection= links go to the matching theme page.
+ */
+const BRAND_HINTS = [
+  [/^(apple|iphone)/, /apple iphone/i, "apple-iphone-skins"], [/^samsung/, /samsung galaxy$/i, "samsung-skins"],
+  [/^oneplus/, /oneplus/i, "oneplus-skins"], [/^(xiaomi|redmi)/, /xiaomi|redmi/i, "xiaomi-skins"],
+  [/^oppo/, /oppo/i, "oppo-skins"], [/^realme/, /realme/i, "realme-skins"], [/^vivo/, /vivo/i, "vivo-skins"],
+  [/^poco/, /poco/i, "poco-skins"], [/^motorola/, /motorola/i, "motorola-skins"], [/^google/, /google pixel/i, "google-pixel-skins"],
+];
+async function legacyRedirects(active, variantsByProduct) {
+  const text = await fs.readFile(path.resolve("seo", "legacy-urls.txt"), "utf8").catch(() => "");
+  const lines = text.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("#"));
+  if (!lines.length) return [];
+  const exists = (route) => fs.access(path.join(DIST, `${route.replace(/^\//, "")}.html`)).then(() => true, () => false);
+  const live = new Set(active.map((p) => p.slug));
+  const byCode = new Map();
+  for (const p of active) {
+    const c = designCode(p, variantsByProduct.get(p._id) || []);
+    if (c) byCode.set(c, [...(byCode.get(c) || []), p]);
+  }
+  // The design's own words: no brand, device, finish or filler.
+  const STOP = /^(skin|skins|phone|phones|finish|all|models?|the|for|and|latest|new|matte|embossed|textured|transparent|tranzy|series|clean|apple|iphone|samsung|galaxy|oneplus|xiaomi|redmi|oppo|realme|vivo|poco|motorola|google|pixel|android|zvxtus|mfnoteflip|charger|cover|case|back|mobile|[a-z]?\d+[a-z]?)$/;
+  const words = (s) => new Set(String(s).toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length > 2 && !STOP.test(w)));
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rules = [];
+  for (const line of lines) {
+    const url = new URL(line, SITE);
+    if (url.pathname === "/products" && url.searchParams.get("collection")) {
+      const col = url.searchParams.get("collection").toLowerCase().replace(/[^a-z0-9-]/g, "");
+      const special = { "magneto-x": "/magneto-x", "cover-and-case": "/cases-covers" }[col];
+      const to = special || (await exists(`/${col}`) ? `/${col}` : await exists(`/${col}-skins`) ? `/${col}-skins` : "/products");
+      rules.push(`RewriteCond %{QUERY_STRING} (^|&)collection=${esc(col)}(&|$)\nRewriteRule ^products$ ${SITE}${to}? [R=301,L]`);
+      continue;
+    }
+    const m = /^\/products\/([a-z0-9-]+)$/.exec(url.pathname);
+    if (!m || live.has(m[1])) continue;
+    const slug = m[1];
+    const hint = BRAND_HINTS.find(([re]) => re.test(slug));
+    const charger = /charger/.test(slug);
+    const cm = /-([a-z])-?(\d{1,4})$/.exec(slug);
+    const pool = (cm && byCode.get(`${cm[1].toUpperCase()}-${cm[2]}`)) || [];
+    // The design's code decides; the name only when the code is not sold any more.
+    let target = pool.find((p) => hint && hint[1].test(String(p.listingKind || "")))
+      || pool.find((p) => p.gadgetCategory === (charger ? "charger" : "phone"))
+      || pool[0];
+    if (!target) {
+      // No code (an old one-off listing): the live listing sharing most of its words, if clearly the same.
+      const w = words(slug);
+      let best = null, score = 0;
+      for (const p of active) {
+        if (p.gadgetCategory !== (charger ? "charger" : "phone")) continue; // same kind of device only
+        const pw = words(p.slug);
+        const common = [...w].filter((x) => pw.has(x)).length;
+        const s = common / Math.max(w.size, pw.size, 1);
+        if (s > score) { score = s; best = p; }
+      }
+      // At least two design words, and most of both names: "cyberpunk cat" yes, "cat" alone no.
+      if (w.size >= 2 && score >= 0.66) target = best;
+    }
+    const to = target ? `/products/${target.slug}`
+      : hint && await exists(`/${hint[2]}`) ? `/${hint[2]}`
+      : charger && await exists("/chargers-skins") ? "/chargers-skins"
+      : "/products";
+    rules.push(`RewriteRule ^products/${esc(slug)}$ ${SITE}${to}? [R=301,L]`);
+  }
+  return rules;
+}
+
+async function writeHtaccess(strict, retired = [], legacy = []) {
   const file = path.join(DIST, ".htaccess");
   let src = await fs.readFile(file, "utf8");
   const sa = src.indexOf("# >>> stale assets");
@@ -1378,11 +1454,11 @@ async function writeHtaccess(strict, retired = []) {
   if (!strict) return;
   // Retired listings: their old URL moves permanently to the replacement.
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const moves = retired.length
+  const moves = (retired.length
     ? `# Retired listings -> their replacements\n${retired
         .map((p) => `RewriteRule ^products/${esc(p.slug)}$ ${SITE}${p.redirectTo} [R=301,L]`)
         .join("\n")}\n\n`
-    : "";
+    : "") + (legacy.length ? `# Old-store URLs (seo/legacy-urls.txt) -> what replaced them\n${legacy.join("\n")}\n\n` : "");
   const appOnly = await appOnlyRoutes();
   const rule = `RewriteRule ^(${appOnly.exact.join("|")})$ /app.html [L]\nRewriteRule ^(${appOnly.prefix.join("|")})/.+$ /app.html [L]`;
   const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${moves}${STRICT_ROUTING.replace("__APP_ONLY_RULE__", rule)}\n` + src.slice(end);
@@ -2276,8 +2352,10 @@ async function main() {
     p.status === "archived" && p.slug && /^[a-z0-9][a-z0-9-]*$/.test(p.slug) && !productSlugs.has(p.slug) &&
     typeof p.redirectTo === "string" && /^\/[a-z0-9/-]*$/.test(p.redirectTo)
   );
-  await writeHtaccess(true, retired);
+  const legacy = await legacyRedirects(active, variantsByProduct);
+  await writeHtaccess(true, retired, legacy);
   if (retired.length) log(`redirects: ${retired.length} retired listings`);
+  if (legacy.length) log(`redirects: ${legacy.length} old-store URLs`);
   const kinds = {};
   for (const i of seoInfo.values()) kinds[i.target.kind] = (kinds[i.target.kind] || 0) + 1;
   log(`wrote ${statics.length + 1} static, ${categories.length} category, ${productPages.length} product and ${seo.length} SEO pages`);
