@@ -107,7 +107,7 @@ const claim = async (queueId: string): Promise<any | null> => {
   }
 };
 
-const sendOne = async (queueRow: any): Promise<boolean> => {
+const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Promise<boolean> => {
   const db = admin.firestore();
   const queueRef = db.collection("whatsappQueue").doc(queueRow._id);
 
@@ -122,7 +122,7 @@ const sendOne = async (queueRow: any): Promise<boolean> => {
   // Respect the per-usecase switch at send time, so turning one off takes
   // effect immediately for anything already queued.
   const uc = await db.collection("whatsappUsecases").where("usecaseKey", "==", msg.usecaseKey).limit(1).get();
-  if (uc.empty || uc.docs[0].data().enabled !== true) {
+  if (uc.empty || (!opts.ignoreSwitch && uc.docs[0].data().enabled !== true)) {
     await queueRef.update({ status: "skipped", failureReason: "usecase disabled" });
     await msgSnap.ref.update({ status: "skipped" });
     return false;
@@ -245,29 +245,44 @@ export const triggerWhatsAppWorker = onCall(async (_data: any, context: any) => 
   return drainQueue();
 });
 
-/** Sends one message against a usecase, to check the provider wiring. */
+/**
+ * Admin › WhatsApp › Test: one message for a usecase, to the admin's own
+ * number (or the one given), sent now through the same path as real ones —
+ * template lookup, numbered values, image header — and Authkey's answer
+ * returned, so a wrong ID or variable count shows on the spot.
+ */
 export const testWhatsAppTemplate = onCall(async (data: any, context: any) => {
   await requireAdmin(context);
-  if (!data?.phone || !data?.usecaseKey) {
-    throw new HttpsError("invalid-argument", "phone and usecaseKey are required");
-  }
+  const usecaseKey = String(data?.usecaseKey || "");
+  if (!usecaseKey) throw new HttpsError("invalid-argument", "usecaseKey is required");
+  await enforceDailyRateLimit({ key: "whatsappTests", limit: 40 });
 
   const db = admin.firestore();
-  const uc = await db.collection("whatsappUsecases").where("usecaseKey", "==", data.usecaseKey).limit(1).get();
+  const uc = await db.collection("whatsappUsecases").where("usecaseKey", "==", usecaseKey).limit(1).get();
   if (uc.empty) throw new HttpsError("not-found", "Usecase not found");
+  if (!uc.docs[0].data().providerTemplateId) throw new HttpsError("failed-precondition", "Add the template ID first");
 
-  const authkey = process.env.WHATSAPP_AUTHKEY || "";
-  if (!authkey) throw new HttpsError("failed-precondition", "WHATSAPP_AUTHKEY is not configured");
+  let phone = String(data?.phone || "").replace(/\D/g, "").slice(-10);
+  if (!phone) {
+    const cfg = await db.doc("whatsappSettings/adminNotifications").get();
+    phone = String((cfg.data() as any)?.adminPhone || "").replace(/\D/g, "").slice(-10);
+  }
+  if (!/^[6-9]\d{9}$/.test(phone)) throw new HttpsError("failed-precondition", "Set the admin WhatsApp number first");
 
-  const phone = String(data.phone).replace(/\D/g, "").slice(-10);
-  const params = new URLSearchParams({
-    authkey, mobile: phone, country_code: "91",
-    sid: String(uc.docs[0].data().providerTemplateId || ""),
-    ...(data.variables || {}),
+  const variables: Record<string, string> = {};
+  for (const [k, v] of Object.entries(data?.variables || {})) variables[String(k)] = String(v).slice(0, 500);
+  const msg = await db.collection("whatsappMessages").add({
+    usecaseKey, recipientPhone: phone, variables, status: "pending", test: true, createdAt: Date.now(),
+  });
+  const q = await db.collection("whatsappQueue").add({
+    messageId: msg.id, status: "pending", attempts: 0, scheduledFor: Date.now(), createdAt: Date.now(),
   });
 
-  const fetch = require("node-fetch");
-  const res = await fetch(`${AUTHKEY_URL}?${params.toString()}`, { method: "GET" });
-  const body = await res.text();
-  return { ok: res.ok && !/error/i.test(body), response: body.slice(0, 500) };
+  // Sent regardless of the on/off switch: testing is how you decide to switch it on.
+  const row = await claim(q.id);
+  if (row) await sendOne(row, { ignoreSwitch: true });
+  const after = (await msg.get()).data() as any;
+  // A failed test is not retried by the cron: the admin is watching and will press again.
+  if (after?.status !== "sent") await q.update({ status: "failed" });
+  return { status: after?.status, response: String(after?.providerResponse || after?.failureReason || "").slice(0, 500), phone };
 });

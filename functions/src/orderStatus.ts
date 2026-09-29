@@ -327,6 +327,10 @@ export async function notifyOrderStatus(
   const cod = String(order.paymentMethod || "").toLowerCase() === "cod";
   const due = Math.max(0, total - (Number(order.prepaidAmount) || 0));
   const { reviewLinkUrl } = await import("./reviews");
+  // Dispatched and delivered carry the parcel's picture in their header.
+  const headerImage = ["shipped", "delivered"].includes(status)
+    ? await import("./waImage").then((m) => m.whatsappHeaderImage(`order-${orderId}`, items)).catch(() => "https://goskinly.com/og-default.jpg")
+    : "";
   const [wa, mail] = await Promise.all([
     queueWhatsApp(db, notice.whatsapp, order.shippingAddress?.phone || order.phone || "", {
       customer_name: order.shippingAddress?.fullName || order.customerName || "Customer",
@@ -344,6 +348,7 @@ export async function notifyOrderStatus(
       refund_line: order.paymentStatus === "success" && !cod
         ? "Your payment will be refunded to the original payment method."
         : "No payment was taken for this order.",
+      ...(headerImage ? { header_image: headerImage } : {}),
     }, orderId).catch(() => false),
     notice.email ? sendUsecaseEmail(db, order, orderId, notice.email).catch(() => false) : Promise.resolve(false),
   ]);
