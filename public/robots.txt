@@ -1,15 +1,20 @@
 User-agent: *
 Allow: /
 
-Disallow: /backend-skinly/
-Disallow: /auth/
-Disallow: /account/
-Disallow: /orders/
-Disallow: /cart/
-Disallow: /checkout/
-Disallow: /payment/
+# Private and transactional pages. No trailing slash, so /cart is covered as
+# well as /cart/... ("/cart/" alone never matched /cart itself). /pay/,
+# /review/ and /c/ keep theirs: /payment, /reviews and /cases-covers are
+# different pages.
+Disallow: /backend-skinly
+Disallow: /auth
+Disallow: /account
+Disallow: /orders
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment
 Disallow: /pay/
 Disallow: /review/
-Disallow: /mock-payment/
+Disallow: /c/
+Disallow: /mock-payment
 
 Sitemap: https://goskinly.com/sitemap.xml

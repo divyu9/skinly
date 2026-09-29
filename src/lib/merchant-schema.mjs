@@ -31,7 +31,24 @@ export function offerShippingAndReturns(price, shipping) {
       returnPolicyCategory: "https://schema.org/MerchantReturnFiniteReturnWindow",
       merchantReturnDays: 2,
       returnMethod: "https://schema.org/ReturnByMail",
+      // Returns are accepted only for our mistakes (wrong, missing, damaged
+      // item — policies/returns), and we send the label: the customer pays nothing.
+      returnFees: "https://schema.org/FreeReturn",
       itemCondition: "https://schema.org/NewCondition",
     },
   };
+}
+
+/**
+ * What a listing is made of, where that is known for certain — for the
+ * Product schema's `material` and the Merchant feed's g:material. Skins are
+ * printed vinyl; AutoApply screen guards are tempered glass. Cases, rings and
+ * accessories vary by product and are left out rather than guessed.
+ */
+export function productMaterial(p) {
+  const cat = String(p?.productCategory || "").toLowerCase();
+  const isSkin = cat ? cat === "skin" : Boolean(p?.finishType || p?.finishTypeId);
+  if (isSkin) return "Vinyl";
+  if (cat === "glass") return "Tempered Glass";
+  return "";
 }

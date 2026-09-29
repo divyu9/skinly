@@ -5,3 +5,4 @@ export function offerShippingAndReturns(
   shippingDetails: Record<string, unknown>;
   hasMerchantReturnPolicy: Record<string, unknown>;
 };
+export function productMaterial(p: unknown): string;

@@ -27,7 +27,7 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-import { offerShippingAndReturns } from "../src/lib/merchant-schema.mjs";
+import { offerShippingAndReturns, productMaterial } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
 import { CATEGORY_PAGES, GADGET_PAGES, HOME_META, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD } from "../src/lib/category-paths.mjs";
 
@@ -84,12 +84,23 @@ const esc = (s) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/**
+ * Plain text from a description, which may be HTML or the markdown the
+ * generator writes ("**Transform your iPhone**…"). Every caller wants text —
+ * meta descriptions, JSON-LD, the Merchant feed — and the markdown markers
+ * were going out literally: Merchant Center showed "*Launch into…".
+ */
 const stripHtml = (s) =>
   String(s ?? "")
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
+    .replace(/\[([^\]]+)\]\((?:[^)]+)\)/g, "$1")      // [text](url) -> text
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")                 // **bold** / __bold__
+    .replace(/(^|[\s(])[*_]([^*_\n]+?)[*_](?=[\s).,!?:;]|$)/gm, "$1$2") // *italic*
+    .replace(/^\s{0,3}(#{1,6}\s+|[-*+•]\s+|>\s+)/gm, "") // headings, bullets, quotes
+    .replace(/[*`]{1,3}/g, "")                           // any marker left over
     .replace(/\s+/g, " ")
     .trim();
 
@@ -901,6 +912,7 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
     ...(image ? { image } : {}),
     ...(variants[0]?.sku ? { sku: variants[0].sku } : {}),
     brand: { "@type": "Brand", name: "GoSkinly" },
+    ...(productMaterial(p) ? { material: productMaterial(p) } : {}),
     ...ratingFor(reviews),
     offers: {
       "@type": "Offer",
@@ -1306,8 +1318,10 @@ RewriteCond %{REQUEST_FILENAME}.html -f
 RewriteCond %{REQUEST_FILENAME}#$1 ^.*/([^/]+)#(?:.*/)?\\1$
 RewriteRule ^(.+)$ /$1.html [L]`}
 
-# Routes the app renders but that are never prerendered (and are not indexed)
-RewriteRule ^(account|auth|backend-skinly|admin|cart|checkout|orders|payment|mock-payment|products/detail)(/.*)?$ /app.html [L]
+# Routes the app renders but that are never prerendered (and are not indexed).
+# Read from src/App.tsx at build time (appOnlyRoutes), so a new route can't
+# be left answering 404 the way /track, /pay, /review and /c/ once did.
+__APP_ONLY_RULE__
 
 # Anything else is not a page. 404.html is the app shell with noindex, so a
 # product or SEO page created after this build still renders for people; it
@@ -1369,8 +1383,48 @@ async function writeHtaccess(strict, retired = []) {
         .map((p) => `RewriteRule ^products/${esc(p.slug)}$ ${SITE}${p.redirectTo} [R=301,L]`)
         .join("\n")}\n\n`
     : "";
-  const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${moves}${STRICT_ROUTING}\n` + src.slice(end);
+  const appOnly = await appOnlyRoutes();
+  const rule = `RewriteRule ^(${appOnly.exact.join("|")})$ /app.html [L]\nRewriteRule ^(${appOnly.prefix.join("|")})/.+$ /app.html [L]`;
+  const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${moves}${STRICT_ROUTING.replace("__APP_ONLY_RULE__", rule)}\n` + src.slice(end);
   await fs.writeFile(file, out);
+  /*
+   * With strict routing in place app.html is served only on these app-only
+   * routes — cart, checkout, account, pay, review links — none of which is a
+   * page for search. They answered 200 with no canonical and no robots tag,
+   * and Search Console filed them as "Duplicate without user-selected
+   * canonical". Only here, never in the fallback: without strict routing
+   * app.html serves every path, and noindex on it would drop the whole site.
+   */
+  const appFile = path.join(DIST, "app.html");
+  const app = await fs.readFile(appFile, "utf8");
+  if (!app.includes('name="robots"')) {
+    await fs.writeFile(appFile, app.replace("</head>", '<meta name="robots" content="noindex" />\n</head>'));
+  }
+  log(`app-only routes: ${appOnly.exact.length} exact, prefixes ${appOnly.prefix.join(", ")}`);
+}
+
+/**
+ * First path segments the React app serves that are never prerendered, read
+ * from the <Route path> list in src/App.tsx. Left out: "/" and the pages this
+ * script writes (their .html wins first anyway), "/:slug" and "*" (SEO pages
+ * and the 404), and /products/:slug — an unknown product must stay a 404,
+ * not become the app with a 200.
+ */
+async function appOnlyRoutes() {
+  const app = await fs.readFile(path.resolve("src", "App.tsx"), "utf8");
+  const exact = new Set();
+  const prefix = new Set(["auth", "admin"]);
+  for (const m of app.matchAll(/<Route\s+path="([^"]+)"/g)) {
+    const route = m[1];
+    if (route === "/" || route === "*" || route.startsWith("/:") || route.startsWith("/products/:")) continue;
+    const parts = route.replace(/^\//, "").split("/");
+    const i = parts.findIndex((x) => x.startsWith(":") || x === "*");
+    // A page this script wrote is served from its .html, never the noindex app shell.
+    if (i === -1) { if (!(await fs.access(path.join(DIST, `${parts.join("/")}.html`)).then(() => true, () => false))) exact.add(parts.join("/")); }
+    else if (i > 0) prefix.add(parts.slice(0, i).join("/"));
+  }
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return { exact: [...exact].sort().map(esc), prefix: [...prefix].sort().map(esc) };
 }
 
 // ─── storefront catalogue ─────────────────────────────────────────────────────
@@ -1435,10 +1489,28 @@ function brandLogos(sections, cards) {
  * rejects those anyway. Shipping (free above ₹499) is set in the Merchant
  * Center account, not here.
  */
+/** "matte", "3D textured"… from the listing's finish or title, for the feed's material line. */
+function finishName(p) {
+  const t = `${p.finishType || ""} ${p.title || ""}`.toLowerCase();
+  if (/tranzy|transparent/.test(t)) return "transparent";
+  if (/3d|textured/.test(t)) return "3D textured";
+  if (/emboss/.test(t)) return "embossed";
+  if (/leather/.test(t)) return "leather-texture";
+  if (/matte/.test(t)) return "matte";
+  return "";
+}
+
+/*
+ * Google product taxonomy, by what the listing is — not the device it fits.
+ * Skins were filed as "Mobile Phone Accessories" (Google then read them as
+ * Cell Phone Cases and asked for case details), and laptop and tablet skins
+ * as "Laptops" / "Tablet Computers" — the device itself. A skin is a decal
+ * for an electronic device, whatever the device.
+ */
 const GOOGLE_CATEGORY = {
-  phone: "Electronics > Communications > Telephony > Mobile Phone Accessories",
-  tablet: "Electronics > Computers > Tablet Computers",
-  laptop: "Electronics > Computers > Laptops",
+  skin: "Electronics > Electronics Accessories > Electronics Films & Shields > Electronics Stickers & Decals",
+  glass: "Electronics > Electronics Accessories > Electronics Films & Shields > Screen Protectors",
+  "case-cover": "Electronics > Communications > Telephony > Mobile Phone Accessories > Mobile Phone Cases",
 };
 async function writeMerchantFeed(active, variantsByProduct) {
   const x = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -1453,9 +1525,16 @@ async function writeMerchantFeed(active, variantsByProduct) {
     const images = (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).filter(liveImage).map((u) => u.replace(/ /g, "%20"));
     if (!images.length) continue;
     const title = productSeoTitle(p).replace(/\s*\|\s*GoSkinly$/, "");
-    const desc = clip(stripHtml(p.description) || p.metaDescription || `${title}, printed and cut for your exact device.`, 4900);
-    const type = [p.productCategory === "skin" ? "Skins" : titleCase(p.productCategory || "Accessories"), p.gadgetCategory && titleCase(p.gadgetCategory)].filter(Boolean).join(" > ");
-    const gcat = p.productCategory === "skin" ? GOOGLE_CATEGORY[p.gadgetCategory] : null;
+    const material = productMaterial(p);
+    // The material stated in the text as well as g:material: Merchant Center
+    // reads the description for it ("Add to description: Material").
+    const facts = material === "Vinyl"
+      ? ` Material: ${[finishName(p), "vinyl"].filter(Boolean).join(" ")} skin, printed and precision-cut for your exact ${p.gadgetCategory && p.gadgetCategory !== "accessory" ? p.gadgetCategory : "device"}; peels off clean.`
+      : material ? ` Material: ${material.toLowerCase()}.` : "";
+    const desc = clip((stripHtml(p.description) || stripHtml(p.metaDescription) || `${title}, printed and cut for your exact device.`) + facts, 4900);
+    const cat = p.productCategory || (p.finishType || p.finishTypeId ? "skin" : "");
+    const type = [cat === "skin" ? "Skins" : titleCase(cat || "Accessories"), p.gadgetCategory && titleCase(p.gadgetCategory)].filter(Boolean).join(" > ");
+    const gcat = GOOGLE_CATEGORY[cat] || null;
     items.push(
       `<item>` +
       `<g:id>${x(p._id)}</g:id>` +
@@ -1470,6 +1549,7 @@ async function writeMerchantFeed(active, variantsByProduct) {
       `<g:condition>new</g:condition>` +
       `<g:identifier_exists>no</g:identifier_exists>` +
       (gcat ? `<g:google_product_category>${x(gcat)}</g:google_product_category>` : "") +
+      (material ? `<g:material>${x(material)}</g:material>` : "") +
       (type ? `<g:product_type>${x(type)}</g:product_type>` : "") +
       `</item>`
     );

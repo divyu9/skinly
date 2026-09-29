@@ -1,7 +1,7 @@
 import { Helmet } from "react-helmet-async";
 import type { Crumb } from "@/lib/product-breadcrumb";
 import { generateBreadcrumbStructuredData } from "@/lib/seo-structured-data";
-import { offerShippingAndReturns } from "@/lib/merchant-schema.mjs";
+import { offerShippingAndReturns, productMaterial } from "@/lib/merchant-schema.mjs";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 
@@ -96,6 +96,7 @@ export function ProductSEOHead({
         image: productImage,
         sku: defaultVariantSku,
         brand: { "@type": "Brand", name: "GoSkinly" },
+        ...(productMaterial(productData) ? { material: productMaterial(productData) } : {}),
         offers: {
           "@type": "Offer",
           price: cheapestPrice,
