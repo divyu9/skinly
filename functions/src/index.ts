@@ -52,3 +52,4 @@ export * from "./addOns";
 export * from "./funnel";
 export * from "./walletEmail";
 export * from "./adminOrderEmail";
+export * from "./contacts";

@@ -27,6 +27,7 @@ import {
   Home,
   Bug,
   Coins,
+  BookUser,
   Gift,
   TrendingUp,
   FileText,
@@ -129,6 +130,7 @@ export function AdminSidebar() {
       label: "Marketing & Promotions",
       icon: TrendingUp,
       items: [
+        { path: "/backend-skinly/contacts", label: "WhatsApp Contacts", icon: BookUser },
         { path: "/backend-skinly/coupons", label: "Coupons", icon: Ticket },
         { path: "/backend-skinly/reviews", label: "Reviews", icon: Star },
         { path: "/backend-skinly/upsells", label: "Upsells", icon: TrendingUp },
