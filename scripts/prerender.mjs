@@ -1372,6 +1372,16 @@ const BRAND_HINTS = [
   [/^oneplus/, /oneplus/i, "oneplus-skins"], [/^(xiaomi|redmi)/, /xiaomi|redmi/i, "xiaomi-skins"],
   [/^oppo/, /oppo/i, "oppo-skins"], [/^realme/, /realme/i, "realme-skins"], [/^vivo/, /vivo/i, "vivo-skins"],
   [/^poco/, /poco/i, "poco-skins"], [/^motorola/, /motorola/i, "motorola-skins"], [/^google/, /google pixel/i, "google-pixel-skins"],
+  [/^asus/, /asus/i, "asus-phone-skins"], [/^cmf/, /nothing/i, "cmf-skins"], [/^nothing/, /nothing/i, "nothing-phone-skins"],
+  [/^honor/, /honor/i, "honor-skins"], [/^huawei/, /huawei/i, "huawei-skins"], [/^infinix/, /infinix/i, "infinix-phone-skins"],
+  [/^iqoo/, /iqoo/i, "iqoo-phone-skins"], [/^lava/, /lava/i, "lava-phone-skins"], [/^tecno/, /tecno/i, "tecno-phone-skins"],
+];
+// Slug word -> gadget, and the page that gadget's old URLs fall back to.
+const LEGACY_GADGETS = [
+  [/charger/, "charger", "/chargers-skins"], [/ipad/, "tablet", "/apple-ipad-skins"], [/\btab\b|-tab-|tablet/, "tablet", "/ipad-tablet-skins"],
+  [/macbook/, "laptop", "/apple-macbook-skins"], [/laptop/, "laptop", "/laptop-skins"], [/mac-mini/, "mac-mini", "/mac-mini-skins"],
+  [/lens/, "lens", "/camera-lens-skins"], [/camera/, "camera", "/camera-skins"], [/controller/, "controller", "/gaming-console-skins"],
+  [/ps5|xbox|console|playstation/, "console", "/gaming-console-skins"], [/drone/, "drone", "/drone-skins"], [/gimbal/, "gimbals", "/dji-gimbal-skins"],
 ];
 async function legacyRedirects(active, variantsByProduct) {
   const text = await fs.readFile(path.resolve("seo", "legacy-urls.txt"), "utf8").catch(() => "");
@@ -1402,19 +1412,19 @@ async function legacyRedirects(active, variantsByProduct) {
     if (!m || live.has(m[1])) continue;
     const slug = m[1];
     const hint = BRAND_HINTS.find(([re]) => re.test(slug));
-    const charger = /charger/.test(slug);
+    const gadget = LEGACY_GADGETS.find(([re]) => re.test(slug))?.[1] || "phone";
     const cm = /-([a-z])-?(\d{1,4})$/.exec(slug);
     const pool = (cm && byCode.get(`${cm[1].toUpperCase()}-${cm[2]}`)) || [];
     // The design's code decides; the name only when the code is not sold any more.
     let target = pool.find((p) => hint && hint[1].test(String(p.listingKind || "")))
-      || pool.find((p) => p.gadgetCategory === (charger ? "charger" : "phone"))
+      || pool.find((p) => p.gadgetCategory === gadget)
       || pool[0];
     if (!target) {
       // No code (an old one-off listing): the live listing sharing most of its words, if clearly the same.
       const w = words(slug);
       let best = null, score = 0;
       for (const p of active) {
-        if (p.gadgetCategory !== (charger ? "charger" : "phone")) continue; // same kind of device only
+        if (p.gadgetCategory !== gadget) continue; // same kind of device only
         const pw = words(p.slug);
         const common = [...w].filter((x) => pw.has(x)).length;
         const s = common / Math.max(w.size, pw.size, 1);
@@ -1423,9 +1433,11 @@ async function legacyRedirects(active, variantsByProduct) {
       // At least two design words, and most of both names: "cyberpunk cat" yes, "cat" alone no.
       if (w.size >= 2 && score >= 0.66) target = best;
     }
+    const page = LEGACY_GADGETS.find(([re]) => re.test(slug))?.[2];
     const to = target ? `/products/${target.slug}`
-      : hint && await exists(`/${hint[2]}`) ? `/${hint[2]}`
-      : charger && await exists("/chargers-skins") ? "/chargers-skins"
+      : gadget === "phone" && hint && await exists(`/${hint[2]}`) ? `/${hint[2]}`
+      : page && await exists(page) ? page
+      : gadget === "phone" && await exists("/phone-skins") ? "/phone-skins"
       : "/products";
     rules.push(`RewriteRule ^products/${esc(slug)}$ ${SITE}${to}? [R=301,L]`);
   }

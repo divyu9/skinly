@@ -131,6 +131,9 @@ RewriteRule ^pages/(terms-of-service|terms)$ https://goskinly.com/policies/terms
 RewriteRule ^pages/(shop|store)$ https://goskinly.com/products [R=301,L]
 RewriteRule ^pages(/.*)?$ https://goskinly.com/ [R=301,L]
 RewriteRule ^account/(login|register|signup)$ https://goskinly.com/account [R=301,L]
+# Shopify's own machinery (web-pixel manager, asset CDN, storefront password,
+# checkout): never pages, nothing replaced them. 410 tells Google to forget them.
+RewriteRule ^(wpm|cdn|password|checkouts)(/.*)?$ - [G,L]
 # Shopify paginated listings: /products?page=4
 RewriteCond %{QUERY_STRING} (^|&)page=[0-9]+(&|$)
 RewriteRule ^products$ https://goskinly.com/products? [R=301,L]
