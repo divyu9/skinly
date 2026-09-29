@@ -3218,12 +3218,16 @@ export function useQuery(apiRef: any, args?: any) {
 
               if (targetId) {
                 const snap = await getDoc(doc(db, 'products', targetId));
+                if (!snap.exists() && snap.metadata.fromCache) throw new Error("products: server not reached");
                 if (snap.exists()) {
                   productData = { _id: snap.id, ...snap.data() };
                 }
               } else if (args?.slug) {
                 const q = query(collection(db, 'products'), where('slug', '==', args.slug), limit(1));
                 const snap = await getDocs(q);
+                // Offline, getDocs answers from the (empty) cache instead of
+                // failing: that is "couldn't ask", not "no such product".
+                if (snap.empty && snap.metadata.fromCache) throw new Error("products: server not reached");
                 if (!snap.empty) {
                   productData = { _id: snap.docs[0].id, ...snap.docs[0].data() };
                 }
