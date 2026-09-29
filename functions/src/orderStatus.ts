@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
-import { queueWhatsApp, sendUsecaseEmail } from "./orderNotifications";
+import { orderLinkFor, queueWhatsApp, sendUsecaseEmail, trackingLinkFor } from "./orderNotifications";
 
 /**
  * The one place an order's status is decided and written.
@@ -130,6 +130,9 @@ const STAMP: Partial<Record<OrderStatus, string>> = {
 /** Which message a status sends, where one exists. */
 const NOTICE: Partial<Record<OrderStatus, { email: string; whatsapp: string }>> = {
   shipped: { email: "order_dispatched", whatsapp: "order_dispatched" },
+  // WhatsApp only: "arriving today — keep the COD amount ready" is what saves
+  // a COD parcel from coming back; an email that day is noise.
+  out_for_delivery: { email: "", whatsapp: "out_for_delivery" },
   delivered: { email: "order_delivered", whatsapp: "order_delivered" },
   cancelled: { email: "order_cancelled", whatsapp: "order_cancelled" },
 };
@@ -320,14 +323,29 @@ export async function notifyOrderStatus(
   if (!order) return { email: false, whatsapp: false };
 
   const items = Array.isArray(order.items) ? order.items : [];
+  const total = Number(order.total ?? order.amountPayable) || 0;
+  const cod = String(order.paymentMethod || "").toLowerCase() === "cod";
+  const due = Math.max(0, total - (Number(order.prepaidAmount) || 0));
+  const { reviewLinkUrl } = await import("./reviews");
   const [wa, mail] = await Promise.all([
     queueWhatsApp(db, notice.whatsapp, order.shippingAddress?.phone || order.phone || "", {
       customer_name: order.shippingAddress?.fullName || order.customerName || "Customer",
+      first_name: String(order.shippingAddress?.fullName || order.customerName || "there").trim().split(/\s+/)[0],
       order_number: String(order.orderNumber || order.failedOrderNumber || "Pending"),
-      order_total: (Number(order.total ?? order.amountPayable) || 0).toFixed(2),
-      product_name: items.map((i: any) => i?.productTitle).filter(Boolean).join(", "),
+      order_total: total.toFixed(2),
+      product_name: items.map((i: any) => i?.productTitle).filter(Boolean).join(", ").slice(0, 120),
+      // What each status template can print.
+      courier_name: String(order.courierName || (order.shippingProvider === "delhivery" ? "Delhivery" : "our courier partner")),
+      awb_number: String(order.awbNumber || order.parentAwbNumber || "—"),
+      tracking_url: trackingLinkFor(order, orderId),
+      order_link: orderLinkFor(orderId),
+      cod_line: cod && due > 0 ? `Please keep ₹${Math.round(due)} ready — it's Cash on Delivery.` : "It's prepaid, so there's nothing to pay.",
+      review_link: status === "delivered" ? reviewLinkUrl(orderId, "whatsapp") : "",
+      refund_line: order.paymentStatus === "success" && !cod
+        ? "Your payment will be refunded to the original payment method."
+        : "No payment was taken for this order.",
     }, orderId).catch(() => false),
-    sendUsecaseEmail(db, order, orderId, notice.email).catch(() => false),
+    notice.email ? sendUsecaseEmail(db, order, orderId, notice.email).catch(() => false) : Promise.resolve(false),
   ]);
 
   console.log("notifyOrderStatus", { orderId, status, whatsapp: wa, email: mail });

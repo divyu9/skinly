@@ -197,6 +197,21 @@ const reminderVariables = (cart: any, couponCode: string | null, s: Settings) =>
   return vars;
 };
 
+/** The `abandoned_cart` WhatsApp (queued; off until its usecase is switched on). */
+const sendReminderWhatsApp = async (cart: any, couponCode: string | null, s: Settings): Promise<boolean> => {
+  const phone = String(cart.userPhone || "").replace(/\D/g, "").slice(-10);
+  if (!/^[6-9]\d{9}$/.test(phone)) return false;
+  const v = reminderVariables(cart, couponCode, s);
+  const { queueWhatsApp } = await import("./orderNotifications");
+  return queueWhatsApp(admin.firestore(), "abandoned_cart", phone, {
+    customer_name: v.customerName,
+    product_name: v.productName.slice(0, 80),
+    cart_total: `₹${v.amount}`,
+    cart_link: v.cartLink.replace("utm_source=email", "utm_source=whatsapp"),
+    coupon_line: v.couponLine || "Your cart is saved for you.",
+  }, String(cart.orderId || ""));
+};
+
 const sendReminderEmail = async (cart: any, couponCode: string | null, s: Settings): Promise<boolean> => {
   const authkey = process.env.MSG91_AUTH_TOKEN || "";
   if (!authkey) {
@@ -452,7 +467,7 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
     if (!cart) continue; // already claimed, capped, or no longer eligible
     claimed++;
 
-    if (!cart.userEmail) continue;
+    if (!cart.userEmail && !cart.userPhone) continue;
 
     // A global daily ceiling, independent of the per-cart cap.
     try {
@@ -463,7 +478,10 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
     }
 
     const coupon = await createRecoveryCoupon(cart, s);
-    if (await sendReminderEmail(cart, coupon, s)) sent++;
+    if (cart.userEmail && await sendReminderEmail(cart, coupon, s)) sent++;
+    // WhatsApp too, on the first reminder only: read far more than email,
+    // and one nudge is the most a chat should get.
+    if (c.count === 0) await sendReminderWhatsApp(cart, coupon, s).catch((e) => console.warn("cart WhatsApp skipped", e?.message || e));
   }
 
   return { sent, claimed, skipped: "" };

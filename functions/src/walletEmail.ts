@@ -29,11 +29,6 @@ export const onWalletCredit = functionsV1.firestore
     const source = String(t.source || t.type || "");
     const usecaseKey = source === "refund" ? "wallet_refund" : "wallet_credited";
 
-    const tpl = await db.collection("emailUsecaseTemplates").where("usecaseKey", "==", usecaseKey).limit(1).get();
-    if (tpl.empty || tpl.docs[0].data().enabled !== true) return null;
-    const authkey = process.env.MSG91_AUTH_TOKEN || "";
-    if (!authkey) return null;
-
     // Who: the wallet's account (by document id, or by sign-in uid), else the order's email.
     const users = db.collection("users");
     let user = t.userId ? (await users.doc(String(t.userId)).get()).data() as any : null;
@@ -51,6 +46,21 @@ export const onWalletCredit = functionsV1.firestore
       : source === "referral_reward" ? "Your friend's order was delivered — here's your referral reward"
       : ["cashback", "coupon_credit", "delivery_credit"].includes(source) ? `Cashback for order ${orderNumber}, now that it's delivered`.trim()
       : String(t.description || "Added to your Skinly wallet");
+
+    // WhatsApp (`wallet_credited` usecase, off until switched on), whatever the email does.
+    const phone = String(user?.phone || user?.phoneNumber || order?.shippingAddress?.phone || order?.phone || "").replace(/\D/g, "").slice(-10);
+    if (/^[6-9]\d{9}$/.test(phone)) {
+      const { queueWhatsApp } = await import("./orderNotifications");
+      await queueWhatsApp(db, "wallet_credited", phone, {
+        customer_name: first, amount_text: rupees(t.amount), reason_line: reasonLine, wallet_balance: rupees(t.balanceAfter),
+        wallet_link: `${SITE}/account/wallet?utm_source=whatsapp&utm_medium=wallet_credited`,
+      }, String(t.relatedOrderId || "")).catch(() => false);
+    }
+
+    const tpl = await db.collection("emailUsecaseTemplates").where("usecaseKey", "==", usecaseKey).limit(1).get();
+    if (tpl.empty || tpl.docs[0].data().enabled !== true) return null;
+    const authkey = process.env.MSG91_AUTH_TOKEN || "";
+    if (!authkey) return null;
 
     const variables: Record<string, string> = {
       customerName: name || "there",

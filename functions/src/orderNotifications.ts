@@ -21,7 +21,7 @@ import { describeItems } from "./ordersAdmin";
 const MSG91_EMAIL_ENDPOINT = "https://control.msg91.com/api/v5/email/send";
 
 /** Where "View Your Order" should point. */
-function orderLinkFor(orderId: string): string {
+export function orderLinkFor(orderId: string): string {
   const site = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
   /*
    * Signed, so the customer's own link opens their full order (name, address,
@@ -47,6 +47,19 @@ function usableImage(items: any[]): string {
   const url = String(items?.[0]?.productImage || "");
   if (!url || url.includes("res.cloudinary.com")) return "";
   return url;
+}
+
+/**
+ * The courier's own tracking page for the parcel (the order page's
+ * courierTrackUrl, same rules), or the order page before there is an AWB.
+ */
+export function trackingLinkFor(order: any, orderId: string): string {
+  if (/^https?:\/\//i.test(String(order?.trackingUrl || ""))) return String(order.trackingUrl);
+  const awb = String(order?.awbNumber || order?.parentAwbNumber || "").trim();
+  if (!awb) return orderLinkFor(orderId);
+  return order?.shippingProvider === "delhivery"
+    ? `https://www.delhivery.com/track-v2/package/${encodeURIComponent(awb)}`
+    : `https://app.rapidshyp.com/t/${encodeURIComponent(awb)}`;
 }
 
 /** Queues one WhatsApp message, if that usecase is switched on. */
@@ -155,12 +168,7 @@ export async function sendUsecaseEmail(
           // (the order page's courierTrackUrl, same rules), and the expected date.
           awbNumber: String(order.awbNumber || "—"),
           courierName: String(order.courierName || (order.shippingProvider === "delhivery" ? "Delhivery" : order.awbNumber ? "RapidShyp" : "Our courier partner")),
-          trackingUrl: /^https?:\/\//i.test(String(order.trackingUrl || "")) ? String(order.trackingUrl)
-            : order.awbNumber
-              ? (order.shippingProvider === "delhivery"
-                ? `https://www.delhivery.com/track-v2/package/${encodeURIComponent(String(order.awbNumber).trim())}`
-                : `https://app.rapidshyp.com/t/${encodeURIComponent(String(order.awbNumber).trim())}`)
-              : orderLinkFor(orderId),
+          trackingUrl: trackingLinkFor(order, orderId),
           deliveryLine: Number(order.expectedDeliveryAt) > Date.now()
             ? `Expected by ${new Date(Number(order.expectedDeliveryAt) + 5.5 * 3600000).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" })}`
             : "We'll send you updates on WhatsApp as it moves",
