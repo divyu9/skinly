@@ -194,6 +194,14 @@ const titleCase = (slug) =>
 
 /** Cloudinary's account is gone; its URLs answer 401. */
 const liveImage = (u) => typeof u === "string" && /^https?:\/\//.test(u) && !u.includes("res.cloudinary.com");
+/*
+ * The same R2 object on the shop's own image domain. Stored URLs point at the
+ * bucket's pub-….r2.dev address, which Cloudflare rate-limits and says is not
+ * for production; Google fetching every product picture for Shopping hit it
+ * ("Image not processed", "Unable to show image"). What crawlers are handed —
+ * the feed, Product schema, og:image, the image sitemap — uses cdn.goskinly.com.
+ */
+const publicImage = (u) => String(u || "").replace(/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i, "https://cdn.goskinly.com/");
 
 // JSON inside <script> must not be able to close the tag.
 const jsonLd = (obj) =>
@@ -879,7 +887,8 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
     : priced.length
       ? Math.min(...priced.map((v) => Number(v.price)))
       : 0;
-  const image = [...(p.images || []).map((i) => (typeof i === "string" ? i : i?.url))].find(liveImage);
+  const found = [...(p.images || []).map((i) => (typeof i === "string" ? i : i?.url))].find(liveImage);
+  const image = found ? publicImage(found) : found;
 
   const plain = stripHtml(p.description);
   const title = productSeoTitle(p);
@@ -928,7 +937,8 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
   // Only when the photo the app will show first is this one: it shows
   // images[0] as stored, live or not.
   const first = (p.images || [])[0];
-  const photo = image && (typeof first === "string" ? first : first?.url) === image ? productPhoto(image) : null;
+  // The shell draws the exact URL the app will (the stored one), so the picture downloads once.
+  const photo = found && (typeof first === "string" ? first : first?.url) === found ? productPhoto(found) : null;
   const isSkin = p.productCategory ? p.productCategory === "skin" : Boolean(p.finishType || p.finishTypeId);
 
   // The listing itself, for the app's first render (firebase-hooks seededProduct):
@@ -950,7 +960,7 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
     ],
     jsonLd: [product, breadcrumbLd(trail)],
     lastmod: p.updatedAt || p._creationTime,
-    images: (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).filter(liveImage).slice(0, 5),
+    images: (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).filter(liveImage).slice(0, 5).map(publicImage),
     title_: p.title,
     priority: "0.8",
     body:
@@ -1626,7 +1636,7 @@ async function writeMerchantFeed(active, variantsByProduct) {
     if (!priced.length) continue;
     const inStock = priced.filter((v) => stock(v) > 0);
     const price = Math.min(...(inStock.length ? inStock : priced).map((v) => Number(v.price)));
-    const images = (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).filter(liveImage).map((u) => u.replace(/ /g, "%20"));
+    const images = (p.images || []).map((i) => (typeof i === "string" ? i : i?.url)).filter(liveImage).map((u) => publicImage(u).replace(/ /g, "%20"));
     if (!images.length) continue;
     const title = productSeoTitle(p).replace(/\s*\|\s*GoSkinly$/, "");
     const material = productMaterial(p);
