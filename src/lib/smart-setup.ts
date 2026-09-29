@@ -119,7 +119,11 @@ export function modelsInTitle(title: string): string[] {
   const base = parts[0];
   const cut = base.search(/\d/);
   const family = cut > 0 ? base.slice(0, cut) : "";
-  return parts.map((p) => (/^\d/.test(p) && family ? family + p : p)).map(modelKey).filter(Boolean);
+  // A one-word letter model takes the brand line too: "iPhone X/XS" is X and XS.
+  const line = base.includes(" ") ? base.slice(0, base.lastIndexOf(" ") + 1) : "";
+  return parts
+    .map((p) => (/^\d/.test(p) && family ? family + p : /^[A-Za-z]+$/.test(p) && line && !/^(blue|black|white|red|green|pink|purple|silver|gold|grey|gray|clear|orange|yellow)$/i.test(p) ? line + p : p))
+    .map(modelKey).filter(Boolean);
 }
 
 /** The colour at the end of a ring's variant ("iPhone 15 Pro / 15 Pro Max / Blue"), if any. */
