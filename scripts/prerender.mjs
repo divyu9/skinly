@@ -931,8 +931,12 @@ function productPage(p, variants, categoryNames, shipping, links = {}, reviews =
   const photo = image && (typeof first === "string" ? first : first?.url) === image ? productPhoto(image) : null;
   const isSkin = p.productCategory ? p.productCategory === "skin" : Boolean(p.finishType || p.finishTypeId);
 
+  // The listing itself, for the app's first render (firebase-hooks seededProduct):
+  // a page that waits on Firestore says "not found" when Firestore is out of reach.
+  const { originalImages: _o, ...seedProduct } = p;
   return {
     route: `/products/${p.slug}`,
+    seed: { slug: p.slug, product: { ...seedProduct, variants } },
     title,
     description,
     canonical: url,
@@ -1483,7 +1487,9 @@ async function writeHtaccess(strict, retired = [], legacy = []) {
     : "") + (legacy.length ? `# Old-store URLs (seo/legacy-urls.txt) -> what replaced them\n${legacy.join("\n")}\n\n` : "");
   const appOnly = await appOnlyRoutes();
   const rule = `RewriteRule ^(${appOnly.exact.join("|")})$ /app.html [L]\nRewriteRule ^(${appOnly.prefix.join("|")})/.+$ /app.html [L]`;
-  const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${moves}${STRICT_ROUTING.replace("__APP_ONLY_RULE__", rule)}\n` + src.slice(end);
+  // The redirects sit after the prerendered-page rule: none of their URLs is a
+  // page, and a live page should not walk ~1,600 patterns to be served.
+  const out = src.slice(0, start) + `# >>> routing (written by scripts/prerender.mjs)\n${STRICT_ROUTING.replace("__APP_ONLY_RULE__", moves + rule)}\n` + src.slice(end);
   await fs.writeFile(file, out);
   /*
    * With strict routing in place app.html is served only on these app-only

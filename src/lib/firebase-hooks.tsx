@@ -466,7 +466,32 @@ function stripUndefinedDeep(value: any): any {
  */
 let homeSeed: Record<string, unknown> | null | undefined;
 const SEEDABLE = new Set(['homepage.getActiveHeroSlides', 'homepage.getActiveHomepageSections']);
+/*
+ * A product page's own listing, written into the page by the build
+ * (scripts/prerender.mjs, `__seed` with a `product`). Without it the page
+ * waited on Firestore, and when that request failed — as it does for
+ * Googlebot's renderer — it said "Product not found" over a real product:
+ * Search Console filed those pages as Soft 404. Only for the slug it was
+ * written for; the live query still runs and replaces it.
+ */
+let productSeed: { slug: string; product: any } | null | undefined;
+function seededProduct(slug: unknown): any {
+  if (productSeed === undefined) {
+    try {
+      const el = typeof document !== 'undefined' ? document.getElementById('__seed') : null;
+      const seed = el?.textContent ? JSON.parse(el.textContent) : null;
+      productSeed = seed?.product && seed?.slug ? { slug: seed.slug, product: seed.product } : null;
+    } catch {
+      productSeed = null;
+    }
+  }
+  if (!productSeed || productSeed.slug !== slug) return undefined;
+  const { variants = [], ...rest } = productSeed.product;
+  return { ...rest, variants: sortVariants(variants) };
+}
+
 function seededValue(path: string, args: any): any {
+  if (path === 'products.getProductBySlug' && args && args !== 'skip') return seededProduct(args.slug);
   if (!SEEDABLE.has(path) || (args && args !== 'skip' && Object.keys(args).length)) return undefined;
   if (homeSeed === undefined) {
     try {
@@ -3186,7 +3211,7 @@ export function useQuery(apiRef: any, args?: any) {
           unsubscribe = () => { unsubRolls(); unsubGadgets(); };
         }
         else if (path === 'products.getProduct' || path === 'products.getProductBySlug') {
-          const fetchProduct = async () => {
+          const fetchProduct = async (attempt = 0): Promise<void> => {
             try {
               const targetId = args?.productId || args?.id;
               let productData = null;
@@ -3215,8 +3240,17 @@ export function useQuery(apiRef: any, args?: any) {
               
               setData(productData);
             } catch (error) {
+              /*
+               * A failed request is not "no such product". Saying null here
+               * drew "Product not found" over real products whenever Firestore
+               * was unreachable (Soft 404s in Search Console). Keep what the
+               * page already has — the build's seed — and try again; only a
+               * query that succeeded and came back empty is a missing product.
+               */
               console.error("Error fetching product and variants:", error);
-              setData(null);
+              if (!active) return;
+              if (attempt < 2) { setTimeout(() => { if (active) void fetchProduct(attempt + 1); }, 1500 * (attempt + 1)); return; }
+              setData((cur: any) => (cur === undefined ? null : cur));
             }
           };
 
@@ -3566,10 +3600,13 @@ export function useQuery(apiRef: any, args?: any) {
           unsubscribe = onSnapshot(q, (snap) => {
             if (!snap.empty) {
               setData({ _id: snap.docs[0].id, ...snap.docs[0].data() });
-            } else {
+            } else if (!snap.metadata.fromCache) {
+              // Only the server can say a page does not exist. An empty cache
+              // read (offline, or Googlebot's renderer with Firestore out of
+              // reach) drew NotFound over a real landing page — Soft 404s.
               setData(null);
             }
-          });
+          }, (err) => console.error("seoPages.getPageBySlug failed", err));
         }
         else if (path === 'seoPages.getPage' || path === 'seoPages.getPageById') {
           const ref = doc(db, 'seoPages', args.pageId);
