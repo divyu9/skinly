@@ -15,6 +15,7 @@ import { hasUsableImage } from "@/lib/image-fallback";
 import { toast } from "sonner";
 import type { Id } from "@/lib/firebase-api";
 import { useState, useMemo, useRef, useEffect, Fragment } from "react";
+import { useUrlState } from "@/hooks/use-url-state";
 import { Input } from "@/components/ui/input.tsx";
 import {
   Dialog,
@@ -259,16 +260,16 @@ function EditableCell({
 function AdminProductsPageInner() {
   // State declarations first
   const [isDeleting, setIsDeleting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useUrlState("q", "");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [managingImagesProduct, setManagingImagesProduct] = useState<{id: Id<"products">; title: string; images: Array<{url: string; alt?: string}>} | null>(null);
   const [selectedProducts, setSelectedProducts] = useState<Array<Id<"products">>>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [skuLetterFilter, setSkuLetterFilter] = useState<"all" | "M" | "L" | "T" | "R">("all");
-  const [skuSortOrder, setSkuSortOrder] = useState<"asc" | "desc">("asc");
-  const [gadgetCategoryFilter, setGadgetCategoryFilter] = useState<string>("all");
+  const [skuLetterFilter, setSkuLetterFilter] = useUrlState<"all" | "M" | "L" | "T" | "R">("letter", "all");
+  const [skuSortOrder, setSkuSortOrder] = useUrlState<"asc" | "desc">("skuSort", "asc");
+  const [gadgetCategoryFilter, setGadgetCategoryFilter] = useUrlState<string>("gadget", "all");
   const [showBulkPriceEdit, setShowBulkPriceEdit] = useState(false);
   const [recounting, setRecounting] = useState(false);
   const syncInventory = useMutation(api.rollsManagement.syncInventoryFromRolls);
@@ -287,12 +288,12 @@ function AdminProductsPageInner() {
     }
   };
   const [showPriceRules, setShowPriceRules] = useState(false);
-  const [skuFilterCondition, setSkuFilterCondition] = useState<"starts-with" | "contains">("starts-with");
-  const [skuFilterValue, setSkuFilterValue] = useState("");
-  const [productNameCondition, setProductNameCondition] = useState<"starts-with" | "contains">("contains");
-  const [productNameValue, setProductNameValue] = useState("");
+  const [skuFilterCondition, setSkuFilterCondition] = useUrlState<"starts-with" | "contains">("skuMode", "starts-with");
+  const [skuFilterValue, setSkuFilterValue] = useUrlState("sku", "");
+  const [productNameCondition, setProductNameCondition] = useUrlState<"starts-with" | "contains">("nameMode", "contains");
+  const [productNameValue, setProductNameValue] = useUrlState("name", "");
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "draft" | "archived">("all");
+  const [statusFilter, setStatusFilter] = useUrlState<"all" | "active" | "draft" | "archived">("status", "all");
   /*
    * Products with nothing to show.
    *
@@ -301,7 +302,7 @@ function AdminProductsPageInner() {
    * one, and the storefront's push-down setting asks the same function, so
    * what is listed here is exactly what gets pushed down there.
    */
-  const [imageFilter, setImageFilter] = useState<"all" | "missing" | "has">("all");
+  const [imageFilter, setImageFilter] = useUrlState<"all" | "missing" | "has">("img", "all");
   const [expandedProducts, setExpandedProducts] = useState<Set<Id<"products">>>(new Set());
 
   // Tag manager state
@@ -314,12 +315,14 @@ function AdminProductsPageInner() {
   // State for active tab
   
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50);
+  const [currentPage, setCurrentPage] = useUrlState("page", 1);
+  const [itemsPerPage, setItemsPerPage] = useUrlState("per", 50);
 
   // Inventory sorting state
-  const [inventorySortOrder, setInventorySortOrder] = useState<"asc" | "desc">("desc");
-  const [activeSortColumn, setActiveSortColumn] = useState<"sku" | "inventory" | null>(null);
+  const [inventorySortOrder, setInventorySortOrder] = useUrlState<"asc" | "desc">("invSort", "desc");
+  const [sortColumnRaw, setSortColumnRaw] = useUrlState<string>("sortBy", "");
+  const activeSortColumn = (sortColumnRaw || null) as "sku" | "inventory" | null;
+  const setActiveSortColumn = (v: "sku" | "inventory" | null) => setSortColumnRaw(v || "");
 
   // Backend sort option (for efficient sorting)
   const [backendSortBy, setBackendSortBy] = useState<"latest" | "oldest" | "title_asc" | "title_desc">("latest");
@@ -787,9 +790,16 @@ function AdminProductsPageInner() {
   }, [products, gadgetTypeNameById, searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, imageFilter, activeSortColumn, inventorySortOrder]);
 
   // Reset to page 1 whenever filters change
+  // Back to page 1 when a filter changes — but not on arrival: the page in the
+  // URL (coming Back from a product) is the one the admin was on.
+  const filtersKey = [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, imageFilter, itemsPerPage].join("|");
+  const lastFilters = useRef(filtersKey);
   useEffect(() => {
+    if (lastFilters.current === filtersKey) return;
+    lastFilters.current = filtersKey;
     setCurrentPage(1);
-  }, [searchQuery, skuLetterFilter, skuSortOrder, gadgetCategoryFilter, skuFilterValue, productNameValue, skuFilterCondition, productNameCondition, statusFilter, imageFilter, itemsPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
 
   // Paginate filtered products
   const paginatedProducts = useMemo(() => {

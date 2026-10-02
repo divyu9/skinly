@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRightIcon, BadgeCheckIcon, StarIcon } from "lucide-react";
 import { responsiveImg } from "@/lib/image-cdn";
+import { ReviewPhotoViewer } from "@/components/review-photo-viewer.tsx";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
 import { reviewAge, reviewStats, useApprovedReviews, type PublicReview } from "@/lib/public-reviews";
 
@@ -26,17 +27,29 @@ export function Stars({ n, size = "size-4" }: { n: number; size?: string }) {
 /** One review as a card: stars and age, photo, words, then who and where. */
 export function ReviewCard({ r, clamp = true }: { r: PublicReview; clamp?: boolean }) {
   const photo = r.imageUrls?.[0];
+  const [viewing, setViewing] = useState(false);
   const design = String(r.productTitle || "").replace(/\s+(matte|3d|embossed|textured|glossy|tranzy)\b.*$/i, "").replace(/,.*$/, "").trim();
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-2xl border-2 border-ink/15 bg-card transition-all hover:border-ink hover:shadow-[3px_3px_0_0_var(--ink)]">
       {photo && (
-        <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+        /* The whole photo, never cropped (phones are tall, the box is not):
+           contained over a blurred copy of itself so the box isn't empty.
+           Tapping opens every photo of the review — and doesn't follow the card's link. */
+        <button type="button" aria-label={`View ${r.imageUrls!.length > 1 ? `all ${r.imageUrls!.length} photos` : "photo"}`}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setViewing(true); }}
+          className="relative block aspect-[4/3] w-full overflow-hidden bg-muted">
+          <img src={responsiveImg(photo, [320], "40px").src} alt="" aria-hidden="true" loading="lazy"
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-xl" />
           <img {...responsiveImg(photo, [320, 480, 640], "300px")} alt={`${r.productTitle || "Skin"}, customer photo`}
-            loading="lazy" decoding="async" className="h-full w-full object-cover" />
+            loading="lazy" decoding="async" className="relative h-full w-full object-contain" />
           {(r.imageUrls?.length || 0) > 1 && (
-            <span className="absolute bottom-2 right-2 rounded-full bg-background/90 px-2 py-0.5 text-[10px] font-bold">+{r.imageUrls!.length - 1} photos</span>
+            <span className="absolute bottom-2 right-2 rounded-full border border-ink/20 bg-background/90 px-2 py-0.5 text-[10px] font-bold">+{r.imageUrls!.length - 1} photos</span>
           )}
-        </div>
+        </button>
+      )}
+      {photo && (
+        <ReviewPhotoViewer photos={r.imageUrls!} start={0} open={viewing} onOpenChange={setViewing}
+          caption={[r.userName, r.device, design].filter(Boolean).join(" · ")} />
       )}
       <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-center justify-between gap-2">

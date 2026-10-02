@@ -1,5 +1,5 @@
-import { useMemo, useCallback, useState } from "react";
-import { CameraIcon, PackageIcon, SmartphoneIcon } from "lucide-react";
+import { useMemo, useCallback, useState, useEffect, useRef } from "react";
+import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, PackageIcon, SmartphoneIcon } from "lucide-react";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { productImageUrl, productMainImg } from "@/lib/image-cdn";
 
@@ -83,6 +83,28 @@ export function ProductImages({
   }, [currentIndex, validImages, onImageSelect]);
   
   const swipeHandlers = useSwipeNavigation(handleSwipeLeft, handleSwipeRight);
+
+  // Desktop has no swipe: arrow keys step through the photos too.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (e.key === "ArrowRight") handleSwipeLeft();
+      else if (e.key === "ArrowLeft") handleSwipeRight();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleSwipeLeft, handleSwipeRight]);
+
+  // The chosen thumbnail scrolls into view in the strip (only the strip, not the page).
+  const stripRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = stripRef.current;
+    const el = strip?.querySelector<HTMLElement>(`[data-idx="${currentIndex}"]`);
+    if (!strip || !el) return;
+    const left = el.offsetLeft - (strip.clientWidth - el.clientWidth) / 2;
+    strip.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+  }, [currentIndex]);
   
   const isMockupImage = mockupUrl && selectedImage === mockupUrl;
   const selectedReal = images.find((img) => img.url === selectedImage)?.realCutFor;
@@ -123,6 +145,30 @@ export function ProductImages({
               </div>
             )}
             
+            {/* Previous / next, for a mouse (phones swipe). */}
+            {validImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  aria-label="Previous photo"
+                  onClick={handleSwipeRight}
+                  disabled={currentIndex <= 0}
+                  className="absolute left-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full border-2 border-ink bg-background/90 p-1.5 shadow-[2px_2px_0_0_var(--ink)] transition hover:bg-background disabled:opacity-0 md:flex"
+                >
+                  <ChevronLeftIcon className="size-5" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next photo"
+                  onClick={handleSwipeLeft}
+                  disabled={currentIndex >= validImages.length - 1}
+                  className="absolute right-2 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full border-2 border-ink bg-background/90 p-1.5 shadow-[2px_2px_0_0_var(--ink)] transition hover:bg-background disabled:opacity-0 md:flex"
+                >
+                  <ChevronRightIcon className="size-5" />
+                </button>
+              </>
+            )}
+
             {/* Swipe Indicator Dots */}
             {validImages.length > 1 && (
               <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
@@ -223,12 +269,17 @@ export function ProductImages({
 
       {/* Thumbnail Gallery */}
       {validImages.length > 1 && (
-        <div className="grid grid-cols-4 gap-2">
-          {validImages.slice(0, 4).map((image, idx) => (
+        /* Every photo, not just the first four: customer and real photos come
+           after the mockups, and on a desktop (no swipe) a fifth photo had no
+           way to be opened. A strip that scrolls, four-and-a-bit visible. */
+        <div ref={stripRef} className="flex snap-x gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+          {validImages.map((image, idx) => (
             <button
               key={idx}
+              data-idx={idx}
+              type="button"
               onClick={() => onImageSelect(image.url)}
-              className={`aspect-square overflow-hidden rounded-lg border-2 transition-all ${
+              className={`aspect-square w-[22%] shrink-0 snap-start overflow-hidden rounded-lg border-2 transition-all ${
                 selectedImage === image.url
                   ? "border-primary"
                   : "border-border hover:border-primary/50"
@@ -239,6 +290,7 @@ export function ProductImages({
                 alt={image.alt || productTitle}
                 className="w-full h-full object-cover"
                 decoding="async"
+                loading={idx > 3 ? "lazy" : undefined}
                 fetchPriority="low"
                 onError={(e) => {
                   (e.target as HTMLImageElement).parentElement!.style.display = 'none';

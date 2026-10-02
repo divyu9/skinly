@@ -42,7 +42,8 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
   const today = dayStart(now);
   const from62 = today - 61 * DAY;
 
-  const [recentSnap, openSnap, rollSnap, cutoutSnap, alertSnap, reqSnap, reviewSnap, bugSnap, cartSnap, oosCount] = await Promise.all([
+  const [allSnap, recentSnap, openSnap, rollSnap, cutoutSnap, alertSnap, reqSnap, reviewSnap, bugSnap, cartSnap, oosCount] = await Promise.all([
+    db.collection("orders").get(), // all time, for the all-time bestsellers and phones
     db.collection("orders").where("createdAt", ">=", from62).get(),
     db.collection("orders").where("status", "in", OPEN_RAW).get(),
     db.collection("rollInventory").get(),
@@ -125,6 +126,34 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
       if (m) byModel.set(m, (byModel.get(m) || 0) + qty);
     }
   }
+
+  /*
+   * Bestsellers and top phones over three windows, ten each — for ads: what
+   * sells this week, this month, and ever. One pass per window over that
+   * window's sales; "all" reads every order.
+   */
+  const allSales = allSnap.docs.map((d) => ({ _id: d.id, ...(d.data() as any) })).filter(isSale);
+  const rank = (list: any[]) => {
+    const prod = new Map<string, { productId: string; title: string; image: string; qty: number; sales: number }>();
+    const phones = new Map<string, number>();
+    for (const o of list) {
+      for (const it of o.items || []) {
+        const qty = Number(it.quantity) || 1;
+        const id = String(it.productId || it.productTitle || "");
+        const row = prod.get(id) || { productId: String(it.productId || ""), title: String(it.productTitle || "Item"), image: String(it.productImage || ""), qty: 0, sales: 0 };
+        row.qty += qty;
+        row.sales += (Number(it.price) || 0) * qty;
+        prod.set(id, row);
+        const m = [it.phoneBrand, it.phoneModel].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+        if (m) phones.set(m, (phones.get(m) || 0) + qty);
+      }
+    }
+    return {
+      products: [...prod.values()].sort((a, b) => b.qty - a.qty || b.sales - a.sales).slice(0, 10),
+      phones: [...phones.entries()].map(([model, qty]) => ({ model, qty })).sort((a, b) => b.qty - a.qty).slice(0, 10),
+    };
+  };
+  const r7 = rank(inRange(today - 6 * DAY, now + 1)), r30 = rank(last30), rAll = rank(allSales);
 
   // ── Upsells (30 days) ───────────────────────────────────────────────────
   // What the add-on offers sell: each upsell line by kind and by where it was
@@ -254,6 +283,7 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     city: String(o.shippingAddress?.city || ""), total: money(o), cod: String(o.paymentMethod).toLowerCase() === "cod",
     status: statusOf(o), createdAt: o.createdAt, items: (o.items || []).reduce((s: number, it: any) => s + (Number(it.quantity) || 1), 0),
     image: String(o.items?.[0]?.productImage || ""),
+    productId: String(o.items?.[0]?.productId || ""),
   }));
 
   return {
@@ -268,6 +298,14 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     daily, hours, upsells, funnel,
     topProducts: [...top.values()].sort((a, b) => b.qty - a.qty || b.sales - a.sales).slice(0, 6),
     topModels: [...byModel.entries()].map(([model, qty]) => ({ model, qty })).sort((a, b) => b.qty - a.qty).slice(0, 6),
+    bestsellers: { d7: r7.products, d30: r30.products, all: rAll.products },
+    topPhones: { d30: r30.phones, all: rAll.phones },
+    // The product's current picture, for when the one an order kept has gone
+    // (re-rendered mockups move: 16 of the last 80 orders' pictures were 404).
+    productImages: await currentImages(db, [
+      ...[...r7.products, ...r30.products, ...rAll.products].map((p) => p.productId),
+      ...recentOrders.map((o) => o.productId),
+    ]),
     tasks: {
       toPack: toPack.length, oldestToPackHours: toPack.length ? Math.round((now - oldestToPack) / 3600000) : 0,
       readyToShip: readyToShip.length, pickupLate: pickupLate.length,
@@ -298,3 +336,16 @@ export const adminDashboard = functionsV1
     await requireAdmin(context);
     return buildDashboard(admin.firestore());
   });
+
+/** productId -> the product's first stored picture, for the dashboard's fallbacks. */
+async function currentImages(db: admin.firestore.Firestore, ids: string[]): Promise<Record<string, string>> {
+  const uniq = [...new Set(ids.filter(Boolean))].slice(0, 200);
+  if (!uniq.length) return {};
+  const snaps = await db.getAll(...uniq.map((id) => db.collection("products").doc(id)));
+  const out: Record<string, string> = {};
+  for (const s of snaps) {
+    const first = ((s.data() as any)?.images || []).map((x: any) => (typeof x === "string" ? x : x?.url)).find(Boolean);
+    if (first) out[s.id] = String(first);
+  }
+  return out;
+}

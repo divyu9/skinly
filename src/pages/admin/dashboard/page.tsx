@@ -46,6 +46,9 @@ type Dashboard = {
   hours: number[];
   topProducts: Array<{ productId: string; title: string; image: string; qty: number; sales: number }>;
   topModels: Array<{ model: string; qty: number }>;
+  bestsellers?: Record<"d7" | "d30" | "all", Array<{ productId: string; title: string; image: string; qty: number; sales: number }>>;
+  topPhones?: Record<"d30" | "all", Array<{ model: string; qty: number }>>;
+  productImages?: Record<string, string>;
   tasks: {
     toPack: number; oldestToPackHours: number; readyToShip: number; pickupLate: number; inTransit: number; slow: number;
     undelivered: number; rto30: number; unpaid: number; unpaidValue: number; carts: number; cartsValue: number;
@@ -59,7 +62,7 @@ type Dashboard = {
   wantedModels: Array<{ model: string; category: string; count: number }>;
   recentOrders: Array<{
     _id: string; orderNumber: string; customer: string; city: string; total: number; cod: boolean;
-    status: string; createdAt: number; items: number; image: string;
+    status: string; createdAt: number; items: number; image: string; productId?: string;
   }>;
 };
 
@@ -215,13 +218,28 @@ function ChartTip({ active, payload, metric }: any) {
   );
 }
 
-function Thumb({ src, alt }: { src: string; alt: string }) {
-  const [broken, setBroken] = useState(false);
+/** The picture the order kept, then the product's current one if that has gone, then a box. */
+function Thumb({ src, fallback, alt }: { src: string; fallback?: string; alt: string }) {
+  const [tries, setTries] = useState(0);
+  const chain = [src, fallback].filter((u, i, a): u is string => !!u && a.indexOf(u) === i);
+  const current = chain[tries];
   return (
     <span className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-lg border-2 border-ink/15 bg-muted">
-      {src && !broken
-        ? <img src={sizedImage(src, 96)} alt={alt} loading="lazy" onError={() => setBroken(true)} className="size-full object-cover" />
+      {current
+        ? <img key={current} src={sizedImage(current, 96)} alt={alt} loading="lazy" onError={() => setTries((t) => t + 1)} className="size-full object-cover" />
         : <PackageIcon className="size-4 text-muted-foreground" />}
+    </span>
+  );
+}
+
+/** Small segmented control for a panel's time window. */
+function Tabs<T extends string>({ value, options, onChange }: { value: T; options: Array<[T, string]>; onChange: (v: T) => void }) {
+  return (
+    <span className="inline-flex rounded-lg border-2 border-ink/15 p-0.5 text-[11px] font-bold">
+      {options.map(([v, label]) => (
+        <button key={v} type="button" onClick={() => onChange(v)}
+          className={cn("rounded-md px-2 py-0.5", value === v ? "bg-ink text-background" : "text-muted-foreground hover:text-foreground")}>{label}</button>
+      ))}
     </span>
   );
 }
@@ -236,6 +254,9 @@ function greeting() {
 function DashboardInner() {
   const { data, loading, error, reload } = useDashboard();
   const [metric, setMetric] = useState<"sales" | "orders">("sales");
+  // Bestsellers default to 30 days (the old fixed 7 is a tab); phones 30 days, or all time for ads.
+  const [bestWin, setBestWin] = useState<"d7" | "d30" | "all">("d30");
+  const [phoneWin, setPhoneWin] = useState<"d30" | "all">("d30");
   const ago = useAgo(data?.generatedAt);
   const name = (auth.currentUser?.displayName || "").split(" ")[0];
 
@@ -257,8 +278,10 @@ function DashboardInner() {
   const shipTotal = t.toPack + t.pickupLate + t.slow + t.undelivered;
   const peakHour = data.hours.indexOf(Math.max(...data.hours));
   const hourLabel = (h: number) => `${h % 12 || 12}${h < 12 ? "am" : "pm"}`;
-  const maxModel = Math.max(1, ...data.topModels.map((m) => m.qty));
-  const maxTop = Math.max(1, ...data.topProducts.map((p) => p.qty));
+  const best = data.bestsellers?.[bestWin] ?? data.topProducts;
+  const phones = data.topPhones?.[phoneWin] ?? data.topModels;
+  const maxModel = Math.max(1, ...phones.map((m) => m.qty));
+  const maxTop = Math.max(1, ...best.map((p) => p.qty));
 
   return (
     <div className="admin-brandy space-y-6 pb-10">
@@ -411,7 +434,7 @@ function DashboardInner() {
             {data.recentOrders.map((o) => (
               <li key={o._id}>
                 <Link to={`/backend-skinly/orders/${o._id}`} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-muted">
-                  <Thumb src={o.image} alt="" />
+                  <Thumb src={o.image} fallback={o.productId ? data.productImages?.[o.productId] : undefined} alt="" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-sm font-bold">
                       {o.orderNumber}
@@ -432,13 +455,14 @@ function DashboardInner() {
           </ul>
         </Panel>
 
-        <Panel title="Bestsellers · 7 days" icon={<FlameIcon className="size-4 text-heart" />} action={<PanelLink to="/backend-skinly/products">Products</PanelLink>}>
+        <Panel title="Bestsellers" icon={<FlameIcon className="size-4 text-heart" />}
+          action={<Tabs value={bestWin} onChange={setBestWin} options={[["d7", "7 days"], ["d30", "30 days"], ["all", "All time"]]} />}>
           <ol className="space-y-3">
-            {data.topProducts.map((p, i) => (
+            {best.map((p, i) => (
               <li key={p.productId || p.title}>
                 <Link to={p.productId ? `/backend-skinly/products/${p.productId}` : "/backend-skinly/products"} className="group flex items-center gap-3">
                   <span className={cn("grid size-6 shrink-0 place-items-center rounded-md text-xs font-extrabold", i === 0 ? "border-2 border-ink bg-sunny" : "text-muted-foreground")}>{i + 1}</span>
-                  <Thumb src={p.image} alt={p.title} />
+                  <Thumb src={p.image} fallback={p.productId ? data.productImages?.[p.productId] : undefined} alt={p.title} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold group-hover:underline">{designNameOf(p.title)}</span>
                     <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-muted">
@@ -449,13 +473,16 @@ function DashboardInner() {
                 </Link>
               </li>
             ))}
-            {!data.topProducts.length && <li className="py-8 text-center text-sm text-muted-foreground">No sales this week yet</li>}
+            {!best.length && <li className="py-8 text-center text-sm text-muted-foreground">No sales in this period yet</li>}
           </ol>
-          {data.topModels.length > 0 && (
+          {phones.length > 0 && (
             <div className="mt-5 border-t border-dashed border-ink/15 pt-4">
-              <p className="mb-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Top phones · 30 days</p>
+              <div className="mb-2.5 flex items-center justify-between gap-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Top phones</p>
+                <Tabs value={phoneWin} onChange={setPhoneWin} options={[["d30", "30 days"], ["all", "All time"]]} />
+              </div>
               <div className="space-y-1.5">
-                {data.topModels.map((m) => (
+                {phones.map((m) => (
                   <div key={m.model} className="flex items-center gap-2 text-xs">
                     <span className="w-40 truncate font-medium">{m.model.replace(/\s+/g, " ")}</span>
                     <span className="h-2 flex-1 overflow-hidden rounded-full bg-muted">

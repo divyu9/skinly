@@ -40,23 +40,44 @@ type DateFilter = "7" | "15" | "30" | "60" | "90" | "custom" | "all";
 
 function AdminOrdersPageInner() {
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   /*
    * ?q= seeds the search, so "See orders" on a customer lands here already
    * filtered to them. The tab widens to All at the same time, or a customer
    * whose orders are all delivered would open on an empty Processing list.
    */
   const [statusFilter, setStatusFilter] = useState<string>(params.get("status") || (params.get("q") ? "all" : "processing"));
-  const [paymentFilter, setPaymentFilter] = useState<string>("all");
+  const [paymentFilter, setPaymentFilter] = useState<string>(params.get("pay") || "all");
+  // Delivered tab: by delivery date, newest or oldest first ("" = the list's own order).
+  const [sortBy, setSortBy] = useState<string>(params.get("sort") || "");
   const [searchTerm, setSearchTerm] = useState(params.get("q") || "");
   const [selectedOrders, setSelectedOrders] = useState<Set<Id<"orders">>>(new Set());
   const [bookingRs, setBookingRs] = useState<{ done: number; total: number } | null>(null);
   const [showDelhiveryBulk, setShowDelhiveryBulk] = useState(false);
 
   // Date filter state
-  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
+  const [dateFilter, setDateFilter] = useState<DateFilter>((params.get("date") as DateFilter) || "all");
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(() => (params.get("from") ? new Date(params.get("from") + "T00:00:00") : undefined));
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(() => (params.get("to") ? new Date(params.get("to") + "T00:00:00") : undefined));
+
+  /*
+   * Every filter lives in the URL, not only in this component: opening an
+   * order and pressing Back used to land on the default tab with the search
+   * gone. Replace, not push, so typing doesn't fill the history.
+   */
+  useEffect(() => {
+    const ymd = (d?: Date) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : "");
+    const next = new URLSearchParams();
+    next.set("status", statusFilter);
+    if (searchTerm) next.set("q", searchTerm);
+    if (paymentFilter !== "all") next.set("pay", paymentFilter);
+    if (dateFilter !== "all") next.set("date", dateFilter);
+    if (dateFilter === "custom" && customStartDate) next.set("from", ymd(customStartDate));
+    if (dateFilter === "custom" && customEndDate) next.set("to", ymd(customEndDate));
+    if (sortBy && statusFilter === "delivered") next.set("sort", sortBy);
+    if (next.toString() !== params.toString()) setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, searchTerm, paymentFilter, dateFilter, customStartDate, customEndDate, sortBy]);
 
   // Bulk operations state
   const [showBulkShipDialog, setShowBulkShipDialog] = useState(false);
@@ -102,7 +123,12 @@ function AdminOrdersPageInner() {
   // Apply date filter to orders
   const displayOrders = useMemo(() => {
     if (!baseOrders) return undefined;
-    if (dateFilter === "all") return baseOrders;
+    const sorted = (list: any[]) => {
+      if (statusFilter !== "delivered" || !sortBy) return list;
+      const at = (o: any) => Number(o.deliveredAt || o.statusChangedAt || o.updatedAt || o._creationTime) || 0;
+      return [...list].sort((a, b) => (sortBy === "delivered-asc" ? at(a) - at(b) : at(b) - at(a)));
+    };
+    if (dateFilter === "all") return sorted(baseOrders);
     
     let filtered = [...baseOrders];
     const now = Date.now();
@@ -123,8 +149,8 @@ function AdminOrdersPageInner() {
       filtered = filtered.filter(order => order._creationTime >= startTime);
     }
     
-    return filtered;
-  }, [baseOrders, dateFilter, customStartDate, customEndDate]);
+    return sorted(filtered);
+  }, [baseOrders, dateFilter, customStartDate, customEndDate, statusFilter, sortBy]);
 
   // Package figures for the rows on screen, fetched in one call per page (getOrderPackages).
   const [packages, setPackages] = useState<Record<string, PackageInfo>>({});
@@ -889,6 +915,15 @@ function AdminOrdersPageInner() {
               </div>
             )}
             
+            {statusFilter === "delivered" && (
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Sort delivered orders"
+                className="h-9 rounded-md border bg-background px-3 text-sm">
+                <option value="">Sort: order number</option>
+                <option value="delivered-desc">Latest delivered first</option>
+                <option value="delivered-asc">Oldest delivered first</option>
+              </select>
+            )}
+
             {(dateFilter !== "all" || statusFilter !== "all" || paymentFilter !== "all" || searchTerm.length >= 3) && (
               <Button 
                 variant="ghost" 
