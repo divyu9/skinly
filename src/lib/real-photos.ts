@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDocsOf } from "@/lib/fs";
 
 /**
  * Photos of real skins, taken while packing orders.
@@ -53,7 +52,7 @@ export function useLatestRealPhotos(max = 20): RealPhoto[] | undefined {
   const [photos, setPhotos] = useState<RealPhoto[] | undefined>(undefined);
   useEffect(() => {
     let live = true;
-    getDocs(query(collection(db, "realPhotos"), orderBy("createdAt", "desc"), limit(max * 3)))
+    getDocsOf(({ query, collection, db, where, orderBy, limit, documentId }) => query(collection(db, "realPhotos"), orderBy("createdAt", "desc"), limit(max * 3)))
       .then((s) => {
         const rows = s.docs.map((d) => ({ _id: d.id, ...d.data() } as RealPhoto)).filter((p) => !p.hidden && p.imageUrl);
         rows.sort((a, b) => Number(!!b.featured) - Number(!!a.featured) || b.createdAt - a.createdAt);
@@ -71,7 +70,7 @@ export function useDesignRealPhotos(designCode: string | null | undefined, gadge
   useEffect(() => {
     if (!designCode) { setPhotos([]); return; }
     let live = true;
-    getDocs(query(collection(db, "realPhotos"), where("designCode", "==", designCode), limit(30)))
+    getDocsOf(({ query, collection, db, where, orderBy, limit, documentId }) => query(collection(db, "realPhotos"), where("designCode", "==", designCode), limit(30)))
       .then((s) => {
         const rows = s.docs.map((d) => ({ _id: d.id, ...d.data() } as RealPhoto))
           .filter((p) => !p.hidden && p.imageUrl && (!gadget || !p.gadget || p.gadget === gadget))
@@ -91,7 +90,7 @@ export function useDesignRealPhotos(designCode: string | null | undefined, gadge
  */
 let countsLoad: Promise<Map<string, number>> | null = null;
 function loadCounts() {
-  countsLoad ??= getDocs(query(collection(db, "realPhotos"), limit(1000)))
+  countsLoad ??= getDocsOf(({ query, collection, db, where, orderBy, limit, documentId }) => query(collection(db, "realPhotos"), limit(1000)))
     .then((s) => {
       const m = new Map<string, number>();
       s.docs.forEach((d) => {
@@ -132,7 +131,7 @@ export function useOrderRealPhotos(orderNumber: string | null | undefined): Real
   useEffect(() => {
     if (!orderNumber) { setPhotos([]); return; }
     let live = true;
-    getDocs(query(collection(db, "realPhotos"), where("orderNumber", "==", String(orderNumber)), limit(20)))
+    getDocsOf(({ query, collection, db, where, orderBy, limit, documentId }) => query(collection(db, "realPhotos"), where("orderNumber", "==", String(orderNumber)), limit(20)))
       .then((s) => {
         const rows = s.docs.map((d) => ({ _id: d.id, ...d.data() } as RealPhoto))
           .filter((p) => p.imageUrl)

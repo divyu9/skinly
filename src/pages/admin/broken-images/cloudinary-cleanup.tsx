@@ -11,7 +11,7 @@ import {
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { isDeadImageUrl } from "@/lib/image-fallback.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";

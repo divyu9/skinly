@@ -2,7 +2,7 @@ import { useState } from "react";
 import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { PencilIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";

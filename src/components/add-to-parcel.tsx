@@ -4,7 +4,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { CheckIcon, LoaderIcon, PackageOpenIcon, PlusIcon, TruckIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { loadCatalogue, loadModelCatalogue, type CatalogueModel, type CatalogueProduct } from "@/lib/catalogue";
 import { sizedImage } from "@/lib/image-cdn";
 import { buildSetupPicks, kindOf, offerPrice, withDefaults, type SetupPick, type SmartUpsellSettings } from "@/lib/smart-setup";

@@ -3,8 +3,6 @@ import type { VariantProps } from "class-variance-authority";
 import { Loader2, LogIn, LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { auth } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } from "firebase/auth";
 
 export interface SignInButtonProps
   extends Omit<React.ComponentProps<"button">, "onClick">,
@@ -75,9 +73,8 @@ export const SignInButton = forwardRef<HTMLButtonElement, SignInButtonProps>(
 
     const handleSignIn = async (event: React.MouseEvent<HTMLButtonElement>) => {
       onClick?.(event);
-      const provider = new GoogleAuthProvider();
       try {
-        await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+        await (await import("@/lib/firebase-auth")).signInWithGoogle();
       } catch (error) {
         console.error("Sign in failed", error);
       }

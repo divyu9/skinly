@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 
 /**
  * The review-reward rules, as the shopper is told them. The server pays by

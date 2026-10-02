@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { collection, doc, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { Button } from "@/components/ui/button.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
 import { Textarea } from "@/components/ui/textarea.tsx";

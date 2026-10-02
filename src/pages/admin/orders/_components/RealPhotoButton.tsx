@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { addDoc, collection, deleteDoc, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { CameraIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs, limit, orderBy, query, where } from "firebase/firestore";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { Button } from "@/components/ui/button.tsx";
 
 /**

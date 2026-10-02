@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { writeBatch, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import {
   Dialog,
   DialogContent,

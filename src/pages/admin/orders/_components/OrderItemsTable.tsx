@@ -15,7 +15,7 @@ import { EditIcon, ExternalLinkIcon, ImageOffIcon, TrashIcon } from "lucide-reac
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { RealPhotoButton } from "./RealPhotoButton.tsx";
 
 export interface OrderItem {

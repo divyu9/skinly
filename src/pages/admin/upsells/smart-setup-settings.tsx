@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { GiftIcon, LoaderIcon, SparklesIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { Button } from "@/components/ui/button.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { offerPrice, SETUP_KINDS, withDefaults, type SetupKind, type SmartUpsellSettings } from "@/lib/smart-setup";

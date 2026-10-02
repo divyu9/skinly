@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { addDoc, collection, doc, getDocs, limit, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";

@@ -11,7 +11,7 @@ import { ReferralTracker } from "./components/referral-tracker.tsx";
 import { lazyWithReload } from "./lib/lazy-with-reload.ts";
 import { StorefrontErrorBoundary } from "./components/storefront-error-boundary.tsx";
 import { MobileBottomNav } from "./components/mobile-bottom-nav.tsx";
-import { loadLazy } from "./lib/firebase-hooks.tsx";
+import { loadLazy, warmProduct } from "./lib/firebase-hooks.tsx";
 
 // Critical pages - loaded immediately
 import Index from "./pages/Index.tsx";
@@ -124,6 +124,45 @@ function DragScrollRows() {
   return null;
 }
 
+/**
+ * Reads a product as soon as its link is touched or pressed, or pointed at for
+ * a moment (warmProduct). The mouse has to rest 120 ms, so sweeping across a
+ * grid of cards does not read every product it passes over.
+ */
+function WarmProductLinks() {
+  useEffect(() => {
+    const slugOf = (t: EventTarget | null) => {
+      const a = (t as Element | null)?.closest?.('a[href^="/products/"]');
+      const slug = a?.getAttribute("href")?.split(/[?#]/)[0].split("/")[2];
+      return slug ? decodeURIComponent(slug) : "";
+    };
+    let hover: ReturnType<typeof setTimeout> | undefined;
+    const now = (e: Event) => { const s = slugOf(e.target); if (s) warmProduct(s); };
+    const over = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      clearTimeout(hover);
+      const s = slugOf(e.target);
+      if (s) hover = setTimeout(() => warmProduct(s), 120);
+    };
+    const out = () => clearTimeout(hover);
+    const opts = { passive: true, capture: true } as const;
+    document.addEventListener("touchstart", now, opts);
+    document.addEventListener("mousedown", now, opts);
+    document.addEventListener("focusin", now, opts);
+    document.addEventListener("pointerover", over, opts);
+    document.addEventListener("pointerout", out, opts);
+    return () => {
+      clearTimeout(hover);
+      document.removeEventListener("touchstart", now, opts);
+      document.removeEventListener("mousedown", now, opts);
+      document.removeEventListener("focusin", now, opts);
+      document.removeEventListener("pointerover", over, opts);
+      document.removeEventListener("pointerout", out, opts);
+    };
+  }, []);
+  return null;
+}
+
 function PrefetchCheckoutChunks() {
   const loaded = usePageLoaded();
   useEffect(() => {
@@ -148,6 +187,7 @@ export default function App() {
         <BrowserRouter>
           <ReferralTracker />
           <PrefetchCheckoutChunks />
+          <WarmProductLinks />
           <DragScrollRows />
           <StorefrontErrorBoundary>
           <Routes>

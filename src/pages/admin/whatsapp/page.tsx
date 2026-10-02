@@ -4,7 +4,7 @@ import { addDoc, collection, doc, getDocs, query, setDoc, where } from "firebase
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { CheckCircle2Icon, ImageIcon, LoaderIcon, MessageSquareIcon, SendIcon, TypeIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated } from "@/lib/firebase-hooks";
 import { Button } from "@/components/ui/button.tsx";

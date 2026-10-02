@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import { EyeIcon, EyeOffIcon, StarIcon, Trash2Icon, ExternalLinkIcon } from "lucide-react";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { cutFor, photoLink, type RealPhoto } from "@/lib/real-photos";

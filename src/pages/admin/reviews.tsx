@@ -4,7 +4,7 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { CheckCircleIcon, CheckIcon, GiftIcon, MessageSquareIcon, StarIcon, TrashIcon, XIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Button } from "@/components/ui/button.tsx";

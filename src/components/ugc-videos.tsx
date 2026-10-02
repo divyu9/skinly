@@ -4,7 +4,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, PlayIcon, ShoppingBagIcon, Volume2Icon, XIcon } from "lucide-react";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { sizedImage } from "@/lib/image-cdn";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 

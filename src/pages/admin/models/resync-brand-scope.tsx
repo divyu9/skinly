@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { collection, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { scopeFor } from "@/lib/ai-mockup-shots.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { Loader2Icon, RefreshCwIcon } from "lucide-react";

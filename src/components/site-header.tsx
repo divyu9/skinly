@@ -5,8 +5,6 @@ import { api } from "@/lib/firebase-api";
 import { MobileNav } from "./mobile-nav";
 import { HeaderSearch } from "./header-search";
 import { useAuth } from "@/hooks/use-auth";
-import { auth } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } from "firebase/auth";
 
 import { BrandLogo } from "./brand-logo";
 
@@ -32,7 +30,7 @@ export function SiteHeader({
 
   const handleSignIn = async () => {
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
+      await (await import("@/lib/firebase-auth")).signInWithGoogle();
     } catch (err) {
       console.error(err);
     }

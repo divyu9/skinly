@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc, writeBatch } from "firebase/firestore";
 import { AlertTriangleIcon, CheckCircle2Icon, ExternalLinkIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon, WandSparklesIcon } from "lucide-react";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { issuesOf, type Issue, type Product, type TypeRow } from "@/lib/classification";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { deleteField, doc, onSnapshot, setDoc } from "firebase/firestore";
 import { MegaphoneIcon, SaveIcon } from "lucide-react";
 import { toast } from "sonner";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";

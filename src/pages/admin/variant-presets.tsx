@@ -3,7 +3,9 @@ import { addDoc, collection, deleteDoc, doc, onSnapshot, updateDoc, writeBatch }
 import { LinkIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { httpsCallable } from "firebase/functions";
-import { db, auth, functions } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
+import { functions } from "@/lib/firebase";
+import { auth } from "@/lib/firebase-auth";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";

@@ -3,7 +3,8 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { GiftIcon } from "lucide-react";
 import { toast } from "sonner";
-import { db, functions } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
+import { functions } from "@/lib/firebase";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 

@@ -85,7 +85,8 @@ export function ExploreByGadget({ sectionId, config }: ExploreByGadgetProps) {
             >
               {/* Background Image */}
               <img
-                {...responsiveImg(card.imageUrl, [320, 480, 640, 900], "(min-width: 768px) 320px, 80vw")}
+                // sizes is the card's own width (config), not 80vw: a 280px card took the 640px copy.
+                {...responsiveImg(card.imageUrl, [320, 480, 560, 640, 900], `(min-width: 768px) ${desktopWidth}, ${mobileWidth}`)}
                 alt={card.title}
                 loading="lazy"
                 decoding="async"

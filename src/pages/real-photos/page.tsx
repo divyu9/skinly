@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { collection, getDocs, limit, orderBy, query } from "firebase/firestore";
 import { CameraIcon, ChevronLeftIcon, ChevronRightIcon, XIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { responsiveImg, sizedImage } from "@/lib/image-cdn";
 import { cutFor, type RealPhoto } from "@/lib/real-photos";
 import { readActiveDevice } from "@/lib/active-device";

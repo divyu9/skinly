@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { collection, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";

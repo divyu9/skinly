@@ -1,5 +1,4 @@
-import { collection, documentId, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDocsOf } from "@/lib/fs";
 import { designCodeOf } from "@/lib/real-photos";
 
 /**
@@ -59,8 +58,8 @@ export async function buildPackList(orders: Array<{ orderNumber?: string; _id: s
   for (let i = 0; i < pids.length; i += 30) {
     const chunk = pids.slice(i, i + 30);
     const [vs, ps] = await Promise.all([
-      getDocs(query(collection(db, "variants"), where("productId", "in", chunk))),
-      getDocs(query(collection(db, "products"), where(documentId(), "in", chunk))),
+      getDocsOf(({ query, collection, db, where, orderBy, limit, documentId }) => query(collection(db, "variants"), where("productId", "in", chunk))),
+      getDocsOf(({ query, collection, db, where, orderBy, limit, documentId }) => query(collection(db, "products"), where(documentId(), "in", chunk))),
     ]);
     vs.docs.forEach((d) => {
       const v = d.data() as any;

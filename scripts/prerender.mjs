@@ -2161,10 +2161,11 @@ async function main() {
       readCollection(project, "collections"),
       readCollection(project, "collectionProducts"),
     ]);
-    const [sections, sectionCards, heroSlides] = await Promise.all([
+    const [sections, sectionCards, heroSlides, homepageSettings] = await Promise.all([
       readCollection(project, "homepageSections").catch(() => []),
       readCollection(project, "homepageSectionCards").catch(() => []),
       readCollection(project, "heroSlides").catch(() => []),
+      readCollection(project, "homepageSettings").catch(() => null),
     ]);
     // Ratings for the Product markup. A separate read because a site with no
     // reviews yet must still build.
@@ -2174,6 +2175,7 @@ async function main() {
     const settingsRows = Array.isArray(shipping) ? shipping : [];
     data = {
       products, variants, seoPages, categories, models, collections, memberships, sections, sectionCards, reviews, heroSlides,
+      homepageSettings: Array.isArray(homepageSettings) ? homepageSettings.find((r) => r._id === "default") || null : undefined,
       shipping: settingsRows.find((r) => r._id === "shipping") || null,
       homeRankings: settingsRows.find((r) => r._id === "homeRankings") || null,
     };
@@ -2254,6 +2256,13 @@ async function main() {
     seed: {
       "homepage.getActiveHeroSlides": liveSlides,
       "homepage.getActiveHomepageSections": liveSections,
+      // Whether the notice bar is up decides where the header and the page
+      // sit (Index.tsx headerOffset). Guessed until Firestore answered, a
+      // wrong guess moved the whole page 28px once the answer came. Shaped as
+      // the hook returns it: the document's fields, no id.
+      ...(data.homepageSettings !== undefined
+        ? { "homepage.getHomepageSettings": data.homepageSettings && (({ _id, ...rest }) => rest)(data.homepageSettings) }
+        : {}),
       heroLocal,
     },
     shell: homeShell(liveSlides[0], heroLocal),

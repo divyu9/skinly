@@ -6,7 +6,8 @@ import {
   SearchIcon, Trash2Icon, UploadIcon, XCircleIcon, XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { db, functions } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
+import { functions } from "@/lib/firebase";
 import { useAction } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { convertImageToWebP, blobToBase64 } from "@/lib/image-processing";

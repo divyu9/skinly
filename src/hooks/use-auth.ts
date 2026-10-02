@@ -1,18 +1,26 @@
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import type { User } from "firebase/auth";
-import { auth } from "@/lib/firebase";
 
+/*
+ * Who is signed in. The Auth SDK is fetched here, once the app has drawn,
+ * rather than shipped in the first download (lib/firebase-auth.ts); until it
+ * answers, isLoaded is false, which is the state every caller already handles.
+ */
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setIsLoaded(true);
+    let live = true;
+    let unsubscribe = () => {};
+    import("@/lib/firebase-auth").then((m) => {
+      if (!live) return;
+      unsubscribe = m.onAuthStateChanged(m.auth, (currentUser) => {
+        setUser(currentUser);
+        setIsLoaded(true);
+      });
     });
-    return () => unsubscribe();
+    return () => { live = false; unsubscribe(); };
   }, []);
 
   const fetchAccessToken = async ({ forceRefreshToken = false }: { forceRefreshToken?: boolean } = {}) => {
@@ -21,7 +29,8 @@ export function useAuth() {
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    const m = await import("@/lib/firebase-auth");
+    await m.signOut(m.auth);
   };
 
   return {

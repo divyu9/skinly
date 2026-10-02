@@ -61,7 +61,8 @@
     <meta name="facebook-domain-verification" content="vm0bjui4j2eqmsl9csnumdym9zepkk" />
 
     <!-- Resource Hints for Performance -->
-    <link rel="preconnect" href="https://pub-db30b224c5eb4a378f7b3fd8fd5f2272.r2.dev" crossorigin />
+    <!-- Every storefront picture is served (resized) from cdn.goskinly.com. -->
+    <link rel="preconnect" href="https://cdn.goskinly.com" />
     <!-- The two families the site actually sets text in, fetched without
          holding up the first paint: text shows in the system font at once and
          swaps to Geist when it arrives. Connections open early because the
@@ -80,13 +81,31 @@
          and nothing calls window.PhonePeCheckout, so every visitor downloaded
          a script from a fourth host for nothing. -->
 
-    <!-- Google Analytics - the script deferred (5s or first interaction), the
+    <!-- Google Analytics - the script deferred (idle after load), the
          queue not. window.gtag exists from the first line, so events the app
          sends before the script arrives (a purchase on the order page, an
          add-to-cart) wait in dataLayer and go when it loads. gtag used to be
          a function local to this closure: window.gtag was never defined, and
          every purchase, add_to_cart, view_item and search event was dropped —
          GA4 received page views and nothing else. -->
+    <!-- When the tags load: after the page has loaded and the main thread is
+         idle, not on the first scroll or tap. Loading gtag.js (190 KB) and
+         fbevents.js (110 KB + config) on the first touch put their parsing
+         inside that touch's response, which is what INP measures; real users'
+         INP was 284 ms. Events sent before then wait in dataLayer / the fbq
+         queue and go when the scripts arrive, as before. -->
+    <script>
+      window.__skinlyWhenIdle = function (fn) {
+        var run = function () {
+          setTimeout(function () {
+            if (window.requestIdleCallback) requestIdleCallback(fn, { timeout: 2000 });
+            else fn();
+          }, 1500);
+        };
+        if (document.readyState === "complete") run();
+        else window.addEventListener("load", run, { once: true });
+      };
+    </script>
     <script>
       window.dataLayer = window.dataLayer || [];
       window.gtag = function(){ window.dataLayer.push(arguments); };
@@ -105,61 +124,44 @@
         // A purchase cannot wait for the 5 s or an interaction: the app loads it at once (lib/analytics.ts).
         window.__skinlyLoadGA = loadAnalytics;
         
-        // Load after 5 seconds
-        setTimeout(loadAnalytics, 5000);
-        
-        // OR load on first user interaction
-        var events = ['scroll', 'click', 'touchstart', 'mousemove', 'keydown'];
-        events.forEach(function(event) {
-          window.addEventListener(event, function() {
-            loadAnalytics();
-            events.forEach(function(e) {
-              window.removeEventListener(e, loadAnalytics);
-            });
-          }, { once: true, passive: true });
-        });
+        window.__skinlyWhenIdle(loadAnalytics);
       })();
     </script>
 
-    <!-- Meta Pixel - Initialized dynamically from Convex settings -->
+    <!-- Meta Pixel. The id comes from the admin settings (FacebookPixelInitializer),
+         which answer only after the app has loaded its data. Calls made before
+         that — the product page's ViewContent fires on arrival — used to find
+         no fbq and were dropped; they now wait here and are replayed, in order,
+         right after init. fbevents.js itself loads when the page is idle. -->
     <script>
       window.__fbPixelId = null;
       window.__fbPixelLoaded = false;
-      
-      window.initFacebookPixel = function(pixelId) {
-        if (!pixelId || window.__fbPixelLoaded) return;
-        window.__fbPixelId = pixelId;
-        
-        var loadPixel = function() {
-          if (window.__fbPixelLoaded) return;
+      (function () {
+        var early = [];
+        window.fbq = function () { early.push(arguments); };
+        window.fbq.__early = true;
+
+        window.initFacebookPixel = function (pixelId) {
+          if (!pixelId || window.__fbPixelLoaded) return;
+          window.__fbPixelId = pixelId;
           window.__fbPixelLoaded = true;
-          
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', window.__fbPixelId);
-          fbq('track', 'PageView');
+          var n = window.fbq = function () {
+            n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+          };
+          if (!window._fbq) window._fbq = n;
+          n.push = n; n.loaded = true; n.version = "2.0"; n.queue = [];
+          n("init", pixelId);
+          n("track", "PageView");
+          for (var i = 0; i < early.length; i++) n.apply(null, early[i]);
+          early = [];
+          window.__skinlyWhenIdle(function () {
+            var t = document.createElement("script");
+            t.async = true;
+            t.src = "https://connect.facebook.net/en_US/fbevents.js";
+            document.head.appendChild(t);
+          });
         };
-        
-        // Load after 5 seconds
-        setTimeout(loadPixel, 5000);
-        
-        // OR load on first user interaction
-        var events = ['scroll', 'click', 'touchstart', 'mousemove', 'keydown'];
-        events.forEach(function(event) {
-          window.addEventListener(event, function() {
-            loadPixel();
-            events.forEach(function(e) {
-              window.removeEventListener(e, loadPixel);
-            });
-          }, { once: true, passive: true });
-        });
-      };
+      })();
     </script>
 
 

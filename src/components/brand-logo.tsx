@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { cn } from "@/lib/utils";
+import { responsiveImg } from "@/lib/image-cdn";
 
 const LOGO_CACHE_KEY = "goskinly_logo_url";
 const FOOTER_LOGO_CACHE_KEY = "goskinly_footer_logo_url";
@@ -69,8 +70,10 @@ export function BrandLogo({
     // hero slide, which is the page's largest paint, for the same connection.
     // The width and height give the box its shape before the file arrives
     // (the wordmark is 5:2), so the header does not reflow when it lands.
+    // Resized at cdn.goskinly.com (AVIF, ~5 KB) instead of the 9 KB original
+    // from r2.dev, which also cost the page a connection to a second host.
     <img
-      src={logoUrl}
+      {...responsiveImg(logoUrl, [240, 360], "120px", 85)}
       alt="GoSkinly"
       width={120}
       height={48}

@@ -1,7 +1,4 @@
 import { initializeApp } from "firebase/app";
-import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
@@ -27,22 +24,7 @@ if (typeof window !== "undefined" && import.meta.env.VITE_RECAPTCHA_SITE_KEY) {
   });
 }
 
-// Initialize Services
-/*
- * Auth without the sign-in popup machinery loaded up front.
- *
- * getAuth() wires in the popup/redirect resolver, and that resolver loads an
- * iframe from firebaseapp.com plus apis.google.com on every page — about 110 KB
- * fetched while the hero image is still arriving, for a button most visitors
- * never press. The resolver is passed where it is used instead (signInWithPopup
- * in the headers and the sign-in dialog), so it loads when somebody signs in.
- */
-export const auth = initializeAuth(app, {
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
-});
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-
+// Initialize Services (Auth and Firestore load on their own: firebase-auth.ts, firebase-db.ts)
 export const functions = getFunctions(app, "us-central1");
 
 /*

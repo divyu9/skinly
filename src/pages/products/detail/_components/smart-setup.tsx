@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { loadFs } from "@/lib/fs";
 import { CheckIcon, PlusIcon, SparklesIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
 import { loadCatalogue, loadModelCatalogue, type CatalogueModel, type CatalogueProduct } from "@/lib/catalogue";
 import { sizedImage } from "@/lib/image-cdn";
 import { buildSetupPicks, offerPrice, withDefaults, type SetupPick, type SmartUpsellSettings } from "@/lib/smart-setup";
@@ -22,7 +21,7 @@ export type SetupCartItem = {
 
 let settingsOnce: Promise<SmartUpsellSettings> | null = null;
 const loadSettings = () =>
-  (settingsOnce ||= getDoc(doc(db, "settings", "smartUpsell")).then((s) => withDefaults(s.data())).catch(() => withDefaults(null)));
+  (settingsOnce ||= loadFs().then(({ doc, getDoc, db }) => getDoc(doc(db, "settings", "smartUpsell"))).then((s) => withDefaults(s.data())).catch(() => withDefaults(null)));
 
 type Choice = { option: number; charger?: string };
 

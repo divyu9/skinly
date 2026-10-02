@@ -11,7 +11,7 @@ import { AdminLayout } from "@/components/admin-layout.tsx";
 import { Authenticated, AuthLoading, Unauthenticated } from "@/lib/firebase-hooks";
 import { SignInButton } from "@/components/ui/signin.tsx";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
-import { auth } from "@/lib/firebase";
+import { auth } from "@/lib/firebase-auth";
 import { sizedImage } from "@/lib/image-cdn";
 import { designNameOf } from "@/lib/pack-list";
 import { adminStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";

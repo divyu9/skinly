@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { CheckIcon, GiftIcon, LoaderIcon, PlusIcon, SparklesIcon } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import { useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import { useAuth } from "@/hooks/use-auth.ts";

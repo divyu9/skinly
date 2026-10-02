@@ -4,7 +4,9 @@
  * firebase-hooks.tsx by splitting; loaded on first use (see loadLazy there).
  */
 import { useState, useEffect, useCallback } from 'react';
-import { db, functions, auth as firebaseAuth } from './firebase';
+import { db } from "./firebase-db";
+import { functions } from "./firebase";
+import { auth as firebaseAuth } from "./firebase-auth";
 import { 
   collection, query, where, getDocs as fsGetDocs, onSnapshot as fsOnSnapshot, doc, getDoc as fsGetDoc,
   limit, orderBy, startAfter, setDoc, addDoc, updateDoc, deleteDoc,
@@ -21,7 +23,7 @@ import { searchRows } from "./search-match";
 import { calculateGST } from "./gst";
 import { laptopBodyKeys, squash } from "./laptop-body";
 import { brandInScope } from "./device-fit";
-import { onSnapshot, getDocs, getDoc, resolveUserDocId, exportRows, userIdCandidates, stripUndefinedDeep } from './firebase-hooks';
+import { onSnapshot, getDocs, getDoc, resolveUserDocId, exportRows, userIdCandidates, stripUndefinedDeep } from './firebase-hooks-store';
 
 export type QueryCtx = { path: string; args: any; setData: (v: any) => void; unsubscribe: () => void };
 

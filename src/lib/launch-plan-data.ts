@@ -1,5 +1,5 @@
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db } from "@/lib/firebase-db";
 import type { ExistingListing, ExistingVariant } from "@/lib/launch-plan.ts";
 
 /** Every listing whose variants carry this design code, with its variants. */

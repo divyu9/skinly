@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDocsOf } from "@/lib/fs";
 
 /**
  * Approved reviews, as the shop shows them.
@@ -67,10 +66,9 @@ export function useDesignReviews(productId: string | null | undefined, designCod
   useEffect(() => {
     if (!productId) return;
     let live = true;
-    const approved = collection(db, "reviews");
     Promise.all([
-      getDocs(query(approved, where("status", "==", "approved"), where("productId", "==", productId), limit(100))),
-      designCode ? getDocs(query(approved, where("status", "==", "approved"), where("designCode", "==", designCode), limit(200))) : null,
+      getDocsOf(({ query, collection, db, where, limit }) => query(collection(db, "reviews"), where("status", "==", "approved"), where("productId", "==", productId), limit(100))),
+      designCode ? getDocsOf(({ query, collection, db, where, limit }) => query(collection(db, "reviews"), where("status", "==", "approved"), where("designCode", "==", designCode), limit(200))) : null,
     ])
       .then(([own, family]) => {
         const byId = new Map<string, PublicReview>();
@@ -87,7 +85,7 @@ export function useDesignReviews(productId: string | null | undefined, designCod
 /** Every approved review, newest first (homepage and /reviews). */
 let allOnce: Promise<PublicReview[]> | null = null;
 export function loadApprovedReviews(): Promise<PublicReview[]> {
-  return (allOnce ||= getDocs(query(collection(db, "reviews"), where("status", "==", "approved"), limit(500)))
+  return (allOnce ||= getDocsOf(({ query, collection, db, where, limit }) => query(collection(db, "reviews"), where("status", "==", "approved"), limit(500)))
     .then((s) => s.docs.map((d) => ({ _id: d.id, ...(d.data() as any) } as PublicReview)).sort((a, b) => whenOf(b) - whenOf(a)))
     .catch(() => []));
 }

@@ -1,7 +1,5 @@
 import { useQuery } from "@/lib/firebase-hooks";
 import { useAuth } from "@/hooks/use-auth";
-import { auth } from "@/lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, browserPopupRedirectResolver } from "firebase/auth";
 import { api } from "@/lib/firebase-api";
 import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -56,7 +54,7 @@ export function AdminAuthGuard({ children }: { children: ReactNode }) {
   if (!isSignedIn) {
     const handleSignIn = async () => {
       try {
-        await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
+        await (await import("@/lib/firebase-auth")).signInWithGoogle();
       } catch (err) {
         console.error(err);
       }
