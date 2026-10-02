@@ -23,6 +23,13 @@ export function ReviewPhotoViewer({ photos, start, open, onOpenChange, caption }
   });
   if (!n) return null;
   return (
+    /*
+     * The dialog is portalled out of the card in the DOM, but React still
+     * bubbles its clicks up the component tree — into the card's <Link>, so
+     * an arrow, a thumbnail or the backdrop opened the product page. Clicks
+     * stop here.
+     */
+    <div className="contents" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl border-2 border-ink bg-background p-3 sm:p-4 [&>button]:hidden">
         <DialogTitle className="sr-only">{caption || "Customer photos"}</DialogTitle>
@@ -60,5 +67,6 @@ export function ReviewPhotoViewer({ photos, start, open, onOpenChange, caption }
         {caption && <p className="mt-2 text-center text-xs text-muted-foreground">{caption}</p>}
       </DialogContent>
     </Dialog>
+    </div>
   );
 }
