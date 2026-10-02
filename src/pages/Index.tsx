@@ -1,4 +1,5 @@
-import { Fragment, useState, useEffect, useRef, lazy, Suspense } from "react";
+import { Fragment, useState, useEffect, useRef, Suspense } from "react";
+import { lazyWithReload } from "@/lib/lazy-with-reload";
 import { HOME_META, ORGANIZATION_LD } from "@/lib/category-paths.mjs";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
@@ -9,22 +10,22 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { DeviceSelectorDialog } from "@/pages/_components/device-selector-dialog.tsx";
 
 // Lazy load below-the-fold and modal components for better FCP/LCP
-const MobileNav = lazy(() => import("@/components/mobile-nav.tsx").then(m => ({ default: m.MobileNav })));
-const ModelsMarquee = lazy(() => import("@/components/models-marquee.tsx").then(m => ({ default: m.ModelsMarquee })));
-const ExploreModels = lazy(() => import("@/components/explore-models.tsx").then(m => ({ default: m.ExploreModels })));
-const TopPicksRows = lazy(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.TopPicksRows })));
-const VibeRows = lazy(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.VibeRows })));
-const MatchingSets = lazy(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.MatchingSets })));
-const ExploreByBrand = lazy(() => import("@/components/explore-by-brand.tsx").then(m => ({ default: m.ExploreByBrand })));
-const ExploreByGadget = lazy(() => import("@/components/explore-by-gadget.tsx").then(m => ({ default: m.ExploreByGadget })));
-const SiteFooter = lazy(() => import("@/components/site-footer.tsx").then(m => ({ default: m.SiteFooter })));
+const MobileNav = lazyWithReload(() => import("@/components/mobile-nav.tsx").then(m => ({ default: m.MobileNav })), "@/components/mobile-nav.tsx#MobileNav");
+const ModelsMarquee = lazyWithReload(() => import("@/components/models-marquee.tsx").then(m => ({ default: m.ModelsMarquee })), "@/components/models-marquee.tsx#ModelsMarquee");
+const ExploreModels = lazyWithReload(() => import("@/components/explore-models.tsx").then(m => ({ default: m.ExploreModels })), "@/components/explore-models.tsx#ExploreModels");
+const TopPicksRows = lazyWithReload(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.TopPicksRows })), "@/components/home/home-rows.tsx#TopPicksRows");
+const VibeRows = lazyWithReload(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.VibeRows })), "@/components/home/home-rows.tsx#VibeRows");
+const MatchingSets = lazyWithReload(() => import("@/components/home/home-rows.tsx").then(m => ({ default: m.MatchingSets })), "@/components/home/home-rows.tsx#MatchingSets");
+const ExploreByBrand = lazyWithReload(() => import("@/components/explore-by-brand.tsx").then(m => ({ default: m.ExploreByBrand })), "@/components/explore-by-brand.tsx#ExploreByBrand");
+const ExploreByGadget = lazyWithReload(() => import("@/components/explore-by-gadget.tsx").then(m => ({ default: m.ExploreByGadget })), "@/components/explore-by-gadget.tsx#ExploreByGadget");
+const SiteFooter = lazyWithReload(() => import("@/components/site-footer.tsx").then(m => ({ default: m.SiteFooter })), "@/components/site-footer.tsx#SiteFooter");
 import { RequestModelDialog } from "@/components/request-model-dialog.tsx";
-const BugReportModal = lazy(() => import("@/components/bug-report-modal.tsx").then(m => ({ default: m.BugReportModal })));
-const WhySkinlyProof = lazy(() => import("@/components/home/why-skinly-proof.tsx").then(m => ({ default: m.WhySkinlyProof })));
-const ClosingSearch = lazy(() => import("@/components/home/closing-search.tsx").then(m => ({ default: m.ClosingSearch })));
-const UgcVideos = lazy(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })));
-const RealCuts = lazy(() => import("@/components/real-cuts").then(m => ({ default: m.RealCuts })));
-const CustomerReviews = lazy(() => import("@/components/customer-reviews").then(m => ({ default: m.CustomerReviews })));
+const BugReportModal = lazyWithReload(() => import("@/components/bug-report-modal.tsx").then(m => ({ default: m.BugReportModal })), "@/components/bug-report-modal.tsx#BugReportModal");
+const WhySkinlyProof = lazyWithReload(() => import("@/components/home/why-skinly-proof.tsx").then(m => ({ default: m.WhySkinlyProof })), "@/components/home/why-skinly-proof.tsx#WhySkinlyProof");
+const ClosingSearch = lazyWithReload(() => import("@/components/home/closing-search.tsx").then(m => ({ default: m.ClosingSearch })), "@/components/home/closing-search.tsx#ClosingSearch");
+const UgcVideos = lazyWithReload(() => import("@/components/ugc-videos").then(m => ({ default: m.UgcVideos })), "@/components/ugc-videos#UgcVideos");
+const RealCuts = lazyWithReload(() => import("@/components/real-cuts").then(m => ({ default: m.RealCuts })), "@/components/real-cuts#RealCuts");
+const CustomerReviews = lazyWithReload(() => import("@/components/customer-reviews").then(m => ({ default: m.CustomerReviews })), "@/components/customer-reviews#CustomerReviews");
 
 // Loading fallback for lazy components
 /**

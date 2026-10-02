@@ -22,6 +22,27 @@ function writeFlag(key: string, on: boolean): void {
 }
 
 /**
+ * Reload into the current build, once per key per tab. The page itself is
+ * cached at the edge for a couple of minutes after a deploy, so a plain reload
+ * could get the same old HTML again; a query string the edge has not seen
+ * fetches the new one (index.html removes `_v` from the address afterwards).
+ * Returns false when this key already reloaded, so the caller shows its error.
+ */
+export function reloadForFreshBuild(key: string): boolean {
+  if (readFlag(key)) return false;
+  writeFlag(key, true);
+  const u = new URL(window.location.href);
+  u.searchParams.set("_v", String(Date.now()));
+  window.location.replace(u.toString());
+  return true;
+}
+
+/** Clears reloadForFreshBuild's flag once the thing it was for has loaded. */
+export function freshBuildLoaded(key: string): void {
+  if (readFlag(key)) writeFlag(key, false);
+}
+
+/**
  * `lazy()` that survives a deploy happening under an open tab.
  *
  * Every build gives its chunks new content-hashed names and the old ones stop
@@ -58,9 +79,7 @@ export function lazyWithReload<T extends ComponentType<any>>(
         if (readFlag(key)) writeFlag(key, false);
         return mod;
       } catch {
-        if (readFlag(key)) throw error;  // Already reloaded for this one.
-        writeFlag(key, true);
-        window.location.reload();
+        if (!reloadForFreshBuild(key)) throw error;  // Already reloaded for this one.
         // Never resolves; the reload is already under way.
         return await new Promise<{ default: T }>(() => {});
       }

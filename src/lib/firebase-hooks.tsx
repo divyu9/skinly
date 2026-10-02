@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/use-auth';
+import { reloadForFreshBuild, freshBuildLoaded } from './lazy-with-reload';
 
 
 /**
@@ -115,13 +116,20 @@ const ADMIN_QUERY_PATHS = new Set<string>(["abandonedCartSettings.getSettings","
 let lazyOnce: Promise<typeof import('./firebase-hooks-lazy')> | null = null;
 /** The admin queries, every mutation and every action: one chunk, fetched on first use. */
 export function loadLazy() {
-  return (lazyOnce ||= import('./firebase-hooks-lazy').catch((e) => { lazyOnce = null; throw e; }));
+  return (lazyOnce ||= import('./firebase-hooks-lazy')
+    .then((m) => { freshBuildLoaded('firebase-hooks-lazy'); return m; })
+    .catch((e) => { lazyOnce = null; reloadForFreshBuild('firebase-hooks-lazy'); throw e; }));
 }
 
 let storeOnce: Promise<typeof import('./firebase-hooks-store')> | null = null;
 /** The storefront's Firestore reads, and the Firestore SDK with them: fetched when the first query runs. */
 export function loadStore() {
-  return (storeOnce ||= import('./firebase-hooks-store').catch((e) => { storeOnce = null; throw e; }));
+  // Right after a deploy the edge can still hand out the previous page, whose
+  // chunk names no longer exist; every query would then fail. Reload into the
+  // current build instead (once per tab).
+  return (storeOnce ||= import('./firebase-hooks-store')
+    .then((m) => { freshBuildLoaded('firebase-hooks-store'); return m; })
+    .catch((e) => { storeOnce = null; reloadForFreshBuild('firebase-hooks-store'); throw e; }));
 }
 
 export function useQuery(apiRef: any, args?: any) {

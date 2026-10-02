@@ -29,13 +29,19 @@
           if (!t || t === window) return;
           var src = t.src || t.href || "";
           if (src.indexOf(location.origin + "/assets/") !== 0) return;
-          try { if (sessionStorage.getItem(KEY)) return; sessionStorage.setItem(KEY, "1"); } catch (_) { return; }
+          // At most once a minute. This was a flag cleared on every `load`,
+          // and a chunk still missing after the reload (a dynamic import's
+          // modulepreload fails after load) reloaded again, every ~130 ms.
+          try {
+            var last = Number(sessionStorage.getItem(KEY)) || 0;
+            if (Date.now() - last < 60000) return;
+            sessionStorage.setItem(KEY, String(Date.now()));
+          } catch (_) { return; }
           var u = new URL(location.href);
           u.searchParams.set("_v", String(Date.now()));
           location.replace(u.toString());
         }, true);
         window.addEventListener("load", function () {
-          try { sessionStorage.removeItem(KEY); } catch (_) {}
           // Leave nobody holding a URL with the cache-buster in it.
           if (location.search.indexOf("_v=") !== -1) {
             var u = new URL(location.href);
