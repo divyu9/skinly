@@ -11,6 +11,7 @@ import { ReferralTracker } from "./components/referral-tracker.tsx";
 import { lazyWithReload } from "./lib/lazy-with-reload.ts";
 import { StorefrontErrorBoundary } from "./components/storefront-error-boundary.tsx";
 import { MobileBottomNav } from "./components/mobile-bottom-nav.tsx";
+import { loadLazy } from "./lib/firebase-hooks.tsx";
 
 // Critical pages - loaded immediately
 import Index from "./pages/Index.tsx";
@@ -131,6 +132,8 @@ function PrefetchCheckoutChunks() {
     const t = setTimeout(() => idle(() => {
       void import("./pages/cart/page.tsx").catch(() => {});
       void import("./pages/checkout/page.tsx").catch(() => {});
+      // Every mutation and action (add to cart when signed in, place order…) runs from this chunk.
+      void loadLazy().catch(() => {});
     }), 4000);
     return () => clearTimeout(t);
   }, [loaded]);
