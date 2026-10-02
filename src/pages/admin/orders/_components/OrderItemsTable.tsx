@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog.tsx";
+import { ProductLinePicker } from "./product-line-picker.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Badge } from "@/components/ui/badge.tsx";
@@ -41,6 +42,8 @@ export interface ItemFormEntry {
   phoneModel?: string;
   phoneBrand?: string;
   coverage?: "only_back" | "full_body_wrap";
+  sku?: string;
+  productSlug?: string;
 }
 
 interface OrderItemsTableProps {
@@ -62,7 +65,9 @@ interface OrderItemsTableProps {
   onOpenEditItems: () => void;
   onCloseEditItems: () => void;
   onItemsFormChange: (items: ItemFormEntry[]) => void;
-  onSaveItems: () => void;
+  onSaveItems: (reason: string) => void;
+  /** Saving: the server swaps the stock over too, which takes a moment. */
+  savingItems?: boolean;
 }
 
 export function OrderItemsTable({
@@ -74,7 +79,10 @@ export function OrderItemsTable({
   onCloseEditItems,
   onItemsFormChange,
   onSaveItems,
+  savingItems,
 }: OrderItemsTableProps) {
+  const [picking, setPicking] = useState<number | "new" | null>(null);
+  const [reason, setReason] = useState("");
   const items = Array.isArray(itemsProp) ? itemsProp : [];
   const missing = !Array.isArray(itemsProp);
 
@@ -232,15 +240,42 @@ export function OrderItemsTable({
           <DialogHeader>
             <DialogTitle>Edit Order Items</DialogTitle>
             <DialogDescription>
-              Modify quantities, prices, or remove items. Subtotal and total will be recalculated.
+              Change a design or SKU, the phone, the quantity, or add and remove items. The old
+              items' material goes back to stock and the new ones' is taken. A prepaid order's total
+              stays what was paid; a COD order's changes with the goods.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             {itemsForm.map((item, idx) => (
               <div key={idx} className="flex gap-4 p-4 border rounded-lg">
                 <div className="flex-1 space-y-2">
-                  <p className="font-medium text-sm">{item.productTitle}</p>
-                  <p className="text-xs text-muted-foreground">Variant: {item.variant}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-sm">{item.productTitle}</p>
+                      <p className="text-xs text-muted-foreground">Variant: {item.variant}{item.sku ? ` · SKU ${item.sku}` : ""}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => setPicking(picking === idx ? null : idx)}>Change design / SKU</Button>
+                  </div>
+                  {picking === idx && (
+                    <ProductLinePicker onCancel={() => setPicking(null)} onPick={(l) => {
+                      const next = [...itemsForm];
+                      next[idx] = { ...next[idx], ...l };
+                      onItemsFormChange(next);
+                      setPicking(null);
+                    }} />
+                  )}
+                  {(item.phoneModel !== undefined || item.phoneBrand !== undefined) && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">Phone brand</Label>
+                        <Input value={item.phoneBrand || ""} onChange={(e) => { const n = [...itemsForm]; n[idx] = { ...n[idx], phoneBrand: e.target.value }; onItemsFormChange(n); }} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Phone model</Label>
+                        <Input value={item.phoneModel || ""} onChange={(e) => { const n = [...itemsForm]; n[idx] = { ...n[idx], phoneModel: e.target.value }; onItemsFormChange(n); }} />
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <Label htmlFor={`price-${idx}`} className="text-xs">Price (₹)</Label>
@@ -290,11 +325,23 @@ export function OrderItemsTable({
                 No items. Add at least one item to save.
               </p>
             )}
+            {picking === "new" ? (
+              <ProductLinePicker onCancel={() => setPicking(null)} onPick={(l) => {
+                onItemsFormChange([...itemsForm, { ...l, quantity: 1, phoneBrand: "", phoneModel: "" }]);
+                setPicking(null);
+              }} />
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => setPicking("new")}>+ Add item</Button>
+            )}
+            <div>
+              <Label className="text-xs">Why (kept on the order)</Label>
+              <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Customer asked for Blue Sober instead of Midnight Topography" />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={onCloseEditItems}>Cancel</Button>
-            <Button onClick={onSaveItems} disabled={itemsForm.length === 0}>
-              Save Changes
+            <Button onClick={() => onSaveItems(reason)} disabled={itemsForm.length === 0 || !!savingItems}>
+              {savingItems ? "Saving…" : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

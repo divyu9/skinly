@@ -29,7 +29,8 @@ const designCodeOf = (sku: unknown) => String(sku || "").trim().toUpperCase().re
 const money = (o: any) => Number(o?.total ?? o?.amountPayable) || 0;
 const OPEN_RAW = ["pending", "processing", "ready_to_ship", "shipped", "out_for_delivery", "undelivered"];
 
-const isSale = (o: any) => isConfirmedOrder(o) && o.status !== "cancelled" && !o.testOrder;
+// A replacement (reshipOrder) is not a sale: same goods, sent again.
+const isSale = (o: any) => isConfirmedOrder(o) && o.status !== "cancelled" && !o.testOrder && !o.isReplacement;
 const statusOf = (o: any) => normalizeOrderStatus(o.status, o.paymentStatus, o);
 /** When the order last changed state: what "stuck for N days" is measured from. */
 const since = (o: any) => Number(o.statusChangedAt || o.confirmedAt || o.createdAt) || 0;

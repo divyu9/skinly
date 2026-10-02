@@ -63,7 +63,7 @@ export const listContacts = onCall(async (_data: any, context: any) => {
     const c = get(phone, at);
     add(c.sources, "order");
     // A sale the way the dashboard counts one, so the two never disagree.
-    const confirmed = isConfirmedOrder(o) && o.status !== "cancelled" && !o.testOrder && !o.addOnTo;
+    const confirmed = isConfirmedOrder(o) && o.status !== "cancelled" && !o.testOrder && !o.addOnTo && !o.isReplacement;
     if (confirmed) {
       c.orders++;
       c.spent += Number(o.total ?? o.amountPayable) || 0;

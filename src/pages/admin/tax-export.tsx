@@ -148,7 +148,8 @@ function TaxExportPageInner() {
         "Tracking URL",
       ];
 
-      const rows = orders.map((order) => {
+      // A replacement parcel (Reship) is the same sale sent again: the original's invoice covers it.
+      const rows = orders.filter((order: any) => !order.isReplacement).map((order) => {
         // Format items
         const itemDetails = (order.items || [])
           .map(

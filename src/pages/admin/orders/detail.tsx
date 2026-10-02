@@ -22,6 +22,7 @@ import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
 import { PackageCard } from "./_components/PackageCard.tsx";
 import { OrderNavigator } from "./_components/OrderNavigator.tsx";
 import { OrderTimeline } from "./_components/OrderTimeline.tsx";
+import { ReshipPanel } from "./_components/ReshipPanel.tsx";
 import { RtoActionsPanel, type RtoActionFormData } from "./_components/RtoActionsPanel.tsx";
 import { WhatsAppPanel, type EmailType } from "./_components/WhatsAppPanel.tsx";
 
@@ -238,15 +239,23 @@ function OrderDetailPageInner() {
     }
   };
 
-  const handleUpdateOrderItems = async () => {
+  /*
+   * Through the server (orderItems.ts replaceOrderItems), not a straight write:
+   * the old lines' material goes back to stock and the new lines' comes off.
+   */
+  const [savingItems, setSavingItems] = useState(false);
+  const handleUpdateOrderItems = async (reason: string) => {
     if (!orderId) return;
+    setSavingItems(true);
     try {
-      await updateOrderItems({ orderId: orderId as Id<"orders">, items: itemsForm });
-      toast.success("Order items updated");
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const r: any = (await httpsCallable(getFunctions(), "replaceOrderItems")({ orderId, items: itemsForm, reason })).data;
+      const stock = r.returned?.length || r.took?.length ? ` · stock: ${r.returned?.length || 0} returned, ${r.took?.length || 0} taken` : "";
+      toast.success(`Order items updated${stock}${r.totalChanged ? ` · COD amount changed by ₹${r.itemsTotalDiff}` : r.itemsTotalDiff ? ` · goods differ by ₹${r.itemsTotalDiff} (prepaid total unchanged)` : ""}`);
       setShowEditItemsDialog(false);
-    } catch {
-      toast.error("Failed to update order items");
-    }
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update order items");
+    } finally { setSavingItems(false); }
   };
 
   const handleShippingUpdate = async () => {
@@ -568,7 +577,10 @@ function OrderDetailPageInner() {
             onCloseEditItems={() => setShowEditItemsDialog(false)}
             onItemsFormChange={setItemsForm}
             onSaveItems={handleUpdateOrderItems}
+            savingItems={savingItems}
           />
+
+          {orderId && <ReshipPanel order={order} orderId={orderId} />}
 
           {orderId && (
             <PackageCard orderId={orderId} override={(order as any).packageOverride} locked={!!order.awbNumber} />

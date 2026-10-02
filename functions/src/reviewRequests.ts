@@ -55,7 +55,8 @@ export async function sendReviewRequests(
   const byPhone = new Map<string, { d: admin.firestore.QueryDocumentSnapshot; at: number }>();
   for (const d of snap.docs) {
     const o = d.data() as any;
-    if (o.isDeleted === true || o.reviewAskedAt || o.reviewedAt) continue;
+    // A replacement parcel (reshipOrder): the original order is the one asked about.
+    if (o.isDeleted === true || o.isReplacement || o.reviewAskedAt || o.reviewedAt) continue;
     // Orders from before the move to Firebase carry _creationTime, not createdAt.
     const at = Number(o.deliveredAt) || Number(o.updatedAt) || Number(o.createdAt) || Number(o._creationTime) || 0;
     if (!at || at > now - ASK_AFTER_DAYS * 86400000) continue;

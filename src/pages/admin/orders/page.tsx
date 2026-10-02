@@ -186,7 +186,7 @@ function AdminOrdersPageInner() {
       failed: displayOrders.filter((o) => normalizePaymentStatus(o.paymentStatus) === "failed").length,
       deleted: displayOrders.filter((o) => o.isDeleted).length,
       totalRevenue: displayOrders
-        .filter((o) => normalizePaymentStatus(o.paymentStatus) === "success")
+        .filter((o: any) => normalizePaymentStatus(o.paymentStatus) === "success" && !o.isReplacement)
         .reduce((sum, o) => sum + (o.total || 0), 0),
       pendingPayments: displayOrders.filter(
         (o) => normalizePaymentStatus(o.paymentStatus) === "pending" || !o.paymentStatus
