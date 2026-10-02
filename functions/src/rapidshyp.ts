@@ -136,7 +136,10 @@ function describeError(status: number, body: string): string {
  * Two different things that land on one SKU keep both, the second suffixed —
  * merging those would under-declare what is in the box.
  */
-const cleanSku = (s: string) => s.trim().replace(/\s+/g, "-").replace(/[^A-Za-z0-9._\-\/]/g, "");
+// RapidShyp takes letters, digits, "-" and "_" only: "SG-iPhn15/16-2P" came back
+// "Invalid stock keeping unit". Anything else becomes "-", consistently, so one
+// SKU always maps to the same RapidShyp SKU.
+const cleanSku = (s: string) => s.trim().replace(/[^A-Za-z0-9_-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
 
 async function resolveLines(db: admin.firestore.Firestore, items: any[]) {
   const pids = [...new Set(items.map((i) => String(i?.productId || "")).filter(Boolean))];
@@ -284,9 +287,17 @@ export async function buildOrderPayload(orderId: string) {
   const paymentMethod = isCod ? "COD" : "Prepaid";
   const codValue = isCod ? (num(order.codAmount) ?? money.total) : 0;
 
-  const nameParts = String(order.shippingAddress.fullName || order.customerName || "").trim().split(/\s+/);
-  const firstName = nameParts[0] || "";
-  const lastName = nameParts.slice(1).join(" ") || "";
+  /*
+   * RapidShyp wants a first name of 3–100 characters. "M. Aqeeb" split into
+   * "M." and was refused, so initials take the next word with them ("M. Aqeeb"
+   * as the first name), and a name still too short is completed from the rest.
+   */
+  const nameParts = String(order.shippingAddress.fullName || order.customerName || "").trim().split(/\s+/).filter(Boolean);
+  let firstName = nameParts.shift() || "";
+  while (firstName.replace(/[^\p{L}\p{M}]/gu, "").length < 3 && nameParts.length) firstName = `${firstName} ${nameParts.shift()}`;
+  if (firstName.replace(/[^\p{L}\p{M}]/gu, "").length < 3) firstName = `${firstName} Customer`.trim();
+  firstName = firstName.slice(0, 100);
+  const lastName = nameParts.join(" ");
   const phone = String(order.shippingAddress.phone).replace(/^\+/, "");
   const email = emailOf(order);
 
