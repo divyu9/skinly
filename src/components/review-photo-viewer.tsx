@@ -29,7 +29,7 @@ export function ReviewPhotoViewer({ photos, start, open, onOpenChange, caption }
      * an arrow, a thumbnail or the backdrop opened the product page. Clicks
      * stop here.
      */
-    <div className="contents" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+    <div className="contents" onClick={(e) => e.stopPropagation()}>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl border-2 border-ink bg-background p-3 sm:p-4 [&>button]:hidden">
         <DialogTitle className="sr-only">{caption || "Customer photos"}</DialogTitle>
