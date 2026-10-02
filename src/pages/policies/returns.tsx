@@ -102,7 +102,7 @@ export default function ReturnsPolicy() {
             <section className="mb-8">
               <h2 className="text-2xl font-bold mb-4">4. How to Initiate a Return</h2>
               <ol className="list-decimal pl-6 mb-4 space-y-2">
-                <li>Contact our support team within 48 hours of delivery via WhatsApp at <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a> or email at <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></li>
+                <li>Contact our support team within 48 hours of delivery via WhatsApp at <a href="https://wa.me/919761011121" className="text-primary hover:underline">+91 97610 11121</a> or email at <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></li>
                 <li>Provide your order number, reason for return, and supporting documentation (photos if applicable)</li>
                 <li>Our team will review your request within 24-48 hours</li>
                 <li>If approved, we will provide you with return instructions and shipping label (if applicable)</li>
@@ -132,7 +132,7 @@ export default function ReturnsPolicy() {
                 <p className="font-semibold mb-2">Mad House Media</p>
                 <p className="mb-1">Agra, Uttar Pradesh 282003</p>
                 <p className="mb-1">Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></p>
-                <p>WhatsApp: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></p>
+                <p>WhatsApp: <a href="https://wa.me/919761011121" className="text-primary hover:underline">+91 97610 11121</a></p>
               </div>
             </section>
           </CardContent>

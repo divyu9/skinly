@@ -57,7 +57,7 @@ export default function PrivacyPolicy() {
               <p className="mb-4">For privacy-related inquiries or support, you can reach us at:</p>
               <ul className="list-disc pl-6 mb-4">
                 <li>Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></li>
-                <li>WhatsApp Support: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></li>
+                <li>WhatsApp Support: <a href="https://wa.me/919761011121" className="text-primary hover:underline">+91 97610 11121</a></li>
               </ul>
               <p className="mb-4">Skinly specializes in custom phone skins and cases with personalized design capabilities across thousands of phone models.</p>
             </section>
@@ -141,7 +141,7 @@ export default function PrivacyPolicy() {
                 <p className="font-semibold mb-2">Mad House Media</p>
                 <p className="mb-1">Agra, Uttar Pradesh 282003</p>
                 <p className="mb-1">Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></p>
-                <p>WhatsApp: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></p>
+                <p>WhatsApp: <a href="https://wa.me/919761011121" className="text-primary hover:underline">+91 97610 11121</a></p>
               </div>
             </section>
           </CardContent>

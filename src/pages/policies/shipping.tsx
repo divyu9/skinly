@@ -128,7 +128,7 @@ export default function ShippingPolicy() {
                 <p className="font-semibold mb-2">Mad House Media</p>
                 <p className="mb-1">Agra, Uttar Pradesh 282003</p>
                 <p className="mb-1">Email: <a href="mailto:hello@goskinly.com" className="text-primary hover:underline">hello@goskinly.com</a></p>
-                <p>WhatsApp: <a href="https://wa.me/917505273504" className="text-primary hover:underline">+91 7505273504</a></p>
+                <p>WhatsApp: <a href="https://wa.me/919761011121" className="text-primary hover:underline">+91 97610 11121</a></p>
               </div>
             </section>
           </CardContent>
