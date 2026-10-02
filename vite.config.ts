@@ -31,8 +31,6 @@ export default defineConfig(({ mode }) => {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui': ['@radix-ui/react-dialog', '@radix-ui/react-select',
                         '@radix-ui/react-dropdown-menu'],
-          'vendor-charts': ['recharts'],
-          'vendor-motion': ['motion'],
         }
       }
     },

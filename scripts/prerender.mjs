@@ -1288,6 +1288,7 @@ const INDEXNOW_KEY = process.env.INDEXNOW_KEY || "05da6902fa7d4e47f5084f259923eb
 const INDEXNOW_WINDOW_MS = 48 * 60 * 60 * 1000;
 
 async function submitIndexNow(pages) {
+  if (process.env.SKIP_INDEXNOW) { log("IndexNow: skipped (SKIP_INDEXNOW)"); return; }
   const cutoff = Date.now() - INDEXNOW_WINDOW_MS;
   const fresh = pages
     .filter((p) => p.canonical && Number(p.lastmod) > cutoff)
