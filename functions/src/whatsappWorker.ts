@@ -12,7 +12,7 @@ const NEEDS_OPT_IN = new Set(["abandoned_cart"]);
 
 const F2S_GRAPH_VERSION = process.env.FAST2SMS_GRAPH_VERSION || "v26.0";
 
-type F2sTemplate = { name: string; language: string; varCount: number; urlButton: { index: number; url: string } | null };
+type F2sTemplate = { name: string; language: string; varCount: number; imageHeader: boolean; urlButton: { index: number; url: string } | null };
 const f2sCache = new Map<string, { at: number; t: F2sTemplate | null }>();
 
 /**
@@ -36,6 +36,7 @@ async function fast2smsTemplate(key: string, phoneNumberId: string, messageId: s
       t: {
         name: String(t.template_name), language: String(t.language || "en"),
         varCount: Number.isFinite(Number(t.var_count)) ? Number(t.var_count) : -1,
+        imageHeader: (t.components || []).some((c: any) => String(c.type).toUpperCase() === "HEADER" && String(c.format).toUpperCase() === "IMAGE"),
         urlButton: i >= 0 ? { index: i, url: String(buttons[i].url) } : null,
       },
     });
@@ -249,16 +250,22 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
    * picture is `header_image` on the message, else the store's default card.
    */
   const tplData = tpl.empty ? {} : (tpl.docs[0].data() as any);
-  const headerImage = tplData.headerType === "image"
+  // Fast2SMS says itself whether the approved template has a photo header, so
+  // the admin's Photo/Text toggle cannot disagree with Meta (error 132012).
+  const f2sMeta = provider === "fast2sms" && prov.phoneNumberId
+    ? await fast2smsTemplate(f2sKey, String(prov.phoneNumberId), wid).catch((e) => {
+        console.warn("[fast2sms] template details unavailable:", e?.message || e);
+        return null;
+      })
+    : null;
+  const wantsImage = f2sMeta ? f2sMeta.imageHeader : tplData.headerType === "image";
+  const headerImage = wantsImage
     ? String((msg.variables || {}).header_image || "https://goskinly.com/og-default.jpg")
     : "";
 
   const fetch = require("node-fetch");
   if (provider === "fast2sms") {
-    const meta = await fast2smsTemplate(f2sKey, String(prov.phoneNumberId), wid).catch((e) => {
-      console.warn("[fast2sms] template details unavailable:", e?.message || e);
-      return null;
-    });
+    const meta = f2sMeta;
     // Values in template order. The body may take fewer than the registry
     // lists (the review link moved into the button), so only var_count go.
     let values = order.map((_, i) => String(numbered[String(i + 1)] ?? "").replace(/\s*\n\s*/g, " "));
@@ -272,8 +279,11 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
        * the button's {{1}}. The value is the part of this message's link
        * after the button's fixed start ("https://goskinly.com/orders/").
        */
-      const full = buttonUrlFor(msg.usecaseKey, msg.variables || {});
-      const base = urlButton.url.split("{{1}}")[0];
+      // www.goskinly.com and goskinly.com are one site (SITE_URL carries the
+      // www; the templates were approved without it), so compare without it.
+      const noWww = (u: string) => u.replace(/^(https?:\/\/)www\./i, "$1");
+      const full = noWww(buttonUrlFor(msg.usecaseKey, msg.variables || {}));
+      const base = noWww(urlButton.url.split("{{1}}")[0]);
       if (!full || !full.startsWith(base)) {
         const why = `button link ${full ? "does not start with " + base : "missing"}`;
         await queueRef.update({ status: "failed", failureReason: why });

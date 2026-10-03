@@ -94,6 +94,9 @@ export async function notifyRestocked(
           company_name: "GoSkinly",
           customer_name: "there",
           stock_notification: "back in stock",
+          // The template's photo header: the product itself, not the store card.
+          header_image: await import("./waImage").then((m) => m.whatsappHeaderImage(`restock-${product.slug || n.productId || ""}`,
+            [{ productImage: (product.images?.[0]?.url || product.images?.[0] || "") }])).catch(() => "https://goskinly.com/og-default.jpg"),
         },
         status: "pending",
         retryCount: 0,
