@@ -238,18 +238,23 @@ Samples: Priya · #4102 · Your payment will be refunded to the original payment
 
 ## 11. `skinly_back_in_stock` — Marketing
 **Header: Image** — the product that is back. Upload any Skinly product photo as the sample.  
-Variables: `product_name, product_url`
+Variables (body): `product_name` — the product link goes in the button.  
+**Button: Visit website, Dynamic URL** — opens that product's page.
+- Button text: `Buy now`
+- URL type: **Dynamic**, URL: `https://goskinly.com/products/{{1}}`
+- Sample for `{{1}}`: `aurora-arches-matte-iphone-skin?utm_source=whatsapp`
 
-Sent only to people who tapped "Notify me" on a sold-out product.
+Sent only to people who tapped "Notify me" on a sold-out product (they asked
+for it, and a STOP reply still removes them).
 
 ```
-Good news! {{1}} is back in stock at GoSkinly 🎉
+Good news! *{{1}}* is back in stock at GoSkinly 🎉
 
-You asked us to tell you when it returned. Grab it before it sells out again: {{2}}
+You asked us to tell you when it returned. ⚡ *Stock is limited* — tap *Buy now* below before it sells out again.
 
 Team GoSkinly
 ```
-Samples: Aurora Arches Matte iPhone 15 Skin · https://goskinly.com/products/aurora-arches
+Samples: Aurora Arches Matte iPhone 15 Skin
 
 ## 12. `skinly_abandoned_cart` — Marketing
 **Header: Image** — a collage of the products in the cart (up to 4). Upload any Skinly product photo as the sample.  
