@@ -488,3 +488,31 @@ export const fast2smsAccount = onCall(async (_data: any, context: any) => {
     })),
   };
 });
+
+/**
+ * Admin › WhatsApp › "Delivery log": Fast2SMS's status reports for the last
+ * three days (accepted → sent → delivered / read, or failed with Meta's
+ * error). "Sent" in our log only means Fast2SMS took the message; this is
+ * where a message Meta refused afterwards (e.g. a marketing cap) shows up.
+ */
+export const fast2smsLogs = onCall(async (_data: any, context: any) => {
+  await requireAdmin(context);
+  const key = process.env.FAST2SMS_API_KEY || "";
+  if (!key) throw new HttpsError("failed-precondition", "FAST2SMS_API_KEY is not in functions/.env");
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 5.5 * 3600 * 1000);
+  const from = new Date(to.getTime() - 2 * 86400 * 1000);
+  const fetch = require("node-fetch");
+  const res = await fetch(`https://www.fast2sms.com/dev/whatsapp_logs?from=${day(from)}&to=${day(to)}`, { headers: { Authorization: key } });
+  const text = await res.text();
+  let j: any;
+  try { j = JSON.parse(text); } catch { throw new HttpsError("internal", `Fast2SMS: ${text.slice(0, 200)}`); }
+  if (!Array.isArray(j?.data)) throw new HttpsError("internal", `Fast2SMS: ${text.slice(0, 200)}`);
+  const rows = j.data.map((r: any) => ({
+    requestId: String(r.request_id || ""), to: String(r.recipient_id || ""), status: String(r.status || ""),
+    at: Number(r.timestamp) ? Number(r.timestamp) * 1000 : 0,
+    error: r.errors ? JSON.stringify(r.errors).slice(0, 400) : "",
+  }));
+  rows.sort((a: any, b: any) => b.at - a.at);
+  return { rows: rows.slice(0, 80) };
+});
