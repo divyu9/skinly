@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
@@ -89,7 +89,6 @@ export default function AdminModelsPage() {
   
   // Model requests
   const allModelRequests = useQuery(api.modelRequests.getAllModelRequests, {});
-  const approveRequests = useMutation(api.modelRequests.approveModelRequests);
   const rejectRequest = useMutation(api.modelRequests.rejectModelRequest);
   const updateRequest = useMutation(api.modelRequests.updateModelRequest);
 
@@ -342,22 +341,38 @@ export default function AdminModelsPage() {
     return true;
   });
   
-  // Handle bulk approve requests
-  const handleBulkApprove = async () => {
-    if (selectedRequests.length === 0) {
-      toast.error("Please select at least one request");
-      return;
-    }
-    
+  /*
+   * Which pending requests the site already lists (functions/src/modelRequestsAdmin.ts):
+   * "exact" — the same model written differently (iQOO | IQOO Z7 = iQOO | Z7);
+   * "possible" — differs only by 4G/5G, which may be another phone, so the admin picks.
+   */
+  const [matches, setMatches] = useState<Record<string, { level: "exact" | "possible"; modelId: string; label: string }>>({});
+  const loadMatches = async () => {
     try {
-      const result = await approveRequests({ requestIds: selectedRequests });
-      toast.success(`Approved ${result.successCount} request(s) and added to database`);
-      setSelectedRequests([]);
-    } catch (error) {
-      toast.error("Failed to approve requests");
-      console.error(error);
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const r: any = (await httpsCallable(getFunctions(), "modelRequestMatches")({})).data;
+      setMatches(r.matches || {});
+    } catch { /* tags are a convenience */ }
+  };
+  useEffect(() => { void loadMatches(); }, [allModelRequests?.length]);
+
+  // Approve on the server: links to a listed model instead of copying it, then the customer is told.
+  const approve = async (requestIds: string[], choices: Record<string, string> = {}) => {
+    if (!requestIds.length) { toast.error("Please select at least one request"); return; }
+    try {
+      const { getFunctions, httpsCallable } = await import("firebase/functions");
+      const r: any = (await httpsCallable(getFunctions(), "approveModelRequests", { timeout: 300_000 })({ requestIds, choices })).data;
+      if (r.successCount) toast.success(`Approved ${r.successCount}: ${r.linked} linked to listed models, ${r.added} added as new. Customers are being told.`);
+      if (r.needsChoice?.length) toast.warning(`${r.needsChoice.length} need your choice (Use existing / Add as new): ${r.needsChoice.slice(0, 3).join("; ")}`);
+      if (r.errors?.length) toast.error(r.errors.slice(0, 3).join("; "));
+      setSelectedRequests((sel) => sel.filter((id) => !requestIds.includes(id)));
+      void loadMatches();
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to approve requests");
     }
   };
+  const handleBulkApprove = () => approve(selectedRequests as string[]);
+  const exactIds = (filteredRequests || []).filter((r) => r.status === "pending" && matches[r._id]?.level === "exact").map((r) => r._id as string);
   
   // Handle reject single request
   const handleRejectRequest = async (requestId: Id<"modelRequests">) => {
@@ -860,13 +875,20 @@ export default function AdminModelsPage() {
                       Rejected
                     </Button>
                   </div>
-                  <Button 
-                    onClick={handleBulkApprove} 
-                    disabled={selectedRequests.length === 0}
-                  >
-                    <CheckIcon className="size-4 mr-2" />
-                    Approve Selected ({selectedRequests.length})
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    {exactIds.length > 0 && (
+                      <Button variant="outline" onClick={() => void approve(exactIds)} title="Approve every request the site already lists and tell those customers">
+                        Notify all already-on-site ({exactIds.length})
+                      </Button>
+                    )}
+                    <Button 
+                      onClick={() => void handleBulkApprove()} 
+                      disabled={selectedRequests.length === 0}
+                    >
+                      <CheckIcon className="size-4 mr-2" />
+                      Approve Selected ({selectedRequests.length})
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -928,10 +950,17 @@ export default function AdminModelsPage() {
                         <TableCell className="font-medium">{request.brandName}</TableCell>
                         <TableCell>
                           {request.modelName}
-                          {request.status === "pending" && alreadyListed(request) && (
-                            <Badge variant="outline" className="ml-2 border-green-500 text-[10px] text-green-700" title="The site already lists this model — approve to tell the customer">
-                              Already on site
+                          {request.status === "pending" && (matches[request._id]?.level === "exact" || alreadyListed(request)) && (
+                            <Badge variant="outline" className="ml-2 border-green-500 text-[10px] text-green-700" title={`Listed as ${matches[request._id]?.label || "this model"} — approve to tell the customer (no duplicate is made)`}>
+                              Already on site{matches[request._id]?.label ? `: ${matches[request._id].label}` : ""}
                             </Badge>
+                          )}
+                          {request.status === "pending" && matches[request._id]?.level === "possible" && !alreadyListed(request) && (
+                            <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <Badge variant="outline" className="border-amber-500 text-[10px] text-amber-700">Possibly on site as: {matches[request._id].label}</Badge>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => void approve([request._id], { [request._id]: matches[request._id].modelId })}>Use existing</Button>
+                              <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => void approve([request._id], { [request._id]: "new" })}>Add as new</Button>
+                            </span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -986,8 +1015,8 @@ export default function AdminModelsPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => handleBulkApprove()}
-                                  title="Approve"
+                                  onClick={() => void approve([request._id])}
+                                  title="Approve this request"
                                 >
                                   <CheckIcon className="size-4 text-green-600" />
                                 </Button>

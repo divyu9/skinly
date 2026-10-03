@@ -55,3 +55,4 @@ export * from "./walletEmail";
 export * from "./adminOrderEmail";
 export * from "./contacts";
 export * from "./orderItems";
+export * from "./modelRequestsAdmin";
