@@ -516,7 +516,7 @@ export const fast2smsLogs = onCall(async (_data: any, context: any) => {
   const rows = j.data.map((r: any) => ({
     requestId: String(r.request_id || ""), to: String(r.recipient_id || ""), status: String(r.status || ""),
     at: Number(r.timestamp) ? Number(r.timestamp) * 1000 : 0,
-    error: r.errors ? JSON.stringify(r.errors).slice(0, 400) : "",
+    error: explainMetaError(r.errors, r.status_description),
   }));
   rows.sort((a: any, b: any) => b.at - a.at);
   return { rows: rows.slice(0, 80) };
@@ -538,7 +538,19 @@ const META_ERRORS: Record<string, string> = {
   "130472": "Meta is running an experiment and held this marketing message back for this user.",
   "131031": "The WhatsApp business account is restricted.",
 };
-function explainMetaError(errors: any): string {
+/*
+ * Fast2SMS puts Meta's reason in `status_description` — "This message was not
+ * delivered to maintain healthy ecosystem engagement. (Error: 131049)",
+ * "(#132012) Parameter format does not match…" — with `errors` null, so every
+ * failure read as a bare "Failed at Meta". Both are read now.
+ */
+function explainMetaError(errors: any, description?: unknown): string {
+  const desc = String(description || "").trim();
+  if (desc) {
+    const code = /(?:Error:\s*|#)(\d{5,6})/.exec(desc)?.[1] || "";
+    const plain = code ? META_ERRORS[code] : "";
+    return plain ? `${plain} (Meta ${code})` : desc.slice(0, 200);
+  }
   const e = Array.isArray(errors) ? errors[0] : errors;
   if (!e) return "";
   const code = String(e.code ?? e.error_code ?? "");
@@ -581,11 +593,11 @@ async function syncFast2smsDelivery(): Promise<{ updated: number; reports: numbe
       const r = best.get(String(d.data().providerMessageId));
       const status = String(r?.status || "");
       if (!["delivered", "read", "failed"].includes(status)) continue;
-      const at = Number(r.timestamp) ? Number(r.timestamp) * 1000 : Date.now();
+      const at = Number(r.timestamp) ? Number(r.timestamp) * 1000 : Number(r.sent_timestamp) ? Number(r.sent_timestamp) * 1000 : Date.now();
       const patch: any = { status, deliveryCheckedAt: Date.now() };
       if (status === "delivered") patch.deliveredAt = at;
       if (status === "read") { patch.readAt = at; patch.deliveredAt = d.data().deliveredAt || at; }
-      if (status === "failed") { patch.failedAt = at; patch.failureReason = explainMetaError(r.errors) || "Failed at Meta"; }
+      if (status === "failed") { patch.failedAt = at; patch.failureReason = explainMetaError(r.errors, r.status_description) || "Failed at Meta"; }
       if (d.data().status === status && d.data().failureReason === patch.failureReason) continue;
       await d.ref.update(patch);
       updated++;
