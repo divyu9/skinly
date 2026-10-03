@@ -44,6 +44,13 @@ function AccordionTrigger({
   );
 }
 
+/*
+ * Always mounted. Radix removes a closed panel's content from the page, so an
+ * FAQ answer only existed after someone clicked it: Google's rendered page and
+ * AI readers got the questions without the answers. With forceMount the
+ * answer is in the DOM from the start, merely hidden (Radix sets `hidden`
+ * while closed) — collapsed content in the DOM is read and indexed.
+ */
 function AccordionContent({
   className,
   children,
@@ -52,7 +59,8 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden text-sm"
+      forceMount
+      className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden text-sm data-[state=closed]:hidden"
       {...props}
     >
       <div className={cn("pt-0 pb-4", className)}>{children}</div>

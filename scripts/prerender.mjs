@@ -234,11 +234,11 @@ const unwrap = (v) => {
   return v;
 };
 
-async function getJson(url) {
+async function getJson(url, init = {}) {
   let last;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      const res = await fetch(url, { ...init, signal: AbortSignal.timeout(20000) });
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       return await res.json();
     } catch (err) {
@@ -261,6 +261,27 @@ async function readCollection(project, name) {
     token = body.nextPageToken || "";
   } while (token);
   return out;
+}
+
+/**
+ * Approved reviews only — the one way the rules let the public read them
+ * (firestore.rules: status == "approved"). An unfiltered list was refused,
+ * the refusal was caught as "no reviews", and every build since shipped
+ * product pages without their rating and /reviews without a single review.
+ */
+async function readApprovedReviews(project) {
+  const url = `https://firestore.googleapis.com/v1/projects/${project}/databases/(default)/documents:runQuery`;
+  const rows = await getJson(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ structuredQuery: {
+      from: [{ collectionId: "reviews" }],
+      where: { fieldFilter: { field: { fieldPath: "status" }, op: "EQUAL", value: { stringValue: "approved" } } },
+      limit: 2000,
+    } }),
+  });
+  return (Array.isArray(rows) ? rows : []).filter((r) => r.document)
+    .map((r) => ({ _id: r.document.name.split("/").pop(), ...unwrap({ mapValue: { fields: r.document.fields || {} } }) }));
 }
 
 /** Every mockup row for one device (the storefront asks the same question). */
@@ -342,7 +363,9 @@ function headFor(p) {
 
 function noscriptFor(p) {
   if (!p.body) return "";
-  return `<noscript><main class="prerender-summary">${p.body}</main></noscript>`;
+  // Plain HTML, not <noscript>: hidden for script-running browsers by a class
+  // index.html sets in <head>, readable by every parser that doesn't run JS.
+  return `<main class="prerender-summary">${p.body}</main>`;
 }
 
 /*
@@ -793,6 +816,41 @@ function staticPages(hub, home = null) {
         `<p>A few minutes, no bubbles, with the install kit in your box: wet and dry wipes, a dust absorber, a squeegee and a microfiber cloth.</p>` +
         `<ol><li>Clean with the wet and dry wipes.</li><li>Lift the dust with the dust absorber.</li><li>Start at the bottom: line up the ports and speakers.</li><li>Press it flat with the squeegee.</li><li>Fine-tune around the camera.</li><li>Fold and press the sides.</li><li>Full body wrap: set the corners with a little heat.</li><li>Final wipe with the microfiber cloth.</li></ol>` +
         `<p><a href="https://www.youtube.com/watch?v=kP2ywckzWXA">Watch the video guide</a> · <a href="${SITE}/products">Shop skins</a></p>`,
+    },
+    {
+      // Who is behind the shop (src/pages/about/page.tsx): what AI answers and
+      // Google's quality raters look for — a real business, a place, a process.
+      route: "/about",
+      title: "About GoSkinly — Vinyl Skins Cut to Fit Your Exact Device | GoSkinly",
+      description: "GoSkinly by Mad House Media, Agra: printed vinyl skins precision-cut to the exact model of phone, laptop, console or camera, made to order and shipped across India.",
+      canonical: `${SITE}/about`,
+      priority: "0.5",
+      jsonLd: [{
+        "@context": "https://schema.org",
+        "@type": "AboutPage",
+        name: "About GoSkinly",
+        url: `${SITE}/about`,
+        mainEntity: {
+          "@type": "Organization",
+          name: "GoSkinly",
+          legalName: "Mad House Media",
+          url: SITE,
+          logo: `${SITE}/logo.webp`,
+          address: { "@type": "PostalAddress", addressLocality: "Agra", addressRegion: "Uttar Pradesh", postalCode: "282003", addressCountry: "IN" },
+          contactPoint: { "@type": "ContactPoint", contactType: "customer service", telephone: "+91-9761011121", email: "prgoskinly@gmail.com", areaServed: "IN", availableLanguage: ["English", "Hindi"] },
+        },
+      }],
+      body:
+        `<h1>About GoSkinly</h1>` +
+        `<p>GoSkinly makes printed vinyl skins for phones, laptops, tablets, consoles, cameras, lenses, drones and chargers. It is run by Mad House Media from Agra, Uttar Pradesh, and ships across India.</p>` +
+        `<h2>How a skin is made</h2>` +
+        `<ol><li>You choose a design and your exact device model.</li><li>The design is printed on vinyl and cut on a plotter from that model's own template, with openings for the cameras, ports and buttons.</li><li>It is packed with an install kit (wipes, dust absorber, squeegee, microfiber cloth) and dispatched in 2–3 business days.</li></ol>` +
+        `<h2>What a skin does — and doesn't</h2>` +
+        `<p>A skin changes how your device looks and protects the surface from scratches and scuffs. It is a thin wrap, so it does not protect against drops. It peels off cleanly without residue.</p>` +
+        `<h2>Finishes</h2><p>Matte, 3D textured, embossed and transparent (Tranzy) finishes; full body wraps for phones cover the back and sides.</p>` +
+        `<h2>Buying from us</h2><ul><li>Free shipping above ₹499 within India.</li><li>Returns within 48 hours of delivery for a wrong, missing or damaged item.</li><li>Every review on the site comes from a delivered order.</li></ul>` +
+        `<h2>Contact</h2><p>WhatsApp +91 97610 11121 · prgoskinly@gmail.com · Agra, Uttar Pradesh 282003, India.</p>` +
+        `<p><a href="${SITE}/how-to-apply">How to apply a skin</a> · <a href="${SITE}/real-photos">Real photos</a> · <a href="${SITE}/reviews">Customer reviews</a> · <a href="${SITE}/products">Shop</a></p>`,
     },
     {
       // Every approved review (src/pages/reviews/page.tsx).
@@ -1591,6 +1649,56 @@ function brandLogos(sections, cards) {
   return out;
 }
 
+// ─── llms.txt ─────────────────────────────────────────────────────────────────
+
+/**
+ * /llms.txt: a plain map of the shop for AI assistants (llmstxt.org) — what
+ * GoSkinly is, the facts people ask about, and the pages that answer them,
+ * each with its own one-line description. Written from the pages this build
+ * published, so it never lists a page that doesn't exist.
+ */
+async function writeLlmsTxt({ statics, categories, seo, seoDocs, seoInfo, stats }) {
+  const line = (p) => `- [${String(p.title || p.route).replace(/\s*\|\s*GoSkinly$/, "").replace(/[\[\]]/g, "")}](${SITE}${p.route === "/" ? "" : p.route}): ${clip(stripHtml(p.description || ""), 160)}`;
+  const kindOf = new Map(seoDocs.map((d) => [`/${d.slug}`, seoInfo.get(d.slug)?.target?.kind]));
+  const live = seo.filter((p) => !p.empty);
+  const of = (...kinds) => live.filter((p) => kinds.includes(kindOf.get(p.route)));
+  const models = Number(stats?.models) || 0, designs = Number(stats?.designs) || 0;
+  const out = [
+    "# GoSkinly",
+    "",
+    `> GoSkinly (goskinly.com, by Mad House Media, Agra, India) prints and precision-cuts vinyl skins for ${models ? `${models.toLocaleString("en-IN")}+` : "thousands of"} device models — phones, laptops, tablets, consoles, cameras, lenses, drones, chargers — in ${designs ? `${designs}+ ` : ""}designs and matte, 3D textured, embossed and transparent finishes. Every skin is cut to order for the exact model, ships across India, and peels off clean.`,
+    "",
+    "Key facts:",
+    "- What a skin is: a thin printed vinyl wrap for the back (and optionally sides) of a device — it changes the look and guards against scratches, not drops.",
+    "- Fit: cut for one exact model from its own template, with openings for cameras, ports and buttons.",
+    "- Shipping: India only; free above ₹499, otherwise a flat fee; dispatched in 2–3 business days, 4–6 days in transit.",
+    "- Returns: within 48 hours of delivery for a wrong, missing or damaged item.",
+    "- Payment: online (UPI, cards) and cash on delivery where available.",
+    "- Support: WhatsApp +91 97610 11121, email prgoskinly@gmail.com.",
+    "",
+    "## Shop and guides",
+    ...statics.filter((p) => p.route && !/^\/policies/.test(p.route)).map(line),
+    ...categories.map(line),
+    "",
+    "## Skins by brand and device type",
+    ...of("brand", "gadget", "family").slice(0, 80).map(line),
+    "",
+    "## Skins by style",
+    ...of("theme", "finish").slice(0, 50).map(line),
+    "",
+    "## Popular device models",
+    ...of("model").slice(0, 80).map(line),
+    "",
+    "## Policies",
+    ...statics.filter((p) => /^\/policies/.test(p.route || "")).map(line),
+    "",
+    `Full product list: ${SITE}/sitemap.xml`,
+    "",
+  ];
+  await fs.writeFile(path.join(DIST, "llms.txt"), out.join("\n"));
+  log(`llms.txt: ${out.filter((l) => l.startsWith("- [")).length} links`);
+}
+
 // ─── Google Merchant Center feed ──────────────────────────────────────────────
 
 /**
@@ -2169,7 +2277,7 @@ async function main() {
     ]);
     // Ratings for the Product markup. A separate read because a site with no
     // reviews yet must still build.
-    const reviews = await readCollection(project, "reviews").catch(() => []);
+    const reviews = await readApprovedReviews(project).catch((e) => { log(`warning: reviews not read (${e?.message || e})`); return []; });
     // `shipping` above is every settings document; the pages want the shipping one,
     // and the homepage rows want the bestseller ranking (settings/homeRankings).
     const settingsRows = Array.isArray(shipping) ? shipping : [];
@@ -2280,6 +2388,24 @@ async function main() {
     tag(CATALOGUE_CLAIMS.designs, designsNow, "designs");
   }
   const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home);
+  /*
+   * /reviews in the plain HTML: the reviews themselves, not one line about
+   * them — what a reader without JavaScript (an AI crawler) can quote. No
+   * review schema on it: ratings of the shop itself are not eligible, and
+   * each product page carries its own.
+   */
+  const reviewsPage = statics.find((p) => p.route === "/reviews");
+  const shown = (data.reviews || []).filter((r) => r.status === "approved" && Number(r.rating) >= 1)
+    .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0)).slice(0, 60);
+  if (reviewsPage && shown.length) {
+    const avg = shown.reduce((s2, r) => s2 + Number(r.rating), 0) / shown.length;
+    reviewsPage.body = `<h1>Customer reviews</h1><p>${shown.length} reviews from verified buyers, average ${avg.toFixed(1)} out of 5. Every review is tied to a delivered GoSkinly order.</p><ul>` +
+      shown.map((r) => `<li><p><strong>${"★".repeat(Math.round(Number(r.rating)))}${"☆".repeat(5 - Math.round(Number(r.rating)))}</strong> ${esc(r.title || "")}</p>` +
+        (r.comment ? `<p>“${esc(String(r.comment).slice(0, 600))}”</p>` : "") +
+        `<p>— ${esc(r.userName || "Verified buyer")}${r.city ? `, ${esc(r.city)}` : ""}${r.device ? ` · ${esc(r.device)}` : ""}${r.productSlug ? ` · <a href="${SITE}/products/${esc(r.productSlug)}">${esc(r.productTitle || "the design")}</a>` : ""}</p></li>`).join("") +
+      `</ul><p><a href="${SITE}/products">Shop all skins</a> · <a href="${SITE}/real-photos">Real photos</a></p>`;
+  }
+
   for (const p of statics) await writePage(p.route, render(template, p));
 
   const seoInfo = await seoPageData(project, seoDocs, data, variantsByProduct);
@@ -2394,6 +2520,7 @@ async function main() {
 
   const indexable = [...statics, magneto, ...categories.filter((p) => !p.empty), ...seo.filter((p) => !p.empty)];
   await writeSitemaps(indexable, productPages);
+  await writeLlmsTxt({ statics: [...statics, magneto], categories: categories.filter((p) => !p.empty), seo, seoDocs, seoInfo, stats: rows.stats });
   await fs.writeFile(path.join(DIST, `${INDEXNOW_KEY}.txt`), INDEXNOW_KEY);
   await submitIndexNow([...indexable, ...productPages]);
   const retired = data.products.filter((p) =>

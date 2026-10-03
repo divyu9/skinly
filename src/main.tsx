@@ -17,3 +17,7 @@ ReactDOM.createRoot(root).render(
 );
 
 reportWebVitals();
+
+// The build's plain-HTML copy of the page (for readers without JavaScript) has
+// done its job once the app is running; drop it so the page holds one copy.
+document.querySelectorAll(".prerender-summary").forEach((el) => el.remove());

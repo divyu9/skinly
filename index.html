@@ -12,6 +12,13 @@
          prerendered, and a hardcoded canonical here told every page on the
          site that it was a copy of the homepage. -->
     <!--seo-head-->
+    <!-- The page's text, written by the build into .prerender-summary, is plain
+         HTML for readers that don't run JavaScript (AI crawlers, link
+         previews). It used to sit inside <noscript>, which some parsers skip.
+         With JavaScript the app draws the same content, so it is hidden from
+         the first paint and removed when the app mounts (src/main.tsx). -->
+    <script>document.documentElement.classList.add("js")</script>
+    <style>.js .prerender-summary{display:none}</style>
     <!-- A page whose own bundle is gone reloads itself, once.
          Every page is cached at the edge for a few minutes, and every deploy
          replaces the hashed bundles under /assets with new names. For those
