@@ -1,494 +1,233 @@
-import { useQuery, useMutation } from "@/lib/firebase-hooks";
-import { api } from "@/lib/firebase-api";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button.tsx";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Label } from "@/components/ui/label.tsx";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select.tsx";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table.tsx";
-import { Badge } from "@/components/ui/badge.tsx";
-import { Skeleton } from "@/components/ui/skeleton.tsx";
+import { collection, getDocs, limit, orderBy, query, startAfter, type QueryDocumentSnapshot } from "firebase/firestore";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { db } from "@/lib/firebase-db";
+import { useMutation } from "@/lib/firebase-hooks";
+import { api } from "@/lib/firebase-api";
+import { WHATSAPP_MESSAGES } from "@/lib/whatsapp-registry";
 import { AdminLayout } from "@/components/admin-layout.tsx";
-import {
-  MessageSquareIcon,
-  FilterIcon,
-  RefreshCwIcon,
-  CheckCircle2Icon,
-  ClockIcon,
-  AlertCircleIcon,
-  SendIcon,
-  EyeIcon,
-} from "lucide-react";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
+import { LoaderIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon, SendIcon } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog.tsx";
-import type { Id } from "@/lib/firebase-api";
+
+/*
+ * Every WhatsApp message the site queued, newest first, and what became of it.
+ *
+ * "Sent" only means the provider took the message. Whether the phone got it
+ * comes later, from Fast2SMS's delivery reports, which whatsappDeliverySync
+ * copies onto each message every 15 minutes (or now, with "Refresh delivery
+ * status"): delivered, read, or failed with Meta's reason in plain words.
+ *
+ * This page used to load an arbitrary 50 documents (a limit with no order),
+ * ran one filter at a time, and kept the reason a message failed inside a
+ * dialog. It now reads the newest 200 by createdAt, filters them together
+ * here, and says why on the row.
+ */
+
+type Msg = {
+  _id: string; usecaseKey: string; recipientPhone: string; status: string; createdAt: number;
+  sentAt?: number; deliveredAt?: number; readAt?: number; failureReason?: string; test?: boolean;
+  provider?: string; providerResponse?: string; providerTemplateId?: string; variables?: Record<string, string>;
+  headerImage?: string; retryCount?: number;
+};
+
+const PAGE = 200;
+const LABEL = new Map(WHATSAPP_MESSAGES.map((m) => [m.key, m.label]));
+const STATUSES = ["all", "failed", "skipped", "pending", "sent", "delivered", "read"] as const;
+const STATUS_STYLE: Record<string, string> = {
+  failed: "bg-destructive/10 text-destructive border-destructive/40",
+  skipped: "bg-muted text-muted-foreground border-muted-foreground/30",
+  pending: "bg-[#fff4d6] text-ink border-ink/30",
+  processing: "bg-[#fff4d6] text-ink border-ink/30",
+  sent: "bg-muted text-ink border-ink/30",
+  delivered: "bg-[#d6f5ec] text-[#1b7462] border-[#1b7462]/40",
+  read: "bg-[#28a58b] text-ink border-ink",
+};
+const when = (t?: number) => t ? new Date(t).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "";
 
 export default function WhatsAppMessagesPage() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [usecaseFilter, setUsecaseFilter] = useState<string>("all");
-  const [phoneFilter, setPhoneFilter] = useState<string>("");
-  const [selectedMessageId, setSelectedMessageId] = useState<Id<"whatsappMessages"> | null>(null);
-
-  // Queries
-  const messages = useQuery(
-    api.whatsappMessaging.getMessages,
-    statusFilter !== "all"
-      ? { status: statusFilter as "pending" | "sent" | "delivered" | "read" | "failed" }
-      : usecaseFilter !== "all"
-      ? { usecaseKey: usecaseFilter }
-      : phoneFilter
-      ? { recipientPhone: phoneFilter }
-      : {}
-  );
-
-  const queueStats = useQuery(api.whatsappMessaging.getQueueStats);
-  const deliveryStats = useQuery(api.whatsappMessaging.getDeliveryStats);
-  const messageDetails = useQuery(
-    api.whatsappMessaging.getMessageDetails,
-    selectedMessageId ? { messageId: selectedMessageId } : "skip"
-  );
-
-  // Mutations
+  const [rows, setRows] = useState<Msg[] | null>(null);
+  const [cursor, setCursor] = useState<QueryDocumentSnapshot | null>(null);
+  const [more, setMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [status, setStatus] = useState<(typeof STATUSES)[number]>("all");
+  const [usecase, setUsecase] = useState("all");
+  const [q, setQ] = useState("");
+  const [hideTests, setHideTests] = useState(false);
+  const [open, setOpen] = useState<Msg | null>(null);
   const retryMessage = useMutation(api.whatsappMessaging.retryMessage);
-  const triggerWorker = useMutation(api.whatsappMessaging.triggerWorker);
 
-  const handleRetry = async (messageId: Id<"whatsappMessages">) => {
+  const load = async (next = false) => {
+    setLoading(true);
     try {
-      await retryMessage({ messageId });
-      toast.success("Message queued for retry");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to retry message");
-    }
+      const base = query(collection(db, "whatsappMessages"), orderBy("createdAt", "desc"), limit(PAGE));
+      const snap = await getDocs(next && cursor ? query(base, startAfter(cursor)) : base);
+      const got = snap.docs.map((d) => ({ _id: d.id, ...(d.data() as any) }) as Msg);
+      setRows((prev) => (next ? [...(prev || []), ...got] : got));
+      setCursor(snap.docs[snap.docs.length - 1] || null);
+      setMore(snap.size === PAGE);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not load messages");
+    } finally { setLoading(false); }
   };
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleTriggerWorker = async () => {
+  const syncDelivery = async () => {
+    setSyncing(true);
     try {
-      await triggerWorker({});
-      toast.success("Worker triggered");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to trigger worker");
-    }
+      const r: any = (await httpsCallable(getFunctions(), "syncWhatsAppDelivery")({})).data;
+      toast.success(`${r.updated} message${r.updated === 1 ? "" : "s"} updated from ${r.reports} delivery reports`);
+      await load();
+    } catch (e: any) { toast.error(e?.message || "Could not reach Fast2SMS"); }
+    finally { setSyncing(false); }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<
-      string,
-      { variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle2Icon }
-    > = {
-      pending: { variant: "outline", icon: ClockIcon },
-      sent: { variant: "secondary", icon: SendIcon },
-      delivered: { variant: "default", icon: CheckCircle2Icon },
-      read: { variant: "default", icon: EyeIcon },
-      failed: { variant: "destructive", icon: AlertCircleIcon },
-    };
-
-    const config = statusConfig[status] || { variant: "outline" as const, icon: ClockIcon };
-    const Icon = config.icon;
-
-    return (
-      <Badge variant={config.variant} className="gap-1">
-        <Icon className="size-3" />
-        {status}
-      </Badge>
-    );
+  const sendQueued = async () => {
+    try {
+      await httpsCallable(getFunctions(), "triggerWhatsAppWorker")({});
+      toast.success("Queued messages sent");
+      await load();
+    } catch (e: any) { toast.error(e?.message || "Could not run the worker"); }
   };
 
-  if (!messages || !queueStats || !deliveryStats) {
-    return (
-      <AdminLayout>
-        <Skeleton className="h-32 w-full mb-4" />
-        <Skeleton className="h-96 w-full" />
-      </AdminLayout>
-    );
-  }
+  const retry = async (m: Msg) => {
+    try {
+      await retryMessage({ messageId: m._id, retryCount: m.retryCount || 0 });
+      toast.success("Queued again — it goes out on the next run, or press Send queued now");
+      await load();
+    } catch (e: any) { toast.error(e?.message || "Could not retry"); }
+  };
+
+  const base = useMemo(() => (rows || []).filter((m) => !hideTests || !m.test), [rows, hideTests]);
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: base.length };
+    for (const m of base) c[m.status] = (c[m.status] || 0) + 1;
+    return c;
+  }, [base]);
+  const usecases = useMemo(() => [...new Set((rows || []).map((m) => m.usecaseKey))].sort(), [rows]);
+  const list = useMemo(() => {
+    const digits = q.replace(/\D/g, "");
+    return base.filter((m) =>
+      (status === "all" || m.status === status) &&
+      (usecase === "all" || m.usecaseKey === usecase) &&
+      (!digits || String(m.recipientPhone || "").replace(/\D/g, "").includes(digits)));
+  }, [base, status, usecase, q]);
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <MessageSquareIcon className="size-8" />
-              WhatsApp Messages
-            </h1>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleTriggerWorker}>
-                <RefreshCwIcon className="size-4 mr-2" />
-                Trigger Worker
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link to="/backend-skinly/whatsapp">Back to Settings</Link>
-              </Button>
-            </div>
+      <div className="mx-auto max-w-6xl space-y-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="flex items-center gap-2 text-3xl font-extrabold"><MessageSquareIcon className="size-7" /> WhatsApp Messages</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Newest first. <b>Sent</b> = Fast2SMS took it; <b>Delivered / Read</b> = it reached the phone; <b>Failed</b> says why. Delivery updates every 15 minutes.
+            </p>
           </div>
-          <p className="text-muted-foreground">
-            View and monitor all sent WhatsApp messages
-          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => void syncDelivery()} disabled={syncing}>
+              {syncing ? <LoaderIcon className="mr-2 size-4 animate-spin" /> : <RefreshCwIcon className="mr-2 size-4" />}Refresh delivery status
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void sendQueued()}><SendIcon className="mr-2 size-4" />Send queued now</Button>
+            <Button variant="outline" size="sm" asChild><Link to="/backend-skinly/whatsapp">Templates</Link></Button>
+          </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Delivery Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Sent:</span>
-                  <span className="font-semibold">{deliveryStats.total}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Delivered:</span>
-                  <span className="font-semibold text-green-600">{deliveryStats.delivered}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Failed:</span>
-                  <span className="font-semibold text-red-600">{deliveryStats.failed}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Queue Stats</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Pending:</span>
-                  <span className="font-semibold">{queueStats.pending}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Processing:</span>
-                  <span className="font-semibold text-blue-600">{queueStats.processing}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Failed:</span>
-                  <span className="font-semibold text-red-600">{queueStats.failed}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Status Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Pending:</span>
-                  <span className="font-semibold">{deliveryStats.pending}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Sent:</span>
-                  <span className="font-semibold">{deliveryStats.sent}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Read:</span>
-                  <span className="font-semibold text-blue-600">{deliveryStats.read}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-2">
+          {STATUSES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStatus(s)}
+              className={`rounded-full border-2 px-3 py-1 text-sm font-semibold capitalize ${status === s ? "border-ink bg-[#28a58b] text-ink" : "border-muted bg-background text-muted-foreground hover:border-ink"}`}
+            >
+              {s} <span className="opacity-70">{rows ? counts[s] || 0 : ""}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <FilterIcon className="size-4" />
-              Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="delivered">Delivered</SelectItem>
-                    <SelectItem value="read">Read</SelectItem>
-                    <SelectItem value="failed">Failed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search phone number…" className="pl-9" inputMode="numeric" />
+          </div>
+          <select value={usecase} onChange={(e) => setUsecase(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm">
+            <option value="all">All messages</option>
+            {usecases.map((k) => <option key={k} value={k}>{LABEL.get(k) || k}</option>)}
+          </select>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={hideTests} onChange={(e) => setHideTests(e.target.checked)} /> Hide tests
+          </label>
+        </div>
 
-              <div className="space-y-2">
-                <Label>Use Case</Label>
-                <Select value={usecaseFilter} onValueChange={setUsecaseFilter}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Use Cases</SelectItem>
-                    <SelectItem value="order_received">Order Received</SelectItem>
-                    <SelectItem value="order_dispatched">Order Dispatched</SelectItem>
-                    <SelectItem value="order_delivered">Order Delivered</SelectItem>
-                    <SelectItem value="order_cancelled">Order Cancelled</SelectItem>
-                    <SelectItem value="cod_confirmation">COD Confirmation</SelectItem>
-                    <SelectItem value="cod_otp">COD OTP</SelectItem>
-                    <SelectItem value="partial_cod">Partial COD</SelectItem>
-                    <SelectItem value="payment_failed">Payment Failed</SelectItem>
-                    <SelectItem value="back_in_stock">Back in Stock</SelectItem>
-                    <SelectItem value="review_request">Review Request</SelectItem>
-                    <SelectItem value="review_reminder">Review Reminder</SelectItem>
-                    <SelectItem value="otp_login">Login OTP</SelectItem>
-                    <SelectItem value="admin_new_order">Admin New Order</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {!rows ? (
+          <div className="flex items-center gap-2 text-muted-foreground"><LoaderIcon className="size-4 animate-spin" /> Loading…</div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border-2 border-ink bg-card">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="border-b-2 border-ink bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="p-3">When</th><th className="p-3">Message</th><th className="p-3">To</th><th className="p-3">Status</th><th className="p-3">Why / detail</th><th className="p-3" /></tr>
+              </thead>
+              <tbody>
+                {list.map((m) => (
+                  <tr key={m._id} className="border-b align-top last:border-0">
+                    <td className="whitespace-nowrap p-3 text-muted-foreground">{when(m.createdAt)}</td>
+                    <td className="p-3">
+                      <div className="font-semibold">{LABEL.get(m.usecaseKey) || m.usecaseKey}</div>
+                      {m.test && <span className="rounded bg-[#ffd166] px-1.5 text-[10px] font-bold uppercase">test</span>}
+                    </td>
+                    <td className="whitespace-nowrap p-3 font-mono text-xs">{m.recipientPhone}</td>
+                    <td className="p-3">
+                      <span className={`inline-block rounded-full border px-2 py-0.5 text-xs font-bold capitalize ${STATUS_STYLE[m.status] || STATUS_STYLE.sent}`}>{m.status}</span>
+                      <div className="mt-1 text-[11px] text-muted-foreground">
+                        {m.readAt ? `read ${when(m.readAt)}` : m.deliveredAt ? `delivered ${when(m.deliveredAt)}` : m.sentAt ? `sent ${when(m.sentAt)}` : ""}
+                      </div>
+                    </td>
+                    <td className={`max-w-[340px] p-3 text-xs ${m.status === "failed" ? "text-destructive" : "text-muted-foreground"}`}>
+                      {m.failureReason || (m.status === "sent" ? "Waiting for the delivery report" : "")}
+                    </td>
+                    <td className="whitespace-nowrap p-3 text-right">
+                      <button type="button" className="text-xs underline" onClick={() => setOpen(m)}>Details</button>
+                      {(m.status === "failed" || m.status === "skipped") && !m.test && (
+                        <button type="button" className="ml-3 text-xs font-semibold underline" onClick={() => void retry(m)}>Retry</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {!list.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Nothing matches these filters.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-              <div className="space-y-2">
-                <Label>Phone Number</Label>
-                <Input
-                  placeholder="Filter by phone..."
-                  value={phoneFilter}
-                  onChange={(e) => setPhoneFilter(e.target.value)}
-                />
-              </div>
-            </div>
-
-            {(statusFilter !== "all" || usecaseFilter !== "all" || phoneFilter) && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4"
-                onClick={() => {
-                  setStatusFilter("all");
-                  setUsecaseFilter("all");
-                  setPhoneFilter("");
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Messages Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Messages ({messages.length})</CardTitle>
-            <CardDescription>
-              Showing most recent {messages.length} messages
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {messages.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No messages found
-              </div>
-            ) : (
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Use Case</TableHead>
-                      <TableHead>Recipient</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Sent</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {messages.map((message) => (
-                      <TableRow key={message._id}>
-                        <TableCell className="text-sm">
-                          {message.createdAtFormatted}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                            {message.usecaseKey}
-                          </span>
-                        </TableCell>
-                        <TableCell>{message.recipientName}</TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {message.recipientPhone}
-                        </TableCell>
-                        <TableCell>{getStatusBadge(message.status)}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {message.sentAtFormatted || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedMessageId(message._id)}
-                            >
-                              View
-                            </Button>
-                            {message.status === "failed" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleRetry(message._id)}
-                              >
-                                Retry
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {more && (
+          <div className="text-center">
+            <Button variant="outline" onClick={() => void load(true)} disabled={loading}>{loading ? "Loading…" : `Load ${PAGE} older`}</Button>
+          </div>
+        )}
       </div>
 
-      {/* Message Details Dialog */}
-      <Dialog
-        open={selectedMessageId !== null}
-        onOpenChange={(open) => !open && setSelectedMessageId(null)}
-      >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Message Details</DialogTitle>
-            <DialogDescription>Full details of the WhatsApp message</DialogDescription>
-          </DialogHeader>
-
-          {messageDetails ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+      <Dialog open={!!open} onOpenChange={(v) => !v && setOpen(null)}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogHeader><DialogTitle>{open ? LABEL.get(open.usecaseKey) || open.usecaseKey : ""}</DialogTitle></DialogHeader>
+          {open && (
+            <div className="space-y-3 text-sm">
+              <p>To <b className="font-mono">{open.recipientPhone}</b> · {open.status} · {open.provider || "—"} template <span className="font-mono">{open.providerTemplateId || "—"}</span></p>
+              <p className="text-muted-foreground">Created {when(open.createdAt)}{open.sentAt ? ` · sent ${when(open.sentAt)}` : ""}{open.deliveredAt ? ` · delivered ${when(open.deliveredAt)}` : ""}{open.readAt ? ` · read ${when(open.readAt)}` : ""}</p>
+              {open.failureReason && <p className="rounded bg-destructive/10 p-2 text-destructive">{open.failureReason}</p>}
+              {open.headerImage && <img src={open.headerImage} alt="" className="max-h-40 rounded border" />}
+              {open.variables && (
+                <pre className="whitespace-pre-wrap break-all rounded bg-muted p-2 text-xs">{JSON.stringify(open.variables, null, 2)}</pre>
+              )}
+              {open.providerResponse && (
                 <div>
-                  <Label className="text-xs text-muted-foreground">Status</Label>
-                  <div className="mt-1">{getStatusBadge(messageDetails.status)}</div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Use Case</Label>
-                  <div className="mt-1 text-sm font-mono bg-muted px-2 py-1 rounded inline-block">
-                    {messageDetails.usecaseKey}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs text-muted-foreground">Recipient</Label>
-                <div className="mt-1 text-sm">{messageDetails.recipientName}</div>
-                <div className="text-xs font-mono text-muted-foreground">
-                  {messageDetails.recipientPhone}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-xs text-muted-foreground">Template</Label>
-                <div className="mt-1 text-sm">{messageDetails.templateName}</div>
-                <div className="text-xs font-mono text-muted-foreground">
-                  ID: {messageDetails.providerTemplateId}
-                </div>
-              </div>
-
-              {messageDetails.variables && Object.keys(messageDetails.variables).length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Variables</Label>
-                  <div className="mt-1 bg-muted p-3 rounded text-xs font-mono">
-                    {JSON.stringify(messageDetails.variables, null, 2)}
-                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground">Provider's reply</p>
+                  <pre className="whitespace-pre-wrap break-all rounded bg-muted p-2 text-xs">{open.providerResponse}</pre>
                 </div>
               )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Retry Count</Label>
-                  <div className="mt-1 text-sm">{messageDetails.retryCount}</div>
-                </div>
-                {messageDetails.providerMessageId && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Provider Message ID</Label>
-                    <div className="mt-1 text-xs font-mono">{messageDetails.providerMessageId}</div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Created</Label>
-                  <div className="mt-1 text-sm">
-                    {new Date(messageDetails.createdAt).toLocaleString("en-IN")}
-                  </div>
-                </div>
-                {messageDetails.sentAt && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Sent</Label>
-                    <div className="mt-1 text-sm">
-                      {new Date(messageDetails.sentAt).toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                )}
-                {messageDetails.deliveredAt && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Delivered</Label>
-                    <div className="mt-1 text-sm">
-                      {new Date(messageDetails.deliveredAt).toLocaleString("en-IN")}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {messageDetails.errorMessage && (
-                <div className="pt-4 border-t">
-                  <Label className="text-xs text-muted-foreground">Error Message</Label>
-                  <div className="mt-1 text-sm text-red-600 bg-red-50 dark:bg-red-950 p-3 rounded">
-                    {messageDetails.errorMessage}
-                  </div>
-                </div>
-              )}
-
-              {messageDetails.queueStatus && (
-                <div className="pt-4 border-t">
-                  <Label className="text-xs text-muted-foreground">Queue Status</Label>
-                  <div className="mt-1 text-sm">
-                    Status: {messageDetails.queueStatus} | Attempts: {messageDetails.queueAttempts}
-                  </div>
-                  {messageDetails.queueError && (
-                    <div className="mt-2 text-xs text-red-600 bg-red-50 dark:bg-red-950 p-2 rounded">
-                      {messageDetails.queueError}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
             </div>
           )}
         </DialogContent>

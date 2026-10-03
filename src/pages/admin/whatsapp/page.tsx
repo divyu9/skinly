@@ -35,7 +35,6 @@ export default function WhatsAppAdminPage() {
   const [savedProvider, setSavedProvider] = useState({ provider: "authkey", phoneNumberId: "" });
   const [f2s, setF2s] = useState<any>(null);
   const [f2sLoading, setF2sLoading] = useState(false);
-  const [f2sLog, setF2sLog] = useState<any[] | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -152,36 +151,8 @@ export default function WhatsAppAdminPage() {
                   finally { setF2sLoading(false); }
                 }}>{f2sLoading ? "Checking…" : "Check Fast2SMS"}</Button>
               )}
-              {provider === "fast2sms" && (
-                <Button size="sm" variant="outline" disabled={f2sLoading} onClick={async () => {
-                  setF2sLoading(true);
-                  try {
-                    const r: any = (await httpsCallable(getFunctions(), "fast2smsLogs")({})).data;
-                    setF2sLog(r.rows || []);
-                  } catch (e: any) { toast.error(e?.message || "Could not reach Fast2SMS"); }
-                  finally { setF2sLoading(false); }
-                }}>Delivery log</Button>
-              )}
+              <Link to="/backend-skinly/whatsapp/messages" className="text-sm font-semibold underline">Delivery status per message</Link>
             </div>
-            {f2sLog && (
-              <div className="mt-3 overflow-x-auto text-xs">
-                <p className="mb-1 text-muted-foreground">Fast2SMS reports, last 3 days, newest first. "accepted"/"sent" is not "delivered"; a failed one shows Meta's reason.</p>
-                <table className="w-full">
-                  <thead className="text-left text-muted-foreground"><tr><th className="p-1">Time</th><th className="p-1">To</th><th className="p-1">Status</th><th className="p-1">Error</th></tr></thead>
-                  <tbody>
-                    {f2sLog.map((r, i) => (
-                      <tr key={i} className="border-t align-top">
-                        <td className="whitespace-nowrap p-1">{r.at ? new Date(r.at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—"}</td>
-                        <td className="p-1">{r.to}</td>
-                        <td className={`p-1 font-semibold ${r.status === "failed" ? "text-destructive" : ""}`}>{r.status}</td>
-                        <td className="break-all p-1 text-destructive">{r.error}</td>
-                      </tr>
-                    ))}
-                    {!f2sLog.length && <tr><td colSpan={4} className="p-2 text-muted-foreground">No reports in the last 3 days.</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-            )}
             {f2s && (
               <div className="mt-3 space-y-3 text-sm">
                 {f2s.numbers.map((n: any) => (

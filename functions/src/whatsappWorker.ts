@@ -323,9 +323,11 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
     }
     const fbody = await fres.text();
     let ok = false;
+    let providerMessageId = "";
     try {
       const j = JSON.parse(fbody);
       ok = fres.status === 200 && (j.status === true || j.return === true || !!j.messages?.[0]?.id);
+      providerMessageId = String(j.request_id || j.messages?.[0]?.id || "");
     } catch { ok = false; }
     if (!ok) {
       console.error("fast2sms send failed:", { status: fres.status, body: fbody.slice(0, 300) });
@@ -334,7 +336,10 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
       return false;
     }
     await queueRef.update({ status: "sent", sentAt: Date.now(), failureReason: admin.firestore.FieldValue.delete() });
-    await msgSnap.ref.update({ status: "sent", sentAt: Date.now(), provider, providerResponse: fbody.slice(0, 500), providerTemplateId: wid, sentParams: numbered, ...(headerImage ? { headerImage } : {}) });
+    await msgSnap.ref.update({
+      status: "sent", sentAt: Date.now(), provider, providerResponse: fbody.slice(0, 500), providerTemplateId: wid, sentParams: numbered,
+      ...(providerMessageId ? { providerMessageId } : {}), ...(headerImage ? { headerImage } : {}),
+    });
     return true;
   }
   const res = headerImage
@@ -515,4 +520,91 @@ export const fast2smsLogs = onCall(async (_data: any, context: any) => {
   }));
   rows.sort((a: any, b: any) => b.at - a.at);
   return { rows: rows.slice(0, 80) };
+});
+
+
+// ── Delivery reports ────────────────────────────────────────────────────────
+
+/** Meta's error codes a shop owner actually meets, in plain words. */
+const META_ERRORS: Record<string, string> = {
+  "131049": "Meta held this marketing message back (it limits how many marketing messages one person gets). Not a fault on our side; try again in a day or two.",
+  "131050": "The customer chose to stop marketing messages from us.",
+  "131026": "This number can't receive it (not on WhatsApp, old app, or hasn't accepted the latest WhatsApp terms).",
+  "131047": "More than 24 hours since the customer's last message, so only a template can be sent.",
+  "131056": "Too many messages to this number too quickly; it will go through later.",
+  "132012": "The message didn't match the approved template (photo header or variables).",
+  "132001": "Template not found or not approved yet.",
+  "131051": "Unsupported message type.",
+  "130472": "Meta is running an experiment and held this marketing message back for this user.",
+  "131031": "The WhatsApp business account is restricted.",
+};
+function explainMetaError(errors: any): string {
+  const e = Array.isArray(errors) ? errors[0] : errors;
+  if (!e) return "";
+  const code = String(e.code ?? e.error_code ?? "");
+  const plain = META_ERRORS[code];
+  const raw = String(e.title || e.message || e.error_data?.details || JSON.stringify(e)).slice(0, 200);
+  return plain ? `${plain} (Meta ${code})` : `${raw}${code ? ` (Meta ${code})` : ""}`;
+}
+
+const RANK: Record<string, number> = { accepted: 1, sent: 2, delivered: 3, read: 4, failed: 5 };
+
+/**
+ * Pulls Fast2SMS's status reports (last 3 days) onto whatsappMessages:
+ * delivered / read / failed with Meta's reason in plain words. "sent" in our
+ * log only meant Fast2SMS took it; this is where the phone's answer arrives.
+ */
+async function syncFast2smsDelivery(): Promise<{ updated: number; reports: number }> {
+  const key = process.env.FAST2SMS_API_KEY || "";
+  if (!key) return { updated: 0, reports: 0 };
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const to = new Date(Date.now() + 5.5 * 3600 * 1000);
+  const from = new Date(to.getTime() - 2 * 86400 * 1000);
+  const fetch = require("node-fetch");
+  const res = await fetch(`https://www.fast2sms.com/dev/whatsapp_logs?from=${day(from)}&to=${day(to)}`, { headers: { Authorization: key } });
+  const j: any = await res.json().catch(() => null);
+  const rows: any[] = Array.isArray(j?.data) ? j.data : [];
+  // The furthest each message got: failed beats read beats delivered beats sent.
+  const best = new Map<string, any>();
+  for (const r of rows) {
+    const id = String(r.request_id || "");
+    if (!id) continue;
+    const cur = best.get(id);
+    if (!cur || (RANK[r.status] || 0) > (RANK[cur.status] || 0)) best.set(id, r);
+  }
+  const db = admin.firestore();
+  let updated = 0;
+  const ids = [...best.keys()];
+  for (let i = 0; i < ids.length; i += 30) {
+    const snap = await db.collection("whatsappMessages").where("providerMessageId", "in", ids.slice(i, i + 30)).get();
+    for (const d of snap.docs) {
+      const r = best.get(String(d.data().providerMessageId));
+      const status = String(r?.status || "");
+      if (!["delivered", "read", "failed"].includes(status)) continue;
+      const at = Number(r.timestamp) ? Number(r.timestamp) * 1000 : Date.now();
+      const patch: any = { status, deliveryCheckedAt: Date.now() };
+      if (status === "delivered") patch.deliveredAt = at;
+      if (status === "read") { patch.readAt = at; patch.deliveredAt = d.data().deliveredAt || at; }
+      if (status === "failed") { patch.failedAt = at; patch.failureReason = explainMetaError(r.errors) || "Failed at Meta"; }
+      if (d.data().status === status && d.data().failureReason === patch.failureReason) continue;
+      await d.ref.update(patch);
+      updated++;
+    }
+  }
+  return { updated, reports: rows.length };
+}
+
+/** Every 15 minutes, so the Messages page shows delivered / failed without anyone asking. */
+export const whatsappDeliverySync = functionsV1.pubsub
+  .schedule("every 15 minutes")
+  .timeZone("Asia/Kolkata")
+  .onRun(async () => {
+    const r = await syncFast2smsDelivery().catch((e) => { console.error("[delivery sync]", e); return null; });
+    console.log("[delivery sync]", r);
+  });
+
+/** Admin › WhatsApp › Messages: "Refresh delivery status". */
+export const syncWhatsAppDelivery = onCall(async (_data: any, context: any) => {
+  await requireAdmin(context);
+  return syncFast2smsDelivery();
 });
