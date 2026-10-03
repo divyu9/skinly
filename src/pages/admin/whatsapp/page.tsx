@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { addDoc, collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { CheckCircle2Icon, ImageIcon, LoaderIcon, MessageSquareIcon, SendIcon, TypeIcon } from "lucide-react";
@@ -29,11 +29,21 @@ export default function WhatsAppAdminPage() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, { ok: boolean; text: string }>>({});
+  // Who sends (whatsappSettings/provider). The API keys stay in functions/.env.
+  const [provider, setProvider] = useState<"authkey" | "fast2sms">("authkey");
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+  const [savedProvider, setSavedProvider] = useState({ provider: "authkey", phoneNumberId: "" });
 
   useEffect(() => {
     (async () => {
       const [uc, tpl] = await Promise.all([getDocs(collection(db, "whatsappUsecases")), getDocs(collection(db, "whatsappTemplates"))]);
-      const photoOf = new Map(tpl.docs.map((d) => [String(d.data().providerTemplateId || ""), d.data().headerType === "image"]));
+      const ps = (await getDoc(doc(db, "whatsappSettings", "provider"))).data() as any;
+      const prov = ps?.provider === "fast2sms" ? "fast2sms" : "authkey";
+      setProvider(prov); setPhoneNumberId(String(ps?.phoneNumberId || ""));
+      setSavedProvider({ provider: prov, phoneNumberId: String(ps?.phoneNumberId || "") });
+      const photoOf = new Map(tpl.docs
+        .filter((d) => (d.data().provider || "authkey") === prov)
+        .map((d) => [String(d.data().providerTemplateId || ""), d.data().headerType === "image"]));
       const next: Record<string, Row> = {};
       for (const spec of WHATSAPP_MESSAGES) {
         const d = uc.docs.find((x) => x.data().usecaseKey === spec.key);
@@ -55,8 +65,10 @@ export default function WhatsAppAdminPage() {
     setBusy(`save:${spec.key}`);
     try {
       if (id) {
-        const t = await getDocs(query(collection(db, "whatsappTemplates"), where("providerTemplateId", "==", id)));
-        const data = { providerTemplateId: id, name: spec.key, variables: spec.vars, headerType: row.photo ? "image" : "none", status: "approved", updatedAt: Date.now() };
+        const all = await getDocs(query(collection(db, "whatsappTemplates"), where("providerTemplateId", "==", id)));
+        const mine = all.docs.filter((d) => (d.data().provider || "authkey") === savedProvider.provider);
+        const t = { empty: !mine.length, docs: mine };
+        const data = { providerTemplateId: id, provider: savedProvider.provider, name: spec.key, variables: spec.vars, headerType: row.photo ? "image" : "none", status: "approved", updatedAt: Date.now() };
         if (t.empty) await addDoc(collection(db, "whatsappTemplates"), { ...data, templateName: spec.key, createdAt: Date.now() });
         else await setDoc(t.docs[0].ref, data, { merge: true });
       }
@@ -101,6 +113,32 @@ export default function WhatsAppAdminPage() {
             <div className="flex items-center gap-2 text-sm">
               <span className="rounded-full border-2 border-ink bg-[#ffd166] px-3 py-1 font-bold">{onCount} of {WHATSAPP_MESSAGES.length} on</span>
               <Link to="/backend-skinly/whatsapp/messages" className="font-semibold underline">Message log</Link>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border-2 border-ink bg-card p-4 shadow-[3px_3px_0_0_var(--ink)]">
+            <h2 className="text-base font-extrabold">Sending through</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              The template IDs below belong to this provider — switching means pasting that provider's IDs.
+              Fast2SMS: Phone Number ID is on its WhatsApp dashboard; the API key goes in functions/.env as FAST2SMS_API_KEY.
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <select value={provider} onChange={(e) => setProvider(e.target.value as any)} className="h-9 rounded-md border bg-background px-3 text-sm">
+                <option value="fast2sms">Fast2SMS</option>
+                <option value="authkey">Authkey</option>
+              </select>
+              {provider === "fast2sms" && (
+                <Input value={phoneNumberId} onChange={(e) => setPhoneNumberId(e.target.value.replace(/\D/g, ""))} placeholder="WABA Phone Number ID" className="w-64" inputMode="numeric" />
+              )}
+              {(provider !== savedProvider.provider || phoneNumberId !== savedProvider.phoneNumberId) && (
+                <Button size="sm" onClick={async () => {
+                  if (provider === "fast2sms" && !phoneNumberId) { toast.error("Add the Phone Number ID"); return; }
+                  await setDoc(doc(db, "whatsappSettings", "provider"), { provider, phoneNumberId, updatedAt: Date.now() }, { merge: true });
+                  setSavedProvider({ provider, phoneNumberId });
+                  toast.success(`Sending through ${provider === "fast2sms" ? "Fast2SMS" : "Authkey"}`);
+                  window.location.reload();
+                }}>Save</Button>
+              )}
             </div>
           </div>
 

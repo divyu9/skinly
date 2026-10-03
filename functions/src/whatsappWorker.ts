@@ -128,8 +128,17 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
     return false;
   }
 
+  /*
+   * Which provider sends: whatsappSettings/provider (Admin › WhatsApp). The
+   * number moved to Fast2SMS on 3 Oct 2026 after Authkey's onboarding stalled;
+   * Authkey stays as a fallback. Keys live in functions/.env, never Firestore.
+   */
+  const prov = ((await db.doc("whatsappSettings/provider").get()).data() || {}) as any;
+  const provider: "fast2sms" | "authkey" = prov.provider === "fast2sms" ? "fast2sms" : "authkey";
   const authkey = process.env.WHATSAPP_AUTHKEY || "";
-  if (!authkey) throw new Error("WHATSAPP_AUTHKEY not configured");
+  const f2sKey = process.env.FAST2SMS_API_KEY || "";
+  if (provider === "authkey" && !authkey) throw new Error("WHATSAPP_AUTHKEY not configured");
+  if (provider === "fast2sms" && (!f2sKey || !prov.phoneNumberId)) throw new Error("Fast2SMS needs FAST2SMS_API_KEY in functions/.env and the Phone Number ID in Admin › WhatsApp");
 
   const phone = String(msg.recipientPhone || "").replace(/\D/g, "").slice(-10);
   if (!/^[6-9]\d{9}$/.test(phone)) {
@@ -148,8 +157,10 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
   // Authkey takes variables positionally, as 1, 2, 3…, in the order the
   // template declares them — not by name. Sent by name they are simply
   // dropped and the message arrives with empty placeholders.
-  const tpl = await db.collection("whatsappTemplates")
-    .where("providerTemplateId", "==", wid).limit(1).get();
+  // The template registered for this provider (IDs from two providers can collide).
+  const tplAll = await db.collection("whatsappTemplates").where("providerTemplateId", "==", wid).get();
+  const tplDoc = tplAll.docs.find((d) => ((d.data() as any).provider || "authkey") === provider) || tplAll.docs[0];
+  const tpl = { empty: !tplDoc, docs: tplDoc ? [tplDoc] : [] };
   const order: string[] = tpl.empty ? [] : (tpl.docs[0].data().variables || []);
   const numbered: Record<string, string> = {};
   order.forEach((name, i) => {
@@ -169,6 +180,27 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
     : "";
 
   const fetch = require("node-fetch");
+  if (provider === "fast2sms") {
+    // Values in template order, joined with "|" — so a "|" inside one would split it.
+    const values = order.map((_, i) => String(numbered[String(i + 1)] ?? "").replace(/\|/g, "/").replace(/\s*\n\s*/g, " "));
+    const q = new URLSearchParams({ message_id: wid, phone_number_id: String(prov.phoneNumberId), numbers: phone });
+    if (values.length) q.set("variables_values", values.join("|"));
+    if (headerImage) q.set("media_url", headerImage);
+    q.set("udf1", messageId);
+    const fres = await fetch(`https://www.fast2sms.com/dev/whatsapp?${q.toString()}`, { method: "GET", headers: { Authorization: f2sKey } });
+    const fbody = await fres.text();
+    let ok = false;
+    try { const j = JSON.parse(fbody); ok = fres.status === 200 && (j.status === true || j.return === true); } catch { ok = false; }
+    if (!ok) {
+      console.error("fast2sms send failed:", { status: fres.status, body: fbody.slice(0, 300) });
+      await queueRef.update({ status: "pending", failureReason: `Fast2SMS: ${fbody.slice(0, 200)}` });
+      await msgSnap.ref.update({ status: "failed", provider, failureReason: `Fast2SMS: ${fbody.slice(0, 200)}`, providerResponse: fbody.slice(0, 500) });
+      return false;
+    }
+    await queueRef.update({ status: "sent", sentAt: Date.now(), failureReason: admin.firestore.FieldValue.delete() });
+    await msgSnap.ref.update({ status: "sent", sentAt: Date.now(), provider, providerResponse: fbody.slice(0, 500), providerTemplateId: wid, sentParams: numbered, ...(headerImage ? { headerImage } : {}) });
+    return true;
+  }
   const res = headerImage
     ? await fetch(AUTHKEY_JSON_URL, {
         method: "POST",
