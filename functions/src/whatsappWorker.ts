@@ -136,6 +136,15 @@ export function readAuthkeyResult(status: number, body: string): { sent: boolean
 }
 
 const isSendableStatus = (s: string) => s === "pending" || s === "queued";
+/*
+ * A row is claimed ("processing") before its send. If the run dies in between
+ * — a deploy replacing the function, a timeout — nothing ever put it back, and
+ * the worker only picks up pending rows: two messages sat "processing" for
+ * days. A claim older than this is taken as abandoned and tried again (still
+ * within MAX_ATTEMPTS, so a message that kills the run can't loop forever).
+ */
+const STALE_CLAIM_MS = 10 * 60 * 1000;
+const isStaleClaim = (row: any) => row.status === "processing" && Date.now() - Number(row.lastAttemptAt || 0) > STALE_CLAIM_MS;
 
 /** Claims one queue row, or returns null if another run already has it. */
 const claim = async (queueId: string): Promise<any | null> => {
@@ -147,7 +156,7 @@ const claim = async (queueId: string): Promise<any | null> => {
       if (!snap.exists) return null;
       const row = snap.data() as any;
 
-      if (!isSendableStatus(row.status)) return null;
+      if (!isSendableStatus(row.status) && !isStaleClaim(row)) return null;
       if (Number(row.attempts || 0) >= MAX_ATTEMPTS) {
         tx.update(ref, { status: "failed", failureReason: "attempt limit reached" });
         return null;
@@ -376,7 +385,7 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
 const drainQueue = async (): Promise<{ sent: number; claimed: number }> => {
   const db = admin.firestore();
   const due = await db.collection("whatsappQueue")
-    .where("status", "in", ["pending", "queued"])
+    .where("status", "in", ["pending", "queued", "processing"])
     .limit(MAX_PER_RUN)
     .get();
 
@@ -398,7 +407,13 @@ const drainQueue = async (): Promise<{ sent: number; claimed: number }> => {
       break;
     }
 
-    if (await sendOne(row)) sent++;
+    // An error mid-send puts the row back with the reason, never leaves it claimed.
+    try {
+      if (await sendOne(row)) sent++;
+    } catch (e: any) {
+      console.error("whatsapp send threw:", { queueId: row._id, error: e?.message || e });
+      await db.collection("whatsappQueue").doc(row._id).update({ status: "pending", failureReason: String(e?.message || e).slice(0, 300) }).catch(() => undefined);
+    }
   }
   return { sent, claimed };
 };
