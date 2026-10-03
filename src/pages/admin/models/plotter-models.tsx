@@ -37,6 +37,8 @@ type Row = {
   vendors?: Partial<Record<"mobicare" | "tia", { name: string; firstFileAt?: number | null }>>;
   status: "pending" | "approved" | "rejected" | "backlog";
   approvedAs?: { brandName: string; modelName: string; category: string };
+  /** A site model with a similar name — check it isn't the same one before approving. */
+  siteHint?: string;
 };
 
 /** Used until the site's own gadget types have loaded. */
@@ -310,6 +312,9 @@ export function PlotterModels() {
                     {reviewable
                       ? <Input value={val(r, "model")} onChange={(e) => edit(r._id, { model: e.target.value })} className="h-8" />
                       : (r.approvedAs?.modelName || r.model)}
+                    {reviewable && r.siteHint && (
+                      <p className="mt-1 text-[11px] font-semibold text-amber-700">Maybe already on site as: {r.siteHint}</p>
+                    )}
                   </TableCell>
                   <TableCell>
                     {reviewable ? (

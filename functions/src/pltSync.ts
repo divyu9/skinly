@@ -150,6 +150,9 @@ export async function processUpload(
       continue;
     }
     const vendors: Record<string, unknown> = { [vendor]: vendorEntry };
+    // A near match on the site (spelling, a lens variant): shown on the row so the admin checks before adding a duplicate.
+    const near = site.find(m);
+    const siteHint = near.status === "maybe" ? near.name : "";
     const o = otherIdx.find(m);
     if (o.status === "yes") {
       const e = otherByName.get(o.name);
@@ -166,6 +169,7 @@ export async function processUpload(
     if (writer) writer.set(ref, {
       brand, model, category: siteCategory(m.gadget, m.model, m.brand),
       parts: m.parts.slice(0, 60), folders: m.folders, firstFileAt: m.firstAt || null, newestFileAt: m.firstAt || null,
+      ...(siteHint ? { siteHint } : {}),
       status: backlog ? "backlog" : "pending", source: backlog ? `backlog-${vendor}` : `sync-${vendor}`, createdAt: Date.now(), vendors,
     });
     rowsIdx.add(siteCategory(m.gadget, m.model, m.brand), brand, ModelIndex.fullName(brand, model));
