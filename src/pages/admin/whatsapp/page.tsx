@@ -33,6 +33,8 @@ export default function WhatsAppAdminPage() {
   const [provider, setProvider] = useState<"authkey" | "fast2sms">("authkey");
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [savedProvider, setSavedProvider] = useState({ provider: "authkey", phoneNumberId: "" });
+  const [f2s, setF2s] = useState<any>(null);
+  const [f2sLoading, setF2sLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -139,7 +141,44 @@ export default function WhatsAppAdminPage() {
                   window.location.reload();
                 }}>Save</Button>
               )}
+              {provider === "fast2sms" && (
+                <Button size="sm" variant="outline" disabled={f2sLoading} onClick={async () => {
+                  setF2sLoading(true);
+                  try {
+                    const r: any = (await httpsCallable(getFunctions(), "fast2smsAccount")({})).data;
+                    setF2s(r);
+                  } catch (e: any) { toast.error(e?.message || "Could not reach Fast2SMS"); }
+                  finally { setF2sLoading(false); }
+                }}>{f2sLoading ? "Checking…" : "Check Fast2SMS"}</Button>
+              )}
             </div>
+            {f2s && (
+              <div className="mt-3 space-y-3 text-sm">
+                {f2s.numbers.map((n: any) => (
+                  <div key={n.phoneNumberId} className="rounded-lg bg-muted/50 p-2">
+                    <b>{n.number}</b> · {n.verifiedName || "—"} · name <b>{n.nameStatus || "—"}</b> · {n.connection} · quality {n.quality} · {n.limit}
+                    <div className="text-xs text-muted-foreground">
+                      Phone Number ID: <code>{n.phoneNumberId}</code>{" "}
+                      {n.phoneNumberId !== phoneNumberId && <button type="button" className="underline" onClick={() => setPhoneNumberId(n.phoneNumberId)}>use this</button>}
+                    </div>
+                  </div>
+                ))}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="text-left text-muted-foreground"><tr><th className="p-1">Message ID</th><th className="p-1">Template</th><th className="p-1">Status</th><th className="p-1">Category</th><th className="p-1">Vars</th><th className="p-1">Photo</th><th className="p-1">Button</th></tr></thead>
+                    <tbody>
+                      {f2s.templates.map((t: any) => (
+                        <tr key={t.messageId} className="border-t">
+                          <td className="p-1 font-mono font-bold">{t.messageId}</td><td className="p-1">{t.name}</td><td className="p-1">{t.status}</td>
+                          <td className="p-1">{t.category}</td><td className="p-1">{t.varCount}</td><td className="p-1">{t.hasImage ? "yes" : ""}</td><td className="p-1">{t.dynamicButton ? "dynamic" : ""}</td>
+                        </tr>
+                      ))}
+                      {!f2s.templates.length && <tr><td colSpan={7} className="p-2 text-muted-foreground">No templates yet.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           <AdminNotifications />

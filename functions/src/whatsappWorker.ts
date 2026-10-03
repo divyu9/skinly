@@ -444,3 +444,37 @@ export const testWhatsAppTemplate = onCall(async (data: any, context: any) => {
   if (after?.status !== "sent") await q.update({ status: "failed" });
   return { status: after?.status, response: String(after?.providerResponse || after?.failureReason || "").slice(0, 500), phone };
 });
+
+/**
+ * Admin › WhatsApp › "Check Fast2SMS": the numbers on the Fast2SMS account
+ * (Phone Number ID, display-name status, quality) and every template with
+ * its Message ID, status and whether it has a dynamic URL button. The key
+ * stays on the server; only these details go back.
+ */
+export const fast2smsAccount = onCall(async (_data: any, context: any) => {
+  await requireAdmin(context);
+  const key = process.env.FAST2SMS_API_KEY || "";
+  if (!key) throw new HttpsError("failed-precondition", "FAST2SMS_API_KEY is not in functions/.env");
+  const fetch = require("node-fetch");
+  const res = await fetch("https://www.fast2sms.com/dev/dlt_manager/whatsapp?type=template", { headers: { Authorization: key } });
+  const text = await res.text();
+  let j: any;
+  try { j = JSON.parse(text); } catch { throw new HttpsError("internal", `Fast2SMS: ${text.slice(0, 200)}`); }
+  if (!res.ok || j?.success === false || !Array.isArray(j?.data)) throw new HttpsError("internal", `Fast2SMS: ${text.slice(0, 200)}`);
+  return {
+    numbers: j.data.map((n: any) => ({
+      phoneNumberId: String(n.phone_number_id), number: String(n.number || ""), verifiedName: String(n.verified_name || ""),
+      nameStatus: String(n.name_status || ""), quality: String(n.quality_rating || ""), limit: String(n.messaging_limit || ""),
+      connection: String(n.connection_status || ""),
+    })),
+    templates: j.data.flatMap((n: any) => (n.templates || []).map((t: any) => {
+      const buttons: any[] = (t.components || []).find((c: any) => String(c.type).toUpperCase() === "BUTTONS")?.buttons || [];
+      return {
+        messageId: String(t.message_id), name: String(t.template_name), status: String(t.status), category: String(t.category),
+        language: String(t.language || ""), varCount: Number(t.var_count) || 0,
+        hasImage: (t.components || []).some((c: any) => String(c.type).toUpperCase() === "HEADER" && String(c.format).toUpperCase() === "IMAGE"),
+        dynamicButton: buttons.some((b: any) => String(b.type).toUpperCase() === "URL" && String(b.url || "").includes("{{1}}")),
+      };
+    })),
+  };
+});
