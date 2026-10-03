@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { marketingFrom } from "./mailFrom";
 
 /**
  * Telling the people who asked to be told.
@@ -164,7 +165,7 @@ async function sendRestockEmail(
     body: JSON.stringify({
       template_id: templateId,
       recipients: to.map((email) => ({ to: [{ email, name: "there" }], variables })),
-      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+      from: marketingFrom("GoSkinly"),
       domain: "mail.goskinly.com",
     }),
   });

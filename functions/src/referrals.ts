@@ -5,6 +5,7 @@ import { getCaller, requireAdmin, requireAuth } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
 import { isConfirmed } from "./orderConfirm";
 import { verifiedEmail, walletUserRef } from "./userDoc";
+import { transactionalFrom } from "./mailFrom";
 
 /**
  * Refer a friend: the friend gets money off their first order, and whoever
@@ -278,7 +279,7 @@ async function tellReferrer(db: admin.firestore.Firestore, ref: any, usecaseKey:
         body: JSON.stringify({
           template_id: t.msg91TemplateId,
           recipients: [{ to: [{ email: ref.referrerEmail, name: vars.referrerName }], variables: vars }],
-          from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+          from: transactionalFrom("GoSkinly"),
           domain: "mail.goskinly.com",
         }),
       });

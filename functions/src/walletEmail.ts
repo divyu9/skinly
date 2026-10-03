@@ -1,5 +1,6 @@
 import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import { transactionalFrom } from "./mailFrom";
 
 /**
  * An email whenever money lands in a customer's Skinly wallet.
@@ -80,7 +81,7 @@ export const onWalletCredit = functionsV1.firestore
       body: JSON.stringify({
         template_id: tpl.docs[0].data().msg91TemplateId,
         recipients: [{ to: [{ email: to, name: name || first }], variables }],
-        from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+        from: transactionalFrom("GoSkinly"),
         domain: "mail.goskinly.com",
       }),
     });

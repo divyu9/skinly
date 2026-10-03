@@ -3,6 +3,7 @@ import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { enforceDailyRateLimit } from "./rate-limit";
+import { marketingFrom } from "./mailFrom";
 
 /**
  * At most two emails per cart, ever. This is a constant rather than a setting
@@ -240,7 +241,7 @@ const sendReminderEmail = async (cart: any, couponCode: string | null, s: Settin
       to: [{ email: cart.userEmail, name: cart.userName || "" }],
       variables: reminderVariables(cart, couponCode, s),
     }],
-    from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+    from: marketingFrom("GoSkinly"),
     domain: "mail.goskinly.com",
   };
 

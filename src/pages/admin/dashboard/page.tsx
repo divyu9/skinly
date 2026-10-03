@@ -46,6 +46,9 @@ type Dashboard = {
   hours: number[];
   topProducts: Array<{ productId: string; title: string; image: string; qty: number; sales: number }>;
   topModels: Array<{ model: string; qty: number }>;
+  alerts?: Array<{ level: "red" | "amber"; text: string; href: string }>;
+  dailyTarget?: number;
+  shipping30?: { parcels: number; of: number; spend: number; avg: number; pctOfSales: number; afterShipping: number };
   bestsellers?: Record<"d7" | "d30" | "all", Array<{ productId: string; title: string; image: string; qty: number; sales: number }>>;
   topPhones?: Record<"d30" | "all", Array<{ model: string; qty: number }>>;
   productImages?: Record<string, string>;
@@ -163,6 +166,57 @@ function Sparkline({ values, className }: { values: number[]; className?: string
   );
 }
 
+/** Only what needs doing, most urgent first; nothing when all is well. */
+function AlertStrip({ alerts }: { alerts: NonNullable<Dashboard["alerts"]> }) {
+  if (!alerts.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {alerts.map((a) => (
+        <Link key={a.text} to={a.href}
+          className={cn("inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-xs font-bold hover:shadow-[2px_2px_0_0_var(--ink)]",
+            a.level === "red" ? "border-heart bg-heart/10 text-heart" : "border-amber-500 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200")}>
+          <AlertTriangleIcon className="size-3.5" /> {a.text}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/** Today against the day's target (settings/dashboard.dailyTarget), set right here. */
+function TargetBar({ today, target, onSaved }: { today: number; target: number; onSaved: (t: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(target || ""));
+  const save = async () => {
+    const t = Math.max(0, Math.round(Number(value) || 0));
+    const { db, doc, setDoc } = await import("@/lib/firestore-sdk");
+    await setDoc(doc(db, "settings", "dashboard"), { dailyTarget: t, updatedAt: Date.now() }, { merge: true });
+    onSaved(t); setEditing(false);
+  };
+  const pctDone = target > 0 ? Math.min(100, Math.round((today / target) * 100)) : 0;
+  return (
+    <div className="tile flex flex-wrap items-center gap-3 rounded-2xl px-5 py-3">
+      <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Today's target</span>
+      {editing ? (
+        <span className="flex items-center gap-2">
+          ₹<input autoFocus value={value} onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && void save()}
+            className="h-8 w-28 rounded-md border bg-background px-2 text-sm" inputMode="numeric" />
+          <button type="button" onClick={() => void save()} className="rounded-md bg-ink px-2.5 py-1 text-xs font-bold text-background">Save</button>
+        </span>
+      ) : target > 0 ? (
+        <>
+          <span className="h-3 min-w-[160px] flex-1 overflow-hidden rounded-full border-2 border-ink bg-muted">
+            <span className={cn("block h-full", pctDone >= 100 ? "bg-brand" : "bg-sunny")} style={{ width: `${pctDone}%` }} />
+          </span>
+          <span className="text-sm font-bold tabular-nums">{inr(today)} / {inr(target)} · {pctDone}%{pctDone >= 100 ? " 🎉" : ""}</span>
+          <button type="button" onClick={() => { setValue(String(target)); setEditing(true); }} className="text-xs font-semibold underline">Change</button>
+        </>
+      ) : (
+        <button type="button" onClick={() => setEditing(true)} className="text-sm font-semibold underline">Set a daily sales target</button>
+      )}
+    </div>
+  );
+}
+
 function Kpi({ label, value, delta, compare, spark, icon, tone }: {
   label: string; value: string; delta: number | null; compare: string; spark?: number[]; icon: ReactNode; tone: string;
 }) {
@@ -257,6 +311,7 @@ function DashboardInner() {
   // Bestsellers default to 30 days (the old fixed 7 is a tab); phones 30 days, or all time for ads.
   const [bestWin, setBestWin] = useState<"d7" | "d30" | "all">("d30");
   const [phoneWin, setPhoneWin] = useState<"d30" | "all">("d30");
+  const [targetOverride, setTargetOverride] = useState<number | null>(null);
   const ago = useAgo(data?.generatedAt);
   const name = (auth.currentUser?.displayName || "").split(" ")[0];
 
@@ -329,6 +384,19 @@ function DashboardInner() {
         <p className="flex items-center gap-2 rounded-lg border border-heart/30 bg-heart/10 px-3 py-2 text-sm text-heart">
           <AlertTriangleIcon className="size-4" /> Showing the last figures — refresh failed: {error}
         </p>
+      )}
+
+      <AlertStrip alerts={data.alerts || []} />
+      <TargetBar today={k.today.sales} target={targetOverride ?? data.dailyTarget ?? 0} onSaved={setTargetOverride} />
+      {data.shipping30 && data.shipping30.parcels > 0 && (
+        <div className="tile flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl px-5 py-3 text-sm">
+          <span className="text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Shipping · 30 days</span>
+          <span><b className="tabular-nums">{inr(data.shipping30.spend)}</b> on {data.shipping30.parcels} parcels</span>
+          <span>avg <b className="tabular-nums">{inr(data.shipping30.avg)}</b></span>
+          <span><b className="tabular-nums">{data.shipping30.pctOfSales}%</b> of their sales</span>
+          <span><b className="tabular-nums">{inr(data.shipping30.afterShipping)}</b> left after shipping</span>
+          <span className="text-xs text-muted-foreground">courier quotes at booking · {data.shipping30.parcels} of {data.shipping30.of} orders costed</span>
+        </div>
       )}
 
       {/* ── KPIs ─────────────────────────────────────────────────────────── */}

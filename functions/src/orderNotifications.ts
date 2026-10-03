@@ -1,6 +1,7 @@
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import { describeItems } from "./ordersAdmin";
+import { transactionalFrom } from "./mailFrom";
 
 /**
  * Tells the customer, and you, that an order exists.
@@ -174,7 +175,7 @@ export async function sendUsecaseEmail(
             : "We'll send you updates on WhatsApp as it moves",
         },
       }],
-      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+      from: transactionalFrom("GoSkinly"),
       domain: "mail.goskinly.com",
     }),
   });

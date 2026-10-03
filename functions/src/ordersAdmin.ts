@@ -2,6 +2,7 @@ import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { walletUserRef } from "./userDoc";
+import { transactionalFrom } from "./mailFrom";
 
 /**
  * Order actions that must not run in the browser.
@@ -231,7 +232,7 @@ export const sendOrderStatusEmail = onCall(async (data: any, context: any) => {
         orderLink: `${(process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "")}/orders/${orderId}`,
       },
     }],
-    from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+    from: transactionalFrom("GoSkinly"),
     domain: "mail.goskinly.com",
   };
 

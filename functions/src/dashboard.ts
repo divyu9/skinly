@@ -287,8 +287,49 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
     productId: String(o.items?.[0]?.productId || ""),
   }));
 
+  /*
+   * The strip across the top: only things someone has to act on, most urgent
+   * first, each linking to where it gets fixed. Empty when all is well.
+   */
+  const dayAgo = now - DAY;
+  const [waFailed, mailFailed, settingsSnap] = await Promise.all([
+    db.collection("whatsappMessages").where("createdAt", ">=", dayAgo).get(),
+    db.collection("emailMessages").where("createdAt", ">=", dayAgo).get(),
+    db.collection("settings").doc("dashboard").get(),
+  ]);
+  const waFail = waFailed.docs.filter((d) => (d.data() as any).status === "failed" && !(d.data() as any).test).length;
+  const mailFail = mailFailed.docs.filter((d) => (d.data() as any).status === "failed").length;
+  const oldPack = toPack.filter((o) => now - since(o) > 2 * DAY).length;
+  type Alert = { level: "red" | "amber"; text: string; href: string };
+  const alerts: Alert[] = [];
+  const add = (cond: boolean, level: Alert["level"], text: string, href: string) => { if (cond) alerts.push({ level, text, href }); };
+  add(oldPack > 0, "red", `${oldPack} order${oldPack === 1 ? "" : "s"} waiting to be packed for over 2 days`, "/backend-skinly/orders?status=processing");
+  add(undelivered.length > 0, "red", `${undelivered.length} parcel${undelivered.length === 1 ? "" : "s"} undelivered (NDR) — call the customer`, "/backend-skinly/orders?status=undelivered");
+  add(pickupLate.length > 0, "amber", `${pickupLate.length} parcel${pickupLate.length === 1 ? "" : "s"} not picked up 2+ days after booking`, "/backend-skinly/orders?status=ready_to_ship");
+  add(slow.length > 0, "amber", `${slow.length} parcel${slow.length === 1 ? "" : "s"} in transit for 6+ days`, "/backend-skinly/orders?status=shipped");
+  add(soldOutEverywhere > 0, "amber", `${soldOutEverywhere} design${soldOutEverywhere === 1 ? "" : "s"} out of material`, "/backend-skinly/oos");
+  add(waFail > 0, "amber", `${waFail} WhatsApp message${waFail === 1 ? "" : "s"} failed today`, "/backend-skinly/whatsapp/messages");
+  add(mailFail > 0, "amber", `${mailFail} email${mailFail === 1 ? "" : "s"} failed today`, "/backend-skinly/emails");
+  add(unpaid.length >= 3, "amber", `${unpaid.length} checkouts unpaid in the last 24h (₹${Math.round(unpaid.reduce((s, o) => s + money(o), 0)).toLocaleString("en-IN")})`, "/backend-skinly/orders?status=pending_payment");
+  alerts.sort((a, b) => (a.level === b.level ? 0 : a.level === "red" ? -1 : 1));
+  const dailyTarget = Number((settingsSnap.data() as any)?.dailyTarget) || 0;
+
+  // Shipping over 30 days: the recorded courier quote per parcel (shippingCompare.ts).
+  const costed = last30.filter((o) => Number.isFinite(Number(o.shippingCost)) && o.shippingCost !== null);
+  const spend = costed.reduce((s2, o) => s2 + Number(o.shippingCost), 0);
+  const costedSales = costed.reduce((s2, o) => s2 + money(o), 0);
+  const shipping30 = {
+    parcels: costed.length, of: last30.length, spend: Math.round(spend),
+    avg: costed.length ? Math.round(spend / costed.length) : 0,
+    pctOfSales: costedSales ? Math.round((spend / costedSales) * 1000) / 10 : 0,
+    afterShipping: Math.round(tally(last30).sales - spend),
+  };
+
   return {
     generatedAt: now,
+    alerts,
+    dailyTarget,
+    shipping30,
     kpis: {
       today: todayP, yesterdaySoFar, yesterday, month, lastMonth,
       last30: tally(last30), prev30: tally(prev30),

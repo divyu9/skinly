@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v1/https";
+import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
 import { buildOrderPayload, orderMoney } from "./rapidshyp";
@@ -17,7 +18,7 @@ import { serviceability, estimate } from "./delhivery";
  */
 export interface CourierQuote { code: string; name: string; parent: string; freight: number; mode: string; edd: string | null }
 
-async function rapidshypCouriers(pickupPin: string, pin: string, cod: boolean, value: number, grams: number): Promise<CourierQuote[] | { error: string }> {
+export async function rapidshypCouriers(pickupPin: string, pin: string, cod: boolean, value: number, grams: number): Promise<CourierQuote[] | { error: string }> {
   const key = process.env.RAPIDSHYP_API_KEY || "";
   if (!key) return { error: "RapidShyp API key not configured" };
   if (!pickupPin) return { error: "Set the warehouse pincode in Admin › Shipping" };
@@ -63,4 +64,53 @@ export const compareShipping = onCall(async (data: any, context: any) => {
     rapidshyp: Array.isArray(rs) ? { couriers: rs.slice(0, 6) } : { couriers: [], error: rs.error },
     missing: [!cfg.pickup && "Delhivery pickup name", !cfg.originPin && "warehouse pincode", !cfg.gstin && "GSTIN"].filter(Boolean),
   };
+});
+
+/**
+ * What a parcel cost to send, recorded once it has an AWB — however it got
+ * one (the RapidShyp button, Compare & ship, Delhivery, the webhook). Nothing
+ * stored a courier charge, so the dashboard couldn't say what shipping costs
+ * or what's left after it. The figure is the courier's quote for that lane
+ * and weight at booking: RapidShyp's rate for the courier that took it (the
+ * cheapest when its name doesn't match), Delhivery's own estimate. A quote,
+ * not the invoice — close, and labelled as such.
+ */
+export async function recordShippingCost(db: admin.firestore.Firestore, orderId: string): Promise<number | null> {
+  const ref = db.collection("orders").doc(orderId);
+  const { order, payload } = await buildOrderPayload(orderId);
+  if (order.shippingCost != null) return Number(order.shippingCost);
+  const cfg = await delhiverySettings(db);
+  const pin = String(order.shippingAddress?.pincode || "").replace(/\D/g, "");
+  const cod = payload.paymentMethod === "COD";
+  const grams = Number((payload.packageDetails as any)?.packageWeight) || 100;
+  const value = orderMoney(order, Array.isArray(order.items) ? order.items : []).total;
+  let cost: number | null = null, courier = "", source = "";
+  if (order.shippingProvider === "delhivery") {
+    cost = await estimate(cfg.originPin, pin, grams, cod, Number(payload.codValue) || 0, cfg.mode).catch(() => null);
+    courier = "Delhivery"; source = "delhivery-estimate";
+  } else {
+    const list = await rapidshypCouriers(cfg.originPin, pin, cod, value, grams).catch(() => null);
+    if (Array.isArray(list) && list.length) {
+      const want = String(order.courierName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const hit = want ? list.find((c) => norm(c.name).includes(want) || want.includes(norm(c.name)) || (c.parent && want.includes(norm(c.parent)))) : undefined;
+      const pick = hit || list[0];
+      cost = pick.freight; courier = pick.name; source = hit ? "rapidshyp-quote" : "rapidshyp-cheapest-quote";
+    }
+  }
+  if (cost == null) return null;
+  await ref.update({ shippingCost: cost, shippingCostCourier: courier, shippingCostSource: source, shippingCostAt: Date.now() });
+  return cost;
+}
+
+export const onOrderAwbCost = functionsV1.firestore.document("orders/{orderId}").onWrite(async (change, context) => {
+  const after = change.after.exists ? (change.after.data() as any) : null;
+  const before = change.before.exists ? (change.before.data() as any) : null;
+  if (!after?.awbNumber || before?.awbNumber || after.shippingCost != null || after.addOnTo) return null;
+  try {
+    await recordShippingCost(admin.firestore(), context.params.orderId);
+  } catch (e: any) {
+    console.error("onOrderAwbCost failed", { order: context.params.orderId, error: e?.message || e });
+  }
+  return null;
 });

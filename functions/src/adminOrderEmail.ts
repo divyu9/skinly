@@ -1,6 +1,7 @@
 import * as functionsV1 from "firebase-functions/v1";
 import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
+import { transactionalFrom } from "./mailFrom";
 
 /**
  * "New order!" — an email to the shop's own inbox the moment an order is
@@ -68,7 +69,7 @@ export async function sendAdminOrderEmail(db: admin.firestore.Firestore, order: 
     body: JSON.stringify({
       template_id: tpl.docs[0].data().msg91TemplateId,
       recipients: to.map((email) => ({ to: [{ email, name: "GoSkinly" }], variables })),
-      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly Orders" },
+      from: transactionalFrom("GoSkinly Orders"),
       domain: "mail.goskinly.com",
     }),
   });

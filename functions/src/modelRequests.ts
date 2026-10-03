@@ -2,6 +2,7 @@ import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { queueWhatsApp } from "./orderNotifications";
 import { enforceDailyRateLimit } from "./rate-limit";
+import { transactionalFrom } from "./mailFrom";
 
 const COUNTER = "counters/modelRequests";
 
@@ -225,7 +226,7 @@ async function sendEmail(
     body: JSON.stringify({
       template_id: t.msg91TemplateId,
       recipients: [{ to: [{ email: to, name }], variables }],
-      from: { email: "noreply@mail.goskinly.com", name: "GoSkinly" },
+      from: transactionalFrom("GoSkinly"),
       domain: "mail.goskinly.com",
     }),
   });
