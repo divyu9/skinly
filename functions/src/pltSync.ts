@@ -65,8 +65,9 @@ async function loadIndex(db: admin.firestore.Firestore, vendor: Vendor): Promise
 
 export async function processUpload(
   db: admin.firestore.Firestore, vendor: Vendor, lines: string[],
-  opts: { dryRun?: boolean; watermark?: number; maxTiaId?: number } = {}
+  opts: { dryRun?: boolean; watermark?: number; maxTiaId?: number; mode?: "new" | "backlog" } = {}
 ) {
+  const backlog = opts.mode === "backlog";
   const models = vendor === "mobicare" ? parseMobicare(lines) : parseTia(lines);
   const stateRef = db.collection("pltSync").doc("state");
   const state = ((await stateRef.get()).data() || {}) as any;
@@ -105,6 +106,9 @@ export async function processUpload(
   const rowsIdx = new ModelIndex();
   const rowByName = new Map<string, admin.firestore.QueryDocumentSnapshot>();
   const rows = await db.collection("plotterModels").get();
+  const existingIds = new Set(rows.docs.map((d) => d.id));
+  // New rows go out in bulk: a backlog pass writes thousands, one by one it ran past the time limit.
+  const writer = opts.dryRun ? null : db.bulkWriter();
   for (const d of rows.docs) {
     const x = d.data() as any;
     const full = ModelIndex.fullName(x.brand, x.approvedAs?.modelName || x.model);
@@ -123,7 +127,16 @@ export async function processUpload(
   }
 
   const out = { vendor, models: models.length, newModels: 0, onSite: 0, added: 0, updated: 0, names: [] as string[] };
-  for (const m of models.filter(isNew)) {
+  /*
+   * "new": what the vendor added since the last upload (the daily run).
+   * "backlog": everything older than that watermark which the site still
+   * doesn't list and nobody has decided on — the first watermark was the
+   * library as it stood on 25 Sep 2026, so a model already in the cutting
+   * software then (Moto Edge 60 Pro, Galaxy Z Flip 7…) was never offered at
+   * all. Those become "backlog" rows, filtered and approved in the admin
+   * without flooding the pending queue.
+   */
+  for (const m of models.filter((x) => (backlog ? !isNew(x) : isNew(x)))) {
     out.newModels++;
     if (site.find(m).status === "yes") { out.onSite++; continue; }
     const vendorEntry = { name: vendor === "tia" ? `${m.brand} ${m.model}` : m.model, firstAt: m.firstAt || null };
@@ -131,7 +144,7 @@ export async function processUpload(
     if (hit.status === "yes") {
       const row = rowByName.get(hit.name);
       if (row && !(row.data() as any).vendors?.[vendor]) {
-        if (!opts.dryRun) await row.ref.update({ [`vendors.${vendor}`]: vendorEntry });
+        if (writer) writer.update(row.ref, { [`vendors.${vendor}`]: vendorEntry });
         out.updated++;
       }
       continue;
@@ -144,22 +157,25 @@ export async function processUpload(
     }
     const id = `${vendor === "tia" ? "t" : "p"}_${crypto.createHash("sha1").update(`${m.gadget}|${m.group}|${m.key}`).digest("hex").slice(0, 20)}`;
     const ref = db.collection("plotterModels").doc(id);
-    if ((await ref.get()).exists) continue;
+    if (existingIds.has(id)) continue;
+    existingIds.add(id);
     // iQOO, Poco, Honor and CMF are brands of their own on the site, and their
     // models are named without the brand ("Poco | X8 Power", not "Poco | Poco X8 Power").
     const brand = brandFor(m);
     const model = /^(iqoo|poco|honor|cmf)$/i.test(brand) ? m.model.replace(new RegExp(`^${brand}\\s+`, "i"), "").trim() || m.model : m.model;
-    if (!opts.dryRun) await ref.set({
+    if (writer) writer.set(ref, {
       brand, model, category: siteCategory(m.gadget, m.model, m.brand),
       parts: m.parts.slice(0, 60), folders: m.folders, firstFileAt: m.firstAt || null, newestFileAt: m.firstAt || null,
-      status: "pending", source: `sync-${vendor}`, createdAt: Date.now(), vendors,
+      status: backlog ? "backlog" : "pending", source: backlog ? `backlog-${vendor}` : `sync-${vendor}`, createdAt: Date.now(), vendors,
     });
     rowsIdx.add(siteCategory(m.gadget, m.model, m.brand), brand, ModelIndex.fullName(brand, model));
     out.added++;
     if (out.names.length < 30) out.names.push(`${brand} | ${model}`);
   }
 
-  if (opts.dryRun) return out;
+  if (writer) await writer.close();
+  // A backlog pass reads the last upload; it moves no watermark and no index.
+  if (opts.dryRun || backlog) return out;
   await saveIndex(db, vendor, models);
   const newest = Math.max(watermark, ...models.map((m) => m.firstAt || 0));
   const topId = Math.max(maxTiaId, ...models.map((m) => m.tiaId || 0));
@@ -222,4 +238,27 @@ export const pltInventoryUpload = functionsV1
 
     console.log("pltInventoryUpload", { vendor, machine, files: lines.length, result });
     res.json({ ok: true, vendor, files: lines.length, result });
+  });
+
+/**
+ * Admin › Models › From plotter › "Find missed models": the backlog pass over
+ * each vendor's last upload (the raw lines are kept with every run).
+ */
+export const buildPltBacklog = functionsV1
+  .runWith({ memory: "1GB", timeoutSeconds: 540 })
+  .https.onCall(async (data: any, context: any) => {
+    const { requireAdmin } = await import("./auth");
+    await requireAdmin(context);
+    const db = admin.firestore();
+    const vendors: Vendor[] = data?.vendor === "tia" || data?.vendor === "mobicare" ? [data.vendor] : ["tia", "mobicare"];
+    const results: any[] = [];
+    for (const vendor of vendors) {
+      const latest = (await db.collection("pltSync").doc(`latest_${vendor}`).get()).data() as any;
+      if (!latest?.runId) { results.push({ vendor, error: "no upload yet" }); continue; }
+      const chunks = await db.collection("pltSync").doc(latest.runId).collection("chunks").get();
+      const lines = chunks.docs.sort((a, b) => a.id.localeCompare(b.id)).map((d) => String(d.data().text || "")).join("").split("\n").filter((l) => l.trim());
+      const r = await processUpload(db, vendor, lines, { mode: "backlog" });
+      results.push({ vendor, models: r.models, added: r.added, updated: r.updated, onSite: r.onSite });
+    }
+    return { results };
   });

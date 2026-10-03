@@ -35,7 +35,7 @@ type Row = {
   firstFileAt?: number;
   /** Which cutting software has it, the name it uses there, and when that vendor added it. */
   vendors?: Partial<Record<"mobicare" | "tia", { name: string; firstFileAt?: number | null }>>;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "backlog";
   approvedAs?: { brandName: string; modelName: string; category: string };
 };
 
@@ -132,7 +132,7 @@ export function PlotterModels() {
   }, [rows, status, category, vendor, search]);
 
   const counts = useMemo(() => {
-    const c = { pending: 0, approved: 0, rejected: 0 } as Record<string, number>;
+    const c = { pending: 0, approved: 0, rejected: 0, backlog: 0 } as Record<string, number>;
     (rows || []).forEach((r) => { c[r.status] = (c[r.status] || 0) + 1; });
     return c;
   }, [rows]);
@@ -194,11 +194,32 @@ export function PlotterModels() {
     }
   };
 
+  // Missed models (backlog) are reviewed exactly like pending ones.
+  const reviewable = status === "pending" || status === "backlog";
+  const [finding, setFinding] = useState(false);
+  const findMissed = async () => {
+    setFinding(true);
+    try {
+      const r: any = (await httpsCallable(functions, "buildPltBacklog", { timeout: 540_000 })({})).data;
+      const added = (r.results || []).reduce((n: number, x: any) => n + (Number(x.added) || 0), 0);
+      toast.success(`${added} missed models added to the Missed list`);
+      setStatus("backlog");
+    } catch (e: any) {
+      toast.error(e?.message || "Could not look for missed models");
+    } finally { setFinding(false); }
+  };
+
   return (
     <Card>
       <CardHeader className="space-y-3">
         <CardTitle>New models from the plotter software</CardTitle>
         <LastSync />
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button size="sm" variant="outline" disabled={finding} onClick={() => void findMissed()}>
+            {finding ? "Looking…" : "Find missed models"}
+          </Button>
+          <span className="text-muted-foreground">Models the cutting software already had before the sync started, which the site still doesn't list — they go to "Missed", not Pending.</span>
+        </div>
         <p className="text-sm text-muted-foreground">
           Models the cutting software (Mobicare, TIA) has and the website doesn't. Names are as the software writes them, with the
           part files (-A, -B, -B1, Sides, Top…) folded into one. Fix the brand, name or category in the row if needed,
@@ -211,6 +232,7 @@ export function PlotterModels() {
               <SelectItem value="pending">Pending ({counts.pending || 0})</SelectItem>
               <SelectItem value="approved">Approved ({counts.approved || 0})</SelectItem>
               <SelectItem value="rejected">Rejected ({counts.rejected || 0})</SelectItem>
+              <SelectItem value="backlog">Missed — older, never offered ({counts.backlog || 0})</SelectItem>
             </SelectContent>
           </Select>
           <Select value={category} onValueChange={setCategory}>
@@ -233,7 +255,7 @@ export function PlotterModels() {
             <SearchIcon className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
             <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search brand or model" className="w-56 pl-8" />
           </div>
-          {status === "pending" && (
+          {reviewable && (
             <div className="ml-auto flex gap-2">
               <Button size="sm" disabled={busy || !selected.size} onClick={() => approve([...selected])}>
                 <CheckIcon className="mr-1 size-4" /> Approve {selected.size || ""}
@@ -241,6 +263,11 @@ export function PlotterModels() {
               <Button size="sm" variant="outline" disabled={busy || !selected.size} onClick={() => reject([...selected])}>
                 <XIcon className="mr-1 size-4" /> Reject {selected.size || ""}
               </Button>
+              {status === "backlog" && (
+                <Button size="sm" variant="outline" disabled={busy || !selected.size} onClick={() => reject([...selected], true)}>
+                  Move to pending {selected.size || ""}
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -254,7 +281,7 @@ export function PlotterModels() {
           <Table>
             <TableHeader>
               <TableRow>
-                {status === "pending" && (
+                {reviewable && (
                   <TableHead className="w-8">
                     <Checkbox checked={allOn} onCheckedChange={() => setSelected(allOn ? new Set() : new Set(visible.map((r) => r._id)))} />
                   </TableHead>
@@ -271,21 +298,21 @@ export function PlotterModels() {
             <TableBody>
               {visible.map((r) => (
                 <TableRow key={r._id}>
-                  {status === "pending" && (
+                  {reviewable && (
                     <TableCell><Checkbox checked={selected.has(r._id)} onCheckedChange={() => toggle(r._id)} /></TableCell>
                   )}
                   <TableCell>
-                    {status === "pending"
+                    {reviewable
                       ? <Input value={val(r, "brand")} onChange={(e) => edit(r._id, { brand: e.target.value })} className="h-8" />
                       : (r.approvedAs?.brandName || r.brand)}
                   </TableCell>
                   <TableCell>
-                    {status === "pending"
+                    {reviewable
                       ? <Input value={val(r, "model")} onChange={(e) => edit(r._id, { model: e.target.value })} className="h-8" />
                       : (r.approvedAs?.modelName || r.model)}
                   </TableCell>
                   <TableCell>
-                    {status === "pending" ? (
+                    {reviewable ? (
                       <Select value={val(r, "category")} onValueChange={(v) => edit(r._id, { category: v })}>
                         <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                         <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
@@ -326,7 +353,7 @@ export function PlotterModels() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{fmt(since(r))}</TableCell>
                   <TableCell className="text-right">
-                    {status === "pending" ? (
+                    {reviewable ? (
                       <div className="flex justify-end gap-1">
                         <Button size="sm" disabled={busy} onClick={() => approve([r._id])}><CheckIcon className="size-4" /></Button>
                         <Button size="sm" variant="outline" disabled={busy} onClick={() => reject([r._id])}><XIcon className="size-4" /></Button>
