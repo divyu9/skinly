@@ -116,6 +116,7 @@ export function PlotterModels() {
   const [category, setCategory] = useState("all");
   const [vendor, setVendor] = useState<"all" | Vendor | "both">("all");
   const [search, setSearch] = useState("");
+  const [brand, setBrand] = useState("all");
   const [busy, setBusy] = useState(false);
   const CATEGORIES = useGadgetTypes();
 
@@ -129,9 +130,22 @@ export function PlotterModels() {
       .filter((r) => r.status === status)
       .filter((r) => category === "all" || r.category === category)
       .filter((r) => vendor === "all" || (vendor === "both" ? vendorsOf(r).length > 1 : vendorsOf(r).includes(vendor)))
+      .filter((r) => brand === "all" || (r.approvedAs?.brandName || r.brand).toLowerCase() === brand)
       .filter((r) => !q || `${r.brand} ${r.model}`.toLowerCase().includes(q))
       .sort((a, b) => since(b) - since(a) || a.brand.localeCompare(b.brand) || a.model.localeCompare(b.model));
-  }, [rows, status, category, vendor, search]);
+  }, [rows, status, category, vendor, search, brand]);
+
+  // Brands in the list being looked at (status and gadget), most rows first.
+  const brands = useMemo(() => {
+    const c = new Map<string, { name: string; n: number }>();
+    for (const r of rows || []) {
+      if (r.status !== status || (category !== "all" && r.category !== category)) continue;
+      const name = r.approvedAs?.brandName || r.brand || "?";
+      const k = name.toLowerCase();
+      c.set(k, { name: c.get(k)?.name || name, n: (c.get(k)?.n || 0) + 1 });
+    }
+    return [...c.entries()].sort((a, b) => b[1].n - a[1].n || a[1].name.localeCompare(b[1].name));
+  }, [rows, status, category]);
 
   const counts = useMemo(() => {
     const c = { pending: 0, approved: 0, rejected: 0, backlog: 0 } as Record<string, number>;
@@ -242,6 +256,13 @@ export function PlotterModels() {
             <SelectContent>
               <SelectItem value="all">All gadgets</SelectItem>
               {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={brand} onValueChange={(v) => { setBrand(v); setSelected(new Set()); }}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent className="max-h-80">
+              <SelectItem value="all">All brands</SelectItem>
+              {brands.map(([k, b]) => <SelectItem key={k} value={k}>{b.name} ({b.n})</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={vendor} onValueChange={(v) => setVendor(v as typeof vendor)}>
