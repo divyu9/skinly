@@ -150,16 +150,16 @@ Variables (body): `first_name, order_number` — the review link goes in the but
 - URL type: **Dynamic**, URL: `https://goskinly.com/review/{{1}}`
 - Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?t=8f2a1c9e4b7d&utm_source=whatsapp`
 
-No reward or "% back" in the text: a Utility template that offers money is
-re-filed by Meta as Marketing (dearer, and capped per user). The wallet reward
-is explained on the review page itself.
+Mentions the "up to 10% back" reward (Chandan's call, 3 Oct 2026). Meta may
+re-file a Utility template that offers money as Marketing (dearer, capped per
+user); if it does, accept that rather than dropping the line.
 
 ```
 Hi {{1}}, your GoSkinly order {{2}} has been delivered 🎉
 
 Before you apply it, watch our step-by-step video guide — it takes 2 minutes and gives a bubble-free finish: https://goskinly.com/how-to-apply
 
-Once it's on, tell us how it turned out using the button below.
+Once it's on, rate it using the button below. Add a photo and get up to 10% of your order back in your Skinly wallet.
 
 Need help applying it? WhatsApp our support team: https://goskinly.com/support
 ```
@@ -174,13 +174,13 @@ Variables (body): `customer_name, product_name` — the review link goes in the 
 - Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?t=8f2a1c9e4b7d&utm_source=whatsapp`
 
 Sent a few days after delivery, and once more five days later to anyone who
-hasn't reviewed yet (never a third time). No reward wording, so Meta keeps it
-Utility; the wallet reward is shown on the review page.
+hasn't reviewed yet (never a third time). Mentions the "up to 10% back"
+reward; Meta may re-file it as Marketing.
 
 ```
 Hi {{1}}, how are you liking your {{2}}? 😊
 
-It takes 30 seconds to rate it, and a photo helps other shoppers pick their design. Tap the button below.
+It takes 30 seconds to rate it. Add a photo and get up to 10% of your order back in your Skinly wallet. Tap the button below.
 
 Thank you for choosing GoSkinly!
 ```
