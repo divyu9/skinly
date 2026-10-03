@@ -209,16 +209,20 @@ Thank you for shopping with GoSkinly!
 Samples: Priya · ₹23 · Thanks for reviewing order #4102 — here's your reward · ₹73 · https://goskinly.com/account/wallet
 
 ## 9. `skinly_payment_failed` — Utility
-Variables: `customer_name, order_number, order_amount, pay_link`
+Variables (body): `customer_name, order_number, order_amount` — the pay link goes in the button.  
+**Button: Visit website, Dynamic URL** — opens the order's own payment page (signed, works for guests), straight to PhonePe.
+- Button text: `Complete payment`
+- URL type: **Dynamic**, URL: `https://goskinly.com/pay/{{1}}`
+- Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?t=8f2a1c9e4b7d&utm_source=whatsapp`
 
 ```
-Hi {{1}}, the payment for your GoSkinly order {{2}} of {{3}} didn't go through.
+Hi {{1}}, the payment for your GoSkinly order {{2}} of *{{3}}* didn't go through.
 
-Don't worry, your items are saved. Complete the payment securely here: {{4}}
+Don't worry, your items are saved. Tap *Complete payment* below to pay securely and confirm your order.
 
 If money was deducted, it will be refunded automatically by your bank.
 ```
-Samples: Priya · 4102 · ₹527 · https://goskinly.com/pay/abc123?t=xyz
+Samples: Priya · 4102 · ₹527
 
 ## 10. `skinly_order_cancelled` — Utility
 Variables: `first_name, order_number, refund_line`
