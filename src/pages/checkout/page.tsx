@@ -80,6 +80,7 @@ function CheckoutPageInner() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [otpInput, setOtpInput] = useState("");
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
+  const [codOtpToken, setCodOtpToken] = useState<string | null>(null);
   const [useWallet, setUseWallet] = useState(false);
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
   const [currentMerchantTxnId, setCurrentMerchantTxnId] = useState<string | null>(null);
@@ -306,13 +307,13 @@ function CheckoutPageInner() {
 
   const handlePaymentMethodChange = (value: string) => {
     setFormData((prev) => ({ ...prev, paymentMethod: value }));
-    if (value !== "cod") { setOtpSent(false); setOtpVerified(false); setOtpInput(""); setOtpExpiresAt(null); }
+    if (value !== "cod") { setOtpSent(false); setOtpVerified(false); setOtpInput(""); setOtpExpiresAt(null); setCodOtpToken(null); }
   };
 
   const handlePhoneChange = (value: string) => {
     const digitsOnly = value.replace(/\D/g, "").slice(0, 10);
     setFormData((prev) => ({ ...prev, phone: digitsOnly }));
-    if (otpVerified || otpSent) { setOtpSent(false); setOtpVerified(false); setOtpInput(""); setOtpExpiresAt(null); }
+    if (otpVerified || otpSent) { setOtpSent(false); setOtpVerified(false); setOtpInput(""); setOtpExpiresAt(null); setCodOtpToken(null); }
   };
 
   const handleCouponCodeChange = (value: string) => {
@@ -399,7 +400,7 @@ function CheckoutPageInner() {
       const result = await generateCodOtp({ phoneNumber: getFullPhoneNumber() });
       setOtpSent(true);
       setOtpExpiresAt(result.expiresAt);
-      toast.success("OTP sent to your WhatsApp");
+      toast.success("OTP sent by SMS");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to send OTP");
     } finally {
@@ -411,7 +412,8 @@ function CheckoutPageInner() {
     if (!otpInput.trim()) { toast.error("Please enter the OTP"); return; }
     setIsVerifyingOtp(true);
     try {
-      await verifyCodOtp({ phoneNumber: getFullPhoneNumber(), otp: otpInput });
+      const verified = await verifyCodOtp({ phoneNumber: getFullPhoneNumber(), otp: otpInput });
+      setCodOtpToken(verified?.codOtpToken || null);
       setOtpVerified(true);
       toast.success("Phone number verified successfully!");
     } catch (error) {
@@ -443,7 +445,8 @@ function CheckoutPageInner() {
     if (!/^[1-9]\d{5}$/.test(formData.pincode.trim())) {
       toast.error("Please enter a valid 6-digit pincode"); return;
     }
-    if (formData.paymentMethod === "cod" && !otpVerified) { toast.error("Please verify your phone number with OTP before placing a COD order"); return; }
+    // Only while Admin › COD › OTP is on; placeOrder checks the same switch.
+    if (formData.paymentMethod === "cod" && codAvailability?.otpRequired && !otpVerified) { toast.error("Please verify your phone number with OTP before placing a COD order"); return; }
 
     setIsSubmitting(true); setRetryCount(0); setShowPaymentVerificationFailed(false);
     try {
@@ -461,6 +464,7 @@ function CheckoutPageInner() {
         shippingAddress: { fullName: formData.fullName, phone: getFullPhoneNumber(), addressLine1: formData.addressLine1, addressLine2: formData.addressLine2, city: formData.city, state: formData.state, pincode: formData.pincode },
         customerEmail: formData.email || undefined,
         paymentMethod: formData.paymentMethod,
+        codOtpToken: formData.paymentMethod === "cod" ? codOtpToken || undefined : undefined,
         codFee: codFeeAmount, prepaidAmount, codAmount,
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
         couponId: appliedCoupon?.coupon._id,
@@ -710,7 +714,7 @@ function CheckoutPageInner() {
                 onPaymentMethodChange={handlePaymentMethodChange}
               />
 
-              {formData.paymentMethod === "cod" && codAvailability?.available && (
+              {formData.paymentMethod === "cod" && codAvailability?.available && codAvailability?.otpRequired && (
                 <CodOtpSection
                   fullPhoneNumber={getFullPhoneNumber()}
                   isPhoneValid={isPhoneValid}

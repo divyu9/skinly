@@ -1251,7 +1251,7 @@ export async function runQuery(c: QueryCtx) {
               codAmount = totalAmount + codFee - prepaidAmount;
             }
 
-            setData({ available: true, codFee, prepaidAmount, codAmount, reason: "", isMixedCart, showOption: true });
+            setData({ available: true, codFee, prepaidAmount, codAmount, reason: "", isMixedCart, showOption: true, otpRequired: s.otpRequired === true });
           })();
         }
         else if (path === 'wallet.calculateMaxWalletUsage') {

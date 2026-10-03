@@ -2651,11 +2651,11 @@ export async function runMutation(path: string, args?: any) {
         const res: any = await callable(args);
         return res.data;
       }
-      if (collectionName === 'codOtp' && actionName === 'generateCodOtp') {
-        return { success: true };
-      }
-      if (collectionName === 'codOtp' && actionName === 'verifyCodOtp') {
-        return { success: true };
+      // Sent by SMS and checked server-side (functions/src/codOtp.ts); verify
+      // returns the token placeOrder asks for while Admin › COD › OTP is on.
+      if (collectionName === 'codOtp' && (actionName === 'generateCodOtp' || actionName === 'verifyCodOtp')) {
+        const res: any = await httpsCallable(functions, actionName)(args);
+        return res.data;
       }
       
       if (collectionName === 'abandonedCartsActions') {

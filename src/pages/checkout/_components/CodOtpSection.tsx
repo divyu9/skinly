@@ -41,7 +41,7 @@ export function CodOtpSection({
         {!otpVerified ? (
           <>
             <p className="text-sm text-muted-foreground">
-              For COD orders, we need to verify your phone number. An OTP will be sent to your WhatsApp.
+              For COD orders, we need to verify your phone number. An OTP will be sent to your phone by SMS.
             </p>
 
             {!otpSent ? (
@@ -51,14 +51,14 @@ export function CodOtpSection({
                 disabled={!fullPhoneNumber || !isPhoneValid || isSendingOtp}
                 className="w-full"
               >
-                {isSendingOtp ? "Sending OTP..." : "Send OTP to WhatsApp"}
+                {isSendingOtp ? "Sending OTP..." : "Send OTP"}
               </Button>
             ) : (
               <div className="space-y-3">
                 <div className="flex items-start gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                   <ShieldCheckIcon className="size-4 text-green-600 mt-0.5 shrink-0" />
                   <p className="text-sm text-green-900 dark:text-green-100">
-                    OTP sent to {fullPhoneNumber}. Check your WhatsApp.
+                    OTP sent to {fullPhoneNumber}. Check your SMS.
                   </p>
                 </div>
 

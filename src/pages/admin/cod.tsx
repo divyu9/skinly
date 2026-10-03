@@ -100,6 +100,7 @@ function AdminCODInner() {
   // UI visibility controls
   const [showCodOnPaymentPage, setShowCodOnPaymentPage] = useState(true);
   const [allowMixedCartCod, setAllowMixedCartCod] = useState(false);
+  const [otpRequired, setOtpRequired] = useState(false);
 
   // Display rules
   const [hideWhenIneligible, setHideWhenIneligible] = useState(false);
@@ -167,6 +168,7 @@ function AdminCODInner() {
       setPrepaidValue(settings.prepaidValue);
       setShowCodOnPaymentPage(settings.showCodOnPaymentPage ?? true);
       setAllowMixedCartCod(settings.allowMixedCartCod ?? false);
+      setOtpRequired(settings.otpRequired === true);
       if ("hideWhenIneligible" in settings) {
         setHideWhenIneligible(settings.hideWhenIneligible ?? false);
       }
@@ -203,6 +205,7 @@ function AdminCODInner() {
         prepaidValue,
         showCodOnPaymentPage,
         allowMixedCartCod,
+        otpRequired,
       });
       
       await updateSettings({
@@ -229,6 +232,7 @@ function AdminCODInner() {
         prepaidValue,
         showCodOnPaymentPage,
         allowMixedCartCod,
+        otpRequired,
       });
       toast.success("COD settings saved successfully");
     } catch (error) {
@@ -367,6 +371,21 @@ function AdminCODInner() {
                 <Switch
                   checked={allowMixedCartCod}
                   onCheckedChange={setAllowMixedCartCod}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-1 flex-1">
+                  <Label className="text-base font-medium">Verify phone by OTP (SMS)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    COD orders need a 6-digit code sent by SMS to the order's phone. The server refuses a COD order without it, so fake numbers cannot book parcels.
+                  </p>
+                </div>
+                <Switch
+                  checked={otpRequired}
+                  onCheckedChange={setOtpRequired}
                 />
               </div>
               

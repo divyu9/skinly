@@ -21,6 +21,7 @@ export * from "./seoAuto";
 export * from "./trackOrder";
 export * from "./orderNotifications";
 export * from "./loginOtp";
+export * from "./codOtp";
 export * from "./abandonedCarts";
 export * from "./collectionSync";
 export * from "./productGadget";

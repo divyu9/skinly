@@ -7,6 +7,7 @@ import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
+import { assertCodOtp, markCodOtpUsed } from "./codOtp";
 import { evaluateReferral, normCode, recordReferral, referrerRewardFor } from "./referrals";
 import { verifiedEmail, walletUserRef } from "./userDoc";
 
@@ -254,9 +255,13 @@ export const placeOrder = functions
      * Same rules as cod.isCodAvailable in the storefront; checked before the
      * coupon, so a refused COD order doesn't use one up.
      */
+    // The phone check (Admin › COD › OTP), when it is switched on: codOtp.ts.
+    let codOtpRef: admin.firestore.DocumentReference | null = null;
     if (paymentMethod === "cod") {
       const cs = await db.collection("codSettings").limit(1).get();
-      await assertCodAllowed(db, cs.empty ? null : cs.docs[0].data(), orderItems, variantIdMap, itemsTotal + shippingFee);
+      const codSettings = cs.empty ? null : cs.docs[0].data();
+      await assertCodAllowed(db, codSettings, orderItems, variantIdMap, itemsTotal + shippingFee);
+      codOtpRef = await assertCodOtp(db, codSettings, shippingAddress?.phone, data?.codOtpToken);
     }
 
     // ── 3b. Re-derive every discount server-side ──────────────────────────────
@@ -532,6 +537,7 @@ export const placeOrder = functions
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
+    await markCodOtpUsed(codOtpRef, docRef.id);
 
     if (referral) {
       await recordReferral(db, orderId, referral.r, {
