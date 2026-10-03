@@ -94,14 +94,16 @@ Open the admin panel to pack it: https://goskinly.com/backend-skinly/orders
 Samples: #4102 · 527.00 · Priya Sharma · 2 · COD
 
 ## 3. `skinly_model_added` — Utility
-Variables: `brand_name, model_name, request_number`
+Variables: `brand_name, model_name, request_number`  
+**Button: Visit website, Dynamic URL** — opens the skins for that exact model.
+- Button text: `See skins for my device`
+- URL type: **Dynamic**, URL: `https://goskinly.com/{{1}}`
+- Sample for `{{1}}`: `products?brand=Samsung&model=Galaxy+S25+FE`
 
 ```
 Good news! Skins for your {{1}} {{2}} are now live on GoSkinly 🎉
 
-You asked for this model in request {{3}}, and we've added it.
-
-Browse all designs for your device: https://goskinly.com/products
+You asked for this model in request {{3}}, and we've added it. Tap the button below to see every design cut for your device.
 
 Thank you for waiting — Team GoSkinly
 ```
