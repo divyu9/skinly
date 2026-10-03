@@ -1,4 +1,11 @@
-# WhatsApp templates for Authkey / Meta
+# WhatsApp templates (Fast2SMS, earlier Authkey) / Meta
+
+> 3 Oct 2026: the business number moved to Fast2SMS, a new WhatsApp Business
+> account, so every template is submitted again there (Fast2SMS → WhatsApp →
+> Templates). The texts, categories, headers and variable order below are the
+> same; the IDs Fast2SMS gives are pasted in Admin › WhatsApp with provider
+> "Fast2SMS". Template 0 was approved on Authkey and is written out here so it
+> can be submitted again too.
 
 Every template below matches a trigger that already exists in the code, and its
 variables are exactly what that trigger sends. Create each one in Authkey
@@ -39,6 +46,18 @@ order was never confirmed (the new one removes the guesswork).
 | 16 | skinly_admin_daily_digest | Utility | admin_daily_digest | 🆕 later |
 
 ---
+
+## 0. `skinly_model_requested` — Utility
+Variables: `brand_name, model_name, request_number`
+
+```
+Hi! We've received your request for {{1}} {{2}} skins on GoSkinly.
+
+Your request number is {{3}}. We'll add the model and message you here as soon as its skins are live.
+
+Questions? WhatsApp our support team: https://goskinly.com/support
+```
+Samples: Samsung · Galaxy S25 FE · MR-150
 
 ## 1. `skinly_order_confirmed` — Utility
 **Header: Image** — a collage of the products in the order (up to 4). Upload any Skinly product photo as the sample.  
