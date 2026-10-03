@@ -34,7 +34,7 @@ order was never confirmed (the new one removes the guesswork).
 | 4 | skinly_order_dispatched | Utility | order_dispatched | 🆕 |
 | 5 | skinly_out_for_delivery | Utility | out_for_delivery | 🆕 |
 | 6 | skinly_order_delivered | Utility | order_delivered | 🆕 |
-| 7 | skinly_review_request | Utility | review_request | 🆕 |
+| 7 | skinly_review_request | Marketing | review_request | 🆕 |
 | 8 | skinly_wallet_credited | Utility | wallet_credited | 🆕 |
 | 9 | skinly_payment_failed | Utility | payment_failed | 🆕 |
 | 10 | skinly_order_cancelled | Utility | order_cancelled | 🆕 |
@@ -159,13 +159,13 @@ Hi {{1}}, your GoSkinly order {{2}} has been delivered 🎉
 
 Before you apply it, watch our step-by-step video guide — it takes 2 minutes and gives a bubble-free finish: https://goskinly.com/how-to-apply
 
-Once it's on, rate it using the button below. Add a photo and get up to 10% of your order back in your Skinly wallet.
+Once it's on, rate it using the button below. 📸 *Add a photo and get up to 10% of your order back* in your Skinly wallet.
 
 Need help applying it? WhatsApp our support team: https://goskinly.com/support
 ```
 Samples: Priya · #4102
 
-## 7. `skinly_review_request` — Utility
+## 7. `skinly_review_request` — Marketing
 **Header: Image** — the product being reviewed. Upload any Skinly product photo as the sample.  
 Variables (body): `customer_name, product_name` — the review link goes in the button.  
 **Button: Visit website, Dynamic URL** — opens the order's own review page (signed, works for guests).
@@ -174,15 +174,18 @@ Variables (body): `customer_name, product_name` — the review link goes in the 
 - Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?t=8f2a1c9e4b7d&utm_source=whatsapp`
 
 Sent a few days after delivery, and once more five days later to anyone who
-hasn't reviewed yet (never a third time). Mentions the "up to 10% back"
-reward; Meta may re-file it as Marketing.
+hasn't reviewed yet (never a third time). Submitted as Marketing (it offers
+the "up to 10% back" reward), so the key lines are in WhatsApp bold (*…*).
+Sent to buyers about their own order; anyone who replied STOP is skipped.
 
 ```
-Hi {{1}}, how are you liking your {{2}}? 😊
+Hi {{1}}, how are you liking your *{{2}}*? 😊
 
-It takes 30 seconds to rate it. Add a photo and get up to 10% of your order back in your Skinly wallet. Tap the button below.
+⭐ *Rate it in 30 seconds* — tap the button below.
 
-Thank you for choosing GoSkinly!
+📸 *Add a photo and get up to 10% of your order back* in your Skinly wallet, to spend on your next skin.
+
+Thank you for choosing GoSkinly! 💚
 ```
 Samples: Priya · Aurora Arches Matte iPhone 15 Skin
 
