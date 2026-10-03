@@ -29,7 +29,7 @@ export const WHATSAPP_MESSAGES: WhatsAppMessageSpec[] = [
     key: "order_dispatched", label: "Order shipped", group: "Orders", photo: true,
     when: "When the parcel is handed to the courier, with AWB and tracking.",
     vars: ["first_name", "order_number", "courier_name", "awb_number", "tracking_url"],
-    sample: { first_name: "Priya", order_number: "#4102", courier_name: "Delhivery", awb_number: "38291045561", tracking_url: "https://www.delhivery.com/track-v2/package/38291045561" },
+    sample: { first_name: "Priya", order_number: "#4102", courier_name: "Delhivery", awb_number: "38291045561", tracking_url: "https://www.delhivery.com/track-v2/package/38291045561", order_link: `${SITE}/orders/test-order` },
   },
   {
     key: "out_for_delivery", label: "Out for delivery", group: "Orders", photo: false,
@@ -41,7 +41,7 @@ export const WHATSAPP_MESSAGES: WhatsAppMessageSpec[] = [
     key: "order_delivered", label: "Delivered", group: "Orders", photo: true,
     when: "On delivery, with the how-to-apply guide and the review link.",
     vars: ["first_name", "order_number", "review_link"],
-    sample: { first_name: "Priya", order_number: "#4102", review_link: `${SITE}/reviews` },
+    sample: { first_name: "Priya", order_number: "#4102", review_link: `${SITE}/review/test-order` },
   },
   {
     key: "order_cancelled", label: "Order cancelled", group: "Orders", photo: false,
@@ -53,7 +53,7 @@ export const WHATSAPP_MESSAGES: WhatsAppMessageSpec[] = [
     key: "review_request", label: "Review request", group: "Customer", photo: false,
     when: "A few days after delivery, and one reminder 5 days later if no review.",
     vars: ["customer_name", "product_name", "review_link"],
-    sample: { customer_name: "Priya", product_name: "Aurora Arches Matte iPhone 15 Skin", review_link: `${SITE}/reviews` },
+    sample: { customer_name: "Priya", product_name: "Aurora Arches Matte iPhone 15 Skin", review_link: `${SITE}/review/test-order` },
   },
   {
     key: "wallet_credited", label: "Wallet credited", group: "Customer", photo: false,
@@ -77,19 +77,19 @@ export const WHATSAPP_MESSAGES: WhatsAppMessageSpec[] = [
     key: "payment_failed", label: "Payment failed", group: "Recovery", photo: false,
     when: "When an online payment doesn't go through, with a link to finish paying.",
     vars: ["customer_name", "order_number", "order_amount", "pay_link"],
-    sample: { customer_name: "Priya", order_number: "4102", order_amount: "₹527", pay_link: `${SITE}/cart` },
+    sample: { customer_name: "Priya", order_number: "4102", order_amount: "₹527", pay_link: `${SITE}/pay/test-order` },
   },
   {
     key: "abandoned_cart", label: "Abandoned cart", group: "Recovery", photo: true,
     when: "First cart reminder; the button (/c/<code>) refills the cart with the coupon.",
     vars: ["customer_name", "product_name", "coupon_line"],
-    sample: { customer_name: "Priya", product_name: "Aurora Arches Matte iPhone 15 Skin", coupon_line: "Use code BACK10 at checkout for 10% off." },
+    sample: { customer_name: "Priya", product_name: "Aurora Arches Matte iPhone 15 Skin", coupon_line: "Use code BACK10 at checkout for 10% off.", cart_code: "TEST" },
   },
   {
     key: "back_in_stock", label: "Back in stock", group: "Recovery", photo: false,
     when: "To everyone who tapped Notify me, when the product is restocked.",
     vars: ["product_name", "product_url"],
-    sample: { product_name: "Aurora Arches Matte iPhone 15 Skin", product_url: `${SITE}/products` },
+    sample: { product_name: "Aurora Arches Matte iPhone 15 Skin", product_url: `${SITE}/products/refill-hd-glass-autoapply-iphone` },
   },
   {
     key: "model_requested", label: "Model request received", group: "Model requests", photo: false,

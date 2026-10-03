@@ -81,6 +81,8 @@ function CheckoutPageInner() {
   const [otpInput, setOtpInput] = useState("");
   const [otpExpiresAt, setOtpExpiresAt] = useState<number | null>(null);
   const [codOtpToken, setCodOtpToken] = useState<string | null>(null);
+  // The unticked offers box under the phone field; placeOrder saves a yes to contacts/{phone}.
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [useWallet, setUseWallet] = useState(false);
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
   const [currentMerchantTxnId, setCurrentMerchantTxnId] = useState<string | null>(null);
@@ -465,6 +467,7 @@ function CheckoutPageInner() {
         customerEmail: formData.email || undefined,
         paymentMethod: formData.paymentMethod,
         codOtpToken: formData.paymentMethod === "cod" ? codOtpToken || undefined : undefined,
+        marketingOptIn: marketingOptIn || undefined,
         codFee: codFeeAmount, prepaidAmount, codAmount,
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
         couponId: appliedCoupon?.coupon._id,
@@ -691,6 +694,8 @@ function CheckoutPageInner() {
                 formData={formData}
                 isPhoneValid={isPhoneValid}
                 otpVerified={otpVerified}
+                marketingOptIn={marketingOptIn}
+                onMarketingOptInChange={setMarketingOptIn}
                 isAuthenticated={isAuthenticated}
                 onFieldChange={handleFieldChange}
                 onPhoneChange={handlePhoneChange}

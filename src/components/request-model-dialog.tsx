@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
+import { WhatsAppOptIn, recordWhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select.tsx";
@@ -42,6 +43,7 @@ export function RequestModelDialog({
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [optIn, setOptIn] = useState(false);
 
   // Opened from the picker, the brand and category are already known — asking
   // again for what the shopper just tapped is how a two-field form becomes four.
@@ -73,9 +75,10 @@ export function RequestModelDialog({
         // The same messages go to both, in case one channel does not reach.
         userEmail: email.trim().toLowerCase(),
       } as any);
+      if (optIn) void recordWhatsAppOptIn(phone, "model_request");
       toast.success("Request submitted! We'll notify you when it's available.");
       onOpenChange(false);
-      setBrand(""); setModel(""); setCategory(""); setPhone(""); setEmail("");
+      setBrand(""); setModel(""); setCategory(""); setPhone(""); setEmail(""); setOptIn(false);
     } catch (error) {
       toast.error("Failed to submit request. Please try again.");
       console.error(error);
@@ -157,6 +160,8 @@ export function RequestModelDialog({
               We'll tell you on WhatsApp and email when your model is available
             </p>
           </div>
+
+          <WhatsAppOptIn checked={optIn} onCheckedChange={setOptIn} />
 
           <div className="flex gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">

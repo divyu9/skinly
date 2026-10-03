@@ -2,6 +2,7 @@ import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { AlertCircleIcon, TruckIcon } from "lucide-react";
+import { WhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import { Link } from "react-router-dom";
 
 export interface FormData {
@@ -20,6 +21,8 @@ interface AddressFormProps {
   formData: FormData;
   isPhoneValid: boolean;
   otpVerified: boolean;
+  marketingOptIn?: boolean;
+  onMarketingOptInChange?: (v: boolean) => void;
   isAuthenticated: boolean;
   onFieldChange: (field: keyof FormData, value: string) => void;
   onPhoneChange: (value: string) => void;
@@ -29,6 +32,8 @@ export function AddressForm({
   formData,
   isPhoneValid,
   otpVerified,
+  marketingOptIn = false,
+  onMarketingOptInChange,
   isAuthenticated,
   onFieldChange,
   onPhoneChange,
@@ -99,6 +104,9 @@ export function AddressForm({
               <p className="text-xs text-green-600 mt-1">
                 ✓ Verified for COD orders
               </p>
+            )}
+            {onMarketingOptInChange && (
+              <WhatsAppOptIn checked={marketingOptIn} onCheckedChange={onMarketingOptInChange} className="mt-3" />
             )}
           </div>
 

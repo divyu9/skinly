@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.tsx";
+import { WhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import { AlertCircleIcon } from "lucide-react";
 
 interface SimilarModel {
@@ -35,6 +36,7 @@ interface RequestModelDialogProps {
     category: string;
     whatsApp: string;
     email: string;
+    marketingOptIn?: boolean;
     confirmedNotMatch: boolean;
     isSubmitting: boolean;
   };
@@ -224,6 +226,8 @@ export function RequestModelDialog({
               We'll tell you on WhatsApp and email when your device is added
             </p>
           </div>
+
+          <WhatsAppOptIn checked={!!formState.marketingOptIn} onCheckedChange={(v) => onUpdateForm({ marketingOptIn: v })} />
 
           {/* Submit Button */}
           <div className="flex gap-3 pt-4">

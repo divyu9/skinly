@@ -6,6 +6,7 @@ import { searchModels } from "@/lib/laptop-body";
 import { siblingListingFor, type ListingLike } from "@/lib/listing-siblings";
 import { brandKey, loadCatalogue } from "@/lib/catalogue";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
+import { recordWhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import { toast } from "sonner";
 
 interface ModelSelectorState {
@@ -23,6 +24,7 @@ interface RequestFormState {
   category: string;
   whatsApp: string;
   email: string;
+  marketingOptIn: boolean;
   confirmedNotMatch: boolean;
   isSubmitting: boolean;
 }
@@ -58,6 +60,7 @@ export function useModelSelector(
     category: "phone",
     whatsApp: "",
     email: "",
+    marketingOptIn: false,
     confirmedNotMatch: false,
     isSubmitting: false,
   });
@@ -239,6 +242,7 @@ export function useModelSelector(
         whatsappPhone: "+91" + cleanedPhone,
         userEmail: email,
       } as any);
+      if (requestState.marketingOptIn) void recordWhatsAppOptIn(cleanedPhone, "model_request");
       
       toast.success("Request submitted! We'll tell you on WhatsApp and email when it's added.");
       resetRequestForm();
@@ -289,7 +293,8 @@ export function useModelSelector(
       category: "phone",
       whatsApp: "",
     email: "",
-      confirmedNotMatch: false,
+      marketingOptIn: false,
+    confirmedNotMatch: false,
       isSubmitting: false,
     });
   }, []);

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { BellIcon, CheckIcon } from "lucide-react";
 import { toast } from "sonner";
 import { ConvexError } from "convex/values";
+import { WhatsAppOptIn, recordWhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import type { Id } from "@/lib/firebase-api";
 
 interface StockNotificationProps {
@@ -21,6 +22,7 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
   const [email, setEmail] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [optIn, setOptIn] = useState(false);
   
   const subscribeToNotification = useMutation(api.stockNotifications.subscribeToNotification);
   
@@ -54,6 +56,7 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
         email: email.trim().toLowerCase(),
       });
       
+      if (optIn) void recordWhatsAppOptIn(phoneNumber.replace(/\D/g, ""), "notify_me");
       if (result.alreadySubscribed) {
         toast.info("You're already subscribed to notifications for this product");
       } else {
@@ -129,6 +132,7 @@ export function StockNotification({ variantId, variantTitle }: StockNotification
               disabled={isSubscribing}
             />
           </div>
+          <WhatsAppOptIn checked={optIn} onCheckedChange={setOptIn} />
           <Button
             type="submit"
             className="w-full"

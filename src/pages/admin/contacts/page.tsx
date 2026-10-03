@@ -62,6 +62,24 @@ export default function AdminContactsPage() {
   };
   useEffect(() => { void load(); }, []);
 
+  // Where replies to the business number are sent, so a STOP opts the sender out (whatsappInbound).
+  const [inboundUrl, setInboundUrl] = useState("");
+  useEffect(() => {
+    httpsCallable(getFunctions(), "whatsappInboundUrl")({}).then((r: any) => setInboundUrl(r.data?.url || "")).catch(() => {});
+  }, []);
+
+  /** What the customer asked for, recorded by hand (a call, a chat): stop offers, or start again. */
+  const setOffers = async (c: Contact, change: { optOut?: boolean; optIn?: boolean }) => {
+    try {
+      await httpsCallable(getFunctions(), "setContactMarketing")({ phone: c.phone, ...change });
+      setContacts((all) => (all || []).map((x) => x.phone !== c.phone ? x
+        : { ...x, optOut: change.optOut === true, optIn: change.optIn === true ? true : x.optIn }));
+      toast.success(change.optOut ? `${c.phone} won't get offers` : `${c.phone} will get offers`);
+    } catch (e: any) {
+      toast.error(e?.message || "Could not save");
+    }
+  };
+
   const brands = useMemo(() => {
     const n = new Map<string, number>();
     for (const c of contacts || []) for (const d of [...c.devices, ...c.requested]) {
@@ -137,8 +155,18 @@ export default function AdminContactsPage() {
 
           <div className="rounded-xl border-2 border-ink bg-[#fff4d6] p-3 text-sm">
             <b>Offers only to "Opted in".</b> An order or shipping message is not permission for marketing — sending offers to everyone gets the number reported and restricted.
-            {(counts.optin || 0) === 0 && " Nobody has opted in yet; that starts once the opt-in checkbox goes live at checkout and on the forms."}
+            {(counts.optin || 0) === 0 && " Nobody has opted in yet; the opt-in checkbox is live at checkout, in the model-request forms and on Notify me."}
+            {" "}A customer who replies STOP is opted out automatically once the webhook below is set in Fast2SMS.
           </div>
+
+          {inboundUrl && (
+            <details className="rounded-xl border-2 border-dashed border-ink/40 p-3 text-sm">
+              <summary className="cursor-pointer font-semibold">STOP replies: webhook URL for Fast2SMS</summary>
+              <p className="mt-2 text-muted-foreground">Fast2SMS › WhatsApp › Webhook (incoming messages): paste this URL. Keep it private — it carries a secret.</p>
+              <code className="mt-2 block break-all rounded bg-muted p-2 text-xs">{inboundUrl}</code>
+              <Button size="sm" variant="outline" className="mt-2" onClick={() => { void navigator.clipboard.writeText(inboundUrl); toast.success("Copied"); }}>Copy</Button>
+            </details>
+          )}
 
           <div className="flex flex-wrap gap-2">
             {SEGMENTS.map((s) => (
@@ -196,6 +224,11 @@ export default function AdminContactsPage() {
                       <td className="p-3 text-xs text-muted-foreground">{c.sources.join(", ")}</td>
                       <td className="p-3 text-xs font-semibold">
                         {c.optOut ? <span className="text-destructive">Opted out</span> : c.optIn === true ? <span className="text-[#1b7462]">Yes</span> : <span className="text-muted-foreground">Not asked</span>}
+                        <div className="mt-1">
+                          {c.optOut
+                            ? <button type="button" className="font-normal text-muted-foreground underline" onClick={() => void setOffers(c, { optOut: false })}>Undo opt-out</button>
+                            : <button type="button" className="font-normal text-muted-foreground underline" onClick={() => void setOffers(c, { optOut: true })}>Opt out</button>}
+                        </div>
                       </td>
                     </tr>
                   ))}

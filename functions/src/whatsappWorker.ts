@@ -2,7 +2,65 @@ import * as functionsV1 from "firebase-functions/v1";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
+import { marketingAllowed } from "./contacts";
 import { enforceDailyRateLimit } from "./rate-limit";
+
+const MARKETING_USECASES = new Set(["abandoned_cart", "back_in_stock", "review_request"]);
+const NEEDS_OPT_IN = new Set(["abandoned_cart"]);
+
+// ── Fast2SMS ────────────────────────────────────────────────────────────────
+
+const F2S_GRAPH_VERSION = process.env.FAST2SMS_GRAPH_VERSION || "v26.0";
+
+type F2sTemplate = { name: string; language: string; varCount: number; urlButton: { index: number; url: string } | null };
+const f2sCache = new Map<string, { at: number; t: F2sTemplate | null }>();
+
+/**
+ * One approved template's name, language, body variable count and dynamic
+ * URL button, by its Fast2SMS message_id (Get WABA & Template Details).
+ * Cached for ten minutes per worker instance.
+ */
+async function fast2smsTemplate(key: string, phoneNumberId: string, messageId: string): Promise<F2sTemplate | null> {
+  const hit = f2sCache.get(messageId);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.t;
+  const fetch = require("node-fetch");
+  const res = await fetch(`https://www.fast2sms.com/dev/dlt_manager/whatsapp?type=template&phone_number_id=${encodeURIComponent(phoneNumberId)}`,
+    { headers: { Authorization: key } });
+  const j: any = await res.json();
+  const all: any[] = (j?.data || []).flatMap((n: any) => n.templates || []);
+  for (const t of all) {
+    const buttons: any[] = (t.components || []).find((c: any) => String(c.type).toUpperCase() === "BUTTONS")?.buttons || [];
+    const i = buttons.findIndex((b: any) => String(b.type).toUpperCase() === "URL" && String(b.url || "").includes("{{1}}"));
+    f2sCache.set(String(t.message_id), {
+      at: Date.now(),
+      t: {
+        name: String(t.template_name), language: String(t.language || "en"),
+        varCount: Number.isFinite(Number(t.var_count)) ? Number(t.var_count) : -1,
+        urlButton: i >= 0 ? { index: i, url: String(buttons[i].url) } : null,
+      },
+    });
+  }
+  return f2sCache.get(messageId)?.t ?? null;
+}
+
+const SITE = (process.env.SITE_URL || "https://goskinly.com").replace(/\/+$/, "");
+
+/** The full link a message's dynamic URL button opens (docs/whatsapp-templates.md). */
+function buttonUrlFor(usecaseKey: string, v: Record<string, any>): string {
+  switch (usecaseKey) {
+    case "order_dispatched": return String(v.order_link || "");
+    case "order_delivered":
+    case "review_request": return String(v.review_link || "");
+    case "payment_failed": return String(v.pay_link || "");
+    case "back_in_stock": return String(v.product_url || "");
+    case "abandoned_cart": return v.cart_code ? `${SITE}/c/${v.cart_code}` : "";
+    case "model_added":
+      return v.brand_name && v.model_name
+        ? `${SITE}/products?${new URLSearchParams({ brand: String(v.brand_name), model: String(v.model_name), utm_source: "whatsapp", utm_medium: "model_added" })}`
+        : "";
+    default: return String(v.button_url || "");
+  }
+}
 
 /**
  * Drains whatsappQueue through the authkey API.
@@ -147,6 +205,22 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
     return false;
   }
 
+  /*
+   * Marketing permission (contacts/{phone}, Admin › Contacts). An order
+   * message is not permission for offers (Meta policy, India's DPDP Act):
+   * the abandoned-cart nudge needs the customer's opt-in; back in stock (they
+   * asked for it) and the review request (about their own order) go unless
+   * they said STOP. Order and shipping messages are never held back.
+   */
+  if (!msg.test && MARKETING_USECASES.has(msg.usecaseKey)) {
+    const allowed = await marketingAllowed(phone, NEEDS_OPT_IN.has(msg.usecaseKey));
+    if (!allowed) {
+      await queueRef.update({ status: "skipped", failureReason: "no marketing permission (not opted in, or said STOP)" });
+      await msgSnap.ref.update({ status: "skipped", failureReason: "no marketing permission" });
+      return false;
+    }
+  }
+
   const wid = String(msg.providerTemplateId || uc.docs[0].data().providerTemplateId || "");
   if (!wid) {
     await queueRef.update({ status: "failed", failureReason: "no providerTemplateId on the usecase" });
@@ -181,16 +255,68 @@ const sendOne = async (queueRow: any, opts: { ignoreSwitch?: boolean } = {}): Pr
 
   const fetch = require("node-fetch");
   if (provider === "fast2sms") {
-    // Values in template order, joined with "|" — so a "|" inside one would split it.
-    const values = order.map((_, i) => String(numbered[String(i + 1)] ?? "").replace(/\|/g, "/").replace(/\s*\n\s*/g, " "));
-    const q = new URLSearchParams({ message_id: wid, phone_number_id: String(prov.phoneNumberId), numbers: phone });
-    if (values.length) q.set("variables_values", values.join("|"));
-    if (headerImage) q.set("media_url", headerImage);
-    q.set("udf1", messageId);
-    const fres = await fetch(`https://www.fast2sms.com/dev/whatsapp?${q.toString()}`, { method: "GET", headers: { Authorization: f2sKey } });
+    const meta = await fast2smsTemplate(f2sKey, String(prov.phoneNumberId), wid).catch((e) => {
+      console.warn("[fast2sms] template details unavailable:", e?.message || e);
+      return null;
+    });
+    // Values in template order. The body may take fewer than the registry
+    // lists (the review link moved into the button), so only var_count go.
+    let values = order.map((_, i) => String(numbered[String(i + 1)] ?? "").replace(/\s*\n\s*/g, " "));
+    if (meta && meta.varCount >= 0) values = values.slice(0, meta.varCount);
+
+    let fres: any;
+    const urlButton = meta?.urlButton || null;
+    if (meta && urlButton) {
+      /*
+       * A dynamic URL button: only Fast2SMS's Meta-format endpoint carries
+       * the button's {{1}}. The value is the part of this message's link
+       * after the button's fixed start ("https://goskinly.com/orders/").
+       */
+      const full = buttonUrlFor(msg.usecaseKey, msg.variables || {});
+      const base = urlButton.url.split("{{1}}")[0];
+      if (!full || !full.startsWith(base)) {
+        const why = `button link ${full ? "does not start with " + base : "missing"}`;
+        await queueRef.update({ status: "failed", failureReason: why });
+        await msgSnap.ref.update({ status: "failed", provider, failureReason: why });
+        return false;
+      }
+      const suffix = full.slice(base.length);
+      const components: any[] = [];
+      if (headerImage) components.push({ type: "header", parameters: [{ type: "image", image: { link: headerImage } }] });
+      if (values.length) components.push({ type: "body", parameters: values.map((text) => ({ type: "text", text })) });
+      const send = (paramType: "text" | "payload") => fetch(
+        `https://www.fast2sms.com/dev/whatsapp/${F2S_GRAPH_VERSION}/${prov.phoneNumberId}/messages`,
+        {
+          method: "POST",
+          headers: { Authorization: f2sKey, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messaging_product: "whatsapp", recipient_type: "individual", to: `91${phone}`, type: "template",
+            template: {
+              name: meta.name, language: { code: meta.language },
+              components: [...components, {
+                type: "button", sub_type: "url", index: String(urlButton.index),
+                parameters: [paramType === "text" ? { type: "text", text: suffix } : { type: "payload", payload: suffix }],
+              }],
+            },
+          }),
+        });
+      // Meta's own format names the URL value "text"; Fast2SMS's page shows "payload". Try both.
+      fres = await send("text");
+      if (fres.status !== 200) fres = await send("payload");
+    } else {
+      const q = new URLSearchParams({ message_id: wid, phone_number_id: String(prov.phoneNumberId), numbers: phone });
+      // Joined with "|", so a "|" inside one would split it.
+      if (values.length) q.set("variables_values", values.map((v) => v.replace(/\|/g, "/")).join("|"));
+      if (headerImage) q.set("media_url", headerImage);
+      q.set("udf1", messageId);
+      fres = await fetch(`https://www.fast2sms.com/dev/whatsapp?${q.toString()}`, { method: "GET", headers: { Authorization: f2sKey } });
+    }
     const fbody = await fres.text();
     let ok = false;
-    try { const j = JSON.parse(fbody); ok = fres.status === 200 && (j.status === true || j.return === true); } catch { ok = false; }
+    try {
+      const j = JSON.parse(fbody);
+      ok = fres.status === 200 && (j.status === true || j.return === true || !!j.messages?.[0]?.id);
+    } catch { ok = false; }
     if (!ok) {
       console.error("fast2sms send failed:", { status: fres.status, body: fbody.slice(0, 300) });
       await queueRef.update({ status: "pending", failureReason: `Fast2SMS: ${fbody.slice(0, 200)}` });

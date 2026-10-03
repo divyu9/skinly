@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog.tsx";
+import { WhatsAppOptIn, recordWhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import {
   Select,
   SelectContent,
@@ -50,6 +51,7 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
   });
   
   const createModelRequest = useMutation(api.modelRequests.createModelRequest);
+  const [optIn, setOptIn] = useState(false);
   
   const updateField = useCallback((field: string, value: string) => {
     setFormState(prev => ({ ...prev, [field]: value }));
@@ -57,6 +59,7 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
   
   const resetForm = useCallback(() => {
     setFormState({ brand: "", model: "", category: "", phone: "", email: "" });
+    setOptIn(false);
   }, []);
   
   const handleSubmit = useCallback(async () => {
@@ -81,6 +84,7 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
         // The same messages go to both, in case one channel does not reach.
         userEmail: email.trim().toLowerCase(),
       } as any);
+      if (optIn) void recordWhatsAppOptIn(phone, "model_request");
       toast.success("Model request submitted! We'll notify you when it's added.");
       onOpenChange(false);
       resetForm();
@@ -88,7 +92,7 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
       toast.error("Failed to submit request. Please try again.");
       console.error("Model request error:", error);
     }
-  }, [formState, createModelRequest, onOpenChange, resetForm]);
+  }, [formState, optIn, createModelRequest, onOpenChange, resetForm]);
   
   const isValid = formState.brand.trim() && 
     formState.model.trim() && 
@@ -170,6 +174,8 @@ export const ModelRequestDialog = memo(function ModelRequestDialog({
             />
             <p className="text-xs text-muted-foreground">We'll tell you on WhatsApp and email when it's added.</p>
           </div>
+
+          <WhatsAppOptIn checked={optIn} onCheckedChange={setOptIn} />
           
           <div className="flex gap-3">
             <Button

@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { Checkbox } from "@/components/ui/checkbox.tsx";
 import { useDebounce } from "@/hooks/use-debounce.ts";
+import { WhatsAppOptIn, recordWhatsAppOptIn } from "@/components/whatsapp-opt-in.tsx";
 import { toast } from "sonner";
 
 const CATEGORY_CONFIG = {
@@ -73,6 +74,7 @@ export default function DevicesPage() {
   const [requestCategory, setRequestCategory] = useState<string>("");
   const [requestWhatsApp, setRequestWhatsApp] = useState("");
   const [requestEmail, setRequestEmail] = useState("");
+  const [requestOptIn, setRequestOptIn] = useState(false);
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
   const [confirmedNotMatch, setConfirmedNotMatch] = useState(false); // Confirmation checkbox
   
@@ -344,10 +346,12 @@ export default function DevicesPage() {
         whatsappPhone: "+91" + cleanedPhone,
         userEmail: requestEmail.trim().toLowerCase(),
       } as any);
+      if (requestOptIn) void recordWhatsAppOptIn(cleanedPhone, "model_request");
       
       toast.success("Request submitted! We'll tell you on WhatsApp and email when it's added.");
       
       // Reset form
+      setRequestOptIn(false);
       setRequestDialogOpen(false);
       setRequestBrand("");
       setRequestNewBrand("");
@@ -877,6 +881,8 @@ export default function DevicesPage() {
                 We'll tell you on WhatsApp and email when your device is added
               </p>
             </div>
+
+            <WhatsAppOptIn checked={requestOptIn} onCheckedChange={setRequestOptIn} />
 
             {/* Submit Button */}
             <div className="flex gap-3 pt-4">

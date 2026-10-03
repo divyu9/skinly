@@ -8,6 +8,7 @@ import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 import { getCaller } from "./auth";
 import { assertCodOtp, markCodOtpUsed } from "./codOtp";
+import { recordOptIn } from "./contacts";
 import { evaluateReferral, normCode, recordReferral, referrerRewardFor } from "./referrals";
 import { verifiedEmail, walletUserRef } from "./userDoc";
 
@@ -534,10 +535,15 @@ export const placeOrder = functions
           ...(item?.coverage && (/tranzy/i.test(String(item?.productTitle || "")) || /^T-\d+$/i.test(String(sku || ""))) ? { coverage: "only_back" } : {}),
         };
       }),
+      // The unticked "WhatsApp pe naye designs aur offers bhejein" box at checkout.
+      ...(data?.marketingOptIn === true ? { marketingOptIn: true, marketingOptInAt: Date.now() } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
     await markCodOtpUsed(codOtpRef, docRef.id);
+    if (data?.marketingOptIn === true) {
+      await recordOptIn(String(shippingAddress?.phone || ""), "checkout").catch((e) => console.error("[placeOrder] opt-in:", e));
+    }
 
     if (referral) {
       await recordReferral(db, orderId, referral.r, {
