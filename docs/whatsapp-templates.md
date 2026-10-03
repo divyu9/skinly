@@ -258,12 +258,16 @@ Samples: Aurora Arches Matte iPhone 15 Skin
 
 ## 12. `skinly_abandoned_cart` — Marketing
 **Header: Image** — a collage of the products in the cart (up to 4). Upload any Skinly product photo as the sample.  
-Variables: `customer_name, product_name, coupon_line` · Button 1 variable: `cart_code`
+Variables (body): `customer_name, product_name, coupon_line` · Button variable: `cart_code`  
+**Button: Visit website, Dynamic URL** — /c/<code> puts the same cart back (same phone model and coverage) and opens checkout.
+- Button text: `Complete my order`
+- URL type: **Dynamic**, URL: `https://goskinly.com/c/{{1}}`
+- Sample for `{{1}}`: `Xy12Ab34Cd56`
 
 ```
-Hi {{1}}, you left {{2}} in your GoSkinly cart 🛒
+Hi {{1}}, you left *{{2}}* in your GoSkinly cart 🛒
 
-It's saved and ready — tap below to check out in one step.
+It's saved and ready — tap *Complete my order* below to check out in one step.
 
 {{3}}
 
