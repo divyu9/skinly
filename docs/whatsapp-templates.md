@@ -111,7 +111,11 @@ Samples: Samsung · Galaxy S25 FE · MR-150
 
 ## 4. `skinly_order_dispatched` — Utility
 **Header: Image** — a collage of the products in the parcel (up to 4). Upload any Skinly product photo as the sample.  
-Variables: `first_name, order_number, courier_name, awb_number, tracking_url`
+Variables: `first_name, order_number, courier_name, awb_number, tracking_url`  
+**Button: Visit website, Dynamic URL** — opens the customer's own order page (items, address, live tracking).
+- Button text: `View my order`
+- URL type: **Dynamic**, URL: `https://goskinly.com/orders/{{1}}`
+- Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?k=8f2a1c9e4b7d`
 
 ```
 Hi {{1}}, your GoSkinly order {{2}} has been shipped! 🚚
