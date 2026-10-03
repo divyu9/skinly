@@ -144,18 +144,26 @@ Samples: Priya · #4102 · Please keep ₹527 ready — it's Cash on Delivery.
 
 ## 6. `skinly_order_delivered` — Utility
 **Header: Image** — a collage of the products in the parcel (up to 4). Upload any Skinly product photo as the sample.  
-Variables: `first_name, order_number, review_link`
+Variables (body): `first_name, order_number` — the review link goes in the button.  
+**Button: Visit website, Dynamic URL** — opens the order's own review page (signed, works for guests).
+- Button text: `Rate my skin`
+- URL type: **Dynamic**, URL: `https://goskinly.com/review/{{1}}`
+- Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?t=8f2a1c9e4b7d&utm_source=whatsapp`
+
+No reward or "% back" in the text: a Utility template that offers money is
+re-filed by Meta as Marketing (dearer, and capped per user). The wallet reward
+is explained on the review page itself.
 
 ```
 Hi {{1}}, your GoSkinly order {{2}} has been delivered 🎉
 
 Before you apply it, watch our step-by-step video guide — it takes 2 minutes and gives a bubble-free finish: https://goskinly.com/how-to-apply
 
-Loved it? Rate your skin here and get up to 10% back in your Skinly wallet: {{3}}
+Once it's on, tell us how it turned out using the button below.
 
 Need help applying it? WhatsApp our support team: https://goskinly.com/support
 ```
-Samples: Priya · #4102 · https://goskinly.com/review/abc123?t=xyz
+Samples: Priya · #4102
 
 ## 7. `skinly_review_request` — Utility
 **Header: Image** — the product being reviewed. Upload any Skinly product photo as the sample.  
