@@ -167,19 +167,24 @@ Samples: Priya · #4102
 
 ## 7. `skinly_review_request` — Utility
 **Header: Image** — the product being reviewed. Upload any Skinly product photo as the sample.  
-Variables: `customer_name, product_name, review_link`
+Variables (body): `customer_name, product_name` — the review link goes in the button.  
+**Button: Visit website, Dynamic URL** — opens the order's own review page (signed, works for guests).
+- Button text: `Rate my skin`
+- URL type: **Dynamic**, URL: `https://goskinly.com/review/{{1}}`
+- Sample for `{{1}}`: `Xk3P9qLm2Rt7Vb1Nc4Ds?t=8f2a1c9e4b7d&utm_source=whatsapp`
 
 Sent a few days after delivery, and once more five days later to anyone who
-hasn't reviewed yet (never a third time).
+hasn't reviewed yet (never a third time). No reward wording, so Meta keeps it
+Utility; the wallet reward is shown on the review page.
 
 ```
 Hi {{1}}, how are you liking your {{2}}? 😊
 
-Tell us in 30 seconds — rate it here: {{3}}
+It takes 30 seconds to rate it, and a photo helps other shoppers pick their design. Tap the button below.
 
-Add a photo and get up to 10% of your order back in your Skinly wallet. Thank you for choosing GoSkinly!
+Thank you for choosing GoSkinly!
 ```
-Samples: Priya · Aurora Arches Matte iPhone 15 Skin · https://goskinly.com/review/abc123?t=xyz
+Samples: Priya · Aurora Arches Matte iPhone 15 Skin
 
 ## 8. `skinly_wallet_credited` — Utility
 Variables: `customer_name, amount_text, reason_line, wallet_balance, wallet_link`
