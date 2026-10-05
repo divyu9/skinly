@@ -14,6 +14,7 @@ import { Link } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { httpsCallable } from "firebase/functions";
+import { getAttribution } from "@/lib/attribution";
 import { functions } from "@/lib/firebase";
 import { storedReferralCode, clearStoredReferralCode, ownReferralCode } from "@/components/referral-tracker.tsx";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
@@ -468,6 +469,7 @@ function CheckoutPageInner() {
         paymentMethod: formData.paymentMethod,
         codOtpToken: formData.paymentMethod === "cod" ? codOtpToken || undefined : undefined,
         marketingOptIn: marketingOptIn || undefined,
+        attribution: getAttribution(),
         codFee: codFeeAmount, prepaidAmount, codAmount,
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
         couponId: appliedCoupon?.coupon._id,

@@ -17,6 +17,7 @@ import { CustomerInfoCard, type CustomerFormData, type AddressFormData } from ".
 import { OrderItemsTable, type ItemFormEntry } from "./_components/OrderItemsTable.tsx";
 import { PaymentRefundPanel, type RefundFormData } from "./_components/PaymentRefundPanel.tsx";
 import { ReferralPanel } from "./_components/ReferralPanel.tsx";
+import { SourceCard } from "./_components/SourceCard.tsx";
 import { ShippingTrackingPanel, type ShippingFormData, type ManualTrackingFormData } from "./_components/ShippingTrackingPanel.tsx";
 import { DelhiveryShipPanel } from "./_components/DelhiveryShipPanel.tsx";
 import { PackageCard } from "./_components/PackageCard.tsx";
@@ -706,6 +707,8 @@ function OrderDetailPageInner() {
             onAddressFormChange={setAddressForm}
             onSaveAddress={handleUpdateShippingAddress}
           />
+
+          <SourceCard attribution={(order as any).attribution} />
 
           {(order as any).referred && <ReferralPanel orderId={String(order._id)} />}
 

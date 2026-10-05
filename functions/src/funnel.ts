@@ -26,7 +26,7 @@ const STEPS: Array<[string, string]> = [
   ["purchase", "Paid"],
 ];
 
-async function runReport(body: any) {
+export async function runReport(body: any) {
   const auth = new GoogleAuth({ scopes: ["https://www.googleapis.com/auth/analytics.readonly"] });
   const client = await auth.getClient();
   const res = await client.request<any>({

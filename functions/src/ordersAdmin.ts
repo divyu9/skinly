@@ -1,3 +1,4 @@
+import { msg91Ref } from "./emailEvents";
 import { onCall, HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
 import { requireAdmin } from "./auth";
@@ -256,6 +257,7 @@ export const sendOrderStatusEmail = onCall(async (data: any, context: any) => {
     msg91TemplateId: t.msg91TemplateId,
     relatedOrderId: orderId,
     status: "sent",
+    providerId: msg91Ref(text),
     retryCount: 0,
   });
 

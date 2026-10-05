@@ -1,3 +1,4 @@
+import { msg91Ref } from "./emailEvents";
 import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { transactionalFrom } from "./mailFrom";
@@ -90,7 +91,7 @@ export const onWalletCredit = functionsV1.firestore
       createdAt: Date.now(), recipientEmail: to, recipientUserId: t.userId || null, usecaseKey,
       templateName: tpl.docs[0].data().templateName || usecaseKey, msg91TemplateId: tpl.docs[0].data().msg91TemplateId,
       relatedOrderId: t.relatedOrderId || null, relatedWalletTransactionId: snap.id, variables,
-      status: res.ok ? "sent" : "failed", ...(res.ok ? {} : { errorMessage: text.slice(0, 500) }),
+      status: res.ok ? "sent" : "failed", ...(res.ok ? { providerId: msg91Ref(text) } : { errorMessage: text.slice(0, 500) }),
     });
     console.log("onWalletCredit", { id: snap.id, source, usecaseKey, ok: res.ok });
     return null;

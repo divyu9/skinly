@@ -4,11 +4,13 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { reportWebVitals } from "./lib/web-vitals";
+import { captureAttribution } from "./lib/attribution";
 
 const root = document.getElementById("root")!;
 
 
 installImageFallback();
+captureAttribution();
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>

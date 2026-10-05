@@ -34,7 +34,9 @@ export function useModelSelector(
   // The listing's brands: an "Apple iPad Skin" offers iPads only.
   brandScope: { modelBrands?: string[]; modelBrandsExclude?: string[] } = {},
   // This listing, so a brand it leaves to its own listing can be sent there.
-  listing: ListingLike = {}
+  listing: ListingLike = {},
+  // Quick buy (homepage cards) keeps the pick in its sheet instead of moving the page.
+  opts: { onSelect?: (model: string, brand: string) => void } = {}
 ) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -169,6 +171,12 @@ export function useModelSelector(
       }
     }
     
+    if (opts.onSelect) {
+      opts.onSelect(model, brand);
+      setSelectorState({ dialogOpen: false, selectedBrand: "", searchQuery: "" });
+      return;
+    }
+
     // Land on the canonical /products/<slug> whenever the slug is known,
     // including from an old /products/detail?slug= link.
     if (productSlug) {
@@ -191,7 +199,7 @@ export function useModelSelector(
       selectedBrand: "",
       searchQuery: "",
     });
-  }, [searchParams, navigate, productId, productSlug, params.slug, (brandScope.modelBrandsExclude || []).join("|"), listing.slug, listing.title]);
+  }, [searchParams, navigate, productId, productSlug, params.slug, (brandScope.modelBrandsExclude || []).join("|"), listing.slug, listing.title, opts.onSelect]);
   
   // Submit model request
   const handleSubmitRequest = useCallback(async () => {

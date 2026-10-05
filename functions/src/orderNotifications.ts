@@ -1,3 +1,4 @@
+import { msg91Ref } from "./emailEvents";
 import * as crypto from "crypto";
 import * as admin from "firebase-admin";
 import { describeItems } from "./ordersAdmin";
@@ -190,7 +191,7 @@ export async function sendUsecaseEmail(
     msg91TemplateId: t.msg91TemplateId,
     relatedOrderId: orderId,
     status: res.ok ? "sent" : "failed",
-    ...(res.ok ? {} : { errorMessage: text.slice(0, 500) }),
+    ...(res.ok ? { providerId: msg91Ref(text) } : { errorMessage: text.slice(0, 500) }),
     retryCount: 0,
   });
   if (!res.ok) console.error(`${usecaseKey} email failed`, { orderId, status: res.status, text });

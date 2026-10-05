@@ -4,6 +4,7 @@ import { api } from "@/lib/firebase-api";
 import type { Id } from "@/lib/firebase-api";
 import { AdminLayout } from "@/components/admin-layout.tsx";
 import { AdminAlertsCard } from "./admin-alerts-card.tsx";
+import { DeliveryWebhookCard } from "./delivery-webhook-card.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Card,
@@ -173,6 +174,7 @@ export default function AdminEmailsPage() {
         </div>
 
         <AdminAlertsCard />
+        <DeliveryWebhookCard />
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">

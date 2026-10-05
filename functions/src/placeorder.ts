@@ -61,6 +61,22 @@ const getPhonePeConfig = () => {
   return { merchantId, saltKey, saltIndex, v1BaseUrl };
 };
 
+const TOUCH_KEYS = ["channel", "source", "medium", "campaign", "content", "referrer", "landing", "click", "app"];
+/** The browser's attribution, kept to known short strings. */
+function cleanAttribution(a: any): Record<string, any> | null {
+  if (!a || typeof a !== "object") return null;
+  const touch = (t: any) => {
+    if (!t || typeof t !== "object" || !t.channel) return undefined;
+    const out: Record<string, any> = {};
+    for (const k of TOUCH_KEYS) if (typeof t[k] === "string" && t[k]) out[k] = t[k].slice(0, 300);
+    if (Number.isFinite(Number(t.at))) out.at = Number(t.at);
+    return out;
+  };
+  const first = touch(a.first), last = touch(a.last);
+  return first || last ? { ...(first ? { first } : {}), ...(last ? { last } : {}) } : null;
+}
+
+
 /**
  * Fast combined placeOrder — single function call for the entire checkout.
  *
@@ -537,6 +553,8 @@ export const placeOrder = functions
       }),
       // The unticked "WhatsApp pe naye designs aur offers bhejein" box at checkout.
       ...(data?.marketingOptIn === true ? { marketingOptIn: true, marketingOptInAt: Date.now() } : {}),
+      // Where the buyer came from (src/lib/attribution.ts), first and latest visit.
+      ...(cleanAttribution(data?.attribution) ? { attribution: cleanAttribution(data?.attribution) } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

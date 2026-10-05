@@ -51,6 +51,8 @@ export * from "./dashboard";
 export * from "./homeRankings";
 export * from "./addOns";
 export * from "./funnel";
+export * from "./orderSources";
+export * from "./emailEvents";
 export * from "./walletEmail";
 export * from "./adminOrderEmail";
 export * from "./contacts";

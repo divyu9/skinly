@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightIcon, FlameIcon, SmartphoneIcon, SparklesIcon } from "lucide-react";
+import { ArrowRightIcon, FlameIcon, ShoppingCartIcon, SmartphoneIcon, SparklesIcon } from "lucide-react";
 import { responsiveImg } from "@/lib/image-cdn";
 import { loadCatalogue, loadHomeProducts, type CatalogueProduct, type HomeRows } from "@/lib/catalogue";
 import { readActiveDevice, type ActiveDevice } from "@/lib/active-device";
@@ -69,6 +69,10 @@ function hrefFor(p: CatalogueProduct, device: ActiveDevice | null) {
   return `/products/${p.slug}`;
 }
 
+// The quick-buy sheet's code loads on the first tap (or hover), not with the page.
+const loadQuickBuy = () => import("./quick-buy.tsx");
+const QuickBuy = lazy(loadQuickBuy);
+
 export function HomeProductCard({ p, device, badge }: { p: CatalogueProduct; device: ActiveDevice | null; badge?: ReactNode }) {
   const v = [...(p.variants || [])].filter((x) => x.price > 0).sort((a, b) => a.price - b.price)[0];
   const price = v?.price || 0;
@@ -77,8 +81,11 @@ export function HomeProductCard({ p, device, badge }: { p: CatalogueProduct; dev
   const skin = p.productCategory === "skin";
   const chip = skin ? GADGET[String(p.gadgetCategory)] || "Skin" : "Accessory";
   const finish = skin ? FINISH[String(p.finishType || "").toLowerCase()] : "";
+  const [buying, setBuying] = useState(false);
+  const [opened, setOpened] = useState(false);
   return (
-    <Link to={hrefFor(p, device)} className="group w-[164px] flex-shrink-0 snap-start md:w-[212px]">
+    <div className="relative w-[164px] flex-shrink-0 snap-start md:w-[212px]">
+    <Link to={hrefFor(p, device)} className="group block">
       <div className="overflow-hidden rounded-2xl border-2 border-ink/15 bg-card transition-all group-hover:-translate-y-0.5 group-hover:border-ink group-hover:shadow-[3px_3px_0_0_var(--ink)]">
         <div className="relative aspect-square overflow-hidden bg-muted">
           {p.images?.[0]?.url && (
@@ -104,6 +111,26 @@ export function HomeProductCard({ p, device, badge }: { p: CatalogueProduct; dev
         </div>
       </div>
     </Link>
+    {/* Over the picture's bottom-right corner; outside the link, so the
+        sheet's taps never count as opening the product page. */}
+    <div className="pointer-events-none absolute inset-x-0 top-0 aspect-square">
+      <button
+        type="button"
+        aria-label={`Quick add ${p.title} to cart`}
+        onPointerEnter={() => { void loadQuickBuy(); }}
+        onTouchStart={() => { void loadQuickBuy(); }}
+        onClick={() => { setOpened(true); setBuying(true); }}
+        className="pointer-events-auto absolute bottom-2 right-2 grid size-9 place-items-center rounded-full border-2 border-ink bg-brand text-brand-foreground shadow-[2px_2px_0_0_var(--ink)] transition-transform active:translate-x-px active:translate-y-px active:shadow-none md:size-10"
+      >
+        <ShoppingCartIcon className="size-4" strokeWidth={2.4} />
+      </button>
+    </div>
+    {opened && (
+      <Suspense fallback={null}>
+        <QuickBuy slug={p.slug} title={p.title} open={buying} onOpenChange={setBuying} />
+      </Suspense>
+    )}
+    </div>
   );
 }
 
