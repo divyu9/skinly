@@ -49,7 +49,23 @@ function TouchBlock({ title, t }: { title: string; t: Touch }) {
   );
 }
 
-export function SourceCard({ attribution }: { attribution?: { first?: Touch; last?: Touch; ga4?: Touch } }) {
+type CapiRun = { ok?: boolean; error?: string; eventId?: string; sentAt?: number; testCode?: string; events?: string[] };
+
+/** What the Conversions API sent for this order (functions/src/metaCapi.ts). */
+function MetaRows({ tracking, metaCapi }: { tracking?: any; metaCapi?: { purchase?: CapiRun; checkout?: CapiRun } }) {
+  if (!tracking && !metaCapi) return null;
+  const run = (r?: CapiRun) => !r ? "not sent" : r.ok ? `sent${r.testCode ? " (test events)" : ""}` : r.sentAt ? `failed — ${r.error || "?"}` : "pending";
+  return (
+    <div className="space-y-1.5 border-t pt-3">
+      <span className="text-xs font-medium text-muted-foreground">Meta (server events)</span>
+      <Row label="Purchase" value={`${run(metaCapi?.purchase)}${metaCapi?.purchase?.eventId ? ` · ${metaCapi.purchase.eventId}` : ""}`} />
+      <Row label="Checkout" value={metaCapi?.checkout ? `${run(metaCapi.checkout)} · ${(metaCapi.checkout.events || []).join(", ")}` : "not sent"} />
+      <Row label="Match keys" value={[tracking?.fbp && "fbp", tracking?.fbc && "fbc", tracking?.clientIp && "ip", tracking?.userAgent && "browser"].filter(Boolean).join(", ") || "none"} />
+    </div>
+  );
+}
+
+export function SourceCard({ attribution, tracking, metaCapi }: { attribution?: { first?: Touch; last?: Touch; ga4?: Touch }; tracking?: any; metaCapi?: any }) {
   const { first, last, ga4 } = attribution || {};
   const main = last || first || ga4;
   const sameFirst = first && last && first.channel === last.channel && first.campaign === last.campaign && first.landing === last.landing;
@@ -74,6 +90,7 @@ export function SourceCard({ attribution }: { attribution?: { first?: Touch; las
             )}
           </>
         )}
+        <MetaRows tracking={tracking} metaCapi={metaCapi} />
       </CardContent>
     </Card>
   );

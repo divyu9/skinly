@@ -35,11 +35,35 @@ export const claim = (n) => `${Number(n).toLocaleString("en-IN")}+`;
  * and "Premium Device Skins & Accessories".
  */
 const C = CATALOGUE_CLAIMS;
-export const HOME_META = {
-  title: `Mobile Back Skins & Device Skins for ${claim(C.models)} Models | GoSkinly`,
-  description: `Mobile, laptop, tablet, console & camera skins cut for ${claim(C.models)} models across ${C.brands} brands. ${claim(C.designs)} designs in matte & 3D textured finishes. Free shipping above ₹499.`,
-  heading: "GoSkinly — mobile skins and device skins cut for your exact model",
-};
+
+/*
+ * The homepage's counts come from the catalogue itself. Its meta description
+ * said "3,600+ models across 55 brands" (the constants above) while the page
+ * body, counted on every build, said 5,765 models. scripts/prerender.mjs now
+ * counts { models, brands, designs } once (catalogueStats), writes the head
+ * from them, and puts them in the homepage seed, where Index.tsx's Helmet and
+ * the "Why Skinly" tiles read the same numbers. Models and designs round
+ * down (to 100 and 10) so the copy never oversells between builds; brands are
+ * exact. CATALOGUE_CLAIMS remains the floor when no counts are available.
+ */
+export const floorClaim = (n, step) => (n >= step ? Math.floor(n / step) * step : n);
+export function catalogueClaims(stats) {
+  if (!stats || !(Number(stats.models) > 0)) return CATALOGUE_CLAIMS;
+  return {
+    models: floorClaim(Number(stats.models), 100),
+    designs: Number(stats.designs) > 0 ? floorClaim(Number(stats.designs), 10) : CATALOGUE_CLAIMS.designs,
+    brands: Number(stats.brands) > 0 ? Number(stats.brands) : CATALOGUE_CLAIMS.brands,
+  };
+}
+export function homeMeta(stats) {
+  const c = catalogueClaims(stats);
+  return {
+    title: `Mobile Back Skins & Device Skins for ${claim(c.models)} Models | GoSkinly`,
+    description: `Mobile, laptop, tablet, console & camera skins cut for ${claim(c.models)} models across ${c.brands} brands. ${claim(c.designs)} designs in matte & 3D textured finishes. Free shipping above ₹499.`,
+    heading: "GoSkinly — mobile skins and device skins cut for your exact model",
+  };
+}
+export const HOME_META = homeMeta(null);
 /*
  * The business, as search engines should know it: one name, one city, one
  * phone, the same everywhere. The street address is a private residence, so

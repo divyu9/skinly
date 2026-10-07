@@ -29,7 +29,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { offerShippingAndReturns, productMaterial } from "../src/lib/merchant-schema.mjs";
 import { resolveSeoTarget, selectSeoProducts, seoCopy, brandGadgetLabel, gadgetLabel, oneRowPerDesign, slugify, productSeoTitle } from "../src/lib/seo-pages.mjs";
-import { CATEGORY_PAGES, GADGET_PAGES, HOME_META, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD } from "../src/lib/category-paths.mjs";
+import { CATEGORY_PAGES, GADGET_PAGES, homeMeta, PRODUCTS_META, CATALOGUE_CLAIMS, ORGANIZATION_LD } from "../src/lib/category-paths.mjs";
 
 const SITE = "https://goskinly.com";
 const DIST = path.resolve("dist");
@@ -666,7 +666,9 @@ function siteHub(active, models, seoSlugs) {
 
 const hubList = (items) => items.length ? `<ul>${items.join("")}</ul>` : "";
 
-function staticPages(hub, home = null) {
+function staticPages(hub, home = null, stats = null) {
+  // The live counts (catalogueStats), the same ones the homepage seed carries.
+  const HOME_META = homeMeta(stats);
   const homeDescription = HOME_META.description;
   const productsDescription = PRODUCTS_META.description;
   const policy = (slug, title, description) => ({
@@ -2360,8 +2362,20 @@ async function main() {
     .sort((a, b) => (a.order || 0) - (b.order || 0))
     .map((x) => ({ ...x, config: asObject(x.config) }));
   const heroLocal = liveSlides.length ? await localHero(liveSlides[0]) : {};
+  /*
+   * The catalogue's counts, once: the homepage head (staticPages), its seed
+   * (Index.tsx's Helmet), the "Why Skinly" tiles and llms.txt all use these.
+   */
+  const activeModels = (data.models || []).filter((m) => m.isActive !== false);
+  const catalogueStats = {
+    models: activeModels.length,
+    brands: new Set(activeModels.map((m) => String(m.brandName || "").trim().toLowerCase()).filter(Boolean)).size,
+    designs: new Set(active.filter((p) => p.productCategory === "skin").map((p) => designCode(p, variantsByProduct.get(p._id)) || p._id)).size,
+  };
+  log(`catalogue stats: ${JSON.stringify(catalogueStats)}`);
   const home = liveSlides.length ? {
     seed: {
+      catalogueStats,
       "homepage.getActiveHeroSlides": liveSlides,
       "homepage.getActiveHomepageSections": liveSections,
       // Whether the notice bar is up decides where the header and the page
@@ -2387,7 +2401,7 @@ async function main() {
     tag(CATALOGUE_CLAIMS.models, modelsNow, "models");
     tag(CATALOGUE_CLAIMS.designs, designsNow, "designs");
   }
-  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home);
+  const statics = staticPages(siteHub(active, data.models, new Set(seoDocs.map((d) => d.slug))), home, catalogueStats);
   /*
    * /reviews in the plain HTML: the reviews themselves, not one line about
    * them — what a reader without JavaScript (an AI crawler) can quote. No
@@ -2494,8 +2508,9 @@ async function main() {
   const realPhotos = await readCollection(project, "realPhotos").catch(() => []);
   const approved = (data.reviews || []).filter((r) => r.status === "approved" && Number(r.rating) >= 1);
   rows.stats = {
-    models: (data.models || []).filter((m) => m.isActive !== false).length,
-    designs: new Set(active.filter((p) => p.productCategory === "skin").map((p) => designCode(p, variantsByProduct.get(p._id)) || p._id)).size,
+    models: catalogueStats.models,
+    brands: catalogueStats.brands,
+    designs: catalogueStats.designs,
     realPhotos: realPhotos.filter((r) => !r.hidden && r.imageUrl).length,
     reviews: approved.length,
     rating: approved.length ? Math.round((approved.reduce((sum, r) => sum + Number(r.rating), 0) / approved.length) * 10) / 10 : 0,

@@ -8,6 +8,7 @@ import { enforceDailyRateLimit } from "./rate-limit";
 import { payLinkValid } from "./payLink";
 import { normalizeOrderStatus } from "./orderStatus";
 import { confirmOrder } from "./orderConfirm";
+import { sendPurchaseForOrder } from "./metaCapi";
 
 // PhonePe Config from Firebase environment config or secrets
 const getPhonePeConfig = () => {
@@ -152,6 +153,12 @@ const applyPaymentResult = async (
   notifyOrderPlaced(admin.firestore(), doc.id).catch((e) =>
     console.error("notifyOrderPlaced failed", { order: doc.id, error: e?.message || e })
   );
+
+  // Meta Conversions API Purchase — here and only here for an online order:
+  // the money is confirmed, the order has its number (the browser's eventID
+  // is purchase-<number>), and it covers a buyer who never comes back to the
+  // order page. Once per order (claimed in a transaction); never throws.
+  await sendPurchaseForOrder(admin.firestore(), doc.id, source);
 
   return { paymentStatus, orderId: doc.id, changed: true };
 };

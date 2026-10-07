@@ -119,15 +119,35 @@
         else window.addEventListener("load", run, { once: true });
       };
     </script>
+    <!-- Tags only on the live site. Local dev and preview builds sent ~117
+         events a week from "localhost" into the production pixel and GA4.
+         The hosts come from VITE_TRACKING_HOSTS (comma-separated, default
+         goskinly.com and www.goskinly.com); VITE_TRACKING_FORCE=true turns
+         the tags on anywhere, for testing a build. Elsewhere gtag and fbq
+         still exist, so the app's calls are harmless, but nothing loads and
+         nothing is sent. ?ga_debug=1 marks this tab's GA4 hits for DebugView. -->
+    <script>
+      (function () {
+        var hosts = "%VITE_TRACKING_HOSTS%";
+        if (!hosts || hosts.charAt(0) === "%") hosts = "goskinly.com,www.goskinly.com";
+        var force = "%VITE_TRACKING_FORCE%" === "true";
+        var list = hosts.split(",").map(function (h) { return h.trim().toLowerCase(); });
+        window.__skinlyTrackingOn = force || list.indexOf(location.hostname.toLowerCase()) !== -1;
+        try {
+          if (/[?&]ga_debug=1/.test(location.search)) sessionStorage.setItem("skinly_ga_debug", "1");
+          window.__skinlyGaDebug = sessionStorage.getItem("skinly_ga_debug") === "1";
+        } catch (e) { window.__skinlyGaDebug = false; }
+      })();
+    </script>
     <script>
       window.dataLayer = window.dataLayer || [];
       window.gtag = function(){ window.dataLayer.push(arguments); };
       window.gtag('js', new Date());
-      window.gtag('config', 'G-16S5XDYGYR');
+      window.gtag('config', 'G-16S5XDYGYR', window.__skinlyGaDebug ? { debug_mode: true } : {});
       (function() {
         var loaded = false;
         var loadAnalytics = function() {
-          if (loaded) return;
+          if (loaded || !window.__skinlyTrackingOn) return;
           loaded = true;
           var script = document.createElement('script');
           script.src = 'https://www.googletagmanager.com/gtag/js?id=G-16S5XDYGYR';
@@ -155,7 +175,7 @@
         window.fbq.__early = true;
 
         window.initFacebookPixel = function (pixelId) {
-          if (!pixelId || window.__fbPixelLoaded) return;
+          if (!pixelId || window.__fbPixelLoaded || !window.__skinlyTrackingOn) return;
           window.__fbPixelId = pixelId;
           window.__fbPixelLoaded = true;
           var n = window.fbq = function () {

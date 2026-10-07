@@ -97,8 +97,23 @@ function read(): { first?: Touch; last?: Touch } {
   try { return JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { return {}; }
 }
 
+/*
+ * Meta's click id, kept for the Conversions API (functions/src/metaCapi.ts).
+ * The pixel writes the _fbc cookie itself, but only once fbevents.js has
+ * loaded (idle, seconds after landing) and only if fbclid is still in the
+ * URL then — the SPA may have moved on. Keeping it here from the first page
+ * lets the order carry a click id either way. 90 days, as Meta keeps _fbc.
+ */
+const FBCLID_KEY = "skinly_fbclid";
+const FBC_TTL = 90 * 24 * 60 * 60 * 1000;
+function captureFbclid() {
+  const id = new URLSearchParams(location.search).get("fbclid");
+  if (id) localStorage.setItem(FBCLID_KEY, JSON.stringify({ id: id.slice(0, 500), at: Date.now() }));
+}
+
 /** Once per page load, from main.tsx. */
 export function captureAttribution() {
+  try { captureFbclid(); } catch { /* storage blocked */ }
   try {
     const touch = readTouch();
     if (!touch) return;
@@ -118,4 +133,42 @@ export function captureAttribution() {
 export function getAttribution(): { first?: Touch; last?: Touch } | undefined {
   const a = read();
   return a.first || a.last ? a : undefined;
+}
+
+function cookie(name: string): string | undefined {
+  const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : undefined;
+}
+
+export interface AdTracking {
+  fbp?: string;
+  fbc?: string;
+  fbclid?: string;
+  utm?: { source?: string; medium?: string; campaign?: string; content?: string; term?: string };
+}
+
+/**
+ * What Meta needs to match a server event to the ad click and the browser:
+ * the pixel's _fbp, the click id as _fbc (built from a kept fbclid when the
+ * pixel never wrote the cookie — "fb.1.<ms>.<fbclid>", Meta's own format),
+ * and the latest campaign tags. Sent with placeOrder and stored on the order.
+ */
+export function getAdTracking(): AdTracking {
+  const out: AdTracking = {};
+  try {
+    out.fbp = cookie("_fbp");
+    out.fbc = cookie("_fbc");
+    const kept = JSON.parse(localStorage.getItem(FBCLID_KEY) || "null");
+    if (kept?.id && Date.now() - Number(kept.at) < FBC_TTL) {
+      out.fbclid = kept.id;
+      if (!out.fbc) out.fbc = `fb.1.${Number(kept.at)}.${kept.id}`;
+    }
+    const last = read().last;
+    if (last && last.channel !== "Direct") {
+      const q = new URLSearchParams((last.landing || "").split("?")[1] || "");
+      const term = q.get("utm_term") || undefined;
+      out.utm = { source: last.source, medium: last.medium, campaign: last.campaign, content: last.content, ...(term ? { term } : {}) };
+    }
+  } catch { /* storage or cookies blocked */ }
+  return out;
 }

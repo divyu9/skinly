@@ -11,6 +11,7 @@ import { CoverageSelector } from "@/components/product/CoverageSelector";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { SmartSetup, type SetupCartItem } from "@/pages/products/detail/_components/smart-setup.tsx";
 import { CashbackLine } from "@/pages/products/detail/_components/cashback-line.tsx";
+import { ShippingLine } from "@/pages/products/detail/_components/shipping-line.tsx";
 import { useIsMobile } from "@/hooks/use-mobile.ts";
 import { useCartActions } from "@/hooks/useCartActions";
 import { useModelSelector } from "@/hooks/useModelSelector";
@@ -152,6 +153,7 @@ function QuickBuyBody({ slug, onDone }: { slug: string; onDone: () => void }) {
       </div>
 
       <CashbackLine info={cashbackInfo as any} price={price} />
+      <ShippingLine price={price} />
 
       {/* Device */}
       {needsDevice && (

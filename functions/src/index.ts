@@ -53,6 +53,7 @@ export * from "./addOns";
 export * from "./funnel";
 export * from "./orderSources";
 export * from "./emailEvents";
+export { metaCapiTestPurchase } from "./metaCapi";
 export * from "./walletEmail";
 export * from "./adminOrderEmail";
 export * from "./contacts";

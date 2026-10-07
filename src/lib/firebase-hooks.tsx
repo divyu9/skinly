@@ -98,6 +98,12 @@ function seededValue(path: string, args: any): any {
   return homeSeed?.[path];
 }
 
+/** A value the build put in the homepage seed (e.g. catalogueStats), or undefined off the homepage. */
+export function homeSeedValue(key: string): unknown {
+  seededValue('homepage.getActiveHeroSlides', undefined);
+  return homeSeed?.[key];
+}
+
 /**
  * The site's own copy of a picture the build saved next to the page, or the
  * URL unchanged. The homepage's first hero slide is copied so its largest

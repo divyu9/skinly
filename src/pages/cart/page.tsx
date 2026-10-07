@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
+import { shippingFor, shippingRule } from "@/lib/shipping-config.mjs";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -201,9 +202,10 @@ function AuthenticatedCartContent() {
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const itemCount = cartItems.reduce((n, i) => n + i.quantity, 0);
-  const freeShippingThreshold = Number(shippingSettings?.freeShippingThreshold) || 0;
-  const shippingFee = Number(shippingSettings?.flatShippingFee) || 0;
+  // src/lib/shipping-config.mjs: the rule placeOrder charges.
+  const { threshold: freeShippingThreshold, fee: shippingFee } = shippingRule(shippingSettings);
   const qualifiesFreeShipping = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
+  const shippingNow = shippingSettings === undefined ? null : shippingFor(subtotal, shippingSettings);
 
   const handleUpdateQuantity = async (cartId: Id<"cart">, newQuantity: number) => {
     try {
@@ -418,7 +420,7 @@ function AuthenticatedCartContent() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
                   <span className={qualifiesFreeShipping ? "font-bold text-brand" : ""}>
-                    {qualifiesFreeShipping ? "FREE" : shippingFee ? `₹${shippingFee}` : "At checkout"}
+                    {qualifiesFreeShipping ? "FREE" : shippingNow !== null ? `₹${shippingNow}` : "…"}
                   </span>
                 </div>
               </div>
@@ -443,8 +445,8 @@ function AuthenticatedCartContent() {
               <Separator />
 
               <div className="flex items-center justify-between">
-                <span className="font-semibold">Subtotal</span>
-                <span className="text-2xl font-extrabold text-brand">₹{subtotal.toFixed(0)}</span>
+                <span className="font-semibold">{shippingNow === null ? "Subtotal" : "Total"}</span>
+                <span className="text-2xl font-extrabold text-brand">₹{(subtotal + (shippingNow || 0)).toFixed(0)}</span>
               </div>
 
               {hasOutOfStockItems && (
@@ -564,9 +566,10 @@ function GuestCartContent() {
 
   const subtotal = guestCart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const itemCount = guestCart.reduce((n, i) => n + i.quantity, 0);
-  const freeShippingThreshold = Number(shippingSettings?.freeShippingThreshold) || 0;
-  const shippingFee = Number(shippingSettings?.flatShippingFee) || 0;
+  // src/lib/shipping-config.mjs: the rule placeOrder charges.
+  const { threshold: freeShippingThreshold, fee: shippingFee } = shippingRule(shippingSettings);
   const qualifiesFreeShipping = freeShippingThreshold > 0 && subtotal >= freeShippingThreshold;
+  const shippingNow = shippingSettings === undefined ? null : shippingFor(subtotal, shippingSettings);
 
   const handleUpdateQuantity = (productId: string, variant: string, newQuantity: number) => {
     try {
@@ -770,7 +773,7 @@ function GuestCartContent() {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shipping</span>
                   <span className={qualifiesFreeShipping ? "font-bold text-brand" : ""}>
-                    {qualifiesFreeShipping ? "FREE" : shippingFee ? `₹${shippingFee}` : "At checkout"}
+                    {qualifiesFreeShipping ? "FREE" : shippingNow !== null ? `₹${shippingNow}` : "…"}
                   </span>
                 </div>
               </div>
@@ -792,8 +795,8 @@ function GuestCartContent() {
               <Separator />
 
               <div className="flex items-center justify-between">
-                <span className="font-semibold">Subtotal</span>
-                <span className="text-2xl font-extrabold text-brand">₹{subtotal.toFixed(0)}</span>
+                <span className="font-semibold">{shippingNow === null ? "Subtotal" : "Total"}</span>
+                <span className="text-2xl font-extrabold text-brand">₹{(subtotal + (shippingNow || 0)).toFixed(0)}</span>
               </div>
 
               {hasOutOfStockItems && (

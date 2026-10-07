@@ -30,6 +30,9 @@ const PUBLIC_FIELDS = [
   "reviewedAt", "reviewRewardPaid", "reviewRewardOwed",
   // An add-on says which order's parcel it rides in.
   "addOnTo", "parentOrderNumber",
+  // PhonePe's reason for a failed payment (codes, no personal data): the order
+  // page reports payment_failed / payment_cancelled with it.
+  "paymentFailureCode", "paymentFailureReason",
 ];
 const ITEM_FIELDS = ["productId", "productTitle", "productImage", "variant", "variantId", "sku", "quantity", "price",
   "compareAtPrice", "phoneBrand", "phoneModel", "gadgetType", "finishType", "isUpsell", "coverage"];

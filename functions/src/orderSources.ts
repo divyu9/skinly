@@ -5,8 +5,9 @@ import { runReport } from "./funnel";
 /**
  * Where each paid order came from, as GA4 saw it.
  *
- * The site sends GA4 a purchase with transaction_id = the order id
- * (src/lib/analytics.ts), so GA's session source for that purchase can be
+ * The site sends GA4 a purchase with transaction_id = the order NUMBER
+ * (trackPurchaseOnce passes order.orderNumber), so GA's session source for
+ * that purchase can be
  * written back onto the order as attribution.ga4. This covers orders placed
  * before the checkout recorded its own source (src/lib/attribution.ts), and
  * buyers whose browser kept nothing. Only orders whose purchase reached GA4
@@ -48,9 +49,13 @@ export async function syncOrderSources(days: number) {
     const [id, source, medium, campaign, group] = row.dimensionValues.map((d: any) => String(d.value || ""));
     if (!id || id === "(not set)" || seen.has(id) || id.includes("/")) continue;
     seen.add(id);
-    const ref = db.collection("orders").doc(id);
-    const snap = await ref.get();
-    if (!snap.exists) { missing++; continue; }
+    // transaction_id is the order number; older builds may have sent the doc id.
+    const asNumber = Number(id);
+    let snap: admin.firestore.DocumentSnapshot | undefined = (await db.collection("orders").where("orderNumber", "==", id).limit(1).get()).docs[0];
+    if (!snap && Number.isFinite(asNumber)) snap = (await db.collection("orders").where("orderNumber", "==", asNumber).limit(1).get()).docs[0];
+    if (!snap && id.length >= 15) { const d = await db.collection("orders").doc(id).get(); if (d.exists) snap = d; }
+    if (!snap) { missing++; continue; }
+    const ref = snap.ref;
     const ga4: Record<string, string> = { channel: channelOf(source, medium, group), source, medium, group };
     if (campaign && campaign !== "(not set)" && campaign !== "(direct)") ga4.campaign = campaign;
     const prev = (snap.data() as any)?.attribution?.ga4;

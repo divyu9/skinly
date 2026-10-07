@@ -1,6 +1,7 @@
 import { Fragment, useState, useEffect, useRef, Suspense } from "react";
 import { lazyWithReload } from "@/lib/lazy-with-reload";
-import { HOME_META, ORGANIZATION_LD } from "@/lib/category-paths.mjs";
+import { homeMeta, ORGANIZATION_LD, type CatalogueStats } from "@/lib/category-paths.mjs";
+import { homeSeedValue } from "@/lib/firebase-hooks";
 import { Helmet } from "react-helmet-async";
 import { AnnouncementBar } from "@/components/announcement-bar.tsx";
 import { MobileHeader } from "@/components/mobile-header.tsx";
@@ -110,6 +111,8 @@ const HOME_WEBSITE_LD = {
 };
 
 export default function Index() {
+  // The build's counts (homepage seed), the same ones its prerendered head used.
+  const [HOME_META] = useState(() => homeMeta(homeSeedValue("catalogueStats") as CatalogueStats | undefined));
   const [isRequestModelOpen, setIsRequestModelOpen] = useState(false);
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

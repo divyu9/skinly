@@ -1,3 +1,4 @@
+import { SHIPPING_DEFAULTS } from "./shipping-config.mjs";
 /**
  * Everything that talks to Firestore for the storefront's reads: the query
  * handlers, the paginated listing and the helpers they share. Split out of
@@ -1021,8 +1022,8 @@ export async function runQuery(c: QueryCtx) {
             } else {
               setData({
                 baseRate: 0,
-                freeShippingThreshold: 500,
-                flatShippingFee: 50,
+                freeShippingThreshold: SHIPPING_DEFAULTS.freeShippingThreshold,
+                flatShippingFee: SHIPPING_DEFAULTS.flatShippingFee,
                 codFee: 50,
                 expressShippingFee: 100,
                 expressShippingEnabled: true,

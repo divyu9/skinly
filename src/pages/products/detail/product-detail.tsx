@@ -48,6 +48,7 @@ import {
 import { ProductShareButton } from "./_components/product-share.tsx";
 import { ProductUgcFloat } from "./_components/product-ugc-float.tsx";
 import { CashbackLine, cashbackAmount } from "./_components/cashback-line.tsx";
+import { ShippingLine } from "./_components/shipping-line.tsx";
 import { useHeaderOffset } from "@/hooks/use-header-offset.ts";
 import { StickyBottomBar } from "./_components/sticky-bottom-bar.tsx";
 import { SmartSetup, type SetupCartItem } from "./_components/smart-setup.tsx";
@@ -519,6 +520,7 @@ export default function ProductDetailPage() {
                     happens. It used to sit in the offers block, 665px below
                     the Buy button. */}
                 <CashbackLine info={cashbackInfo} price={nowPrice} />
+                <ShippingLine price={nowPrice} />
               </div>
 
               <RefillLine title={productData.title} category={(productData as any).productCategory} />

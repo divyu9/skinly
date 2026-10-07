@@ -14,7 +14,8 @@ import { Link } from "react-router-dom";
 import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { httpsCallable } from "firebase/functions";
-import { getAttribution } from "@/lib/attribution";
+import { getAttribution, getAdTracking } from "@/lib/attribution";
+import { shippingFor } from "@/lib/shipping-config.mjs";
 import { functions } from "@/lib/firebase";
 import { storedReferralCode, clearStoredReferralCode, ownReferralCode } from "@/components/referral-tracker.tsx";
 import { useGuestCart } from "@/hooks/use-guest-cart.ts";
@@ -22,7 +23,7 @@ import { useAuth } from "@/hooks/use-auth.ts";
 import type { Id } from "@/lib/firebase-api";
 import { CheckoutUpsells } from "./_components/checkout-upsells.tsx";
 import { CartSmartSetup, useSmartRepricing } from "@/components/cart-smart-setup.tsx";
-import { trackBeginCheckout } from "@/lib/analytics.ts";
+import { trackBeginCheckout, trackAddPaymentInfo, trackCheckoutValidationError, trackPaymentIssue, trackCheckoutAbandoned, markCheckoutDone, checkoutEventContext } from "@/lib/analytics.ts";
 import { AddressForm, type FormData } from "./_components/AddressForm.tsx";
 import { PaymentMethodSelector } from "./_components/PaymentMethodSelector.tsx";
 import { CodOtpSection } from "./_components/CodOtpSection.tsx";
@@ -103,6 +104,7 @@ function CheckoutPageInner() {
       setIsRedirectingToPayment(false); setIsSubmitting(false); setRetryCount(0);
       sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
       toast.error("Payment cancelled");
+      trackPaymentIssue("cancelled", "USER_CANCEL", String(orderId || merchantTxnId || "unknown"));
       if (orderId) setTimeout(() => navigate(`/orders/${orderId}`), 300);
       return;
     }
@@ -120,9 +122,10 @@ function CheckoutPageInner() {
         try {
           const phonepeStatus = await checkPaymentStatus({ merchantTransactionId: merchantTxnId, orderId: orderId, sessionId: !isAuthenticated ? guestSessionId : undefined });
           if (phonepeStatus.paymentStatus === "success") {
-            // Manually update payment status for local development mock
-            try { await updatePaymentStatus({ orderId: orderId, paymentStatus: "success" }); } catch {}
-            
+            // The server already marked it paid (applyPaymentResult). This
+            // page used to write paymentStatus itself — a no-op for customers
+            // (rules refuse it) and a way for an admin's checkout to mark an
+            // order paid with no confirmation, number or invoice.
             sessionStorage.removeItem("skinly_merchant_txn_id"); sessionStorage.removeItem("skinly_order_id");
             setRetryCount(0); setIsRedirectingToPayment(false); setIsSubmitting(false);
             if (!isAuthenticated) clearGuestCart();
@@ -212,8 +215,27 @@ function CheckoutPageInner() {
   useSmartRepricing(cartItems as any, !isAuthenticated);
   // The funnel's "began checkout" step, once the cart is known.
   useEffect(() => {
-    if (cartItems?.length) trackBeginCheckout(cartItems as any);
+    // Not on the way back from PhonePe: that is the same checkout, already placed.
+    let returning = false;
+    try { returning = !!sessionStorage.getItem("skinly_merchant_txn_id"); } catch { /* storage blocked */ }
+    if (cartItems?.length && !returning) trackBeginCheckout(cartItems as any);
   }, [cartItems?.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /*
+   * checkout_abandoned: leaving after InitiateCheckout without an order —
+   * closing the tab, or navigating away inside the app. Not sent once the
+   * order is placed or the page is leaving for PhonePe (markCheckoutDone).
+   */
+  const abandonRef = useRef<{ items: any[]; step: string }>({ items: [], step: "opened" });
+  abandonRef.current = {
+    items: (cartItems || []) as any[],
+    step: isSubmitting ? "submitting" : formData.phone && formData.pincode ? "details_entered" : formData.phone || formData.email ? "contact_entered" : "opened",
+  };
+  useEffect(() => {
+    const leave = () => trackCheckoutAbandoned(abandonRef.current.items, abandonRef.current.step);
+    window.addEventListener("pagehide", leave);
+    return () => { window.removeEventListener("pagehide", leave); leave(); };
+  }, []);
 
   const cartItemsForStockCheck = cartItems?.map((item) => ({
     productId: item.productId, variant: item.variant, quantity: item.quantity,
@@ -232,9 +254,8 @@ function CheckoutPageInner() {
     : 0;
 
   const shippingSettings = useQuery(api.shipping.getShippingSettings);
-  const shippingFee = shippingSettings
-    ? subtotal >= shippingSettings.freeShippingThreshold ? 0 : shippingSettings.flatShippingFee
-    : 0;
+  // src/lib/shipping-config.mjs: the same rule placeOrder charges.
+  const shippingFee = shippingSettings ? shippingFor(subtotal, shippingSettings) : 0;
   const total = subtotal + shippingFee;
 
   const walletData = useQuery(api.wallet.getWalletBalance, isAuthenticated ? {} : "skip");
@@ -426,9 +447,22 @@ function CheckoutPageInner() {
     }
   };
 
+  // A field that stopped Place Order: the toast, and which field for the funnel.
+  const invalid = (field: string, message: string) => { trackCheckoutValidationError(field); toast.error(message); };
+  // Most empty fields are stopped by the browser's own `required` check
+  // before handleSubmit runs; report the first one of each attempt.
+  const lastNativeInvalid = useRef(0);
+  const onNativeInvalid = (e: React.FormEvent<HTMLFormElement>) => {
+    if (Date.now() - lastNativeInvalid.current < 1000) return;
+    lastNativeInvalid.current = Date.now();
+    const el = e.target as HTMLInputElement;
+    trackCheckoutValidationError(el?.name || el?.id || "unknown");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (hasOutOfStockItems) {
+      trackCheckoutValidationError("out_of_stock");
       const names = outOfStockItems.map((item) => cartItems?.find((ci) => ci.productId === item.productId && ci.variant === item.variant)?.productTitle || "Item").join(", ");
       toast.error(`Cannot proceed: Some items are out of stock (${names}). Please remove them from your cart and try again.`, { duration: 5000 });
       return;
@@ -436,20 +470,23 @@ function CheckoutPageInner() {
     // Present is not the same as usable. A malformed email means the
     // confirmation and the tracking link never arrive, and a five-digit
     // pincode fails at the courier rather than here.
-    if (!formData.fullName.trim()) { toast.error("Please enter your full name"); return; }
-    if (!formData.email.trim()) { toast.error("Email is required"); return; }
+    if (!formData.fullName.trim()) { invalid("fullName", "Please enter your full name"); return; }
+    if (!formData.email.trim()) { invalid("email", "Email is required"); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) {
-      toast.error("Please enter a valid email address"); return;
+      invalid("email_format", "Please enter a valid email address"); return;
     }
-    if (!isPhoneValid) { toast.error("Please enter a valid 10-digit mobile number"); return; }
-    if (!formData.addressLine1.trim()) { toast.error("Please enter address line 1"); return; }
-    if (!formData.city.trim()) { toast.error("Please enter your city"); return; }
-    if (!formData.state.trim()) { toast.error("Please enter your state"); return; }
+    if (!isPhoneValid) { invalid("phone", "Please enter a valid 10-digit mobile number"); return; }
+    if (!formData.addressLine1.trim()) { invalid("addressLine1", "Please enter address line 1"); return; }
+    if (!formData.city.trim()) { invalid("city", "Please enter your city"); return; }
+    if (!formData.state.trim()) { invalid("state", "Please enter your state"); return; }
     if (!/^[1-9]\d{5}$/.test(formData.pincode.trim())) {
-      toast.error("Please enter a valid 6-digit pincode"); return;
+      invalid("pincode", "Please enter a valid 6-digit pincode"); return;
     }
     // Only while Admin › COD › OTP is on; placeOrder checks the same switch.
-    if (formData.paymentMethod === "cod" && codAvailability?.otpRequired && !otpVerified) { toast.error("Please verify your phone number with OTP before placing a COD order"); return; }
+    if (formData.paymentMethod === "cod" && codAvailability?.otpRequired && !otpVerified) { invalid("cod_otp", "Please verify your phone number with OTP before placing a COD order"); return; }
+
+    // Place Order with a valid form: AddPaymentInfo (repeated server-side with the same event_id).
+    trackAddPaymentInfo((cartItems || []) as any, finalTotal, formData.paymentMethod);
 
     setIsSubmitting(true); setRetryCount(0); setShowPaymentVerificationFailed(false);
     try {
@@ -470,6 +507,8 @@ function CheckoutPageInner() {
         codOtpToken: formData.paymentMethod === "cod" ? codOtpToken || undefined : undefined,
         marketingOptIn: marketingOptIn || undefined,
         attribution: getAttribution(),
+        // For the Conversions API: _fbp/_fbc/fbclid/utm and this checkout's event_ids (functions/src/metaCapi.ts).
+        tracking: { ...getAdTracking(), ...checkoutEventContext() },
         codFee: codFeeAmount, prepaidAmount, codAmount,
         walletAmount: isAuthenticated && useWallet ? walletAmount : undefined,
         couponId: appliedCoupon?.coupon._id,
@@ -487,6 +526,7 @@ function CheckoutPageInner() {
 
       // This browser placed it: the order page reports the purchase to GA4 / Meta once it is confirmed.
       markOrderPlacedHere(result.orderId);
+      markCheckoutDone();
       const guestNav = () => navigate(`/orders/${result.orderId}`);
       // A friend's link is for one first order.
       if (referral) clearStoredReferralCode();
@@ -499,6 +539,7 @@ function CheckoutPageInner() {
         // Order was created but PhonePe failed — let user retry from order page
         console.error("Payment initiation failed:", result.paymentError);
         toast.error(result.paymentError + " You can retry payment from the order page.");
+        trackPaymentIssue("failed", "init_error", String(result.orderId), finalTotal);
         guestNav();
       } else if (result.paymentUrl && result.merchantTransactionId) {
         setIsRedirectingToPayment(true);
@@ -515,6 +556,7 @@ function CheckoutPageInner() {
       let msg = "Failed to place order. Please try again.";
       if (e?.message && !e.message.includes("INTERNAL")) msg = e.message;
       else if (e?.data?.message) msg = e.data.message;
+      trackPaymentIssue("failed", `order_error:${String(e?.code || "unknown").replace(/^functions\//, "")}`, `attempt-${Date.now()}`, finalTotal);
       toast.error(msg); setIsSubmitting(false); setIsRedirectingToPayment(false);
     }
   };
@@ -645,7 +687,7 @@ function CheckoutPageInner() {
               </Card>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} onInvalidCapture={onNativeInvalid} className="space-y-6">
               {/*
                 Order summary — mobile only, and folded shut.
 

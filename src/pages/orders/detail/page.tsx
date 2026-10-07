@@ -16,7 +16,7 @@ import { OrderTrackingHistory } from "@/components/order-tracking-history.tsx";
 import { ReviewRewardCta } from "@/components/review-reward-cta.tsx";
 import { AddToParcel, AddOnOfBanner } from "@/components/add-to-parcel.tsx";
 import { OrderProgress } from "@/components/order-progress.tsx";
-import { trackPurchaseOnce } from "@/lib/analytics.ts";
+import { trackPurchaseOnce, trackPaymentIssue, isCancelCode } from "@/lib/analytics.ts";
 
 import { orderLabel, orderStatusLabel, STATUS_BADGE } from "@/lib/order-label.ts";
 import { resumePayment, paymentErrorMessage } from "@/lib/resume-payment.ts";
@@ -211,6 +211,14 @@ function OrderDetailPageInner() {
 
   // The sale, reported to GA4 and the Meta Pixel once the order is confirmed (lib/analytics.ts).
   useEffect(() => { if (order) trackPurchaseOnce(order); }, [order]);
+  // A failed or cancelled payment, with PhonePe's reason, from the browser that placed the order.
+  useEffect(() => {
+    const o: any = order;
+    if (!o?._id || o.paymentStatus !== "failed") return;
+    try { if (!localStorage.getItem(`skinly_placed_${o._id}`)) return; } catch { return; }
+    const code = String(o.paymentFailureReason || o.paymentFailureCode || "unknown");
+    trackPaymentIssue(isCancelCode(code) ? "cancelled" : "failed", code, `${o._id}-${o.paymentTransactionId || ""}`, Number(o.total) || undefined);
+  }, [order]);
 
   if (order === undefined) {
     return (

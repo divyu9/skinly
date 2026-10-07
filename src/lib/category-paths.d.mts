@@ -6,6 +6,10 @@ export function canonicalListingPath(productType?: string | null, gadget?: strin
 export const CATALOGUE_CLAIMS: { models: number; designs: number; brands: number };
 export function claim(n: number): string;
 export const HOME_META: { title: string; description: string; heading: string };
+export type CatalogueStats = { models: number; brands?: number; designs?: number };
+export function floorClaim(n: number, step: number): number;
+export function catalogueClaims(stats: CatalogueStats | null | undefined): { models: number; designs: number; brands: number };
+export function homeMeta(stats: CatalogueStats | null | undefined): { title: string; description: string; heading: string };
 export const PRODUCTS_META: { title: string; description: string };
 export const BUSINESS: { name: string; legalName: string; city: string; region: string; postalCode: string; country: string; phone: string; email: string };
 export const ORGANIZATION_LD: Record<string, unknown>;

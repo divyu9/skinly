@@ -2,6 +2,7 @@ import * as functions from "firebase-functions/v1";
 import { loadSmartRules, smartLinePrice } from "./smartUpsell";
 import { cashbackForLines } from "./cashback";
 import { notifyOrderPlaced } from "./orderNotifications";
+import { cleanTracking, sendCheckoutEventsForOrder, sendPurchaseForOrder, capiCodPurchase } from "./metaCapi";
 import { confirmOrder } from "./orderConfirm";
 import { HttpsError } from "firebase-functions/v1/https";
 import * as admin from "firebase-admin";
@@ -260,8 +261,9 @@ export const placeOrder = functions
     // Defaults match the storefront's fallback when the settings doc is absent.
     const shipSnap = await db.collection("settings").doc("shipping").get();
     const ship = shipSnap.exists ? (shipSnap.data() as any) : {};
+    // Same defaults as src/lib/shipping-config.mjs (SHIPPING_DEFAULTS).
     const freeShippingThreshold = Number(ship.freeShippingThreshold ?? 500);
-    const flatShippingFee = Number(ship.flatShippingFee ?? 50);
+    const flatShippingFee = Number(ship.flatShippingFee ?? 70);
     const shippingFee = itemsTotal >= freeShippingThreshold ? 0 : Math.max(0, flatShippingFee);
 
     /*
@@ -483,6 +485,7 @@ export const placeOrder = functions
     const checkoutRef = `CHK-${orderId.slice(0, 8).toUpperCase()}`;
     let orderNumber = "";
 
+    const tracking = cleanTracking(data?.tracking, context?.rawRequest);
     await docRef.set({
       checkoutRef,
       userId: uid || reqSessionId || "guest",
@@ -555,10 +558,20 @@ export const placeOrder = functions
       ...(data?.marketingOptIn === true ? { marketingOptIn: true, marketingOptInAt: Date.now() } : {}),
       // Where the buyer came from (src/lib/attribution.ts), first and latest visit.
       ...(cleanAttribution(data?.attribution) ? { attribution: cleanAttribution(data?.attribution) } : {}),
+      // For the Conversions API (metaCapi.ts): _fbp, _fbc, fbclid, utm, this
+      // checkout's event_ids, and the buyer's IP and browser as this call saw them.
+      ...(tracking ? { tracking } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
     await markCodOtpUsed(codOtpRef, docRef.id);
+
+    // Meta Conversions API: InitiateCheckout + AddPaymentInfo with the
+    // browser's event_ids. Started now, alongside PhonePe; awaited before
+    // every reply (work left after the reply may not run). Never rejects.
+    const capiCheckout: Promise<void> = docRef.get()
+      .then((s) => sendCheckoutEventsForOrder(db, docRef.id, s.data()))
+      .catch((e) => console.error("[placeOrder] capi checkout:", e?.message || e));
     if (data?.marketingOptIn === true) {
       await recordOptIn(String(shippingAddress?.phone || ""), "checkout").catch((e) => console.error("[placeOrder] opt-in:", e));
     }
@@ -592,6 +605,12 @@ export const placeOrder = functions
       await notifyOrderPlaced(db, docRef.id).catch((e) =>
         console.error("notifyOrderPlaced failed", { order: docRef.id, error: e?.message || e })
       );
+      // A COD order is a Purchase for Meta only when META_CAPI_COD_PURCHASE=true;
+      // otherwise the server waits for money (a part-prepaid COD order sends it
+      // when PhonePe confirms the prepaid part).
+      if (paymentMethod === "cod" && !(prepaidAmount > 0) && capiCodPurchase()) {
+        await sendPurchaseForOrder(db, docRef.id, "cod");
+      }
     }
 
     // ── 5. Initiate PhonePe (same function call, no second round-trip) ──────────
@@ -638,7 +657,7 @@ export const placeOrder = functions
         let responseData: any = {};
         try { responseData = JSON.parse(responseText); } catch {
           console.error("PhonePe non-JSON", { status: response.status, body: responseText.slice(0, 200) });
-          return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: `PhonePe HTTP ${response.status}` };
+          await capiCheckout; return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: `PhonePe HTTP ${response.status}` };
         }
 
         console.log("PhonePe response", { code: responseData.code, success: responseData.success });
@@ -646,19 +665,19 @@ export const placeOrder = functions
         if (!response.ok || !responseData.success) {
           const errMsg = `PhonePe error: ${responseData.code || "UNKNOWN"} - ${responseData.message || "Payment initiation failed"}`;
           console.error("PhonePe failed", responseData);
-          return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: errMsg };
+          await capiCheckout; return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: errMsg };
         }
 
         const paymentUrl = responseData.data?.instrumentResponse?.redirectInfo?.url;
         if (!paymentUrl) {
-          return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: "PhonePe returned no payment URL" };
+          await capiCheckout; return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentError: "PhonePe returned no payment URL" };
         }
 
         // Fire-and-forget — doesn't block the redirect
         docRef.update({ paymentTransactionId: merchantTransactionId, paymentStatus: "PENDING", paymentProvider: "phonepe" })
           .catch((e) => console.error("order txn update failed", e));
 
-        return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentUrl, merchantTransactionId };
+        await capiCheckout; return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}`, paymentUrl, merchantTransactionId };
       } catch (err: any) {
         console.error("PhonePe API error", err?.message || err);
         if (err instanceof HttpsError) throw err;
@@ -667,7 +686,7 @@ export const placeOrder = functions
     }
 
     // ── 6. COD / wallet / zero-total path ─────────────────────────────────────
-    return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}` };
+    await capiCheckout; return { orderId, orderNumber, remainingAmount: calculatedTotal, trackingToken: `TRACK-${orderId}` };
   });
 
 /** Throws unless the storefront would offer COD on this cart (see cod.isCodAvailable). */

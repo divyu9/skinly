@@ -1,3 +1,4 @@
+import { shippingFor } from "./shipping-config.mjs";
 /**
  * Shipping and returns for a Product's Offer, as schema.org wants them.
  *
@@ -11,9 +12,7 @@
  * - returns within 48 hours of delivery, unopened packaging, by courier
  */
 export function offerShippingAndReturns(price, shipping) {
-  const threshold = Number(shipping?.freeShippingThreshold ?? 500);
-  const fee = Number(shipping?.flatShippingFee ?? 50);
-  const rate = Number(price) >= threshold ? 0 : fee;
+  const rate = shippingFor(price, shipping);
   return {
     shippingDetails: {
       "@type": "OfferShippingDetails",
