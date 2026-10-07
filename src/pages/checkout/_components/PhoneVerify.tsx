@@ -68,7 +68,7 @@ export function PhoneVerify({ phone, isPhoneValid, verified, required, items, on
       {!codeSent ? (
         <button type="button" onClick={send} disabled={busy}
           className="w-full rounded-lg border-2 border-ink bg-brand px-3 py-2 text-sm font-bold text-brand-foreground disabled:opacity-60">
-          {busy ? "Sending…" : `Verify ${phone} on WhatsApp${required ? "" : " (recommended)"}`}
+          {busy ? "Sending…" : `Verify ${phone} on WhatsApp`}
         </button>
       ) : (
         <>

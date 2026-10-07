@@ -785,7 +785,6 @@ function CheckoutPageInner() {
                 isAuthenticated={isAuthenticated}
                 onFieldChange={handleFieldChange}
                 onPhoneChange={handlePhoneChange}
-                hideMarketingOptIn={phoneVerified}
                 phoneExtra={phoneOtpCfg.enabled ? (
                   <PhoneVerify
                     phone={formData.phone}
@@ -793,6 +792,8 @@ function CheckoutPageInner() {
                     verified={phoneVerified}
                     required={phoneOtpCfg.required}
                     items={(cartItems || []) as any[]}
+                    // Verifying is consent (the line under the button says so), so the
+                    // offers box ticks itself; the shopper can still untick it.
                     onVerified={(token) => { setPhoneToken({ phone: formData.phone, token }); setMarketingOptIn(true); }}
                   />
                 ) : undefined}
