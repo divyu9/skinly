@@ -27,7 +27,8 @@ export function AbandonedCartSettings() {
   const [secondReminderEnabled, setSecondReminderEnabled] = useState<boolean>(false);
   const [secondReminderDelayHours, setSecondReminderDelayHours] = useState<number>(24);
   const [dailyEmailCap, setDailyEmailCap] = useState<number>(200);
-  const [delayHours, setDelayHours] = useState<number>(1);
+  // The first reminder's wait, in minutes (functions/src/abandonedCarts.ts, firstDelayMs).
+  const [delayMinutes, setDelayMinutes] = useState<number>(60);
   const [couponDiscountType, setCouponDiscountType] = useState<"percentage" | "fixed">("percentage");
   const [couponDiscountValue, setCouponDiscountValue] = useState<number>(15);
   const [couponValidityDays, setCouponValidityDays] = useState<number>(7);
@@ -40,7 +41,7 @@ export function AbandonedCartSettings() {
       setSecondReminderEnabled(settings.secondReminderEnabled ?? false);
       setSecondReminderDelayHours(settings.secondReminderDelayHours ?? 24);
       setDailyEmailCap(settings.dailyEmailCap ?? 200);
-      setDelayHours(settings.delayHours);
+      setDelayMinutes(Number((settings as any).delayMinutes) || Math.round(Number(settings.delayHours || 1) * 60));
       setCouponDiscountType(settings.couponDiscountType as "percentage" | "fixed");
       setCouponDiscountValue(settings.couponDiscountValue);
       setCouponValidityDays(settings.couponValidityDays);
@@ -56,7 +57,8 @@ export function AbandonedCartSettings() {
         secondReminderEnabled,
         secondReminderDelayHours,
         dailyEmailCap,
-        delayHours,
+        delayMinutes,
+        delayHours: delayMinutes / 60,
         couponDiscountType,
         couponDiscountValue,
         couponValidityDays,
@@ -110,17 +112,17 @@ export function AbandonedCartSettings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="delayHours">Delay (Hours)</Label>
+              <Label htmlFor="delayMinutes">Delay (minutes)</Label>
               <Input
-                id="delayHours"
+                id="delayMinutes"
                 type="number"
-                min={0}
-                max={168}
-                value={delayHours}
-                onChange={(e) => setDelayHours(Number(e.target.value))}
+                min={10}
+                max={10080}
+                value={delayMinutes}
+                onChange={(e) => setDelayMinutes(Number(e.target.value))}
               />
               <p className="text-xs text-muted-foreground">
-                Wait {delayHours} hour{delayHours !== 1 ? "s" : ""} after cart abandonment before sending reminder
+                First reminder {delayMinutes} minutes after the cart is left (minimum 10; checked every 5 minutes).
               </p>
             </div>
 
@@ -330,7 +332,7 @@ export function AbandonedCartSettings() {
               2
             </div>
             <div>
-              <strong>Wait {delayHours} hour{delayHours !== 1 ? "s" : ""}</strong>
+              <strong>Wait {delayMinutes} minutes</strong>
               <p className="text-muted-foreground">System waits before sending reminder</p>
             </div>
           </div>

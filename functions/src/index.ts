@@ -55,6 +55,7 @@ export * from "./orderSources";
 export * from "./emailEvents";
 export { metaCapiTestPurchase } from "./metaCapi";
 export { syncCart } from "./cartSync";
+export { sendCartSaveOtp, verifyCartSaveOtp } from "./phoneOtp";
 export * from "./walletEmail";
 export * from "./adminOrderEmail";
 export * from "./contacts";

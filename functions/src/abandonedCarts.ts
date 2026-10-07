@@ -19,6 +19,8 @@ const USECASE_KEY = "abandoned_cart";
 type Settings = {
   enabled: boolean;
   delayHours: number;
+  /** Preferred over delayHours when set (Admin › Abandoned Carts › Settings). */
+  delayMinutes?: number;
   secondReminderEnabled: boolean;
   secondReminderDelayHours: number;
   dailyEmailCap: number;
@@ -289,8 +291,12 @@ const sendReminderEmail = async (cart: any, couponCode: string | null, s: Settin
  * write to everybody who wandered off in the spring.
  */
 const LOOKBACK_MS = 7 * 86400_000;
-// Long enough that somebody still on the payment page is not "abandoned".
-const IDLE_MS = 60 * 60_000;
+// How long a cart sits before it counts as abandoned: the admin's delay
+// (Settings › Delay, in minutes), never under 10 minutes, so somebody still
+// on PhonePe's page is not "abandoned".
+const MIN_IDLE_MS = 10 * 60_000;
+export const firstDelayMs = (s: { delayMinutes?: number; delayHours?: number }) =>
+  Math.max(MIN_IDLE_MS, (Number(s.delayMinutes) || Number(s.delayHours) * 60 || 60) * 60_000);
 
 const contactKey = (email?: unknown, phone?: unknown) => {
   const e = String(email || "").trim().toLowerCase();
@@ -310,9 +316,10 @@ type Found = {
   items: any[]; cartTotal: number; abandonedAt: number; source: "checkout" | "draft" | "cart"; orderId?: string;
 };
 
-export async function detectAbandonedCarts(): Promise<{ found: number; created: number; updated: number; recovered: number }> {
+export async function detectAbandonedCarts(idleMs = 60 * 60_000): Promise<{ found: number; created: number; updated: number; recovered: number }> {
   const db = admin.firestore();
   const now = Date.now();
+  const IDLE_MS = Math.max(MIN_IDLE_MS, idleMs);
   const since = now - LOOKBACK_MS;
 
   // Paid orders tell us who came back. Looked at over twice the window, so a
@@ -366,7 +373,7 @@ export async function detectAbandonedCarts(): Promise<{ found: number; created: 
   for (const d of drafts.docs) {
     const c = d.data() as any;
     const at = Number(c.checkoutAt || c.updatedAt) || 0;
-    if (c.stage !== "checkout" || at > now - IDLE_MS || !Array.isArray(c.items) || !c.items.length) continue;
+    if ((c.stage !== "checkout" && c.stage !== "saved") || at > now - IDLE_MS || !Array.isArray(c.items) || !c.items.length) continue;
     const key = contactKey(c.email, c.phone);
     if (!key || found.has(key)) continue; // an order attempt says more than a draft
     if (cameBack(key, contactKey(null, c.phone), at)) continue;
@@ -462,7 +469,7 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
   // whether or not reminders are switched on, so the admin page is true
   // either way.
   try {
-    const d = await detectAbandonedCarts();
+    const d = await detectAbandonedCarts(firstDelayMs(await readSettings()));
     console.log("abandoned carts detected", d);
   } catch (e: any) {
     console.error("abandoned cart detection failed", e?.message || e);
@@ -477,7 +484,7 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
   // First reminder: never contacted, and abandoned long enough ago.
   const firstDue = await db.collection("abandonedCarts")
     .where("reminderCount", "==", 0)
-    .where("abandonedAt", "<=", now - s.delayHours * 3600_000)
+    .where("abandonedAt", "<=", now - firstDelayMs(s))
     .limit(MAX_SENDS_PER_RUN)
     .get();
 
@@ -522,8 +529,9 @@ const runReminderPass = async (): Promise<{ sent: number; claimed: number; skipp
   return { sent, claimed, skipped: "" };
 };
 
+// Every 5 minutes, so a 15-minute delay means 15–20 minutes, not up to 45.
 export const processAbandonedCartReminders = functionsV1.pubsub
-  .schedule("every 30 minutes")
+  .schedule("every 5 minutes")
   .timeZone("Asia/Kolkata")
   .onRun(async () => {
     const result = await runReminderPass();
@@ -540,7 +548,7 @@ export const runAbandonedCartReminders = onCall(async (_data: any, context: any)
 /** The dashboard's "Scan": finds carts now instead of at the next half hour. */
 export const scanAbandonedCarts = onCall(async (_data: any, context: any) => {
   await requireAdmin(context);
-  const d = await detectAbandonedCarts();
+  const d = await detectAbandonedCarts(firstDelayMs(await readSettings()));
   return { ...d, tracked: d.created + d.updated };
 });
 

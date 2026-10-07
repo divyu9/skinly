@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@/lib/firebase-hooks";
 import { shippingFor, shippingRule } from "@/lib/shipping-config.mjs";
+import { SaveCartWhatsApp } from "./_components/save-cart-whatsapp.tsx";
 import { api } from "@/lib/firebase-api";
 import { Button } from "@/components/ui/button.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
@@ -824,6 +825,8 @@ function GuestCartContent() {
                   Continue shopping
                 </Button>
               </Link>
+
+              <SaveCartWhatsApp items={guestCart} />
 
               {/* The reasons to go through with it, at the moment of deciding.
                   Reprint moved out: it is a promise about what happens after a

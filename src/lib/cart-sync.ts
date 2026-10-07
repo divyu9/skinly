@@ -12,7 +12,7 @@ type Line = {
 };
 type Payload = {
   items: Line[];
-  stage: "cart" | "checkout" | "ordered";
+  stage: "cart" | "saved" | "checkout" | "ordered";
   phone?: string; email?: string; name?: string; optIn?: boolean; orderId?: string;
 };
 
@@ -22,7 +22,7 @@ let lastSent = "";
 let pending: Payload | null = null;
 
 /** One id per browser, kept across visits, so a returning guest's cart is the same row. */
-function cartId(): string {
+export function cartId(): string {
   try {
     let id = localStorage.getItem(ID_KEY);
     if (!id) {

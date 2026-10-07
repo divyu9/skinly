@@ -185,11 +185,11 @@ function AbandonedCartsPageInner() {
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-green-600">Automation Active</span>
                   <Badge variant="outline" className="text-green-600 border-green-500/30">
-                    Every 30 min
+                    Every 5 min
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  System automatically scans for abandoned carts and sends reminders after {settings.delayHours}h delay
+                  System automatically scans for abandoned carts and sends reminders {Number((settings as any).delayMinutes) || Math.round(Number(settings.delayHours || 1) * 60)} minutes after a cart is left
                 </p>
               </div>
             </div>
@@ -325,7 +325,7 @@ function AbandonedCartsPageInner() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Process runs automatically every 30 min. Use this for immediate processing.</p>
+                    <p>Process runs automatically every 5 min. Use this for immediate processing.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

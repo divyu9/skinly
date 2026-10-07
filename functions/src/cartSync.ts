@@ -16,6 +16,9 @@ import { enforceDailyRateLimit } from "./rate-limit";
  *                       abandoned-cart detector (abandonedCarts.ts) picks it
  *                       up after an hour without an order, so it gets the same
  *                       reminder as a failed payment.
+ *   stage "saved"     — the shopper left a phone number on the cart page to
+ *                       get their cart (and a code) on WhatsApp; reminded
+ *                       like a checkout.
  *   stage "ordered"   — the order was placed from this cart.
  *
  * Only this function writes the collection and only admin code reads it
@@ -24,10 +27,10 @@ import { enforceDailyRateLimit } from "./rate-limit";
  * never to bill (placeOrder prices from the variants).
  */
 
-const STAGES = new Set(["cart", "checkout", "ordered"]);
+const STAGES = new Set(["cart", "saved", "checkout", "ordered"]);
 const str = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(0, n) : "");
 
-function cleanItems(raw: unknown) {
+export function cleanItems(raw: unknown) {
   if (!Array.isArray(raw)) return [];
   return raw.slice(0, 30).map((i: any) => ({
     productId: str(i?.productId, 64),
@@ -73,8 +76,9 @@ export const syncCart = onCall(async (data: any, context: any) => {
     patch.stage = "ordered";
     patch.orderedAt = now;
     if (str(data?.orderId, 64)) patch.orderId = str(data.orderId, 64);
-  } else if (stage === "checkout") {
-    patch.stage = "checkout";
+  } else if (stage === "checkout" || stage === "saved") {
+    // A cart that already reached checkout keeps that stage.
+    patch.stage = stage === "saved" && prevStage === "checkout" ? "checkout" : stage;
     patch.checkoutAt = now;
     if (/^[6-9]\d{9}$/.test(phone)) patch.phone = phone;
     if (/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) patch.email = email;
@@ -83,15 +87,15 @@ export const syncCart = onCall(async (data: any, context: any) => {
   } else if (items.length) {
     // Adding to a cart after an order, or before checkout: back to "cart",
     // unless this cart already reached checkout (its contact still counts).
-    patch.stage = prevStage === "checkout" ? "checkout" : "cart";
+    patch.stage = prevStage === "checkout" || prevStage === "saved" ? prevStage : "cart";
   }
   await ref.set(patch, { merge: true });
 
   // The offers box ticked at checkout is consent, whether or not they pay;
   // the cart reminder on WhatsApp needs it (contacts/{phone}.optIn).
-  if (stage === "checkout" && data?.optIn === true && /^[6-9]\d{9}$/.test(phone)) {
+  if ((stage === "checkout" || stage === "saved") && data?.optIn === true && /^[6-9]\d{9}$/.test(phone)) {
     const { recordOptIn } = await import("./contacts");
-    await recordOptIn(phone, "checkout_draft").catch((e) => console.warn("[syncCart] opt-in:", e?.message || e));
+    await recordOptIn(phone, stage === "saved" ? "cart_save" : "checkout_draft").catch((e) => console.warn("[syncCart] opt-in:", e?.message || e));
   }
   return { ok: true };
 });
