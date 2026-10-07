@@ -34,7 +34,9 @@ export default function ReviewsPage() {
     if (filter === "photos") return l.filter((r) => r.imageUrls?.length);
     if (filter === "mine" && device) return l.filter((r) => String(r.device || "").toLowerCase().includes(device.model.toLowerCase()));
     if (/^\d$/.test(filter)) return l.filter((r) => Math.round(r.rating) === Number(filter));
-    return l;
+    // Something to see or read first; stars-only reviews still count and still show, after them.
+    const rank = (r: typeof l[number]) => (r.imageUrls?.length ? 0 : r.comment?.trim() || r.title?.trim() ? 1 : 2);
+    return [...l].sort((a, b) => rank(a) - rank(b));
   }, [all, filter, device]);
 
   const chip = (id: string, label: string) => (

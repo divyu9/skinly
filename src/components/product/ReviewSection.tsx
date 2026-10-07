@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card.tsx";
-import { BadgeCheckIcon, StarIcon, XIcon } from "lucide-react";
-import { sizedImage } from "@/lib/image-cdn";
-import { timeAgo } from "@/lib/public-reviews";
+import { StarIcon } from "lucide-react";
+// The same card as the homepage and /reviews: photo, the quote large when
+// there is no photo, the rating large when there are only stars.
+import { ReviewCard } from "@/components/customer-reviews.tsx";
 
 interface Review {
   _id: string;
@@ -70,58 +70,6 @@ function RatingBar({ rating, count, total }: { rating: number; count: number; to
   );
 }
 
-function ReviewCard({ review }: { review: Review }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const when = timeAgo(Number(review.createdAt || review._creationTime || 0));
-  return (
-    <div className="rounded-2xl border-2 border-ink/10 bg-card p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-bold">{review.userName || "Verified buyer"}</span>
-            {review.city && <span className="text-sm text-muted-foreground">· {review.city}</span>}
-          </div>
-          {review.verified !== false && (
-            <span className="mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-              <BadgeCheckIcon className="size-3.5" /> Verified Buyer
-            </span>
-          )}
-        </div>
-        {when && <span className="shrink-0 text-xs text-muted-foreground">{when}</span>}
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <StarRating rating={review.rating} />
-        {review.device && <span className="text-xs text-muted-foreground">on {review.device}</span>}
-      </div>
-      {review.title && <h4 className="mt-2 font-semibold">{review.title}</h4>}
-      {review.comment && <p className="mt-1.5 text-sm leading-relaxed text-foreground/85">{review.comment}</p>}
-
-      {review.imageUrls && review.imageUrls.length > 0 && (
-        <div data-drag-scroll className="mt-3 flex gap-2 overflow-x-auto">
-          {review.imageUrls.map((url, idx) => (
-            <button key={idx} type="button" onClick={() => setOpen(url)} className="shrink-0 overflow-hidden rounded-xl border border-ink/10">
-              <img src={sizedImage(url, 240)} alt={`Customer photo ${idx + 1}`} loading="lazy" className="size-24 object-cover transition-transform hover:scale-105 md:size-28" />
-            </button>
-          ))}
-        </div>
-      )}
-      {review.videoUrls && review.videoUrls.length > 0 && (
-        <div data-drag-scroll className="mt-3 flex gap-2 overflow-x-auto">
-          {review.videoUrls.map((url, idx) => <video key={idx} src={url} controls className="h-40 rounded-lg" />)}
-        </div>
-      )}
-
-      {open && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => setOpen(null)} role="dialog" aria-modal="true">
-          <button aria-label="Close" className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white"><XIcon className="size-5" /></button>
-          <img src={sizedImage(open, 1000)} alt="Customer photo" className="max-h-[85vh] max-w-full rounded-2xl object-contain" />
-        </div>
-      )}
-    </div>
-  );
-}
-
 /*
  * Reviews come only from buyers, through the link sent after delivery
  * (src/pages/review). There is no "Post A Review" here any more: it let any
@@ -145,9 +93,10 @@ export function ReviewSection({ reviews }: ReviewSectionProps) {
     (acc, n) => ({ ...acc, [n]: list.filter((r) => Math.round(Number(r.rating)) === n).length }),
     {} as Record<number, number>,
   );
-  // Photos first, then the newest.
+  // Photos first, then words, then stars only; the newest first within each.
+  const rank = (r: Review) => (r.imageUrls?.length ? 0 : r.comment?.trim() || r.title?.trim() ? 1 : 2);
   const sorted = [...list].sort((a, b) =>
-    (b.imageUrls?.length ? 1 : 0) - (a.imageUrls?.length ? 1 : 0) ||
+    rank(a) - rank(b) ||
     (b.createdAt || b._creationTime || 0) - (a.createdAt || a._creationTime || 0));
 
   return (
@@ -179,9 +128,16 @@ export function ReviewSection({ reviews }: ReviewSectionProps) {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           {sorted.map((review) => (
-            <ReviewCard key={review._id} review={review} />
+            <div key={review._id} className="space-y-2">
+              <ReviewCard r={review} clamp={false} showShop={false} />
+              {review.videoUrls && review.videoUrls.length > 0 && (
+                <div data-drag-scroll className="flex gap-2 overflow-x-auto">
+                  {review.videoUrls.map((url, idx) => <video key={idx} src={url} controls className="h-40 rounded-lg" />)}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

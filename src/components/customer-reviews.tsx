@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightIcon, BadgeCheckIcon, StarIcon } from "lucide-react";
+import { ArrowRightIcon, BadgeCheckIcon, QuoteIcon, StarIcon } from "lucide-react";
 import { responsiveImg } from "@/lib/image-cdn";
 import { ReviewPhotoViewer } from "@/components/review-photo-viewer.tsx";
 import { ScrollNavButtons } from "@/components/ui/scroll-nav-buttons.tsx";
@@ -24,9 +24,24 @@ export function Stars({ n, size = "size-4" }: { n: number; size?: string }) {
   );
 }
 
-/** One review as a card: stars and age, photo, words, then who and where. */
-export function ReviewCard({ r, clamp = true }: { r: PublicReview; clamp?: boolean }) {
+/*
+ * A review without a photo gets its words where the photo would be: a block
+ * in one of the packaging's colours with the quote set large. Laid out like
+ * a photo card, the words sat in the top corner of a tall white card with
+ * nothing above them — "Very cool" and a blank 250px.
+ */
+const QUOTE_TONES = ["bg-blush/45", "bg-sunny/45", "bg-brand/20"];
+const toneFor = (id: string) => QUOTE_TONES[[...String(id)].reduce((n, c) => n + c.charCodeAt(0), 0) % QUOTE_TONES.length];
+
+/** One review as a card: stars and age, photo (or the quote, large), words, then who and where. */
+export function ReviewCard({ r, clamp = true, showShop = true }: { r: PublicReview; clamp?: boolean; showShop?: boolean }) {
   const photo = r.imageUrls?.[0];
+  const quote = !photo && r.comment?.trim() ? r.comment.trim() : "";
+  // Short praise reads as a headline; a paragraph steps down so it still fits.
+  const quoteSize = quote.length <= 40 ? "text-2xl md:text-[26px]" : quote.length <= 110 ? "text-lg" : "text-[15px]";
+  // Stars and nothing else: the rating is the content, said as a rating —
+  // never words put in the buyer's mouth.
+  const ratingOnly = !photo && !quote && !r.title;
   const [viewing, setViewing] = useState(false);
   const design = String(r.productTitle || "").replace(/\s+(matte|3d|embossed|textured|glossy|tranzy)\b.*$/i, "").replace(/,.*$/, "").trim();
   return (
@@ -47,18 +62,44 @@ export function ReviewCard({ r, clamp = true }: { r: PublicReview; clamp?: boole
           )}
         </button>
       )}
+      {quote && (
+        /* Fills the card down to the buyer's name, so a short review leaves no
+           blank stretch beside its photo-card neighbours. */
+        <div className={`relative flex w-full flex-1 flex-col overflow-hidden border-b-2 border-ink/10 px-5 pb-5 pt-4 ${clamp ? "min-h-[220px]" : "min-h-[180px]"} ${toneFor(r._id)}`}>
+          <QuoteIcon aria-hidden className="pointer-events-none absolute -right-2 -top-2 size-24 fill-ink/10 text-transparent" />
+          <div className="relative flex items-center justify-between gap-2">
+            <Stars n={r.rating} />
+            <span className="text-[11px] font-medium text-ink/60">{reviewAge(r)}</span>
+          </div>
+          {r.title && <p className="relative mt-3 text-sm font-bold text-ink/80">{r.title}</p>}
+          <p className={`relative my-auto pt-4 font-extrabold leading-snug tracking-tight text-ink ${quoteSize} ${clamp ? "line-clamp-6" : ""}`}>“{quote}”</p>
+        </div>
+      )}
+      {ratingOnly && (
+        <div className={`relative flex w-full flex-1 flex-col items-center justify-center gap-2 overflow-hidden border-b-2 border-ink/10 px-5 py-6 text-center ${clamp ? "min-h-[220px]" : "min-h-[180px]"} ${toneFor(r._id)}`}>
+          <span className="absolute right-3 top-3 text-[11px] font-medium text-ink/60">{reviewAge(r)}</span>
+          <p className="text-5xl font-extrabold leading-none tracking-tight text-ink">{Number(r.rating).toFixed(1)}</p>
+          <Stars n={r.rating} size="size-6" />
+          <p className="mt-1 text-sm font-bold text-ink/80">Rated {Math.round(r.rating)} out of 5</p>
+          {(design || r.device) && (
+            <p className="line-clamp-2 max-w-[90%] text-xs text-ink/60">for {[design, r.device].filter(Boolean).join(" on ")}</p>
+          )}
+        </div>
+      )}
       {photo && (
         <ReviewPhotoViewer photos={r.imageUrls!} start={0} open={viewing} onOpenChange={setViewing}
           caption={[r.userName, r.device, design].filter(Boolean).join(" · ")} />
       )}
-      <div className="flex flex-1 flex-col gap-2 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <Stars n={r.rating} />
-          <span className="text-[11px] text-muted-foreground">{reviewAge(r)}</span>
-        </div>
-        {r.title && <p className="text-sm font-bold">{r.title}</p>}
-        {r.comment && <p className={`text-sm leading-relaxed text-foreground/85 ${clamp ? (photo ? "line-clamp-3" : "line-clamp-6") : ""}`}>“{r.comment}”</p>}
-        <div className="mt-auto space-y-0.5 pt-2 text-xs">
+      <div className={`flex flex-col gap-2 p-4 ${quote || ratingOnly ? "" : "flex-1"}`}>
+        {!quote && !ratingOnly && (
+          <div className="flex items-center justify-between gap-2">
+            <Stars n={r.rating} />
+            <span className="text-[11px] text-muted-foreground">{reviewAge(r)}</span>
+          </div>
+        )}
+        {r.title && !quote && <p className="text-sm font-bold">{r.title}</p>}
+        {r.comment && !quote && <p className={`text-sm leading-relaxed text-foreground/85 ${clamp ? "line-clamp-3" : ""}`}>“{r.comment}”</p>}
+        <div className={`mt-auto space-y-0.5 text-xs ${quote || ratingOnly ? "" : "pt-2"}`}>
           <p className="flex flex-wrap items-center gap-x-1.5 font-bold">
             {r.userName || "Verified buyer"}
             {r.city && <span className="font-normal text-muted-foreground">· {r.city}</span>}
@@ -66,8 +107,8 @@ export function ReviewCard({ r, clamp = true }: { r: PublicReview; clamp?: boole
           <p className="flex items-center gap-1 font-semibold text-emerald-700 dark:text-emerald-400">
             <BadgeCheckIcon className="size-3.5" /> Verified Buyer
           </p>
-          {(design || r.device) && <p className="line-clamp-1 text-muted-foreground">{[design, r.device].filter(Boolean).join(" · ")}</p>}
-          {r.productSlug && (
+          {(design || r.device) && !ratingOnly && <p className="line-clamp-1 text-muted-foreground">{[design, r.device].filter(Boolean).join(" · ")}</p>}
+          {r.productSlug && showShop && (
             <span className="inline-flex items-center gap-0.5 pt-1 font-bold text-brand-deep">Shop this design <ArrowRightIcon className="size-3" /></span>
           )}
         </div>
