@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { syncCartSoon } from "@/lib/cart-sync";
 
 export interface GuestCartItem {
   productId: string;
@@ -65,6 +66,8 @@ export function useGuestCart() {
     setGuestCart(newCart);
     localStorage.setItem(GUEST_CART_KEY, JSON.stringify(newCart));
     window.dispatchEvent(new Event(GUEST_CART_UPDATE_EVENT));
+    // The server keeps a copy (no contact) so the dashboard can count guest carts.
+    syncCartSoon({ items: newCart, stage: "cart" });
   }, []);
 
   const addToGuestCart = (item: Omit<GuestCartItem, "quantity"> & { quantity?: number }) => {

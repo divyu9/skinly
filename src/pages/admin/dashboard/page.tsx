@@ -48,6 +48,7 @@ type Dashboard = {
   topModels: Array<{ model: string; qty: number }>;
   alerts?: Array<{ level: "red" | "amber"; text: string; href: string }>;
   dailyTarget?: number;
+  cartsToday?: { started: number; value: number; reachedCheckout: number; withContact: number; ordered: number; topProducts: Array<{ title: string; qty: number }> };
   shipping30?: { parcels: number; of: number; spend: number; avg: number; pctOfSales: number; afterShipping: number };
   bestsellers?: Record<"d7" | "d30" | "all", Array<{ productId: string; title: string; image: string; qty: number; sales: number }>>;
   topPhones?: Record<"d30" | "all", Array<{ model: string; qty: number }>>;
@@ -603,6 +604,9 @@ function DashboardInner() {
         </Panel>
       </div>
 
+      {/* ── Carts today (guests included, functions/src/cartSync.ts) ─────── */}
+      {data.cartsToday && <CartsTodayPanel c={data.cartsToday} />}
+
       {/* ── Funnel ───────────────────────────────────────────────────────── */}
       <FunnelPanel funnel={data.funnel || null} onRefreshed={() => void reload()} />
 
@@ -861,5 +865,46 @@ export default function AdminDashboardPage() {
       <AuthLoading><DashboardSkeleton /></AuthLoading>
       <Authenticated><DashboardInner /></Authenticated>
     </AdminLayout>
+  );
+}
+
+/*
+ * Carts started today, guests included. A guest's cart used to live only in
+ * their browser, so a busy evening read as "no carts". Only the carts that
+ * reached checkout with a phone or email can be reminded; the rest are counted.
+ */
+function CartsTodayPanel({ c }: { c: NonNullable<Dashboard["cartsToday"]> }) {
+  const stat = (label: string, value: ReactNode, hint?: string) => (
+    <div className="min-w-0">
+      <div className="text-2xl font-extrabold tabular-nums">{value}</div>
+      <div className="text-xs font-semibold">{label}</div>
+      {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
+    </div>
+  );
+  return (
+    <Panel title="Carts today" icon={<FlameIcon className="size-4 text-brand" />} action={<PanelLink to="/backend-skinly/abandoned-carts">Abandoned carts</PanelLink>}>
+      {c.started === 0 ? (
+        <p className="text-sm text-muted-foreground">No carts yet today. Guest carts are counted from the day this update went live.</p>
+      ) : (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {stat("Carts started", c.started, `${inr(c.value)} not yet ordered`)}
+            {stat("Reached checkout", c.reachedCheckout)}
+            {stat("Left a phone / email", c.withContact, "can get a reminder")}
+            {stat("Ordered", c.ordered)}
+          </div>
+          {c.topProducts.length > 0 && (
+            <div className="text-sm">
+              <span className="text-xs font-semibold text-muted-foreground">Most added today</span>
+              <ul className="mt-1 space-y-0.5">
+                {c.topProducts.map((p) => (
+                  <li key={p.title} className="flex justify-between gap-3"><span className="truncate">{p.title}</span><span className="tabular-nums text-muted-foreground">{p.qty}</span></li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Panel>
   );
 }

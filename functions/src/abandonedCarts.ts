@@ -307,7 +307,7 @@ const rowId = (key: string) =>
 
 type Found = {
   key: string; userEmail: string; userPhone: string; userName: string; userId: string | null;
-  items: any[]; cartTotal: number; abandonedAt: number; source: "checkout" | "cart"; orderId?: string;
+  items: any[]; cartTotal: number; abandonedAt: number; source: "checkout" | "draft" | "cart"; orderId?: string;
 };
 
 export async function detectAbandonedCarts(): Promise<{ found: number; created: number; updated: number; recovered: number }> {
@@ -360,7 +360,31 @@ export async function detectAbandonedCarts(): Promise<{ found: number; created: 
     });
   }
 
-  // 2. Signed-in customers' carts.
+  // 2. Checkouts that never reached Place Order: the shopper typed a phone or
+  //    email at checkout (cartSync.ts saved it with the cart) and left.
+  const drafts = await db.collection("cartSnapshots").where("updatedAt", ">=", since).get();
+  for (const d of drafts.docs) {
+    const c = d.data() as any;
+    const at = Number(c.checkoutAt || c.updatedAt) || 0;
+    if (c.stage !== "checkout" || at > now - IDLE_MS || !Array.isArray(c.items) || !c.items.length) continue;
+    const key = contactKey(c.email, c.phone);
+    if (!key || found.has(key)) continue; // an order attempt says more than a draft
+    if (cameBack(key, contactKey(null, c.phone), at)) continue;
+    found.set(key, {
+      key, source: "draft",
+      userEmail: String(c.email || ""), userPhone: String(c.phone || ""),
+      userName: String(c.name || ""),
+      userId: c.uid ? String(c.uid) : null,
+      items: c.items.map((i: any) => ({
+        productId: i.productId, productTitle: i.productTitle, productImage: i.productImage,
+        variant: i.variant, price: i.price, quantity: i.quantity, ...deviceOf(i),
+      })),
+      cartTotal: Number(c.total) || 0,
+      abandonedAt: at,
+    });
+  }
+
+  // 3. Signed-in customers' carts.
   const cart = await db.collection("cart").get();
   const byUser = new Map<string, any[]>();
   for (const d of cart.docs) {

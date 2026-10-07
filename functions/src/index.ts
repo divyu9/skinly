@@ -54,6 +54,7 @@ export * from "./funnel";
 export * from "./orderSources";
 export * from "./emailEvents";
 export { metaCapiTestPurchase } from "./metaCapi";
+export { syncCart } from "./cartSync";
 export * from "./walletEmail";
 export * from "./adminOrderEmail";
 export * from "./contacts";

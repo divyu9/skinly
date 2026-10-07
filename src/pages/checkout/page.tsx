@@ -15,6 +15,7 @@ import { Spinner } from "@/components/ui/spinner.tsx";
 import { calculateGST } from "@/lib/gst";
 import { httpsCallable } from "firebase/functions";
 import { getAttribution, getAdTracking } from "@/lib/attribution";
+import { syncCartSoon, syncCartNow } from "@/lib/cart-sync";
 import { shippingFor } from "@/lib/shipping-config.mjs";
 import { functions } from "@/lib/firebase";
 import { storedReferralCode, clearStoredReferralCode, ownReferralCode } from "@/components/referral-tracker.tsx";
@@ -326,6 +327,26 @@ function CheckoutPageInner() {
   const getFullPhoneNumber = () => (formData.phone ? `+91${formData.phone}` : "");
   const isPhoneValid = formData.phone.length === 10;
 
+  /*
+   * A checkout left half-way can still be reminded: once a valid phone or
+   * email is typed, the cart and that contact go to the server (cartSync.ts),
+   * and an hour without an order makes it an abandoned cart. Before this only
+   * carts that reached Place Order, or signed-in carts, could be reached.
+   */
+  useEffect(() => {
+    const email = formData.email.trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+    if ((!isPhoneValid && !emailOk) || !cartItems?.length) return;
+    syncCartSoon({
+      items: cartItems as any,
+      stage: "checkout",
+      phone: isPhoneValid ? formData.phone : undefined,
+      email: emailOk ? email : undefined,
+      name: formData.fullName.trim() || undefined,
+      optIn: marketingOptIn || undefined,
+    }, 2500);
+  }, [formData.phone, formData.email, formData.fullName, marketingOptIn, cartItems, isPhoneValid]);
+
   const handleFieldChange = (field: keyof FormData, value: string) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
@@ -527,6 +548,7 @@ function CheckoutPageInner() {
       // This browser placed it: the order page reports the purchase to GA4 / Meta once it is confirmed.
       markOrderPlacedHere(result.orderId);
       markCheckoutDone();
+      syncCartNow({ items: [], stage: "ordered", orderId: String(result.orderId) });
       const guestNav = () => navigate(`/orders/${result.orderId}`);
       // A friend's link is for one first order.
       if (referral) clearStoredReferralCode();

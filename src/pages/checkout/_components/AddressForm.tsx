@@ -95,9 +95,14 @@ export function AddressForm({
                 pattern="[0-9]{10}"
               />
             </div>
-            {formData.phone && !isPhoneValid && (
+            {formData.phone && !isPhoneValid ? (
               <p className="text-xs text-red-600 mt-1">
                 Please enter a valid 10-digit mobile number
+              </p>
+            ) : (
+              // The number is saved with the cart as soon as it is typed (cartSync.ts).
+              <p className="text-xs text-muted-foreground mt-1">
+                For order updates. We keep it with your cart so you can pick up where you left off.
               </p>
             )}
             {otpVerified && (

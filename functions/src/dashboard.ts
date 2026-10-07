@@ -219,6 +219,26 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
   const unpaid = recent.filter((o) => o.createdAt >= now - DAY && statusOf(o) === "pending_payment" && !o.testOrder);
   const carts = cartSnap.docs.map((d) => d.data() as any).filter((c) => c.status === "abandoned" || c.status === "reminded");
 
+  // Carts started today, guests included (cartSync.ts): how many, worth how
+  // much, how far they got. Only "reached checkout" ones have a contact.
+  const snaps = (await db.collection("cartSnapshots").where("updatedAt", ">=", today).get())
+    .docs.map((d) => d.data() as any).filter((c) => Number(c.createdAt || c.updatedAt) >= today);
+  const productCount = new Map<string, { title: string; qty: number }>();
+  for (const c of snaps) for (const i of c.items || []) {
+    const k = String(i.productId || i.productTitle);
+    const cur = productCount.get(k) || { title: String(i.productTitle || ""), qty: 0 };
+    cur.qty += Number(i.quantity) || 1; productCount.set(k, cur);
+  }
+  const withItems = snaps.filter((c) => (c.items || []).length || c.stage === "ordered");
+  const cartsToday = {
+    started: withItems.length,
+    value: withItems.filter((c) => c.stage !== "ordered").reduce((s2, c) => s2 + (Number(c.total) || 0), 0),
+    reachedCheckout: withItems.filter((c) => c.stage === "checkout" || c.stage === "ordered").length,
+    withContact: withItems.filter((c) => c.phone || c.email).length,
+    ordered: withItems.filter((c) => c.stage === "ordered").length,
+    topProducts: [...productCount.values()].sort((a, b) => b.qty - a.qty).slice(0, 5),
+  };
+
   const alertsWaiting = alertSnap.docs.map((d) => d.data() as any).filter((a) => !a.status || a.status === "waiting" || a.status === "pending");
   const demand = new Map<string, { title: string; sku: string; slug: string; count: number; latest: number }>();
   for (const a of alertsWaiting) {
@@ -337,7 +357,7 @@ export async function buildDashboard(db: admin.firestore.Firestore) {
       aovPrev30: prev30.length ? tally(prev30).sales / prev30.length : 0,
       codShare, repeat30: repeat,
     },
-    daily, hours, upsells, funnel,
+    daily, hours, upsells, funnel, cartsToday,
     topProducts: [...top.values()].sort((a, b) => b.qty - a.qty || b.sales - a.sales).slice(0, 6),
     topModels: [...byModel.entries()].map(([model, qty]) => ({ model, qty })).sort((a, b) => b.qty - a.qty).slice(0, 6),
     bestsellers: { d7: r7.products, d30: r30.products, all: rAll.products },
